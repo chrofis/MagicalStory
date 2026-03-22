@@ -38,6 +38,15 @@ function getStoryHelpers() {
 // Character photo helpers
 const { getFacePhoto } = require('./characterPhotos');
 
+// Gemini safety settings — used for all Gemini API calls to avoid content filtering
+const GEMINI_SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" },
+];
+
 // Helper: Check if a model supports thinking (includeThoughts in generationConfig)
 function modelSupportsThinking(modelId) {
   const config = IMAGE_MODELS[modelId];
@@ -435,13 +444,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
         body: JSON.stringify({
           contents: [{ parts: inventoryParts }],
           generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
     }, { maxRetries: 2, baseDelay: 2000 });
@@ -526,6 +529,41 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * @param {string|null} sceneHint - Direct statement of what image should show (for semantic eval)
  * @returns {Promise<Object>} Quality result with score, reasoning, semantic issues, etc.
  */
+
+// Sanitize prompt for Gemini 2.5 to avoid content filter triggers
+// Remove age references and detailed physical descriptions while keeping scene context
+const sanitizePromptFor25 = (prompt) => {
+  if (!prompt) return prompt;
+  return prompt
+    // Remove age references like "8-year-old", "6 years old", "young child"
+    .replace(/\b\d{1,2}[-\s]?year[-\s]?old\b/gi, '')
+    .replace(/\b(young|little|small)\s+(child|boy|girl|kid)\b/gi, 'character')
+    .replace(/\bage[sd]?\s*\d+\b/gi, '')
+    // Remove body type descriptions
+    .replace(/\b(slim|thin|chubby|petite|small-framed|athletic)\s+(body|build|figure)\b/gi, '')
+    // Clean up extra whitespace
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+// Helper function to check if a Gemini response indicates blocked content
+const isBlockedResponse = (responseData) => {
+  // Check promptFeedback for block reason
+  if (responseData.promptFeedback?.blockReason) {
+    return true;
+  }
+  // Check if no candidates due to safety
+  if (!responseData.candidates || responseData.candidates.length === 0) {
+    return true;
+  }
+  // Check candidate-level blocking
+  const finishReason = responseData.candidates[0]?.finishReason;
+  if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
+    return true;
+  }
+  return false;
+};
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null) {
   try {
     // Guard against undefined/invalid imageData
@@ -570,22 +608,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Determine model to use (parameter override > config default > fallback)
     const modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
-
-    // Sanitize prompt for Gemini 2.5 to avoid content filter triggers
-    // Remove age references and detailed physical descriptions while keeping scene context
-    const sanitizePromptFor25 = (prompt) => {
-      if (!prompt) return prompt;
-      return prompt
-        // Remove age references like "8-year-old", "6 years old", "young child"
-        .replace(/\b\d{1,2}[-\s]?year[-\s]?old\b/gi, '')
-        .replace(/\b(young|little|small)\s+(child|boy|girl|kid)\b/gi, 'character')
-        .replace(/\bage[sd]?\s*\d+\b/gi, '')
-        // Remove body type descriptions
-        .replace(/\b(slim|thin|chubby|petite|small-framed|athletic)\s+(body|build|figure)\b/gi, '')
-        // Clean up extra whitespace
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-    };
 
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
     const promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;
@@ -671,34 +693,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               maxOutputTokens: 16000,  // High limit to accommodate Gemini 2.5 thinking tokens
               temperature: 0.3
             },
-            safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-            ]
+            safetySettings: GEMINI_SAFETY_SETTINGS
           })
         });
       }, { maxRetries: 2, baseDelay: 2000 });
-    };
-
-    // Helper function to check if response indicates blocked content
-    const isBlockedResponse = (responseData) => {
-      // Check promptFeedback for block reason
-      if (responseData.promptFeedback?.blockReason) {
-        return true;
-      }
-      // Check if no candidates due to safety
-      if (!responseData.candidates || responseData.candidates.length === 0) {
-        return true;
-      }
-      // Check candidate-level blocking
-      const finishReason = responseData.candidates[0]?.finishReason;
-      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
-        return true;
-      }
-      return false;
     };
 
     let response = await callQualityAPI(modelId);
@@ -762,13 +760,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
             maxOutputTokens: 16000,
             temperature: 0.3
           },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
 
@@ -1233,13 +1225,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
             temperature: 0.1,  // Low temperature for precise detection
             responseMimeType: 'application/json'
           },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
     }, { maxRetries: 2, baseDelay: 1000 });
@@ -1502,13 +1488,7 @@ async function detectSubRegion(characterCrop, targetElement) {
             temperature: 0.1,
             responseMimeType: 'application/json'
           },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
     }, { maxRetries: 2, baseDelay: 1000 });
@@ -4297,7 +4277,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   } = options;
 
   const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
-  const { getFacePhoto } = require('./characterPhotos');
   const { extractSceneMetadata } = getStoryHelpers();
 
   const imagesWithData = rawImages.filter(r => r.imageData);
@@ -5468,7 +5447,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // ── Blended mode: whiteout head → Grok redraws face → feathered blend ──
     // White out only the face/head area so Grok knows what to fix.
     // The full body bbox is used for the blend region.
-    const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
     const bboxLeft = Math.floor(xmin * sceneMeta.width);
@@ -5644,8 +5622,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       character: charName,
       usage: grokResult.usage,
       method,
-      // Debug: what was sent to Grok (for dev panel inspection)
-      debug: {
+      // Debug: what was sent to Grok (for dev panel inspection) — gated by options.includeDebug
+      debug: options.includeDebug ? {
         prompt,
         sceneSent: sceneDataUri,
         avatarSent: croppedAvatarDataUri,
@@ -5653,11 +5631,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         bbox: [ymin, xmin, ymax, xmax],
         faceBbox: faceBbox || null,
         blendRegion: { left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight },
-      }
+      } : null
     };
   } else if (useCutout) {
     // ── Cut-out mode: extract bbox region, repair it, composite back ──
-    const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();
     const pixelLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
     const pixelTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
@@ -8567,13 +8544,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
             maxOutputTokens: 8000,
             temperature: 0.2
           },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
 
@@ -9063,13 +9034,7 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
             maxOutputTokens: 4000,
             temperature: 0.2
           },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
+          safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
 

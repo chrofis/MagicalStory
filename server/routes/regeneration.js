@@ -56,6 +56,8 @@ const {
   blackoutIssueRegions,
   enrichWithBoundingBoxes,
   collectAllIssuesForPage,
+  repairCharacterMismatch,
+  detectAllBoundingBoxes,
   IMAGE_QUALITY_THRESHOLD
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
@@ -65,7 +67,7 @@ const {
   buildFullVisualBiblePrompt
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
-const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
+const { runEntityConsistencyChecks, repairSinglePage, repairEntityConsistency, getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
@@ -2311,7 +2313,6 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
 
     // Single-page mode: repair just one page
     if (isSinglePageMode) {
-      const { repairSinglePage } = require('../lib/entityConsistency');
 
       // Get issues for this character from the consistency report
       const entityReport = storyData.finalChecksReport?.entity;
@@ -2456,7 +2457,6 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
     if (!entityReport || !entityReport.characters?.[entityName]) {
       // Run entity consistency check first
       log.info(`🔧 [ENTITY-REPAIR] Running entity consistency check for ${entityName}`);
-      const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
       entityReport = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
         checkCharacters: true,
         checkObjects: false
@@ -2464,7 +2464,6 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
     }
 
     // Run the repair
-    const { repairEntityConsistency } = require('../lib/entityConsistency');
     const repairResult = await repairEntityConsistency(storyData, character, entityReport);
 
     if (!repairResult.success) {
@@ -2607,10 +2606,10 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
     // Rehydrate images from story_images table (they're stripped from JSON on save)
-    await rehydrateStoryImages(id, storyData);
+    storyData = await rehydrateStoryImages(id, storyData);
 
     const pages = {};
 
@@ -2797,7 +2796,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         totalOutput += pageData.usage.output_tokens || 0;
       }
     }
-    const apiCost = calculateTokenCost('gemini-2.5-flash', totalInput, totalOutput);
+    const evalModel = qualityModelOverride || 'gemini-2.5-flash';
+    const apiCost = calculateTokenCost(evalModel, totalInput, totalOutput);
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages);
@@ -2836,7 +2836,6 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
 
     // Run entity consistency check with rehydrated data
-    const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
 
@@ -2990,17 +2989,20 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     let repairs;
 
+    // Load story data once upfront (shared by autoSelect and repair phases)
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
     if (autoSelect) {
       // Auto-select mode: derive repairs from entity report in DB
-      const storyResult = await getDbPool().query(
-        'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-        [id, req.user.id]
-      );
-      if (storyResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Story not found' });
-      }
-      const story = storyResult.rows[0];
-      const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
       const storyEntityReport = storyData.finalChecksReport?.entity;
 
       if (!storyEntityReport || !storyEntityReport.characters) {
@@ -3056,22 +3058,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const repairMethod = grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
-    const { repairSinglePage } = require('../lib/entityConsistency');
     const results = [];
     let totalGeminiRepairs = 0, totalMagicApiRepairs = 0;
     let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
-
-    // Load story data once upfront
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
-    if (storyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-    const story = storyResult.rows[0];
-    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
-    storyData = await rehydrateStoryImages(id, storyData);
     const artStyle = storyData.artStyle || 'pixar';
 
     // Helper: look up a scene image or cover image by page number
@@ -3190,7 +3179,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
         if (useMagicApiRepair) {
           const { repairFaceWithMagicApi, isMagicApiConfigured } = require('../lib/magicApi');
-          const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 
           if (!isMagicApiConfigured()) {
             log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
@@ -3283,8 +3271,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         } else if (grokRepairMode || isGrokConfigured()) {
           // Grok repair: blended (default), cutout, or blackout
           const effectiveMode = grokRepairMode || 'blended';
-          const { repairCharacterMismatch } = require('../lib/images');
-          const { getStyledAvatarForClothing } = require('../lib/entityConsistency');
 
           const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {
@@ -3308,7 +3294,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Fallback: re-detect if entity report doesn't have bbox for this page
           if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const { detectAllBoundingBoxes } = require('../lib/images');
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, [characterName]);
             const charFigure = detection?.figures?.find(f => f.label?.toLowerCase().includes(characterName.toLowerCase()));
             if (charFigure?.boundingBox) {
@@ -3380,6 +3365,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               sceneDescription: sceneDesc,
               faceBbox,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
+              includeDebug: req.user.role === 'admin',
             }
           );
 
