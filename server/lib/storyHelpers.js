@@ -363,6 +363,10 @@ function stripSceneMetadata(sceneDescription) {
   // Support all wrapper formats: "scene" (critique-only), "output" (old), "draft" (unified),
   // "previewMismatches" (iteration/consistency regen), or raw
   let sceneData = parsed?.scene || parsed?.output || parsed?.draft;
+  // Handle double-nesting from prefill: {"scene":{"scene":{...}}}
+  if (sceneData?.scene && !sceneData.imageSummary) {
+    sceneData = sceneData.scene;
+  }
   // Handle previewMismatches wrapper: scene is nested inside previewMismatches[0].scene
   if (!sceneData && parsed?.previewMismatches?.[0]?.scene) {
     sceneData = parsed.previewMismatches[0].scene;

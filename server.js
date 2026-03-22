@@ -2454,7 +2454,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           { maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3 }
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"scene":{' });
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
