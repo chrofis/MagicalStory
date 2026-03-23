@@ -1491,19 +1491,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           effectiveCostumeType = charCurrentClothing.split(':')[1];
           log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${charCurrentClothing}`);
         } else {
-          // If scene says "standard" but the character has a costumed variant defined,
-          // auto-upgrade to costumed (Claude sometimes forgets to use costumed on every page)
-          const charReqs = clothingRequirements[char.name];
-          const hasCostumed = charReqs?.costumed?.used || charReqs?.costumed?.costume;
-          if (charCurrentClothing === 'standard' && hasCostumed) {
-            effectiveClothingCategory = 'costumed';
-            effectiveCostumeType = charReqs.costumed.costume || null;
-            log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${charCurrentClothing} → auto-upgraded to costumed:${effectiveCostumeType} (character has costume defined)`);
-          } else {
-            effectiveClothingCategory = charCurrentClothing;
-            effectiveCostumeType = null;
-            log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${effectiveClothingCategory}`);
-          }
+          effectiveClothingCategory = charCurrentClothing;
+          effectiveCostumeType = null;
+          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${effectiveClothingCategory}`);
         }
       }
 

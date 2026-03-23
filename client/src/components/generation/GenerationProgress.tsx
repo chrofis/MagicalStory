@@ -321,56 +321,68 @@ export function GenerationProgress({
     return null;
   }
 
-  // Server progress (0-100)
-  const serverProgress = total === 100 ? current : Math.round((current / total) * 100);
+  // Server sends sequential checkpoint numbers (1-23, then 100 for done).
+  // Map to display percentages based on real story run timings.
+  // Between checkpoints, interpolate with time so the bar never looks stuck.
+  const serverCheckpoint = total === 100 ? current : Math.round((current / total) * 100);
+  const isDone = serverCheckpoint >= 100;
 
-  // Estimated total duration based on page count (seconds)
-  // Based on real runs: 5 pages ~3min, 10 pages ~11min, 25 pages ~15min, 50 pages ~25min
-  // Formula: base 150s + 40s per page (streaming + expansion + images + eval + repair)
-  const estimatedTotal = Math.max(150, 150 + pageCount * 40);
+  // Checkpoint → display % mapping (based on wall-clock time proportions)
+  // 1=start, 2=title, 3=clothing, 4=arcs, 5=plot, 6=VB, 7=covers,
+  // 8-12=pages streaming, 13=text done, 14=avatars, 15=scenes,
+  // 16=images start, 17-21=images generating, 22=covers finish, 23=finalize, 100=done
+  const checkpointToPercent = (cp: number): number => {
+    if (cp <= 1) return 3;       // start
+    if (cp <= 2) return 10;      // title
+    if (cp <= 3) return 15;      // clothing
+    if (cp <= 4) return 18;      // arcs
+    if (cp <= 5) return 22;      // plot
+    if (cp <= 6) return 28;      // visual bible
+    if (cp <= 7) return 32;      // cover hints
+    if (cp <= 12) return 32 + Math.round(((cp - 7) / 5) * 13); // 32-45 pages streaming
+    if (cp <= 13) return 48;     // text complete
+    if (cp <= 14) return 52;     // avatars
+    if (cp <= 15) return 55;     // scenes expanded
+    if (cp <= 16) return 60;     // images start
+    if (cp <= 21) return 60 + Math.round(((cp - 16) / 5) * 25); // 60-85 images
+    if (cp <= 22) return 90;     // covers finishing
+    if (cp <= 23) return 95;     // finalizing
+    if (cp < 100) return 98;     // almost done
+    return 100;
+  };
 
-  // Time-based progress: fill the bar linearly based on elapsed time.
-  // Use server checkpoints to correct course when they arrive.
+  const checkpointPercent = checkpointToPercent(serverCheckpoint);
+
+  // Between checkpoints, interpolate with time so bar keeps moving
   const [startTime] = useState(() => Date.now());
-  const [displayProgress, setDisplayProgress] = useState(1);
-  const lastServerRef = useRef(serverProgress);
+  const [displayProgress, setDisplayProgress] = useState(3);
+  const lastCheckpointRef = useRef({ percent: 3, time: Date.now() });
 
   useEffect(() => {
+    if (isDone) { setDisplayProgress(100); return; }
+
+    // When checkpoint changes, record it
+    if (checkpointPercent > lastCheckpointRef.current.percent) {
+      lastCheckpointRef.current = { percent: checkpointPercent, time: Date.now() };
+      setDisplayProgress(checkpointPercent);
+    }
+
+    // Interpolate between checkpoints: creep 1% every few seconds
+    // Speed: assume next checkpoint arrives in ~30-60s depending on story size
+    const creepSeconds = Math.max(5, Math.min(20, pageCount * 0.8));
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-
-      // Time-based estimate: linear fill to 95% over estimated duration
-      const timeBased = Math.min(95, Math.round((elapsed / estimatedTotal) * 95));
-
-      // Server-based: map server progress to a reasonable user value
-      // Server 5=start, 18=text done, 30=scenes, 50=images start, 80=images done, 100=done
-      let serverBased = 0;
-      if (serverProgress >= 100) serverBased = 100;
-      else if (serverProgress >= 80) serverBased = 90 + Math.round(((serverProgress - 80) / 20) * 10);
-      else if (serverProgress >= 50) serverBased = 65 + Math.round(((serverProgress - 50) / 30) * 25);
-      else if (serverProgress >= 30) serverBased = 55 + Math.round(((serverProgress - 30) / 20) * 10);
-      else if (serverProgress >= 18) serverBased = 50 + Math.round(((serverProgress - 18) / 12) * 5);
-      else if (serverProgress >= 5) serverBased = 3 + Math.round(((serverProgress - 5) / 13) * 47);
-      else serverBased = 1;
-
-      // Use whichever is higher — time keeps it moving, server corrects at checkpoints
-      const target = Math.max(timeBased, serverBased);
-
       setDisplayProgress(prev => {
-        // Never go backwards, never exceed 99 until server says 100
-        if (serverProgress >= 100) return 100;
-        return Math.max(prev, Math.min(target, 99));
+        const sinceLast = (Date.now() - lastCheckpointRef.current.time) / 1000;
+        const creep = Math.floor(sinceLast / creepSeconds);
+        // Never creep more than 5% past last checkpoint, never past 98
+        const max = Math.min(lastCheckpointRef.current.percent + 5, 98);
+        return Math.min(Math.max(prev, lastCheckpointRef.current.percent + creep), max);
       });
     }, 2000);
     return () => clearInterval(interval);
-  }, [serverProgress, startTime, estimatedTotal]);
+  }, [isDone, checkpointPercent, pageCount]);
 
-  // Track server changes for immediate sync
-  if (serverProgress !== lastServerRef.current) {
-    lastServerRef.current = serverProgress;
-  }
-
-  const progressPercent = serverProgress >= 100 ? 100 : displayProgress;
+  const progressPercent = isDone ? 100 : displayProgress;
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
