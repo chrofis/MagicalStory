@@ -3616,10 +3616,10 @@ export function StoryDisplay({
                       </select>
                       <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                         <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.04)</option>
+                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                       </select>
                     </div>
                   </div>
@@ -3875,10 +3875,10 @@ export function StoryDisplay({
                       </select>
                       <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                         <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.04)</option>
+                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                       </select>
                     </div>
                   </div>
@@ -4250,10 +4250,10 @@ export function StoryDisplay({
                                       </select>
                                       <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Image: Default</option>
-                                        <option value="grok-imagine">Grok Imagine ($0.02)</option>
-                                        <option value="grok-imagine-pro">Grok Pro ($0.07)</option>
-                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04)</option>
-                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.04)</option>
+                                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+                                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                                       </select>
                                     </div>
                                     <div className="flex gap-2">
@@ -4826,10 +4826,10 @@ export function StoryDisplay({
                                       </select>
                                       <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Image: Default</option>
-                                        <option value="grok-imagine">Grok Imagine ($0.02)</option>
-                                        <option value="grok-imagine-pro">Grok Pro ($0.07)</option>
-                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04)</option>
-                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.04)</option>
+                                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+                                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                                       </select>
                                     </div>
                                     <div className="flex gap-2">
@@ -5281,10 +5281,10 @@ export function StoryDisplay({
                       </select>
                       <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                         <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.04)</option>
+                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                       </select>
                     </div>
                   </div>
