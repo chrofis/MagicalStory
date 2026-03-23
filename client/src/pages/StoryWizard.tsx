@@ -5465,6 +5465,7 @@ export default function StoryWizard() {
           isStalled={isProgressStalled}
           onDismissStalled={() => setIsProgressStalled(false)}
           isImpersonating={isImpersonating}
+          pageCount={storySettings.pages || 20}
           onMinimize={() => setShowMinimizeDialog(true)}
           onCancel={jobId ? async () => {
             try {

@@ -17,6 +17,7 @@ interface GenerationProgressProps {
   onMinimize?: () => void;  // Callback to minimize and continue in background
   characters?: Character[];  // Characters to show avatars from
   isStalled?: boolean;  // Whether progress appears stalled
+  pageCount?: number;  // Number of story pages (affects progress timing)
   onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
   isImpersonating?: boolean;  // Whether admin is impersonating a user
 }
@@ -34,6 +35,7 @@ export function GenerationProgress({
   isStalled = false,
   onDismissStalled,
   isImpersonating = false,
+  pageCount = 20,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -340,8 +342,14 @@ export function GenerationProgress({
 
   // Smooth interpolation: during streaming the server stays at 5-8% for minutes.
   // Use elapsed time to smoothly fill between checkpoints so the bar never looks stuck.
+  // Creep speed scales with page count: fewer pages = faster creep.
   const [startTime] = useState(() => Date.now());
   const [displayProgress, setDisplayProgress] = useState(1);
+
+  // Scale creep interval: 5 pages = 8s, 10 pages = 12s, 25 pages = 20s, 50 pages = 30s
+  const creepInterval = Math.max(8, Math.min(30, Math.round(8 + (pageCount - 5) * 0.5))) * 1000;
+  // How often the tick runs (always 3s for smooth updates)
+  const tickMs = 3000;
 
   useEffect(() => {
     // If mapped progress jumped ahead, sync immediately
@@ -350,19 +358,18 @@ export function GenerationProgress({
       return;
     }
     // While waiting for next checkpoint, creep forward based on time
-    // Fast at first (2% in first 30s), then slower — never overshoots next checkpoint by more than 3
     const interval = setInterval(() => {
       setDisplayProgress(prev => {
         const elapsed = (Date.now() - startTime) / 1000;
-        const target = mappedProgress;
-        // Creep: add 1% every 20 seconds, but never more than 3 ahead of the mapped value
-        const timeBump = Math.floor(elapsed / 20);
-        const maxCreep = Math.min(target + 3, 98); // never hit 100 by creeping
+        // Creep: +1% every creepInterval seconds, capped at 3 ahead of mapped
+        const creepSeconds = creepInterval / 1000;
+        const timeBump = Math.floor(elapsed / creepSeconds);
+        const maxCreep = Math.min(mappedProgress + 3, 98);
         return Math.min(prev + 1, maxCreep, Math.max(prev, timeBump));
       });
-    }, 3000);
+    }, tickMs);
     return () => clearInterval(interval);
-  }, [mappedProgress, displayProgress, startTime]);
+  }, [mappedProgress, displayProgress, startTime, creepInterval]);
 
   const progressPercent = Math.max(displayProgress, mappedProgress);
 
