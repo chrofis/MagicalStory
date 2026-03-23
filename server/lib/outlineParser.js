@@ -74,7 +74,7 @@ function parseCharacterClothingBlock(content) {
   // Also handles single-line comma-separated format:
   // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
   // Match "Characters:" with optional suffix like "(MAX 3)", "(MAX 5)", "(max 2-3)", etc.
-  const charactersBlockMatch = content.match(/Characters(?:\s*\([^)]*\))?:\s*([\s\S]*?)(?=---\s*Page|$)/i);
+  const charactersBlockMatch = content.match(/Characters(?:\s*\([^)]*\))?:\s*([\s\S]*?)(?=---\s*(?:Page|Seite|Página)|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
     // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
@@ -1396,9 +1396,9 @@ class UnifiedStoryParser {
       log.debug(`[UNIFIED-PARSER] No ---STORY PAGES--- marker found, searching entire response`);
     }
 
-    // Match page blocks: --- Page X --- followed by TEXT: and SCENE HINT:
+    // Match page blocks: --- Page/Seite/Página X --- (multilingual: EN/DE/FR/ES)
     // Using greedy match with explicit next-page lookahead, plus end-of-string fallback
-    const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;
+    const pagePattern = /---\s*(?:Page|Seite|Página)\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*(?:Page|Seite|Página)\s+\d+\s*---|$)/gi;
 
     let match;
     let lastPageNumber = 0;
@@ -1416,11 +1416,11 @@ class UnifiedStoryParser {
       // Try JSON format first: SCENE HINT:\n{...} (balanced braces)
       // Then fall back to text format: stops at line-start Characters: or next page
       let sceneHint = '';
-      const jsonHintMatch = content.match(/SCENE HINT:\s*(\{[\s\S]*\})\s*(?=---\s*Page|$)/i);
+      const jsonHintMatch = content.match(/SCENE HINT:\s*(\{[\s\S]*\})\s*(?=---\s*(?:Page|Seite|Página)|$)/i);
       if (jsonHintMatch) {
         sceneHint = jsonHintMatch[1].trim();
       } else {
-        const textHintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*Page)/im);
+        const textHintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página))/im);
         sceneHint = textHintMatch ? textHintMatch[1].trim() : '';
       }
 
@@ -1856,8 +1856,8 @@ class ProgressiveUnifiedParser {
   _checkPages() {
     if (!this._hasMarker('STORY PAGES')) return;
 
-    // Find all page blocks
-    const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;
+    // Find all page blocks (multilingual: Page/Seite/Página)
+    const pagePattern = /---\s*(?:Page|Seite|Página)\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*(?:Page|Seite|Página)\s+\d+\s*---|$)/gi;
 
     let match;
     while ((match = pagePattern.exec(this.fullText)) !== null) {
@@ -1872,7 +1872,10 @@ class ProgressiveUnifiedParser {
       const hasHint = /SCENE HINT:\s*\S/.test(content);
 
       // Check if there's a next page (means this one is complete) or end of content
-      const nextPageIndex = this.fullText.indexOf(`--- Page ${pageNum + 1} ---`);
+      // Check for next page marker in any language (Page/Seite/Página)
+      const nextPageRegex = new RegExp(`---\\s*(?:Page|Seite|Página)\\s+${pageNum + 1}\\s*---`);
+      const nextPageMatch = this.fullText.match(nextPageRegex);
+      const nextPageIndex = nextPageMatch ? this.fullText.indexOf(nextPageMatch[0]) : -1;
       const isLastKnownPage = nextPageIndex === -1;
 
       // Page completeness detection:
@@ -1903,7 +1906,7 @@ class ProgressiveUnifiedParser {
         // Strip any trailing metadata like "*(Word count: 331)*" or similar
         const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
-        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*Page|$)/i);
+        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página)|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
         // Extract per-character clothing using shared helper
@@ -1947,15 +1950,15 @@ class ProgressiveUnifiedParser {
   getRawPageBlock(pageNumber) {
     if (!this.fullText) return null;
 
-    // Match the specific page block
+    // Match the specific page block (multilingual: Page/Seite/Página)
     const pattern = new RegExp(
-      `---\\s*Page\\s+${pageNumber}\\s*---\\s*([\\s\\S]*?)(?=---\\s*Page\\s+\\d+\\s*---|$)`,
+      `---\\s*(?:Page|Seite|Página)\\s+${pageNumber}\\s*---\\s*([\\s\\S]*?)(?=---\\s*(?:Page|Seite|Página)\\s+\\d+\\s*---|$)`,
       'i'
     );
     const match = this.fullText.match(pattern);
     if (!match) return null;
 
-    // Return the header + content
+    // Return the header + content (normalize to English "Page" for downstream)
     return `--- Page ${pageNumber} ---\n${match[1].trim()}`;
   }
 

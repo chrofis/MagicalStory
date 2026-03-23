@@ -1985,8 +1985,8 @@ function buildCharacterReferenceList(photos, characters = null) {
  * Parse story text into pages
  */
 function parseStoryPages(storyText) {
-  // Split by page markers (## Seite X, ## Page X, or --- Page X ---)
-  const pageRegex = /(?:##\s*(?:Seite|Page)\s+(\d+)|---\s*Page\s+(\d+)\s*---)/gi;
+  // Split by page markers (## Seite/Page X, or --- Page/Seite/Página X ---)
+  const pageRegex = /(?:##\s*(?:Seite|Page|Página)\s+(\d+)|---\s*(?:Page|Seite|Página)\s+(\d+)\s*---)/gi;
   const pages = [];
   let match;
 
@@ -3823,8 +3823,8 @@ function getPageText(storyText, pageNumber) {
     return page?.text || null;
   }
 
-  // Match page markers like "--- Page X ---" or "## Page X"
-  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${safeNum}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  // Match page markers like "--- Page/Seite/Página X ---" or "## Page/Seite X"
+  const pageRegex = new RegExp(`(?:---|##)\\s*(?:Page|Seite|Página)\\s+${safeNum}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*(?:Page|Seite|Página)\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
   return match ? match[1].trim() : null;
@@ -3842,7 +3842,7 @@ function updatePageText(storyText, pageNumber, newText) {
   if (isNaN(safeNum)) return storyText || '';
   if (!storyText) return `--- Page ${safeNum} ---\n${newText}\n`;
 
-  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${safeNum}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const pageRegex = new RegExp(`((?:---|##)\\s*(?:Page|Seite|Página)\\s+${safeNum}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*(?:Page|Seite|Página)\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
   if (match) {

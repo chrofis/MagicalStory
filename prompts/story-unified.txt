@@ -514,6 +514,8 @@ Rules: no two consecutive pages with same shot + same character count. At least 
 
 Write the story following your SCENE PLAN above. No word counts - clean text only.
 
+**CRITICAL: Use EXACTLY `--- Page N ---` as page markers (in English, even for non-English stories). Do NOT translate to "Seite" or "Página".**
+
 For EACH of the {PAGES} pages:
 
 --- Page 1 ---
