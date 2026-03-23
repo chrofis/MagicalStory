@@ -31,7 +31,7 @@ You are a Scene Composer creating simple illustration briefs for children's book
 **Available Avatars (select clothing from these):**
 {AVAILABLE_AVATARS}
 
-IMPORTANT: Select clothing ONLY from the character's available avatars. If in doubt, use "standard".
+IMPORTANT: PRESERVE the clothing value from the scene hint EXACTLY. If the hint says `costumed:mittelalterlich`, your output MUST say `costumed:mittelalterlich`. Do NOT change clothing to "standard" — the clothing was carefully chosen by the story writer. Only use the available avatars list to verify the clothing exists, never to override it.
 
 **Recurring Visual Elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}

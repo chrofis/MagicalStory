@@ -2953,19 +2953,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         lastProgressUpdate = now;
 
         // Calculate progress based on parallel work happening
-        // Checkpoints: sequential numbers representing generation milestones
-        // 1-7 streaming, 8 text done, 9 avatars, 10 scenes, 11-30 images, 31-50 eval, 51-70 redo, 71-73 final, 100 done
-        let progress = 1;                                    // 1 = started
-        if (type === 'title') progress = 2;                  // 2 = title detected
-        else if (type === 'clothing') progress = 3;          // 3 = clothing parsed
-        else if (type === 'arcs') progress = 4;              // 4 = character arcs
-        else if (type === 'plot') progress = 5;              // 5 = plot structure
-        else if (type === 'visualBible') progress = 6;       // 6 = visual bible
-        else if (type === 'covers') progress = 7;            // 7 = cover hints
-        else if (type === 'page' && pageNum) {
-          // Spread pages across 7.1-7.9 (all within streaming phase)
-          progress = 7;
-        }
+        // Checkpoints numbered by ARRIVAL ORDER (not logical order)
+        // Streaming: arcs → title → clothing → plot → VB → covers → pages
+        // 1=start, 2=arcs, 3=title, 4=clothing, 5=plot, 6=VB, 7=covers/pages
+        // 8=text done, 9=avatars, 10=scenes, 11-30=images, 31+=repair, 73=finalize, 100=done
+        let progress = 1;
+        if (type === 'arcs') progress = 2;                   // arrives first
+        else if (type === 'title') progress = 3;             // arrives second
+        else if (type === 'clothing') progress = 4;          // arrives third
+        else if (type === 'plot') progress = 5;              // arrives fourth
+        else if (type === 'visualBible') progress = 6;       // arrives fifth
+        else if (type === 'covers') progress = 7;            // cover hints
+        else if (type === 'page') progress = 7;              // pages streaming (same phase)
 
         // Enhance message to show parallel work
         let enhancedMessage = message;

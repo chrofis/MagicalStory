@@ -337,10 +337,11 @@ export function GenerationProgress({
   //   55=redo pass 2, 65=pick best, 68=char repair, 72=finalizing repair
   //   73=finalizing story, 100=done
   const checkpointToPercent = (cp: number): number => {
+    // Checkpoints arrive in order: 1=start, 2=arcs, 3=title, 4=clothing, 5=plot, 6=VB, 7=covers/pages
     if (cp <= 1) return 3;       // start
-    if (cp <= 2) return 10;      // title
-    if (cp <= 3) return 14;      // clothing
-    if (cp <= 4) return 17;      // arcs
+    if (cp <= 2) return 8;       // arcs
+    if (cp <= 3) return 12;      // title
+    if (cp <= 4) return 15;      // clothing
     if (cp <= 5) return 20;      // plot
     if (cp <= 6) return 25;      // visual bible
     if (cp <= 7) return 28;      // covers/pages streaming
