@@ -319,34 +319,8 @@ export function GenerationProgress({
     return null;
   }
 
-  // Remap server progress to user-perceived progress
-  // Server: 5-15 (streaming 6min), 18-30 (expansion), 50-80 (images), 82-96 (repair), 100
-  // User:   0-70  (streaming),      70-80  (expansion), 80-90 (images), 90-99 (repair), 100
-  // This makes the progress bar move steadily during the long streaming phase
-  const serverProgress = total === 100 ? current : Math.round((current / total) * 100);
-  const remapProgress = (sp: number): number => {
-    if (sp <= 5) return 0;
-    if (sp <= 15) return Math.round(((sp - 5) / 10) * 70);           // 5-15 → 0-70
-    if (sp <= 30) return Math.round(70 + ((sp - 18) / 12) * 10);     // 18-30 → 70-80
-    if (sp <= 50) return 80;                                           // 30-50 → 80 (brief transition)
-    if (sp <= 80) return Math.round(80 + ((sp - 50) / 30) * 10);     // 50-80 → 80-90
-    if (sp < 100) return Math.round(90 + ((sp - 82) / 14) * 9);      // 82-96 → 90-99
-    return 100;
-  };
-  const progressPercent = remapProgress(serverProgress);
-
-  // Phase-appropriate status message (replaces raw server messages)
-  const getPhaseMessage = (): string => {
-    if (serverProgress <= 5) return language === 'de' ? '✍️ Geschichte wird vorbereitet...' : language === 'fr' ? '✍️ Préparation de l\'histoire...' : '✍️ Preparing your story...';
-    if (serverProgress <= 7) return language === 'de' ? '✍️ Titel und Figuren werden erstellt...' : language === 'fr' ? '✍️ Création du titre et des personnages...' : '✍️ Creating title and characters...';
-    if (serverProgress <= 11) return language === 'de' ? '✍️ Handlung wird geschrieben...' : language === 'fr' ? '✍️ Écriture de l\'intrigue...' : '✍️ Writing the plot...';
-    if (serverProgress <= 15) return language === 'de' ? '✍️ Seiten werden geschrieben...' : language === 'fr' ? '✍️ Écriture des pages...' : '✍️ Writing pages...';
-    if (serverProgress <= 20) return language === 'de' ? '🎨 Figuren werden gestylt...' : language === 'fr' ? '🎨 Stylisation des personnages...' : '🎨 Styling characters...';
-    if (serverProgress <= 30) return language === 'de' ? '🎨 Szenen werden vorbereitet...' : language === 'fr' ? '🎨 Préparation des scènes...' : '🎨 Preparing scenes...';
-    if (serverProgress <= 80) return language === 'de' ? '🖼️ Illustrationen werden erstellt...' : language === 'fr' ? '🖼️ Création des illustrations...' : '🖼️ Creating illustrations...';
-    if (serverProgress <= 96) return language === 'de' ? '✨ Qualitätskontrolle...' : language === 'fr' ? '✨ Contrôle qualité...' : '✨ Quality check...';
-    return language === 'de' ? '✅ Fast fertig!' : language === 'fr' ? '✅ Presque terminé !' : '✅ Almost done!';
-  };
+  // Use server progress directly (0-100 scale)
+  const progressPercent = total === 100 ? current : Math.round((current / total) * 100);
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
@@ -552,11 +526,8 @@ export function GenerationProgress({
           </div>
         )}
 
-        {/* Phase message + Progress bar */}
+        {/* Progress bar */}
         <div className="mb-4">
-          <div className="text-sm text-gray-600 text-center mb-2 font-medium">
-            {getPhaseMessage()}
-          </div>
           <ProgressBar
             value={progressPercent}
             max={100}
