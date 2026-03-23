@@ -5004,21 +5004,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array (all non-primary versions)
-    // The loop already includes all versions except the best (primary),
-    // so no need to separately add the original — it's already in the loop output.
+    // Build imageVersions array — ALL versions including the active one
     const imageVersions = [];
     for (const v of versions) {
-      if (v === best && !charFix) continue; // Primary version, skip unless char fix replaced it
+      const isBest = v === best && !charFix;
       imageVersions.push({
         imageData: v.imageData,
         qualityScore: v.score,
         source: v.source,
+        type: v.source === 'original' ? 'original' : 'repair',
+        isActive: isBest,
         modelId: v.modelId,
         generatedAt: new Date().toISOString(),
         // Per-version evaluation data for dev mode version comparison
         qualityReasoning: v.evaluation?.reasoning || null,
         fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
+        bboxDetection: v.evaluation?.bboxDetection || null,
         description: img.sceneDescription || null,
         prompt: img.prompt || null
       });
