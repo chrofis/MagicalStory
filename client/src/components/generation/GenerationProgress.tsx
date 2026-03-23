@@ -365,7 +365,6 @@ export function GenerationProgress({
   const checkpointPercent = checkpointToPercent(serverCheckpoint);
 
   // Between checkpoints, interpolate with time so bar keeps moving
-  const [startTime] = useState(() => Date.now());
   const [displayProgress, setDisplayProgress] = useState(3);
   const lastCheckpointRef = useRef({ percent: 3, time: Date.now() });
 
