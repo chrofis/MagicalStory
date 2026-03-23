@@ -269,8 +269,7 @@ export function StoryDisplay({
 
   // User-facing improve state (one-click, available to all users)
   const [improvingPages, setImprovingPages] = useState<Set<number>>(new Set());
-  // Improve model selection (dev mode only)
-  const [improveModelsPage, setImproveModelsPage] = useState<number | null>(null);
+  // Model selection state (used by Iterate button in dev mode)
   const [improveSceneModel, setImproveSceneModel] = useState<string>('');
   const [improveImageModel, setImproveImageModel] = useState<string>('');
   // Iterative improvement state (dev mode only)
