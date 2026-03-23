@@ -492,7 +492,7 @@ export default function StoryWizard() {
           return {
             ...img,
             // Set bboxDetection from retryHistory if scene-level is missing
-            ...(retryBbox ? { bboxDetection: retryBbox } : {}),
+            ...(retryBbox ? { bboxDetection: retryBbox as import('@/types/story').BboxSceneDetection } : {}),
             prompt: devData.prompt ?? img.prompt,
             qualityReasoning: devData.qualityReasoning ?? img.qualityReasoning,
             retryHistory: devData.retryHistory ?? img.retryHistory,
