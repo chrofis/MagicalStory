@@ -46,6 +46,10 @@ const SAGE_CITY_MAP: Record<string, string[]> = {
   chur: ['sage-heidi'],
   maienfeld: ['sage-heidi'],
   zermatt: ['sage-gargantua-matterhorn'],
+  altdorf: ['sage-wilhelm-tell'],
+  buerglen: ['sage-wilhelm-tell'],
+  sempach: ['sage-winkelried-sempach'],
+  stans: ['sage-winkelried-sempach'],
 };
 
 const pageTexts: Record<string, {

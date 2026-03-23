@@ -292,5 +292,47 @@
     "themes": ["even the mightiest things have a story behind them"],
     "age": "3+",
     "emoji": "⛰️"
+  },
+  {
+    "id": "sage-wilhelm-tell",
+    "title": {
+      "en": "Wilhelm Tell and the Apple",
+      "de": "Wilhelm Tell und der Apfelschuss",
+      "fr": "Guillaume Tell et la pomme"
+    },
+    "description": {
+      "en": "A proud mountain man named Wilhelm Tell refuses to bow to the tyrant Gessler's hat in the town square. As punishment, he must shoot an apple from his own son's head with a crossbow. Tell makes the impossible shot — but hides a second arrow for Gessler. His courage sparks a rebellion that frees the Swiss people.",
+      "de": "Ein stolzer Bergbewohner namens Wilhelm Tell weigert sich, vor dem Hut des Tyrannen Gessler auf dem Dorfplatz den Hut zu ziehen. Zur Strafe muss er mit der Armbrust einen Apfel vom Kopf seines eigenen Sohnes schiessen. Tell trifft — doch einen zweiten Pfeil hat er für Gessler versteckt. Sein Mut löst einen Aufstand aus, der die Schweizer befreit.",
+      "fr": "Un fier montagnard nommé Guillaume Tell refuse de s'incliner devant le chapeau du tyran Gessler sur la place du village. En punition, il doit tirer une pomme sur la tête de son propre fils avec une arbalète. Tell réussit le tir impossible — mais cache une seconde flèche pour Gessler. Son courage déclenche une rébellion qui libère le peuple suisse."
+    },
+    "context": {
+      "en": "Switzerland's most famous legend, set in 1307 in Altdorf, Canton Uri. Real locations include the Tellskapelle (Tell's Chapel) on Lake Lucerne, the Rütli meadow, and the Hohle Gasse (Hollow Lane). Friedrich Schiller's 1804 play made the story world-famous.",
+      "de": "Die berühmteste Schweizer Sage, angesiedelt im Jahr 1307 in Altdorf, Kanton Uri. Reale Schauplätze sind die Tellskapelle am Vierwaldstättersee, die Rütliwiese und die Hohle Gasse. Friedrich Schillers Schauspiel von 1804 machte die Geschichte weltberühmt.",
+      "fr": "La légende suisse la plus célèbre, située en 1307 à Altdorf, canton d'Uri. Les lieux réels incluent la Tellskapelle (chapelle de Tell) au bord du lac des Quatre-Cantons, la prairie du Grütli et la Hohle Gasse (chemin creux). La pièce de Friedrich Schiller de 1804 a rendu l'histoire mondialement célèbre."
+    },
+    "themes": ["courage against tyranny", "standing up for what is right", "a father's love"],
+    "age": "5+",
+    "emoji": "🏹"
+  },
+  {
+    "id": "sage-winkelried-sempach",
+    "title": {
+      "en": "Arnold von Winkelried at Sempach",
+      "de": "Arnold von Winkelried bei Sempach",
+      "fr": "Arnold von Winkelried à Sempach"
+    },
+    "description": {
+      "en": "In the Battle of Sempach, the Swiss confederates face an impenetrable wall of Austrian lances. Arnold von Winkelried cries 'I will make a path!' and throws himself onto the enemy spears, gathering as many as he can in his arms. His sacrifice breaks open a gap, and the Swiss charge through to victory.",
+      "de": "In der Schlacht bei Sempach stehen die Eidgenossen vor einer undurchdringlichen Wand aus österreichischen Lanzen. Arnold von Winkelried ruft «Ich will euch eine Gasse machen!» und wirft sich auf die feindlichen Speere, so viele er mit den Armen umfassen kann. Sein Opfer reisst eine Lücke, durch die die Schweizer zum Sieg stürmen.",
+      "fr": "Lors de la bataille de Sempach, les confédérés suisses font face à un mur impénétrable de lances autrichiennes. Arnold von Winkelried crie «Je vais vous ouvrir un passage!» et se jette sur les lances ennemies, en saisissant autant qu'il peut dans ses bras. Son sacrifice ouvre une brèche et les Suisses s'y engouffrent vers la victoire."
+    },
+    "context": {
+      "en": "Battle of Sempach, 9 July 1386. The Austrian Duke Leopold III was killed in the battle. Real locations include the Schlachtkapelle (Battle Chapel) near Sempach, Canton Lucerne. Winkelried's sacrifice became a symbol of Swiss heroism and self-sacrifice.",
+      "de": "Schlacht bei Sempach, 9. Juli 1386. Der österreichische Herzog Leopold III. fiel in der Schlacht. Reale Schauplätze sind die Schlachtkapelle bei Sempach, Kanton Luzern. Winkelrieds Opfer wurde zum Symbol für Schweizer Heldenmut und Aufopferung.",
+      "fr": "Bataille de Sempach, 9 juillet 1386. Le duc autrichien Léopold III fut tué dans la bataille. Les lieux réels incluent la Schlachtkapelle (chapelle de la bataille) près de Sempach, canton de Lucerne. Le sacrifice de Winkelried est devenu un symbole de l'héroïsme et du sacrifice suisses."
+    },
+    "themes": ["sacrifice for the greater good", "one person can change the course of history", "courage in the face of impossible odds"],
+    "age": "6+",
+    "emoji": "🛡️"
   }
 ]
