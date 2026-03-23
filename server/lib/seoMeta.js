@@ -1181,8 +1181,12 @@ function buildGiftDescription(giftSlug, lang) {
  * @param {object} meta - Meta object from getMetaForRoute()
  * @returns {string} - Modified HTML
  */
-function injectMeta(html, meta) {
+function injectMeta(html, meta, lang = 'de') {
   let result = html;
+
+  // Replace <html lang="..."> to match content language
+  const htmlLang = lang === 'fr' ? 'fr' : lang === 'en' ? 'en' : 'de';
+  result = result.replace(/<html\s+lang="[^"]*"/, `<html lang="${htmlLang}"`);
 
   // Replace <title>
   result = result.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(meta.title)}</title>`);
@@ -1211,6 +1215,13 @@ function injectMeta(html, meta) {
   result = result.replace(
     /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/,
     `<meta property="og:url" content="${escapeAttr(meta.canonical)}" />`
+  );
+
+  // Replace og:locale to match content language
+  const ogLocale = lang === 'fr' ? 'fr_CH' : lang === 'en' ? 'en_US' : 'de_CH';
+  result = result.replace(
+    /<meta\s+property="og:locale"\s+content="[^"]*"\s*\/?>/,
+    `<meta property="og:locale" content="${ogLocale}" />`
   );
 
   // Replace Twitter tags

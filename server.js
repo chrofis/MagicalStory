@@ -5270,7 +5270,7 @@ app.get('*', (req, res, next) => {
   if (cachedHtmlTemplate) {
     const lang = req.query.lang || 'de';
     const meta = getMetaForRoute(req.path, lang);
-    const html = injectMeta(cachedHtmlTemplate, meta);
+    const html = injectMeta(cachedHtmlTemplate, meta, lang);
     res.type('html').send(html);
   } else if (hasDistFolder) {
     res.sendFile(path.join(distPath, 'index.html'));
