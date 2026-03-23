@@ -4415,7 +4415,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 1: Evaluate all images + entity consistency (parallel)
   // =========================================================================
-  await updateProgress(82, 'Evaluating image quality...');
+  await updateProgress(32, 'Evaluating image quality...');  // 32 = eval start
   log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
   const step1Start = Date.now();
 
@@ -4559,7 +4559,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const lowScoringPages = rawImages.filter(img => pass1BadPageNums.includes(img.pageNumber));
 
   if (lowScoringPages.length > 0 && maxRegenAttempts >= 1) {
-    await updateProgress(85, `Improving ${lowScoringPages.length} low-scoring images (pass 1)...`);
+    await updateProgress(40, `Improving ${lowScoringPages.length} low-scoring images (pass 1)...`);  // 40 = redo pass 1
     log.info(`🔄 [UNIFIED PIPELINE] Step 2: Regenerating ${lowScoringPages.length} low-scoring pages (pass 1)...`);
     const regen1Start = Date.now();
 
@@ -4644,7 +4644,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // Re-evaluate regenerated images
     if (regen1Success.length > 0) {
-      await updateProgress(88, 'Re-evaluating improved images...');
+      await updateProgress(50, 'Re-evaluating improved images...');  // 50 = re-eval pass 1
       log.info(`🔍 [UNIFIED PIPELINE] Step 2b: Re-evaluating ${regen1Success.length} regenerated images...`);
 
       const regen1EvalInputs = regen1Success.map(r => {
@@ -4708,7 +4708,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const stillLowPages = rawImages.filter(img => pass2BadPageNums.includes(img.pageNumber));
 
     if (stillLowPages.length > 0) {
-      await updateProgress(90, `Improving ${stillLowPages.length} low-scoring images (pass 2)...`);
+      await updateProgress(55, `Improving ${stillLowPages.length} low-scoring images (pass 2)...`);  // 55 = redo pass 2
       log.info(`🔄 [UNIFIED PIPELINE] Step 3: Regenerating ${stillLowPages.length} still-low pages (pass 2)...`);
       const regen2Start = Date.now();
 
@@ -4836,7 +4836,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 4: Select best version per page
   // =========================================================================
-  await updateProgress(92, 'Selecting best versions...');
+  await updateProgress(65, 'Selecting best versions...');  // 65 = pick best
   log.info(`📊 [UNIFIED PIPELINE] Step 4: Selecting best version per page...`);
 
   const bestPerPage = new Map();
@@ -4861,7 +4861,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const charFixDetails = new Map(); // charName -> Map(pageNumber -> { before, after })
 
   if (entityReport && entityReport.totalIssues > 0) {
-    await updateProgress(93, 'Fixing character consistency...');
+    await updateProgress(68, 'Fixing character consistency...');  // 68 = character repair
     log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${entityReport.totalIssues} entity issues)...`);
 
     // Build page scores map for task prioritization
@@ -4993,7 +4993,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`✅ [UNIFIED PIPELINE] Step 5: No entity issues, skipping character fix`);
   }
 
-  await updateProgress(96, 'Finalizing repair results...');
+  await updateProgress(72, 'Finalizing repair results...');  // 72 = finalizing repair
 
   // =========================================================================
   // Build final results

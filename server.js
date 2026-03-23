@@ -2954,6 +2954,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Calculate progress based on parallel work happening
         // Checkpoints: sequential numbers representing generation milestones
+        // 1-7 streaming, 8 text done, 9 avatars, 10 scenes, 11-30 images, 31-50 eval, 51-70 redo, 71-73 final, 100 done
         let progress = 1;                                    // 1 = started
         if (type === 'title') progress = 2;                  // 2 = title detected
         else if (type === 'clothing') progress = 3;          // 3 = clothing parsed
@@ -2962,7 +2963,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         else if (type === 'visualBible') progress = 6;       // 6 = visual bible
         else if (type === 'covers') progress = 7;            // 7 = cover hints
         else if (type === 'page' && pageNum) {
-          progress = 8 + Math.min(4, Math.floor((pageNum / sceneCount) * 4)); // 8-12 = pages
+          // Spread pages across 7.1-7.9 (all within streaming phase)
+          progress = 7;
         }
 
         // Enhance message to show parallel work
@@ -3143,7 +3145,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const scenesStarted = streamingSceneExpansionPromises.size;
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [13, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]  // 13 = text complete
+      [8, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]  // 8 = text complete
     );
 
     // Wait for early avatar styling (started during streaming when clothing requirements detected)
@@ -3197,7 +3199,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.setStage('avatars');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [14, `Preparing styled avatars...`, jobId]  // 14 = avatar styling
+      [9, `Preparing styled avatars...`, jobId]  // 9 = avatar styling
     );
 
     // Collect avatar requirements and prepare styled avatars
@@ -3321,7 +3323,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       genLog.setStage('scenes');
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [15, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]  // 15 = scenes expanded
+        [10, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]  // 10 = scenes expanded
       );
 
       // Start any missing scene expansions
@@ -3484,7 +3486,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.setStage('images');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [16, 'Generating page illustrations...', jobId]  // 16 = images start
+      [11, 'Generating page illustrations...', jobId]  // 11 = images start
     );
 
     timing.pagesStart = Date.now();
@@ -3524,9 +3526,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const sceneClothingRequirements = { ...clothingRequirements };
         for (const char of sceneCharacters) {
           const charNameTrimmed = char.name.trim().toLowerCase();
-          const charClothing = Object.entries(perCharClothing).find(
+          // Per-scene clothing from Claude's hint or Art Director expansion
+          let charClothing = Object.entries(perCharClothing).find(
             ([name]) => name.trim().toLowerCase() === charNameTrimmed
-          )?.[1] || defaultClothing;
+          )?.[1];
+          // Fallback: if not in per-scene data, check global clothingRequirements for a costumed variant
+          if (!charClothing) {
+            const globalReqs = clothingRequirements?.[char.name] || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
+            if (globalReqs?.costumed?.used && globalReqs.costumed.costume) {
+              charClothing = `costumed:${globalReqs.costumed.costume}`;
+              log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed:${globalReqs.costumed.costume}`);
+            } else {
+              charClothing = defaultClothing;
+            }
+          }
           if (!sceneClothingRequirements[char.name]) {
             sceneClothingRequirements[char.name] = {};
           }
@@ -3613,8 +3626,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
           await checkCancellation();
-          // 17-21 = images generating (spread across pages)
-          const progressPercent = 17 + Math.min(4, Math.floor((pageData.index / expandedScenes.length) * 5));
+          // 11-30 = images generating (1 checkpoint per page, up to 20 pages)
+          const progressPercent = 11 + Math.min(19, Math.floor((pageData.index / expandedScenes.length) * 19));
           await dbPool.query(
             'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
             [progressPercent, `Generating illustration ${pageData.pageNumber}/${expandedScenes.length}...`, jobId]
@@ -3867,7 +3880,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.debug(`⏳ [UNIFIED] Waiting for cover images to finish (page images done first)...`);
         await dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [22, 'Finishing cover images...', jobId]  // 22 = covers finishing
+          [31, 'Finishing cover images...', jobId]  // 31 = covers finishing
         );
       }
       const COVER_TIMEOUT_MS = 180000; // 3 minutes
@@ -3973,7 +3986,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [23, 'Finalizing story...', jobId]  // 23 = finalizing
+      [73, 'Finalizing story...', jobId]  // 73 = finalizing
     );
 
     // Extract entity report from unified pipeline results (same on every page)

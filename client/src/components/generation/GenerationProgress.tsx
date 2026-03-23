@@ -328,25 +328,35 @@ export function GenerationProgress({
   const isDone = serverCheckpoint >= 100;
 
   // Checkpoint → display % mapping (based on wall-clock time proportions)
-  // 1=start, 2=title, 3=clothing, 4=arcs, 5=plot, 6=VB, 7=covers,
-  // 8-12=pages streaming, 13=text done, 14=avatars, 15=scenes,
-  // 16=images start, 17-21=images generating, 22=covers finish, 23=finalize, 100=done
+  //
+  // Server checkpoints:
+  //   1=start, 2=title, 3=clothing, 4=arcs, 5=plot, 6=VB, 7=covers/pages streaming
+  //   8=text done, 9=avatars, 10=scenes expanded
+  //   11-30=images generating (1 per page)
+  //   31=covers finishing, 32=eval start, 40=redo pass 1, 50=re-eval,
+  //   55=redo pass 2, 65=pick best, 68=char repair, 72=finalizing repair
+  //   73=finalizing story, 100=done
   const checkpointToPercent = (cp: number): number => {
     if (cp <= 1) return 3;       // start
     if (cp <= 2) return 10;      // title
-    if (cp <= 3) return 15;      // clothing
-    if (cp <= 4) return 18;      // arcs
-    if (cp <= 5) return 22;      // plot
-    if (cp <= 6) return 28;      // visual bible
-    if (cp <= 7) return 32;      // cover hints
-    if (cp <= 12) return 32 + Math.round(((cp - 7) / 5) * 13); // 32-45 pages streaming
-    if (cp <= 13) return 48;     // text complete
-    if (cp <= 14) return 52;     // avatars
-    if (cp <= 15) return 55;     // scenes expanded
-    if (cp <= 16) return 60;     // images start
-    if (cp <= 21) return 60 + Math.round(((cp - 16) / 5) * 25); // 60-85 images
-    if (cp <= 22) return 90;     // covers finishing
-    if (cp <= 23) return 95;     // finalizing
+    if (cp <= 3) return 14;      // clothing
+    if (cp <= 4) return 17;      // arcs
+    if (cp <= 5) return 20;      // plot
+    if (cp <= 6) return 25;      // visual bible
+    if (cp <= 7) return 28;      // covers/pages streaming
+    if (cp <= 8) return 35;      // text complete
+    if (cp <= 9) return 38;      // avatars
+    if (cp <= 10) return 40;     // scenes expanded
+    if (cp <= 30) return 40 + Math.round(((cp - 10) / 20) * 20); // 40-60 images (per page)
+    if (cp <= 31) return 62;     // covers finishing
+    if (cp <= 32) return 65;     // eval start
+    if (cp <= 40) return 70;     // redo pass 1
+    if (cp <= 50) return 75;     // re-eval pass 1
+    if (cp <= 55) return 80;     // redo pass 2
+    if (cp <= 65) return 85;     // pick best
+    if (cp <= 68) return 88;     // character repair
+    if (cp <= 72) return 92;     // finalizing repair
+    if (cp <= 73) return 95;     // finalizing story
     if (cp < 100) return 98;     // almost done
     return 100;
   };
