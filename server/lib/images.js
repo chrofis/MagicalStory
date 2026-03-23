@@ -14,7 +14,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
@@ -37,6 +37,81 @@ function getStoryHelpers() {
 
 // Character photo helpers
 const { getFacePhoto } = require('./characterPhotos');
+
+/**
+ * Call Grok vision API for image analysis (OpenAI-compatible chat completions with images).
+ * Converts Gemini parts format to Grok messages format and returns a Gemini-like response.
+ * @param {string} modelKey - Model key in TEXT_MODELS (e.g., 'grok-4-fast')
+ * @param {string} modelId - Actual model ID (e.g., 'grok-4-1-fast-non-reasoning')
+ * @param {Array} geminiParts - Gemini parts array (inline_data + text)
+ * @param {string} promptText - The evaluation prompt text
+ * @returns {Response} Fake Response object matching Gemini API shape
+ */
+async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
+  const xaiApiKey = process.env.XAI_API_KEY;
+  if (!xaiApiKey) {
+    log.error('❌ [GROK VISION] XAI_API_KEY not configured');
+    return { ok: false, text: () => 'XAI_API_KEY not configured', json: () => ({}) };
+  }
+
+  // Convert Gemini parts to OpenAI messages format
+  const content = [];
+  for (const part of geminiParts) {
+    if (part.inline_data) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` }
+      });
+    } else if (part.text) {
+      content.push({ type: 'text', text: part.text });
+    }
+  }
+
+  const body = {
+    model: modelId,
+    max_tokens: 16000,
+    temperature: 0.3,
+    messages: [{ role: 'user', content }]
+  };
+
+  const startTime = Date.now();
+  const response = await withRetry(async () => {
+    return fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${xaiApiKey}`
+      },
+      body: JSON.stringify(body)
+    });
+  }, { maxRetries: 2, baseDelay: 2000 });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    log.error(`❌ [GROK VISION] API error (${response.status}): ${errText.substring(0, 200)}`);
+    return response;
+  }
+
+  const result = await response.json();
+  const elapsed = Date.now() - startTime;
+  const inputTokens = result.usage?.prompt_tokens || 0;
+  const outputTokens = result.usage?.completion_tokens || 0;
+  log.debug(`📊 [GROK VISION] ${modelKey} (${elapsed}ms): ${inputTokens} in, ${outputTokens} out`);
+
+  // Convert Grok response to Gemini-compatible format so existing parsing works
+  const text = result.choices?.[0]?.message?.content || '';
+  return {
+    ok: true,
+    json: async () => ({
+      candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
+      usageMetadata: {
+        promptTokenCount: inputTokens,
+        candidatesTokenCount: outputTokens,
+        thoughtsTokenCount: 0
+      }
+    })
+  };
+}
 
 // Gemini safety settings — used for all Gemini API calls to avoid content filtering
 const GEMINI_SAFETY_SETTINGS = [
@@ -436,18 +511,25 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
     const inventoryParts = [...parts];
     inventoryParts.push({ text: PROMPT_TEMPLATES.imageVisualInventory });
 
-    const p1Response = await withRetry(async () => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-      return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: inventoryParts }],
-          generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
-          safetySettings: GEMINI_SAFETY_SETTINGS
-        })
-      });
-    }, { maxRetries: 2, baseDelay: 2000 });
+    // Route to Grok vision API for xAI models
+    const modelConfig = TEXT_MODELS[modelId];
+    let p1Response;
+    if (modelConfig?.provider === 'xai') {
+      p1Response = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, PROMPT_TEMPLATES.imageVisualInventory);
+    } else {
+      p1Response = await withRetry(async () => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: inventoryParts }],
+            generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
+            safetySettings: GEMINI_SAFETY_SETTINGS
+          })
+        });
+      }, { maxRetries: 2, baseDelay: 2000 });
+    }
 
     if (!p1Response.ok) {
       const errText = await p1Response.text();
@@ -681,6 +763,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Helper function to call the API with retry for socket errors
     const callQualityAPI = async (model) => {
+      // Route to Grok vision API for xAI models
+      const modelConfig = TEXT_MODELS[model];
+      if (modelConfig?.provider === 'xai') {
+        return callGrokVisionAPI(model, modelConfig.modelId || model, parts, evaluationPrompt);
+      }
       return withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         return fetch(url, {
