@@ -5235,7 +5235,7 @@ app.get('/robots.txt', (req, res) => {
   if (hasDistFolder && require('fs').existsSync(robotsPath)) {
     res.type('text/plain').sendFile(robotsPath);
   } else {
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://magicalstory.ch/sitemap.xml`);
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://www.magicalstory.ch/sitemap.xml`);
   }
 });
 

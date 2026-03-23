@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'https://magicalstory.ch';
+const BASE_URL = 'https://www.magicalstory.ch';
 
 // ─── Swiss City Data (loaded from JSON for /stadt routes) ────────────────────
 
