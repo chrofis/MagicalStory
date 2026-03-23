@@ -5010,19 +5010,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array — ALL versions including the active one
+    // Build imageVersions array — ALL versions including the active one.
+    // Active version's imageData is NOT included here (it's stored as scene.imageData
+    // at DB version_index 0 — including it would create a duplicate).
     const imageVersions = [];
     for (const v of versions) {
       const isBest = v === best && !charFix;
       imageVersions.push({
-        imageData: v.imageData,
+        imageData: isBest ? undefined : v.imageData,  // active image stored at scene level
         qualityScore: v.score,
         source: v.source,
         type: v.source === 'original' ? 'original' : 'repair',
         isActive: isBest,
         modelId: v.modelId,
         generatedAt: new Date().toISOString(),
-        // Per-version evaluation data for dev mode version comparison
         qualityReasoning: v.evaluation?.reasoning || null,
         fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
         bboxDetection: v.evaluation?.bboxDetection || null,
