@@ -136,18 +136,34 @@ SCENE HINT:
 - **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
 - **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters per scene. If a group moment is needed, keep 1-2 characters in foreground and use `"depth": "background"` or `"perspective": "back view"` for others.
 - **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story.
-- **VARY THE SHOT** - Alternate across pages. Never use the same shot type 3 pages in a row:
-  - `close-up` — face/upper body, 1 character, emotional moment
-  - `medium` — 1-2 characters, waist up, dialogue/interaction
-  - `wide` — full body, characters in environment, action
-  - `ultra-wide` — tiny characters in big landscape, new location
-- **VARY DEPTH AND PERSPECTIVE** - Don't put every character in `foreground` facing `front` on every page. Plan variety across the story:
-  - Characters seen from behind walking away (use `"perspective": "back view"`)
-  - One character close, another tiny in the distance (use `"depth": "background"`)
-  - Over-the-shoulder view of one character watching another
-  - Ultra-wide with characters as small figures in a landscape
-  - At least 2-3 scenes should use non-default depth or perspective
 - **VARY EXPRESSIONS** - Not every scene is happy. Match expression to the moment: wonder, concentration, worry, surprise, determination. "Smiling" on at most 2-3 pages in the entire story.
+- **NO TWO CONSECUTIVE SCENES ALIKE** - Each scene must differ from the previous one in at least 2 of: shot type, character count, perspective. If page 3 is a medium shot of 2 characters facing each other, page 4 CANNOT be another medium shot of 2 characters facing each other.
+
+**Scene Types That WORK WELL (use these):**
+- **SOLO DISCOVERY** — One character alone, exploring or reacting (close-up or medium). Best quality images.
+- **CHASE / PURSUIT** — Two characters far apart, both small, moving in the same direction. One left, one right.
+- **CROWD SCENE** — Main character in foreground, nameless background crowd (market, festival, school). Use `"setting"` description for the crowd, don't list them as characters.
+- **OVER-THE-SHOULDER** — Camera behind one character, looking at another. Use `"perspective": "over-the-shoulder"`.
+- **BACK VIEW** — Character walking away from camera into a landscape. Use `"perspective": "back view"`.
+- **BIRD'S EYE** — Looking down at tiny characters in a large space. Use `"shot": "ultra-wide"`.
+- **REACTION CLOSE-UP** — Just the face filling the frame, strong emotion. 1 character only.
+- **DISTANCE SHOT** — Two characters far apart with empty space between them. One `"depth": "foreground"`, other `"depth": "background"`.
+
+**Scene Types That DON'T WORK (avoid):**
+- 4+ named characters all facing the camera (group photo effect — AI makes them identical)
+- 3+ characters at similar size all in foreground (faces blur together)
+- Two characters having a conversation while ALSO holding objects AND gesturing (too complex)
+- Same composition repeated: if two scenes both show "2 people talking face to face", one must change
+
+**SCENE PLAN (required — write this in the ---SCENE PLAN--- section BEFORE writing pages):**
+Before writing any pages, plan the visual composition for each page. For a 10-page story, distribute roughly:
+- 3× solo character scenes (close-up or medium)
+- 2× two characters interacting (medium, varied perspectives)
+- 2× environment-focused (wide/ultra-wide, characters small in landscape)
+- 1× crowd scene (main character + nameless crowd in setting description)
+- 1× over-the-shoulder or back view
+- 1× unique angle (bird's eye, through a window, looking up)
+Scale proportionally for longer/shorter stories. The plan ensures variety BEFORE writing — no need to fix afterwards.
 
 # Character Portrayal Guidelines
 
@@ -262,58 +278,17 @@ For EACH of the {PAGES} pages:
 ... continue for ALL {PAGES} pages ...
 
 
----CRITICAL ANALYSIS---
-Analyze the draft above. Be harsh and critical - pretend you are editing someone else's work.
+---QUICK CHECK---
+Scan the draft for these 5 issues ONLY. Be brief — one line per fix needed.
 
-**PRIORITY ORDER**: Fix story-breaking issues first, formatting issues last:
-1. **HIGH** — Sections A (narrative/plot) and B (character): Plot holes, out-of-character behavior, missing arcs, and flat dialogue ruin the story. Spend most analysis here.
-2. **MEDIUM** — Sections C (prose) and E (clichés): Repetition, passive voice, and banned gestures degrade quality.
-3. **LOW** — Section D (scene hints): Formatting issues like missing positions or weather inconsistency. Fix them, but don't over-analyze if the story itself has bigger problems.
+1. **Character count** - Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? → Remove the least important.
+2. **Scene plan compliance** - Does each page match the SCENE PLAN above? Same shot type, same character count? → Fix any that deviate.
+3. **Clothing** - Are costumed characters using `costumed:type` in ALL scenes (except scene 1)? → Fix any that say `standard` when costumed is available.
+4. **Banned patterns** - Any "hand on shoulder", "ruffled hair", "nodded wisely"? Any character "smiling" on more than 3 pages? → Replace.
+5. **Plot hole** - Any event that doesn't logically follow from the previous? Any character acting out of character? → Fix.
 
-**A. NARRATIVE & PLOT:**
-1. **Plot holes** - Are there any logical gaps? Events that don't make sense? Missing explanations?
-2. **Cause and effect** - Does each event follow naturally from the previous? Or do things happen "just because"?
-3. **Pacing** - Is Act 1 (setup) too long? Is the climax rushed? Is the ending earned or abrupt?
-4. **Stakes** - Is it clear what the characters stand to gain/lose? Does the reader care?
-5. **Resolution** - Is the ending satisfying? Does it feel complete, not just stopped?
-
-**B. CHARACTER & DIALOGUE (ANALYZE EACH CHARACTER INDIVIDUALLY):**
-For EACH character ({CHARACTER_NAMES}), answer these questions BY NAME:
-
-6. **Character consistency** - Does [Name] act according to their established traits? Any out-of-character moments? Any location/ability violations (e.g., character with fear of heights appearing at high altitude)?
-7. **Character voice** - Does [Name] have a distinct way of speaking? Or do they sound like other characters?
-8. **Show vs tell** - Are [Name]'s emotions SHOWN through actions/dialogue? Or just TOLD?
-9. **Motivation** - Is it clear WHY [Name] does what they do? Any unmotivated actions?
-10. **Growth** (main characters only) - Does [Name] learn/change? Is the arc believable?
-
-**FORMAT - You MUST analyze each character separately:**
-- **[Character 1 Name]**: consistency [✓/✗], voice [✓/✗], show vs tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [list any]
-- **[Character 2 Name]**: consistency [✓/✗], voice [✓/✗], show vs tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [list any]
-- ... (continue for ALL characters)
-
-**C. PROSE QUALITY:**
-11. **Reading level** - Is word count appropriate? Vocabulary too simple or complex for target?
-12. **Repetition** - Same words/phrases used too often? Same sentence structures?
-13. **Flow** - Do sentences read smoothly? Any awkward phrasing?
-14. **Passive voice** - Too much "was done" instead of "did"? Make it active.
-
-**D. SCENE HINTS REVIEW:**
-15. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Check EACH page: more than {MAX_CHARACTERS_PER_SCENE} in characters array? Pick the {MAX_CHARACTERS_PER_SCENE} most important.
-16. **Positions** - Does EACH character have `position` set?
-17. **Clothing** - Categories match scene (winter for cold outdoor, costumed for costume scenes)?
-18. **Setting/Weather** - Is weather consistent across outdoor scenes? Time progresses logically?
-19. **Shot variety** - List the shot type for each page. Are 3+ consecutive pages the same type? Fix by varying.
-20. **Depth & perspective variety** - List pages where `depth` or `perspective` differs from the default (foreground/front). Are there at least 2-3 such pages? If every page is foreground+front, add variety: back views, background figures, over-the-shoulder.
-21. **Character coverage** - List which pages each primary character appears in. Any character with fewer than 2 appearances? Add them to a relevant scene.
-
-**E. CLICHÉ CHECK:**
-22. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". FORBIDDEN. Replace with: fist-bump, high-five, thumbs up, playful elbow nudge.
-23. **Repeated gestures** - Same gesture (hug, smile, wink) used twice? Vary them.
-24. **Cliché phrases** - Any "little did they know", "it was a dark and stormy night", "suddenly"? Remove.
-
-**FIXES REQUIRED:**
-For EACH issue found above, write the page number and exactly how you will fix it:
-- Page X: [specific issue] → [specific fix]
+Fixes (only if issues found):
+- Page X: [issue] → [fix]
 
 
 ---TITLE---
@@ -370,9 +345,9 @@ Sophie ran to the window. Snow was falling!
 SCENE HINT:
 {"description":"Sophie presses both hands against the frosty window, breath fogging the glass.","characters":[{"name":"Sophie","position":"right","clothing":"standard"}],"setting":"indoor","time":"morning","weather":"snowy","shot":"close-up"}
 
----CRITICAL ANALYSIS---
-**Check:** 1. Logic OK  2. Positions OK  3. No banned gestures
-**Fixes:** None needed
+---QUICK CHECK---
+1. Character count: ✓  2. Scene plan compliance: ✓  3. Clothing: ✓  4. No banned patterns  5. No plot holes
+Fixes: None needed
 
 ---TITLE---
 TITLE: Sophie's Snowy Surprise
@@ -514,10 +489,30 @@ Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
 
+---SCENE PLAN---
+Plan the visual composition for each page BEFORE writing. One line per page:
+`Page N: [shot] — [character count] character(s) — [brief composition note]`
+
+Example for a 10-page story:
+```
+Page 1: wide — 1 char — Luna alone discovering the forest entrance
+Page 2: medium — 2 chars — Luna meets the fox, over-the-shoulder from Luna
+Page 3: close-up — 1 char — Luna's face reacting to the fox's riddle
+Page 4: ultra-wide — 1 char — tiny Luna crossing the vast frozen lake
+Page 5: medium — 2 chars — Luna and fox at the bridge, both facing it
+Page 6: wide — 1 char — Luna climbing the tower, seen from below
+Page 7: medium — 1 char + crowd — Luna in the market, crowd in background
+Page 8: close-up — 1 char — Luna reading the ancient scroll, concentration
+Page 9: wide — 2 chars — Luna and fox running, chase perspective, both small
+Page 10: medium — 2 chars — Luna and fox at the meadow, back view walking away
+```
+
+Rules: no two consecutive pages with same shot + same character count. At least 30% solo scenes.
+
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
 
-Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
+Write the story following your SCENE PLAN above. No word counts - clean text only.
 
 For EACH of the {PAGES} pages:
 
