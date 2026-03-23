@@ -4833,6 +4833,8 @@ export default function StoryWizard() {
                               qualityReasoning: result.qualityReasoning,
                               wasRegenerated: true,
                               imageVersions: result.imageVersions || existing?.imageVersions,
+                              bboxDetection: result.bboxDetection ?? existing?.bboxDetection,
+                              bboxOverlayImage: null,
                             }
                           };
                         });
@@ -4868,6 +4870,9 @@ export default function StoryWizard() {
                             landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,
                             visualBibleGrid: result.visualBibleGrid || img.visualBibleGrid,
                             grokRefImages: result.grokRefImages || null,
+                            // Update bbox to match the new active image
+                            bboxDetection: result.bboxDetection ?? img.bboxDetection,
+                            bboxOverlayImage: null, // Force regeneration of overlay on-demand
                           };
                         }
                         return img;

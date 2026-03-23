@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -1187,6 +1187,7 @@ export const storyService = {
     landmarkPhotos?: LandmarkPhoto[];
     visualBibleGrid?: string;
     grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
+    bboxDetection?: BboxSceneDetection | null;  // Bbox detection for the new image
     message: string;
   }> {
     const response = await api.post<{
@@ -1220,6 +1221,7 @@ export const storyService = {
       referencePhotos?: ReferencePhoto[];
       landmarkPhotos?: LandmarkPhoto[];
       visualBibleGrid?: string;
+      bboxDetection?: BboxSceneDetection | null;
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,

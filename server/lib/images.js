@@ -7105,7 +7105,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         wasRegenerated: attempts > 1,
         retryHistory: retryHistory,
         totalAttempts: attempts,
-        rewriteUsage: rewriteEntry?.rewriteUsage || null
+        rewriteUsage: rewriteEntry?.rewriteUsage || null,
+        // Two-stage bbox detection results (for version-level storage)
+        bboxDetection: bboxDetectionHistory || null,
+        bboxOverlayImage: bboxOverlayImage || null
       };
     }
 
@@ -7134,7 +7137,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     wasRegenerated: true,
     retryHistory: retryHistory,
     totalAttempts: attempts,
-    rewriteUsage: rewriteEntry?.rewriteUsage || null
+    rewriteUsage: rewriteEntry?.rewriteUsage || null,
+    bboxDetection: bboxDetectionHistory || null,
+    bboxOverlayImage: bboxOverlayImage || null
   };
 }
 

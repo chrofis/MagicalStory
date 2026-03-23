@@ -991,8 +991,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           name: p.name, photoType: p.photoType,
           clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
         })),
+        bboxDetection: imageResult.bboxDetection || null,
       };
       existingCover.imageVersions.push(newVersion);
+
+      // Also update cover-level bboxDetection to match new active image
+      existingCover.bboxDetection = imageResult.bboxDetection || null;
 
       // Query database for actual max version_index to avoid overwriting existing versions
       const maxVersionResult = await dbQuery(
@@ -1446,7 +1450,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       modelId: imageResult.modelId || null,
       iterationCount: (currentImage.iterationCount || 0) + 1,
       // Preserve clothing data from original image for entity consistency
-      sceneCharacterClothing: currentImage.sceneCharacterClothing || currentImage.characterClothing || null
+      sceneCharacterClothing: currentImage.sceneCharacterClothing || currentImage.characterClothing || null,
+      // Bbox detection from the new image (so scene-level bbox matches active image)
+      bboxDetection: imageResult.bboxDetection || null
     };
 
     // Initialize imageVersions if needed
@@ -1495,6 +1501,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         name: p.name, photoType: p.photoType,
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
+      bboxDetection: imageResult.bboxDetection || null,
     };
 
     if (existingImageIndex >= 0) {
@@ -1607,6 +1614,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
       // Exact images sent to Grok API (max 3 packed/stitched slots)
       grokRefImages: imageResult.grokRefImages || null,
+      // Bbox detection for the new image (so frontend can display immediately)
+      bboxDetection: imageResult.bboxDetection || null,
       message: previewMismatches.length > 0
         ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
         : 'No mismatches found, regenerated with fresh analysis'
