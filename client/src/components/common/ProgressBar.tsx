@@ -44,7 +44,7 @@ export function ProgressBar({
       )}
       <div className={`w-full bg-gray-200 rounded-full overflow-hidden ${sizeClasses[size]}`}>
         <div
-          className={`${sizeClasses[size]} ${variantClasses[variant]} rounded-full transition-all duration-500 ease-out`}
+          className={`${sizeClasses[size]} ${variantClasses[variant]} rounded-full transition-all duration-1000 ease-out`}
           style={{ width: `${percentage}%` }}
         />
       </div>
