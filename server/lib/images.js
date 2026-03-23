@@ -5011,18 +5011,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array — ALL versions including the active one.
-    // Active version's imageData is NOT included here (it's stored as scene.imageData
-    // at DB version_index 0 — including it would create a duplicate).
+    // Build imageVersions array — alternative versions only.
+    // Active version is stored as scene.imageData (DB version_index 0).
+    // Including it here would create a duplicate.
     const imageVersions = [];
     for (const v of versions) {
-      const isBest = v === best && !charFix;
+      if (v === best && !charFix) continue;  // active version is scene.imageData
       imageVersions.push({
-        imageData: isBest ? undefined : v.imageData,  // active image stored at scene level
+        imageData: v.imageData,
         qualityScore: v.score,
         source: v.source,
         type: v.source === 'original' ? 'original' : 'repair',
-        isActive: isBest,
         modelId: v.modelId,
         generatedAt: new Date().toISOString(),
         qualityReasoning: v.evaluation?.reasoning || null,
@@ -5030,15 +5029,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         bboxDetection: v.evaluation?.bboxDetection || null,
         description: img.sceneDescription || null,
         prompt: img.prompt || null
-      });
-    }
-
-    // If character fix was applied, add it as a version too
-    if (charFix) {
-      imageVersions.push({
-        imageData: charFix.imageData,
-        source: 'character-fix',
-        generatedAt: new Date().toISOString()
       });
     }
 

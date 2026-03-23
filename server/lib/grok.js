@@ -140,8 +140,29 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     throw new Error('XAI_API_KEY not configured');
   }
 
-  // Grok edit endpoint accepts max 3 images
-  const images = referenceImages.slice(0, 3);
+  // grok-imagine-image: max 3 input images
+  // grok-imagine-image-pro: max 1 input image — stitch multiple refs into one composite
+  let images = referenceImages.slice(0, 3);
+
+  if (model === GROK_MODELS.PRO && images.length > 1) {
+    log.info(`🎨 [GROK] Pro model supports 1 image — stitching ${images.length} refs into composite`);
+    const buffers = images.map(url => {
+      const base64 = url.replace(/^data:image\/\w+;base64,/, '');
+      return Buffer.from(base64, 'base64');
+    });
+    const stitched = await stitchImagesHorizontally(buffers, 768);
+    const squareSize = 768;
+    const meta = await sharp(stitched).metadata();
+    let finalBuf = stitched;
+    if (meta.width !== meta.height) {
+      const size = Math.max(meta.width, meta.height, squareSize);
+      finalBuf = await sharp(stitched)
+        .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+    }
+    images = [`data:image/jpeg;base64,${finalBuf.toString('base64')}`];
+  }
 
   log.info(`🎨 [GROK] Starting edit (model: ${model}, refs: ${images.length}, aspect: ${aspectRatio})`);
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
