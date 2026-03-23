@@ -3212,7 +3212,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         imageData: result.imageData,
         prompt: effectivePrompt,
         modelId: result.modelId,
-        usage: result.usage
+        usage: result.usage,
+        grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
 
       if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
