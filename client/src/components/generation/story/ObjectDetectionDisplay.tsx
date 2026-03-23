@@ -15,6 +15,33 @@ interface ObjectDetectionDisplayProps {
 }
 
 /**
+ * Extract bbox detection data from retry history
+ */
+function extractBboxData(retryHistory?: RetryAttempt[]): {
+  bboxDetection: BboxSceneDetection | null;
+  bboxOverlayImage: string | null;
+  hasBboxOverlay: boolean;
+} {
+  if (!retryHistory || retryHistory.length === 0) {
+    return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
+  }
+  const bboxEntry = retryHistory.find(r => r.type === 'bbox_detection_only' && r.bboxDetection) ||
+    retryHistory.find(r => r.bboxDetection);
+  if (!bboxEntry) {
+    return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
+  }
+  const detection = bboxEntry.bboxDetection;
+  if (detection && typeof detection === 'object' && 'figures' in detection) {
+    return {
+      bboxDetection: detection as BboxSceneDetection,
+      bboxOverlayImage: bboxEntry.bboxOverlayImage || null,
+      hasBboxOverlay: !!bboxEntry.hasBboxOverlay || !!bboxEntry.bboxOverlayImage
+    };
+  }
+  return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
+}
+
+/**
  * Download text content as a file
  */
 function downloadAsText(content: string, filename: string) {
@@ -34,8 +61,7 @@ function downloadAsText(content: string, filename: string) {
  * Shows detected figures, objects, expected positions, and mismatches
  */
 export function ObjectDetectionDisplay({
-  // retryHistory not used — fresh bbox comes from re-evaluate direct props
-  retryHistory: _retryHistory,
+  retryHistory,
   bboxDetection: directBboxDetection,
   bboxOverlayImage: directBboxOverlayImage,
   language,
@@ -53,11 +79,13 @@ export function ObjectDetectionDisplay({
     setLoadedOverlay(null);
   }, [bboxKey, directBboxOverlayImage]);
 
-  // Use direct props only — retryHistory bbox is from old generation attempts and doesn't
-  // match the current active image version. Fresh bbox data comes from re-evaluate.
-  const bboxDetection = directBboxDetection || null;
-  const bboxOverlayImage = directBboxOverlayImage || null;
-  const hasBboxOverlay = !!directBboxOverlayImage;
+  // Prefer direct props (from latest re-evaluation, matches active version).
+  // Fall back to retryHistory (from initial generation — may not match if version switched,
+  // but better than showing nothing).
+  const fromRetryHistory = extractBboxData(retryHistory);
+  const bboxDetection = directBboxDetection || fromRetryHistory.bboxDetection;
+  const bboxOverlayImage = directBboxOverlayImage || fromRetryHistory.bboxOverlayImage;
+  const hasBboxOverlay = !!directBboxOverlayImage || fromRetryHistory.hasBboxOverlay;
 
   // Nothing to show if no detection data
   if (!bboxDetection) {
