@@ -128,6 +128,9 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
 
     log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
 
@@ -147,7 +150,8 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
       : story.data;
 
     // Find the page text
-    const pageText = getPageText(storyData.storyText, pageNumber);
+    const fullStoryText = storyData.storyText || storyData.story || '';
+    const pageText = getPageText(fullStoryText, pageNumber);
     if (!pageText) {
       return res.status(404).json({ error: `Page ${pageNumber} not found in story` });
     }
@@ -170,7 +174,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     const previousScenes = [];
     for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
       if (prevPage >= 1) {
-        const prevText = getPageText(storyData.storyText, prevPage);
+        const prevText = getPageText(fullStoryText, prevPage);
         if (prevText) {
           // Get clothing from pageClothing (outline) first, then fall back to parsing scene description
           let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
@@ -238,7 +242,8 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
 
   } catch (err) {
     log.error('Error regenerating scene description:', err);
-    res.status(500).json({ error: 'Failed to regenerate scene description: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to regenerate scene description: ' + err.message : 'Failed to regenerate scene description' });
   }
 });
 
@@ -248,6 +253,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     const { id, pageNum } = req.params;
     const { customPrompt, editedScene, characterIds } = req.body;
     const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
     // Check if admin is impersonating - they get free regenerations
@@ -432,7 +440,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
       const language = storyData.language || 'en';
       // Build context for scene description prompt (same as original generation)
-      const pageText = getPageText(storyData.storyText, pageNumber);
+      const pageText = getPageText(storyData.storyText || storyData.story || '', pageNumber);
       const previousScenes = buildPreviousScenesContext(sceneDescriptions, pageNumber);
       const clothingData = storyData.clothingRequirements || {};
       // Build available avatars - only show clothing categories used in this story
@@ -814,7 +822,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
   } catch (err) {
     log.error('Error regenerating image:', err);
-    res.status(500).json({ error: 'Failed to regenerate image: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to regenerate image: ' + err.message : 'Failed to regenerate image' });
   }
 });
 
@@ -824,8 +833,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, useOriginalAsReference, blackoutIssues, evaluationFeedback } = req.body;  // Optional: developer model override + evaluation feedback
+    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback } = req.body;  // Optional: model overrides + evaluation feedback
     const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
     // Check if admin is impersonating - they get free iterations
@@ -1132,7 +1144,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     };
 
     // Step 3: Gather context for scene description prompt
-    const pageText = getPageText(storyData.storyText, pageNumber);
+    const fullStoryText = storyData.storyText || storyData.story || '';
+    const pageText = getPageText(fullStoryText, pageNumber);
     if (!pageText) {
       return res.status(404).json({ error: `Page ${pageNumber} text not found` });
     }
@@ -1144,7 +1157,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const previousScenes = [];
     for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
       if (prevPage >= 1) {
-        const prevText = getPageText(storyData.storyText, prevPage);
+        const prevText = getPageText(fullStoryText, prevPage);
         if (prevText) {
           let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
           if (!prevClothing) {
@@ -1197,8 +1210,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     );
 
     // Step 5: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-    const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
+    const effectiveSceneModel = sceneModel || MODEL_DEFAULTS.sceneIteration;
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with ${effectiveSceneModel}...`);
+    const sceneResult = await callClaudeAPI(scenePrompt, 10000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Parse the scene JSON to extract previewMismatches
@@ -1600,7 +1614,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
   } catch (err) {
     log.error('Error iterating image:', err);
-    res.status(500).json({ error: 'Failed to iterate image: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to iterate image: ' + err.message : 'Failed to iterate image' });
   }
 });
 
@@ -2093,7 +2108,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
   } catch (err) {
     log.error('Error regenerating cover:', err);
-    res.status(500).json({ error: 'Failed to regenerate cover: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to regenerate cover: ' + err.message : 'Failed to regenerate cover' });
   }
 });
 
@@ -2103,6 +2119,9 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     const { id, pageNum } = req.params;
     const { editPrompt } = req.body;
     const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
 
     if (!editPrompt || editPrompt.trim().length === 0) {
       return res.status(400).json({ error: 'editPrompt is required' });
@@ -2214,7 +2233,8 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
 
   } catch (err) {
     log.error('Error editing image:', err);
-    res.status(500).json({ error: 'Failed to edit image: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to edit image: ' + err.message : 'Failed to edit image' });
   }
 });
 
@@ -2224,6 +2244,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
     const maxPasses = Math.min(Math.max(parseInt(req.body.maxPasses) || 1, 1), 3);  // 1-3 passes
     const providedFixTargets = req.body.fixTargets || null;  // Optional: use existing fix targets instead of re-evaluating
 
@@ -2451,7 +2474,8 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
   } catch (err) {
     log.error('Error in auto-repair:', err);
-    res.status(500).json({ error: 'Failed to auto-repair image: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to auto-repair image: ' + err.message : 'Failed to auto-repair image' });
   }
 });
 
@@ -2826,7 +2850,8 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
 
   } catch (err) {
     log.error('Error in entity consistency repair:', err);
-    res.status(500).json({ error: 'Failed to repair entity consistency: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to repair entity consistency: ' + err.message : 'Failed to repair entity consistency' });
   }
 });
 
@@ -2842,6 +2867,9 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+    if (!pageNumbers.every(n => Number.isInteger(n))) {
+      return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
 
     log.info(`📊 [REPAIR-WORKFLOW] Re-evaluating pages ${pageNumbers.join(', ')} in story ${id}`);
@@ -3062,7 +3090,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     addRepairCost(id, apiCost, 'Re-evaluate').catch(err => log.error('Failed to save re-eval cost:', err.message));
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
-    res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to re-evaluate: ' + err.message : 'Failed to re-evaluate' });
   }
 });
 
@@ -3139,7 +3168,8 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     addRepairCost(id, apiCost, 'Consistency check').catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in consistency check:', err);
-    res.status(500).json({ error: 'Failed to run consistency check: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to run consistency check: ' + err.message : 'Failed to run consistency check' });
   }
 });
 
@@ -3151,6 +3181,9 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+    if (!pageNumbers.every(n => Number.isInteger(n))) {
+      return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
 
     log.info(`🏆 [REPAIR-WORKFLOW] Picking best versions for ${pageNumbers.length} pages`);
@@ -3231,7 +3264,8 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
     saveStoryData(id, storyData).catch(err => log.error('Failed to save pick-best:', err.message));
   } catch (err) {
     log.error('❌ [REPAIR-WORKFLOW] Failed to pick best versions:', err);
-    res.status(500).json({ error: 'Failed to pick best versions: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to pick best versions: ' + err.message : 'Failed to pick best versions' });
   }
 });
 
@@ -3798,7 +3832,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini)`).catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in character repair:', err);
-    res.status(500).json({ error: 'Failed to repair characters: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to repair characters: ' + err.message : 'Failed to repair characters' });
   }
 });
 
@@ -3810,6 +3845,9 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+    if (!pageNumbers.every(n => Number.isInteger(n))) {
+      return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
 
     log.info(`🔧 [REPAIR-WORKFLOW] Starting artifact repair for pages ${pageNumbers.join(', ')} in story ${id}`);
@@ -3913,7 +3951,8 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
     res.json({ pagesProcessed, issuesFixed });
   } catch (err) {
     log.error('Error in artifact repair:', err);
-    res.status(500).json({ error: 'Failed to repair artifacts: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to repair artifacts: ' + err.message : 'Failed to repair artifacts' });
   }
 });
 
@@ -4046,7 +4085,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
   } catch (err) {
     log.error('Error editing cover:', err);
-    res.status(500).json({ error: 'Failed to edit cover: ' + err.message });
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Failed to edit cover: ' + err.message : 'Failed to edit cover' });
   }
 });
 

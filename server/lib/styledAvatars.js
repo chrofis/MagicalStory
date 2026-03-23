@@ -109,6 +109,7 @@ const conversionInProgress = new Map();
 // Generation log for developer mode auditing
 // Tracks all avatar conversions with inputs, prompts, outputs, timing
 let styledAvatarGenerationLog = [];
+const MAX_GENERATION_LOG_ENTRIES = 50;
 
 /**
  * Create a short identifier for an image (first 8 chars of base64 data after header)
@@ -315,7 +316,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar', null, imageModelOverride, null, '');
 
       if (!result || !result.imageData || typeof result.imageData !== 'string') {
-        log.warn(`⚠️ [STYLED AVATAR] No valid image returned (attempt ${attempt}/${MAX_STYLED_AVATAR_RETRIES})`);
+        log.warn(`⚠️ [STYLED AVATAR] No valid image returned (attempt ${attempt}/${maxRetries})`);
         continue;
       }
 
@@ -342,7 +343,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
           const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
           const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
 
-          if ((faceFail || clothingFail) && attempt < MAX_STYLED_AVATAR_RETRIES) {
+          if ((faceFail || clothingFail) && attempt < maxRetries) {
             log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — retrying`);
             downsized = null; // Clear so we retry
             continue;
@@ -360,7 +361,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     }
 
     if (!downsized) {
-      throw new Error(`All ${MAX_STYLED_AVATAR_RETRIES} attempts failed to produce a valid image`);
+      throw new Error(`All ${maxRetries} attempts failed to produce a valid image`);
     }
 
     const duration = Date.now() - startTime;
@@ -403,6 +404,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         imageData: downsized // Full image for dev mode display
       }
     });
+    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
+      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+    }
 
     return downsized;
   } catch (error) {
@@ -435,6 +439,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         } : null
       }
     });
+    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
+      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+    }
 
     // Return original avatar as fallback
     return originalAvatar;

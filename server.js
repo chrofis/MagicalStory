@@ -5271,6 +5271,8 @@ app.get('*', (req, res, next) => {
     const lang = req.query.lang || 'de';
     const meta = getMetaForRoute(req.path, lang);
     const html = injectMeta(cachedHtmlTemplate, meta, lang);
+    // Cache SEO pages for crawlers — content only changes on deploy
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
     res.type('html').send(html);
   } else if (hasDistFolder) {
     res.sendFile(path.join(distPath, 'index.html'));

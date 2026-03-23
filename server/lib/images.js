@@ -297,7 +297,13 @@ class LRUCache {
   }
 
   has(key) {
-    return this.get(key) !== undefined;
+    if (!this.cache.has(key)) return false;
+    const entry = this.cache.get(key);
+    if (this.ttl > 0 && Date.now() - entry.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return false;
+    }
+    return true;
   }
 
   delete(key) {

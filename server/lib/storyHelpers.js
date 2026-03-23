@@ -3808,7 +3808,7 @@ function convertClothingToCurrentFormat(clothingRequirements) {
 
 /**
  * Get text for a specific page from storyText
- * @param {string} storyText - Full story text with page markers
+ * @param {string|Array} storyText - Full story text with page markers, or array of {pageNumber, text}
  * @param {number} pageNumber - Page number to extract
  * @returns {string|null} Page text or null if not found
  */
@@ -3816,6 +3816,12 @@ function getPageText(storyText, pageNumber) {
   if (!storyText) return null;
   const safeNum = parseInt(pageNumber, 10);
   if (isNaN(safeNum)) return null;
+
+  // Handle array format (unified mode)
+  if (Array.isArray(storyText)) {
+    const page = storyText.find(p => p.pageNumber === safeNum);
+    return page?.text || null;
+  }
 
   // Match page markers like "--- Page X ---" or "## Page X"
   const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${safeNum}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
