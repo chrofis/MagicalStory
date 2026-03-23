@@ -324,54 +324,53 @@ export function GenerationProgress({
   // Server progress (0-100)
   const serverProgress = total === 100 ? current : Math.round((current / total) * 100);
 
-  // Map server checkpoints to user-perceived progress (proportional to wall-clock time)
-  // Server: 5(start) → 6-15(streaming ~6min) → 18(text done) → 20(avatars) → 30(scenes) → 50-80(images ~3min) → 95(covers) → 100
-  // User:   1        → 2-50(streaming)        → 55           → 60          → 65          → 70-90(images)       → 95          → 100
-  const mapToUser = (sp: number): number => {
-    if (sp <= 5) return 1;
-    if (sp <= 15) return 2 + Math.round(((sp - 5) / 10) * 48);     // 5-15 → 2-50  (streaming = 50% of bar)
-    if (sp <= 18) return 55;                                         // 18 = text done
-    if (sp <= 20) return 60;                                         // 20 = avatars
-    if (sp <= 30) return 60 + Math.round(((sp - 20) / 10) * 5);    // 20-30 → 60-65  (scene expansion)
-    if (sp <= 50) return 65 + Math.round(((sp - 30) / 20) * 5);    // 30-50 → 65-70  (transition)
-    if (sp <= 80) return 70 + Math.round(((sp - 50) / 30) * 20);   // 50-80 → 70-90  (images)
-    if (sp < 100) return 90 + Math.round(((sp - 80) / 20) * 10);   // 80-100 → 90-100 (finalization)
-    return 100;
-  };
-  const mappedProgress = mapToUser(serverProgress);
+  // Estimated total duration based on page count (seconds)
+  // Based on real runs: 5 pages ~3min, 10 pages ~11min, 25 pages ~15min, 50 pages ~25min
+  // Formula: base 150s + 40s per page (streaming + expansion + images + eval + repair)
+  const estimatedTotal = Math.max(150, 150 + pageCount * 40);
 
-  // Smooth interpolation: during streaming the server stays at 5-8% for minutes.
-  // Use elapsed time to smoothly fill between checkpoints so the bar never looks stuck.
-  // Creep speed scales with page count: fewer pages = faster creep.
+  // Time-based progress: fill the bar linearly based on elapsed time.
+  // Use server checkpoints to correct course when they arrive.
   const [startTime] = useState(() => Date.now());
   const [displayProgress, setDisplayProgress] = useState(1);
-
-  // Scale creep interval: 5 pages = 8s, 10 pages = 12s, 25 pages = 20s, 50 pages = 30s
-  const creepInterval = Math.max(8, Math.min(30, Math.round(8 + (pageCount - 5) * 0.5))) * 1000;
-  // How often the tick runs (always 3s for smooth updates)
-  const tickMs = 3000;
+  const lastServerRef = useRef(serverProgress);
 
   useEffect(() => {
-    // If mapped progress jumped ahead, sync immediately
-    if (mappedProgress > displayProgress) {
-      setDisplayProgress(mappedProgress);
-      return;
-    }
-    // While waiting for next checkpoint, creep forward based on time
     const interval = setInterval(() => {
-      setDisplayProgress(prev => {
-        const elapsed = (Date.now() - startTime) / 1000;
-        // Creep: +1% every creepInterval seconds, capped at 3 ahead of mapped
-        const creepSeconds = creepInterval / 1000;
-        const timeBump = Math.floor(elapsed / creepSeconds);
-        const maxCreep = Math.min(mappedProgress + 3, 98);
-        return Math.min(prev + 1, maxCreep, Math.max(prev, timeBump));
-      });
-    }, tickMs);
-    return () => clearInterval(interval);
-  }, [mappedProgress, displayProgress, startTime, creepInterval]);
+      const elapsed = (Date.now() - startTime) / 1000;
 
-  const progressPercent = Math.max(displayProgress, mappedProgress);
+      // Time-based estimate: linear fill to 95% over estimated duration
+      const timeBased = Math.min(95, Math.round((elapsed / estimatedTotal) * 95));
+
+      // Server-based: map server progress to a reasonable user value
+      // Server 5=start, 18=text done, 30=scenes, 50=images start, 80=images done, 100=done
+      let serverBased = 0;
+      if (serverProgress >= 100) serverBased = 100;
+      else if (serverProgress >= 80) serverBased = 90 + Math.round(((serverProgress - 80) / 20) * 10);
+      else if (serverProgress >= 50) serverBased = 65 + Math.round(((serverProgress - 50) / 30) * 25);
+      else if (serverProgress >= 30) serverBased = 55 + Math.round(((serverProgress - 30) / 20) * 10);
+      else if (serverProgress >= 18) serverBased = 50 + Math.round(((serverProgress - 18) / 12) * 5);
+      else if (serverProgress >= 5) serverBased = 3 + Math.round(((serverProgress - 5) / 13) * 47);
+      else serverBased = 1;
+
+      // Use whichever is higher — time keeps it moving, server corrects at checkpoints
+      const target = Math.max(timeBased, serverBased);
+
+      setDisplayProgress(prev => {
+        // Never go backwards, never exceed 99 until server says 100
+        if (serverProgress >= 100) return 100;
+        return Math.max(prev, Math.min(target, 99));
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [serverProgress, startTime, estimatedTotal]);
+
+  // Track server changes for immediate sync
+  if (serverProgress !== lastServerRef.current) {
+    lastServerRef.current = serverProgress;
+  }
+
+  const progressPercent = serverProgress >= 100 ? 100 : displayProgress;
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
