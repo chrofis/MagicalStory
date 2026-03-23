@@ -322,31 +322,49 @@ export function GenerationProgress({
   // Server progress (0-100)
   const serverProgress = total === 100 ? current : Math.round((current / total) * 100);
 
-  // Time-based smooth progress during the long streaming phase
-  // Server stays at 5% for ~6 minutes, then jumps. Instead of showing a stuck bar,
-  // we smoothly fill based on elapsed time and sync when real progress arrives.
+  // Map server checkpoints to user-perceived progress (proportional to wall-clock time)
+  // Server: 5(start) → 6-15(streaming ~6min) → 18(text done) → 20(avatars) → 30(scenes) → 50-80(images ~3min) → 95(covers) → 100
+  // User:   1        → 2-50(streaming)        → 55           → 60          → 65          → 70-90(images)       → 95          → 100
+  const mapToUser = (sp: number): number => {
+    if (sp <= 5) return 1;
+    if (sp <= 15) return 2 + Math.round(((sp - 5) / 10) * 48);     // 5-15 → 2-50  (streaming = 50% of bar)
+    if (sp <= 18) return 55;                                         // 18 = text done
+    if (sp <= 20) return 60;                                         // 20 = avatars
+    if (sp <= 30) return 60 + Math.round(((sp - 20) / 10) * 5);    // 20-30 → 60-65  (scene expansion)
+    if (sp <= 50) return 65 + Math.round(((sp - 30) / 20) * 5);    // 30-50 → 65-70  (transition)
+    if (sp <= 80) return 70 + Math.round(((sp - 50) / 30) * 20);   // 50-80 → 70-90  (images)
+    if (sp < 100) return 90 + Math.round(((sp - 80) / 20) * 10);   // 80-100 → 90-100 (finalization)
+    return 100;
+  };
+  const mappedProgress = mapToUser(serverProgress);
+
+  // Smooth interpolation: during streaming the server stays at 5-8% for minutes.
+  // Use elapsed time to smoothly fill between checkpoints so the bar never looks stuck.
   const [startTime] = useState(() => Date.now());
-  const [smoothProgress, setSmoothProgress] = useState(0);
+  const [displayProgress, setDisplayProgress] = useState(1);
 
   useEffect(() => {
-    // Once server reports > 15%, use server progress directly (streaming done)
-    if (serverProgress > 15) {
-      setSmoothProgress(serverProgress);
+    // If mapped progress jumped ahead, sync immediately
+    if (mappedProgress > displayProgress) {
+      setDisplayProgress(mappedProgress);
       return;
     }
-    // During streaming (server 0-15%), interpolate based on time
-    // Assume streaming takes ~6 minutes (360s), fill to ~14% in that time
+    // While waiting for next checkpoint, creep forward based on time
+    // Fast at first (2% in first 30s), then slower — never overshoots next checkpoint by more than 3
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      // Logarithmic curve: moves fast at start, slows down — never exceeds 14%
-      const timeBased = Math.min(14, Math.round(3 * Math.log(1 + elapsed / 20)));
-      // Use whichever is higher: time-based or server progress
-      setSmoothProgress(prev => Math.max(prev, serverProgress, timeBased));
-    }, 2000);
+      setDisplayProgress(prev => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const target = mappedProgress;
+        // Creep: add 1% every 20 seconds, but never more than 3 ahead of the mapped value
+        const timeBump = Math.floor(elapsed / 20);
+        const maxCreep = Math.min(target + 3, 98); // never hit 100 by creeping
+        return Math.min(prev + 1, maxCreep, Math.max(prev, timeBump));
+      });
+    }, 3000);
     return () => clearInterval(interval);
-  }, [serverProgress, startTime]);
+  }, [mappedProgress, displayProgress, startTime]);
 
-  const progressPercent = Math.max(smoothProgress, serverProgress);
+  const progressPercent = Math.max(displayProgress, mappedProgress);
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
