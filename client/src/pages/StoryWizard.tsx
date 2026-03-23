@@ -483,8 +483,16 @@ export default function StoryWizard() {
       setSceneImages(prev => prev.map(img => {
         const devData = devMetadata.sceneImages.find(d => d.pageNumber === img.pageNumber);
         if (devData) {
+          // Extract bboxDetection from retryHistory if not already on the scene
+          // (initial generation stores bbox in retryHistory, not scene-level)
+          const retryBbox = !img.bboxDetection && devData.retryHistory?.length
+            ? [...devData.retryHistory].reverse().find(r => r.bboxDetection)?.bboxDetection ?? null
+            : null;
+
           return {
             ...img,
+            // Set bboxDetection from retryHistory if scene-level is missing
+            ...(retryBbox ? { bboxDetection: retryBbox } : {}),
             prompt: devData.prompt ?? img.prompt,
             qualityReasoning: devData.qualityReasoning ?? img.qualityReasoning,
             retryHistory: devData.retryHistory ?? img.retryHistory,
