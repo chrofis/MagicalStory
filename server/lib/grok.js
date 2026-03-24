@@ -346,9 +346,19 @@ async function packReferences(refs = {}) {
     }
   }
 
-  // Count how many character slots we need (max 2, since 1 slot reserved for VB/landmarks)
+  // Count how many character slots we need (max 3 total reference slots for Grok)
   const charCount = charBuffers.length;
   const slots = [];
+
+  // Previous image goes FIRST — it's the scene being re-rendered (style transfer)
+  // or the previous page for visual continuity (sequential mode)
+  if (previousImage && previousImage.startsWith('data:image')) {
+    const base64 = previousImage.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+    const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 [GROK] Slot ${slots.length}: previous/source image`);
+  }
 
   // Strategy: maximize character image quality by giving them separate slots
   //   1 char:  Slot 1 = VB grid, Slot 2 = landmark(s), Slot 3 = character
@@ -437,7 +447,7 @@ async function packReferences(refs = {}) {
     }
   }
 
-  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots (${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
+  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
   return squareSlots;
 }
 

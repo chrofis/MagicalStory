@@ -2650,8 +2650,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Default clothing category (used if no per-character clothing specified)
         const defaultClothingCategory = 'standard';
-        let effectiveCategory = defaultClothingCategory;
-        let costumeType = null;
 
         // Cap characters at 5 — more than 5 almost always produces bad results
         // Main characters appear on ALL covers, non-main are split across initial/back
@@ -2693,8 +2691,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Get character photos with clothing - per-character clothing from mergedClothingRequirements takes precedence
         let coverPhotos = getCharacterPhotoDetails(
           charactersForCover,
-          effectiveCategory,
-          costumeType,
+          defaultClothingCategory,
           artStyle,
           mergedClothingRequirements
         );
@@ -3544,7 +3541,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
           sceneClothingRequirements[char.name]._currentClothing = charClothing;
         }
-        let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, null, inputData.artStyle, sceneClothingRequirements);
+        let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, inputData.artStyle, sceneClothingRequirements);
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
         let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
         // Trial mode fallback: scene hints are plain text, so extract LOC IDs manually
