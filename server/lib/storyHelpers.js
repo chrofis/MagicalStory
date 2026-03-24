@@ -175,10 +175,24 @@ function extractJsonFromText(text) {
 
   let jsonToParse = text.trim();
 
-  // Fix common AI quirk: doubled braces {{ ... }} → { ... }
-  // Also handles {{{ ... }}} etc. Strip until we have a single { ... }
-  while (jsonToParse.startsWith('{{') && jsonToParse.endsWith('}}')) {
-    jsonToParse = jsonToParse.slice(1, -1);
+  // Fix common AI quirk: doubled opening braces {{ → {
+  // The closing brace may not be doubled (e.g., {{"scene":{...}} has 2 open, 1 close)
+  // Also fix :{{"key" → :{"key" mid-string
+  jsonToParse = jsonToParse.replace(/^\{\{(?=\s*")/,  '{');
+  jsonToParse = jsonToParse.replace(/:\s*\{\{(?=\s*")/g, ':{');
+  // If we stripped an opening brace but the JSON now has unbalanced braces, strip trailing extra }
+  if (jsonToParse.endsWith('}}')) {
+    // Check if braces are balanced without the extra }
+    const withoutLast = jsonToParse.slice(0, -1);
+    let depth = 0, inStr = false, esc = false, balanced = false;
+    for (let i = 0; i < withoutLast.length; i++) {
+      const ch = withoutLast[i];
+      if (ch === '\\' && inStr && !esc) { esc = true; continue; }
+      if (esc) { esc = false; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (!inStr) { if (ch === '{') depth++; if (ch === '}') depth--; }
+    }
+    if (depth === 0) jsonToParse = withoutLast;
   }
 
   // First, try to extract from ```json ... ``` code block
