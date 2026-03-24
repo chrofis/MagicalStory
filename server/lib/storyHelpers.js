@@ -1021,21 +1021,21 @@ function getSceneComplexityGuide(sceneCount) {
  * Art styles definitions (matches index.html)
  */
 const ART_STYLES = {
-  // NOTE: Most styles include "NOT photorealistic" to prevent realistic drift
-  // Exceptions: watercolor, oil, concept - these are meant to look more realistic
-  pixar: '3D animated film style like Pixar/Disney, stylized cartoon characters with smooth plastic-like skin, slightly larger eyes than real humans, simplified facial features, NO skin pores or wrinkles, NOT photorealistic, NOT live-action, vibrant colors, soft volumetric lighting, family-friendly animation',
-  cartoon: '2D cartoon style, bold black outlines, vibrant flat colors (minimal shading/cel-shading), smooth vector quality, classic Saturday morning animation aesthetic, NOT realistic, NOT photorealistic, stylized animated characters',
-  anime: 'Modern digital anime art, stylized animated characters, expressive large eyes, simplified facial features, detailed cel-shading, vibrant palette, style of Makoto Shinkai, NOT photorealistic, NOT live-action',
-  chibi: 'Chibi style, super deformed (SD) proportions, massive head, tiny body, kawaii aesthetic, adorable, smooth illustration, minimalist detail, NOT realistic',
-  steampunk: 'Steampunk graphic novel illustration, stylized characters, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework, NOT photorealistic',
-  comic: 'Classic American comic book art, heavy black ink lines, stylized characters, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee, NOT photorealistic',
-  manga: 'Traditional manga style, Japanese comic art, stylized characters, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition, NOT photorealistic',
-  watercolor: 'Traditional watercolor painting, realistic human proportions and features, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors, fine art quality',
-  oil: 'Classic oil painting style, realistic human proportions like classical portraiture, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality fine art, style of John Singer Sargent',
-  lowpoly: 'Low poly 3D model, stylized geometric characters, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley, NOT realistic',
-  concept: 'Highly detailed digital concept art, realistic human proportions and anatomy, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic, style of Craig Mullins',
-  pixel: '16-bit pixel art style, stylized pixel characters, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI, NOT realistic',
-  cyber: 'Cyberpunk graphic novel illustration, stylized characters, neon reflections, rainy streets, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog, NOT photorealistic'
+  // Sentence-based style descriptions — work well with both Gemini and Grok Imagine.
+  // Each includes artist/studio references where helpful for style anchoring.
+  pixar: 'A 3D animated children\'s illustration in the style of Pixar and Disney Animation Studios. Stylized cartoon characters with smooth skin, slightly larger eyes, and simplified features. Vibrant colors, soft volumetric lighting, and a warm family-friendly aesthetic. Not photorealistic.',
+  cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic.',
+  anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic.',
+  chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic.',
+  steampunk: 'A steampunk graphic novel illustration with Victorian aesthetic. Intricate gears, brass and copper mechanisms, leather textures, and a sepia-toned muted color palette with detailed linework. Not photorealistic.',
+  comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic.',
+  manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic.',
+  watercolor: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors.',
+  oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art.',
+  lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic.',
+  concept: 'Highly detailed digital concept art in the style of Craig Mullins and Karla Ortiz. Realistic human proportions, dramatic lighting, epic composition, smooth rendering with focus on mood and atmosphere. Matte painting aesthetic.',
+  pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic.',
+  cyber: 'A cyberpunk graphic novel illustration with neon reflections, rainy streets, chrome surfaces, and dense visual complexity. High contrast, dark atmosphere with volumetric fog. Not photorealistic.',
 };
 
 /**
