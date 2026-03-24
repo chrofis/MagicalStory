@@ -47,6 +47,7 @@ const {
 const {
   generateImageOnly,
   generateWithIterativePlacement,
+  applyStyleTransfer,
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
@@ -834,7 +835,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { models } = req.body;
+    const { models, iterativePlacement } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     // Admin only
@@ -854,7 +855,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     const visualBible = storyData.visualBible || null;
     const clothingReqs = storyData.clothingRequirements || null;
     // Resolve scene description, characters, and prompt
-    let prompt, characterPhotos, landmarkPhotos = [], visualBibleGrid = null;
+    let prompt, characterPhotos, landmarkPhotos = [], visualBibleGrid = null, sceneMetadata = null;
     if (pageNumber < 0) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
@@ -874,8 +875,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       if (clothing.startsWith('costumed:')) { costumeType = clothing.split(':')[1]; effClothing = 'costumed'; }
       characterPhotos = getCharacterPhotoDetails(chars, effClothing, costumeType, artStyle, clothingReqs);
       if (effClothing !== 'costumed') characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
-      const meta = extractSceneMetadata(desc);
-      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, meta) : [];
+      sceneMetadata = extractSceneMetadata(desc);
+      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
       if (visualBible) {
         const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
         const secLm = landmarkPhotos.slice(1);
@@ -883,15 +884,23 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       }
       prompt = buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
     }
-    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models`);
+    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models${iterativePlacement ? ' (iterative placement)' : ''}`);
     // Run all models in parallel
     const results = {};
     const settled = await Promise.allSettled(models.map(async (model) => {
       const start = Date.now();
-      const result = await generateImageOnly(prompt, characterPhotos, {
-        imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
-      });
+      let result;
+      if (iterativePlacement && sceneMetadata) {
+        result = await generateWithIterativePlacement(prompt, characterPhotos, sceneMetadata, {
+          imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
+          landmarkPhotos, visualBibleGrid, pageNumber,
+        });
+      } else {
+        result = await generateImageOnly(prompt, characterPhotos, {
+          imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
+          landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+        });
+      }
       return { model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null };
     }));
     for (const [i, s] of settled.entries()) {
@@ -906,6 +915,64 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
   } catch (err) {
     log.error('Error in test-models:', err);
     res.status(500).json({ error: 'Failed to test models: ' + err.message });
+  }
+});
+
+// Style transfer: re-render current page image in the story's art style using a different model (admin only)
+router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { targetModel } = req.body;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+    if (!targetModel) return res.status(400).json({ error: 'targetModel required' });
+    if (!IMAGE_MODELS[targetModel]) return res.status(400).json({ error: `Unknown model: ${targetModel}` });
+
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    // Load story
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    storyData = await rehydrateStoryImages(id, storyData);
+    const artStyle = storyData.artStyle || 'pixar';
+
+    // Get the current image for the page
+    let currentImageData;
+    if (pageNumber < 0) {
+      const coverType = getCoverType(pageNumber);
+      if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
+      const cover = getCoverData(storyData, coverType);
+      if (!cover || !cover.imageData) return res.status(400).json({ error: `No cover image found for ${coverType}` });
+      currentImageData = cover.imageData;
+    } else {
+      const sceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+      if (!sceneImage || !sceneImage.imageData) return res.status(400).json({ error: `No image found for page ${pageNumber}` });
+      currentImageData = sceneImage.imageData;
+    }
+
+    log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}`);
+    const start = Date.now();
+    const result = await applyStyleTransfer(currentImageData, artStyle, {
+      imageModelOverride: targetModel,
+      imageBackendOverride: IMAGE_MODELS[targetModel].backend,
+    });
+    const elapsed = Date.now() - start;
+    log.info(`🎨 [STYLE-TRANSFER] Completed in ${elapsed}ms`);
+
+    res.json({
+      success: true,
+      imageData: result.imageData,
+      modelId: result.modelId || targetModel,
+      elapsed,
+    });
+  } catch (err) {
+    log.error('Error in style-transfer:', err);
+    res.status(500).json({ error: 'Failed to apply style transfer: ' + err.message });
   }
 });
 

@@ -10067,6 +10067,35 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
   return issues;
 }
 
+/**
+ * Apply style transfer: re-render an existing image in the story's art style using a different model.
+ * Sends the current image as a reference and asks the model to redraw it in the specified art style,
+ * keeping all characters, positions, and scene composition identical.
+ */
+async function applyStyleTransfer(imageData, artStyle, options = {}) {
+  const { imageModelOverride, imageBackendOverride } = options;
+  const { ART_STYLES } = require('./storyHelpers');
+
+  const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar || artStyle;
+
+  const prompt = `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style.
+
+Art Style: ${styleDescription}
+
+CRITICAL:
+- Same characters in same positions
+- Same scene composition and background
+- Same objects and landmarks
+- Only the rendering style changes (colors, brush strokes, texture, shading)`;
+
+  return generateImageOnly(prompt, [], {
+    imageModelOverride,
+    imageBackendOverride,
+    previousImage: imageData,
+    skipCache: true,
+  });
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -10085,6 +10114,7 @@ module.exports = {
   // Separated evaluation pipeline functions (new architecture)
   generateImageOnly,
   generateWithIterativePlacement,
+  applyStyleTransfer,
   evaluateImageBatch,
   buildRepairPlan,
   executeRepairPlan,

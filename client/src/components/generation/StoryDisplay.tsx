@@ -120,7 +120,7 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; iterativePlacement?: boolean }) => Promise<void>;
+  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
@@ -281,7 +281,6 @@ export function StoryDisplay({
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
   const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
-  const [iterativePlacement, setIterativePlacement] = useState(false);
   // Test Models panel: which page is showing the comparison
   const [testModelsPage, setTestModelsPage] = useState<number | null>(null);
 
@@ -681,7 +680,7 @@ export function StoryDisplay({
 
   // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
   // Supports parallel: multiple pages can iterate simultaneously
-  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; iterativePlacement?: boolean }) => {
+  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => {
     if (!onIteratePage || iteratingPages.has(pageNumber)) return;
     setIteratingPages(prev => new Set(prev).add(pageNumber));
     setIterateOptionsPage(null); // Close options panel
@@ -4244,11 +4243,6 @@ export function StoryDisplay({
                                         ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
                                         : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
-                                    <label className="flex items-center gap-2 cursor-pointer mt-1 pt-1 border-t border-gray-100">
-                                      <input type="checkbox" checked={iterativePlacement} onChange={e => setIterativePlacement(e.target.checked)} className="text-orange-600" />
-                                      <span className="text-sm text-orange-700 font-medium">Iterative Placement</span>
-                                      <span className="text-[10px] text-gray-400">(2-pass: foreground first, then background)</span>
-                                    </label>
                                     <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                       <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Scene: Default</option>
@@ -4276,7 +4270,6 @@ export function StoryDisplay({
                                           blackoutIssues: iterateMode === 'blackout',
                                           sceneModel: improveSceneModel || undefined,
                                           imageModel: improveImageModel || undefined,
-                                          iterativePlacement: iterativePlacement || undefined,
                                         })}
                                         className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
                                       >
@@ -4846,11 +4839,6 @@ export function StoryDisplay({
                                         ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
                                         : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
-                                    <label className="flex items-center gap-2 cursor-pointer mt-1 pt-1 border-t border-gray-100">
-                                      <input type="checkbox" checked={iterativePlacement} onChange={e => setIterativePlacement(e.target.checked)} className="text-orange-600" />
-                                      <span className="text-sm text-orange-700 font-medium">Iterative Placement</span>
-                                      <span className="text-[10px] text-gray-400">(2-pass: foreground first, then background)</span>
-                                    </label>
                                     <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                       <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Scene: Default</option>
@@ -4878,7 +4866,6 @@ export function StoryDisplay({
                                           blackoutIssues: iterateMode === 'blackout',
                                           sceneModel: improveSceneModel || undefined,
                                           imageModel: improveImageModel || undefined,
-                                          iterativePlacement: iterativePlacement || undefined,
                                         })}
                                         className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
                                       >

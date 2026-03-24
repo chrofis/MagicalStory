@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, Loader2, Check, Clock, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
 
@@ -44,6 +44,12 @@ export function TestModelsPanel({
   const [results, setResults] = useState<Record<string, ModelTestResult>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [iterativePlacement, setIterativePlacement] = useState(false);
+
+  // Style Transfer state
+  const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
+  const [styleResult, setStyleResult] = useState<ModelTestResult | null>(null);
+  const [isStyleTransferring, setIsStyleTransferring] = useState(false);
 
   const toggleModel = useCallback((modelId: string) => {
     setSelectedModels(prev => {
@@ -72,47 +78,27 @@ export function TestModelsPanel({
     setIsRunning(true);
     setResults({});
 
-    // Check if storyService.testModels exists
-    const hasTestModelsApi = typeof (storyService as Record<string, unknown>).testModels === 'function';
+    const models = Array.from(selectedModels);
+    const options = iterativePlacement ? { iterativePlacement: true } : undefined;
 
-    const promises = Array.from(selectedModels).map(async (model) => {
+    const promises = models.map(async (model) => {
       setResults(prev => ({ ...prev, [model]: { loading: true } }));
       const startTime = Date.now();
 
       try {
-        if (hasTestModelsApi) {
-          // Use the dedicated testModels API if available
-          const response = await (storyService as unknown as {
-            testModels: (storyId: string, pageNumber: number, models: string[]) => Promise<{
-              results: Record<string, { imageData?: string; error?: string; modelId?: string }>;
-            }>;
-          }).testModels(storyId, pageNumber, [model]);
-          const result = response.results[model];
-          const elapsedMs = Date.now() - startTime;
-          setResults(prev => ({
-            ...prev,
-            [model]: {
-              loading: false,
-              imageData: result?.imageData,
-              error: result?.error,
-              modelId: model,
-              elapsedMs,
-            },
-          }));
-        } else {
-          // Fallback: use iteratePage with the model override
-          const response = await storyService.iteratePage(storyId, pageNumber, model);
-          const elapsedMs = Date.now() - startTime;
-          setResults(prev => ({
-            ...prev,
-            [model]: {
-              loading: false,
-              imageData: response.imageData,
-              modelId: response.modelId || model,
-              elapsedMs,
-            },
-          }));
-        }
+        const response = await storyService.testModels(storyId, pageNumber, [model], options);
+        const result = response.results[model];
+        const elapsedMs = Date.now() - startTime;
+        setResults(prev => ({
+          ...prev,
+          [model]: {
+            loading: false,
+            imageData: result?.imageData,
+            error: result?.error,
+            modelId: model,
+            elapsedMs,
+          },
+        }));
       } catch (err: unknown) {
         const elapsedMs = Date.now() - startTime;
         const message = err instanceof Error ? err.message : 'Unknown error';
@@ -125,7 +111,31 @@ export function TestModelsPanel({
 
     await Promise.allSettled(promises);
     setIsRunning(false);
-  }, [selectedModels, storyId, pageNumber]);
+  }, [selectedModels, storyId, pageNumber, iterativePlacement]);
+
+  const runStyleTransfer = useCallback(async () => {
+    if (!styleTargetModel) return;
+    setIsStyleTransferring(true);
+    setStyleResult({ loading: true });
+    const startTime = Date.now();
+
+    try {
+      const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel);
+      const elapsedMs = Date.now() - startTime;
+      setStyleResult({
+        loading: false,
+        imageData: response.imageData,
+        modelId: response.modelId,
+        elapsedMs,
+      });
+    } catch (err: unknown) {
+      const elapsedMs = Date.now() - startTime;
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setStyleResult({ loading: false, error: message, elapsedMs });
+    } finally {
+      setIsStyleTransferring(false);
+    }
+  }, [storyId, pageNumber, styleTargetModel]);
 
   const formatElapsed = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
@@ -173,6 +183,18 @@ export function TestModelsPanel({
               </label>
             ))}
           </div>
+          {/* Iterative Placement checkbox */}
+          <label className="flex items-center gap-2 cursor-pointer mb-3">
+            <input
+              type="checkbox"
+              checked={iterativePlacement}
+              onChange={e => setIterativePlacement(e.target.checked)}
+              disabled={isRunning}
+              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+            />
+            <span className="text-sm text-orange-700 font-medium">Iterative Placement</span>
+            <span className="text-[10px] text-gray-400">(2-pass: foreground first, then background)</span>
+          </label>
           <div className="flex items-center gap-2">
             <button
               onClick={allSelected ? deselectAll : selectAll}
@@ -288,6 +310,107 @@ export function TestModelsPanel({
             })}
           </div>
         )}
+
+        {/* Style Transfer Section */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Paintbrush size={16} className="text-purple-600" />
+            <h4 className="text-sm font-semibold text-gray-800">Style Transfer</h4>
+            <span className="text-[10px] text-gray-400">Re-render current page image in the story art style using a different model</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={styleTargetModel}
+              onChange={e => setStyleTargetModel(e.target.value)}
+              disabled={isStyleTransferring}
+              className="flex-1 rounded border-gray-300 text-sm p-1.5"
+            >
+              {AVAILABLE_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label} ({m.cost})</option>
+              ))}
+            </select>
+            <button
+              onClick={runStyleTransfer}
+              disabled={isStyleTransferring || !styleTargetModel}
+              className="px-3 py-1.5 text-sm font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
+            >
+              {isStyleTransferring ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Transferring...
+                </>
+              ) : (
+                <>
+                  <Paintbrush size={14} />
+                  Apply Style Transfer
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Style Transfer Result */}
+          {styleResult && (
+            <div className="mt-3 border rounded-lg p-3 bg-purple-50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-purple-800">
+                  Style Transfer Result
+                  {styleResult.modelId && ` (${AVAILABLE_MODELS.find(m => m.id === styleResult.modelId)?.label || styleResult.modelId})`}
+                </span>
+                {styleResult.elapsedMs != null && !styleResult.loading && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Clock size={12} />
+                    {formatElapsed(styleResult.elapsedMs)}
+                  </div>
+                )}
+              </div>
+              {styleResult.loading ? (
+                <div className="flex items-center justify-center h-48 bg-white rounded border border-dashed border-purple-300">
+                  <div className="flex flex-col items-center gap-2 text-purple-400">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span className="text-xs">Applying style transfer...</span>
+                  </div>
+                </div>
+              ) : styleResult.error ? (
+                <div className="flex items-center justify-center h-48 bg-red-50 rounded border border-red-200">
+                  <div className="flex flex-col items-center gap-2 text-red-500 px-3 text-center">
+                    <AlertTriangle size={24} />
+                    <span className="text-xs">{styleResult.error}</span>
+                  </div>
+                </div>
+              ) : styleResult.imageData ? (
+                <div className="relative group">
+                  <img
+                    src={
+                      styleResult.imageData.startsWith('data:')
+                        ? styleResult.imageData
+                        : `data:image/png;base64,${styleResult.imageData}`
+                    }
+                    alt="Style transfer result"
+                    className="max-h-64 w-full object-contain rounded border bg-white cursor-pointer"
+                    onClick={() =>
+                      setLightboxImage(
+                        styleResult.imageData!.startsWith('data:')
+                          ? styleResult.imageData!
+                          : `data:image/png;base64,${styleResult.imageData!}`
+                      )
+                    }
+                  />
+                  {onUseImage && (
+                    <button
+                      onClick={() =>
+                        onUseImage(styleResult.imageData!, styleResult.modelId || styleTargetModel)
+                      }
+                      className="absolute bottom-2 right-2 px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 shadow"
+                    >
+                      <Check size={12} />
+                      Use This
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Lightbox */}

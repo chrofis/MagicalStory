@@ -271,6 +271,41 @@ User clicks "Run Full Workflow"
 - `server/lib/images.js` → `repairCharacterMismatchWithGrok()` — Grok character repair
 - `server/lib/images.js` → `collectAllIssuesForPage()` — aggregates all issue sources
 
+### Test Models (Dev Mode)
+
+Allows admins to compare image generation across multiple AI models side-by-side for the same
+page/scene. Accessible via the "Test Models" button on each page in developer mode.
+
+**How it works:**
+1. User selects which image models to test (Grok Standard/Pro, Gemini Flash/Pro)
+2. Clicks "Run Test" — all selected models generate the same scene in parallel
+3. Results appear in a grid with timing and "Use This" buttons to adopt a result
+
+**Iterative Placement** option (checkbox in TestModelsPanel): when enabled, uses a two-pass
+generation strategy instead of single-pass. Pass 1 generates foreground characters only,
+Pass 2 composites them onto the background scene. This improves character placement when
+multiple characters appear at different depths (foreground vs background). Only activates
+when the scene metadata contains background-depth characters.
+
+**Style Transfer** (in TestModelsPanel): takes the current page image and re-renders it in
+the story's art style using a different model. The original scene composition, characters,
+and layout are preserved — only the visual rendering style changes. Useful for comparing
+how different models interpret the same art style.
+
+**Endpoints:**
+- `POST /:id/test-models/:pageNum` — generate same scene with multiple models
+- `POST /:id/style-transfer/:pageNum` — re-render current image in art style via different model
+
+**Key files:**
+- `client/src/components/generation/TestModelsPanel.tsx` — UI panel with model selection, results grid, style transfer
+- `client/src/services/storyService.ts` → `testModels()`, `styleTransfer()` — API client methods
+- `server/routes/regeneration.js` — backend endpoints
+- `server/lib/images.js` → `generateImageOnly()`, `generateWithIterativePlacement()`, `applyStyleTransfer()`
+
+**CLI script** (`scripts/test-models.js`): command-line tool for comparing scene expansion and
+iteration prompts across text AI models (not image models). Tests how different LLMs expand
+scene descriptions. Usage: `node scripts/test-models.js <story-id> <page-number> [expansion|iterate|both]`
+
 ### Key Backend Files
 - `server.js` - Main Express app with all routes embedded
 - `server/config/models.js` - AI model configuration and defaults
