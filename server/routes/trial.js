@@ -1654,7 +1654,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       let coverPhotos = getCharacterPhotoDetails(
         characters,
         costume ? 'costumed' : 'standard',
-        costumeType,
         'watercolor',
         coverClothingRequirements
       );

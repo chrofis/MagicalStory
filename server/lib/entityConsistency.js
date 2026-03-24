@@ -37,10 +37,8 @@ function normalizeClothingCategory(category) {
   if (!category) return 'standard';
   const raw = category.replace(/\s*\[[A-Z]+\d+\]\s*/g, '').trim().toLowerCase();
   if (!raw) return 'standard';
-  // Extract costumed type — handles costumed:type, costumed:costumed:type, etc.
-  const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
-  if (costumedMatch) return `costumed:${costumedMatch[1].trim()}`;
-  if (raw.includes('costumed')) return 'costumed'; // bare "costumed" without type
+  // One costume per story — no need for sub-type
+  if (raw.includes('costumed')) return 'costumed';
   if (raw.includes('winter')) return 'winter';
   if (raw.includes('summer')) return 'summer';
   return 'standard';
@@ -92,20 +90,13 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const availableKeys = Object.keys(styledForArt || {});
   log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: styledAvatars[${artStyle}] has keys: [${availableKeys.join(', ')}]`);
 
-  // Handle costumed categories (e.g., "costumed:pirate")
-  if (clothingCategory.startsWith('costumed:')) {
-    const costumeType = clothingCategory.replace('costumed:', '');
-    const costumedAvatar = styledForArt.costumed?.[costumeType];
-    if (costumedAvatar) {
-      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found costumed avatar for ${costumeType}`);
-      return costumedAvatar;
-    }
-    // Try any other costumed avatar
+  // Handle costumed category — one costume per story, grab the first
+  if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
     if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
-      const availableCostumes = Object.entries(styledForArt.costumed);
-      if (availableCostumes.length > 0) {
-        log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed[${costumeType}], using costumed[${availableCostumes[0][0]}] as fallback`);
-        return availableCostumes[0][1];
+      const firstCostume = Object.values(styledForArt.costumed)[0];
+      if (firstCostume) {
+        log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found costumed avatar`);
+        return firstCostume;
       }
     }
     // Fallback to standard styled if no costume found
@@ -113,22 +104,6 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
       log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed avatars, using standard as fallback`);
       return styledForArt.standard;
     }
-    // Try any other styled avatar
-    for (const [key, value] of Object.entries(styledForArt)) {
-      if (key !== 'costumed' && value && typeof value === 'string') {
-        log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed/standard, using ${key} as fallback`);
-        return value;
-      }
-    }
-    // Try base avatar before photo
-    if (avatars.standard) {
-      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base standard avatar`);
-      return avatars.standard;
-    }
-    // Final fallback to original photo
-    const fallback = getFallbackPhoto();
-    log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled/base avatars found for costume, photo fallback=${fallback ? 'found' : 'null'}`);
-    return fallback;
   }
 
   // Handle standard categories (standard, winter, summer)

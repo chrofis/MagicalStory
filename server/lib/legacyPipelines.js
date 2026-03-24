@@ -684,19 +684,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Parse clothing category from scene description
         // Handle costumed:type format (e.g., "costumed:pirate")
         const clothingRaw = parseClothingCategory(sceneDesc) || 'standard';
-        let clothingCategory = clothingRaw;
-        let costumeType = null;
-        if (clothingRaw.startsWith('costumed:')) {
-          clothingCategory = 'costumed';
-          costumeType = clothingRaw.split(':')[1];
-        }
-        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingRaw}`);
 
         // Use detailed photo info (with names) for labeled reference images
         // Pass artStyle and clothingRequirements for per-character costume lookup
-        let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
+        let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingRaw, artStyle, streamingClothingRequirements);
         // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
-        if (clothingCategory !== 'costumed') {
+        if (!clothingRaw.startsWith('costumed')) {
           referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
         }
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
@@ -849,7 +843,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Extract clothing from block first (more reliable), fallback to parsing scene
         // Handle both simple (winter/summer/standard) and costumed:type formats
         let clothing = null;
-        let costumeType = null;
         if (rawBlock) {
           const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|standard|costumed(?::\w+)?)/i);
           if (clothingMatch) {
@@ -858,11 +851,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
         if (!clothing) {
           clothing = parseClothingCategory(sceneDescription) || 'standard';
-        }
-        // Parse costumed:type format
-        if (clothing && clothing.startsWith('costumed:')) {
-          costumeType = clothing.split(':')[1];
-          clothing = 'costumed';
         }
 
         // Get art style for avatar lookup
@@ -891,8 +879,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             log.info(`📕 [STREAM-COVER] Capping front cover characters from ${charactersToUse.length} to ${MAX_COVER_CHARACTERS}`);
             charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
           }
-          referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, costumeType, artStyleId, convertedClothingRequirements);
-          log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+          referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, artStyleId, convertedClothingRequirements);
+          log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}`);
         } else {
           // Initial page & back cover: main characters + different non-main extras
           // Split non-main into two halves so each cover shows different characters
@@ -907,11 +895,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             extras = nonMainCharacters.slice(halfPoint).slice(0, extraSlots);
           }
           const coverCharacters = [...mainCapped, ...extras];
-          referencePhotos = getCharacterPhotoDetails(coverCharacters, clothing, costumeType, artStyleId, convertedClothingRequirements);
-          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ${coverCharacters.map(c => c.name).join(', ')} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+          referencePhotos = getCharacterPhotoDetails(coverCharacters, clothing, artStyleId, convertedClothingRequirements);
+          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ${coverCharacters.map(c => c.name).join(', ')} (${referencePhotos.length} chars), clothing: ${clothing}`);
         }
         // Apply styled avatars for non-costumed characters
-        if (clothing !== 'costumed') {
+        if (!clothing.startsWith('costumed')) {
           referencePhotos = applyStyledAvatars(referencePhotos, artStyleId);
         }
 
@@ -1396,21 +1384,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Parse clothing category from scene description
           // Handle costumed:type format (e.g., "costumed:pirate")
           const clothingRaw = parseClothingCategory(scene.description) || 'standard';
-          let clothingCategory = clothingRaw;
-          let costumeType = null;
-          if (clothingRaw.startsWith('costumed:')) {
-            clothingCategory = 'costumed';
-            costumeType = clothingRaw.split(':')[1];
-          }
-          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingRaw}`);
 
           // Use detailed photo info (with names) for labeled reference images
           // Pass artStyle and clothingRequirements for per-character costume lookup
-          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
+          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingRaw, artStyle, streamingClothingRequirements);
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
           // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
-          if (clothingCategory !== 'costumed') {
+          if (!clothingRaw.startsWith('costumed')) {
             referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
           }
 
@@ -1431,9 +1413,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               log.debug(`🔲 [STORYBOOK] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
             }
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
-            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
+            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingRaw}, ${relevantEntries.length} visual bible entries)...`);
           } else {
-            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingRaw})...`);
           }
 
           // Build image prompt with only scene-specific characters and visual bible
@@ -1676,19 +1658,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
           // Use extracted clothing or parse from scene description
           const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-          // Handle costumed:type format
-          let frontCoverClothingCat = frontCoverClothing;
-          let frontCoverCostumeType = null;
-          if (frontCoverClothing.startsWith('costumed:')) {
-            frontCoverCostumeType = frontCoverClothing.split(':')[1];
-            frontCoverClothingCat = 'costumed';
-          }
           // Use detailed photo info (with names) for labeled reference images
           // Convert clothingRequirements to _currentClothing format so all characters use story costumes
           const convertedFrontClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
-          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothingCat, frontCoverCostumeType, artStyleId, convertedFrontClothingReqs);
+          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, artStyleId, convertedFrontClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
-          if (frontCoverClothingCat !== 'costumed') {
+          if (!frontCoverClothing.startsWith('costumed')) {
             frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
           }
           log.debug(`📕 [STORYBOOK] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars), clothing: ${frontCoverClothing}`);
@@ -1734,18 +1709,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.initialPage) {
           // Use extracted clothing or parse from scene description
           const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-          // Handle costumed:type format
-          let initialClothingCat = initialPageClothing;
-          let initialCostumeType = null;
-          if (initialPageClothing.startsWith('costumed:')) {
-            initialCostumeType = initialPageClothing.split(':')[1];
-            initialClothingCat = 'costumed';
-          }
           // Convert clothingRequirements to _currentClothing format so all characters use story costumes
           const convertedInitialClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
-          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialClothingCat, initialCostumeType, artStyleId, convertedInitialClothingReqs);
+          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, artStyleId, convertedInitialClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
-          if (initialClothingCat !== 'costumed') {
+          if (!initialPageClothing.startsWith('costumed')) {
             initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
           }
           log.debug(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
@@ -1799,18 +1767,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.backCover) {
           // Use extracted clothing or parse from scene description
           const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-          // Handle costumed:type format
-          let backClothingCat = backCoverClothing;
-          let backCostumeType = null;
-          if (backCoverClothing.startsWith('costumed:')) {
-            backCostumeType = backCoverClothing.split(':')[1];
-            backClothingCat = 'costumed';
-          }
           // Convert clothingRequirements to _currentClothing format so all characters use story costumes
           const convertedBackClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
-          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backClothingCat, backCostumeType, artStyleId, convertedBackClothingReqs);
+          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, artStyleId, convertedBackClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
-          if (backClothingCat !== 'costumed') {
+          if (!backCoverClothing.startsWith('costumed')) {
             backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
           }
           log.debug(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
@@ -2730,18 +2691,12 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
         frontCoverCharacters = frontCoverCharacters.slice(0, 5);
       }
       log.debug(`📕 [PIPELINE] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars)`);
-      const frontCoverClothingRaw = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-      let frontCoverClothing = frontCoverClothingRaw;
-      let frontCoverCostumeType = null;
-      if (frontCoverClothingRaw.startsWith('costumed:')) {
-        frontCoverClothing = 'costumed';
-        frontCoverCostumeType = frontCoverClothingRaw.split(':')[1];
-      }
+      const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
       // Convert clothingRequirements to _currentClothing format so all characters use story costumes
       const convertedPipelineClothingReqs = convertClothingToCurrentFormat(clothingRequirements);
-      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, frontCoverCostumeType, artStyle, convertedPipelineClothingReqs);
+      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, artStyle, convertedPipelineClothingReqs);
       // For non-costumed avatars, apply styled avatars from cache
-      if (frontCoverClothing !== 'costumed') {
+      if (!frontCoverClothing.startsWith('costumed')) {
         frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
       }
       const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
@@ -2769,16 +2724,10 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
       log.debug(`📕 [PIPELINE] Back cover: ${backCoverCharacters.map(c => c.name).join(', ')} (${backCoverCharacters.length} chars)`);
 
       // Initial page - pass artStyle for styled costumed avatars
-      const initialPageClothingRaw = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-      let initialPageClothing = initialPageClothingRaw;
-      let initialPageCostumeType = null;
-      if (initialPageClothingRaw.startsWith('costumed:')) {
-        initialPageClothing = 'costumed';
-        initialPageCostumeType = initialPageClothingRaw.split(':')[1];
-      }
+      const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
       // Use converted clothing requirements (defined earlier for front cover)
-      let initialPagePhotos = getCharacterPhotoDetails(initialPageCharacters, initialPageClothing, initialPageCostumeType, artStyle, convertedPipelineClothingReqs);
-      if (initialPageClothing !== 'costumed') {
+      let initialPagePhotos = getCharacterPhotoDetails(initialPageCharacters, initialPageClothing, artStyle, convertedPipelineClothingReqs);
+      if (!initialPageClothing.startsWith('costumed')) {
         initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
       }
       const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
@@ -2799,16 +2748,10 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
       coverPrompts.initialPage = initialPagePrompt;
 
       // Back cover - pass artStyle for styled costumed avatars
-      const backCoverClothingRaw = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-      let backCoverClothing = backCoverClothingRaw;
-      let backCoverCostumeType = null;
-      if (backCoverClothingRaw.startsWith('costumed:')) {
-        backCoverClothing = 'costumed';
-        backCoverCostumeType = backCoverClothingRaw.split(':')[1];
-      }
+      const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
       // Use converted clothing requirements (defined earlier for front cover)
-      let backCoverPhotos = getCharacterPhotoDetails(backCoverCharacters, backCoverClothing, backCoverCostumeType, artStyle, convertedPipelineClothingReqs);
-      if (backCoverClothing !== 'costumed') {
+      let backCoverPhotos = getCharacterPhotoDetails(backCoverCharacters, backCoverClothing, artStyle, convertedPipelineClothingReqs);
+      if (!backCoverClothing.startsWith('costumed')) {
         backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
       }
       const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
@@ -3113,19 +3056,12 @@ Output Format:
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             const clothingRaw = parseClothingCategory(sceneDescription) || 'standard';
-            // Parse costumed:pirate format
-            let clothingCategory = clothingRaw;
-            let costumeType = null;
-            if (clothingRaw.startsWith('costumed:')) {
-              clothingCategory = 'costumed';
-              costumeType = clothingRaw.split(':')[1];
-            }
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
             // Pass artStyle and clothingRequirements for per-character costume lookup
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, clothingRequirements);
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingRaw, artStyle, clothingRequirements);
             // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
-            if (clothingCategory !== 'costumed') {
+            if (!clothingRaw.startsWith('costumed')) {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             }
 
@@ -3666,20 +3602,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             // Parse clothing category from scene description
             const clothingRaw = parseClothingCategory(sceneDescription) || 'standard';
-            // Parse costumed:pirate format
-            let clothingCategory = clothingRaw;
-            let costumeType = null;
-            if (clothingRaw.startsWith('costumed:')) {
-              clothingCategory = 'costumed';
-              costumeType = clothingRaw.split(':')[1];
-            }
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
             // Use detailed photo info (with names) for labeled reference images
             // Pass artStyle and clothingRequirements for per-character costume lookup
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, clothingRequirements);
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingRaw, artStyle, clothingRequirements);
             // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
-            if (clothingCategory !== 'costumed') {
+            if (!clothingRaw.startsWith('costumed')) {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             }
 
@@ -3791,7 +3720,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               // Build clothing info for each character in this scene
               const clothingInfo = {};
               for (const char of sceneCharacters) {
-                const charClothing = char.clothing?.current?.[clothingCategory] || char.clothing?.current?.standard || null;
+                const charClothing = char.clothing?.current?.[clothingRaw.split(':')[0]] || char.clothing?.current?.standard || null;
                 clothingInfo[char.name] = charClothing
                   ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
                   : clothingRaw;

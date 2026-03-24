@@ -79,13 +79,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const visualBible = storyData.visualBible || null;
 
   // Parse clothing from scene description
-  let coverClothing = parseClothingCategory(sceneDescription) || 'standard';
-  let effectiveCoverClothing = coverClothing;
-  let coverCostumeType = null;
-  if (coverClothing?.startsWith('costumed:')) {
-    coverCostumeType = coverClothing.split(':')[1];
-    effectiveCoverClothing = 'costumed';
-  }
+  const coverClothing = parseClothingCategory(sceneDescription) || 'standard';
   const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
 
   // Merge avatars with fresh characters if provided
@@ -116,7 +110,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
       selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
     }
-    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
   } else {
     const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
     const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
@@ -125,11 +119,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
       ? nonMainChars.slice(0, halfPoint).slice(0, extraSlots)
       : nonMainChars.slice(halfPoint).slice(0, extraSlots);
     selectedCoverCharacters = [...mainCapped, ...extras];
-    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
   }
 
   // Apply styled avatars
-  if (effectiveCoverClothing !== 'costumed') {
+  if (!coverClothing.startsWith('costumed')) {
     coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
   }
 

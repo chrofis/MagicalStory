@@ -1477,7 +1477,7 @@ function parseSceneHintMetadata(sceneHint) {
  * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters, defaultClothing = null, costumeType = null, artStyle = null, clothingRequirements = null) {
+function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle = null, clothingRequirements = null) {
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
@@ -1504,123 +1504,37 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, costumeTyp
       // Check for per-character clothing from scene (_currentClothing field)
       // This overrides the defaultClothing for this specific character
       let resolvedClothing = defaultClothing;
-      let resolvedCostumeType = costumeType;
       if (clothingRequirements && clothingRequirements[char.name]?._currentClothing) {
-        const charCurrentClothing = clothingRequirements[char.name]._currentClothing;
-        if (charCurrentClothing.startsWith('costumed:')) {
-          resolvedClothing = 'costumed';
-          resolvedCostumeType = charCurrentClothing.split(':')[1];
-          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${charCurrentClothing}`);
-        } else {
-          resolvedClothing = charCurrentClothing;
-          resolvedCostumeType = null;
-          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
-        }
+        resolvedClothing = clothingRequirements[char.name]._currentClothing;
+        log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
+      }
+      // Normalize: costumed:anything → costumed (only one costume per story)
+      if (resolvedClothing && resolvedClothing.startsWith('costumed')) {
+        resolvedClothing = 'costumed';
       }
 
-      // Handle costumed category - check styled avatars first, then regular costumed
+      // Handle costumed category — one costume per story, just grab the first
       if (resolvedClothing === 'costumed') {
-        // If specific costumeType provided, use it; otherwise look up from clothingRequirements
-        let costumeKey = resolvedCostumeType?.toLowerCase();
+        // Check styled costumed avatars first (generated during this story's creation)
+        if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed) {
+          const costumeEntries = Object.entries(avatars.styledAvatars[artStyle].costumed);
+          if (costumeEntries.length > 0) {
+            const [key, data] = costumeEntries[0];
+            photoUrl = (typeof data === 'object' && data.imageData) ? data.imageData : data;
+            photoType = `costumed-${key}`;
+            actualClothingUsed = 'costumed';
+            log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${key}"`);
 
-        // Look up costume type from clothingRequirements (per-character)
-        // clothingRequirements can be:
-        // - Nested: { "CharName": { "costumed": { "costume": "superhero", "used": true } } }
-        // - Flat: { "CharName": "costumed:superhero" }
-        // - With _currentClothing: { "CharName": { "_currentClothing": "costumed:superhero" } }
-        if (!costumeKey && clothingRequirements) {
-          const charClothing = clothingRequirements[char.name];
-          if (typeof charClothing === 'string' && charClothing.startsWith('costumed:')) {
-            // Flat format
-            costumeKey = charClothing.split(':')[1].toLowerCase();
-            log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from flat clothingRequirements`);
-          } else if (charClothing && typeof charClothing === 'object') {
-            // Bug #11 fix: Handle multiple nested formats
-            // Format 1: { _currentClothing: "costumed:X" } - check this first (already handled above, but double-check)
-            if (charClothing._currentClothing && charClothing._currentClothing.startsWith('costumed:')) {
-              costumeKey = charClothing._currentClothing.split(':')[1].toLowerCase();
-              log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from _currentClothing`);
-            }
-            // Format 2: { costumed: { costume: "X", used: true } }
-            else if (charClothing.costumed) {
-              if (charClothing.costumed.costume) {
-                // Accept costume even if 'used' is not explicitly true (backwards compat)
-                // Many places set costume without the 'used' flag
-                costumeKey = charClothing.costumed.costume.toLowerCase();
-                log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from nested clothingRequirements (used: ${charClothing.costumed.used})`);
+            // Get clothing description
+            if (avatars?.clothing?.costumed) {
+              const clothingDesc = Object.values(avatars.clothing.costumed)[0];
+              if (clothingDesc) {
+                clothingDescription = typeof clothingDesc === 'string' ? clothingDesc : formatClothingObject(clothingDesc);
               }
             }
           }
         }
-
-        // Auto-detect costume from styledAvatars or regular costumed (fallback)
-        if (!costumeKey) {
-          // First check styled avatars for this art style
-          if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed) {
-            const styledCostumes = Object.keys(avatars.styledAvatars[artStyle].costumed);
-            if (styledCostumes.length > 0) {
-              costumeKey = styledCostumes[0];
-              log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found styled costume "${costumeKey}" for ${artStyle}`);
-            }
-          }
-          // Then check regular costumed avatars
-          if (!costumeKey && avatars?.costumed) {
-            const regularCostumes = Object.keys(avatars.costumed);
-            if (regularCostumes.length > 0) {
-              costumeKey = regularCostumes[0];
-              log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found costume "${costumeKey}"`);
-            }
-          }
-        }
-
-        if (costumeKey) {
-          // Helper: find costume key by prefix match (handles truncated names from streaming)
-          const findCostumeByPrefix = (costumeObj, prefix) => {
-            if (!costumeObj || !prefix) return null;
-            // First try exact match
-            if (costumeObj[prefix]) return prefix;
-            // Case-insensitive match
-            const prefixLower = prefix.toLowerCase();
-            const matchingKey = Object.keys(costumeObj).find(key =>
-              key.toLowerCase() === prefixLower || key.toLowerCase().startsWith(prefixLower) || prefixLower.startsWith(key.toLowerCase())
-            );
-            if (matchingKey) {
-              log.debug(`[AVATAR LOOKUP] Fuzzy match: "${prefix}" -> "${matchingKey}"`);
-              return matchingKey;
-            }
-            // Last resort: just use the first costumed avatar (one costume per story)
-            const firstKey = Object.keys(costumeObj)[0];
-            if (firstKey) {
-              log.debug(`[AVATAR LOOKUP] Using first available costume: "${firstKey}" (wanted "${prefix}")`);
-              return firstKey;
-            }
-            return null;
-          };
-
-          // Check styled costumed avatars (generated during this story's creation)
-          // No fallback to base costumed - different stories have different costumes
-          const foundKey = artStyle && findCostumeByPrefix(avatars?.styledAvatars?.[artStyle]?.costumed, costumeKey);
-
-          if (foundKey) {
-            // Handle legacy object format {imageData, clothing} if present
-            const styledCostumedData = avatars.styledAvatars[artStyle].costumed[foundKey];
-            photoUrl = (typeof styledCostumedData === 'object' && styledCostumedData.imageData)
-              ? styledCostumedData.imageData
-              : styledCostumedData;
-            photoType = `costumed-${foundKey}`;
-            actualClothingUsed = `costumed:${foundKey}`;
-            log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
-
-            // Get clothing description from separate clothing object
-            if (avatars?.clothing?.costumed?.[foundKey]) {
-              const clothingData = avatars.clothing.costumed[foundKey];
-              clothingDescription = typeof clothingData === 'string'
-                ? clothingData
-                : formatClothingObject(clothingData);
-            }
-          }
-          // If not found, will fall through to standard avatar fallback below
-        }
+        // If not found, will fall through to standard avatar fallback below
       }
       // Check styled avatars first (with signature items from this story)
       else if (resolvedClothing && resolvedClothing !== 'costumed' &&
@@ -1773,9 +1687,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, costumeTyp
         photoType,
         photoUrl,
         photoHash: getImagesModule().hashImageData(photoUrl),  // For dev mode verification
-        clothingCategory: actualClothingUsed
-          || (resolvedClothing === 'costumed' && resolvedCostumeType ? `costumed:${resolvedCostumeType}` : resolvedClothing)
-          || null,
+        clothingCategory: actualClothingUsed || resolvedClothing || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'
       };
