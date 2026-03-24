@@ -3399,11 +3399,11 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
   const backgroundChars = [];
 
   for (const sc of sceneChars) {
-    // Match depth values: "background", "midground" treated as background for iterative placement
-    // Also check position for "far background" patterns from the iteration prompt
+    // Only "background" depth triggers two-pass (midground is close enough for single-pass)
+    // Also check position string for "background" patterns from the iteration prompt
     const depth = (sc.depth || '').toLowerCase();
     const position = (sc.position || '').toLowerCase();
-    if (depth === 'background' || depth === 'midground' || position.includes('far background')) {
+    if (depth === 'background' || position.includes('background')) {
       backgroundChars.push(sc);
     } else {
       foregroundChars.push(sc);
@@ -5408,12 +5408,12 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const newSceneMetadata = extractSceneMetadata(newSceneDescription);
   const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
 
-  let vbGrid = null;
+  let visualBibleGrid = null;
   if (visualBible) {
     const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
     const secondaryLandmarks = pageLandmarkPhotos.slice(1);
     if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-      vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
     }
   }
 
@@ -5452,7 +5452,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
     { imageModel: imageModelId },
     `PAGE ${pageNumber} ITERATE`,
-    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacters, sceneMetadata: newSceneMetadata }
+    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata }
   );
 
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
@@ -5469,7 +5469,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     totalAttempts: imageResult.totalAttempts,
     referencePhotos,
     landmarkPhotos: pageLandmarkPhotos,
-    visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+    visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
     method: 'iterate'
   };
 }
