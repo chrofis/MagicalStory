@@ -4300,7 +4300,13 @@ export function StoryDisplay({
                                 pageNumber={pageNumber}
                                 language={language}
                                 onClose={() => setTestModelsPage(null)}
-                                onUseImage={() => {
+                                onUseImage={async (imageData, _modelId) => {
+                                  try {
+                                    await storyService.updateSceneImage(storyId!, pageNumber, imageData);
+                                    if (onRefreshStory) await onRefreshStory();
+                                  } catch (err) {
+                                    console.error('Failed to save test model image:', err);
+                                  }
                                   setTestModelsPage(null);
                                 }}
                               />
@@ -4896,7 +4902,13 @@ export function StoryDisplay({
                                 pageNumber={pageNumber}
                                 language={language}
                                 onClose={() => setTestModelsPage(null)}
-                                onUseImage={() => {
+                                onUseImage={async (imageData, _modelId) => {
+                                  try {
+                                    await storyService.updateSceneImage(storyId!, pageNumber, imageData);
+                                    if (onRefreshStory) await onRefreshStory();
+                                  } catch (err) {
+                                    console.error('Failed to save test model image:', err);
+                                  }
                                   setTestModelsPage(null);
                                 }}
                               />
