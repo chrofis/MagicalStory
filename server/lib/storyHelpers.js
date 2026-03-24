@@ -1471,13 +1471,13 @@ function parseSceneHintMetadata(sceneHint) {
 /**
  * Get detailed photo info for characters (for dev mode display)
  * @param {Array} characters - Array of character objects
- * @param {string} clothingCategory - Optional clothing category to show which avatar is used
+ * @param {string} defaultClothing - Optional clothing category to show which avatar is used
  * @param {string} costumeType - Optional costume type for 'costumed' category (e.g., 'pirate', 'superhero')
  * @param {string} artStyle - Optional art style to look for styled avatars first
  * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters, clothingCategory = null, costumeType = null, artStyle = null, clothingRequirements = null) {
+function getCharacterPhotoDetails(characters, defaultClothing = null, costumeType = null, artStyle = null, clothingRequirements = null) {
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
@@ -1499,29 +1499,29 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       const photos = char.photos || {};
 
       let clothingDescription = null;
-      let usedClothingCategory = null;
+      let actualClothingUsed = null;
 
       // Check for per-character clothing from scene (_currentClothing field)
-      // This overrides the default clothingCategory for this specific character
-      let effectiveClothingCategory = clothingCategory;
-      let effectiveCostumeType = costumeType;
+      // This overrides the defaultClothing for this specific character
+      let resolvedClothing = defaultClothing;
+      let resolvedCostumeType = costumeType;
       if (clothingRequirements && clothingRequirements[char.name]?._currentClothing) {
         const charCurrentClothing = clothingRequirements[char.name]._currentClothing;
         if (charCurrentClothing.startsWith('costumed:')) {
-          effectiveClothingCategory = 'costumed';
-          effectiveCostumeType = charCurrentClothing.split(':')[1];
+          resolvedClothing = 'costumed';
+          resolvedCostumeType = charCurrentClothing.split(':')[1];
           log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${charCurrentClothing}`);
         } else {
-          effectiveClothingCategory = charCurrentClothing;
-          effectiveCostumeType = null;
-          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${effectiveClothingCategory}`);
+          resolvedClothing = charCurrentClothing;
+          resolvedCostumeType = null;
+          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
         }
       }
 
       // Handle costumed category - check styled avatars first, then regular costumed
-      if (effectiveClothingCategory === 'costumed') {
+      if (resolvedClothing === 'costumed') {
         // If specific costumeType provided, use it; otherwise look up from clothingRequirements
-        let costumeKey = effectiveCostumeType?.toLowerCase();
+        let costumeKey = resolvedCostumeType?.toLowerCase();
 
         // Look up costume type from clothingRequirements (per-character)
         // clothingRequirements can be:
@@ -1608,7 +1608,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
               ? styledCostumedData.imageData
               : styledCostumedData;
             photoType = `costumed-${foundKey}`;
-            usedClothingCategory = `costumed:${foundKey}`;
+            actualClothingUsed = `costumed:${foundKey}`;
             log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
 
             // Get clothing description from separate clothing object
@@ -1623,31 +1623,31 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         }
       }
       // Check styled avatars first (with signature items from this story)
-      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' &&
-               artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
+      else if (resolvedClothing && resolvedClothing !== 'costumed' &&
+               artStyle && avatars?.styledAvatars?.[artStyle]?.[resolvedClothing]) {
         // Handle legacy object format {imageData, clothing} if present
-        const styledData = avatars.styledAvatars[artStyle][effectiveClothingCategory];
+        const styledData = avatars.styledAvatars[artStyle][resolvedClothing];
         photoUrl = (typeof styledData === 'object' && styledData.imageData)
           ? styledData.imageData
           : styledData;
-        photoType = `styled-${effectiveClothingCategory}`;
-        usedClothingCategory = effectiveClothingCategory;
-        log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
+        photoType = `styled-${resolvedClothing}`;
+        actualClothingUsed = resolvedClothing;
+        log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${resolvedClothing} for ${artStyle}`);
 
         // Fallback to avatars.clothing if not already set from avatarData
-        if (!clothingDescription && avatars?.clothing?.[effectiveClothingCategory]) {
-          const clothingData = avatars.clothing[effectiveClothingCategory];
+        if (!clothingDescription && avatars?.clothing?.[resolvedClothing]) {
+          const clothingData = avatars.clothing[resolvedClothing];
           clothingDescription = typeof clothingData === 'string'
             ? clothingData
             : formatClothingObject(clothingData);
-          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${effectiveClothingCategory} for styled avatar`);
+          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${resolvedClothing} for styled avatar`);
         }
       }
       // Fall back to unstyled clothing avatar (standard, winter, summer)
-      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
-        photoType = `clothing-${effectiveClothingCategory}`;
+      else if (resolvedClothing && resolvedClothing !== 'costumed' && avatars && avatars[resolvedClothing]) {
+        photoType = `clothing-${resolvedClothing}`;
         // Handle various legacy formats: arrays, {imageData, clothing} objects
-        const avatarData = avatars[effectiveClothingCategory];
+        const avatarData = avatars[resolvedClothing];
         if (Array.isArray(avatarData)) {
           photoUrl = avatarData[0];
         } else if (typeof avatarData === 'object' && avatarData.imageData) {
@@ -1655,17 +1655,17 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         } else {
           photoUrl = avatarData;
         }
-        usedClothingCategory = effectiveClothingCategory;
+        actualClothingUsed = resolvedClothing;
         // Get extracted clothing description for this avatar
-        if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
-          const clothingData = avatars.clothing[effectiveClothingCategory];
+        if (avatars.clothing && avatars.clothing[resolvedClothing]) {
+          const clothingData = avatars.clothing[resolvedClothing];
           clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
         }
-        log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${effectiveClothingCategory} (no styled avatar found)`);
+        log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${resolvedClothing} (no styled avatar found)`);
       }
 
       // Backwards compatibility: use legacy 'formal' avatar for costumed requests
-      if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
+      if (!photoUrl && resolvedClothing === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
         // Handle various legacy formats: arrays, {imageData, clothing} objects
@@ -1677,7 +1677,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         } else {
           photoUrl = formalData;
         }
-        usedClothingCategory = 'formal';
+        actualClothingUsed = 'formal';
         if (avatars.clothing?.formal) {
           const clothingData = avatars.clothing.formal;
           clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
@@ -1687,8 +1687,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Try fallback clothing avatars before falling back to body photo
       // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars
       // applyStyledAvatars() will convert to target style via fresh cache
-      if (!photoUrl && effectiveClothingCategory && avatars) {
-        const fallbacks = clothingFallbackOrder[effectiveClothingCategory] || ['standard', 'summer', 'winter'];
+      if (!photoUrl && resolvedClothing && avatars) {
+        const fallbacks = clothingFallbackOrder[resolvedClothing] || ['standard', 'summer', 'winter'];
 
         // Check unstyled avatars only (styling applied later via cache)
         for (const fallbackCategory of fallbacks) {
@@ -1703,12 +1703,12 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             } else {
               photoUrl = fallbackData;
             }
-            usedClothingCategory = fallbackCategory;
+            actualClothingUsed = fallbackCategory;
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
               clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
             }
-            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using unstyled ${fallbackCategory}`);
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${resolvedClothing}, using unstyled ${fallbackCategory}`);
             break;
           }
         }
@@ -1738,7 +1738,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
 
       // Bug #9 fix: Log when no photo found for a character
       if (!photoUrl) {
-        const searchedFor = effectiveClothingCategory || clothingCategory || 'any';
+        const searchedFor = resolvedClothing || defaultClothing || 'any';
         const hasAvatars = !!avatars;
         const hasPhotos = Object.keys(photos).length > 0;
         log.warn(`[PHOTO LOOKUP] No photo found for "${char.name}" (wanted: ${searchedFor}, hasAvatars: ${hasAvatars}, hasPhotos: ${hasPhotos})`);
@@ -1748,7 +1748,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // This is needed because metadata strips avatar IMAGES but keeps clothing DESCRIPTIONS
       // The actual image comes from styled avatar cache, but description is in character data
       if (!clothingDescription && avatars?.clothing) {
-        const categoryToCheck = usedClothingCategory || effectiveClothingCategory;
+        const categoryToCheck = actualClothingUsed || resolvedClothing;
         if (categoryToCheck && avatars.clothing[categoryToCheck]) {
           const clothingData = avatars.clothing[categoryToCheck];
           clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
@@ -1760,7 +1760,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" } } }
       if (!clothingDescription && clothingRequirements && clothingRequirements[char.name]) {
         const charReqs = clothingRequirements[char.name];
-        const categoryToCheck = usedClothingCategory || effectiveClothingCategory;
+        const categoryToCheck = actualClothingUsed || resolvedClothing;
         if (categoryToCheck && charReqs[categoryToCheck]?.signature) {
           clothingDescription = charReqs[categoryToCheck].signature;
           log.debug(`[CLOTHING DESC] ${char.name}: using signature from clothingRequirements: "${clothingDescription}"`);
@@ -1773,8 +1773,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         photoType,
         photoUrl,
         photoHash: getImagesModule().hashImageData(photoUrl),  // For dev mode verification
-        clothingCategory: usedClothingCategory
-          || (effectiveClothingCategory === 'costumed' && effectiveCostumeType ? `costumed:${effectiveCostumeType}` : effectiveClothingCategory)
+        clothingCategory: actualClothingUsed
+          || (resolvedClothing === 'costumed' && resolvedCostumeType ? `costumed:${resolvedCostumeType}` : resolvedClothing)
           || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'
