@@ -5136,25 +5136,29 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array — alternative versions only.
-    // Active version is stored as scene.imageData (DB version_index 0).
-    // Including it here would create a duplicate.
+    // Build imageVersions array — ALL versions, best first at index 0.
+    // Index 0 = scene.imageData = DB version_index 0 (unified mapping).
     const imageVersions = [];
+    const buildVersionEntry = (v) => ({
+      imageData: v.imageData,
+      qualityScore: v.score,
+      source: v.source,
+      type: v.source === 'original' ? 'original' : 'repair',
+      modelId: v.modelId,
+      generatedAt: new Date().toISOString(),
+      qualityReasoning: v.evaluation?.reasoning || null,
+      fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
+      bboxDetection: v.evaluation?.bboxDetection || null,
+      description: img.sceneDescription || null,
+      prompt: img.prompt || null,
+      isActive: v === best && !charFix
+    });
+    // Best version first (index 0 = active = scene.imageData)
+    if (best) imageVersions.push(buildVersionEntry(best));
+    // Then remaining versions in original order
     for (const v of versions) {
-      if (v === best && !charFix) continue;  // active version is scene.imageData
-      imageVersions.push({
-        imageData: v.imageData,
-        qualityScore: v.score,
-        source: v.source,
-        type: v.source === 'original' ? 'original' : 'repair',
-        modelId: v.modelId,
-        generatedAt: new Date().toISOString(),
-        qualityReasoning: v.evaluation?.reasoning || null,
-        fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
-        bboxDetection: v.evaluation?.bboxDetection || null,
-        description: img.sceneDescription || null,
-        prompt: img.prompt || null
-      });
+      if (v === best) continue;
+      imageVersions.push(buildVersionEntry(v));
     }
 
     // Build retryHistory
