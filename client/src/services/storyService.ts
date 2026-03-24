@@ -1147,7 +1147,7 @@ export const storyService = {
   },
 
   // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
-  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
+  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; iterativePlacement?: boolean; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
     success: boolean;
     pageNumber: number;
     // What the vision model saw
@@ -1225,7 +1225,7 @@ export const storyService = {
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,
-      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
+      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.iterativePlacement && { iterativePlacement: true }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
     );
     return response;
   },
