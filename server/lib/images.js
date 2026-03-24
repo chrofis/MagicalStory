@@ -6656,6 +6656,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   // Store all attempts for dev mode
   const retryHistory = [];
 
+  // Track bbox detection across attempts (declared outside loop so return after loop can access them)
+  let bboxDetectionHistory = null;
+  let bboxOverlayImage = null;
+  let enrichedFixTargets = null;
+
   while (attempts < MAX_ATTEMPTS) {
     attempts++;
     log.debug(`🎨 [QUALITY RETRY] ${pageLabel}Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
@@ -6865,9 +6870,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Determine if we should repair based on unified report or just quality
     let shouldRepair = false;
     let fixTargetsToUse = [];
-    let bboxDetectionHistory = null;  // Track two-stage detection for dev mode display
-    let bboxOverlayImage = null;  // Image with boxes drawn for dev mode
-    let enrichedFixTargets = null;
+    bboxDetectionHistory = null;  // Reset for this attempt
+    bboxOverlayImage = null;
+    enrichedFixTargets = null;
 
     // ALWAYS run bbox detection for every image (figure locations needed for other features)
     // This runs regardless of whether issues were found, incrEnabled, or autoRepair settings
