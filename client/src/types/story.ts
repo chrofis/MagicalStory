@@ -942,9 +942,11 @@ export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | '
 
 export interface PageFeedback {
   pageNumber: number;
+  /** Raw visual quality score from Gemini eval (before semantic/entity penalties) */
   qualityScore?: number;
   semanticScore?: number | null;
   entityPenalty?: number;
+  /** Final combined score = qualityScore - semanticPenalties - entityPenalties. Used for redo threshold. */
   score?: number;
   verdict?: string;
   issuesSummary?: string;

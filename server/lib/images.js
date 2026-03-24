@@ -1082,6 +1082,11 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         semantic_output_tokens: semanticUsage.output_tokens || 0
       };
 
+      // SCORE NAMING CONVENTION (counterintuitive but intentional):
+      // - score:        FINAL penalized score = visual - semantic - entity penalties. Used for redo decisions.
+      // - qualityScore: RAW visual quality score from Gemini eval only (before any penalties).
+      // - semanticScore: Separate semantic fidelity score (0-100, null if not evaluated).
+      // When writing to scene.qualityScore in DB, use evaluation.qualityScore (NOT evaluation.score).
       return {
         score: finalScore,                    // Combined final score
         qualityScore: score,                  // Visual quality score only

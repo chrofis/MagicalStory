@@ -574,17 +574,17 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Get the current image before regenerating (to store as previous version)
     let sceneImages = storyData.sceneImages || [];
-    const existingImage = sceneImages.find(img => img.pageNumber === pageNumber);
-    const previousImageData = existingImage?.imageData || null;
-    const previousScore = existingImage?.qualityScore || null;
-    const previousReasoning = existingImage?.qualityReasoning || null;
-    const previousPrompt = existingImage?.prompt || null;
+    const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
+    const previousImageData = currentImage?.imageData || null;
+    const previousScore = currentImage?.qualityScore || null;
+    const previousReasoning = currentImage?.qualityReasoning || null;
+    const previousPrompt = currentImage?.prompt || null;
     // Keep the true original if this was already regenerated before
-    const trueOriginalImage = existingImage?.originalImage || previousImageData;
-    const trueOriginalScore = existingImage?.originalScore || previousScore;
-    const trueOriginalReasoning = existingImage?.originalReasoning || previousReasoning;
+    const trueOriginalImage = currentImage?.originalImage || previousImageData;
+    const trueOriginalScore = currentImage?.originalScore || previousScore;
+    const trueOriginalReasoning = currentImage?.originalReasoning || previousReasoning;
 
-    log.debug(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!existingImage?.originalImage})`);
+    log.debug(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!currentImage?.originalImage})`);
 
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
@@ -631,9 +631,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
       regeneratedAt: new Date().toISOString(),
-      regenerationCount: (existingImage?.regenerationCount || 0) + 1,
+      regenerationCount: (currentImage?.regenerationCount || 0) + 1,
       // Preserve clothing data from original image for entity consistency
-      sceneCharacterClothing: existingImage?.sceneCharacterClothing || existingImage?.characterClothing || null
+      sceneCharacterClothing: currentImage?.sceneCharacterClothing || currentImage?.characterClothing || null
     };
 
     log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
@@ -3092,7 +3092,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         }
 
         // Update scene with new evaluation
-        scene.qualityScore = evaluation.score;
+        scene.qualityScore = evaluation.qualityScore ?? evaluation.score;
         scene.qualityReasoning = evaluation.reasoning;
         scene.semanticScore = evaluation.semanticScore ?? null;
         scene.semanticResult = evaluation.semanticResult ?? null;

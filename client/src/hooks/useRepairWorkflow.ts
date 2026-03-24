@@ -450,8 +450,8 @@ export function useRepairWorkflow({
           entityPenalty += ENTITY_PENALTIES[si.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         feedback.entityPenalty = entityPenalty;
-        // Use qualityScore (visual-quality-only) as base; scene.score already has entity
-        // penalties baked in from the last evaluation, so using it would double-penalise.
+        // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.
+        // Use qualityScore as base, subtract entity penalties to get final score.
         const baseScore = feedback.qualityScore ?? 100;
         feedback.score = Math.max(0, baseScore - entityPenalty);
 
