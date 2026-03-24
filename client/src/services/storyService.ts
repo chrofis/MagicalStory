@@ -1230,6 +1230,33 @@ export const storyService = {
     return response;
   },
 
+  // Test multiple image models on the same page (admin only, no credits, ephemeral)
+  async testModels(storyId: string, pageNumber: number, models: string[]): Promise<{
+    results: Record<string, {
+      imageData?: string;
+      modelId: string;
+      elapsed: number;
+      usage?: { input_tokens: number; output_tokens: number };
+      error?: string;
+    }>;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      pageNumber: number;
+      results: Record<string, {
+        imageData?: string;
+        modelId: string;
+        elapsed: number;
+        usage?: { input_tokens: number; output_tokens: number };
+        error?: string;
+      }>;
+    }>(
+      `/api/stories/${storyId}/test-models/${pageNumber}`,
+      { models }
+    );
+    return response;
+  },
+
   // Update scene image directly (admin only - for reverting repairs)
   async updateSceneImage(storyId: string, pageNumber: number, imageData: string): Promise<{
     success: boolean;

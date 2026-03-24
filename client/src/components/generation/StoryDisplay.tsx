@@ -9,6 +9,7 @@ import { RetryHistoryDisplay, ObjectDetectionDisplay, ReferencePhotosDisplay, Sc
 import type { GenerationSettings } from './story';
 import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
+import { TestModelsPanel } from './TestModelsPanel';
 
 interface StoryTextPrompt {
   batch: number;
@@ -280,6 +281,8 @@ export function StoryDisplay({
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
   const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
+  // Test Models panel: which page is showing the comparison
+  const [testModelsPage, setTestModelsPage] = useState<number | null>(null);
 
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
@@ -4281,7 +4284,26 @@ export function StoryDisplay({
                                     </div>
                                   </div>
                                 )}
+                                {/* Test Models button */}
+                                <button
+                                  onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
+                                  className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                                >
+                                  <Images size={14} />
+                                  Test Models
+                                </button>
                               </div>
+                            )}
+                            {testModelsPage === pageNumber && storyId && (
+                              <TestModelsPanel
+                                storyId={storyId}
+                                pageNumber={pageNumber}
+                                language={language}
+                                onClose={() => setTestModelsPage(null)}
+                                onUseImage={() => {
+                                  setTestModelsPage(null);
+                                }}
+                              />
                             )}
 
                             {/* Auto-Repair button - dev only */}
@@ -4858,7 +4880,26 @@ export function StoryDisplay({
                                     </div>
                                   </div>
                                 )}
+                                {/* Test Models button */}
+                                <button
+                                  onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
+                                  className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                                >
+                                  <Images size={14} />
+                                  Test Models
+                                </button>
                               </div>
+                            )}
+                            {testModelsPage === pageNumber && storyId && (
+                              <TestModelsPanel
+                                storyId={storyId}
+                                pageNumber={pageNumber}
+                                language={language}
+                                onClose={() => setTestModelsPage(null)}
+                                onUseImage={() => {
+                                  setTestModelsPage(null);
+                                }}
+                              />
                             )}
 
                             {/* Auto-Repair button - dev only */}

@@ -15,7 +15,7 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS } = require('../config/models');
+const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
 // Services
 const { log } = require('../utils/logger');
@@ -45,6 +45,7 @@ const {
   ART_STYLES
 } = require('../lib/storyHelpers');
 const {
+  generateImageOnly,
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
@@ -825,6 +826,85 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     log.error('Error regenerating image:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
     res.status(500).json({ error: isAdmin ? 'Failed to regenerate image: ' + err.message : 'Failed to regenerate image' });
+  }
+});
+
+// Test multiple image models on the same page (ADMIN ONLY, no credits, ephemeral results)
+router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { models } = req.body;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+    // Validate models
+    if (!Array.isArray(models) || models.length === 0) return res.status(400).json({ error: 'models array required' });
+    const unknown = models.filter(m => !IMAGE_MODELS[m]);
+    if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
+    // Load story
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    const artStyle = storyData.artStyle || 'pixar';
+    const visualBible = storyData.visualBible || null;
+    const clothingReqs = storyData.clothingRequirements || null;
+    // Resolve scene description, characters, and prompt
+    let prompt, characterPhotos, landmarkPhotos = [], vbGrid = null;
+    if (pageNumber < 0) {
+      const coverType = getCoverType(pageNumber);
+      if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
+      const cover = getCoverData(storyData, coverType);
+      if (!cover) return res.status(400).json({ error: `No cover found for ${coverType}` });
+      const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
+      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', null, artStyle, clothingReqs);
+      prompt = buildImagePrompt(cover.description || '', storyData, chars, true, visualBible, pageNumber, true, characterPhotos);
+    } else {
+      const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+      if (!sceneDesc) return res.status(400).json({ error: `No scene description for page ${pageNumber}` });
+      const desc = sceneDesc.description || '';
+      const chars = getCharactersInScene(desc, storyData.characters || []);
+      const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
+      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
+      let costumeType = null, effClothing = clothing;
+      if (clothing.startsWith('costumed:')) { costumeType = clothing.split(':')[1]; effClothing = 'costumed'; }
+      characterPhotos = getCharacterPhotoDetails(chars, effClothing, costumeType, artStyle, clothingReqs);
+      if (effClothing !== 'costumed') characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
+      const meta = extractSceneMetadata(desc);
+      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, meta) : [];
+      if (visualBible) {
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+        const secLm = landmarkPhotos.slice(1);
+        if (elRefs.length > 0 || secLm.length > 0) vbGrid = await buildVisualBibleGrid(elRefs, secLm);
+      }
+      prompt = buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
+    }
+    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models`);
+    // Run all models in parallel
+    const results = {};
+    const settled = await Promise.allSettled(models.map(async (model) => {
+      const start = Date.now();
+      const result = await generateImageOnly(prompt, characterPhotos, {
+        imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
+        landmarkPhotos, visualBibleGrid: vbGrid, pageNumber, skipCache: true
+      });
+      return { model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null };
+    }));
+    for (const [i, s] of settled.entries()) {
+      if (s.status === 'fulfilled') {
+        const r = s.value;
+        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage };
+      } else {
+        results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
+      }
+    }
+    res.json({ success: true, pageNumber, results });
+  } catch (err) {
+    log.error('Error in test-models:', err);
+    res.status(500).json({ error: 'Failed to test models: ' + err.message });
   }
 });
 
