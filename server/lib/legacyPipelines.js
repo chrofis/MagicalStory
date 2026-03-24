@@ -709,12 +709,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
         // VB elements are NO LONGER added individually to referencePhotos
-        let vbGrid = null;
+        let visualBibleGrid = null;
         if (vBible) {
           const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 6);
           const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
           if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-            vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+            visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
             log.debug(`🔲 [STREAM-IMG] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
           }
           const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
@@ -771,9 +771,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
-            // Pass vbGrid for combined reference (instead of individual VB element photos)
+            // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: streamingIncrConfig, sceneCharacters });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: streamingIncrConfig, sceneCharacters });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -807,7 +807,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalReasoning: imageResult.originalReasoning || null,
           referencePhotos,  // Dev mode: which character photos were used
           landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
-          visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,  // Dev mode: VB grid used
+          visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,  // Dev mode: VB grid used
           modelId: imageResult.modelId || null
         };
 
@@ -1422,12 +1422,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
           // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
           // VB elements are NO LONGER added individually to referencePhotos
-          let vbGrid = null;
+          let visualBibleGrid = null;
           if (vBible) {
             const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 6);
             const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
             if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-              vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+              visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
               log.debug(`🔲 [STORYBOOK] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
             }
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
@@ -1461,14 +1461,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // Pass labeled character photos (name + photoUrl)
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
-              // Pass vbGrid for combined reference (instead of individual VB element photos)
+              // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
               // Add current page's characters to incremental consistency config
               const incrConfigWithCurrentChars = incrConfig ? {
                 ...incrConfig,
                 currentCharacters: sceneCharacters.map(c => c.name)
               } : null;
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrConfigWithCurrentChars, sceneCharacters });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrConfigWithCurrentChars, sceneCharacters });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -1514,7 +1514,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalReasoning: imageResult.originalReasoning || null,
             referencePhotos,
             landmarkPhotos: pageLandmarkPhotos,
-            visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+            visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
             sceneCharacters,  // Include for incremental consistency tracking
             sceneCharacterClothing: perCharClothing  // Per-character clothing for this scene
           };
@@ -3137,12 +3137,12 @@ Output Format:
 
             // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
             // VB elements are NO LONGER added individually to referencePhotos
-            let vbGrid = null;
+            let visualBibleGrid = null;
             if (visualBible) {
               const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
               const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
               if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+                visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
                 log.debug(`🔲 [PAGE ${pageNum}] VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
               }
             }
@@ -3195,9 +3195,9 @@ Output Format:
 
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                // Pass vbGrid for combined reference (instead of individual VB element photos)
+                // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: parallelPipelineIncrConfig, sceneCharacters });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: parallelPipelineIncrConfig, sceneCharacters });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -3231,7 +3231,7 @@ Output Format:
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos,
               landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
-              visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+              visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
               modelId: imageResult.modelId || null
             };
 
@@ -3691,12 +3691,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
             // VB elements are NO LONGER added individually to referencePhotos
-            let vbGrid = null;
+            let visualBibleGrid = null;
             if (visualBible) {
               const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
               const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
               if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+                visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
                 log.debug(`🔲 [PAGE ${pageNum}] VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
               }
             }
@@ -3759,12 +3759,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
-                // Pass vbGrid for combined reference (instead of individual VB element photos)
+                // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
                 // Use quality retry to regenerate if score is below threshold
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
                 imageResult = await generateImageWithQualityRetry(
                   imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
-                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrementalConsistencyConfig, sceneCharacters }
+                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrementalConsistencyConfig, sceneCharacters }
                 );
               } catch (error) {
                 retries++;
@@ -3822,7 +3822,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos,  // Dev mode: which photos were used
               landmarkPhotos: pageLandmarkPhotos,
-              visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+              visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
               modelId: imageResult.modelId || null
             };
 

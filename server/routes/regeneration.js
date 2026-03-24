@@ -533,12 +533,12 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     }
 
     // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
-    let vbGrid = null;
+    let visualBibleGrid = null;
     if (visualBible) {
       const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
       const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
       if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
         log.debug(`🔲 [REGEN] Page ${pageNumber} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
       }
     }
@@ -594,7 +594,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
       `PAGE ${pageNumber}`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata }
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata }
     );
 
     // Log API costs for this regeneration
@@ -628,7 +628,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       originalReasoning: trueOriginalReasoning,
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
       regeneratedAt: new Date().toISOString(),
       regenerationCount: (currentImage?.regenerationCount || 0) + 1,
@@ -639,20 +639,20 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
 
     // Initialize imageVersions if not present (migrate existing image as first version)
-    if (existingImage && !existingImage.imageVersions) {
-      existingImage.imageVersions = [{
+    if (currentImage && !currentImage.imageVersions) {
+      currentImage.imageVersions = [{
         // Don't copy imageData — the original is already stored at DB version_index 0.
-        description: existingImage.description || originalDescription,
-        prompt: existingImage.prompt,
-        modelId: existingImage.modelId,
+        description: currentImage.description || originalDescription,
+        prompt: currentImage.prompt,
+        modelId: currentImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
         isActive: false,
-        qualityScore: existingImage.qualityScore ?? null,
-        qualityReasoning: existingImage.qualityReasoning || null,
-        fixTargets: existingImage.fixTargets || [],
-        fixableIssues: existingImage.fixableIssues || [],
-        totalAttempts: existingImage.totalAttempts || null,
-        referencePhotoNames: (existingImage.referencePhotos || []).map(p => ({
+        qualityScore: currentImage.qualityScore ?? null,
+        qualityReasoning: currentImage.qualityReasoning || null,
+        fixTargets: currentImage.fixTargets || [],
+        fixableIssues: currentImage.fixableIssues || [],
+        totalAttempts: currentImage.totalAttempts || null,
+        referencePhotoNames: (currentImage.referencePhotos || []).map(p => ({
           name: p.name, photoType: p.photoType,
           clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
         })),
@@ -820,7 +820,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       // Reference images used (for dev mode display)
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null
+      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null
     });
 
   } catch (err) {
@@ -854,7 +854,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     const visualBible = storyData.visualBible || null;
     const clothingReqs = storyData.clothingRequirements || null;
     // Resolve scene description, characters, and prompt
-    let prompt, characterPhotos, landmarkPhotos = [], vbGrid = null;
+    let prompt, characterPhotos, landmarkPhotos = [], visualBibleGrid = null;
     if (pageNumber < 0) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
@@ -879,7 +879,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       if (visualBible) {
         const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
         const secLm = landmarkPhotos.slice(1);
-        if (elRefs.length > 0 || secLm.length > 0) vbGrid = await buildVisualBibleGrid(elRefs, secLm);
+        if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
       prompt = buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
     }
@@ -890,7 +890,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const start = Date.now();
       const result = await generateImageOnly(prompt, characterPhotos, {
         imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-        landmarkPhotos, visualBibleGrid: vbGrid, pageNumber, skipCache: true
+        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
       });
       return { model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null };
     }));
@@ -1415,12 +1415,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Build landmark photos and VB grid (newSceneMetadata already extracted above)
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
 
-    let vbGrid = null;
+    let visualBibleGrid = null;
     if (visualBible) {
       const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
       const secondaryLandmarks = pageLandmarkPhotos.slice(1);
       if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
       }
     }
 
@@ -1505,7 +1505,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         imageModelOverride,
         imageBackendOverride: iterBackend,
         landmarkPhotos: pageLandmarkPhotos,
-        visualBibleGrid: vbGrid,
+        visualBibleGrid,
         pageNumber,
       });
     } else {
@@ -1513,7 +1513,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
         { imageModel: imageModelOverride },
         `PAGE ${pageNumber} ITERATE`,
-        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
+        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
       );
     }
 
@@ -1543,7 +1543,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       originalScore: currentImage.originalScore || previousScore,
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
       iterationCount: (currentImage.iterationCount || 0) + 1,
       // Preserve clothing data from original image for entity consistency
@@ -1710,7 +1710,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Reference info
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
       // Exact images sent to Grok API (max 3 packed/stitched slots)
       grokRefImages: imageResult.grokRefImages || null,
       // Bbox detection for the new image (so frontend can display immediately)

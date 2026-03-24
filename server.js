@@ -3587,9 +3587,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-        let vbGrid = null;
+        let visualBibleGrid = null;
         if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-          vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+          visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
         }
         // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
         const imageModelConfig = IMAGE_MODELS[modelOverrides.imageModel];
@@ -3604,7 +3604,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           prompt: imagePrompt,
           characterPhotos: pagePhotos,
           landmarkPhotos: pageLandmarkPhotos,
-          visualBibleGrid: vbGrid,
+          visualBibleGrid,
           sceneCharacters,
           sceneMetadata,
           perCharClothing
