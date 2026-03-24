@@ -299,7 +299,7 @@ class LRUCache {
   has(key) {
     if (!this.cache.has(key)) return false;
     const entry = this.cache.get(key);
-    if (this.ttl > 0 && Date.now() - entry.timestamp > this.ttl) {
+    if (this.ttlMs > 0 && Date.now() - entry.timestamp > this.ttlMs) {
       this.cache.delete(key);
       return false;
     }
@@ -3367,6 +3367,117 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   throw new Error('Image generation failed after all sanitization levels');
 }
 
+/**
+ * Generate an image with iterative placement for scenes with characters at different depths.
+ * Pass 1: Generate scene with only foreground character(s)
+ * Pass 2: Send Pass 1 image as reference + background character avatar, ask model to add background character as tiny figure
+ *
+ * @param {string} prompt - The full image generation prompt
+ * @param {Array} allCharacterPhotos - All character reference photos
+ * @param {Object} sceneMetadata - Scene metadata with character depth info
+ * @param {Object} options - Generation options
+ * @returns {Promise<Object>} Image generation result
+ */
+async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneMetadata, options = {}) {
+  const {
+    imageModelOverride,
+    imageBackendOverride,
+    landmarkPhotos = [],
+    visualBibleGrid = null,
+    pageNumber = null,
+  } = options;
+
+  // 1. Split characters by depth from sceneMetadata
+  const sceneChars = sceneMetadata?.characters || [];
+  const foregroundChars = [];
+  const backgroundChars = [];
+
+  for (const sc of sceneChars) {
+    if (sc.depth === 'background' || sc.depth === 'far background') {
+      backgroundChars.push(sc);
+    } else {
+      foregroundChars.push(sc);
+    }
+  }
+
+  // If no background chars or only 1 character total, just do normal generation
+  if (backgroundChars.length === 0 || sceneChars.length <= 1) {
+    log.info(`🎯 [ITERATIVE] No background characters found, using single-pass generation`);
+    return generateImageOnly(prompt, allCharacterPhotos, {
+      imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+    });
+  }
+
+  // 2. Build Pass 1: only foreground characters
+  const foregroundNames = new Set(foregroundChars.map(c => c.name));
+  const foregroundPhotos = allCharacterPhotos.filter(p => foregroundNames.has(p.characterName));
+
+  // Modify prompt for Pass 1: remove background character mentions
+  let pass1Prompt = prompt;
+  for (const bgChar of backgroundChars) {
+    // Remove lines mentioning the background character
+    pass1Prompt = pass1Prompt.replace(new RegExp(`.*${bgChar.name}.*\\n?`, 'gi'), '');
+  }
+  // Add instruction that this is a partial scene
+  pass1Prompt += '\n\nIMPORTANT: Only render the foreground character(s) in this scene. Leave the background area open and unoccupied.';
+
+  log.info(`🎯 [ITERATIVE] Pass 1: Generating with ${foregroundPhotos.length} foreground characters (${foregroundChars.map(c => c.name).join(', ')}), excluding ${backgroundChars.map(c => c.name).join(', ')}`);
+
+  const pass1Result = await generateImageOnly(pass1Prompt, foregroundPhotos, {
+    imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+  });
+
+  if (!pass1Result?.imageData) {
+    log.error('🎯 [ITERATIVE] Pass 1 failed — no image generated');
+    return pass1Result;
+  }
+
+  log.info(`🎯 [ITERATIVE] Pass 1 complete. Now adding ${backgroundChars.length} background character(s)...`);
+
+  // 3. Build Pass 2: add background characters using Pass 1 as reference
+  const backgroundNames = backgroundChars.map(c => c.name);
+  const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.characterName));
+
+  // Build a targeted prompt for adding the background character
+  const bgDescriptions = backgroundChars.map(c => {
+    const parts = [`${c.name}`];
+    if (c.position) parts.push(`on the ${c.position}`);
+    if (c.action) parts.push(c.action);
+    return parts.join(' ');
+  }).join('; ');
+
+  const pass2Prompt = `This illustration already shows a scene. Add the following character(s) to the FAR BACKGROUND as TINY FIGURES (approximately 1/5 the size of the foreground character): ${bgDescriptions}.
+
+The background character(s) must be:
+- Very small compared to the foreground figure
+- Positioned in the distant background area
+- Clearly recognizable but tiny
+- Naturally integrated into the existing scene
+
+CRITICAL: Do NOT change the foreground character, the scene layout, or any existing elements. Only ADD the small background figure(s).`;
+
+  const pass2Result = await generateImageOnly(pass2Prompt, backgroundPhotos, {
+    imageModelOverride, imageBackendOverride,
+    previousImage: pass1Result.imageData,
+    pageNumber, skipCache: true
+  });
+
+  if (pass2Result?.imageData) {
+    log.info(`🎯 [ITERATIVE] Pass 2 complete. Scene with iterative placement ready.`);
+    // Return with combined info
+    return {
+      ...pass2Result,
+      iterativePlacement: true,
+      pass1Image: pass1Result.imageData,
+      prompt: prompt, // Keep original full prompt for metadata
+    };
+  }
+
+  // If Pass 2 fails, return Pass 1 result
+  log.warn('🎯 [ITERATIVE] Pass 2 failed, returning Pass 1 result');
+  return pass1Result;
+}
+
 // =============================================================================
 // SEPARATED EVALUATION PIPELINE FUNCTIONS
 // These functions support the new architecture:
@@ -4251,8 +4362,8 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
 function mergeRepairResults(originalImages, evaluations, repairResults) {
   // Build lookup maps
   const evalMap = new Map();
-  for (const eval of evaluations) {
-    evalMap.set(eval.pageNumber, eval);
+  for (const evaluation of evaluations) {
+    evalMap.set(evaluation.pageNumber, evaluation);
   }
 
   return originalImages.map(img => {
@@ -9961,6 +10072,7 @@ module.exports = {
 
   // Separated evaluation pipeline functions (new architecture)
   generateImageOnly,
+  generateWithIterativePlacement,
   evaluateImageBatch,
   buildRepairPlan,
   executeRepairPlan,

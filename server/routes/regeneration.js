@@ -46,6 +46,7 @@ const {
 } = require('../lib/storyHelpers');
 const {
   generateImageOnly,
+  generateWithIterativePlacement,
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
@@ -813,7 +814,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       originalDescription,
       newDescription: expandedDescription,  // Full expanded description
       inputDescription,  // What user provided (before expansion)
-      prompt: imagePrompt,
       sceneWasEdited,
       sceneWasExpanded: shouldExpand,  // Flag if expansion was done
       // Reference images used (for dev mode display)
@@ -914,7 +914,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback } = req.body;  // Optional: model overrides + evaluation feedback
+    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement } = req.body;  // Optional: model overrides + evaluation feedback
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) {
       return res.status(400).json({ error: 'Invalid page number' });
@@ -1012,6 +1012,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const previousImageData = imageResult.previousImage;
       const previousScore = imageResult.previousScore;
       const coverCharacterPhotos = imageResult.referencePhotos;
+      const coverLandmarkPhotos = []; // Covers don't use landmark photos
+      const coverVbGrid = null; // No VB grid for covers
       const coverPrompt = imageResult.prompt;
       const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
 
@@ -1495,12 +1497,22 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
     }
     const iterateSceneMetadata = extractSceneMetadata(newSceneDescription);
-    const imageResult = await generateImageWithQualityRetry(
-      imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
-      { imageModel: imageModelOverride },
-      `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
-    );
+    let imageResult;
+    if (iterativePlacement) {
+      imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
+        imageModelOverride,
+        landmarkPhotos: pageLandmarkPhotos,
+        visualBibleGrid: vbGrid,
+        pageNumber,
+      });
+    } else {
+      imageResult = await generateImageWithQualityRetry(
+        imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
+        { imageModel: imageModelOverride },
+        `PAGE ${pageNumber} ITERATE`,
+        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
+      );
+    }
 
     log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
