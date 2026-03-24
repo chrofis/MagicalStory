@@ -335,6 +335,35 @@ Models are configured in `server/config/models.js`. Frontend can override via de
 - Runware has 3000 char prompt limit (vs 30000 for Gemini)
 - ACE++ uses `referenceImages` at root level, not inside `acePlusPlus` object
 
+### Image Model Comparison (Grok vs Gemini)
+
+**Gemini (primary generator):**
+- Better prompt adherence — follows style/composition instructions more reliably
+- More consistent across multiple generations (critical for 15-page stories)
+- Handles structured illustration, watercolor, whimsical storybook styles well
+- Better at conveying emotional narrative in character illustrations
+- Better at complex scenes with crowds/many elements
+
+**Grok Imagine (secondary — repair + concept art):**
+- Best for: concept art, anime/Studio Ghibli, cinematic, photorealistic styles
+- Weak for: flat illustration, watercolor, minimalist — adds unwanted 3D/polish
+- 2-4x faster than Gemini, same price ($0.02/image standard)
+- Character consistency across generations is weaker than Gemini
+- Style consistency is weakest among major models — same prompt can look very different
+- No negative prompt support — use positive phrasing only
+- Aurora model is autoregressive — prompt ORDER matters (scene → style → lighting → camera)
+
+**When to use Grok:** Character repair (blended mode $0.02), concept art style stories,
+speed-critical operations. **When to use Gemini:** Primary story generation, watercolor/whimsical
+styles, any scene requiring consistent style across multiple pages.
+
+**Prompting tips for Grok Imagine:**
+- Natural sentences, not tag lists ("a child running through a forest" not "child, forest, running")
+- Specific artist/studio references improve results ("Studio Ghibli", "Craig Mullins")
+- Add physical anchors ("feet on cobblestones") to prevent floating characters
+- Avoid generic superlatives ("stunning", "ultra-detailed") — wasted tokens
+- Keep prompts to 1-3 sentences + structured parameters (max ~1000 chars effective)
+
 ## Prompt Templates
 
 All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`:
