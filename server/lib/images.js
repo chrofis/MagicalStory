@@ -3481,6 +3481,8 @@ CRITICAL: Do NOT change the foreground character, the scene layout, or any exist
       ...pass2Result,
       iterativePlacement: true,
       pass1Image: pass1Result.imageData,
+      pass1Prompt: pass1Prompt,
+      pass2Prompt: pass2Prompt,
       prompt: prompt, // Keep original full prompt for metadata
     };
   }

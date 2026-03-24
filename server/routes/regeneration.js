@@ -892,12 +892,16 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
         });
       }
-      return { model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null };
+      return {
+        model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null,
+        // Iterative placement debug data
+        pass1Image: result.pass1Image || null, pass1Prompt: result.pass1Prompt || null, pass2Prompt: result.pass2Prompt || null,
+      };
     }));
     for (const [i, s] of settled.entries()) {
       if (s.status === 'fulfilled') {
         const r = s.value;
-        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage };
+        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage, pass1Image: r.pass1Image, pass1Prompt: r.pass1Prompt, pass2Prompt: r.pass2Prompt };
       } else {
         results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
       }

@@ -17,6 +17,10 @@ interface ModelTestResult {
   error?: string;
   elapsedMs?: number;
   modelId?: string;
+  // Iterative placement debug
+  pass1Image?: string;
+  pass1Prompt?: string;
+  pass2Prompt?: string;
 }
 
 interface ModelOption {
@@ -102,6 +106,9 @@ export function TestModelsPanel({
             error: result?.error,
             modelId: model,
             elapsedMs,
+            pass1Image: (result as any)?.pass1Image,
+            pass1Prompt: (result as any)?.pass1Prompt,
+            pass2Prompt: (result as any)?.pass2Prompt,
           },
         }));
       } catch (err: unknown) {
@@ -313,6 +320,35 @@ export function TestModelsPanel({
                     <div className="flex items-center justify-center h-48 bg-gray-100 rounded border border-dashed border-gray-300">
                       <span className="text-xs text-gray-400">No image returned</span>
                     </div>
+                  )}
+                  {/* Iterative placement debug: show Pass 1 image and prompts */}
+                  {result.pass1Image && (
+                    <div className="mt-2 space-y-1">
+                      <div className="text-[10px] font-medium text-orange-600">Pass 1 (foreground only):</div>
+                      <img
+                        src={result.pass1Image.startsWith('data:') ? result.pass1Image : `data:image/png;base64,${result.pass1Image}`}
+                        alt="Pass 1"
+                        className="max-h-32 w-full object-contain rounded border bg-white cursor-pointer"
+                        onClick={() => setLightboxImage(result.pass1Image!.startsWith('data:') ? result.pass1Image! : `data:image/png;base64,${result.pass1Image!}`)}
+                      />
+                    </div>
+                  )}
+                  {(result.pass1Prompt || result.pass2Prompt) && (
+                    <details className="mt-1">
+                      <summary className="text-[10px] text-gray-400 cursor-pointer">Prompts</summary>
+                      {result.pass1Prompt && (
+                        <div className="mt-1">
+                          <div className="text-[9px] font-medium text-gray-500">Pass 1 prompt:</div>
+                          <pre className="text-[9px] bg-gray-50 p-1 rounded max-h-24 overflow-auto whitespace-pre-wrap">{result.pass1Prompt.substring(0, 500)}</pre>
+                        </div>
+                      )}
+                      {result.pass2Prompt && (
+                        <div className="mt-1">
+                          <div className="text-[9px] font-medium text-gray-500">Pass 2 prompt:</div>
+                          <pre className="text-[9px] bg-gray-50 p-1 rounded max-h-24 overflow-auto whitespace-pre-wrap">{result.pass2Prompt.substring(0, 500)}</pre>
+                        </div>
+                      )}
+                    </details>
                   )}
                 </div>
               );
