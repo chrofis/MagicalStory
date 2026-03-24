@@ -19,7 +19,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
+const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getPool, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -58,6 +58,7 @@ const {
   collectAllIssuesForPage,
   repairCharacterMismatch,
   detectAllBoundingBoxes,
+  createBboxOverlayImage,
   IMAGE_QUALITY_THRESHOLD
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
@@ -3101,6 +3102,118 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
     res.status(500).json({ error: isAdmin ? 'Failed to re-evaluate: ' + err.message : 'Failed to re-evaluate' });
+  }
+});
+
+// Refresh bbox detection for a single page (runs on active image, saves result)
+router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
+
+    // Admin/dev-mode only
+    if (req.user.role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+
+    log.info(`📦 [REFRESH-BBOX] Starting bbox detection for story ${id}, page ${pageNumber}`);
+
+    // Load story data with rehydrated images
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    let storyData = typeof storyResult.rows[0].data === 'string'
+      ? JSON.parse(storyResult.rows[0].data)
+      : storyResult.rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    // Find scene
+    const isCover = pageNumber < 0;
+    let scene, imageData;
+
+    if (isCover) {
+      const coverMap = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+      const coverKey = coverMap[String(pageNumber)];
+      if (!coverKey) return res.status(400).json({ error: 'Invalid cover page number' });
+      scene = storyData.coverImages?.[coverKey];
+      imageData = scene?.imageData;
+    } else {
+      scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      imageData = scene?.imageData;
+    }
+
+    if (!scene || !imageData?.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'No valid image for this page' });
+    }
+
+    // Build character descriptions
+    const characterDescriptions = {};
+    for (const char of (storyData.characters || [])) {
+      characterDescriptions[char.name] = {
+        richDescription: buildCharacterPhysicalDescription(char)
+      };
+    }
+
+    // Get scene metadata for expected positions/clothing/objects
+    const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
+    const expectedPositions = sceneMetadata?.characterPositions || {};
+    const expectedClothing = sceneMetadata?.characterClothing || {};
+    const expectedObjects = sceneMetadata?.objects || [];
+
+    // Run enriched bbox detection
+    const enrichResult = await enrichWithBoundingBoxes(
+      imageData, [], [], [],
+      expectedPositions, expectedObjects, characterDescriptions, expectedClothing
+    );
+
+    const bboxDetection = enrichResult.detectionHistory || null;
+    const fixTargets = enrichResult.targets || [];
+
+    // Create overlay image
+    let bboxOverlayImage = null;
+    if (bboxDetection) {
+      bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
+    }
+
+    // Save to scene + active version
+    scene.bboxDetection = bboxDetection;
+    scene.fixTargets = fixTargets;
+    if (scene.imageVersions) {
+      const activeVersion = scene.imageVersions.find(v => v.isActive);
+      if (activeVersion) {
+        activeVersion.bboxDetection = bboxDetection;
+        activeVersion.fixTargets = fixTargets;
+      }
+    }
+
+    const figCount = bboxDetection?.figures?.length || 0;
+    const objCount = bboxDetection?.objects?.length || 0;
+    const identifiedCount = bboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
+    log.info(`✅ [REFRESH-BBOX] Page ${pageNumber}: ${figCount} figures (${identifiedCount} identified), ${objCount} objects, ${fixTargets.length} fix targets`);
+
+    res.json({ bboxDetection, bboxOverlayImage, fixTargets });
+
+    // Save to DB in background
+    if (isCover) {
+      saveStoryData(id, storyData).catch(err => log.error('Failed to save bbox refresh:', err.message));
+    } else {
+      saveScenePageData(id, pageNumber, scene).catch(err => {
+        log.error('Failed to save bbox refresh atomically, falling back:', err.message);
+        saveStoryData(id, storyData).catch(err2 => log.error('Fallback save failed:', err2.message));
+      });
+    }
+  } catch (err) {
+    log.error('❌ [REFRESH-BBOX] Failed:', err);
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Bbox detection failed: ' + err.message : 'Bbox detection failed' });
   }
 });
 

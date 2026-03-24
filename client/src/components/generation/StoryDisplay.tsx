@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { RetryHistoryDisplay, ObjectDetectionDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
@@ -266,6 +266,9 @@ export function StoryDisplay({
   const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
   const [repairingIssuePage, setRepairingIssuePage] = useState<number | null>(null);
   const [repairingSingleEntityPage, setRepairingSingleEntityPage] = useState<{ entity: string; page: number } | null>(null);
+
+  // Local bbox detection overrides (from refresh-bbox button, keyed by page number or cover type string)
+  const [bboxOverrides, setBboxOverrides] = useState<Record<string, BboxSceneDetection | null>>({});
 
   // User-facing improve state (one-click, available to all users)
   const [improvingPages, setImprovingPages] = useState<Set<number>>(new Set());
@@ -3719,11 +3722,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={frontCoverObj.retryHistory}
-                  bboxDetection={frontCoverObj.bboxDetection}
-                  bboxOverlayImage={frontCoverObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:front'] ?? frontCoverObj.bboxDetection}
+                  bboxOverlayImage={bboxOverrides['cover:front'] ? null : frontCoverObj.bboxOverlayImage}
                   language={language}
                   storyId={storyId}
                   coverType="front"
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:front': bbox }))}
                 />
 
                 {/* Retry History */}
@@ -3978,11 +3982,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={initialPageObj.retryHistory}
-                  bboxDetection={initialPageObj.bboxDetection}
-                  bboxOverlayImage={initialPageObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:initial'] ?? initialPageObj.bboxDetection}
+                  bboxOverlayImage={bboxOverrides['cover:initial'] ? null : initialPageObj.bboxOverlayImage}
                   language={language}
                   storyId={storyId}
                   coverType="initial"
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:initial': bbox }))}
                 />
 
                 {/* Retry History */}
@@ -4574,11 +4579,12 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image?.retryHistory}
-                              bboxDetection={image?.bboxDetection}
-                              bboxOverlayImage={image?.bboxOverlayImage}
+                              bboxDetection={bboxOverrides[`page:${image?.pageNumber}`] ?? image?.bboxDetection}
+                              bboxOverlayImage={bboxOverrides[`page:${image?.pageNumber}`] ? null : image?.bboxOverlayImage}
                               language={language}
                               storyId={storyId}
                               pageNumber={image?.pageNumber}
+                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image?.pageNumber}`]: bbox }))}
                             />
 
                             {/* Retry History (shows all attempts with images) */}
@@ -5078,11 +5084,12 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image.retryHistory}
-                              bboxDetection={image.bboxDetection}
-                              bboxOverlayImage={image.bboxOverlayImage}
+                              bboxDetection={bboxOverrides[`page:${image.pageNumber}`] ?? image.bboxDetection}
+                              bboxOverlayImage={bboxOverrides[`page:${image.pageNumber}`] ? null : image.bboxOverlayImage}
                               language={language}
                               storyId={storyId}
                               pageNumber={image.pageNumber}
+                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image.pageNumber}`]: bbox }))}
                             />
 
                             {/* Retry History (shows all attempts with images) */}
@@ -5384,11 +5391,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={backCoverObj.retryHistory}
-                  bboxDetection={backCoverObj.bboxDetection}
-                  bboxOverlayImage={backCoverObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:back'] ?? backCoverObj.bboxDetection}
+                  bboxOverlayImage={bboxOverrides['cover:back'] ? null : backCoverObj.bboxOverlayImage}
                   language={language}
                   storyId={storyId}
                   coverType="back"
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:back': bbox }))}
                 />
 
                 {/* Retry History */}

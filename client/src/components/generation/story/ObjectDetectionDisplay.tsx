@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, RefreshCw } from 'lucide-react';
 import type { BboxSceneDetection, RetryAttempt } from '@/types/story';
 
 interface ObjectDetectionDisplayProps {
@@ -12,6 +12,8 @@ interface ObjectDetectionDisplayProps {
   pageNumber?: number;
   // For cover images, specify the cover type to use /dev-image?cover=front|initial|back
   coverType?: 'front' | 'initial' | 'back';
+  // Callback when bbox is refreshed (so parent can update state)
+  onBboxRefreshed?: (bboxDetection: BboxSceneDetection | null) => void;
 }
 
 /**
@@ -67,11 +69,13 @@ export function ObjectDetectionDisplay({
   language,
   storyId,
   pageNumber,
-  coverType
+  coverType,
+  onBboxRefreshed
 }: ObjectDetectionDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
   const bboxKey = directBboxDetection ? JSON.stringify(directBboxDetection.figures?.length) + (directBboxDetection.objects?.length || 0) : null;
@@ -87,9 +91,63 @@ export function ObjectDetectionDisplay({
   const bboxOverlayImage = directBboxOverlayImage || fromRetryHistory.bboxOverlayImage;
   const hasBboxOverlay = !!directBboxOverlayImage || fromRetryHistory.hasBboxOverlay;
 
-  // Nothing to show if no detection data
+  // Refresh bbox detection — runs fresh detection on the active image
+  const refreshBbox = async () => {
+    if (!storyId || isRefreshing) return;
+    // Map cover types to negative page numbers
+    let targetPage: number | undefined;
+    if (coverType) {
+      const coverPageMap: Record<string, number> = { front: -1, initial: -2, back: -3 };
+      targetPage = coverPageMap[coverType];
+    } else {
+      targetPage = pageNumber;
+    }
+    if (targetPage === undefined) return;
+
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/refresh-bbox/${targetPage}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.bboxOverlayImage) {
+          setLoadedOverlay(data.bboxOverlayImage);
+        }
+        if (data.bboxDetection && onBboxRefreshed) {
+          onBboxRefreshed(data.bboxDetection);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to refresh bbox detection:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Show refresh button even when no detection data yet
   if (!bboxDetection) {
-    return null;
+    if (!storyId || (pageNumber === undefined && !coverType)) return null;
+    return (
+      <div className="mt-2">
+        <button
+          onClick={refreshBbox}
+          disabled={isRefreshing}
+          className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {isRefreshing ? (
+            <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
+          ) : (
+            <><RefreshCw size={14} /> {language === 'de' ? 'Objekterkennung starten' : 'Run Object Detection'}</>
+          )}
+        </button>
+      </div>
+    );
   }
 
   const figureCount = bboxDetection.figures?.length || 0;
@@ -188,6 +246,21 @@ export function ObjectDetectionDisplay({
         </summary>
 
         <div className="mt-3 space-y-3">
+          {/* Refresh bbox detection button */}
+          {storyId && (pageNumber !== undefined || coverType) && (
+            <button
+              onClick={refreshBbox}
+              disabled={isRefreshing}
+              className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-200 flex items-center gap-1 disabled:opacity-50"
+            >
+              {isRefreshing ? (
+                <><Loader2 size={12} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
+              ) : (
+                <><RefreshCw size={12} /> {language === 'de' ? 'Neu erkennen' : 'Re-detect'}</>
+              )}
+            </button>
+          )}
+
           {/* Bbox Overlay Image */}
           {overlayImage ? (
             <div>
