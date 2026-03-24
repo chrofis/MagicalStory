@@ -456,8 +456,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           }
           // Add all versions (including version 0) to imageVersions array
           // Merge with metadata from data blob (description, prompt, modelId, type)
-          // NOTE: DB version_index 0 = main image, version_index 1+ = blob imageVersions[0+]
-          // saveStoryData saves imageVersions[i] at version_index i+1, so offset by -1
           const scene = sceneImagesMap.get(row.page_number);
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
           const versionMeta = row.version_index > 0
@@ -712,13 +710,11 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         // sceneCharacters - just names, not full character data with avatars
         sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown'),
         // Per-version metadata for dev mode (no image data)
-        // Include versionIndex so frontend can correctly map to its imageVersions array
-        // Blob imageVersions may start at v1 (normal) or v0 (iterate preservation entry)
+        // versionIndex = array index = DB version_index (unified mapping)
         imageVersionsMeta: (() => {
           const versions = img.imageVersions || [];
-          const hasPreservation = versions.length > 0 && versions[0] && !versions[0].source;
           return versions.map((v, idx) => ({
-            versionIndex: hasPreservation ? idx : idx + 1,
+            versionIndex: idx,
             description: v.description || null,
             prompt: v.prompt || null,
             userInput: v.userInput || null,
@@ -1732,9 +1728,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       //  - Repair pipeline: main blob = best version, imageVersions = [v1, v2, ...]
       //  - After iterate: main blob = LATEST version (overwritten by Object.assign),
       //    imageVersions[0] = v0 preservation (no source field), imageVersions[1+] = iterate versions
-      //
-      // DB version_index mapping: imageVersions[i] → DB version_index = i+1 (for scenes)
-      // So DB version_index 0 = main image, DB version_index N → blob imageVersions[N-1]
       if (!activeOnly && storyData.sceneImages) {
         for (const [pageNum, scene] of sceneImagesMap) {
           const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
@@ -1785,7 +1778,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                   scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
                 }
               } else {
-                // v1+: use dbToArrayIndex to find the correct blob entry
+                // v1+: map DB version_index to blob imageVersions array index
                 const blobIdx = dbToArrayIndex(dbVersionIdx, 'scene');
                 const blobVersion = blobScene.imageVersions?.[blobIdx];
                 if (blobVersion) {
@@ -1844,8 +1837,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         imageVersions: img.imageVersions?.map((v, i) => ({
           imageData: normalizeImageData(v.imageData),
           qualityScore: v.qualityScore,
-          isActive: activeIdx === (i + 1),
-          versionIndex: (i === 0 && v.type === 'original') ? 0 : i + 1
+          isActive: activeIdx === i,
+          versionIndex: i
         }))
       };
     });
@@ -2002,7 +1995,6 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     }
 
     // Mark isActive based on image_version_meta (or fallback to legacy isActive in data)
-    // activeVersion is a DB version_index; imageVersions[i] maps to DB index i+1 for scenes
     const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
       ...v,
       isActive: activeVersion > 0 && i === dbToArrayIndex(activeVersion, 'scene')
@@ -2207,16 +2199,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
           for (const scene of story.sceneImages) {
             if (scene.imageVersions && scene.imageVersions.length > 0) {
               const activeDbIndex = activeVersions[scene.pageNumber] ?? 0;
-              // Convert DB version_index to array index (scenes: dbIndex - 1)
-              // DB index 0 = original (not in imageVersions array), so activeArrayIdx = -1 means "original"
-              const activeArrayIdx = activeDbIndex === 0 ? -1 : dbToArrayIndex(activeDbIndex, 'scene');
+              const activeArrayIdx = dbToArrayIndex(activeDbIndex, 'scene');
               const { arrayToDbIndex: toDbIdx } = require('../lib/versionManager');
               scene.imageVersions.forEach((v, idx) => {
                 v.isActive = idx === activeArrayIdx;
                 // Attach DB version_index so the frontend can send it directly
-                // For blob-path scenes: imageVersions[0] with type='original' → DB 0, others → idx+1
                 if (v.versionIndex === undefined) {
-                  v.versionIndex = (idx === 0 && v.type === 'original') ? 0 : toDbIdx(idx, 'scene');
+                  v.versionIndex = toDbIdx(idx, 'scene');
                 }
               });
               // Track active version as array index for frontend
@@ -2636,10 +2625,8 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
 
     const pool = getPool();
 
-    // The frontend sends versionIndex which may be either:
-    // - A direct DB version_index (from fast-path story_images response, which includes versionIndex field)
-    // - An array index from the blob path (legacy: 0=original, 1+=regens mapped via arrayToDbIndex)
-    // Strategy: try versionIndex as a direct DB index first, fall back to array-to-DB mapping
+    // The frontend sends versionIndex as a direct DB version_index
+    // Legacy fallback: try array-to-DB mapping if direct index not found in story_images
     let dbVersionIndex = versionIndex;
 
     console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - versionIndex ${versionIndex}`);
@@ -2664,7 +2651,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     if (versionCheck.rows.length === 0) {
       // Direct index not found — try legacy blob array-to-DB mapping
       const { arrayToDbIndex } = require('../lib/versionManager');
-      const legacyDbIndex = versionIndex === 0 ? 0 : arrayToDbIndex(versionIndex, 'scene');
+      const legacyDbIndex = arrayToDbIndex(versionIndex, 'scene');
       if (legacyDbIndex !== dbVersionIndex) {
         const legacyCheck = await pool.query(
           `SELECT 1 FROM story_images

@@ -1,6 +1,6 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
-const { arrayToDbIndex, dbToArrayIndex } = require('../lib/versionManager');
+const { arrayToDbIndex } = require('../lib/versionManager');
 
 let dbPool = null;
 
@@ -1062,8 +1062,7 @@ async function getActiveStoryImages(storyId) {
   // Single optimized query: join images with active version metadata
   // Uses CTEs for both active versions and version counts to avoid correlated subqueries.
   // Falls back to version_index 0 if the active version doesn't exist in story_images
-  // (can happen when pick-best pointed to an original preservation entry at DB index 1
-  // that was never saved — the actual original lives at version_index 0).
+  // (can happen if activeVersion points to a deleted or never-saved version row).
   const results = await dbQuery(
     `WITH active_versions AS (
       SELECT
@@ -1272,7 +1271,7 @@ async function rehydrateStoryImages(storyId, storyData) {
   const hasSeparate = await hasStorySeparateImages(storyId);
   if (!hasSeparate) return storyData; // Images still inline in data blob
 
-  // Load all active images (version_index 0 = main image)
+  // Load all active images (version_index 0 = original/main image)
   const images = await dbQuery(
     `SELECT image_type, page_number, version_index, image_data
      FROM story_images WHERE story_id = $1 AND version_index = 0
@@ -1326,17 +1325,12 @@ async function rehydrateStoryImages(storyId, storyData) {
       }
 
       // Populate imageVersions with their imageData from database
-      // imageVersions[0] with type='original' → DB version_index 0 (the original/main image)
-      // Other entries: imageVersions[i] → DB version_index via arrayToDbIndex (scenes: i+1)
+      // imageVersions[i] → DB version_index i (unified mapping for all types)
       if (scene.imageVersions && scene.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
           const version = scene.imageVersions[vIdx];
           if (!version.imageData) {
-            // The 'original' entry at index 0 is a metadata-only placeholder for the
-            // main image, which lives at DB version_index 0 (not arrayToDbIndex(0)=1)
-            const dbVersionIndex = (vIdx === 0 && version.type === 'original')
-              ? 0
-              : arrayToDbIndex(vIdx, 'scene');
+            const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
             const versionImg = allVersionImages.find(
               i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
@@ -1378,7 +1372,6 @@ async function rehydrateStoryImages(storyId, storyData) {
       }
 
       // Populate cover imageVersions with their imageData from database
-      // Populate cover imageVersions — covers use arrayToDbIndex(i, coverType) = i
       if (cover && cover.imageVersions && cover.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < cover.imageVersions.length; vIdx++) {
           const version = cover.imageVersions[vIdx];

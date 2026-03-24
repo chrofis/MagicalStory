@@ -2,48 +2,34 @@
  * VersionManager — Central source of truth for version index mapping.
  *
  * The DB stores images with a version_index column. The in-memory data model
- * uses imageVersions arrays. The mapping between them differs by image type:
+ * uses imageVersions arrays. The mapping is:
  *
- *   Scenes:  imageVersions[i]  →  DB version_index = i + 1
- *            (version_index 0 is the original/main image saved separately)
+ *   All types:  imageVersions[i]  →  DB version_index = i
  *
- *   Covers:  imageVersions[i]  →  DB version_index = i
- *            (no separate "main" image offset)
- *
- * Before this module, these formulas were inlined in 12+ locations with
- * inconsistent comments and at least one bug (rehydrateStoryImages used
- * 0-indexed lookup for scenes instead of 1-indexed).
+ * These functions exist as a central abstraction point. They are currently
+ * identity operations after the offset unification (migration 021).
  */
-
-const COVER_TYPES = new Set(['frontCover', 'initialPage', 'backCover']);
-
-/**
- * Is this image type a cover?
- */
-function isCoverType(imageType) {
-  return COVER_TYPES.has(imageType);
-}
 
 /**
  * Convert an array index (position in imageVersions[]) to the DB version_index.
  *
  * @param {number} arrayIndex - Zero-based index into imageVersions array
- * @param {string} imageType  - 'scene' or a cover type ('frontCover', 'initialPage', 'backCover')
+ * @param {string} _imageType - Unused (kept for API stability)
  * @returns {number} The version_index value for the DB
  */
-function arrayToDbIndex(arrayIndex, imageType) {
-  return isCoverType(imageType) ? arrayIndex : arrayIndex + 1;
+function arrayToDbIndex(arrayIndex, _imageType) {
+  return arrayIndex;
 }
 
 /**
  * Convert a DB version_index back to an array index (position in imageVersions[]).
  *
  * @param {number} dbIndex   - version_index from the DB
- * @param {string} imageType - 'scene' or a cover type
+ * @param {string} _imageType - Unused (kept for API stability)
  * @returns {number} Zero-based index into imageVersions array
  */
-function dbToArrayIndex(dbIndex, imageType) {
-  return isCoverType(imageType) ? dbIndex : dbIndex - 1;
+function dbToArrayIndex(dbIndex, _imageType) {
+  return dbIndex;
 }
 
 /**
@@ -53,19 +39,16 @@ function dbToArrayIndex(dbIndex, imageType) {
  * Call this AFTER the push (i.e. imageVersions already contains the new entry).
  *
  * @param {Array} imageVersions - The imageVersions array (after push)
- * @param {string} imageType    - 'scene' or a cover type
+ * @param {string} _imageType   - Unused (kept for API stability)
  * @returns {number} The version_index to pass to setActiveVersion
  */
-function getActiveIndexAfterPush(imageVersions, imageType) {
+function getActiveIndexAfterPush(imageVersions, _imageType) {
   if (!imageVersions || imageVersions.length === 0) return 0;
-  // The last element's DB index
-  return arrayToDbIndex(imageVersions.length - 1, imageType);
+  return imageVersions.length - 1;
 }
 
 module.exports = {
   arrayToDbIndex,
   dbToArrayIndex,
-  getActiveIndexAfterPush,
-  isCoverType,
-  COVER_TYPES
+  getActiveIndexAfterPush
 };

@@ -922,7 +922,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
 router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { targetModel } = req.body;
+    const { targetModel, withAvatars } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     if (!targetModel) return res.status(400).json({ error: 'targetModel required' });
@@ -955,11 +955,26 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
       currentImageData = sceneImage.imageData;
     }
 
-    log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}`);
+    // Build character photos if requested (helps preserve facial details)
+    let characterPhotos = [];
+    if (withAvatars) {
+      const characters = storyData.characters || [];
+      const sceneImage = pageNumber > 0 ? (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber) : null;
+      const sceneDesc = sceneImage?.description || '';
+      const sceneChars = getCharactersInScene(sceneDesc, characters);
+      const charsToUse = sceneChars.length > 0 ? sceneChars : characters;
+      const clothingReqs = convertClothingToCurrentFormat(storyData.clothingRequirements);
+      characterPhotos = getCharacterPhotoDetails(charsToUse, 'standard', null, artStyle, clothingReqs);
+      characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
+      log.info(`🎨 [STYLE-TRANSFER] Including ${characterPhotos.length} avatar references`);
+    }
+
+    log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}${withAvatars ? ' (with avatars)' : ''}`);
     const start = Date.now();
     const result = await applyStyleTransfer(currentImageData, artStyle, {
       imageModelOverride: targetModel,
       imageBackendOverride: IMAGE_MODELS[targetModel].backend,
+      characterPhotos,
     });
     const elapsed = Date.now() - start;
     log.info(`🎨 [STYLE-TRANSFER] Completed in ${elapsed}ms`);
@@ -3531,16 +3546,11 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
 
-        // The original preservation entry at imageVersions[0] (type 'original') has no
-        // imageData saved at DB version_index 1 — the original image lives at version_index 0.
-        // So when picking the original as best, point activeVersion to 0, not arrayToDbIndex(0).
-        const bestVersion = scene.imageVersions[bestIndex];
-        const isOriginalPreservation = bestIndex === 0 && bestVersion.type === 'original';
-        const dbIndex = isOriginalPreservation ? 0 : arrayToDbIndex(bestIndex, imageType);
+        const dbIndex = arrayToDbIndex(bestIndex, imageType);
 
         const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
         await setActiveVersion(id, versionId, dbIndex);
-        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}${isOriginalPreservation ? ' [original]' : ''}, score ${bestScore}, was ${activeIndex})`);
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}, score ${bestScore}, was ${activeIndex})`);
         results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex };
       } else {
         results[pageNumber] = { switched: false, toIndex: activeIndex, score: bestScore };
