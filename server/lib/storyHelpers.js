@@ -175,11 +175,22 @@ function extractJsonFromText(text) {
 
   let jsonToParse = text.trim();
 
+  // Fix common AI quirk: doubled braces {{ ... }} → { ... }
+  // Also handles {{{ ... }}} etc. Strip until we have a single { ... }
+  while (jsonToParse.startsWith('{{') && jsonToParse.endsWith('}}')) {
+    jsonToParse = jsonToParse.slice(1, -1);
+  }
+
   // First, try to extract from ```json ... ``` code block
   const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
+    let blockContent = codeBlockMatch[1].trim();
+    // Also fix doubled braces inside code blocks
+    while (blockContent.startsWith('{{') && blockContent.endsWith('}}')) {
+      blockContent = blockContent.slice(1, -1);
+    }
     try {
-      return JSON.parse(codeBlockMatch[1].trim());
+      return JSON.parse(blockContent);
     } catch (e) {
       // Code block content wasn't valid JSON, continue
     }
@@ -187,7 +198,12 @@ function extractJsonFromText(text) {
 
   // Try parsing the whole thing as JSON
   try {
-    return JSON.parse(jsonToParse);
+    const parsed = JSON.parse(jsonToParse);
+    // Handle double-nested scene: {"scene":{"scene":{...}}} → unwrap
+    if (parsed?.scene?.scene && !parsed.scene.imageSummary && parsed.scene.scene.imageSummary) {
+      return { scene: parsed.scene.scene };
+    }
+    return parsed;
   } catch (e) {
     // Not direct JSON, try to find JSON object
   }
@@ -227,7 +243,12 @@ function extractJsonFromText(text) {
         if (depth === 0) {
           // Found a complete JSON object
           try {
-            return JSON.parse(jsonToParse.substring(jsonStart, i + 1));
+            const parsed = JSON.parse(jsonToParse.substring(jsonStart, i + 1));
+            // Handle double-nested scene: {"scene":{"scene":{...}}} → unwrap
+            if (parsed?.scene?.scene && !parsed.scene.imageSummary && parsed.scene.scene.imageSummary) {
+              return { scene: parsed.scene.scene };
+            }
+            return parsed;
           } catch (e) {
             // Not valid JSON, continue looking
           }
