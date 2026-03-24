@@ -1426,7 +1426,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     let previewMismatches = [];
     let checksRun = {};
     try {
-      const sceneJson = JSON.parse(newSceneDescription);
+      const cleanedScene = newSceneDescription.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+      const sceneJson = JSON.parse(cleanedScene);
       previewMismatches = sceneJson.previewMismatches || [];
       checksRun = sceneJson.selfCritique || {};
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);

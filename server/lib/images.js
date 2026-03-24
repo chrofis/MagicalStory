@@ -5364,7 +5364,8 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   // Parse the scene JSON to extract previewMismatches
   let previewMismatches = [];
   try {
-    const sceneJson = JSON.parse(newSceneDescription);
+    const cleanedScene = newSceneDescription.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+    const sceneJson = JSON.parse(cleanedScene);
     previewMismatches = sceneJson.previewMismatches || [];
     log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
   } catch (parseErr) {
