@@ -10073,12 +10073,23 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
  * keeping all characters, positions, and scene composition identical.
  */
 async function applyStyleTransfer(imageData, artStyle, options = {}) {
-  const { imageModelOverride, imageBackendOverride } = options;
+  const { imageModelOverride, imageBackendOverride, characterPhotos = [] } = options;
   const { ART_STYLES } = require('./storyHelpers');
 
   const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar || artStyle;
 
-  const prompt = `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style.
+  const withAvatars = characterPhotos.length > 0;
+  const prompt = withAvatars
+    ? `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style. Use the provided character reference photos to ensure faces remain accurate and recognizable.
+
+Art Style: ${styleDescription}
+
+CRITICAL:
+- Same characters in same positions — use reference photos to preserve facial features
+- Same scene composition and background
+- Same objects and landmarks
+- Only the rendering style changes (colors, brush strokes, texture, shading)`
+    : `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style.
 
 Art Style: ${styleDescription}
 
@@ -10088,7 +10099,9 @@ CRITICAL:
 - Same objects and landmarks
 - Only the rendering style changes (colors, brush strokes, texture, shading)`;
 
-  return generateImageOnly(prompt, [], {
+  log.info(`🎨 [STYLE TRANSFER] ${withAvatars ? `With ${characterPhotos.length} avatar references` : 'Without avatars'}, target: ${artStyle}, model: ${imageModelOverride || 'default'}`);
+
+  return generateImageOnly(prompt, characterPhotos, {
     imageModelOverride,
     imageBackendOverride,
     previousImage: imageData,

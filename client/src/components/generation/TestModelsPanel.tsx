@@ -48,6 +48,7 @@ export function TestModelsPanel({
 
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
+  const [styleWithAvatars, setStyleWithAvatars] = useState(false);
   const [styleResult, setStyleResult] = useState<ModelTestResult | null>(null);
   const [isStyleTransferring, setIsStyleTransferring] = useState(false);
 
@@ -120,7 +121,7 @@ export function TestModelsPanel({
     const startTime = Date.now();
 
     try {
-      const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel);
+      const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel, styleWithAvatars);
       const elapsedMs = Date.now() - startTime;
       setStyleResult({
         loading: false,
@@ -318,7 +319,7 @@ export function TestModelsPanel({
             <h4 className="text-sm font-semibold text-gray-800">Style Transfer</h4>
             <span className="text-[10px] text-gray-400">Re-render current page image in the story art style using a different model</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={styleTargetModel}
               onChange={e => setStyleTargetModel(e.target.value)}
@@ -329,6 +330,10 @@ export function TestModelsPanel({
                 <option key={m.id} value={m.id}>{m.label} ({m.cost})</option>
               ))}
             </select>
+            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+              <input type="checkbox" checked={styleWithAvatars} onChange={e => setStyleWithAvatars(e.target.checked)} className="text-purple-600" />
+              With Avatars
+            </label>
             <button
               onClick={runStyleTransfer}
               disabled={isStyleTransferring || !styleTargetModel}
