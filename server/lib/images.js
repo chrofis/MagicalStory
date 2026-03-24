@@ -3387,22 +3387,27 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     pageNumber = null,
   } = options;
 
-  // 1. Split characters by depth from sceneMetadata
-  const sceneChars = sceneMetadata?.characters || [];
+  // 1. Split characters by depth from sceneMetadata.fullData (the parsed JSON scene object)
+  // sceneMetadata.characters is string[] (names only), fullData.characters has depth/position/action
+  const sceneChars = sceneMetadata?.fullData?.characters || [];
   const foregroundChars = [];
   const backgroundChars = [];
 
   for (const sc of sceneChars) {
-    if (sc.depth === 'background' || sc.depth === 'far background') {
+    // Match depth values: "background", "midground" treated as background for iterative placement
+    // Also check position for "far background" patterns from the iteration prompt
+    const depth = (sc.depth || '').toLowerCase();
+    const position = (sc.position || '').toLowerCase();
+    if (depth === 'background' || depth === 'midground' || position.includes('far background')) {
       backgroundChars.push(sc);
     } else {
       foregroundChars.push(sc);
     }
   }
 
-  // If no background chars or only 1 character total, just do normal generation
+  // If no background chars, no structured data, or only 1 character total, use single-pass
   if (backgroundChars.length === 0 || sceneChars.length <= 1) {
-    log.info(`🎯 [ITERATIVE] No background characters found, using single-pass generation`);
+    log.info(`🎯 [ITERATIVE] No background characters found (${sceneChars.length} chars, ${backgroundChars.length} bg), using single-pass generation`);
     return generateImageOnly(prompt, allCharacterPhotos, {
       imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
     });
@@ -3410,13 +3415,14 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
 
   // 2. Build Pass 1: only foreground characters
   const foregroundNames = new Set(foregroundChars.map(c => c.name));
-  const foregroundPhotos = allCharacterPhotos.filter(p => foregroundNames.has(p.characterName));
+  const foregroundPhotos = allCharacterPhotos.filter(p => foregroundNames.has(p.name || p.characterName));
 
-  // Modify prompt for Pass 1: remove background character mentions
+  // Modify prompt for Pass 1: remove background character references safely
+  // Escape character names for regex (avoid injection from names with special chars)
   let pass1Prompt = prompt;
   for (const bgChar of backgroundChars) {
-    // Remove lines mentioning the background character
-    pass1Prompt = pass1Prompt.replace(new RegExp(`.*${bgChar.name}.*\\n?`, 'gi'), '');
+    const escaped = bgChar.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    pass1Prompt = pass1Prompt.replace(new RegExp(`^.*\\b${escaped}\\b.*$\\n?`, 'gim'), '');
   }
   // Add instruction that this is a partial scene
   pass1Prompt += '\n\nIMPORTANT: Only render the foreground character(s) in this scene. Leave the background area open and unoccupied.';
@@ -3436,7 +3442,7 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
 
   // 3. Build Pass 2: add background characters using Pass 1 as reference
   const backgroundNames = backgroundChars.map(c => c.name);
-  const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.characterName));
+  const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.name || p.characterName));
 
   // Build a targeted prompt for adding the background character
   const bgDescriptions = backgroundChars.map(c => {
@@ -3459,6 +3465,7 @@ CRITICAL: Do NOT change the foreground character, the scene layout, or any exist
   const pass2Result = await generateImageOnly(pass2Prompt, backgroundPhotos, {
     imageModelOverride, imageBackendOverride,
     previousImage: pass1Result.imageData,
+    landmarkPhotos, visualBibleGrid,
     pageNumber, skipCache: true
   });
 

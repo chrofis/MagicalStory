@@ -1500,8 +1500,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const iterateSceneMetadata = extractSceneMetadata(newSceneDescription);
     let imageResult;
     if (iterativePlacement) {
+      const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
       imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
         imageModelOverride,
+        imageBackendOverride: iterBackend,
         landmarkPhotos: pageLandmarkPhotos,
         visualBibleGrid: vbGrid,
         pageNumber,
