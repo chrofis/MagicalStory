@@ -1258,7 +1258,7 @@ export const storyService = {
   },
 
   // Apply style transfer to a page image using a different model (admin only)
-  async styleTransfer(storyId: string, pageNumber: number, targetModel: string, withAvatars = false): Promise<{
+  async styleTransfer(storyId: string, pageNumber: number, targetModel: string, withAvatars = false, styleDescription?: string): Promise<{
     success: boolean;
     imageData: string;
     modelId: string;
@@ -1271,7 +1271,18 @@ export const storyService = {
       elapsed: number;
     }>(
       `/api/stories/${storyId}/style-transfer/${pageNumber}`,
-      { targetModel, ...(withAvatars && { withAvatars: true }) }
+      { targetModel, ...(withAvatars && { withAvatars: true }), ...(styleDescription && { styleDescription }) }
+    );
+    return response;
+  },
+
+  async analyzeStyle(storyId: string, pageNumber: number): Promise<{
+    style: string;
+    elapsed: number;
+  }> {
+    const response = await api.post<{ success: boolean; style: string; elapsed: number }>(
+      `/api/stories/${storyId}/analyze-style/${pageNumber}`,
+      {}
     );
     return response;
   },

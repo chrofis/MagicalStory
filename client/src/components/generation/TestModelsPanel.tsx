@@ -49,6 +49,10 @@ export function TestModelsPanel({
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
   const [styleWithAvatars, setStyleWithAvatars] = useState(false);
+  const [styleSource, setStyleSource] = useState<'story' | 'analyzed' | 'custom'>('story');
+  const [analyzedStyle, setAnalyzedStyle] = useState<string | null>(null);
+  const [customStyle, setCustomStyle] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [styleResult, setStyleResult] = useState<ModelTestResult | null>(null);
   const [isStyleTransferring, setIsStyleTransferring] = useState(false);
 
@@ -121,7 +125,11 @@ export function TestModelsPanel({
     const startTime = Date.now();
 
     try {
-      const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel, styleWithAvatars);
+      // Determine style description based on source
+      const styleDesc = styleSource === 'analyzed' ? (analyzedStyle || undefined)
+        : styleSource === 'custom' ? (customStyle || undefined)
+        : undefined; // 'story' = use story's art style (server default)
+      const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel, styleWithAvatars, styleDesc);
       const elapsedMs = Date.now() - startTime;
       setStyleResult({
         loading: false,
@@ -319,6 +327,56 @@ export function TestModelsPanel({
             <h4 className="text-sm font-semibold text-gray-800">Style Transfer</h4>
             <span className="text-[10px] text-gray-400">Re-render current page image in the story art style using a different model</span>
           </div>
+          {/* Style source selector */}
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+              <input type="radio" name="styleSource" checked={styleSource === 'story'} onChange={() => setStyleSource('story')} className="text-purple-600" />
+              Story art style
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+              <input type="radio" name="styleSource" checked={styleSource === 'analyzed'} onChange={() => setStyleSource('analyzed')} className="text-purple-600" />
+              Analyzed from image
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+              <input type="radio" name="styleSource" checked={styleSource === 'custom'} onChange={() => setStyleSource('custom')} className="text-purple-600" />
+              Custom
+            </label>
+            {styleSource === 'analyzed' && (
+              <button
+                onClick={async () => {
+                  setIsAnalyzing(true);
+                  try {
+                    const result = await storyService.analyzeStyle(storyId, pageNumber);
+                    setAnalyzedStyle(result.style);
+                  } catch (err) {
+                    setAnalyzedStyle('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+                  } finally {
+                    setIsAnalyzing(false);
+                  }
+                }}
+                disabled={isAnalyzing}
+                className="px-2 py-1 text-xs font-medium rounded bg-gray-600 text-white hover:bg-gray-700 disabled:bg-gray-300"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Analyze Current Image'}
+              </button>
+            )}
+          </div>
+          {styleSource === 'analyzed' && analyzedStyle && (
+            <textarea
+              value={analyzedStyle}
+              onChange={e => setAnalyzedStyle(e.target.value)}
+              className="w-full text-xs border border-gray-300 rounded p-2 mb-2 h-20 resize-y"
+              placeholder="Analyzed style description (editable)"
+            />
+          )}
+          {styleSource === 'custom' && (
+            <textarea
+              value={customStyle}
+              onChange={e => setCustomStyle(e.target.value)}
+              className="w-full text-xs border border-gray-300 rounded p-2 mb-2 h-20 resize-y"
+              placeholder="Describe the art style you want... e.g. 'Soft watercolor with visible brush strokes, warm pastel palette, children's book illustration'"
+            />
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={styleTargetModel}
@@ -336,7 +394,7 @@ export function TestModelsPanel({
             </label>
             <button
               onClick={runStyleTransfer}
-              disabled={isStyleTransferring || !styleTargetModel}
+              disabled={isStyleTransferring || !styleTargetModel || (styleSource === 'analyzed' && !analyzedStyle) || (styleSource === 'custom' && !customStyle)}
               className="px-3 py-1.5 text-sm font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
             >
               {isStyleTransferring ? (

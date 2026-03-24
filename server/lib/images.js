@@ -5391,18 +5391,13 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     ? pageClothingData.pageClothing[pageNumber]
     : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
 
-  let effectiveClothing = clothingCategory;
-  let costumeType = null;
-  if (clothingCategory && clothingCategory.startsWith('costumed:')) {
-    costumeType = clothingCategory.split(':')[1];
-    effectiveClothing = 'costumed';
-  }
-
-  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, sceneClothingReqs);
+  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, sceneClothingReqs);
 
   // Apply styled avatars (handles non-costumed characters in mixed scenes)
   const { applyStyledAvatars } = require('./styledAvatars');
-  referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+  if (!clothingCategory || !clothingCategory.startsWith('costumed')) {
+    referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+  }
 
   // Build landmark photos and VB grid
   const newSceneMetadata = extractSceneMetadata(newSceneDescription);
@@ -10076,7 +10071,8 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
   const { imageModelOverride, imageBackendOverride, characterPhotos = [] } = options;
   const { ART_STYLES } = require('./storyHelpers');
 
-  const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar || artStyle;
+  // artStyle can be: a preset key ("pixar"), or a custom description string
+  const styleDescription = ART_STYLES[artStyle] || artStyle;
 
   const withAvatars = characterPhotos.length > 0;
   const prompt = withAvatars
@@ -10109,6 +10105,55 @@ CRITICAL:
   });
 }
 
+/**
+ * Analyze the art style of an image using Gemini vision.
+ * Returns a text description of the style that can be used for style transfer.
+ */
+async function analyzeImageStyle(imageData) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64Data } },
+          { text: `Analyze the art style of this illustration. Describe it in detail so another AI image generator could reproduce the same style. Include:
+
+1. Medium/technique (watercolor, digital, oil, 3D render, etc.)
+2. Line work (bold outlines, soft edges, no outlines, etc.)
+3. Color palette (warm/cool, muted/vibrant, specific dominant colors)
+4. Shading/lighting style (flat, cel-shaded, volumetric, chiaroscuro, etc.)
+5. Level of realism (photorealistic, stylized, cartoon, abstract)
+6. Texture (smooth, grainy, brush strokes visible, paper texture, etc.)
+7. Overall mood/aesthetic
+
+Output ONLY the style description as a single paragraph (3-5 sentences) that could be used as an art style prompt. No headers, no bullet points, no analysis structure — just the description.` }
+        ]
+      }],
+      generationConfig: { maxOutputTokens: 500, temperature: 0.3 }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini style analysis failed: ${error.substring(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error('No style analysis returned');
+
+  log.info(`🎨 [STYLE ANALYZE] Result: ${text.substring(0, 150)}...`);
+  return { style: text, usage: { input_tokens: data.usageMetadata?.promptTokenCount || 0, output_tokens: data.usageMetadata?.candidatesTokenCount || 0 } };
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -10128,6 +10173,7 @@ module.exports = {
   generateImageOnly,
   generateWithIterativePlacement,
   applyStyleTransfer,
+  analyzeImageStyle,
   evaluateImageBatch,
   buildRepairPlan,
   executeRepairPlan,

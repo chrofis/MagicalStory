@@ -509,18 +509,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
     }
 
-    // Handle costumed:type format
-    let effectiveClothing = clothingCategory;
-    let costumeType = null;
-    if (clothingCategory && clothingCategory.startsWith('costumed:')) {
-      costumeType = clothingCategory.split(':')[1];
-      effectiveClothing = 'costumed';
-    }
     const artStyle = storyData.artStyle || 'pixar';
     // Use detailed photo info (with names) for labeled reference images
-    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, effectiveClothingRequirements);
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, effectiveClothingRequirements);
     // Apply styled avatars for non-costumed characters
-    if (effectiveClothing !== 'costumed') {
+    if (!clothingCategory || !clothingCategory.startsWith('costumed')) {
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
     log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}${pageClothingData ? ' (from outline)' : ' (parsed)'}`);
@@ -862,7 +855,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const cover = getCoverData(storyData, coverType);
       if (!cover) return res.status(400).json({ error: `No cover found for ${coverType}` });
       const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
-      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', null, artStyle, clothingReqs);
+      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
       prompt = buildImagePrompt(cover.description || '', storyData, chars, true, visualBible, pageNumber, true, characterPhotos);
     } else {
       const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
@@ -871,10 +864,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const chars = getCharactersInScene(desc, storyData.characters || []);
       const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
       const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
-      let costumeType = null, effClothing = clothing;
-      if (clothing.startsWith('costumed:')) { costumeType = clothing.split(':')[1]; effClothing = 'costumed'; }
-      characterPhotos = getCharacterPhotoDetails(chars, effClothing, costumeType, artStyle, clothingReqs);
-      if (effClothing !== 'costumed') characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
+      characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
+      if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       sceneMetadata = extractSceneMetadata(desc);
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
       if (visualBible) {
@@ -922,7 +913,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
 router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { targetModel, withAvatars } = req.body;
+    const { targetModel, withAvatars, styleDescription: customStyle } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     if (!targetModel) return res.status(400).json({ error: 'targetModel required' });
@@ -964,14 +955,16 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
       const sceneChars = getCharactersInScene(sceneDesc, characters);
       const charsToUse = sceneChars.length > 0 ? sceneChars : characters;
       const clothingReqs = convertClothingToCurrentFormat(storyData.clothingRequirements);
-      characterPhotos = getCharacterPhotoDetails(charsToUse, 'standard', null, artStyle, clothingReqs);
+      characterPhotos = getCharacterPhotoDetails(charsToUse, 'standard', artStyle, clothingReqs);
       characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       log.info(`🎨 [STYLE-TRANSFER] Including ${characterPhotos.length} avatar references`);
     }
 
     log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}${withAvatars ? ' (with avatars)' : ''}`);
     const start = Date.now();
-    const result = await applyStyleTransfer(currentImageData, artStyle, {
+    // Use custom style description if provided, otherwise use story's art style
+    const effectiveStyle = customStyle || artStyle;
+    const result = await applyStyleTransfer(currentImageData, effectiveStyle, {
       imageModelOverride: targetModel,
       imageBackendOverride: IMAGE_MODELS[targetModel].backend,
       characterPhotos,
@@ -988,6 +981,46 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
   } catch (err) {
     log.error('Error in style-transfer:', err);
     res.status(500).json({ error: 'Failed to apply style transfer: ' + err.message });
+  }
+});
+
+// Analyze the art style of a page image (DEV MODE ONLY)
+router.post('/:id/analyze-style/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    let imageData;
+    if (pageNumber < 0) {
+      const coverType = getCoverType(pageNumber);
+      const cover = coverType ? getCoverData(storyData, coverType) : null;
+      if (!cover?.imageData) return res.status(400).json({ error: 'No cover image found' });
+      imageData = cover.imageData;
+    } else {
+      const scene = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+      if (!scene?.imageData) return res.status(400).json({ error: 'No image found for page' });
+      imageData = scene.imageData;
+    }
+
+    const start = Date.now();
+    const { analyzeImageStyle } = require('../lib/images');
+    const result = await analyzeImageStyle(imageData);
+    const elapsed = Date.now() - start;
+
+    res.json({ success: true, style: result.style, elapsed, usage: result.usage });
+  } catch (err) {
+    log.error('Error in analyze-style:', err);
+    res.status(500).json({ error: 'Failed to analyze style' });
   }
 });
 
@@ -1481,16 +1514,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
-    let effectiveClothing = clothingCategory;
-    let costumeType = null;
-    if (clothingCategory && clothingCategory.startsWith('costumed:')) {
-      costumeType = clothingCategory.split(':')[1];
-      effectiveClothing = 'costumed';
-    }
-
     const artStyle = storyData.artStyle || 'pixar';
-    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, effectiveClothingRequirements);
-    if (effectiveClothing !== 'costumed') {
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, effectiveClothingRequirements);
+    if (!clothingCategory || !clothingCategory.startsWith('costumed')) {
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
 
@@ -1933,13 +1959,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       sceneDescription = editedScene.trim();
     }
 
-    // Handle costumed:type format
-    let effectiveCoverClothing = coverClothing;
-    let coverCostumeType = null;
-    if (coverClothing && coverClothing.startsWith('costumed:')) {
-      coverCostumeType = coverClothing.split(':')[1];
-      effectiveCoverClothing = 'costumed';
-    }
+    // coverClothing passed directly — getCharacterPhotoDetails normalizes costumed:type internally
     // Convert clothingRequirements to _currentClothing format for proper avatar lookup
     // This ensures regenerated covers use the story's costumes (not 'standard' fallback)
     const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
@@ -1992,7 +2012,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         log.info(`📕 [COVER REGEN] Capping selected characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
         selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
       }
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else if (normalizedCoverType === 'front') {
       // Front cover: main characters only (capped)
@@ -2001,7 +2021,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         log.info(`📕 [COVER REGEN] Capping front cover characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
         selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
       }
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] Front cover: ${mainChars.length > 0 ? 'MAIN: ' + mainChars.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else {
       // Initial/Back: main characters + different non-main extras per cover
@@ -2016,11 +2036,11 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
       }
       selectedCoverCharacters = [...mainCapped, ...extras];
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     }
     // Apply styled avatars for non-costumed characters
-    if (effectiveCoverClothing !== 'costumed') {
+    if (!coverClothing || !coverClothing.startsWith('costumed')) {
       coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
     }
 
