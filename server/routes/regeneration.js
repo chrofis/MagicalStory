@@ -1546,6 +1546,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       iterationCount: (currentImage.iterationCount || 0) + 1,
       // Preserve clothing data from original image for entity consistency
       sceneCharacterClothing: currentImage.sceneCharacterClothing || currentImage.characterClothing || null,
+      // Persist scene metadata for future bbox calls (re-evaluate, refresh-bbox, entity consistency)
+      sceneMetadata: iterateSceneMetadata || currentImage.sceneMetadata || null,
       // Bbox detection from the new image (so scene-level bbox matches active image)
       bboxDetection: imageResult.bboxDetection || null
     };
@@ -1888,6 +1890,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     // Get character photos with correct clothing variant
     let coverCharacterPhotos;
+    let selectedCoverCharacters;  // Track character objects for bbox detection
 
     // Cap at 5 characters max — more than 5 almost always produces bad results
     // Strategy: main characters appear on ALL covers, non-main are split across initial/back
@@ -1900,21 +1903,21 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     // If user provided specific character IDs, use those (still capped)
     if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
-      let selectedCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
-      if (selectedCharacters.length > MAX_COVER_CHARACTERS) {
-        log.info(`📕 [COVER REGEN] Capping selected characters from ${selectedCharacters.length} to ${MAX_COVER_CHARACTERS}`);
-        selectedCharacters = selectedCharacters.slice(0, MAX_COVER_CHARACTERS);
+      selectedCoverCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
+      if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
+        log.info(`📕 [COVER REGEN] Capping selected characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
+        selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
       }
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else if (normalizedCoverType === 'front') {
       // Front cover: main characters only (capped)
-      let charactersToUse = mainChars.length > 0 ? mainChars : mergedCharacters;
-      if (charactersToUse.length > MAX_COVER_CHARACTERS) {
-        log.info(`📕 [COVER REGEN] Capping front cover characters from ${charactersToUse.length} to ${MAX_COVER_CHARACTERS}`);
-        charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
+      selectedCoverCharacters = mainChars.length > 0 ? mainChars : mergedCharacters;
+      if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
+        log.info(`📕 [COVER REGEN] Capping front cover characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
+        selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
       }
-      coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] Front cover: ${mainChars.length > 0 ? 'MAIN: ' + mainChars.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else {
       // Initial/Back: main characters + different non-main extras per cover
@@ -1928,9 +1931,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         // back cover gets the second half
         extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
       }
-      const coverChars = [...mainCapped, ...extras];
-      coverCharacterPhotos = getCharacterPhotoDetails(coverChars, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ${coverChars.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+      selectedCoverCharacters = [...mainCapped, ...extras];
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     }
     // Apply styled avatars for non-costumed characters
     if (effectiveCoverClothing !== 'costumed') {
@@ -2054,10 +2057,12 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // Use same model as initial generation for consistency
     const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
     const coverImageModelId = MODEL_DEFAULTS.coverImage;
+    const coverRegenSceneMetadata = extractSceneMetadata(sceneDescription);
     const coverResult = await generateImageWithQualityRetry(
       coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
       { imageModel: coverImageModelId },
-      coverLabel
+      coverLabel,
+      { sceneCharacters: selectedCoverCharacters, sceneMetadata: coverRegenSceneMetadata }
     );
 
     // Log API costs for this cover regeneration

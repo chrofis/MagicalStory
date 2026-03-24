@@ -5440,7 +5440,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
     { imageModel: imageModelId },
     `PAGE ${pageNumber} ITERATE`,
-    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
+    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacters, sceneMetadata: newSceneMetadata }
   );
 
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);

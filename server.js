@@ -2777,7 +2777,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite

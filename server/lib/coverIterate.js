@@ -110,12 +110,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
   let coverCharacterPhotos;
+  let selectedCoverCharacters;  // Track character objects for bbox detection
   if (normalizedCoverType === 'front') {
-    let charactersToUse = mainChars.length > 0 ? mainChars : mergedCharacters;
-    if (charactersToUse.length > MAX_COVER_CHARACTERS) {
-      charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
+    selectedCoverCharacters = mainChars.length > 0 ? mainChars : mergedCharacters;
+    if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
+      selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
     }
-    coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
   } else {
     const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
     const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
@@ -123,7 +124,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     const extras = normalizedCoverType === 'initialPage'
       ? nonMainChars.slice(0, halfPoint).slice(0, extraSlots)
       : nonMainChars.slice(halfPoint).slice(0, extraSlots);
-    coverCharacterPhotos = getCharacterPhotoDetails([...mainCapped, ...extras], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+    selectedCoverCharacters = [...mainCapped, ...extras];
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
   }
 
   // Apply styled avatars
@@ -228,7 +230,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabel} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata }
   );
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
