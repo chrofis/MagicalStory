@@ -3749,6 +3749,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageNumber: img.pageNumber,
           text: img.text,
           description: img.sceneDescription,
+          sceneDescription: img.sceneDescription,  // alias for backward compat
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
@@ -3806,6 +3807,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageNumber: img.pageNumber,
           text: img.text,
           description: img.sceneDescription,
+          sceneDescription: img.sceneDescription,  // alias for backward compat
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),

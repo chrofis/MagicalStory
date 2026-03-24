@@ -608,6 +608,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       pageNumber,
       imageData: imageResult.imageData,
       description: expandedDescription,  // Store the full expanded scene description
+      sceneDescription: expandedDescription,  // alias for backward compat
       prompt: imagePrompt,  // Store the prompt used for this regeneration
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
@@ -1523,6 +1524,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       pageNumber,
       imageData: imageResult.imageData,
       description: newSceneDescription,
+      sceneDescription: newSceneDescription,  // alias for backward compat
       prompt: imagePrompt,
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
