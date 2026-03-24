@@ -5,15 +5,26 @@
 -- After:  scenes use imageVersions[i] → DB version_index = i (same as covers)
 --         (version_index 0 = original, 1+ = iterations, no gap)
 --
--- This shifts all scene version_index values >= 2 down by 1, closing the gap at 1.
--- version_index 0 (the original image) stays unchanged.
+-- Only 47 pages had the gap (v0 then v2+ with no v1).
+-- 210 pages already had data at v1 (from admin migration scripts), so they're
+-- already contiguous and must NOT be shifted.
+--
+-- Two-step approach to avoid unique constraint violations on (story_id, image_type, page_number, version_index):
 
--- Pre-check: version_index = 1 should not exist for scenes (it's the gap).
--- Run this before the migration to verify:
--- SELECT COUNT(*) FROM story_images WHERE image_type = 'scene' AND version_index = 1;
+-- Step 1: Shift gap page versions UP by 10000 (temporary offset)
+UPDATE story_images si
+SET version_index = si.version_index + 10000
+WHERE si.image_type = 'scene'
+  AND si.version_index >= 2
+  AND NOT EXISTS (
+    SELECT 1 FROM story_images gap_check
+    WHERE gap_check.story_id = si.story_id
+      AND gap_check.page_number = si.page_number
+      AND gap_check.image_type = 'scene'
+      AND gap_check.version_index = 1
+  );
 
--- Shift scene versions down: v2→v1, v3→v2, v4→v3, etc.
--- Process in ascending order to avoid unique constraint violations.
+-- Step 2: Shift back down by 10001 (net effect: -1)
 UPDATE story_images
-SET version_index = version_index - 1
-WHERE image_type = 'scene' AND version_index >= 2;
+SET version_index = version_index - 10001
+WHERE image_type = 'scene' AND version_index >= 10000;
