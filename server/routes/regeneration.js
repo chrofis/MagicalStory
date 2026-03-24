@@ -1150,7 +1150,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
             description: existingCover.description,
             createdAt: storyData.createdAt || new Date().toISOString(),
             type: 'original',
-            isActive: false
+            isActive: false,
+            _alreadySaved: true  // Already at DB v0, don't re-save
           });
         }
         const currentImageData = existingCover.imageData || null;
@@ -1163,7 +1164,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
             modelId: existingCover.modelId,
             createdAt: existingCover.regeneratedAt || existingCover.generatedAt || new Date().toISOString(),
             type: existingCover.wasRegenerated ? 'regeneration' : 'original',
-            isActive: false
+            isActive: false,
+            _alreadySaved: true  // Already in DB, don't re-save (would collide with new version)
           });
         } else if (currentImageData && existingCover.imageVersions.length > 0) {
           existingCover.imageVersions[0].isActive = false;
@@ -1784,6 +1786,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         } catch { /* ignore */ }
       }
       return {
+        versionIndex: idx,  // DB version_index (identity mapping)
         description: v.description,
         prompt: v.prompt,
         modelId: v.modelId,

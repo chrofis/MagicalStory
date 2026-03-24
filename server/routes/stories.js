@@ -1934,10 +1934,10 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         }));
       }
 
-      // Build imageVersions array with ALL versions (including version 0 = main image)
-      // Frontend expects imageVersions[0] = original, imageVersions[1] = regeneration 1, etc.
+      // Build imageVersions array with ALL versions (including version 0)
+      // v0 = main image (original after generation, best after unified pipeline, latest after iterate)
       const allVersions = [
-        // Version 0 (main/original image)
+        // Version 0 (main image from DB)
         {
           imageData: normalizeImageData(separateImage.imageData),
           qualityScore: separateImage.qualityScore,
@@ -1994,10 +1994,10 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    // Mark isActive based on image_version_meta (or fallback to legacy isActive in data)
+    // Mark isActive based on image_version_meta
     const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
       ...v,
-      isActive: activeVersion > 0 && i === dbToArrayIndex(activeVersion, 'scene')
+      isActive: i === dbToArrayIndex(activeVersion, 'scene')
     }));
 
     const imageSize = sceneImage.imageData?.length || 0;
@@ -2007,7 +2007,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     res.json({
       pageNumber: pageNum,
       imageData: normalizeImageData(sceneImage.imageData),
-      isActive: activeVersion === 0,
+      isActive: activeVersion === 0,  // top-level: main blob imageData is v0
       imageVersions: versionsWithActive
     });
   } catch (err) {
