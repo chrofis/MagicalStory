@@ -1855,6 +1855,24 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
 
+    // Style Lab images table - stores style convergence test images separately
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS style_lab_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        page_number INT NOT NULL,
+        run_id VARCHAR(100) NOT NULL,
+        model_id VARCHAR(100) NOT NULL,
+        image_data TEXT NOT NULL,
+        thumbnail TEXT,
+        style_prompt TEXT NOT NULL,
+        elapsed_ms INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_style_lab_story ON style_lab_images(story_id)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
+
     log.info('✓ Database tables initialized');
 
   } catch (err) {
