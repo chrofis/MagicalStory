@@ -292,3 +292,30 @@ Each lesson should include:
 - When endpoint A creates data and endpoint B overwrites the table, fix the WRITER (B), not the READER (A)
 - Always preserve DB records that aren't in the incoming payload — they may have been created by another process
 - Prefer simple root-cause fixes over complex workarounds. If a fix feels hacky, step back and find the real cause
+
+---
+
+### 2026-03-24: Verify DB Data Before Writing Migrations
+
+**Context**: Unifying version_index mapping for scenes (removing +1 offset). Plan assumed version_index=1 was always an empty gap for scenes.
+
+**Mistake**: Wrote migration SQL that shifts ALL scene version_index >= 2 down by 1, assuming no rows existed at version_index=1. Reality: 210 pages had real image data at version_index=1 (created by admin migration scripts with hardcoded `i + 1`). The blind migration would have caused unique constraint violations and data corruption.
+
+**Correction**: Ran pre-check query before executing. Discovered the 210 rows. Rewrote migration to only shift gap pages (47 pages that genuinely had no v1). Also needed two-step approach (shift up by 10000, then down by 10001) to avoid unique constraint violations during the UPDATE.
+
+**Rule**:
+- ALWAYS run pre-check queries against production data before executing migrations
+- Never assume DB state matches the mental model — admin scripts, bulk imports, and edge cases create unexpected rows
+- For UPDATE migrations that change indexed/unique columns, use a two-step shift to avoid constraint violations (PostgreSQL doesn't guarantee UPDATE order)
+- When a migration plan says "X should not exist", verify with `SELECT COUNT(*) ... WHERE X` before proceeding
+
+### 2026-03-25: Database Table Creation Lives in server.js, NOT database.js
+
+**Context**: Style Lab feature — added `style_lab_images` table to `database.js`'s `initializeDatabase()`
+
+**Mistake**: Both `server.js` and `server/services/database.js` have their own `initializeDatabase()` function with `CREATE TABLE` statements. Only the one in `server.js` runs on startup (called at line ~5182). Adding the table to `database.js` meant it was never created in production.
+
+**Rule**:
+- New tables MUST be added to `server.js`'s `initializeDatabase()` (the one that actually runs on startup)
+- The `database.js` version is a secondary copy — update it too for completeness, but `server.js` is authoritative
+- After adding any new table, verify it was created by checking Railway logs for the `CREATE TABLE` output

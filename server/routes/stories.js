@@ -1246,7 +1246,7 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         try {
           const activeVersion = await getActiveVersion(id, pageNum);
           const imgRow = await getStoryImage(id, 'scene', pageNum, activeVersion);
-          activeImageData = imgRow?.image_data || null;
+          activeImageData = imgRow?.imageData || null;
         } catch (dbErr) {
           log.warn(`⚠️ [DEV-IMAGE] Failed to load active image for page ${pageNum}: ${dbErr.message}`);
         }

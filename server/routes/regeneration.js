@@ -2029,7 +2029,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       if (!imgData && idx === 0 && v.type === 'original') {
         try {
           const origImg = await getStoryImage(id, 'scene', pageNumber, 0);
-          imgData = origImg?.image_data || undefined;
+          imgData = origImg?.imageData || undefined;
         } catch { /* ignore */ }
       }
       return {
