@@ -67,6 +67,10 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
   const [loadingA, setLoadingA] = useState(false);
   const [loadingB, setLoadingB] = useState(false);
 
+  // Track actual prompts used for each model in current run
+  const [usedPromptA, setUsedPromptA] = useState('');
+  const [usedPromptB, setUsedPromptB] = useState('');
+
   // Evaluation
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -146,6 +150,10 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
       });
 
       setRunId(response.runId);
+
+      // Capture actual prompts used for display
+      if (isRunA) setUsedPromptA(perModelOverrides[modelA] || baseStylePrompt);
+      if (isRunB) setUsedPromptB(perModelOverrides[modelB] || baseStylePrompt);
 
       if (isRunA && response.results[modelA]) {
         setResultA(response.results[modelA]);
@@ -372,7 +380,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
               model={modelA}
               result={resultA}
               loading={loadingA}
-              prompt={getEffectivePrompt(modelA)}
+              prompt={usedPromptA || getEffectivePrompt(modelA)}
               onClickImage={setLightboxImage}
               onUseImage={onUseImage}
               onRerun={() => runModels([modelA])}
@@ -384,7 +392,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
               model={modelB}
               result={resultB}
               loading={loadingB}
-              prompt={getEffectivePrompt(modelB)}
+              prompt={usedPromptB || getEffectivePrompt(modelB)}
               onClickImage={setLightboxImage}
               onUseImage={onUseImage}
               onRerun={() => runModels([modelB])}
