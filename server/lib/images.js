@@ -10419,8 +10419,7 @@ Return ONLY the JSON, no markdown fences.` }
   if (!text) throw new Error('No style comparison returned');
 
   // Parse JSON from response (handle markdown fences)
-  const { extractJsonFromText } = require('./textModels');
-  const parsed = extractJsonFromText(text);
+  const parsed = getStoryHelpers().extractJsonFromText(text);
   if (!parsed || typeof parsed.similarity !== 'number') {
     throw new Error(`Invalid style comparison response: ${text.substring(0, 200)}`);
   }

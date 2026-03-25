@@ -1190,7 +1190,10 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     if (images.length < 2) return res.status(400).json({ error: `Need 2 images to compare, found ${images.length}` });
 
     log.info(`🧪 [STYLE-LAB] Evaluating run ${runId}: comparing ${images[0].model_id} vs ${images[1].model_id}`);
-    const evaluation = await compareImageStyles(images[0].image_data, images[1].image_data);
+    // Compress images for comparison — style analysis doesn't need full resolution
+    const imgA = await compressImageToJPEG(images[0].image_data, 80, 512);
+    const imgB = await compressImageToJPEG(images[1].image_data, 80, 512);
+    const evaluation = await compareImageStyles(imgA, imgB);
 
     // Save evaluation to storyData
     const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
