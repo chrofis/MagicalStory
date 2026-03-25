@@ -3451,9 +3451,15 @@ IMPORTANT: Show ONLY ${fgNames}. Leave the far background OPEN and EMPTY — no 
   log.info(`🎯 [ITERATIVE] Pass 1: ${foregroundPhotos.length} foreground chars (${fgNames}), excluding ${bgNamesList}`);
   log.info(`🎯 [ITERATIVE] Pass 1 prompt (${pass1Prompt.length} chars)`);
 
-  const pass1Result = await generateImageOnly(pass1Prompt, foregroundPhotos, {
-    imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
-  });
+  let pass1Result;
+  try {
+    pass1Result = await generateImageOnly(pass1Prompt, foregroundPhotos, {
+      imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+    });
+  } catch (err) {
+    log.error(`🎯 [ITERATIVE] Pass 1 threw: ${err.message}`);
+    throw err;
+  }
 
   if (!pass1Result?.imageData) {
     log.error('🎯 [ITERATIVE] Pass 1 failed — no image generated');
@@ -3492,13 +3498,13 @@ The added character must be:
       landmarkPhotos, visualBibleGrid,
       pageNumber, skipCache: true
     });
-  } catch (pass2Error) {
-    log.error(`🎯 [ITERATIVE] Pass 2 threw: ${pass2Error.message}`);
+  } catch (err) {
+    log.error(`🎯 [ITERATIVE] Pass 2 threw: ${err.message}`);
     return {
       ...pass1Result,
       iterativePlacement: true,
       pass2Failed: true,
-      pass2Error: pass2Error.message,
+      pass2Error: err.message,
       pass1Image: pass1Result.imageData,
       pass1Prompt: pass1Prompt,
       pass2Prompt: pass2Prompt,
@@ -3524,6 +3530,7 @@ The added character must be:
     ...pass1Result,
     iterativePlacement: true,
     pass2Failed: true,
+    pass2Error: 'Pass 2 returned no imageData',
     pass1Image: pass1Result.imageData,
     pass1Prompt: pass1Prompt,
     pass2Prompt: pass2Prompt,
@@ -8231,6 +8238,150 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
 }
 
 /**
+ * Inpaint regions using Grok edit API with blackout+blend technique.
+ *
+ * Approach (mirrors repairCharacterMismatchWithGrok blended mode):
+ * 1. White out all bounding box regions on the original image
+ * 2. Send whiteout image + fix prompt to editWithGrok()
+ * 3. Resize Grok result to match original dimensions
+ * 4. Feathered-blend each bbox region from Grok result back onto the original (30px feather)
+ *
+ * @param {string} originalImage - Base64 data URI of the original image
+ * @param {Array<number[]>} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1
+ * @param {string} fixPrompt - Instruction for what to fix in the regions
+ * @param {Object} options - Additional options
+ * @returns {Promise<{imageData: string, modelId: string, usage?: Object, fullPrompt: string}>}
+ */
+async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, options = {}) {
+  // 1. Create whiteout overlay on all bounding box regions
+  const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
+  const origBuffer = Buffer.from(origBase64, 'base64');
+  const metadata = await sharp(origBuffer).metadata();
+  const { width, height } = metadata;
+
+  // Build composite operations for all bounding boxes
+  const composites = [];
+  for (const bbox of boundingBoxes) {
+    const [ymin, xmin, ymax, xmax] = bbox;
+    const bx = Math.round(xmin * width);
+    const by = Math.round(ymin * height);
+    const bw = Math.max(1, Math.round((xmax - xmin) * width));
+    const bh = Math.max(1, Math.round((ymax - ymin) * height));
+    // White rectangle with 80% opacity (same as character repair outer ring)
+    const whiteRect = await sharp({
+      create: { width: bw, height: bh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 204 } }
+    }).png().toBuffer();
+    composites.push({ input: whiteRect, left: bx, top: by });
+  }
+
+  const whiteoutBuffer = await sharp(origBuffer)
+    .composite(composites)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  const whiteoutDataUri = `data:image/jpeg;base64,${whiteoutBuffer.toString('base64')}`;
+
+  // 2. Build prompt for Grok
+  const regionDescriptions = boundingBoxes.map((bbox, idx) => {
+    const [ymin, xmin, ymax, xmax] = bbox;
+    return `Region ${idx + 1}: top ${Math.round(ymin * 100)}%-${Math.round(ymax * 100)}%, left ${Math.round(xmin * 100)}%-${Math.round(xmax * 100)}%`;
+  }).join('\n');
+
+  const grokPrompt = `Fix the whited-out region(s) in this illustration. Regenerate ONLY the blanked areas to match the surrounding art style perfectly.
+
+TARGET REGIONS:
+${regionDescriptions}
+
+WHAT TO FIX:
+${fixPrompt}
+
+IMPORTANT:
+- Preserve everything outside the white regions exactly as shown
+- Match the art style, lighting, and color palette of the surrounding image
+- Make the repaired areas blend seamlessly with the rest`;
+
+  // 3. Send to Grok — detect aspect ratio from original image dimensions
+  const aspectRatio = width > height ? '16:9' : height > width ? '9:16' : '1:1';
+  log.info(`🔧 [INPAINT-GROK] Sending ${boundingBoxes.length} region(s) to Grok for repair (aspect: ${aspectRatio})`);
+
+  const grokResult = await editWithGrok(grokPrompt, [whiteoutDataUri], {
+    model: GROK_MODELS.STANDARD,
+    aspectRatio
+  });
+
+  if (!grokResult?.imageData) {
+    throw new Error('Grok returned no image for inpaint repair');
+  }
+
+  // 4. Feathered blend each region back onto original (same technique as character repair)
+  const FEATHER_PX = 30;
+  const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+  let grokBuffer = Buffer.from(grokBase64, 'base64');
+
+  // Resize Grok result to match original dimensions if needed
+  const grokMeta = await sharp(grokBuffer).metadata();
+  if (grokMeta.width !== width || grokMeta.height !== height) {
+    log.warn(`⚠️ [INPAINT-GROK] Grok returned ${grokMeta.width}x${grokMeta.height}, expected ${width}x${height} — resizing`);
+    grokBuffer = await sharp(grokBuffer).resize(width, height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  }
+
+  let resultBuffer = origBuffer;
+
+  for (const bbox of boundingBoxes) {
+    const [ymin, xmin, ymax, xmax] = bbox;
+    // Add 10% padding for blend region
+    const padX = (xmax - xmin) * 0.1;
+    const padY = (ymax - ymin) * 0.1;
+    const bx = Math.max(0, Math.round((xmin - padX) * width));
+    const by = Math.max(0, Math.round((ymin - padY) * height));
+    const bx2 = Math.min(width, Math.round((xmax + padX) * width));
+    const by2 = Math.min(height, Math.round((ymax + padY) * height));
+    const bw = bx2 - bx;
+    const bh = by2 - by;
+
+    if (bw <= 0 || bh <= 0) continue;
+
+    // Extract regions from both images as raw RGB
+    const origRegion = await sharp(resultBuffer)
+      .extract({ left: bx, top: by, width: bw, height: bh })
+      .raw().toBuffer();
+    const grokRegion = await sharp(grokBuffer)
+      .extract({ left: bx, top: by, width: bw, height: bh })
+      .raw().toBuffer();
+
+    // Create feathered blend: original at edges, Grok result in center
+    const blended = Buffer.alloc(bw * bh * 3);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        // Distance from edge (0 at edge, 1 in center beyond feather)
+        const dx = Math.min(x, bw - 1 - x) / FEATHER_PX;
+        const dy = Math.min(y, bh - 1 - y) / FEATHER_PX;
+        const alpha = Math.min(1, Math.min(dx, dy)); // 0=original, 1=grok
+        const idx = (y * bw + x) * 3;
+        for (let c = 0; c < 3; c++) {
+          blended[idx + c] = Math.round(origRegion[idx + c] * (1 - alpha) + grokRegion[idx + c] * alpha);
+        }
+      }
+    }
+
+    // Composite blended region back onto result
+    const blendedPng = await sharp(blended, { raw: { width: bw, height: bh, channels: 3 } }).png().toBuffer();
+    resultBuffer = await sharp(resultBuffer)
+      .composite([{ input: blendedPng, left: bx, top: by }])
+      .jpeg({ quality: 92 }).toBuffer();
+  }
+
+  const finalDataUri = `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
+  log.info(`✅ [INPAINT-GROK] Repair complete. ${boundingBoxes.length} region(s) blended. Cost: $${grokResult.usage?.cost || 0.02}`);
+
+  return {
+    imageData: finalDataUri,
+    modelId: grokResult.modelId || 'grok-imagine',
+    usage: grokResult.usage,
+    fullPrompt: grokPrompt
+  };
+}
+
+/**
  * Inpaint an image using TEXT-BASED region coordinates (semantic masking)
  * NOTE: Gemini 2.5 Flash Image uses natural language to identify regions.
  * We pass coordinates as text in the prompt instead of as a mask image,
@@ -8239,13 +8390,14 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
  * Supports multiple backends:
  * - 'gemini' (default): Uses text-based coordinates with Gemini API
  * - 'runware': Uses mask images with Runware API (much cheaper)
+ * - 'grok': Uses blackout+blend with Grok edit API
  *
  * @param {string} originalImage - Base64 original image
  * @param {Array} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1 coordinates
  * @param {string} fixPrompt - Instruction for what to fix
  * @param {string} maskImage - Optional mask image (required for Runware, optional for Gemini)
  * @param {Object} options - Additional options
- * @param {string} options.backend - 'gemini' or 'runware' (default: MODEL_DEFAULTS.inpaintBackend)
+ * @param {string} options.backend - 'gemini', 'runware', or 'grok' (default: MODEL_DEFAULTS.inpaintBackend)
  * @param {string} options.runwareModel - Runware model to use (default: 'runware:101@1' SDXL)
  * @returns {Promise<{imageData: string, usage?: Object, modelId?: string}|null>}
  */
@@ -8260,6 +8412,11 @@ async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImag
   // Route to Runware if configured
   if (backend === 'runware') {
     return inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt, maskImage, { model: runwareModel });
+  }
+
+  // Route to Grok if configured
+  if (backend === 'grok') {
+    return inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, options);
   }
 
   // Default: Gemini backend

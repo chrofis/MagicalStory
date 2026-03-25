@@ -86,7 +86,7 @@ const MODEL_DEFAULTS = {
   utility: 'gemini-2.0-flash',         // Fast utility tasks
 
   // Inpainting backend for auto-repair
-  inpaintBackend: 'runware',           // 'gemini' or 'runware' (runware is 50x cheaper)
+  inpaintBackend: 'grok',              // 'gemini', 'runware', or 'grok' ($0.02/repair via Grok edit)
 
   // Image generation backend (can be overridden in dev mode)
   // 'gemini' = Gemini API (default, best quality)

@@ -17,6 +17,7 @@ import {
   SkipForward,
   Square,
   Trophy,
+  Paintbrush,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
@@ -64,6 +65,7 @@ const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.Compo
   're-evaluate': { label: 'Re-evaluate', icon: CheckCircle, description: 'Run quality evaluation on new images' },
   'consistency-check': { label: 'Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
   'character-repair': { label: 'Character Repair', icon: Users, description: 'Fix character appearance issues' },
+  'inpaint-repair': { label: 'Inpaint Repair', icon: Paintbrush, description: 'Fix specific image regions using Grok edit' },
 };
 
 // Status badge component
@@ -407,6 +409,7 @@ export function RepairWorkflowPanel({
     reEvaluatePages,
     runConsistencyCheck,
     repairCharacter,
+    repairInpaint,
     runFullWorkflow,
     abortWorkflow,
     isAborted,
@@ -470,6 +473,7 @@ export function RepairWorkflowPanel({
   // Selected character for repair
   const [selectedCharacter, setSelectedCharacter] = useState<string>('');
   const [selectedCharacterPages, setSelectedCharacterPages] = useState<number[]>([]);
+  const [selectedInpaintPage, setSelectedInpaintPage] = useState<number | null>(null);
 
   // Redo mode option for step 3
   const [redoMode, setRedoMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
@@ -1533,6 +1537,83 @@ export function RepairWorkflowPanel({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Step 7: Inpaint Repair */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {renderStepHeader('inpaint-repair')}
+            {expandedSteps.has('inpaint-repair') && (
+              <div className="p-4 space-y-3 bg-white">
+                <p className="text-sm text-gray-600">{STEP_CONFIG['inpaint-repair'].description}</p>
+
+                {/* Page selector — show pages that have fix targets */}
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-gray-700">Select page to repair:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {sceneImages.map(scene => {
+                      const fixTargetCount = scene.fixTargets?.length || 0;
+                      return (
+                        <button
+                          key={scene.pageNumber}
+                          onClick={() => setSelectedInpaintPage(scene.pageNumber)}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedInpaintPage === scene.pageNumber
+                              ? 'bg-orange-100 border-orange-400 text-orange-800'
+                              : fixTargetCount > 0
+                                ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                          }`}
+                          disabled={isFullWorkflowBusy}
+                        >
+                          {getPageName(scene.pageNumber)} {fixTargetCount > 0 && <span className="font-semibold">({fixTargetCount})</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Show fix targets for selected page */}
+                {selectedInpaintPage !== null && (() => {
+                  const scene = sceneImages.find(s => s.pageNumber === selectedInpaintPage);
+                  const fixTargets = scene?.fixTargets || [];
+                  return (
+                    <div className="space-y-2">
+                      {fixTargets.length > 0 ? (
+                        <>
+                          <div className="text-xs text-gray-600">
+                            {fixTargets.length} fixable issue{fixTargets.length !== 1 ? 's' : ''} on {getPageName(selectedInpaintPage)}:
+                          </div>
+                          <ul className="text-xs text-gray-500 list-disc pl-4 space-y-0.5">
+                            {fixTargets.map((t, i) => (
+                              <li key={i}>{t.issue}</li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <div className="text-xs text-gray-400">No fix targets available for this page. Run evaluation first.</div>
+                      )}
+
+                      <button
+                        onClick={async () => {
+                          const result = await repairInpaint(selectedInpaintPage!, fixTargets.length > 0 ? fixTargets : undefined);
+                          if (result?.repaired && onRefreshStory) {
+                            await onRefreshStory();
+                          }
+                        }}
+                        disabled={disableForFinalSteps || selectedInpaintPage === null || workflowState.stepStatus['inpaint-repair'] === 'in-progress'}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                      >
+                        <Paintbrush className="w-4 h-4" />
+                        Inpaint {getPageName(selectedInpaintPage)}
+                        {workflowState.stepStatus['inpaint-repair'] === 'in-progress' && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

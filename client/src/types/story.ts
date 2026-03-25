@@ -936,7 +936,8 @@ export type RepairWorkflowStep =
   | 'redo-pages'
   | 're-evaluate'
   | 'consistency-check'
-  | 'character-repair';
+  | 'character-repair'
+  | 'inpaint-repair';
 
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
 

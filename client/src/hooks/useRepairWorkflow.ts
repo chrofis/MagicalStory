@@ -60,6 +60,7 @@ function createInitialState(): RepairWorkflowState {
       're-evaluate': 'pending',
       'consistency-check': 'pending',
       'character-repair': 'pending',
+      'inpaint-repair': 'pending',
     },
     collectedFeedback: {
       pages: {},
@@ -96,6 +97,7 @@ const STEP_ORDER: RepairWorkflowStep[] = [
   're-evaluate',
   'consistency-check',
   'character-repair',
+  'inpaint-repair',
 ];
 
 export interface UseRepairWorkflowProps {
@@ -154,6 +156,14 @@ export interface UseRepairWorkflowReturn {
 
   // Step 6: Character repair
   repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
+
+  // Step 7: Inpaint repair (targeted fix-target-based region repair)
+  repairInpaint: (pageNumber: number, fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>) => Promise<{
+    success: boolean;
+    repaired: boolean;
+    noErrorsFound: boolean;
+    imageData: string;
+  } | undefined>;
 
   // Full automated workflow
   runFullWorkflow: (options?: {
@@ -896,7 +906,50 @@ export function useRepairWorkflow({
     }
   }, [storyId, startStep, failStep, onImageUpdate]);
 
-  // Get step number (1-6, 0 for idle)
+  // Step 7: Inpaint repair — targeted fix-target-based region repair
+  const repairInpaint = useCallback(async (pageNumber: number, fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>) => {
+    if (!storyId) return;
+
+    startStep('inpaint-repair');
+
+    try {
+      const result = await storyService.repairImage(storyId, pageNumber, fixTargets);
+
+      if (result.repaired && result.imageData && onImageUpdate) {
+        try {
+          onImageUpdate(pageNumber, result.imageData, 0, {
+            type: 'inpaint-repair',
+          });
+        } catch (err) {
+          console.error(`[RepairWorkflow] Failed to notify parent of inpaint update for page ${pageNumber}:`, err);
+        }
+      }
+
+      setWorkflowState(prev => ({
+        ...prev,
+        stepStatus: {
+          ...prev.stepStatus,
+          'inpaint-repair': result.repaired ? 'completed' : 'failed',
+        },
+      }));
+
+      // Re-evaluate the repaired page
+      if (result.repaired) {
+        try {
+          await reEvaluatePages([pageNumber]);
+        } catch (evalErr) {
+          console.warn('[RepairWorkflow] Post-inpaint re-evaluation failed:', evalErr);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Inpaint repair failed:', error);
+      failStep('inpaint-repair', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }, [storyId, startStep, failStep, onImageUpdate]);
+
+  // Get step number (1-7, 0 for idle)
   const getStepNumber = useCallback((step: RepairWorkflowStep): number => {
     const index = STEP_ORDER.indexOf(step);
     return index >= 0 ? index : 0;
@@ -1261,6 +1314,8 @@ export function useRepairWorkflow({
     runConsistencyCheck,
 
     repairCharacter,
+
+    repairInpaint,
 
     runFullWorkflow,
     abortWorkflow,
