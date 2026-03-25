@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
+import { artStyles } from '@/constants/artStyles';
+import { StyleLabSection } from './StyleLabSection';
 
 interface TestModelsPanelProps {
   storyId: string;
@@ -21,6 +23,8 @@ interface ModelTestResult {
   pass1Image?: string;
   pass1Prompt?: string;
   pass2Prompt?: string;
+  pass2Failed?: boolean;
+  pass2Error?: string;
 }
 
 interface ModelOption {
@@ -53,7 +57,8 @@ export function TestModelsPanel({
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
   const [styleWithAvatars, setStyleWithAvatars] = useState(false);
-  const [styleSource, setStyleSource] = useState<'story' | 'analyzed' | 'custom'>('story');
+  const [styleSource, setStyleSource] = useState<'story' | 'preset' | 'analyzed' | 'custom'>('story');
+  const [presetStyleId, setPresetStyleId] = useState<string>('watercolor');
   const [analyzedStyle, setAnalyzedStyle] = useState<string | null>(null);
   const [customStyle, setCustomStyle] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -106,9 +111,11 @@ export function TestModelsPanel({
             error: result?.error,
             modelId: model,
             elapsedMs,
-            pass1Image: (result as any)?.pass1Image,
-            pass1Prompt: (result as any)?.pass1Prompt,
-            pass2Prompt: (result as any)?.pass2Prompt,
+            pass1Image: result?.pass1Image,
+            pass1Prompt: result?.pass1Prompt,
+            pass2Prompt: result?.pass2Prompt,
+            pass2Failed: result?.pass2Failed,
+            pass2Error: result?.pass2Error,
           },
         }));
       } catch (err: unknown) {
@@ -133,7 +140,8 @@ export function TestModelsPanel({
 
     try {
       // Determine style description based on source
-      const styleDesc = styleSource === 'analyzed' ? (analyzedStyle || undefined)
+      const styleDesc = styleSource === 'preset' ? (artStyles.find(s => s.id === presetStyleId)?.prompt || undefined)
+        : styleSource === 'analyzed' ? (analyzedStyle || undefined)
         : styleSource === 'custom' ? (customStyle || undefined)
         : undefined; // 'story' = use story's art style (server default)
       const response = await storyService.styleTransfer(storyId, pageNumber, styleTargetModel, styleWithAvatars, styleDesc);
@@ -322,6 +330,11 @@ export function TestModelsPanel({
                     </div>
                   )}
                   {/* Iterative placement debug: show Pass 1 image and prompts */}
+                  {result.pass2Failed && (
+                    <div className="mt-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      Pass 2 failed{result.pass2Error ? `: ${result.pass2Error}` : ''} — showing Pass 1 only
+                    </div>
+                  )}
                   {result.pass1Image && (
                     <div className="mt-2 space-y-1">
                       <div className="text-[10px] font-medium text-orange-600">Pass 1 (foreground only):</div>
@@ -339,13 +352,13 @@ export function TestModelsPanel({
                       {result.pass1Prompt && (
                         <div className="mt-1">
                           <div className="text-[9px] font-medium text-gray-500">Pass 1 prompt:</div>
-                          <pre className="text-[9px] bg-gray-50 p-1 rounded max-h-24 overflow-auto whitespace-pre-wrap">{result.pass1Prompt.substring(0, 500)}</pre>
+                          <pre className="text-xs bg-gray-50 p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">{result.pass1Prompt}</pre>
                         </div>
                       )}
                       {result.pass2Prompt && (
                         <div className="mt-1">
                           <div className="text-[9px] font-medium text-gray-500">Pass 2 prompt:</div>
-                          <pre className="text-[9px] bg-gray-50 p-1 rounded max-h-24 overflow-auto whitespace-pre-wrap">{result.pass2Prompt.substring(0, 500)}</pre>
+                          <pre className="text-xs bg-gray-50 p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">{result.pass2Prompt}</pre>
                         </div>
                       )}
                     </details>
@@ -368,6 +381,10 @@ export function TestModelsPanel({
             <label className="flex items-center gap-1.5 cursor-pointer text-sm">
               <input type="radio" name="styleSource" checked={styleSource === 'story'} onChange={() => setStyleSource('story')} className="text-purple-600" />
               Story art style
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+              <input type="radio" name="styleSource" checked={styleSource === 'preset'} onChange={() => setStyleSource('preset')} className="text-purple-600" />
+              Preset
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer text-sm">
               <input type="radio" name="styleSource" checked={styleSource === 'analyzed'} onChange={() => setStyleSource('analyzed')} className="text-purple-600" />
@@ -397,6 +414,18 @@ export function TestModelsPanel({
               </button>
             )}
           </div>
+          {styleSource === 'preset' && (
+            <select
+              value={presetStyleId}
+              onChange={e => setPresetStyleId(e.target.value)}
+              disabled={isStyleTransferring}
+              className="w-full rounded border-gray-300 text-sm p-1.5 mb-2"
+            >
+              {artStyles.map(s => (
+                <option key={s.id} value={s.id}>{s.name.en}</option>
+              ))}
+            </select>
+          )}
           {styleSource === 'analyzed' && analyzedStyle && (
             <textarea
               value={analyzedStyle}
@@ -510,6 +539,13 @@ export function TestModelsPanel({
             </div>
           )}
         </div>
+
+        {/* Style Lab Section */}
+        <StyleLabSection
+          storyId={storyId}
+          pageNumber={pageNumber}
+          onUseImage={onUseImage}
+        />
       </div>
 
       {/* Lightbox */}

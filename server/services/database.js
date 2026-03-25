@@ -373,6 +373,24 @@ async function initializeDatabase() {
     // Unique index with COALESCE (can't use inline UNIQUE constraint with functions)
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_retry_images_unique ON story_retry_images(story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))`);
 
+    // Style Lab images table - stores style convergence test images separately
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS style_lab_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        page_number INT NOT NULL,
+        run_id VARCHAR(100) NOT NULL,
+        model_id VARCHAR(100) NOT NULL,
+        image_data TEXT NOT NULL,
+        thumbnail TEXT,
+        style_prompt TEXT NOT NULL,
+        elapsed_ms INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_style_lab_story ON style_lab_images(story_id)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
+
     // Seed default pricing tiers if table is empty
     const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
     if (parseInt(pricingCheck[0].count) === 0) {
@@ -1548,6 +1566,54 @@ async function getRetryHistoryImages(storyId, pageNumber) {
   return result;
 }
 
+// ============================================
+// STYLE LAB IMAGE FUNCTIONS
+// ============================================
+
+/**
+ * Save a style lab image (upsert by story_id, page_number, run_id, model_id).
+ */
+async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData, thumbnail, stylePrompt, elapsedMs) {
+  if (!isDatabaseMode()) return;
+  await dbQuery(
+    `INSERT INTO style_lab_images (story_id, page_number, run_id, model_id, image_data, thumbnail, style_prompt, elapsed_ms)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (story_id, page_number, run_id, model_id)
+     DO UPDATE SET image_data = EXCLUDED.image_data, thumbnail = EXCLUDED.thumbnail,
+                   style_prompt = EXCLUDED.style_prompt, elapsed_ms = EXCLUDED.elapsed_ms,
+                   created_at = CURRENT_TIMESTAMP`,
+    [storyId, pageNumber, runId, modelId, imageData, thumbnail, stylePrompt, elapsedMs]
+  );
+}
+
+/**
+ * Get all style lab thumbnails for a page (for history strip).
+ * Returns rows with run_id, model_id, thumbnail, style_prompt, elapsed_ms, created_at.
+ */
+async function getStyleLabThumbnails(storyId, pageNumber) {
+  if (!isDatabaseMode()) return [];
+  return await dbQuery(
+    `SELECT run_id, model_id, thumbnail, style_prompt, elapsed_ms, created_at
+     FROM style_lab_images
+     WHERE story_id = $1 AND page_number = $2
+     ORDER BY created_at DESC`,
+    [storyId, pageNumber]
+  );
+}
+
+/**
+ * Get full images for a specific style lab run (lazy load on expand).
+ */
+async function getStyleLabRunImages(storyId, pageNumber, runId) {
+  if (!isDatabaseMode()) return [];
+  return await dbQuery(
+    `SELECT model_id, image_data, style_prompt, elapsed_ms, created_at
+     FROM style_lab_images
+     WHERE story_id = $1 AND page_number = $2 AND run_id = $3`,
+    [storyId, pageNumber, runId]
+  );
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -1577,6 +1643,10 @@ module.exports = {
   // Retry history image functions
   saveRetryHistoryImages,
   getRetryHistoryImages,
+  // Style Lab image functions
+  saveStyleLabImage,
+  getStyleLabThumbnails,
+  getStyleLabRunImages,
   // Exposed for testing
   normalizeCoverValue,
   getCoverData

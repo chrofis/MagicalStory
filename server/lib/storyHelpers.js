@@ -2830,7 +2830,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
   const artStyleId = inputData.artStyle || 'pixar';
-  const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+  const styleDescription = options.customStyleDescription || ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
 
   // Build character reference list (Option B: explicit labeling in prompt)

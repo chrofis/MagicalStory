@@ -1238,6 +1238,11 @@ export const storyService = {
       elapsed: number;
       usage?: { input_tokens: number; output_tokens: number };
       error?: string;
+      pass1Image?: string;
+      pass1Prompt?: string;
+      pass2Prompt?: string;
+      pass2Failed?: boolean;
+      pass2Error?: string;
     }>;
   }> {
     const response = await api.post<{
@@ -1249,6 +1254,11 @@ export const storyService = {
         elapsed: number;
         usage?: { input_tokens: number; output_tokens: number };
         error?: string;
+        pass1Image?: string;
+        pass1Prompt?: string;
+        pass2Prompt?: string;
+        pass2Failed?: boolean;
+        pass2Error?: string;
       }>;
     }>(
       `/api/stories/${storyId}/test-models/${pageNumber}`,
@@ -1299,6 +1309,80 @@ export const storyService = {
       `/api/stories/${storyId}/page/${pageNumber}`,
       { imageData }
     );
+    return response;
+  },
+
+  // Style Lab (admin only)
+  async styleLab(storyId: string, pageNumber: number, options: {
+    models: string[];
+    baseStylePrompt: string;
+    artStyleId: string;
+    perModelOverrides?: Record<string, string>;
+    runId?: string;
+  }): Promise<{
+    runId: string;
+    results: Record<string, { imageData?: string; modelId: string; elapsed: number; error?: string }>;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      runId: string;
+      results: Record<string, { imageData?: string; modelId: string; elapsed: number; error?: string }>;
+    }>(`/api/stories/${storyId}/style-lab/${pageNumber}`, options);
+    return response;
+  },
+
+  async styleLabEvaluate(storyId: string, pageNumber: number, runId: string): Promise<{
+    similarity: number;
+    dimensions: Record<string, number>;
+    summary: string;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      similarity: number;
+      dimensions: Record<string, number>;
+      summary: string;
+    }>(`/api/stories/${storyId}/style-lab/${pageNumber}/evaluate`, { runId });
+    return response;
+  },
+
+  async styleLabHistory(storyId: string, pageNumber: number): Promise<{
+    runs: Array<{
+      runId: string;
+      pageNumber: number;
+      artStyleId: string;
+      baseStylePrompt: string;
+      perModelOverrides: Record<string, string>;
+      models: string[];
+      thumbnails: Record<string, string>;
+      evaluation?: { similarity: number; dimensions: Record<string, number>; summary: string };
+      createdAt: string;
+    }>;
+  }> {
+    const response = await api.get<{
+      success: boolean;
+      runs: Array<{
+        runId: string;
+        pageNumber: number;
+        artStyleId: string;
+        baseStylePrompt: string;
+        perModelOverrides: Record<string, string>;
+        models: string[];
+        thumbnails: Record<string, string>;
+        evaluation?: { similarity: number; dimensions: Record<string, number>; summary: string };
+        createdAt: string;
+      }>;
+    }>(`/api/stories/${storyId}/style-lab/${pageNumber}/history`);
+    return response;
+  },
+
+  async styleLabRunImages(storyId: string, pageNumber: number, runId: string): Promise<{
+    results: Record<string, { imageData: string; stylePrompt: string; elapsed: number }>;
+  }> {
+    const response = await api.get<{
+      success: boolean;
+      runId: string;
+      results: Record<string, { imageData: string; stylePrompt: string; elapsed: number }>;
+    }>(`/api/stories/${storyId}/style-lab/${pageNumber}/history/${runId}`);
     return response;
   },
 

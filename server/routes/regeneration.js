@@ -7,6 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const pLimit = require('p-limit');
 
 // Middleware
@@ -19,7 +20,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getPool, dbQuery } = require('../services/database');
+const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -62,7 +63,9 @@ const {
   repairCharacterMismatch,
   detectAllBoundingBoxes,
   createBboxOverlayImage,
-  IMAGE_QUALITY_THRESHOLD
+  IMAGE_QUALITY_THRESHOLD,
+  compareImageStyles,
+  compressImageToJPEG
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
@@ -897,12 +900,13 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         model, imageData: result.imageData, modelId: result.modelId, elapsed: Date.now() - start, usage: result.usage || null,
         // Iterative placement debug data
         pass1Image: result.pass1Image || null, pass1Prompt: result.pass1Prompt || null, pass2Prompt: result.pass2Prompt || null,
+        pass2Failed: result.pass2Failed || false, pass2Error: result.pass2Error || null,
       };
     }));
     for (const [i, s] of settled.entries()) {
       if (s.status === 'fulfilled') {
         const r = s.value;
-        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage, pass1Image: r.pass1Image, pass1Prompt: r.pass1Prompt, pass2Prompt: r.pass2Prompt };
+        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage, pass1Image: r.pass1Image, pass1Prompt: r.pass1Prompt, pass2Prompt: r.pass2Prompt, pass2Failed: r.pass2Failed, pass2Error: r.pass2Error };
       } else {
         results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
       }
@@ -1026,6 +1030,243 @@ router.post('/:id/analyze-style/:pageNum', authenticateToken, async (req, res) =
   } catch (err) {
     log.error('Error in analyze-style:', err);
     res.status(500).json({ error: 'Failed to analyze style' });
+  }
+});
+
+// ============================================
+// STYLE LAB ENDPOINTS
+// ============================================
+
+// Style Lab: generate same scene with per-model style prompt overrides (admin only)
+router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { models, baseStylePrompt, artStyleId, perModelOverrides, runId: existingRunId } = req.body;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    // Validate
+    if (!Array.isArray(models) || models.length === 0) return res.status(400).json({ error: 'models array required' });
+    if (!baseStylePrompt) return res.status(400).json({ error: 'baseStylePrompt required' });
+    const unknown = models.filter(m => !IMAGE_MODELS[m]);
+    if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
+
+    // Load story
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    const artStyle = storyData.artStyle || 'pixar';
+    const visualBible = storyData.visualBible || null;
+    const clothingReqs = storyData.clothingRequirements || null;
+
+    // Resolve scene description, characters, and references (same as test-models)
+    let characterPhotos, landmarkPhotos = [], visualBibleGrid = null;
+    if (pageNumber < 0) {
+      const coverType = getCoverType(pageNumber);
+      if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
+      const cover = getCoverData(storyData, coverType);
+      if (!cover) return res.status(400).json({ error: `No cover found for ${coverType}` });
+      const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
+      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
+    } else {
+      const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+      if (!sceneDesc) return res.status(400).json({ error: `No scene description for page ${pageNumber}` });
+      const desc = sceneDesc.description || '';
+      const chars = getCharactersInScene(desc, storyData.characters || []);
+      const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
+      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
+      characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
+      if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
+      const sceneMetadata = extractSceneMetadata(desc);
+      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+      if (visualBible) {
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+        const secLm = landmarkPhotos.slice(1);
+        if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
+      }
+    }
+
+    const runId = existingRunId || crypto.randomUUID();
+    log.info(`🧪 [STYLE-LAB] Story ${id}, page ${pageNumber}: run ${runId}, models: ${models.join(', ')}`);
+
+    // Build per-model prompts and generate in parallel
+    const results = {};
+    const settled = await Promise.allSettled(models.map(async (model) => {
+      const effectiveStyle = perModelOverrides?.[model] || baseStylePrompt;
+
+      // Resolve scene description for this model with custom style
+      const sceneDesc = pageNumber < 0
+        ? (getCoverData(storyData, getCoverType(pageNumber))?.description || '')
+        : ((storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber)?.description || '');
+      const chars = getCharactersInScene(sceneDesc, storyData.characters || []);
+      const prompt = buildImagePrompt(sceneDesc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos, {
+        customStyleDescription: effectiveStyle
+      });
+
+      const start = Date.now();
+      const result = await generateImageOnly(prompt, characterPhotos, {
+        imageModelOverride: model,
+        imageBackendOverride: IMAGE_MODELS[model].backend,
+        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+      });
+      const elapsed = Date.now() - start;
+
+      // Save full image + thumbnail to DB
+      const thumbnail = await compressImageToJPEG(result.imageData, 60, 200);
+      await saveStyleLabImage(id, pageNumber, runId, model, result.imageData, thumbnail, effectiveStyle, elapsed);
+
+      return { model, imageData: result.imageData, modelId: result.modelId, elapsed };
+    }));
+
+    for (const [i, s] of settled.entries()) {
+      if (s.status === 'fulfilled') {
+        const r = s.value;
+        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed };
+      } else {
+        results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
+      }
+    }
+
+    // Save run metadata to storyData (without images)
+    if (!storyData.styleLabHistory) storyData.styleLabHistory = [];
+    const existingIdx = storyData.styleLabHistory.findIndex(r => r.runId === runId);
+    const runMeta = {
+      runId,
+      pageNumber,
+      artStyleId: artStyleId || 'custom',
+      baseStylePrompt,
+      perModelOverrides: perModelOverrides || {},
+      models: existingIdx >= 0
+        ? [...new Set([...storyData.styleLabHistory[existingIdx].models, ...models])]
+        : models,
+      createdAt: new Date().toISOString()
+    };
+    // Preserve existing evaluation if re-running single model
+    if (existingIdx >= 0) {
+      runMeta.evaluation = storyData.styleLabHistory[existingIdx].evaluation;
+      storyData.styleLabHistory[existingIdx] = runMeta;
+    } else {
+      storyData.styleLabHistory.push(runMeta);
+    }
+    await saveStoryData(id, storyData);
+
+    res.json({ success: true, runId, pageNumber, results });
+  } catch (err) {
+    log.error('Error in style-lab:', err);
+    res.status(500).json({ error: 'Failed to run style lab: ' + err.message });
+  }
+});
+
+// Style Lab: evaluate style similarity between two model results (admin only)
+router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { runId } = req.body;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+    if (!runId) return res.status(400).json({ error: 'runId required' });
+
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    // Load images for this run
+    const images = await getStyleLabRunImages(id, pageNumber, runId);
+    if (images.length < 2) return res.status(400).json({ error: `Need 2 images to compare, found ${images.length}` });
+
+    log.info(`🧪 [STYLE-LAB] Evaluating run ${runId}: comparing ${images[0].model_id} vs ${images[1].model_id}`);
+    const evaluation = await compareImageStyles(images[0].image_data, images[1].image_data);
+
+    // Save evaluation to storyData
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length > 0) {
+      const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+      const run = (storyData.styleLabHistory || []).find(r => r.runId === runId);
+      if (run) {
+        run.evaluation = { ...evaluation, evaluatedAt: new Date().toISOString() };
+        await saveStoryData(id, storyData);
+      }
+    }
+
+    res.json({ success: true, ...evaluation });
+  } catch (err) {
+    log.error('Error in style-lab evaluate:', err);
+    res.status(500).json({ error: 'Failed to evaluate: ' + err.message });
+  }
+});
+
+// Style Lab: get history for a page (thumbnails + metadata, no full images)
+router.get('/:id/style-lab/:pageNum/history', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    // Load run metadata from storyData
+    const storyResult = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+    const allRuns = (storyData.styleLabHistory || []).filter(r => r.pageNumber === pageNumber);
+
+    // Load thumbnails from DB
+    const thumbRows = await getStyleLabThumbnails(id, pageNumber);
+    const thumbMap = {}; // runId -> { modelId: thumbnail }
+    for (const row of thumbRows) {
+      if (!thumbMap[row.run_id]) thumbMap[row.run_id] = {};
+      thumbMap[row.run_id][row.model_id] = row.thumbnail;
+    }
+
+    const runs = allRuns.map(run => ({
+      ...run,
+      thumbnails: thumbMap[run.runId] || {}
+    }));
+
+    res.json({ success: true, runs });
+  } catch (err) {
+    log.error('Error in style-lab history:', err);
+    res.status(500).json({ error: 'Failed to load history: ' + err.message });
+  }
+});
+
+// Style Lab: get full images for a specific run (lazy load on expand)
+router.get('/:id/style-lab/:pageNum/history/:runId', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum, runId } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+
+    // Admin only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
+
+    const images = await getStyleLabRunImages(id, pageNumber, runId);
+    const results = {};
+    for (const img of images) {
+      results[img.model_id] = {
+        imageData: img.image_data,
+        stylePrompt: img.style_prompt,
+        elapsed: img.elapsed_ms,
+        createdAt: img.created_at
+      };
+    }
+
+    res.json({ success: true, runId, results });
+  } catch (err) {
+    log.error('Error in style-lab run images:', err);
+    res.status(500).json({ error: 'Failed to load run images: ' + err.message });
   }
 });
 
