@@ -76,6 +76,10 @@ const MODEL_DEFAULTS = {
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
 
+  // Per-page routing by scene complexity (sceneRouting = 'auto')
+  simplePageImage: 'grok-imagine',            // Simple scenes: all chars foreground ($0.02)
+  complexPageImage: 'gemini-2.5-flash-image', // Complex scenes: background chars need Gemini ($0.04)
+
   // Quality evaluation models
   // NOTE: quality eval uses Gemini REST API directly (not generic text model caller)
   // Switching to Grok requires adding Grok vision API support to evaluateImageQuality()

@@ -215,6 +215,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
     "fixesApplied": []
   },
   "scene": {
+    "sceneComplexity": "simple",
     "landmarkPlacement": { "tower": "top-left background" },
     "imageSummary": "Sophie stands in the foreground pointing up-left toward the distant tower while Manuel walks beside her on the left. The snowy plaza stretches between them and the tower. Main characters: Sophie, Manuel.",
     "setting": {
@@ -255,6 +256,14 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
   }
 }
 ```
+
+## FIELD GUIDELINES
+
+- `sceneComplexity`: `"simple"` or `"complex"`.
+  - **simple**: All characters drawn at NORMAL SIZE on the same depth plane (foreground/midground). Most scenes are simple.
+  - **complex**: Any character positioned as a TINY FIGURE in the far background, OR characters at clearly different size scales due to depth separation.
+  - Rule of thumb: if all character positions are "left"/"center"/"right" → simple. If any position contains "far background" or "(tiny figure)" → complex.
+  - Default to `"simple"` unless depth separation is clearly needed by the story moment.
 
 ---
 

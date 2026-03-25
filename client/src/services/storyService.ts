@@ -1619,6 +1619,7 @@ export const storyService = {
       textModel?: string | null;
       sceneDescriptionModel?: string | null;
       sceneIterationModel?: string | null;
+      sceneRouting?: string | null;  // 'auto', 'grok', 'gemini' (null = auto)
       imageModel?: string | null;
       coverImageModel?: string | null;
       qualityModel?: string | null;

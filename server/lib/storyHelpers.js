@@ -648,6 +648,17 @@ function extractSceneMetadata(sceneDescription) {
       log.info(`[SCENE META] landmarkPhotoVariant=${landmarkVariant} selected`);
     }
 
+    // Detect scene complexity: explicit field or fallback from character positions
+    let sceneComplexity = parsedData.sceneComplexity || null;
+    if (!sceneComplexity && parsedData.characters && Array.isArray(parsedData.characters)) {
+      const hasBackground = parsedData.characters.some(c => {
+        const pos = (c.position || '').toLowerCase();
+        const depth = (c.depth || '').toLowerCase();
+        return depth === 'background' || pos.includes('background');
+      });
+      sceneComplexity = hasBackground ? 'complex' : 'simple';
+    }
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
@@ -665,6 +676,8 @@ function extractSceneMetadata(sceneDescription) {
       landmarkVariant,
       // Store setting for reference
       setting: parsedData.setting || null,
+      // Scene complexity for model routing ('simple' | 'complex' | null)
+      sceneComplexity,
       isJsonFormat: true
     };
   }

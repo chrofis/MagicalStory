@@ -3606,8 +3606,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
           visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
         }
+        // Determine per-page image model based on scene complexity
+        const sceneComplexity = sceneMetadata?.sceneComplexity || 'simple';
+        const sceneRouting = modelOverrides.sceneRouting || 'auto';
+        let pageImageModel, pageImageBackend;
+
+        if (sceneRouting === 'auto') {
+          pageImageModel = sceneComplexity === 'complex'
+            ? MODEL_DEFAULTS.complexPageImage
+            : MODEL_DEFAULTS.simplePageImage;
+          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
+          log.info(`🎯 [ROUTING] Page ${pageNum}: ${sceneComplexity} → ${pageImageModel} (${pageImageBackend})`);
+        } else if (sceneRouting === 'grok') {
+          pageImageModel = MODEL_DEFAULTS.simplePageImage;
+          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
+        } else if (sceneRouting === 'gemini') {
+          pageImageModel = MODEL_DEFAULTS.complexPageImage;
+          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
+        } else {
+          pageImageModel = modelOverrides.imageModel;
+          pageImageBackend = modelOverrides.imageBackend;
+        }
+
         // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
-        const imageModelConfig = IMAGE_MODELS[modelOverrides.imageModel];
+        const imageModelConfig = IMAGE_MODELS[pageImageModel];
         const isGrokImage = imageModelConfig?.backend === 'grok';
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos, { skipVisualBible: isGrokImage }
@@ -3622,7 +3644,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBibleGrid,
           sceneCharacters,
           sceneMetadata,
-          perCharClothing
+          perCharClothing,
+          pageImageModel,
+          pageImageBackend,
+          sceneComplexity,
         };
       };
 
@@ -3652,8 +3677,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               pageData.prompt,
               pageData.characterPhotos,
               {
-                imageModelOverride: modelOverrides.imageModel,
-                imageBackendOverride: modelOverrides.imageBackend,
+                imageModelOverride: pageData.pageImageModel,
+                imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber
@@ -4727,6 +4752,7 @@ async function _processStoryJobImpl(jobId) {
       qualityModel: MODEL_DEFAULTS.qualityEval,
       imageBackend: MODEL_DEFAULTS.imageBackend,
       storyAvatarModel: null,  // null = use default (gemini-2.5-flash-image)
+      sceneRouting: null,      // 'auto', 'grok', 'gemini', or null (= 'auto')
       ...filteredUserOverrides  // Only non-null user overrides
     };
     // Trial mode: use Sonnet for story generation (best narrative quality)

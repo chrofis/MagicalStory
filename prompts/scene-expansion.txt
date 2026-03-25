@@ -45,6 +45,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 ```json
 {
   "scene": {
+    "sceneComplexity": "simple",
     "landmarkPlacement": {},
     "imageSummary": "Sophie and Manuel walk across a snowy plaza toward the clock tower on the left, footprints trailing behind them in fresh snow.",
     "setting": {
@@ -105,6 +106,12 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 - `weatherVisibility`: Critical for indoor scenes with weather outside. E.g. "snow visible through window only" prevents the generator from putting snow inside the room. Use "directly on scene" for outdoor, "visible through window" for indoor with weather outside, "none" for indoor with no weather visible.
 - `objects`: List ALL recurring visual elements (from the list above) that appear in this scene. Use their exact IDs. Include locations, animals, artifacts, vehicles — anything from the recurring elements list that's visible.
 - `landmarkPhotoVariant`: Pick the variant that matches the scene's perspective. If characters are ON or INSIDE the landmark, pick an interior/close-up variant — NOT a distant exterior. A photo from 100m away will make the generator draw the landmark from far away instead of placing characters at/in it. Pick `null` if no variant matches the perspective (no photo is better than a wrong-perspective photo).
+
+- `sceneComplexity`: `"simple"` or `"complex"`.
+  - **simple**: All characters drawn at NORMAL SIZE on the same depth plane (foreground/midground). Most scenes are simple.
+  - **complex**: Any character positioned as a TINY FIGURE in the far background, OR characters at clearly different size scales due to depth separation.
+  - Rule of thumb: if all character positions are "left"/"center"/"right" → simple. If any position contains "far background" or "(tiny figure)" → complex.
+  - Default to `"simple"` unless depth separation is clearly needed by the story moment.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.

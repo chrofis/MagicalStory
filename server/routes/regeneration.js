@@ -1843,7 +1843,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const previousScore = currentImage.qualityScore || null;
 
     // Generate new image - use developer model override if provided, otherwise use default
-    const imageModelOverride = imageModel || null;  // null means use default (gemini-2.5-flash-image for scenes)
+    let imageModelOverride = imageModel || null;  // null means use default (gemini-2.5-flash-image for scenes)
     if (imageModelOverride) {
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModelOverride}`);
     }
@@ -1863,6 +1863,16 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
     }
     const iterateSceneMetadata = extractSceneMetadata(newSceneDescription);
+
+    // Route by scene complexity when no explicit model override
+    if (!imageModelOverride) {
+      const sceneComplexity = iterateSceneMetadata?.sceneComplexity || 'simple';
+      if (sceneComplexity === 'complex') {
+        imageModelOverride = MODEL_DEFAULTS.complexPageImage;
+        log.info(`🎯 [ITERATE] Page ${pageNumber}: complex scene → ${imageModelOverride}`);
+      }
+    }
+
     let imageResult;
     if (iterativePlacement) {
       const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;

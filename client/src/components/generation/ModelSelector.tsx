@@ -178,6 +178,7 @@ export interface ModelSelections {
   textModel: TextModelKey | null;
   sceneDescriptionModel: TextModelKey | null;
   sceneIterationModel: TextModelKey | null;  // Scene iteration/retry (thorough)
+  sceneRouting: 'auto' | 'grok' | 'gemini' | null;  // null = auto (simple→Grok, complex→Gemini)
   imageModel: ImageModelKey | null;
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
@@ -297,6 +298,20 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           value={selections.sceneIterationModel}
           options={TEXT_MODELS}
           onChange={(v) => updateSelection('sceneIterationModel', v)}
+          language={language}
+        />
+
+        {/* Scene Routing (simple→Grok, complex→Gemini) */}
+        <ModelDropdown
+          label={language === 'de' ? 'Szenen-Routing' : language === 'fr' ? 'Routage de scène' : 'Scene Routing'}
+          icon={<Image size={12} />}
+          value={selections.sceneRouting}
+          options={{
+            'auto': { description: 'Simple→Grok ($0.02), Complex→Gemini ($0.04)' },
+            'grok': { description: 'Force all pages to Grok ($0.02/img)' },
+            'gemini': { description: 'Force all pages to Gemini ($0.04/img)' },
+          }}
+          onChange={(v) => updateSelection('sceneRouting', v)}
           language={language}
         />
 
