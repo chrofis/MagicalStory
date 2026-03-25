@@ -1596,7 +1596,8 @@ async function getStyleLabThumbnails(storyId, pageNumber) {
     `SELECT run_id, model_id, thumbnail, style_prompt, elapsed_ms, created_at
      FROM style_lab_images
      WHERE story_id = $1 AND page_number = $2
-     ORDER BY created_at DESC`,
+     ORDER BY created_at DESC
+     LIMIT 200`,
     [storyId, pageNumber]
   );
 }
@@ -1609,7 +1610,8 @@ async function getStyleLabRunImages(storyId, pageNumber, runId) {
   return await dbQuery(
     `SELECT model_id, image_data, style_prompt, elapsed_ms, created_at
      FROM style_lab_images
-     WHERE story_id = $1 AND page_number = $2 AND run_id = $3`,
+     WHERE story_id = $1 AND page_number = $2 AND run_id = $3
+     ORDER BY model_id`,
     [storyId, pageNumber, runId]
   );
 }

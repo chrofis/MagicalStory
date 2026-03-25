@@ -1152,6 +1152,10 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       runMeta.evaluation = storyData.styleLabHistory[existingIdx].evaluation;
       storyData.styleLabHistory[existingIdx] = runMeta;
     } else {
+      // Cap history at 50 entries per story, prune oldest
+      if (storyData.styleLabHistory.length >= 50) {
+        storyData.styleLabHistory = storyData.styleLabHistory.slice(-49);
+      }
       storyData.styleLabHistory.push(runMeta);
     }
     await saveStoryData(id, storyData);
@@ -1177,6 +1181,10 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
 
+    // Verify story ownership before loading images
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+
     // Load images for this run
     const images = await getStyleLabRunImages(id, pageNumber, runId);
     if (images.length < 2) return res.status(400).json({ error: `Need 2 images to compare, found ${images.length}` });
@@ -1185,14 +1193,11 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     const evaluation = await compareImageStyles(images[0].image_data, images[1].image_data);
 
     // Save evaluation to storyData
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-    if (storyResult.rows.length > 0) {
-      const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
-      const run = (storyData.styleLabHistory || []).find(r => r.runId === runId);
-      if (run) {
-        run.evaluation = { ...evaluation, evaluatedAt: new Date().toISOString() };
-        await saveStoryData(id, storyData);
-      }
+    const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+    const run = (storyData.styleLabHistory || []).find(r => r.runId === runId);
+    if (run) {
+      run.evaluation = { ...evaluation, evaluatedAt: new Date().toISOString() };
+      await saveStoryData(id, storyData);
     }
 
     res.json({ success: true, ...evaluation });

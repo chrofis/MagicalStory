@@ -4,6 +4,9 @@ import { ImageLightbox } from '@/components/common/ImageLightbox';
 import { artStyles } from '@/constants/artStyles';
 import storyService from '@/services/storyService';
 
+const formatElapsed = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+const toSrc = (img: string) => img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+
 interface StyleLabSectionProps {
   storyId: string;
   pageNumber: number;
@@ -89,7 +92,17 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
     }
   }, [artStyleId]);
 
-  // Load history on mount
+  // Reset page-specific state when page changes
+  useEffect(() => {
+    setRunId(null);
+    setResultA(null);
+    setResultB(null);
+    setEvaluation(null);
+    setExpandedRunId(null);
+    setExpandedImages(null);
+  }, [pageNumber]);
+
+  // Load history on mount and page change
   useEffect(() => {
     loadHistory();
   }, [storyId, pageNumber]);
@@ -102,10 +115,6 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
       // History load failure is non-critical
     }
   }, [storyId, pageNumber]);
-
-  const formatElapsed = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-
-  const toSrc = (img: string) => img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
 
   const getEffectivePrompt = (model: string) => {
     if (!showOverrides) return baseStylePrompt;
@@ -197,8 +206,8 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
     if (Object.keys(run.perModelOverrides || {}).length > 0) {
       setShowOverrides(true);
       const models = run.models || [];
-      setOverrideA(run.perModelOverrides[models[0]] || run.baseStylePrompt);
-      setOverrideB(run.perModelOverrides[models[1]] || run.baseStylePrompt);
+      setOverrideA(run.perModelOverrides[models[0]] || '');
+      setOverrideB(run.perModelOverrides[models[1]] || '');
       if (models[0]) setModelA(models[0]);
       if (models[1]) setModelB(models[1]);
     } else {
@@ -565,9 +574,6 @@ function ResultCard({
   onRerun: () => void;
   isRunning: boolean;
 }) {
-  const toSrc = (img: string) => img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
-  const formatElapsed = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-
   return (
     <div className="border rounded-lg p-3 bg-gray-50 flex flex-col">
       <div className="flex items-center justify-between mb-2">
