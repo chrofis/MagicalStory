@@ -500,9 +500,13 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
                 ) : expandedImages ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 mb-2">
-                      {Object.entries(expandedImages).map(([model, data]) => (
+                      {(history.find(r => r.runId === expandedRunId)?.models || Object.keys(expandedImages))
+                        .filter(model => expandedImages[model])
+                        .map(model => ({ model, data: expandedImages[model] }))
+                        .map(({ model, data }, idx) => (
                         <div key={model} className="text-center">
                           <div className="text-[10px] font-medium text-gray-600 mb-1">
+                            <span className="text-indigo-500 font-bold mr-1">{idx === 0 ? 'A' : 'B'}</span>
                             {[...GROK_MODELS, ...GEMINI_MODELS].find(m => m.id === model)?.label || model}
                             {data.elapsed ? ` (${formatElapsed(data.elapsed)})` : ''}
                           </div>
