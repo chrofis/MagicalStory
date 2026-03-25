@@ -882,9 +882,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const start = Date.now();
       let result;
       if (iterativePlacement && sceneMetadata) {
+        const artStyleDesc = ART_STYLES[storyData.artStyle] || ART_STYLES.pixar || '';
         result = await generateWithIterativePlacement(prompt, characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-          landmarkPhotos, visualBibleGrid, pageNumber,
+          landmarkPhotos, visualBibleGrid, pageNumber, artStyle: artStyleDesc,
         });
       } else {
         result = await generateImageOnly(prompt, characterPhotos, {

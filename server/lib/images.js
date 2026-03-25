@@ -3390,6 +3390,7 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     landmarkPhotos = [],
     visualBibleGrid = null,
     pageNumber = null,
+    artStyle = '',
   } = options;
 
   // 1. Split characters by depth from sceneMetadata.fullData (the parsed JSON scene object)
@@ -3418,21 +3419,37 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     });
   }
 
-  // 2. Build Pass 1: only foreground characters
+  // 2. Split character photos by foreground/background
   const foregroundNames = new Set(foregroundChars.map(c => c.name));
   const foregroundPhotos = allCharacterPhotos.filter(p => foregroundNames.has(p.name || p.characterName));
+  const backgroundNames = backgroundChars.map(c => c.name);
+  const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.name || p.characterName));
 
-  // Modify prompt for Pass 1: remove background character references safely
-  // Escape character names for regex (avoid injection from names with special chars)
-  let pass1Prompt = prompt;
-  for (const bgChar of backgroundChars) {
-    const escaped = bgChar.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    pass1Prompt = pass1Prompt.replace(new RegExp(`^.*\\b${escaped}\\b.*$\\n?`, 'gim'), '');
-  }
-  // Add instruction that this is a partial scene
-  pass1Prompt += '\n\nIMPORTANT: Only render the foreground character(s) in this scene. Leave the background area open and unoccupied.';
+  // Extract scene info for prompt building
+  const imageSummary = sceneMetadata?.fullData?.imageSummary || sceneMetadata?.imageSummary || '';
+  const settingDesc = sceneMetadata?.fullData?.setting?.description || '';
+  const camera = sceneMetadata?.fullData?.setting?.camera || 'wide shot';
+  const fgNames = foregroundChars.map(c => c.name).join(', ');
+  const bgNamesList = backgroundChars.map(c => c.name).join(', ');
+  const styleLine = artStyle ? `**ART STYLE:** ${artStyle}\n\n` : '';
 
-  log.info(`🎯 [ITERATIVE] Pass 1: Generating with ${foregroundPhotos.length} foreground characters (${foregroundChars.map(c => c.name).join(', ')}), excluding ${backgroundChars.map(c => c.name).join(', ')}`);
+  // 3. Pass 1: Generate scene with ONLY foreground character(s)
+  const fgCharDesc = foregroundChars.map(c =>
+    `- ${c.name}: ${c.position || 'foreground'}, ${c.action || 'standing'}${c.expression ? ', ' + c.expression : ''}`
+  ).join('\n');
+
+  const pass1Prompt = `${styleLine}Generate a SINGLE illustration. No split screen, no panels, no grid. No text or watermarks.
+
+**SCENE:** ${settingDesc || imageSummary}
+Camera: ${camera}
+
+**Characters (foreground ONLY):**
+${fgCharDesc}
+
+IMPORTANT: Show ONLY ${fgNames}. Leave the far background OPEN and EMPTY — no other figures. Space must remain for a tiny character to be added later.`;
+
+  log.info(`🎯 [ITERATIVE] Pass 1: ${foregroundPhotos.length} foreground chars (${fgNames}), excluding ${bgNamesList}`);
+  log.info(`🎯 [ITERATIVE] Pass 1 prompt (${pass1Prompt.length} chars)`);
 
   const pass1Result = await generateImageOnly(pass1Prompt, foregroundPhotos, {
     imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
@@ -3445,27 +3462,27 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
 
   log.info(`🎯 [ITERATIVE] Pass 1 complete. Now adding ${backgroundChars.length} background character(s)...`);
 
-  // 3. Build Pass 2: add background characters using Pass 1 as reference
-  const backgroundNames = backgroundChars.map(c => c.name);
-  const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.name || p.characterName));
-
-  // Build a targeted prompt for adding the background character
-  const bgDescriptions = backgroundChars.map(c => {
-    const parts = [`${c.name}`];
+  // 4. Pass 2: Add background character(s) to the Pass 1 image
+  const bgCharDesc = backgroundChars.map(c => {
+    const parts = [c.name];
     if (c.position) parts.push(`on the ${c.position}`);
     if (c.action) parts.push(c.action);
-    return parts.join(' ');
-  }).join('; ');
+    if (c.clothing) parts.push(`wearing ${c.clothing}`);
+    return parts.join(', ');
+  }).join('\n- ');
 
-  const pass2Prompt = `This illustration already shows a scene. Add the following character(s) to the FAR BACKGROUND as TINY FIGURES (approximately 1/5 the size of the foreground character): ${bgDescriptions}.
+  const pass2Prompt = `${styleLine}This illustration shows ${fgNames} in the foreground. Do NOT change them.
 
-The background character(s) must be:
+ADD to the FAR BACKGROUND as a TINY FIGURE (approximately 1/5 the size of the foreground character):
+- ${bgCharDesc}
+
+The added character must be:
 - Very small compared to the foreground figure
-- Positioned in the distant background area
-- Clearly recognizable but tiny
-- Naturally integrated into the existing scene
+- In the distant background area
+- Recognizable but tiny — match the scene's art style and lighting
+- PRESERVE the entire foreground exactly as shown`;
 
-CRITICAL: Do NOT change the foreground character, the scene layout, or any existing elements. Only ADD the small background figure(s).`;
+  log.info(`🎯 [ITERATIVE] Pass 2 prompt (${pass2Prompt.length} chars)`);
 
   const pass2Result = await generateImageOnly(pass2Prompt, backgroundPhotos, {
     imageModelOverride, imageBackendOverride,
