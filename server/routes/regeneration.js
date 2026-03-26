@@ -2165,9 +2165,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     // Get art style (with per-backend variant if available)
     const artStyleId = storyData.artStyle || 'pixar';
-    const iterateBackend = imageModel ? (IMAGE_MODELS[imageModel]?.backend || null) : null;
     const { resolveArtStyle: resolveStyle } = require('../lib/storyHelpers');
-    const styleDescription = resolveStyle(artStyleId, iterateBackend) || resolveStyle('pixar');
+    const styleDescription = resolveStyle(artStyleId) || resolveStyle('pixar');
 
     // Build character info with main character emphasis
     let characterInfo = '';
