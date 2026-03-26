@@ -2868,7 +2868,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
   const artStyleId = inputData.artStyle || 'pixar';
-  const styleDescription = options.customStyleDescription || resolveArtStyle(artStyleId, options.imageBackend) || ART_STYLES.pixar;
+  // Resolve backend for per-model style variants: use explicit option, or infer from default image model
+  let effectiveBackend = options.imageBackend;
+  if (!effectiveBackend) {
+    try {
+      const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
+      const defaultModel = MODEL_DEFAULTS.pageImage || MODEL_DEFAULTS.image;
+      if (defaultModel && IMAGE_MODELS[defaultModel]) effectiveBackend = IMAGE_MODELS[defaultModel].backend;
+    } catch { /* config not available */ }
+  }
+  const styleDescription = options.customStyleDescription || resolveArtStyle(artStyleId, effectiveBackend) || resolveArtStyle('pixar');
   const language = (inputData.language || 'en').toLowerCase();
 
   // Build character reference list (Option B: explicit labeling in prompt)
