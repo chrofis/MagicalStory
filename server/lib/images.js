@@ -10405,7 +10405,7 @@ Return a JSON object:
 Return ONLY the JSON, no markdown fences.` }
         ]
       }],
-      generationConfig: { maxOutputTokens: 500, temperature: 0.2 }
+      generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }
     })
   });
 
