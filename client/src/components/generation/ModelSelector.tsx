@@ -87,7 +87,7 @@ export const IMAGE_MODELS = {
   }
 } as const;
 
-// Available quality evaluation models
+// Available quality evaluation models (also used for bbox detection)
 export const QUALITY_MODELS = {
   'gemini-2.0-flash': {
     description: 'Gemini 2.0 Flash - Fast evaluation',
@@ -98,6 +98,16 @@ export const QUALITY_MODELS = {
     description: 'Gemini 2.5 Flash - More thorough',
     descriptionDe: 'Gemini 2.5 Flash - Gründlicher',
     descriptionFr: 'Gemini 2.5 Flash - Plus approfondi'
+  },
+  'grok-4-fast': {
+    description: 'Grok 4 Fast - Cheapest vision ($0.20/$0.50 per 1M)',
+    descriptionDe: 'Grok 4 Fast - Günstigstes Vision ($0.20/$0.50 pro 1M)',
+    descriptionFr: 'Grok 4 Fast - Vision la moins chère ($0.20/$0.50 par 1M)'
+  },
+  'grok-3-mini': {
+    description: 'Grok 3 Mini - Fast vision ($0.30/$0.50 per 1M)',
+    descriptionDe: 'Grok 3 Mini - Schnelles Vision ($0.30/$0.50 pro 1M)',
+    descriptionFr: 'Grok 3 Mini - Vision rapide ($0.30/$0.50 par 1M)'
   }
 } as const;
 
@@ -182,6 +192,7 @@ export interface ModelSelections {
   imageModel: ImageModelKey | null;
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
+  bboxModel: QualityModelKey | null;  // Bounding box detection model
   imageBackend: ImageBackendKey | null;  // gemini or runware (for repair)
   avatarModel: AvatarModelKey | null;  // Character creation avatar model
   storyAvatarModel: StoryAvatarModelKey | null;  // Styled avatar model during story generation
@@ -341,6 +352,16 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           value={selections.qualityModel}
           options={QUALITY_MODELS}
           onChange={(v) => updateSelection('qualityModel', v)}
+          language={language}
+        />
+
+        {/* Bounding Box Detection Model */}
+        <ModelDropdown
+          label="Bbox Detection"
+          icon={<Eye size={12} />}
+          value={selections.bboxModel}
+          options={QUALITY_MODELS}
+          onChange={(v) => updateSelection('bboxModel', v)}
           language={language}
         />
 

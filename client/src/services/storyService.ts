@@ -1623,6 +1623,7 @@ export const storyService = {
       imageModel?: string | null;
       coverImageModel?: string | null;
       qualityModel?: string | null;
+      bboxModel?: string | null;  // Bounding box detection model
       imageBackend?: string | null;  // 'gemini' or 'runware'
       storyAvatarModel?: string | null;  // styled avatar model during story gen
     };

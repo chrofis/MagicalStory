@@ -3758,6 +3758,7 @@ export default function StoryWizard() {
           imageModel: modelSelections.imageModel,
           coverImageModel: modelSelections.coverImageModel,
           qualityModel: modelSelections.qualityModel,
+          bboxModel: modelSelections.bboxModel,
           imageBackend: modelSelections.imageBackend,
           storyAvatarModel: modelSelections.storyAvatarModel,
         } : undefined,

@@ -47,6 +47,7 @@ const MODEL_DEFAULTS: ModelSelections = {
   imageModel: null,
   coverImageModel: null,
   qualityModel: null,
+  bboxModel: null,
   imageBackend: null,
   avatarModel: null,
   storyAvatarModel: null,

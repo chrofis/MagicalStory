@@ -4750,6 +4750,7 @@ async function _processStoryJobImpl(jobId) {
       imageModel: MODEL_DEFAULTS.pageImage,
       coverImageModel: MODEL_DEFAULTS.coverImage,
       qualityModel: MODEL_DEFAULTS.qualityEval,
+      bboxModel: MODEL_DEFAULTS.bboxDetection,
       imageBackend: MODEL_DEFAULTS.imageBackend,
       storyAvatarModel: null,  // null = use default (gemini-2.5-flash-image)
       sceneRouting: null,      // 'auto', 'grok', 'gemini', or null (= 'auto')

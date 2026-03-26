@@ -1251,7 +1251,7 @@ function parseVisualBibleObjects(prompt) {
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null } = options;
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1311,33 +1311,47 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       { text: prompt }
     ];
 
-    // Bbox needs spatial precision — use dedicated bbox model (gemini-2.5-flash)
-    const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    // Bbox needs spatial precision — use dedicated bbox model
+    const modelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
+    const modelConfig = TEXT_MODELS[modelId];
 
-    const response = await withRetry(async () => {
-      return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            maxOutputTokens: 16000,  // Doubled to avoid MAX_TOKENS truncation in complex scenes
-            temperature: 0.1,  // Low temperature for precise detection
-            responseMimeType: 'application/json'
-          },
-          safetySettings: GEMINI_SAFETY_SETTINGS
-        })
-      });
-    }, { maxRetries: 2, baseDelay: 1000 });
+    // Route to Grok vision if model is xAI provider
+    let data;
+    if (modelConfig?.provider === 'xai') {
+      log.info(`🔲 [BBOX-DETECT] Using Grok vision: ${modelId}`);
+      data = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
+      if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
+        return null;
+      }
+    } else {
+      // Gemini path
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
-    if (!response.ok) {
-      const error = await response.text();
-      log.error(`❌ [BBOX-DETECT] Gemini API error: ${error.substring(0, 200)}`);
-      return null;
+      const response = await withRetry(async () => {
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              maxOutputTokens: 16000,
+              temperature: 0.1,
+              responseMimeType: 'application/json'
+            },
+            safetySettings: GEMINI_SAFETY_SETTINGS
+          })
+        });
+      }, { maxRetries: 2, baseDelay: 1000 });
+
+      if (!response.ok) {
+        const error = await response.text();
+        log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
+        return null;
+      }
+
+      data = await response.json();
     }
-
-    const data = await response.json();
 
     // Log token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
@@ -1347,11 +1361,11 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     // Check finish reason for truncation or safety blocks
     const finishReason = data.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
-      log.warn(`⚠️  [BBOX-DETECT] Gemini finish reason: ${finishReason}`);
+      log.warn(`⚠️  [BBOX-DETECT] Finish reason: ${finishReason}`);
     }
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      log.warn('🔄 [FALLBACK] No response from Gemini for bbox detection');
+      log.warn('🔄 [FALLBACK] No response for bbox detection');
       return null;
     }
 
