@@ -10419,9 +10419,16 @@ Return ONLY the JSON, no markdown fences.` }
   if (!text) throw new Error('No style comparison returned');
 
   // Parse JSON from response (handle markdown fences)
-  const parsed = getStoryHelpers().extractJsonFromText(text);
+  let parsed = getStoryHelpers().extractJsonFromText(text);
   if (!parsed || typeof parsed.similarity !== 'number') {
-    throw new Error(`Invalid style comparison response: ${text.substring(0, 200)}`);
+    // Fallback: try stripping fences manually and parsing
+    const stripped = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    try {
+      parsed = JSON.parse(stripped);
+    } catch {
+      log.error(`🎨 [STYLE COMPARE] Failed to parse response (${text.length} chars): ${text.substring(0, 500)}`);
+      throw new Error(`Invalid style comparison response — see server logs`);
+    }
   }
 
   log.info(`🎨 [STYLE COMPARE] Similarity: ${parsed.similarity}/100 — ${parsed.summary?.substring(0, 100)}`);
