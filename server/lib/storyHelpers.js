@@ -1061,7 +1061,11 @@ const ART_STYLES = {
   },
   comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic.',
   manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic.',
-  watercolor: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors.',
+  watercolor: {
+    default: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors.',
+    grok: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm but not overly vibrant color palette with visible paper texture throughout.',
+    gemini: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm, inviting color palette with moderate vibrancy — not washed out or cool-toned. Visible watercolor texture in background elements.',
+  },
   oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art.',
   lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic.',
   concept: 'Highly detailed digital concept art in the style of Craig Mullins and Karla Ortiz. Realistic human proportions, dramatic lighting, epic composition, smooth rendering with focus on mood and atmosphere. Matte painting aesthetic.',
