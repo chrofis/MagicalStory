@@ -95,7 +95,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Von der viktorianischen Ära inspiriert mit Zahnrädern und Messing',
       fr: "Inspiré de l'ère victorienne avec engrenages et laiton",
     },
-    prompt: 'Steampunk graphic novel illustration, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework',
+    prompt: 'Steampunk graphic novel illustration in the style of Sean Murphy. Victorian aesthetic with abundant brass and copper gears, cogs, and clockwork mechanisms. Visible leather grain, stitching on clothing, and metal patina on gears. Warm brown and muted amber color palette with restrained saturation. Clean linework with even shading and smooth gradients. Realistic human faces with natural proportions, detailed eyes, and subtle expressions.',
   },
   {
     id: 'cyber',

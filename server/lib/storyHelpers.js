@@ -1054,7 +1054,11 @@ const ART_STYLES = {
   cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic.',
   anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic.',
   chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic.',
-  steampunk: 'A steampunk graphic novel illustration with Victorian aesthetic. Intricate gears, brass and copper mechanisms, leather textures, and a sepia-toned muted color palette with detailed linework. Not photorealistic.',
+  steampunk: {
+    default: 'A steampunk graphic novel illustration with Victorian aesthetic. Intricate gears, brass and copper mechanisms, leather textures, and a sepia-toned muted color palette with detailed linework. Not photorealistic.',
+    grok: 'Steampunk graphic novel illustration in the style of Sean Murphy. Victorian aesthetic with abundant brass and copper gears, cogs, and clockwork mechanisms prominently featured throughout the scene. Visible leather grain, stitching on clothing, and metal patina on gears. Warm brown and muted amber color palette with restrained saturation — earthy tones only. Clean linework with even shading and smooth gradients. Realistic human faces with natural proportions, detailed eyes, and subtle expressions.',
+    gemini: 'Steampunk graphic novel illustration in the style of Sean Murphy and Travis Charest. Victorian aesthetic with brass and copper gears and clockwork mechanisms with leather textures. Warm brown and amber color palette with clear, rich tones — not dark, moody, or desaturated. Well-lit scene with warm natural lighting, no heavy shadows or dark atmospheric overlay. Sharp focus throughout. Detailed character faces with defined features and expressions. Smooth linework with tonal gradients, not flat cel-shading. Smooth texture rendering. Polished graphic novel composition.',
+  },
   comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic.',
   manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic.',
   watercolor: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors.',
@@ -1064,6 +1068,23 @@ const ART_STYLES = {
   pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic.',
   cyber: 'A cyberpunk graphic novel illustration with neon reflections, rainy streets, chrome surfaces, and dense visual complexity. High contrast, dark atmosphere with volumetric fog. Not photorealistic.',
 };
+
+/**
+ * Resolve art style description, supporting per-backend variants.
+ * ART_STYLES entries can be a string (used for all backends) or an object
+ * with { default, grok, gemini } keys for per-backend prompts.
+ * @param {string} artStyleId - Style key (e.g., 'steampunk')
+ * @param {string} [backend] - Image backend ('grok', 'gemini', 'runware')
+ * @returns {string|null} Style description or null if not found
+ */
+function resolveArtStyle(artStyleId, backend) {
+  const style = ART_STYLES[artStyleId];
+  if (!style) return null;
+  if (typeof style === 'string') return style;
+  // Object with per-backend variants
+  if (backend && style[backend]) return style[backend];
+  return style.default || null;
+}
 
 /**
  * Language level definitions - controls text length per page
@@ -2843,7 +2864,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
   const artStyleId = inputData.artStyle || 'pixar';
-  const styleDescription = options.customStyleDescription || ART_STYLES[artStyleId] || ART_STYLES.pixar;
+  const styleDescription = options.customStyleDescription || resolveArtStyle(artStyleId, options.imageBackend) || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
 
   // Build character reference list (Option B: explicit labeling in prompt)
@@ -3816,6 +3837,7 @@ function updatePageText(storyText, pageNumber, newText) {
 module.exports = {
   // Config
   ART_STYLES,
+  resolveArtStyle,
   LANGUAGE_LEVELS,
 
   // Level helpers

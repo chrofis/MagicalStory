@@ -885,7 +885,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const start = Date.now();
       let result;
       if (iterativePlacement && sceneMetadata) {
-        const artStyleDesc = ART_STYLES[storyData.artStyle] || ART_STYLES.pixar || '';
+        const { resolveArtStyle } = require('../lib/storyHelpers');
+        const artStyleDesc = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[model].backend) || resolveArtStyle('pixar') || '';
         result = await generateWithIterativePlacement(prompt, characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos, visualBibleGrid, pageNumber, artStyle: artStyleDesc,
@@ -1822,7 +1823,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     // Build image prompt (append evaluation feedback if provided)
     // Only include critical issues (missing characters/objects/settings) — not pose/expression nitpicks
-    let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    const iterateImageBackend = imageModel ? (IMAGE_MODELS[imageModel]?.backend || null) : null;
+    let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend });
     if (evaluationFeedback) {
       const criticalIssues = (evaluationFeedback.fixableIssues || [])
         .filter(i => {
@@ -2161,9 +2163,11 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       ? JSON.parse(story.data)
       : story.data;
 
-    // Get art style
+    // Get art style (with per-backend variant if available)
     const artStyleId = storyData.artStyle || 'pixar';
-    const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+    const iterateBackend = imageModel ? (IMAGE_MODELS[imageModel]?.backend || null) : null;
+    const { resolveArtStyle: resolveStyle } = require('../lib/storyHelpers');
+    const styleDescription = resolveStyle(artStyleId, iterateBackend) || resolveStyle('pixar');
 
     // Build character info with main character emphasis
     let characterInfo = '';

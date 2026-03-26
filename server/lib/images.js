@@ -10277,10 +10277,10 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
  */
 async function applyStyleTransfer(imageData, artStyle, options = {}) {
   const { imageModelOverride, imageBackendOverride, characterPhotos = [] } = options;
-  const { ART_STYLES } = require('./storyHelpers');
+  const { resolveArtStyle } = require('./storyHelpers');
 
   // artStyle can be: a preset key ("pixar"), or a custom description string
-  const styleDescription = ART_STYLES[artStyle] || artStyle;
+  const styleDescription = resolveArtStyle(artStyle, imageBackendOverride) || artStyle;
 
   const withAvatars = characterPhotos.length > 0;
   const prompt = withAvatars
