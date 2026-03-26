@@ -863,8 +863,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
           data = retryData;
         } else {
           // Still blocked, now fall back to 2.0
-          log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt still blocked, falling back to gemini-2.0-flash-lite...`);
-          modelId = 'gemini-2.0-flash-lite';
+          log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt still blocked, falling back to gemini-2.0-flash...`);
+          modelId = 'gemini-2.0-flash';
           response = await callQualityAPI(modelId);
           if (!response.ok) {
             const error = await response.text();
@@ -875,8 +875,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         }
       } else {
         // HTTP error on retry, fall back to 2.0
-        log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt HTTP error, falling back to gemini-2.0-flash-lite...`);
-        modelId = 'gemini-2.0-flash-lite';
+        log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt HTTP error, falling back to gemini-2.0-flash...`);
+        modelId = 'gemini-2.0-flash';
         response = await callQualityAPI(modelId);
         if (!response.ok) {
           const error = await response.text();

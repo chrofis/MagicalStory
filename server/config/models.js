@@ -81,8 +81,7 @@ const MODEL_DEFAULTS = {
   complexPageImage: 'gemini-2.5-flash-image', // Complex scenes: background chars need Gemini ($0.04)
 
   // Quality evaluation models
-  // NOTE: quality eval uses Gemini REST API directly (not generic text model caller)
-  // Switching to Grok requires adding Grok vision API support to evaluateImageQuality()
+  // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
   qualityEval: 'gemini-2.5-flash',     // Image quality evaluation (2.5 for character identification)
   bboxDetection: 'gemini-2.5-flash',   // Bounding box detection (needs 2.5 for spatial precision)
 
