@@ -1185,19 +1185,24 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
 
-    // Load images for this run
-    const images = await getStyleLabRunImages(id, pageNumber, runId);
-    if (images.length < 2) return res.status(400).json({ error: `Need 2 images to compare, found ${images.length}` });
+    // Load images for this run, ordered to match A/B from run metadata
+    const imageRows = await getStyleLabRunImages(id, pageNumber, runId);
+    if (imageRows.length < 2) return res.status(400).json({ error: `Need 2 images to compare, found ${imageRows.length}` });
 
-    log.info(`🧪 [STYLE-LAB] Evaluating run ${runId}: comparing ${images[0].model_id} vs ${images[1].model_id}`);
-    // Compress images for comparison — style analysis doesn't need full resolution
-    const imgA = await compressImageToJPEG(images[0].image_data, 80, 512);
-    const imgB = await compressImageToJPEG(images[1].image_data, 80, 512);
-    const evaluation = await compareImageStyles(imgA, imgB);
-
-    // Save evaluation to storyData
+    // Use run.models order (A first, B second) instead of alphabetical DB order
     const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
     const run = (storyData.styleLabHistory || []).find(r => r.runId === runId);
+    const modelOrder = run?.models || imageRows.map(r => r.model_id);
+    const imageA = imageRows.find(r => r.model_id === modelOrder[0]) || imageRows[0];
+    const imageB = imageRows.find(r => r.model_id === modelOrder[1]) || imageRows[1];
+
+    log.info(`🧪 [STYLE-LAB] Evaluating run ${runId}: A=${imageA.model_id} vs B=${imageB.model_id}`);
+    // Compress images for comparison — style analysis doesn't need full resolution
+    const imgA = await compressImageToJPEG(imageA.image_data, 80, 512);
+    const imgB = await compressImageToJPEG(imageB.image_data, 80, 512);
+    const evaluation = await compareImageStyles(imgA, imgB);
+
+    // Save evaluation to storyData (storyData and run already loaded above for model ordering)
     if (run) {
       run.evaluation = { ...evaluation, evaluatedAt: new Date().toISOString() };
       await saveStoryData(id, storyData);
