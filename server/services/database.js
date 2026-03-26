@@ -422,6 +422,7 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_without_page
       ON story_images(story_id, image_type, version_index) WHERE page_number IS NULL`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_id ON story_images(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_version ON story_images(story_id, version_index)`);
 
     // Historical locations table (pre-fetched photos for historical stories)
     await dbPool.query(`
@@ -1278,26 +1279,55 @@ async function getAllActiveVersions(storyId) {
 
 /**
  * Rehydrate story data by loading images from story_images table back into the data blob.
- * Used by PDF generation which needs imageData in the sceneImages array.
+ * Used by PDF generation, regeneration endpoints, etc.
  * @param {string} storyId - Story ID
  * @param {object} storyData - Parsed story data blob (sceneImages, coverImages, etc.)
+ * @param {object} options - Options
+ * @param {boolean} options.activeOnly - If true, only load the active version per page (fast path).
+ *   Default: true. Set to false only when you need ALL version imageData (e.g., version picker).
  * @returns {object} storyData with imageData populated from story_images table
  */
-async function rehydrateStoryImages(storyId, storyData) {
+async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = {}) {
   if (!isDatabaseMode() || !storyData) return storyData;
 
   const hasSeparate = await hasStorySeparateImages(storyId);
   if (!hasSeparate) return storyData; // Images still inline in data blob
 
-  // Load all active images (version_index 0 = original/main image)
-  const images = await dbQuery(
-    `SELECT image_type, page_number, version_index, image_data
-     FROM story_images WHERE story_id = $1 AND version_index = 0
-     ORDER BY page_number`,
-    [storyId]
-  );
+  if (activeOnly) {
+    // Fast path: single optimized query returns only the active image per page/cover
+    const activeImages = await getActiveStoryImages(storyId);
 
-  // Load ALL version images (used for imageVersions population AND active overrides)
+    // Populate sceneImages with active image only
+    if (storyData.sceneImages) {
+      for (const scene of storyData.sceneImages) {
+        if (!scene.imageData) {
+          const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
+          if (img) scene.imageData = img.image_data;
+        }
+        // Load active version's bboxDetection onto scene
+        const activeV = scene.imageVersions?.find(v => v.isActive);
+        if (activeV?.bboxDetection) {
+          scene.bboxDetection = activeV.bboxDetection;
+        }
+      }
+    }
+
+    // Populate coverImages with active image only
+    if (storyData.coverImages) {
+      for (const coverType of ['frontCover', 'backCover', 'initialPage']) {
+        storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
+        const cover = storyData.coverImages[coverType];
+        if (cover && !getCoverData(cover)) {
+          const img = activeImages.find(i => i.image_type === coverType);
+          if (img) cover.imageData = img.image_data;
+        }
+      }
+    }
+
+    return storyData;
+  }
+
+  // Full path: load ALL versions (for version picker / full rehydration)
   const allVersionImages = await dbQuery(
     `SELECT image_type, page_number, version_index, image_data
      FROM story_images WHERE story_id = $1
@@ -1312,7 +1342,6 @@ async function rehydrateStoryImages(storyId, storyData) {
   // Build a map of active overrides (keyed by "type:page" or "type:null" for covers).
   // This avoids mutating the v0 entries in the images array, which would cause
   // saveStoryData to overwrite the original v0 with the active version's data.
-  // Derived from allVersionImages (already loaded) to avoid N extra queries.
   const activeOverrides = {};
   const coverTypes = ['frontCover', 'backCover', 'initialPage'];
   for (const [key, meta] of Object.entries(versionMeta)) {
@@ -1337,13 +1366,12 @@ async function rehydrateStoryImages(storyId, storyData) {
         if (activeOverrides[overrideKey]) {
           scene.imageData = activeOverrides[overrideKey];
         } else {
-          const img = images.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
+          const img = allVersionImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === 0);
           if (img) scene.imageData = img.image_data;
         }
       }
 
       // Populate imageVersions with their imageData from database
-      // imageVersions[i] → DB version_index i (unified mapping for all types)
       if (scene.imageVersions && scene.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
           const version = scene.imageVersions[vIdx];
@@ -1354,13 +1382,13 @@ async function rehydrateStoryImages(storyId, storyData) {
             );
             if (versionImg) {
               version.imageData = versionImg.image_data;
-              version._rehydrated = true; // Mark so saveStoryData won't re-save to DB
+              version._rehydrated = true;
             }
           }
         }
       }
 
-      // Load active version's bboxDetection onto scene (so consumers get correct bbox for active image)
+      // Load active version's bboxDetection onto scene
       const activeV = scene.imageVersions?.find(v => v.isActive);
       if (activeV?.bboxDetection) {
         scene.bboxDetection = activeV.bboxDetection;
@@ -1368,28 +1396,22 @@ async function rehydrateStoryImages(storyId, storyData) {
     }
   }
 
-  // Populate coverImages — normalize to object format first
+  // Populate coverImages
   if (storyData.coverImages) {
-    const covers = ['frontCover', 'backCover', 'initialPage'];
-    for (const coverType of covers) {
-      // Normalize legacy string covers to object format
+    for (const coverType of coverTypes) {
       storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
       const cover = storyData.coverImages[coverType];
 
       if (cover && !getCoverData(cover)) {
-        // Use active override if available, otherwise use v0
         const overrideKey = `${coverType}:null`;
         if (activeOverrides[overrideKey]) {
           cover.imageData = activeOverrides[overrideKey];
         } else {
-          const img = images.find(i => i.image_type === coverType);
-          if (img) {
-            cover.imageData = img.image_data;
-          }
+          const img = allVersionImages.find(i => i.image_type === coverType && i.version_index === 0);
+          if (img) cover.imageData = img.image_data;
         }
       }
 
-      // Populate cover imageVersions with their imageData from database
       if (cover && cover.imageVersions && cover.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < cover.imageVersions.length; vIdx++) {
           const version = cover.imageVersions[vIdx];
@@ -1400,7 +1422,7 @@ async function rehydrateStoryImages(storyId, storyData) {
             );
             if (versionImg) {
               version.imageData = versionImg.image_data;
-              version._rehydrated = true; // Mark so saveStoryData won't re-save to DB
+              version._rehydrated = true;
             }
           }
         }

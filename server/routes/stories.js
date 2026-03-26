@@ -585,22 +585,28 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Verify access
+    // Verify access — extract only the JSONB fields we need instead of loading the entire blob
+    const devFields = `data->'outline' as outline, data->'originalStory' as "originalStory",
+      data->'sceneImages' as "sceneImages", data->'coverImages' as "coverImages",
+      data->'sceneDescriptions' as "sceneDescriptions", data->'visualBible' as "visualBible",
+      data->'generationLog' as "generationLog", data->'styledAvatarGeneration' as "styledAvatarGeneration",
+      data->'costumedAvatarGeneration' as "costumedAvatarGeneration", data->'finalChecksReport' as "finalChecksReport"`;
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
-      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
       if (rows.length === 0) {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+        rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1`, [id]);
       }
     } else {
-      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
     }
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    // Reconstruct story object from extracted JSONB fields
+    const story = rows[0];
 
     // Extract CRITICAL ANALYSIS from outline (if present)
     let criticalAnalysis = null;
@@ -2190,10 +2196,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
       if (rows.length > 0) {
         story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
-        // Rehydrate images from story_images table (images may be stripped from data blob)
+        // Rehydrate only active images (fast path — frontend loads versions via /images endpoint)
         story = await rehydrateStoryImages(id, story);
 
         // Sync isActive flags in imageVersions with stored active version metadata
+        // and strip imageData from versions (frontend loads these via /images endpoint)
         if (story.sceneImages && story.sceneImages.length > 0) {
           const activeVersions = await getAllActiveVersions(id);
           for (const scene of story.sceneImages) {
@@ -2203,12 +2210,14 @@ router.get('/:id', authenticateToken, async (req, res) => {
               const { arrayToDbIndex: toDbIdx } = require('../lib/versionManager');
               scene.imageVersions.forEach((v, idx) => {
                 v.isActive = idx === activeArrayIdx;
-                // Attach DB version_index so the frontend can send it directly
                 if (v.versionIndex === undefined) {
                   v.versionIndex = toDbIdx(idx, 'scene');
                 }
+                // Strip imageData from non-active versions — frontend loads via /images endpoint
+                if (!v.isActive) {
+                  delete v.imageData;
+                }
               });
-              // Track active version as array index for frontend
               scene.activeVersionIndex = activeArrayIdx;
             }
           }

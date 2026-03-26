@@ -170,13 +170,61 @@ async function main() {
             fieldsExtracted += await extractRetryImages(pool, storyId, pageNum, img.retryHistory);
           }
 
-          if (img.originalImage) { delete img.originalImage; fieldsStripped++; }
+          // Strip sceneCharacters avatar/photo data (duplicated from characters table on every page)
+          if (Array.isArray(img.sceneCharacters)) {
+            for (const sc of img.sceneCharacters) {
+              if (sc.avatars) { delete sc.avatars; fieldsStripped++; }
+              if (sc.photos) { delete sc.photos; fieldsStripped++; }
+            }
+          }
+
+          // Strip inline image fields
+          for (const f of ['originalImage', 'bboxOverlayImage', 'previousImage']) {
+            if (img[f]) { delete img[f]; fieldsStripped++; }
+          }
+          // Strip consistency regen images
+          if (img.consistencyRegen) {
+            for (const f of ['originalImage', 'fixedImage', 'imageData']) {
+              if (img.consistencyRegen[f]) { delete img.consistencyRegen[f]; fieldsStripped++; }
+            }
+          }
           fieldsStripped += stripRetryHistory(img.retryHistory);
           fieldsStripped += stripRepairHistory(img.repairHistory);
           fieldsStripped += stripImageVersions(img.imageVersions);
-          if (img.consistencyRegen) {
-            if (img.consistencyRegen.originalImage) { delete img.consistencyRegen.originalImage; fieldsStripped++; }
-            if (img.consistencyRegen.fixedImage) { delete img.consistencyRegen.fixedImage; fieldsStripped++; }
+        }
+      }
+
+      // Strip avatars/photos from top-level characters (already in characters DB table)
+      if (Array.isArray(data.characters)) {
+        for (const ch of data.characters) {
+          if (ch.avatars) { delete ch.avatars; fieldsStripped++; }
+          if (ch.photos) { delete ch.photos; fieldsStripped++; }
+        }
+      }
+
+      // Strip visualBible grid images
+      if (data.visualBible) {
+        for (const [key, val] of Object.entries(data.visualBible)) {
+          if (val && typeof val === 'object') {
+            if (val.gridImage) { delete val.gridImage; fieldsStripped++; }
+            if (val.imageData) { delete val.imageData; fieldsStripped++; }
+          }
+        }
+      }
+
+      // Strip styledAvatarGeneration/costumedAvatarGeneration image data
+      for (const genKey of ['styledAvatarGeneration', 'costumedAvatarGeneration']) {
+        if (data[genKey] && typeof data[genKey] === 'object') {
+          for (const [charId, genData] of Object.entries(data[genKey])) {
+            if (genData && typeof genData === 'object') {
+              if (genData.imageData) { delete genData.imageData; fieldsStripped++; }
+              if (genData.resultImage) { delete genData.resultImage; fieldsStripped++; }
+              if (Array.isArray(genData.results)) {
+                for (const result of genData.results) {
+                  if (result.imageData) { delete result.imageData; fieldsStripped++; }
+                }
+              }
+            }
           }
         }
       }
