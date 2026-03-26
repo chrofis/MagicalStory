@@ -89,6 +89,7 @@ const {
 } = require('./landmarkPhotos');
 const {
   ART_STYLES,
+  resolveArtStyle,
   getReadingLevel,
   getTokensPerPage,
   getCharactersInScene,
@@ -906,7 +907,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Build the prompt
         let coverPrompt;
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
-        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+        const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
 
         if (coverType === 'titlePage') {
           // Use extracted title from Claude response, fallback to input title
@@ -1348,7 +1349,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
       // Generate reference images for secondary elements (recurring characters, artifacts, etc.)
       if (visualBible) {
-        const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
+        const styleDescription = resolveArtStyle(artStyle) || resolveArtStyle('pixar');
         try {
           const refResult = await generateReferenceSheet(visualBible, styleDescription, {
             minAppearances: 2,
@@ -1628,7 +1629,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (!skipImages && !skipCovers) {
       try {
         const artStyleId = inputData.artStyle || 'pixar';
-        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+        const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
 
         // Use AI-generated cover scenes (or fallbacks) - handle both new format {scene, clothing} and legacy string
         const titlePageScene = coverScenes.titlePage?.scene || (typeof coverScenes.titlePage === 'string' ? coverScenes.titlePage : null) || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
@@ -2638,7 +2639,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
 
       // Get art style description
       const artStyleId = inputData.artStyle || 'pixar';
-      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+      const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
 
       // Extract cover scene descriptions from outline
       const coverScenes = extractCoverScenes(outline);
