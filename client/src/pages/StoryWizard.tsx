@@ -4298,50 +4298,60 @@ export default function StoryWizard() {
                   finalChecksReport={finalChecksReport}
                   imageModel={modelSelections.imageModel || undefined}
                   onImageUpdate={(pageNumber, imageData, versionIndex, metadata) => {
-                    // Update local state with new image version (include metadata for version details)
-                    setSceneImages(prev => prev.map(img => {
-                      if (img.pageNumber === pageNumber) {
-                        // If no existing versions, create v0 for the original image first
-                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
-                          ? img.imageVersions
-                          : [{
-                              imageData: img.imageData || '',
-                              createdAt: new Date().toISOString(),
-                              isActive: false,
-                              type: 'original' as const
-                            }];
-                        return {
-                          ...img,
-                          imageData,
-                          imageVersions: [
-                            ...existingVersions,
-                            {
-                              imageData,
-                              versionIndex,
-                              createdAt: new Date().toISOString(),
-                              isActive: true,
-                              type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
-                              description: metadata?.description,
-                              prompt: metadata?.prompt,
-                              qualityScore: metadata?.qualityScore,
-                              qualityReasoning: metadata?.qualityReasoning,
-                              modelId: metadata?.modelId,
-                              fixTargets: metadata?.fixTargets,
-                              totalAttempts: metadata?.totalAttempts,
-                            }
-                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }))
-                        };
+                    if (pageNumber < 0) {
+                      // Cover image update
+                      const coverTypeMap: Record<number, 'frontCover' | 'initialPage' | 'backCover'> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                      const coverKey = coverTypeMap[pageNumber];
+                      if (coverKey) {
+                        setCoverImages(prev => {
+                          if (!prev) return prev;
+                          const existing = prev[coverKey];
+                          return { ...prev, [coverKey]: { ...existing, imageData } };
+                        });
                       }
-                      return img;
-                    }));
+                    } else {
+                      // Scene image update
+                      setSceneImages(prev => prev.map(img => {
+                        if (img.pageNumber === pageNumber) {
+                          const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                            ? img.imageVersions
+                            : [{
+                                imageData: img.imageData || '',
+                                createdAt: new Date().toISOString(),
+                                isActive: false,
+                                type: 'original' as const
+                              }];
+                          return {
+                            ...img,
+                            imageData,
+                            imageVersions: [
+                              ...existingVersions,
+                              {
+                                imageData,
+                                versionIndex,
+                                createdAt: new Date().toISOString(),
+                                isActive: true,
+                                type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
+                                description: metadata?.description,
+                                prompt: metadata?.prompt,
+                                qualityScore: metadata?.qualityScore,
+                                qualityReasoning: metadata?.qualityReasoning,
+                                modelId: metadata?.modelId,
+                                fixTargets: metadata?.fixTargets,
+                                totalAttempts: metadata?.totalAttempts,
+                              }
+                            ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }))
+                          };
+                        }
+                        return img;
+                      }));
+                    }
                   }}
                   onRefreshStory={storyId ? async () => {
                     try {
                       log.info('Refreshing story data after repair...');
                       // Use /images endpoint (not getStory blob) to get properly built
                       // imageVersions with imageData from story_images table.
-                      // The blob's rehydration has an off-by-one mapping that leaves
-                      // original version imageData undefined.
                       const allImagesResult = await storyService.getAllImages(storyId, false);
                       if (allImagesResult) {
                         setSceneImages(prev => {
@@ -4354,6 +4364,18 @@ export default function StoryWizard() {
                             return existing;
                           });
                         });
+                        // Also refresh cover images
+                        if (allImagesResult.covers) {
+                          setCoverImages(prev => {
+                            if (!prev) return prev;
+                            const c = allImagesResult.covers!;
+                            return {
+                              frontCover: c.frontCover ? { ...prev.frontCover, imageData: c.frontCover.imageData } : prev.frontCover,
+                              initialPage: c.initialPage ? { ...prev.initialPage, imageData: c.initialPage.imageData } : prev.initialPage,
+                              backCover: c.backCover ? { ...prev.backCover, imageData: c.backCover.imageData } : prev.backCover,
+                            };
+                          });
+                        }
                         log.success(`Story images refreshed (${allImagesResult.images?.length || 0} pages)`);
                       }
                     } catch (error) {
