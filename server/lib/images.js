@@ -6139,11 +6139,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const blendedRegion = await sharp(blended, { raw: { width: blendWidth, height: blendHeight, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
     // Composite mask region onto black full-scene canvas to show position
-    const maskRegion = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } }).jpeg({ quality: 80 }).toBuffer();
-    const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 1, background: 0 } })
+    const maskRegionGray = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } })
+      .toColourspace('srgb').jpeg({ quality: 80 }).toBuffer();
+    const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
       .jpeg({ quality: 80 }).toBuffer();
     const blendMaskFinal = await sharp(blendMaskBuffer)
-      .composite([{ input: maskRegion, left: blendLeft, top: blendTop }])
+      .composite([{ input: maskRegionGray, left: blendLeft, top: blendTop }])
       .jpeg({ quality: 80 }).toBuffer();
 
     // G. Composite blended region onto original scene
