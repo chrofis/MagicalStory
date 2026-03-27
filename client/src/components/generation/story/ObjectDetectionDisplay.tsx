@@ -250,7 +250,7 @@ export function ObjectDetectionDisplay({
     }
   };
 
-  const overlayImage = bboxOverlayImage || loadedOverlay;
+  const overlayImage = loadedOverlay || bboxOverlayImage;
 
   return (
     <>

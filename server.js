@@ -3895,6 +3895,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               coverImages[coverKey].issuesSummary = img.issuesSummary;
               coverImages[coverKey].verdict = img.verdict;
               coverImages[coverKey].bboxDetection = img.bboxDetection;
+              coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
               coverImages[coverKey].imageVersions = img.imageVersions;
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
