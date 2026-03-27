@@ -321,78 +321,89 @@ export function GenerationProgress({
     return null;
   }
 
-  // Server sends sequential checkpoint numbers (1-23, then 100 for done).
-  // Map to display percentages based on real story run timings.
-  // Between checkpoints, interpolate with time so the bar never looks stuck.
+  // Server sends sequential checkpoint numbers (1-73, then 100 for done).
+  // We map these to target percentages and smoothly animate toward them —
+  // the bar should always be increasing, just at different speeds.
   const serverCheckpoint = total === 100 ? current : Math.round((current / total) * 100);
   const isDone = serverCheckpoint >= 100;
 
-  // Checkpoint → display % mapping (based on wall-clock time proportions)
-  //
-  // Server checkpoints:
-  //   1=start, 2=title, 3=clothing, 4=arcs, 5=plot, 6=VB, 7=covers/pages streaming
-  //   8=text done, 9=avatars, 10=scenes expanded
-  //   11-30=images generating (1 per page)
-  //   31=covers finishing, 32=eval start, 40=redo pass 1, 50=re-eval,
-  //   55=redo pass 2, 65=pick best, 68=char repair, 72=finalizing repair
-  //   73=finalizing story, 100=done
+  // Checkpoint → target % mapping (based on wall-clock time proportions)
   const checkpointToPercent = (cp: number): number => {
-    // Checkpoints arrive in order: 1=start, 2=arcs, 3=title, 4=clothing, 5=plot, 6=VB, 7=covers/pages
-    if (cp <= 1) return 3;       // start
-    if (cp <= 2) return 8;       // arcs
-    if (cp <= 3) return 12;      // title
-    if (cp <= 4) return 15;      // clothing
-    if (cp <= 5) return 20;      // plot
-    if (cp <= 6) return 25;      // visual bible
-    if (cp <= 7) return 28;      // covers/pages streaming
-    if (cp <= 8) return 35;      // text complete
-    if (cp <= 9) return 38;      // avatars
-    if (cp <= 10) return 40;     // scenes expanded
-    if (cp <= 30) return 40 + Math.round(((cp - 10) / 20) * 20); // 40-60 images (per page)
-    if (cp <= 31) return 62;     // covers finishing
-    if (cp <= 32) return 65;     // eval start
-    if (cp <= 40) return 70;     // redo pass 1
-    if (cp <= 50) return 75;     // re-eval pass 1
-    if (cp <= 55) return 80;     // redo pass 2
-    if (cp <= 65) return 85;     // pick best
-    if (cp <= 68) return 88;     // character repair
-    if (cp <= 72) return 92;     // finalizing repair
-    if (cp <= 73) return 95;     // finalizing story
-    if (cp < 100) return 98;     // almost done
+    if (cp <= 1) return 3;
+    if (cp <= 2) return 8;
+    if (cp <= 3) return 12;
+    if (cp <= 4) return 15;
+    if (cp <= 5) return 20;
+    if (cp <= 6) return 25;
+    if (cp <= 7) return 28;
+    if (cp <= 8) return 35;
+    if (cp <= 9) return 38;
+    if (cp <= 10) return 40;
+    if (cp <= 30) return 40 + Math.round(((cp - 10) / 20) * 20);
+    if (cp <= 31) return 62;
+    if (cp <= 32) return 65;
+    if (cp <= 40) return 70;
+    if (cp <= 50) return 75;
+    if (cp <= 55) return 80;
+    if (cp <= 65) return 85;
+    if (cp <= 68) return 88;
+    if (cp <= 72) return 92;
+    if (cp <= 73) return 95;
+    if (cp < 100) return 98;
     return 100;
   };
 
-  const checkpointPercent = checkpointToPercent(serverCheckpoint);
+  const targetPercent = checkpointToPercent(serverCheckpoint);
 
-  // Between checkpoints, interpolate with time so bar keeps moving
+  // Smooth progress: always increasing, never jumping.
+  // On each tick, move toward targetPercent. Between checkpoints, creep slowly
+  // so the bar never looks stuck. When a new checkpoint arrives ahead, speed up.
   const [displayProgress, setDisplayProgress] = useState(3);
-  const lastCheckpointRef = useRef({ percent: 3, time: Date.now() });
+  const targetRef = useRef(3);
+
+  // Update target when checkpoint changes
+  if (targetPercent > targetRef.current) {
+    targetRef.current = targetPercent;
+  }
 
   useEffect(() => {
     if (isDone) { setDisplayProgress(100); return; }
 
-    // When checkpoint changes, record it
-    if (checkpointPercent > lastCheckpointRef.current.percent) {
-      lastCheckpointRef.current = { percent: checkpointPercent, time: Date.now() };
-      setDisplayProgress(checkpointPercent);
-    }
-
-    // Interpolate between checkpoints: creep 1% every few seconds
-    // Speed: assume next checkpoint arrives in ~30-60s depending on story size
-    const creepSeconds = Math.max(5, Math.min(20, pageCount * 0.8));
+    // Tick every 500ms for smooth animation
     const interval = setInterval(() => {
       setDisplayProgress(prev => {
-        const sinceLast = (Date.now() - lastCheckpointRef.current.time) / 1000;
-        const creep = Math.floor(sinceLast / creepSeconds);
-        // Never creep more than 5% past last checkpoint, never past 98
-        const max = Math.min(lastCheckpointRef.current.percent + 5, 98);
-        return Math.min(Math.max(prev, lastCheckpointRef.current.percent + creep), max);
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [isDone, checkpointPercent, pageCount]);
+        const target = targetRef.current;
+        const gap = target - prev;
 
-  const progressPercent = isDone ? 100 : displayProgress;
+        if (gap <= 0) {
+          // Already at or past target — slow creep toward 98% so bar never looks stuck
+          // Creep speed: ~1% every 8-15s depending on story size
+          const creepInterval = Math.max(8, Math.min(15, pageCount * 0.6));
+          const creepStep = 0.5 / (creepInterval / 0.5); // 0.5% per creepInterval seconds, ticked every 500ms
+          return Math.min(prev + creepStep, 98);
+        }
+
+        // Approaching target — move faster when gap is large, slower when close
+        // This creates the "always increasing at different speeds" effect
+        // Small gap (<3%): move 0.3% per tick (smooth catchup)
+        // Medium gap (3-10%): move 0.5-1% per tick
+        // Large gap (>10%): move 1-2% per tick (fast but not instant)
+        let step: number;
+        if (gap < 3) {
+          step = 0.3;
+        } else if (gap < 10) {
+          step = 0.3 + (gap - 3) * 0.1;  // 0.3 to 1.0
+        } else {
+          step = Math.min(2, 1 + (gap - 10) * 0.05);  // 1.0 to 2.0
+        }
+
+        return Math.min(prev + step, target);
+      });
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isDone, pageCount]);
+
+  const progressPercent = isDone ? 100 : Math.round(displayProgress);
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
