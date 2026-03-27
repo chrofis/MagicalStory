@@ -4537,6 +4537,24 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             faceBbox = Array.isArray(faceData) ? faceData : [faceData.y, faceData.x, faceData.y + faceData.height, faceData.x + faceData.width];
           }
 
+          // Collect face bboxes of OTHER characters on the same page to protect during blend
+          const protectedFaces = [];
+          if (storedEntityReport?.characters) {
+            for (const [otherName, otherCharReport] of Object.entries(storedEntityReport.characters)) {
+              if (otherName === characterName) continue;
+              if (!otherCharReport?.byClothing) continue;
+              for (const clothingData of Object.values(otherCharReport.byClothing)) {
+                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+                if (app?.faceBox) {
+                  const fb = app.faceBox;
+                  const normalized = Array.isArray(fb) ? fb : [fb.y, fb.x, fb.y + fb.height, fb.x + fb.width];
+                  protectedFaces.push(normalized);
+                  log.info(`🛡️ [CHAR REPAIR] Protecting ${otherName}'s face at [${normalized.map(v => Math.round(v*100)+'%').join(', ')}]`);
+                }
+              }
+            }
+          }
+
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,
             avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
@@ -4550,6 +4568,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               clothingDescription: clothingDesc,
               sceneDescription: sceneDesc,
               faceBbox,
+              protectedFaces,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
             }

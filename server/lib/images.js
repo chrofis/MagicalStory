@@ -1820,17 +1820,21 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
-      // Face box - bright blue, thick solid line (face is primary for character consistency)
+      // Face box - blue for original detection, magenta for fallback/iterated detection
       if (fig.faceBox) {
         const [ymin, xmin, ymax, xmax] = fig.faceBox;
         const x = Math.round(xmin * width);
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#0066ff" stroke-width="5"/>`);
+        const isFallback = fig._source === 'fallback';
+        const faceColor = isFallback ? '#ff00cc' : '#0066ff';  // Magenta for fallback, blue for original
+        const faceLabel = isFallback ? 'FACE ↻' : 'FACE';
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${faceColor}" stroke-width="5"/>`);
         // Face label
-        svgParts.push(`<rect x="${x}" y="${y + h}" width="50" height="16" fill="#0066ff" opacity="0.9" rx="2"/>`);
-        svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">FACE</text>`);
+        const faceLabelWidth = isFallback ? 65 : 50;
+        svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${faceColor}" opacity="0.9" rx="2"/>`);
+        svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">${faceLabel}</text>`);
       }
     }
 
@@ -5988,13 +5992,44 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
     const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
 
+    // Pre-compute protected face rects in blend-region pixel coords (with 20% padding)
+    const protectedFaces = options.protectedFaces || [];
+    const protectedRects = protectedFaces.map(([fymin, fxmin, fymax, fxmax]) => {
+      const fw = fxmax - fxmin, fh = fymax - fymin;
+      const pad = 0.2;
+      const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
+      const pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
+      return {
+        left: Math.floor(pxmin * sceneMeta.width) - blendLeft,
+        top: Math.floor(pymin * sceneMeta.height) - blendTop,
+        right: Math.ceil(pxmax * sceneMeta.width) - blendLeft,
+        bottom: Math.ceil(pymax * sceneMeta.height) - blendTop,
+      };
+    }).filter(r => r.right > 0 && r.bottom > 0 && r.left < blendWidth && r.top < blendHeight);
+    if (protectedRects.length > 0) {
+      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} other face(s) from blend`);
+    }
+
     // F. Feathered blend: original outside, Grok inside, gradient at edges
+    // Protected faces are forced to alpha=0 (100% original preserved)
     const blended = Buffer.alloc(blendWidth * blendHeight * 3);
+    const maskPixels = Buffer.alloc(blendWidth * blendHeight);
     for (let i = 0; i < blendWidth * blendHeight; i++) {
       const y = Math.floor(i / blendWidth);
       const x = i % blendWidth;
+
+      // Check if pixel is inside a protected face — force original
+      let isProtected = false;
+      for (const r of protectedRects) {
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          isProtected = true;
+          break;
+        }
+      }
+
       const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
-      const alpha = (dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255)) / 255;
+      const alpha = isProtected ? 0 : (dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255)) / 255;
+      maskPixels[i] = Math.round(alpha * 255);
       const idx = i * 3;
       blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + grokRegion[idx]     * alpha);
       blended[idx + 1] = Math.round(origRegion[idx + 1] * (1 - alpha) + grokRegion[idx + 1] * alpha);
@@ -6002,15 +6037,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     }
 
     const blendedRegion = await sharp(blended, { raw: { width: blendWidth, height: blendHeight, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
-
-    // Generate blend mask visualization (grayscale: white = Grok, black = original, gray = feather)
-    const maskPixels = Buffer.alloc(blendWidth * blendHeight);
-    for (let i = 0; i < blendWidth * blendHeight; i++) {
-      const y = Math.floor(i / blendWidth);
-      const x = i % blendWidth;
-      const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
-      maskPixels[i] = dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255);
-    }
     // Composite mask region onto black full-scene canvas to show position
     const maskRegion = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } }).jpeg({ quality: 80 }).toBuffer();
     const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 1, background: 0 } })
