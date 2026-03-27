@@ -666,7 +666,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (pageCharNames.length > 0) {
         // Build expected characters with physical descriptions + clothing for Gemini
         const { extractSceneMetadata } = require('./storyHelpers');
-        const sceneMetadata = extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription);
+        const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
         const expectedChars = pageCharNames.map(name => {
