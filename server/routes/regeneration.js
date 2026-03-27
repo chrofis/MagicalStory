@@ -3748,14 +3748,24 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
 CURRENT FACE & BODY BOXES (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):
 ${figuresSummary || '  (none)'}
 
-Your task: Look at the image carefully and REFINE these face and body bounding boxes.
-The FACE box is the most important — it must tightly wrap the character's face/head.
+Your task: Look at the image carefully and REFINE these bounding boxes so they accurately capture each character.
+
+FACE BOX RULES (most important):
+- Must include the COMPLETE face: forehead to chin, ear to ear. Nothing cut off.
+- Include hair/hat if it's part of the head silhouette.
+- Must NOT include shoulders or neck below the jawline.
+- If the face is turned or at an angle, the box should still capture the full visible face area.
+
+BODY BOX RULES:
+- Must include the COMPLETE character from head to feet. Nothing cut off.
+- Include arms, legs, clothing, accessories — everything that is part of the character.
+- If feet are visible, the box must extend to the bottom of the feet.
+- If a character is holding something, include the held object in the body box.
 
 Common issues to fix:
-- Face box shifted left/right/up/down from the actual face
-- Face box too large (includes shoulders) or too small (cuts off forehead/chin)
-- Body box not covering the full figure
-- Boxes completely missing the character
+- Box shifted away from the actual element (move it to center on the character)
+- Box too small — part of the face/body is cut off (EXPAND it)
+- Box too large — includes background or other characters (SHRINK it)
 
 Return CORRECTED coordinates. Keep the same character names. Only adjust the box positions.
 
