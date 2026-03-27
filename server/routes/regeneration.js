@@ -4479,21 +4479,36 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // Look up bbox from stored entity report (saved during consistency check)
-          const storedEntityReport = storyData.finalChecksReport?.entity;
-          const charReport = storedEntityReport?.characters?.[characterName];
+          // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
           let storedAppearance = null;
-          if (charReport?.byClothing) {
-            for (const [, clothingData] of Object.entries(charReport.byClothing)) {
-              const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-              if (app?.faceBox || app?.bodyBox) {
-                storedAppearance = app;
-                break;
+          const sceneBbox = sceneImage.bboxDetection;
+          if (sceneBbox?.figures) {
+            const fig = sceneBbox.figures.find(f =>
+              f.name?.toLowerCase() === characterName.toLowerCase()
+            );
+            if (fig && (fig.faceBox || fig.bodyBox)) {
+              storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: 'standard' };
+              log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber})`);
+            }
+          }
+
+          // 2. Try entity consistency report (stored during consistency check)
+          if (!storedAppearance) {
+            const storedEntityReport = storyData.finalChecksReport?.entity;
+            const charReport = storedEntityReport?.characters?.[characterName];
+            if (charReport?.byClothing) {
+              for (const [, clothingData] of Object.entries(charReport.byClothing)) {
+                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+                if (app?.faceBox || app?.bodyBox) {
+                  storedAppearance = app;
+                  log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from entity report (page ${pageNumber})`);
+                  break;
+                }
               }
             }
           }
 
-          // Fallback: re-detect if entity report doesn't have bbox for this page
+          // 3. Fallback: fresh detection if neither source has bbox
           if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
             const physDesc = buildCharacterPhysicalDescription(character);
