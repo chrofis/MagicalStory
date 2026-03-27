@@ -1484,34 +1484,125 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       bodyBox: normalizeBox(obj.body_box)
     }));
 
-    // Log character identifications
+    // Log character identifications (pass 1)
     const identifiedChars = figures.filter(f => f.name !== 'UNKNOWN');
-    const unknownFigures = figures.filter(f => f.name === 'UNKNOWN');
+    const unknownFiguresPass1 = figures.filter(f => f.name === 'UNKNOWN');
     if (identifiedChars.length > 0) {
-      log.info(`📦 [BBOX-DETECT] Identified ${identifiedChars.length} characters: ${identifiedChars.map(f => `${f.name} (${f.confidence})`).join(', ')}`);
+      log.info(`📦 [BBOX-DETECT] Pass 1: Identified ${identifiedChars.length} characters: ${identifiedChars.map(f => `${f.name} (${f.confidence})`).join(', ')}`);
     }
-    if (unknownFigures.length > 0) {
-      log.info(`📦 [BBOX-DETECT] ${unknownFigures.length} UNKNOWN figures: ${unknownFigures.map(f => f.label).join(', ')}`);
+    if (unknownFiguresPass1.length > 0) {
+      log.info(`📦 [BBOX-DETECT] Pass 1: ${unknownFiguresPass1.length} UNKNOWN figures: ${unknownFiguresPass1.map(f => f.label).join(', ')}`);
     }
-    log.info(`📦 [BBOX-DETECT] Detected ${figures.length} figures, ${objects.length} objects`);
+    log.info(`📦 [BBOX-DETECT] Pass 1: ${figures.length} figures, ${objects.length} objects`);
 
-    // Compute found/missing objects from detection results
-    const foundObjects = objects.filter(o => o.found).map(o => o.name);
-    const missingObjects = objects.filter(o => !o.found).map(o => o.name);
+    // ── Pass 2: Refinement — send pass-1 boxes back for verification/correction ──
+    // Skip refinement if explicitly disabled or if using Grok (different API format)
+    let finalFigures = figures;
+    let finalObjects = objects;
+    let refinementResponse = null;
+    let totalInputTokens = inputTokens;
+    let totalOutputTokens = outputTokens;
+
+    if (options.skipRefinement !== true && !(modelConfig?.provider === 'xai')) {
+      try {
+        const pass1Summary = JSON.stringify({
+          figures: figures.map(f => ({
+            name: f.name, label: f.label, position: f.position, confidence: f.confidence,
+            face_box: f.faceBox ? f.faceBox.map(v => Math.round(v * 1000)) : null,
+            body_box: f.bodyBox ? f.bodyBox.map(v => Math.round(v * 1000)) : null
+          })),
+          objects: objects.map(o => ({
+            name: o.name, found: o.found, label: o.label, position: o.position,
+            body_box: o.bodyBox ? o.bodyBox.map(v => Math.round(v * 1000)) : null
+          }))
+        });
+
+        const expectedCharSection = expectedCharacters.length > 0
+          ? `\nEXPECTED CHARACTERS:\n${expectedCharacters.map(c => `- ${c.name}: ${c.description}${c.position ? ` (expected at ${c.position})` : ''}`).join('\n')}`
+          : '';
+
+        const refinementPrompt = `You are reviewing bounding box detections from a first pass. Here are the results:\n\n${pass1Summary}\n${expectedCharSection}\n\nLook at the image carefully and improve these detections:\n1. Are any face_box or body_box coordinates wrong? Fix them.\n2. Are any characters misidentified (wrong name)? Correct the name.\n3. Are any characters missing that should be detected? Add them.\n4. Are any UNKNOWN figures actually one of the expected characters? Identify them.\n5. Are the confidence levels accurate?\n\nReturn the COMPLETE corrected result in the same JSON format as the input:\n{"figures": [...], "objects": [...]}\n\nCoordinates use 0-1000 scale. Keep figures that are correct unchanged. Only modify what needs fixing.`;
+
+        const refineParts = [
+          { inline_data: { mime_type: mimeType, data: base64Data } },
+          { text: refinementPrompt }
+        ];
+
+        const refineUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        const refineResp = await withRetry(async () => {
+          return fetch(refineUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: refineParts }],
+              generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+              safetySettings: GEMINI_SAFETY_SETTINGS
+            })
+          });
+        }, { maxRetries: 1, baseDelay: 1000 });
+
+        if (refineResp.ok) {
+          const refineData = await refineResp.json();
+          totalInputTokens += refineData.usageMetadata?.promptTokenCount || 0;
+          totalOutputTokens += refineData.usageMetadata?.candidatesTokenCount || 0;
+
+          const refineText = refineData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (refineText) {
+            refinementResponse = refineText;
+            try {
+              const refined = getStoryHelpers().extractJsonFromText(refineText);
+              if (refined?.figures) {
+                finalFigures = (refined.figures || []).map(fig => ({
+                  name: fig.name || 'UNKNOWN',
+                  label: fig.label,
+                  position: fig.position,
+                  faceBox: normalizeBox(fig.face_box),
+                  bodyBox: normalizeBox(fig.body_box),
+                  confidence: fig.confidence || 'low'
+                }));
+                finalObjects = (refined.objects || []).map(obj => ({
+                  name: obj.name,
+                  found: obj.found !== false,
+                  label: obj.label,
+                  position: obj.position,
+                  bodyBox: normalizeBox(obj.body_box)
+                }));
+
+                // Log changes
+                const newIdentified = finalFigures.filter(f => f.name !== 'UNKNOWN');
+                const changes = [];
+                if (newIdentified.length !== identifiedChars.length) changes.push(`characters: ${identifiedChars.length}→${newIdentified.length}`);
+                if (finalFigures.length !== figures.length) changes.push(`figures: ${figures.length}→${finalFigures.length}`);
+                log.info(`📦 [BBOX-DETECT] Pass 2 (refine): ${changes.length > 0 ? changes.join(', ') : 'confirmed'} — ${newIdentified.map(f => `${f.name} (${f.confidence})`).join(', ')}`);
+              }
+            } catch (refineParseErr) {
+              log.warn(`⚠️  [BBOX-DETECT] Pass 2 parse failed, keeping pass 1 results: ${refineParseErr.message}`);
+            }
+          }
+        }
+      } catch (refineErr) {
+        log.warn(`⚠️  [BBOX-DETECT] Pass 2 refinement failed, keeping pass 1 results: ${refineErr.message}`);
+      }
+    }
+
+    // Compute found/missing objects from final results
+    const foundObjects = finalObjects.filter(o => o.found).map(o => o.name);
+    const missingObjects = finalObjects.filter(o => !o.found).map(o => o.name);
 
     return {
-      figures,
-      objects,
+      figures: finalFigures,
+      objects: finalObjects,
       // Include expected inputs for dev mode display
       expectedCharacters,
       expectedObjects,
       foundObjects,
       missingObjects,
-      unknownFigures: figures.filter(f => f.name === 'UNKNOWN').length,
-      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+      unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
+      usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,
-      rawResponse: responseText
+      rawResponse: responseText,
+      refinementResponse
     };
 
   } catch (error) {
