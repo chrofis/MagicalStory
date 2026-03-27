@@ -87,10 +87,13 @@ export function ObjectDetectionDisplay({
   const [bboxModel, setBboxModel] = useState('');
 
   // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
+  // But NOT during active refresh/iterate — those set loadedOverlay themselves
   const bboxKey = directBboxDetection ? JSON.stringify(directBboxDetection.figures?.length) + (directBboxDetection.objects?.length || 0) : null;
   useEffect(() => {
-    setLoadedOverlay(null);
-  }, [bboxKey, directBboxOverlayImage]);
+    if (!isRefreshing && !isIterating) {
+      setLoadedOverlay(null);
+    }
+  }, [bboxKey, directBboxOverlayImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prefer direct props (from latest re-evaluation, matches active version).
   // Fall back to retryHistory (from initial generation — may not match if version switched,
