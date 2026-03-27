@@ -3734,11 +3734,17 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     const modelId = bboxModel || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
     log.info(`🔄 [ITERATE-BBOX] Page ${pageNumber}: Refining bbox with ${modelId}`);
 
-    // Build a prompt that shows the current detections and asks for refinement
-    const figuresSummary = (currentDetection.figures || []).map((f, i) => {
+    // Only send main characters (identified by name), skip UNKNOWN crowd figures
+    const mainCharacters = (currentDetection.figures || []).filter(f => f.name && f.name !== 'UNKNOWN');
+    if (mainCharacters.length === 0) {
+      return res.status(400).json({ error: 'No identified characters to refine — run Re-detect first' });
+    }
+    log.info(`🔄 [ITERATE-BBOX] Refining ${mainCharacters.length} main characters (skipping ${(currentDetection.figures || []).length - mainCharacters.length} crowd figures)`);
+
+    const figuresSummary = mainCharacters.map((f, i) => {
       const fb = f.faceBox ? `face:[${f.faceBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no face';
       const bb = f.bodyBox ? `body:[${f.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no body';
-      return `  ${i + 1}. "${f.name || f.label}" (${f.confidence}) — ${fb}, ${bb}`;
+      return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
     }).join('\n');
 
     const iteratePrompt = `The attached image shows bounding boxes drawn on an illustration.
@@ -3840,7 +3846,7 @@ Respond with ONLY the JSON, no explanation.`;
       ];
     };
 
-    const figures = (refined.figures || []).map(fig => ({
+    const refinedMainFigures = (refined.figures || []).map(fig => ({
       name: fig.name || 'UNKNOWN',
       label: fig.label,
       position: fig.position,
@@ -3849,7 +3855,9 @@ Respond with ONLY the JSON, no explanation.`;
       confidence: fig.confidence || 'medium'
     }));
 
-    // Keep existing objects from the current detection (iterate only refines figures)
+    // Merge: refined main characters + unchanged crowd figures + unchanged objects
+    const crowdFigures = (currentDetection.figures || []).filter(f => !f.name || f.name === 'UNKNOWN');
+    const figures = [...refinedMainFigures, ...crowdFigures];
     const objects = currentDetection.objects || [];
 
     const refinedDetection = { figures, objects, iterated: true };
