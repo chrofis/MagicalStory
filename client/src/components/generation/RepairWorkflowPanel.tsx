@@ -1423,7 +1423,7 @@ export function RepairWorkflowPanel({
                                     </div>
                                   </div>
                                 )}
-                                {/* Reference avatar */}
+                                {/* Reference avatar + blackout input */}
                                 <div className="flex items-center gap-2">
                                   <img
                                     src={page.comparison.reference}
@@ -1432,6 +1432,17 @@ export function RepairWorkflowPanel({
                                     onClick={() => setGridLightbox(page.comparison!.reference)}
                                   />
                                   <span className="text-xs text-gray-500">Reference avatar</span>
+                                  {page.comparison.blackoutImage && (
+                                    <>
+                                      <img
+                                        src={page.comparison.blackoutImage}
+                                        alt="Grok input (blackout)"
+                                        className="w-12 h-12 object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80"
+                                        onClick={() => setGridLightbox(page.comparison!.blackoutImage!)}
+                                      />
+                                      <span className="text-xs text-gray-500">Grok input</span>
+                                    </>
+                                  )}
                                 </div>
                                 {!page.comparison.before && (
                                   <img

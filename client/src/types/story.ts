@@ -989,6 +989,7 @@ export interface RepairComparison {
   after: string;
   diff?: string;
   reference: string;
+  blackoutImage?: string | null;
 }
 
 export interface RepairVerification {
