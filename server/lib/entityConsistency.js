@@ -305,12 +305,21 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
           const maxCrops = refAvatar ? MAX_GRID_CELLS - 1 : MAX_GRID_CELLS;
+          const numGrids = Math.ceil(crops.length / maxCrops);
           const batches = [];
-          for (let i = 0; i < crops.length; i += maxCrops) {
-            batches.push(crops.slice(i, i + maxCrops));
-          }
-          if (batches.length > 1) {
-            log.info(`🔍 [ENTITY-CHECK] ${charName} (${clothingCategory}): ${crops.length} crops → ${batches.length} grids of max ${maxCrops}`);
+          if (numGrids <= 1) {
+            batches.push(crops);
+          } else {
+            // Balance crops evenly across grids (e.g., 10 → 5+5, not 8+2)
+            const baseSize = Math.floor(crops.length / numGrids);
+            const remainder = crops.length % numGrids;
+            let offset = 0;
+            for (let g = 0; g < numGrids; g++) {
+              const size = baseSize + (g < remainder ? 1 : 0);
+              batches.push(crops.slice(offset, offset + size));
+              offset += size;
+            }
+            log.info(`🔍 [ENTITY-CHECK] ${charName} (${clothingCategory}): ${crops.length} crops → ${numGrids} grids (${batches.map(b => b.length).join('+')})`);
           }
 
           // Create and evaluate each grid
