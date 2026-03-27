@@ -1503,81 +1503,89 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     let totalInputTokens = inputTokens;
     let totalOutputTokens = outputTokens;
 
-    if (options.skipRefinement !== true && !(modelConfig?.provider === 'xai')) {
+    // Only refine if we have identified main characters (skip UNKNOWN-only results)
+    const mainCharacters = figures.filter(f => f.name && f.name !== 'UNKNOWN');
+    if (options.skipRefinement !== true && mainCharacters.length > 0) {
       try {
-        const pass1Summary = JSON.stringify({
-          figures: figures.map(f => ({
-            name: f.name, label: f.label, position: f.position, confidence: f.confidence,
-            face_box: f.faceBox ? f.faceBox.map(v => Math.round(v * 1000)) : null,
-            body_box: f.bodyBox ? f.bodyBox.map(v => Math.round(v * 1000)) : null
-          })),
-          objects: objects.map(o => ({
-            name: o.name, found: o.found, label: o.label, position: o.position,
-            body_box: o.bodyBox ? o.bodyBox.map(v => Math.round(v * 1000)) : null
-          }))
-        });
+        // Generate overlay image from pass 1 so the model can see its own drawn boxes
+        const pass1Result = { figures, objects, expectedCharacters, expectedObjects };
+        const overlayDataUri = await createBboxOverlayImage(imageData, pass1Result);
 
-        const expectedCharSection = expectedCharacters.length > 0
-          ? `\nEXPECTED CHARACTERS:\n${expectedCharacters.map(c => `- ${c.name}: ${c.description}${c.position ? ` (expected at ${c.position})` : ''}`).join('\n')}`
-          : '';
+        if (overlayDataUri) {
+          const overlayBase64 = overlayDataUri.replace(/^data:image\/\w+;base64,/, '');
+          const overlayMime = overlayDataUri.match(/^data:(image\/\w+);base64,/)
+            ? overlayDataUri.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-        const refinementPrompt = `You are reviewing bounding box detections from a first pass. Here are the results:\n\n${pass1Summary}\n${expectedCharSection}\n\nLook at the image carefully and improve these detections:\n1. FACE BOXES — this is the most critical check:\n   - Does each face_box fully contain the COMPLETE face INCLUDING all hair above the forehead, the full chin, and ears?\n   - Common error: face_box is too small and cuts off the top of the head/hair. If so, extend y_min upward.\n   - Common error: face_box is too narrow and cuts off ears/hair width. If so, extend x_min/x_max.\n   - When in doubt, make face_box LARGER. It should be roughly square for a front-facing character.\n2. Are any body_box coordinates wrong? Fix them.\n3. Are any characters misidentified (wrong name)? Correct the name.\n4. Are any characters missing that should be detected? Add them.\n5. Are any UNKNOWN figures actually one of the expected characters? Identify them.\n\nFor each figure, add "refined": true if you changed ANY of its boxes or identification, or "refined": false if kept as-is.\n\nReturn the COMPLETE corrected result in the same JSON format as the input:\n{"figures": [...], "objects": [...]}\n\nCoordinates use 0-1000 scale.`;
+          // Same focused prompt as the manual "Bbox verfeinern" button (iterate-bbox endpoint)
+          const figuresSummary = mainCharacters.map((f, i) => {
+            const fb = f.faceBox ? `face:[${f.faceBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no face';
+            const bb = f.bodyBox ? `body:[${f.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no body';
+            return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
+          }).join('\n');
 
-        const refineParts = [
-          { inline_data: { mime_type: mimeType, data: base64Data } },
-          { text: refinementPrompt }
-        ];
+          const refinePrompt = `The attached image shows bounding boxes drawn on an illustration.\n- THICK GREEN boxes = character BODY region\n- THICK BLUE boxes labeled "FACE" = character FACE region (most important!)\n\nCURRENT FACE & BODY BOXES (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):\n${figuresSummary}\n\nYour task: Look at the image carefully and REFINE these bounding boxes so they accurately capture each character.\n\nFACE BOX RULES (most important):\n- Must include the COMPLETE face: forehead to chin, ear to ear. Nothing cut off.\n- Include hair/hat if it's part of the head silhouette.\n- Must NOT include shoulders or neck below the jawline.\n- If the face is turned or at an angle, the box should still capture the full visible face area.\n\nBODY BOX RULES:\n- Must include the COMPLETE character from head to feet. Nothing cut off.\n- Include arms, legs, clothing, accessories — everything that is part of the character.\n- If feet are visible, the box must extend to the bottom of the feet.\n- If a character is holding something, include the held object in the body box.\n\nCommon issues to fix:\n- Box shifted away from the actual element (move it to center on the character)\n- Box too small — part of the face/body is cut off (EXPAND it)\n- Box too large — includes background or other characters (SHRINK it)\n\nReturn CORRECTED coordinates. Keep the same character names. Only adjust the box positions.\n\nOutput JSON (ONLY figures, no objects):\n{\n  "figures": [\n    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}\n  ]\n}\n\nCoordinates use 0-1000 scale where [0,0] is top-left and [1000,1000] is bottom-right.\nRespond with ONLY the JSON, no explanation.`;
 
-        const refineUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-        const refineResp = await withRetry(async () => {
-          return fetch(refineUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: refineParts }],
-              generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
-              safetySettings: GEMINI_SAFETY_SETTINGS
-            })
-          });
-        }, { maxRetries: 1, baseDelay: 1000 });
+          const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
+          const refineModelConfig = TEXT_MODELS[refineModelId];
+          let refineData;
 
-        if (refineResp.ok) {
-          const refineData = await refineResp.json();
-          totalInputTokens += refineData.usageMetadata?.promptTokenCount || 0;
-          totalOutputTokens += refineData.usageMetadata?.candidatesTokenCount || 0;
+          if (refineModelConfig?.provider === 'xai') {
+            const refineParts = [
+              { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
+              { text: refinePrompt }
+            ];
+            const grokResp = await callGrokVisionAPI(refineModelId, refineModelConfig.modelId || refineModelId, refineParts, refinePrompt);
+            refineData = await grokResp.json();
+          } else {
+            const refineUrl = `https://generativelanguage.googleapis.com/v1beta/models/${refineModelId}:generateContent?key=${apiKey}`;
+            const refineResp = await withRetry(async () => {
+              return fetch(refineUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [
+                    { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
+                    { text: refinePrompt }
+                  ] }],
+                  generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+                  safetySettings: GEMINI_SAFETY_SETTINGS
+                })
+              });
+            }, { maxRetries: 1, baseDelay: 1000 });
 
-          const refineText = refineData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (!refineResp.ok) throw new Error(`Refine API ${refineResp.status}`);
+            refineData = await refineResp.json();
+          }
+
+          totalInputTokens += refineData?.usageMetadata?.promptTokenCount || 0;
+          totalOutputTokens += refineData?.usageMetadata?.candidatesTokenCount || 0;
+
+          const refineText = refineData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
           if (refineText) {
             refinementResponse = refineText;
-            try {
-              const refined = getStoryHelpers().extractJsonFromText(refineText);
-              if (refined?.figures) {
-                finalFigures = (refined.figures || []).map(fig => ({
+            const refined = getStoryHelpers().extractJsonFromText(refineText);
+            if (refined?.figures) {
+              // Merge: update main characters with refined boxes, keep UNKNOWN crowd from pass 1
+              const refinedMap = new Map();
+              for (const fig of refined.figures) {
+                refinedMap.set((fig.name || '').toLowerCase(), {
                   name: fig.name || 'UNKNOWN',
                   label: fig.label,
                   position: fig.position,
                   faceBox: normalizeBox(fig.face_box),
                   bodyBox: normalizeBox(fig.body_box),
-                  confidence: fig.confidence || 'low',
-                  _source: fig.refined ? 'refined' : 'original'
-                }));
-                finalObjects = (refined.objects || []).map(obj => ({
-                  name: obj.name,
-                  found: obj.found !== false,
-                  label: obj.label,
-                  position: obj.position,
-                  bodyBox: normalizeBox(obj.body_box)
-                }));
-
-                // Log changes
-                const newIdentified = finalFigures.filter(f => f.name !== 'UNKNOWN');
-                const changes = [];
-                if (newIdentified.length !== identifiedChars.length) changes.push(`characters: ${identifiedChars.length}→${newIdentified.length}`);
-                if (finalFigures.length !== figures.length) changes.push(`figures: ${figures.length}→${finalFigures.length}`);
-                log.info(`📦 [BBOX-DETECT] Pass 2 (refine): ${changes.length > 0 ? changes.join(', ') : 'confirmed'} — ${newIdentified.map(f => `${f.name} (${f.confidence})`).join(', ')}`);
+                  confidence: fig.confidence || 'low'
+                });
               }
-            } catch (refineParseErr) {
-              log.warn(`⚠️  [BBOX-DETECT] Pass 2 parse failed, keeping pass 1 results: ${refineParseErr.message}`);
+              finalFigures = [];
+              for (const mc of mainCharacters) {
+                finalFigures.push(refinedMap.get(mc.name.toLowerCase()) || mc);
+              }
+              // Keep UNKNOWN crowd figures from pass 1
+              for (const uf of figures.filter(f => f.name === 'UNKNOWN')) {
+                finalFigures.push(uf);
+              }
+              log.info(`📦 [BBOX-DETECT] Pass 2 (refine): refined ${refinedMap.size} main character boxes, kept ${finalFigures.length - refinedMap.size} crowd figures`);
             }
           }
         }
