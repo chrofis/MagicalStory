@@ -16,7 +16,14 @@ FOR EACH FIGURE:
 - Use CLOTHING + POSITION to distinguish characters (two boys of similar age are distinguished by what they wear and where they stand)
 - If not identifiable as any expected character, set "name" to "UNKNOWN"
 - Include "confidence": "high", "medium", or "low" for identification certainty
-- face_box: bounding box around the FACE only (forehead to chin, ear to ear)
+- face_box: bounding box around the COMPLETE FACE including all hair.
+  Must include: top of hair/forehead to bottom of chin, and full width from ear to ear including any hair that extends outward.
+  Common mistakes to AVOID:
+  * Do NOT cut off the top of the head or hair — include ALL hair above the forehead
+  * Do NOT cut off the chin — extend below the jawline
+  * Do NOT make the box too narrow — include ears and hair width
+  * When in doubt, make the face_box LARGER rather than smaller
+  * The face_box should be roughly square for a front-facing character
 - body_box: bounding box around the FULL BODY (or as much as visible)
 - If face is not visible (back view, non-human creature), set face_box to null
 
@@ -57,16 +64,16 @@ Given expected objects: "golden crown", "brown teddy bear"
       "name": "Lukas",
       "label": "boy with blonde hair in blue hoodie",
       "position": "left",
-      "face_box": [120, 100, 220, 200],
-      "body_box": [100, 50, 650, 300],
+      "face_box": [80, 100, 250, 280],
+      "body_box": [70, 50, 650, 300],
       "confidence": "high"
     },
     {
       "name": "Mia",
       "label": "girl with curly brown hair in pink dress",
       "position": "right",
-      "face_box": [150, 700, 250, 800],
-      "body_box": [130, 600, 680, 900],
+      "face_box": [100, 680, 280, 830],
+      "body_box": [90, 600, 680, 900],
       "confidence": "high"
     },
     {

@@ -628,6 +628,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           if (detection) {
             bboxDetection = detection;
             figures = detection.figures || [];
+            // Mark figures as from fallback detection (for overlay coloring)
+            for (const fig of figures) fig._source = 'fallback';
             // Cache result back on the image for future use
             img.bboxDetection = detection;
             pagesWithNewBbox.push(pageNumber);
