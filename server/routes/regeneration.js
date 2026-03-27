@@ -4825,8 +4825,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           // Collect face bboxes of OTHER characters on the same page to protect during blend
           const protectedFaces = [];
-          if (storedEntityReport?.characters) {
-            for (const [otherName, otherCharReport] of Object.entries(storedEntityReport.characters)) {
+          const entityReportForProtection = storyData.finalChecksReport?.entity;
+          if (entityReportForProtection?.characters) {
+            for (const [otherName, otherCharReport] of Object.entries(entityReportForProtection.characters)) {
               if (otherName === characterName) continue;
               if (!otherCharReport?.byClothing) continue;
               for (const clothingData of Object.values(otherCharReport.byClothing)) {
