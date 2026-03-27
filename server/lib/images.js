@@ -1521,7 +1521,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           ? `\nEXPECTED CHARACTERS:\n${expectedCharacters.map(c => `- ${c.name}: ${c.description}${c.position ? ` (expected at ${c.position})` : ''}`).join('\n')}`
           : '';
 
-        const refinementPrompt = `You are reviewing bounding box detections from a first pass. Here are the results:\n\n${pass1Summary}\n${expectedCharSection}\n\nLook at the image carefully and improve these detections:\n1. Are any face_box or body_box coordinates wrong? Fix them.\n2. Are any characters misidentified (wrong name)? Correct the name.\n3. Are any characters missing that should be detected? Add them.\n4. Are any UNKNOWN figures actually one of the expected characters? Identify them.\n5. Are the confidence levels accurate?\n\nReturn the COMPLETE corrected result in the same JSON format as the input:\n{"figures": [...], "objects": [...]}\n\nCoordinates use 0-1000 scale. Keep figures that are correct unchanged. Only modify what needs fixing.`;
+        const refinementPrompt = `You are reviewing bounding box detections from a first pass. Here are the results:\n\n${pass1Summary}\n${expectedCharSection}\n\nLook at the image carefully and improve these detections:\n1. FACE BOXES — this is the most critical check:\n   - Does each face_box fully contain the COMPLETE face INCLUDING all hair above the forehead, the full chin, and ears?\n   - Common error: face_box is too small and cuts off the top of the head/hair. If so, extend y_min upward.\n   - Common error: face_box is too narrow and cuts off ears/hair width. If so, extend x_min/x_max.\n   - When in doubt, make face_box LARGER. It should be roughly square for a front-facing character.\n2. Are any body_box coordinates wrong? Fix them.\n3. Are any characters misidentified (wrong name)? Correct the name.\n4. Are any characters missing that should be detected? Add them.\n5. Are any UNKNOWN figures actually one of the expected characters? Identify them.\n\nFor each figure, add "refined": true if you changed ANY of its boxes or identification, or "refined": false if kept as-is.\n\nReturn the COMPLETE corrected result in the same JSON format as the input:\n{"figures": [...], "objects": [...]}\n\nCoordinates use 0-1000 scale.`;
 
         const refineParts = [
           { inline_data: { mime_type: mimeType, data: base64Data } },
@@ -1558,7 +1558,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
                   position: fig.position,
                   faceBox: normalizeBox(fig.face_box),
                   bodyBox: normalizeBox(fig.body_box),
-                  confidence: fig.confidence || 'low'
+                  confidence: fig.confidence || 'low',
+                  _source: fig.refined ? 'refined' : 'original'
                 }));
                 finalObjects = (refined.objects || []).map(obj => ({
                   name: obj.name,
@@ -1919,11 +1920,12 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
         const isFallback = fig._source === 'fallback';
-        const faceColor = isFallback ? '#ff00cc' : '#0066ff';  // Magenta for fallback, blue for original
-        const faceLabel = isFallback ? 'FACE ↻' : 'FACE';
+        const isRefined = fig._source === 'refined';
+        const faceColor = isFallback ? '#ff00cc' : isRefined ? '#00cccc' : '#0066ff';  // Magenta=fallback, Cyan=refined, Blue=original
+        const faceLabel = isFallback ? 'FACE ↻' : isRefined ? 'FACE ✓' : 'FACE';
         svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${faceColor}" stroke-width="5"/>`);
         // Face label
-        const faceLabelWidth = isFallback ? 65 : 50;
+        const faceLabelWidth = (isFallback || isRefined) ? 65 : 50;
         svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${faceColor}" opacity="0.9" rx="2"/>`);
         svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">${faceLabel}</text>`);
       }
