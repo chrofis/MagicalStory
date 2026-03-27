@@ -1423,25 +1423,49 @@ export function RepairWorkflowPanel({
                                     </div>
                                   </div>
                                 )}
-                                {/* Reference avatar + blackout input */}
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={page.comparison.reference}
-                                    alt="Reference avatar"
-                                    className="w-12 h-12 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80"
-                                    onClick={() => setGridLightbox(page.comparison!.reference)}
-                                  />
-                                  <span className="text-xs text-gray-500">Reference avatar</span>
+                                {/* Reference avatar + Grok repair debug images */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="flex flex-col items-center">
+                                    <img
+                                      src={page.comparison.reference}
+                                      alt="Reference avatar"
+                                      className="w-12 h-12 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80"
+                                      onClick={() => setGridLightbox(page.comparison!.reference)}
+                                    />
+                                    <span className="text-[10px] text-gray-500">Avatar</span>
+                                  </div>
                                   {page.comparison.blackoutImage && (
-                                    <>
+                                    <div className="flex flex-col items-center">
                                       <img
                                         src={page.comparison.blackoutImage}
-                                        alt="Grok input (blackout)"
+                                        alt="Whiteout sent to Grok"
                                         className="w-12 h-12 object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80"
                                         onClick={() => setGridLightbox(page.comparison!.blackoutImage!)}
                                       />
-                                      <span className="text-xs text-gray-500">Grok input</span>
-                                    </>
+                                      <span className="text-[10px] text-gray-500">Whiteout</span>
+                                    </div>
+                                  )}
+                                  {page.comparison.grokRawResult && (
+                                    <div className="flex flex-col items-center">
+                                      <img
+                                        src={page.comparison.grokRawResult}
+                                        alt="Raw Grok output"
+                                        className="w-12 h-12 object-contain rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80"
+                                        onClick={() => setGridLightbox(page.comparison!.grokRawResult!)}
+                                      />
+                                      <span className="text-[10px] text-gray-500">Grok raw</span>
+                                    </div>
+                                  )}
+                                  {page.comparison.blendMask && (
+                                    <div className="flex flex-col items-center">
+                                      <img
+                                        src={page.comparison.blendMask}
+                                        alt="Feather blend mask"
+                                        className="w-12 h-12 object-contain rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80"
+                                        onClick={() => setGridLightbox(page.comparison!.blendMask!)}
+                                      />
+                                      <span className="text-[10px] text-gray-500">Blend mask</span>
+                                    </div>
                                   )}
                                 </div>
                                 {!page.comparison.before && (

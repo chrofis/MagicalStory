@@ -6003,6 +6003,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const blendedRegion = await sharp(blended, { raw: { width: blendWidth, height: blendHeight, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
 
+    // Generate blend mask visualization (grayscale: white = Grok, black = original, gray = feather)
+    const maskPixels = Buffer.alloc(blendWidth * blendHeight);
+    for (let i = 0; i < blendWidth * blendHeight; i++) {
+      const y = Math.floor(i / blendWidth);
+      const x = i % blendWidth;
+      const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
+      maskPixels[i] = dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255);
+    }
+    // Composite mask region onto black full-scene canvas to show position
+    const maskRegion = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } }).jpeg({ quality: 80 }).toBuffer();
+    const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 1, background: 0 } })
+      .jpeg({ quality: 80 }).toBuffer();
+    const blendMaskFinal = await sharp(blendMaskBuffer)
+      .composite([{ input: maskRegion, left: blendLeft, top: blendTop }])
+      .jpeg({ quality: 80 }).toBuffer();
+
     // G. Composite blended region onto original scene
     const composited = await sharp(sceneBuffer)
       .composite([{ input: blendedRegion, left: blendLeft, top: blendTop }])
@@ -6014,6 +6030,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     return {
       imageData: finalImageData,
       blackoutImage: `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`,
+      grokRawResult: grokResult.imageData,
+      blendMask: `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}`,
       character: charName,
       usage: grokResult.usage,
       method,

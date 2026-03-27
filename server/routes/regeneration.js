@@ -2698,32 +2698,78 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       log.error(`⚠️ [EDIT] Quality evaluation failed:`, evalErr.message);
     }
 
-    // Update the image in story data
+    // Update the scene metadata (but NOT imageData — that goes into imageVersions)
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
     if (existingIndex >= 0) {
-      sceneImages[existingIndex] = {
-        ...sceneImages[existingIndex],
+      const scene = sceneImages[existingIndex];
+
+      // Update scene-level metadata
+      scene.qualityScore = qualityScore;
+      scene.qualityReasoning = qualityReasoning;
+      scene.wasEdited = true;
+      scene.lastEditPrompt = editPrompt;
+      scene.originalImage = scene.originalImage || previousImageData;
+      scene.originalScore = scene.originalScore || previousScore;
+      scene.originalReasoning = scene.originalReasoning || previousReasoning;
+      scene.editedAt = new Date().toISOString();
+
+      // --- Version management (same pattern as iterate endpoint) ---
+      // Lazy-migrate imageVersions if missing
+      if (!scene.imageVersions) {
+        scene.imageVersions = [{
+          // Don't copy imageData — the original is already stored at DB version_index 0.
+          description: scene.description,
+          prompt: scene.prompt,
+          modelId: scene.modelId,
+          createdAt: storyData.createdAt || new Date().toISOString(),
+          isActive: false,
+          type: 'original',
+          qualityScore: previousScore,
+          qualityReasoning: previousReasoning,
+          fixTargets: scene.fixTargets || [],
+          fixableIssues: scene.fixableIssues || [],
+          totalAttempts: scene.totalAttempts || null,
+          referencePhotoNames: (scene.referencePhotos || []).map(p => ({
+            name: p.name, photoType: p.photoType,
+            clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+          })),
+        }];
+        log.debug(`✏️ [EDIT] Migrated legacy scene format to imageVersions[] (1 version)`);
+      }
+
+      // Mark all existing versions as inactive
+      scene.imageVersions.forEach(v => v.isActive = false);
+
+      // Create new version entry
+      const timestamp = new Date().toISOString();
+      scene.imageVersions.push({
         imageData: editResult.imageData,
+        description: scene.description,
+        prompt: scene.prompt,
+        modelId: scene.modelId,
+        createdAt: timestamp,
+        generatedAt: timestamp,
+        isActive: true,
+        type: 'edit',
         qualityScore,
         qualityReasoning,
-        wasEdited: true,
-        lastEditPrompt: editPrompt,
-        originalImage: previousImageData,
-        originalScore: previousScore,
-        originalReasoning: previousReasoning,
-        editedAt: new Date().toISOString()
-      };
+        editPrompt,
+      });
+
+      // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
+      delete scene.imageData;
+
+      // Save updated scene atomically
+      storyData.sceneImages = sceneImages;
+      const savedAtomically = await saveScenePageData(id, pageNumber, scene);
+      if (!savedAtomically) {
+        await saveStoryData(id, storyData);
+      }
+
+      // Update active version in metadata
+      const newActiveIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
+      await setActiveVersion(id, pageNumber, newActiveIndex);
     }
-
-    // Persist edited image directly to story_images (saveStoryData won't re-save v0)
-    await saveStoryImage(id, 'scene', pageNumber, editResult.imageData, {
-      qualityScore,
-      versionIndex: 0
-    });
-
-    // Save updated story with metadata
-    storyData.sceneImages = sceneImages;
-    await saveStoryData(id, storyData);
 
     log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
 
@@ -2946,25 +2992,79 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
     // Update scene data
     if (anyRepaired || newRetryEntries.length > 0) {
-      sceneImages[sceneIndex] = {
-        ...currentScene,
-        imageData: currentImageData,
-        wasAutoRepaired: anyRepaired || currentScene.wasAutoRepaired,
-        retryHistory: [...currentScene.retryHistory, ...newRetryEntries],
-        repairHistory: allRepairHistory,
-        repairedAt: anyRepaired ? new Date().toISOString() : currentScene.repairedAt
-      };
+      // Update scene-level metadata
+      currentScene.wasAutoRepaired = anyRepaired || currentScene.wasAutoRepaired;
+      currentScene.retryHistory = [...currentScene.retryHistory, ...newRetryEntries];
+      currentScene.repairHistory = allRepairHistory;
+      currentScene.repairedAt = anyRepaired ? new Date().toISOString() : currentScene.repairedAt;
 
-      // Persist repaired image directly to story_images (saveStoryData won't re-save v0)
       if (anyRepaired) {
         const lastEntry = newRetryEntries[newRetryEntries.length - 1];
         const repairScore = lastEntry?.postRepairScore || null;
-        await saveStoryImage(id, 'scene', pageNumber, currentImageData, { qualityScore: repairScore, versionIndex: 0 });
+
+        // Update scene-level quality data
+        currentScene.qualityScore = repairScore;
+
+        // --- Version management (same pattern as iterate endpoint) ---
+        // Lazy-migrate imageVersions if missing
+        if (!currentScene.imageVersions) {
+          currentScene.imageVersions = [{
+            // Don't copy imageData — the original is already stored at DB version_index 0.
+            description: currentScene.description,
+            prompt: currentScene.prompt,
+            modelId: currentScene.modelId,
+            createdAt: storyData.createdAt || new Date().toISOString(),
+            isActive: false,
+            type: 'original',
+            qualityScore: currentScene.qualityScore ?? null,
+            qualityReasoning: currentScene.qualityReasoning || null,
+            fixTargets: currentScene.fixTargets || [],
+            fixableIssues: currentScene.fixableIssues || [],
+            totalAttempts: currentScene.totalAttempts || null,
+            referencePhotoNames: (currentScene.referencePhotos || []).map(p => ({
+              name: p.name, photoType: p.photoType,
+              clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+            })),
+          }];
+          log.debug(`🔧 [REPAIR] Migrated legacy scene format to imageVersions[] (1 version)`);
+        }
+
+        // Mark all existing versions as inactive
+        currentScene.imageVersions.forEach(v => v.isActive = false);
+
+        // Create new version entry
+        const timestamp = new Date().toISOString();
+        currentScene.imageVersions.push({
+          imageData: currentImageData,
+          description: currentScene.description,
+          prompt: currentScene.prompt,
+          modelId: currentScene.modelId,
+          createdAt: timestamp,
+          generatedAt: timestamp,
+          isActive: true,
+          type: 'inpaint-repair',
+          qualityScore: repairScore,
+          repairHistory: allRepairHistory,
+        });
+
+        // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
+        delete currentScene.imageData;
       }
 
-      // Save updated story
+      sceneImages[sceneIndex] = currentScene;
+
+      // Save updated scene atomically
       storyData.sceneImages = sceneImages;
-      await saveStoryData(id, storyData);
+      const savedAtomically = await saveScenePageData(id, pageNumber, currentScene);
+      if (!savedAtomically) {
+        await saveStoryData(id, storyData);
+      }
+
+      // Update active version in metadata if we created a new version
+      if (anyRepaired) {
+        const newActiveIndex = getActiveIndexAfterPush(currentScene.imageVersions, 'scene');
+        await setActiveVersion(id, pageNumber, newActiveIndex);
+      }
 
       log.info(`✅ [REPAIR] Saved ${newRetryEntries.length} repair entries for story ${id}, page ${pageNumber}`);
     }
@@ -3163,12 +3263,14 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         }
 
         // Add new version for entity repair
+        const entityRepairTimestamp = new Date().toISOString();
         existingImage.imageVersions.push({
           imageData: update.imageData,
           description: existingImage.description,
           prompt: existingImage.prompt,
           modelId: 'gemini-2.0-flash-preview-image-generation',
-          createdAt: new Date().toISOString(),
+          createdAt: entityRepairTimestamp,
+          generatedAt: entityRepairTimestamp,
           isActive: true,
           type: 'entity-repair',
           entityRepairedFor: entityName,
@@ -3179,14 +3281,10 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
           totalAttempts: null,
         });
 
-        // Keep preEntityRepairImage for backward compatibility
-        if (!existingImage.preEntityRepairImage) {
-          existingImage.preEntityRepairImage = existingImage.imageData;
-        }
         // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
         delete existingImage.imageData;
         existingImage.entityRepaired = true;
-        existingImage.entityRepairedAt = new Date().toISOString();
+        existingImage.entityRepairedAt = entityRepairTimestamp;
         existingImage.entityRepairedFor = entityName;
       }
 
@@ -3284,26 +3382,24 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         }
 
         // Add new version for entity repair
+        const entityRepairTs = new Date().toISOString();
         existingImage.imageVersions.push({
           imageData: update.imageData,
           description: existingImage.description,
           prompt: existingImage.prompt,
           modelId: 'gemini-2.0-flash-preview-image-generation',
-          createdAt: new Date().toISOString(),
+          createdAt: entityRepairTs,
+          generatedAt: entityRepairTs,
           isActive: true,
           type: 'entity-repair',
           entityRepairedFor: entityName,
           clothingCategory: update.clothingCategory
         });
 
-        // Keep preEntityRepairImage for backward compatibility
-        if (!existingImage.preEntityRepairImage) {
-          existingImage.preEntityRepairImage = existingImage.imageData;
-        }
         // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
         delete existingImage.imageData;
         existingImage.entityRepaired = true;
-        existingImage.entityRepairedAt = new Date().toISOString();
+        existingImage.entityRepairedAt = entityRepairTs;
         existingImage.entityRepairedFor = entityName;
       }
     }
@@ -3427,10 +3523,11 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       if (!scene) return;
 
       try {
-        // Get image data - check active version first, then fallback to scene.imageData
+        // Get image data - look up active version from DB, then fallback to scene.imageData
         let imageData = scene.imageData;
         if (scene.imageVersions?.length > 0) {
-          const activeVersion = scene.imageVersions.find(v => v.isActive);
+          const activeDbIndex = await getActiveVersion(id, pageNumber);
+          const activeVersion = scene.imageVersions?.[activeDbIndex];
           if (activeVersion?.imageData) {
             imageData = activeVersion.imageData;
           }
@@ -3538,7 +3635,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Store combined issues + bbox results on scene and active version
         scene.fixableIssues = allIssues;
-        const activeVersion = scene.imageVersions?.find(v => v.isActive);
+        const activeDbIdx = await getActiveVersion(id, pageNumber);
+        const activeVersion = scene.imageVersions?.[activeDbIdx];
         if (activeVersion) {
           activeVersion.fixTargets = scene.fixTargets;
           activeVersion.fixableIssues = allIssues;
@@ -4469,6 +4567,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 after: grokResult.imageData,
                 reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
                 blackoutImage: grokResult.blackoutImage || null,
+                grokRawResult: grokResult.grokRawResult || null,
+                blendMask: grokResult.blendMask || null,
               },
             };
           } else {
@@ -4675,6 +4775,9 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
+    // Rehydrate images from story_images table (they're stripped from JSON on save)
+    storyData = await rehydrateStoryImages(id, storyData);
+
     const pagesProcessed = [];
     let issuesFixed = 0;
 
@@ -4796,9 +4899,12 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Get the current cover image
     const coverImages = storyData.coverImages || {};
@@ -4851,34 +4957,100 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       log.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
     }
 
-    // Update the cover image in story data
-    const updatedCover = {
+    // Update the cover in-place (preserve existing fields, add edit metadata)
+    const cover = typeof currentCover === 'object' ? currentCover : { imageData: currentCover };
+    cover.qualityScore = qualityScore;
+    cover.qualityReasoning = qualityReasoning;
+    cover.wasEdited = true;
+    cover.lastEditPrompt = editPrompt;
+    cover.originalImage = cover.originalImage || previousImageData;
+    cover.originalScore = cover.originalScore || previousScore;
+    cover.originalReasoning = cover.originalReasoning || previousReasoning;
+    cover.editedAt = new Date().toISOString();
+
+    // --- Version management (same pattern as cover iterate endpoint) ---
+    // Lazy-migrate imageVersions if missing
+    if (!cover.imageVersions) {
+      cover.imageVersions = [];
+      if (cover.originalImage) {
+        cover.imageVersions.push({
+          imageData: cover.originalImage,
+          qualityScore: cover.originalScore,
+          description: cover.description,
+          createdAt: storyData.createdAt || new Date().toISOString(),
+          type: 'original',
+          isActive: false,
+          _alreadySaved: true  // Already at DB v0, don't re-save
+        });
+      }
+      const existingImageData = currentImageData;
+      if (existingImageData && (!cover.originalImage || existingImageData !== cover.originalImage)) {
+        cover.imageVersions.push({
+          imageData: existingImageData,
+          qualityScore: previousScore,
+          description: cover.description,
+          prompt: cover.prompt,
+          modelId: cover.modelId,
+          createdAt: cover.regeneratedAt || cover.generatedAt || new Date().toISOString(),
+          type: cover.wasRegenerated ? 'regeneration' : 'original',
+          isActive: false,
+          _alreadySaved: true  // Already in DB, don't re-save
+        });
+      } else if (existingImageData && cover.imageVersions.length > 0) {
+        cover.imageVersions[0].isActive = false;
+      }
+      log.debug(`✏️ [COVER EDIT] Migrated legacy cover format to imageVersions[] (${cover.imageVersions.length} versions)`);
+    }
+
+    // Mark all existing versions as inactive
+    cover.imageVersions.forEach(v => v.isActive = false);
+
+    // Create new version entry
+    const timestamp = new Date().toISOString();
+    const newVersion = {
       imageData: editResult.imageData,
+      description: cover.description,
+      prompt: cover.prompt,
+      modelId: cover.modelId,
+      createdAt: timestamp,
+      generatedAt: timestamp,
+      isActive: true,
+      type: 'edit',
       qualityScore,
       qualityReasoning,
-      wasEdited: true,
-      lastEditPrompt: editPrompt,
-      originalImage: previousImageData,
-      originalScore: previousScore,
-      originalReasoning: previousReasoning,
-      editedAt: new Date().toISOString(),
-      // Preserve other existing fields
-      ...(typeof currentCover === 'object' ? {
-        description: currentCover.description,
-        prompt: currentCover.prompt
-      } : {})
+      editPrompt,
     };
-    coverImages[coverKey] = updatedCover;
+    cover.imageVersions.push(newVersion);
 
-    // Persist edited cover image directly to story_images (saveStoryData won't re-save v0)
+    // Delete rehydrated imageData to prevent duplicate storage
+    delete cover.imageData;
+
+    // Query database for actual max version_index to avoid overwriting existing versions
+    const maxVersionResult = await dbQuery(
+      `SELECT COALESCE(MAX(version_index), -1) as max_version
+       FROM story_images
+       WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
+      [id, coverKey]
+    );
+    const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
+    const newVersionIndex = currentMaxVersion + 1;
+
+    // Save the new cover image directly at the correct version_index
     await saveStoryImage(id, coverKey, null, editResult.imageData, {
       qualityScore,
-      versionIndex: 0
+      generatedAt: timestamp,
+      versionIndex: newVersionIndex
     });
+    // Mark as already saved so saveStoryData doesn't re-save it
+    newVersion._alreadySaved = true;
 
-    // Save updated story with metadata
+    // Update cover in storyData
+    coverImages[coverKey] = cover;
     storyData.coverImages = coverImages;
     await saveStoryData(id, storyData);
+
+    // Update active version in metadata
+    await setActiveVersion(id, coverKey, newVersionIndex);
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 

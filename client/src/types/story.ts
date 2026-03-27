@@ -990,6 +990,8 @@ export interface RepairComparison {
   diff?: string;
   reference: string;
   blackoutImage?: string | null;
+  grokRawResult?: string | null;
+  blendMask?: string | null;
 }
 
 export interface RepairVerification {
