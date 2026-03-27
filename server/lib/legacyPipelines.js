@@ -18,6 +18,7 @@ const pLimit = require('p-limit');
 
 const { GenerationLogger } = require('./generationLogger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { IMAGE_MODELS } = require('../config/models');
 const {
   generateImageWithQualityRetry,
   runFinalConsistencyChecks,
@@ -907,7 +908,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Build the prompt
         let coverPrompt;
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
-        const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
+        const coverModelForStyle = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
+        const coverBackendForStyle = IMAGE_MODELS[coverModelForStyle]?.backend || null;
+        const styleDescription = resolveArtStyle(artStyleId, coverBackendForStyle) || resolveArtStyle('pixar');
 
         if (coverType === 'titlePage') {
           // Use extracted title from Claude response, fallback to input title
@@ -1349,7 +1352,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
       // Generate reference images for secondary elements (recurring characters, artifacts, etc.)
       if (visualBible) {
-        const styleDescription = resolveArtStyle(artStyle) || resolveArtStyle('pixar');
+        const pageModelForStyle = modelOverrides.imageModel || MODEL_DEFAULTS.pageImage || MODEL_DEFAULTS.image;
+        const pageBackendForStyle = IMAGE_MODELS[pageModelForStyle]?.backend || null;
+        const styleDescription = resolveArtStyle(artStyle, pageBackendForStyle) || resolveArtStyle('pixar');
         try {
           const refResult = await generateReferenceSheet(visualBible, styleDescription, {
             minAppearances: 2,
@@ -1629,7 +1634,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (!skipImages && !skipCovers) {
       try {
         const artStyleId = inputData.artStyle || 'pixar';
-        const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
+        const ot_coverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
+        const ot_coverBackend = IMAGE_MODELS[ot_coverModel]?.backend || null;
+        const styleDescription = resolveArtStyle(artStyleId, ot_coverBackend) || resolveArtStyle('pixar');
 
         // Use AI-generated cover scenes (or fallbacks) - handle both new format {scene, clothing} and legacy string
         const titlePageScene = coverScenes.titlePage?.scene || (typeof coverScenes.titlePage === 'string' ? coverScenes.titlePage : null) || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
@@ -2639,7 +2646,9 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
 
       // Get art style description
       const artStyleId = inputData.artStyle || 'pixar';
-      const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
+      const uni_coverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
+      const uni_coverBackend = IMAGE_MODELS[uni_coverModel]?.backend || null;
+      const styleDescription = resolveArtStyle(artStyleId, uni_coverBackend) || resolveArtStyle('pixar');
 
       // Extract cover scene descriptions from outline
       const coverScenes = extractCoverScenes(outline);

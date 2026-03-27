@@ -7,7 +7,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { MODEL_DEFAULTS } = require('../config/models');
+const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const { resolveArtStyle } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
@@ -73,7 +73,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   // --- Art style ---
   const artStyleId = storyData.artStyle || 'pixar';
-  const styleDescription = resolveArtStyle(artStyleId) || resolveArtStyle('pixar');
+  const coverModel = MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
+  const coverBackend = IMAGE_MODELS[coverModel]?.backend || null;
+  const styleDescription = resolveArtStyle(artStyleId, coverBackend) || resolveArtStyle('pixar');
 
   // --- Characters ---
   const characters = storyData.characters || [];

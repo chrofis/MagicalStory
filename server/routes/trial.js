@@ -1640,7 +1640,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     // Lazy require the styled avatar and story helper modules
     const { runInCacheScope, prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence } = require('../lib/styledAvatars');
-    const { ART_STYLES, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
+    const { resolveArtStyle, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
     const { generateImageOnly } = require('../lib/images');
 
@@ -1665,7 +1665,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       const sceneDescription = `A magical, eye-catching front cover scene featuring ${character.name} in a ${storyTopic}-themed setting. The main character is prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
 
       // Fill the front cover template
-      const styleDescription = ART_STYLES.watercolor;
+      const styleDescription = resolveArtStyle('watercolor');
       const characterRefList = buildCharacterReferenceList(coverPhotos, characters);
       const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
         TITLE_PAGE_SCENE: sceneDescription,
