@@ -499,6 +499,14 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       }
 
       const sceneImages = Array.from(sceneImagesMap.values()).sort((a, b) => a.pageNumber - b.pageNumber);
+
+      // Attach scene descriptions to sceneImages so frontend has them without waiting for separate load
+      const sceneDescs = baseData.sceneDescriptions || [];
+      for (const scene of sceneImages) {
+        const desc = sceneDescs.find(s => s.pageNumber === scene.pageNumber);
+        if (desc?.description) scene.description = desc.description;
+      }
+
       const coverCount = (coverImages.frontCover ? 1 : 0) + (coverImages.initialPage ? 1 : 0) + (coverImages.backCover ? 1 : 0);
 
       metadata = {
