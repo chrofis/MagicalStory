@@ -1319,7 +1319,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     let data;
     if (modelConfig?.provider === 'xai') {
       log.info(`🔲 [BBOX-DETECT] Using Grok vision: ${modelId}`);
-      data = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
+      const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
+      data = await grokResponse.json();
       if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
         return null;
