@@ -1805,7 +1805,7 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const boxColor = isIdentified ? (confidenceColors[confidence] || '#aa00ff') : '#888888';  // Gray for UNKNOWN
         const labelBgColor = boxColor;
 
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="3"/>`);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="4"/>`);
 
         // Label - show character name + confidence, or "UNKNOWN" + visual label
         let label;
@@ -1820,14 +1820,17 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
-      // Face box - blue dashed
+      // Face box - bright blue, thick solid line (face is primary for character consistency)
       if (fig.faceBox) {
         const [ymin, xmin, ymax, xmax] = fig.faceBox;
         const x = Math.round(xmin * width);
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#0088ff" stroke-width="2" stroke-dasharray="5,3"/>`);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#0066ff" stroke-width="5"/>`);
+        // Face label
+        svgParts.push(`<rect x="${x}" y="${y + h}" width="50" height="16" fill="#0066ff" opacity="0.9" rx="2"/>`);
+        svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">FACE</text>`);
       }
     }
 

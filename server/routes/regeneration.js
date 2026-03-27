@@ -3741,33 +3741,28 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       return `  ${i + 1}. "${f.name || f.label}" (${f.confidence}) — ${fb}, ${bb}`;
     }).join('\n');
 
-    const objectsSummary = (currentDetection.objects || []).map((o, i) => {
-      const bb = o.bodyBox ? `box:[${o.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no box';
-      return `  ${i + 1}. "${o.name || o.label}" — ${bb}`;
-    }).join('\n');
+    const iteratePrompt = `The attached image shows bounding boxes drawn on an illustration.
+- THICK GREEN boxes = character BODY region
+- THICK BLUE boxes labeled "FACE" = character FACE region (most important!)
 
-    const iteratePrompt = `The attached image shows bounding boxes drawn on an illustration. The colored rectangles represent detected figures and objects.
-
-CURRENT DETECTIONS (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):
-Figures:
+CURRENT FACE & BODY BOXES (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):
 ${figuresSummary || '  (none)'}
-Objects:
-${objectsSummary || '  (none)'}
 
-Your task: Look at the image carefully and REFINE these bounding boxes. The boxes may be:
-- Offset (shifted left/right/up/down from the actual element)
-- Too large or too small
-- Missing a face or body region
+Your task: Look at the image carefully and REFINE these face and body bounding boxes.
+The FACE box is the most important — it must tightly wrap the character's face/head.
 
-Return the CORRECTED detections in the same JSON format. Keep the same names and structure, just adjust the coordinates to better fit the actual elements in the illustration.
+Common issues to fix:
+- Face box shifted left/right/up/down from the actual face
+- Face box too large (includes shoulders) or too small (cuts off forehead/chin)
+- Body box not covering the full figure
+- Boxes completely missing the character
 
-Output JSON format:
+Return CORRECTED coordinates. Keep the same character names. Only adjust the box positions.
+
+Output JSON (ONLY figures, no objects):
 {
   "figures": [
     {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
-  ],
-  "objects": [
-    {"name": "ObjName", "label": "description", "position": "left", "found": true, "body_box": [ymin, xmin, ymax, xmax]}
   ]
 }
 
@@ -3844,13 +3839,8 @@ Respond with ONLY the JSON, no explanation.`;
       confidence: fig.confidence || 'medium'
     }));
 
-    const objects = (refined.objects || []).map(obj => ({
-      name: obj.name,
-      found: obj.found !== false,
-      label: obj.label,
-      position: obj.position,
-      bodyBox: normalizeBox(obj.body_box)
-    }));
+    // Keep existing objects from the current detection (iterate only refines figures)
+    const objects = currentDetection.objects || [];
 
     const refinedDetection = { figures, objects, iterated: true };
 
