@@ -48,7 +48,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
     extractSceneMetadata,
     getLandmarkPhotosForScene,
     convertClothingToCurrentFormat,
-    buildFullVisualBiblePrompt,
   } = getStoryHelpers();
 
   const {
@@ -59,7 +58,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     buildVisualBibleGrid,
   } = require('./images');
 
-  const { getElementReferenceImagesForPage } = require('./visualBible');
+  const { getElementReferenceImagesForPage, buildFullVisualBiblePrompt } = require('./visualBible');
 
   // Get existing cover data
   storyData.coverImages = storyData.coverImages || {};

@@ -4725,6 +4725,19 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
+          // Determine clothing for this character on this page
+          // Priority: scene metadata > clothingRequirements > 'standard'
+          let pageClothing = 'standard';
+          const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
+          if (sceneMetadata?.characterClothing?.[characterName]) {
+            pageClothing = sceneMetadata.characterClothing[characterName];
+          } else if (storyData.clothingRequirements?.[characterName]) {
+            const charReqs = storyData.clothingRequirements[characterName];
+            if (charReqs?.costumed?.used && charReqs.costumed.costume) {
+              pageClothing = `costumed:${charReqs.costumed.costume}`;
+            }
+          }
+
           // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
           let storedAppearance = null;
           const sceneBbox = sceneImage.bboxDetection;
@@ -4733,8 +4746,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               f.name?.toLowerCase() === characterName.toLowerCase()
             );
             if (fig && (fig.faceBox || fig.bodyBox)) {
-              storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: 'standard' };
-              log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber})`);
+              storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: pageClothing };
+              log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber}, clothing: ${pageClothing})`);
             }
           }
 
@@ -4769,7 +4782,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               storedAppearance = {
                 faceBox: charFigure.faceBox,
                 bodyBox: charFigure.bodyBox,
-                clothing: 'standard'
+                clothing: pageClothing
               };
               log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: face=${charFigure.faceBox ? 'yes' : 'no'}, body=${charFigure.bodyBox ? 'yes' : 'no'}`);
             } else {

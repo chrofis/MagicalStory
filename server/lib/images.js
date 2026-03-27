@@ -4891,7 +4891,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const { iterateCover } = require('./coverIterate');
             const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
             const ck = coverKeys[String(img.pageNumber)];
-            if (ck) {
+            // Skip if cover doesn't exist yet (covers may not be in storyData if generated in parallel)
+            if (ck && storyData.coverImages?.[ck]?.imageData) {
               const ev = evalMap.get(img.pageNumber);
               const coverFeedback = ev ? {
                 score: ev.score ?? ev.qualityScore,
@@ -4903,6 +4904,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 evaluationFeedback: coverFeedback,
                 usageTracker,
               });
+            } else if (ck) {
+              log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} regen — no image data available yet`);
             }
             // No separate usage tracking — iterateCover passes usageTracker through
           } else {
@@ -5039,7 +5042,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               const { iterateCover } = require('./coverIterate');
               const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
               const ck = coverKeys[String(img.pageNumber)];
-              if (ck) {
+              // Skip if cover doesn't exist yet (covers may not be in storyData if generated in parallel)
+              if (ck && storyData.coverImages?.[ck]?.imageData) {
                 const versions = pageVersions.get(img.pageNumber) || [];
                 const latestVersion = versions[versions.length - 1];
                 const latestEval2 = latestVersion?.evaluation || evalMap.get(img.pageNumber);
@@ -5053,6 +5057,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                   evaluationFeedback: coverFeedback2,
                   usageTracker,
                 });
+              } else if (ck) {
+                log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} regen pass 2 — no image data available yet`);
               }
             } else {
               // Use latest evaluation (from pass 1 if available) for feedback

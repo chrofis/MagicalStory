@@ -304,15 +304,28 @@ function calculateTextCost(modelId, usage) {
  * @returns {number} Estimated cost in USD
  */
 function calculateImageCost(modelId, imageCount = 1) {
-  // Check IMAGE_BACKENDS first
+  // Check IMAGE_BACKENDS first (e.g. 'grok', 'gemini', 'runware')
   if (IMAGE_BACKENDS[modelId]) {
     return IMAGE_BACKENDS[modelId].costPerImage * imageCount;
   }
 
-  // Check MODEL_PRICING for image models
+  // Check MODEL_PRICING for image models (e.g. 'grok-imagine-image')
   const pricing = MODEL_PRICING[modelId];
   if (pricing?.perImage) {
     return pricing.perImage * imageCount;
+  }
+
+  // Resolve display name → backend via IMAGE_MODELS (e.g. 'grok-imagine' → backend 'grok')
+  const imageModelConfig = IMAGE_MODELS[modelId];
+  if (imageModelConfig?.backend && IMAGE_BACKENDS[imageModelConfig.backend]) {
+    return IMAGE_BACKENDS[imageModelConfig.backend].costPerImage * imageCount;
+  }
+  // Also check the internal modelId (e.g. 'grok-imagine' → modelId 'grok-imagine-image')
+  if (imageModelConfig?.modelId) {
+    const internalPricing = MODEL_PRICING[imageModelConfig.modelId];
+    if (internalPricing?.perImage) {
+      return internalPricing.perImage * imageCount;
+    }
   }
 
   // Default to Gemini pricing if unknown
