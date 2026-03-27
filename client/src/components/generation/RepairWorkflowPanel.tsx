@@ -1583,10 +1583,37 @@ export function RepairWorkflowPanel({
               <div className="p-4 space-y-3 bg-white">
                 <p className="text-sm text-gray-600">{STEP_CONFIG['inpaint-repair'].description}</p>
 
-                {/* Page selector — show pages that have fix targets */}
+                {/* Page selector — show pages + covers that have fix targets */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-gray-700">Select page to repair:</div>
                   <div className="flex flex-wrap gap-1">
+                    {/* Cover entries */}
+                    {([
+                      { key: 'frontCover', pageNumber: -1 },
+                      { key: 'initialPage', pageNumber: -2 },
+                      { key: 'backCover', pageNumber: -3 },
+                    ] as const).map(({ key, pageNumber }) => {
+                      const cover = coverImages?.[key];
+                      if (!cover?.hasImage && !cover?.imageData) return null;
+                      const fixTargetCount = cover?.fixTargets?.length || 0;
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => setSelectedInpaintPage(pageNumber)}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedInpaintPage === pageNumber
+                              ? 'bg-orange-100 border-orange-400 text-orange-800'
+                              : fixTargetCount > 0
+                                ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                          }`}
+                          disabled={isFullWorkflowBusy}
+                        >
+                          {getPageName(pageNumber)} {fixTargetCount > 0 && <span className="font-semibold">({fixTargetCount})</span>}
+                        </button>
+                      );
+                    })}
+                    {/* Scene entries */}
                     {sceneImages.map(scene => {
                       const fixTargetCount = scene.fixTargets?.length || 0;
                       return (
@@ -1611,8 +1638,11 @@ export function RepairWorkflowPanel({
 
                 {/* Show fix targets for selected page */}
                 {selectedInpaintPage !== null && (() => {
-                  const scene = sceneImages.find(s => s.pageNumber === selectedInpaintPage);
-                  const fixTargets = scene?.fixTargets || [];
+                  const COVER_KEY_MAP: Record<number, keyof CoverImages> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                  const isCover = selectedInpaintPage < 0;
+                  const scene = isCover ? null : sceneImages.find(s => s.pageNumber === selectedInpaintPage);
+                  const cover = isCover ? coverImages?.[COVER_KEY_MAP[selectedInpaintPage]] : null;
+                  const fixTargets = (isCover ? cover?.fixTargets : scene?.fixTargets) || [];
                   return (
                     <div className="space-y-2">
                       {fixTargets.length > 0 ? (

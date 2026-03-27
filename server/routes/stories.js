@@ -710,6 +710,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           source: p.source,
           hasPhoto: !!p.photoData
         })),
+        fixTargets: img.fixTargets || [],
+        fixableIssues: img.fixableIssues || [],
         hasVisualBibleGrid: !!img.visualBibleGrid,
         grokRefImages: img.grokRefImages || null,
         // Consistency regeneration - flags only, images lazy loaded
