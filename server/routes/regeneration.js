@@ -4496,12 +4496,21 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Fallback: re-detect if entity report doesn't have bbox for this page
           if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const detection = await detectAllBoundingBoxes(sceneImage.imageData, [characterName]);
-            const charFigure = detection?.figures?.find(f => f.label?.toLowerCase().includes(characterName.toLowerCase()));
-            if (charFigure?.boundingBox) {
-              const [ymin, xmin, ymax, xmax] = charFigure.boundingBox;
-              storedAppearance = { faceBox: { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin }, clothing: 'standard' };
-              log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: [${charFigure.boundingBox.map(v => Math.round(v*100)+'%').join(', ')}]`);
+            const physDesc = buildCharacterPhysicalDescription(character);
+            const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
+              expectedCharacters: [{ name: characterName, description: physDesc }]
+            });
+            const charFigure = detection?.figures?.find(f =>
+              f.name?.toLowerCase() === characterName.toLowerCase() ||
+              f.label?.toLowerCase().includes(characterName.toLowerCase())
+            );
+            if (charFigure && (charFigure.faceBox || charFigure.bodyBox)) {
+              storedAppearance = {
+                faceBox: charFigure.faceBox,
+                bodyBox: charFigure.bodyBox,
+                clothing: 'standard'
+              };
+              log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: face=${charFigure.faceBox ? 'yes' : 'no'}, body=${charFigure.bodyBox ? 'yes' : 'no'}`);
             } else {
               return { task, error: true, failReason: `Could not locate ${characterName} on page ${pageNumber}` };
             }
