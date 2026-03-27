@@ -5,7 +5,7 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ObjectDetectionDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { RetryHistoryDisplay, ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
 import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
@@ -5144,6 +5144,15 @@ export function StoryDisplay({
                               pageNumber={image.pageNumber}
                               onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image.pageNumber}`]: bbox }))}
                             />
+
+                            {/* Eval Testing (per-page evaluation in dev mode) */}
+                            {storyId && (
+                              <EvalTestingPanel
+                                storyId={storyId}
+                                pageNumber={image.pageNumber}
+                                language={language}
+                              />
+                            )}
 
                             {/* Retry History (shows all attempts with images) */}
                             {image.retryHistory && image.retryHistory.length > 0 && (

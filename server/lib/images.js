@@ -10689,6 +10689,9 @@ module.exports = {
   // Issue collection
   collectAllIssuesForPage,
 
+  // Standalone visual inventory (for evaluate-single endpoint)
+  runVisualInventory,
+
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
   MAX_MASK_COVERAGE_PERCENT

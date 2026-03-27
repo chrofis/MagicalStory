@@ -68,7 +68,8 @@ const {
   GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
   compareImageStyles,
-  compressImageToJPEG
+  compressImageToJPEG,
+  runVisualInventory
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
@@ -3712,6 +3713,251 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
     res.status(500).json({ error: isAdmin ? 'Failed to re-evaluate: ' + err.message : 'Failed to re-evaluate' });
+  }
+});
+
+// Evaluate a single page with full prompt/output visibility (admin-only, no DB writes)
+router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
+
+    // Admin/dev-mode only
+    if (req.user.role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+
+    const { evalType, model } = req.body;
+    const validTypes = ['quality', 'semantic', 'visual-inventory'];
+    if (!evalType || !validTypes.includes(evalType)) {
+      return res.status(400).json({ error: `evalType must be one of: ${validTypes.join(', ')}` });
+    }
+
+    log.info(`🔬 [EVAL-SINGLE] ${evalType} eval for story ${id}, page ${pageNumber}${model ? ` (model: ${model})` : ''}`);
+
+    // Load story data with rehydrated images
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    let storyData = typeof storyResult.rows[0].data === 'string'
+      ? JSON.parse(storyResult.rows[0].data)
+      : storyResult.rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    // Find the page or cover
+    let scene;
+    let evaluationType = 'scene';
+    let pageLabel = `PAGE ${pageNumber}`;
+    if (isCoverPage(pageNumber)) {
+      const coverType = getCoverType(pageNumber);
+      if (!coverType) return res.status(400).json({ error: 'Invalid cover page number' });
+      scene = getCoverData(storyData, coverType);
+      evaluationType = 'cover';
+      pageLabel = coverType.toUpperCase();
+    } else {
+      scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+    }
+    if (!scene) {
+      return res.status(404).json({ error: `Page ${pageNumber} not found` });
+    }
+
+    // Get active version's image data
+    let imageData = scene.imageData;
+    if (scene.imageVersions?.length > 0) {
+      const activeDbIndex = await getActiveVersion(id, pageNumber);
+      const activeVersion = scene.imageVersions?.[activeDbIndex];
+      if (activeVersion?.imageData) {
+        imageData = activeVersion.imageData;
+      }
+    }
+    if (!imageData || !imageData.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'No valid image data for this page' });
+    }
+
+    // Build character reference images (same pattern as re-evaluate)
+    const characters = storyData.characters || [];
+    const characterPhotos = characters
+      .filter(c => c.photoUrl || c.avatars?.styled)
+      .map(c => ({
+        name: c.name,
+        photoUrl: c.avatars?.styled || c.photoUrl
+      }));
+
+    // Get page text and scene hint
+    const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
+    const pageText = isCoverPage(pageNumber) ? null : (getPageText(fullStoryText, pageNumber) || scene.text || null);
+    const sceneHint = scene.outlineExtract || scene.sceneHint || null;
+
+    // ─── QUALITY EVALUATION ────────────────────────────────────────────
+    if (evalType === 'quality') {
+      const qualityModelOverride = model || null;
+
+      // Build the filled prompt text for visibility
+      let evaluationTemplate;
+      if (evaluationType === 'cover' && PROMPT_TEMPLATES.coverImageEvaluation) {
+        evaluationTemplate = PROMPT_TEMPLATES.coverImageEvaluation;
+      } else if (PROMPT_TEMPLATES.imageEvaluation) {
+        evaluationTemplate = PROMPT_TEMPLATES.imageEvaluation;
+      } else {
+        evaluationTemplate = null;
+      }
+      const filledPrompt = evaluationTemplate
+        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: scene.description || '' })
+        : '(no evaluation template loaded)';
+
+      // Run the actual evaluation
+      const evaluation = await evaluateImageQuality(
+        imageData,
+        scene.description,       // originalPrompt
+        characterPhotos,         // referenceImages
+        evaluationType,
+        qualityModelOverride,
+        pageLabel,
+        null,                    // storyText — run quality only, semantic is separate
+        null                     // sceneHint — not used for quality-only
+      );
+
+      if (!evaluation) {
+        return res.status(500).json({ error: 'Quality evaluation returned null (content blocked or API error)' });
+      }
+
+      return res.json({
+        evalType: 'quality',
+        pageNumber,
+        prompt: filledPrompt,
+        rawResponse: evaluation.reasoning,
+        score: evaluation.score,
+        qualityScore: evaluation.qualityScore,
+        rawScore: evaluation.rawScore,
+        verdict: evaluation.verdict,
+        issuesSummary: evaluation.issuesSummary,
+        fixableIssues: evaluation.fixableIssues,
+        figures: evaluation.figures,
+        matches: evaluation.matches,
+        modelId: evaluation.modelId,
+        usage: evaluation.usage
+      });
+    }
+
+    // ─── SEMANTIC EVALUATION ───────────────────────────────────────────
+    if (evalType === 'semantic') {
+      if (!pageText && !sceneHint) {
+        return res.status(400).json({ error: 'No story text or scene hint available for semantic evaluation' });
+      }
+
+      // Build the filled prompt text for visibility
+      const semanticTemplate = PROMPT_TEMPLATES.imageSemantic;
+      const filledPrompt = semanticTemplate
+        ? fillTemplate(semanticTemplate, {
+            STORY_TEXT: pageText || 'Not provided',
+            SCENE_HINT: sceneHint || 'Not provided',
+            IMAGE_PROMPT: scene.description || 'No prompt provided'
+          })
+        : '(no semantic template loaded)';
+
+      // Run the semantic evaluation
+      const { evaluateSemanticFidelity } = require('../lib/sceneValidator');
+      const semanticResult = await evaluateSemanticFidelity(
+        imageData,
+        pageText || sceneHint,   // storyText (falls back to sceneHint)
+        scene.description,       // imagePrompt
+        sceneHint                // sceneHint
+      );
+
+      if (!semanticResult) {
+        return res.status(500).json({ error: 'Semantic evaluation returned null' });
+      }
+
+      return res.json({
+        evalType: 'semantic',
+        pageNumber,
+        prompt: filledPrompt,
+        rawResponse: semanticResult.rawResponse || JSON.stringify({
+          score: semanticResult.rawScore,
+          verdict: semanticResult.verdict,
+          semanticIssues: semanticResult.semanticIssues,
+          visible: semanticResult.visible,
+          expected: semanticResult.expected
+        }, null, 2),
+        score: semanticResult.score,
+        rawScore: semanticResult.rawScore,
+        verdict: semanticResult.verdict,
+        semanticIssues: semanticResult.semanticIssues,
+        visible: semanticResult.visible,
+        expected: semanticResult.expected,
+        usage: semanticResult.usage
+      });
+    }
+
+    // ─── VISUAL INVENTORY ──────────────────────────────────────────────
+    if (evalType === 'visual-inventory') {
+      const inventoryModel = model || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key not configured' });
+      }
+
+      // Build parts array (image + reference images) — same structure as evaluateImageQuality
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+      const parts = [
+        { inline_data: { mime_type: mimeType, data: base64Data } }
+      ];
+
+      // Add reference images (compressed)
+      for (const ref of characterPhotos) {
+        const photoUrl = ref.photoUrl;
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
+          const compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          parts.push({ text: `Reference: ${ref.name}` });
+          parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
+        }
+      }
+
+      // Get the filled prompt for visibility
+      const inventoryTemplate = PROMPT_TEMPLATES.imageVisualInventory || '';
+      const filledPrompt = inventoryTemplate || '(no visual inventory template loaded)';
+
+      // Run visual inventory
+      const inventoryResult = await runVisualInventory(parts, inventoryModel, apiKey, pageLabel);
+
+      if (!inventoryResult) {
+        return res.status(500).json({ error: 'Visual inventory returned null (content blocked or parse failed)' });
+      }
+
+      return res.json({
+        evalType: 'visual-inventory',
+        pageNumber,
+        prompt: filledPrompt,
+        rawResponse: JSON.stringify({
+          figures: inventoryResult.figures,
+          matches: inventoryResult.matches,
+          objectMatches: inventoryResult.objectMatches,
+          rendering: inventoryResult.rendering
+        }, null, 2),
+        figures: inventoryResult.figures,
+        matches: inventoryResult.matches,
+        objectMatches: inventoryResult.objectMatches,
+        rendering: inventoryResult.rendering,
+        usage: {
+          input_tokens: inventoryResult.inputTokens,
+          output_tokens: inventoryResult.outputTokens
+        }
+      });
+    }
+  } catch (err) {
+    log.error('❌ [EVAL-SINGLE] Failed:', err);
+    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
+    res.status(500).json({ error: isAdmin ? 'Evaluation failed: ' + err.message : 'Evaluation failed' });
   }
 });
 
