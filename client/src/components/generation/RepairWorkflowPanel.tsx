@@ -1021,10 +1021,10 @@ export function RepairWorkflowPanel({
                       <p className="text-xs text-gray-600">{workflowState.consistencyResults.report.summary}</p>
                     </div>
 
-                    {/* Detailed per-character breakdown */}
+                    {/* Per-character grids — always visible */}
                     {Object.entries(workflowState.consistencyResults.report.characters || {}).map(([charName, charResult]) => (
-                      <details key={charName} className="border rounded-lg overflow-hidden">
-                        <summary className={`px-3 py-2 cursor-pointer text-sm font-medium flex items-center justify-between ${
+                      <div key={charName} className="border rounded-lg overflow-hidden">
+                        <div className={`px-3 py-2 text-sm font-medium flex items-center justify-between ${
                           charResult.overallConsistent ? 'bg-green-50' : 'bg-amber-50'
                         }`}>
                           <span>{charName}</span>
@@ -1037,7 +1037,7 @@ export function RepairWorkflowPanel({
                             {(charResult.totalIssues ?? charResult.issues?.length ?? 0) > 0 &&
                               ` • ${charResult.totalIssues ?? charResult.issues?.length} issues`}
                           </span>
-                        </summary>
+                        </div>
                         <div className="p-3 bg-white space-y-2 text-sm">
                           {/* Per-clothing breakdown (new structure) */}
                           {charResult.byClothing && Object.entries(charResult.byClothing).map(([clothing, clothingResult]) => (
@@ -1114,7 +1114,7 @@ export function RepairWorkflowPanel({
                             <p className="text-xs text-green-600">No issues found</p>
                           )}
                         </div>
-                      </details>
+                      </div>
                     ))}
 
                     {charactersWithIssues.length > 0 && (
