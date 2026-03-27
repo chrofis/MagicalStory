@@ -6010,7 +6010,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     return {
       imageData: finalImageData,
-      blackoutImage: `data:image/jpeg;base64,${blackoutBuffer.toString('base64')}`,
+      blackoutImage: `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`,
       character: charName,
       usage: grokResult.usage,
       method,
