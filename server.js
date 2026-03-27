@@ -3896,7 +3896,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               coverImages[coverKey].verdict = img.verdict;
               coverImages[coverKey].bboxDetection = img.bboxDetection;
               coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
-              coverImages[coverKey].imageVersions = img.imageVersions;
+              // Only overwrite imageVersions if pipeline produced new ones (cover was regenerated)
+              // Otherwise keep existing versions from prior iterations
+              if (img.wasRegenerated || !coverImages[coverKey].imageVersions?.length) {
+                coverImages[coverKey].imageVersions = img.imageVersions;
+              }
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
               log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
