@@ -199,11 +199,18 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             if (activeVersion?.imageData) imageData = activeVersion.imageData;
           }
           if (imageData) {
+            // Get bbox from active version or cover root
+            let coverBbox = cover.bboxDetection || null;
+            if (cover.imageVersions?.length > 0) {
+              const activeVersion = cover.imageVersions.find(v => v.isActive);
+              if (activeVersion?.bboxDetection) coverBbox = activeVersion.bboxDetection;
+            }
             coverEntries.push({
               pageNumber: COVER_PAGE_MAP[coverType],
               imageData,
               description: cover.description || cover.translatedDescription || '',
               text: '',
+              bboxDetection: coverBbox,
               _coverType: coverType,
             });
           }
@@ -575,6 +582,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (sceneDesc?.description) {
         const pageChars = getCharactersInScene(sceneDesc.description, storyCharacters);
         pageCharNames = pageChars.map(c => c.name);
+      } else if (pageNumber < 0) {
+        // Covers: no scene description — expect all story characters
+        pageCharNames = storyCharacters.map(c => c.name);
+        log.debug(`[ENTITY-COLLECT] Page ${pageNumber} (cover): Using all ${pageCharNames.length} characters for fallback detection`);
       }
 
       if (pageCharNames.length > 0) {
