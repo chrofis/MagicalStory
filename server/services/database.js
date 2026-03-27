@@ -593,6 +593,7 @@ async function saveStoryData(storyId, storyData) {
         }
       }
       delete img.originalImage;
+      delete img.preEntityRepairImage;
     }
   }
 
@@ -789,6 +790,7 @@ async function updateStoryDataOnly(storyId, storyData) {
         }
       }
       delete img.originalImage;
+      delete img.preEntityRepairImage;
     }
   }
 
@@ -894,6 +896,7 @@ async function upsertStory(storyId, userId, storyData) {
         }
       }
       delete img.originalImage;
+      delete img.preEntityRepairImage;
     }
   }
 

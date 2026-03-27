@@ -2724,8 +2724,8 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
           createdAt: storyData.createdAt || new Date().toISOString(),
           isActive: false,
           type: 'original',
-          qualityScore: previousScore,
-          qualityReasoning: previousReasoning,
+          qualityScore: previousScore ?? null,
+          qualityReasoning: previousReasoning || null,
           fixTargets: scene.fixTargets || [],
           fixableIssues: scene.fixableIssues || [],
           totalAttempts: scene.totalAttempts || null,
@@ -2746,14 +2746,14 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
         imageData: editResult.imageData,
         description: scene.description,
         prompt: scene.prompt,
-        modelId: scene.modelId,
+        modelId: editResult.modelId || scene.modelId,
         createdAt: timestamp,
         generatedAt: timestamp,
         isActive: true,
         type: 'edit',
-        qualityScore,
-        qualityReasoning,
-        editPrompt,
+        qualityScore: qualityScore ?? null,
+        qualityReasoning: qualityReasoning || null,
+        lastEditPrompt: editPrompt,
       });
 
       // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
@@ -4687,6 +4687,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             prompt: existingImage.prompt,
             modelId: repairModelId,
             createdAt: new Date().toISOString(),
+            generatedAt: new Date().toISOString(),
             isActive: true,
             type: 'entity-repair',
             qualityScore: null,
@@ -4823,6 +4824,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
             imageData: repairResult.imageData,
             description: scene.description,
             createdAt: new Date().toISOString(),
+            generatedAt: new Date().toISOString(),
             isActive: true,
             type: 'repair',
             qualityScore: repairResult.score,
@@ -4910,22 +4912,22 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     const coverImages = storyData.coverImages || {};
     const coverKey = normalizedCoverType === 'front' ? 'frontCover' :
                      normalizedCoverType === 'back' ? 'backCover' : 'initialPage';
-    const currentCover = coverImages[coverKey];
+    const existingCover = coverImages[coverKey];
 
-    if (!currentCover) {
+    if (!existingCover) {
       return res.status(404).json({ error: 'No cover image found' });
     }
 
     // Get the image data (handle both string and object formats)
-    const currentImageData = typeof currentCover === 'string' ? currentCover : currentCover.imageData;
+    const currentImageData = typeof existingCover === 'string' ? existingCover : existingCover.imageData;
     if (!currentImageData) {
       return res.status(404).json({ error: 'No cover image data found' });
     }
 
     // Capture previous image info before editing
     const previousImageData = currentImageData;
-    const previousScore = typeof currentCover === 'object' ? currentCover.qualityScore || null : null;
-    const previousReasoning = typeof currentCover === 'object' ? currentCover.qualityReasoning || null : null;
+    const previousScore = typeof existingCover === 'object' ? existingCover.qualityScore || null : null;
+    const previousReasoning = typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null;
     log.debug(`📸 [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
@@ -4957,73 +4959,49 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       log.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
     }
 
-    // Update the cover in-place (preserve existing fields, add edit metadata)
-    const cover = typeof currentCover === 'object' ? currentCover : { imageData: currentCover };
-    cover.qualityScore = qualityScore;
-    cover.qualityReasoning = qualityReasoning;
-    cover.wasEdited = true;
-    cover.lastEditPrompt = editPrompt;
-    cover.originalImage = cover.originalImage || previousImageData;
-    cover.originalScore = cover.originalScore || previousScore;
-    cover.originalReasoning = cover.originalReasoning || previousReasoning;
-    cover.editedAt = new Date().toISOString();
-
     // --- Version management (same pattern as cover iterate endpoint) ---
     // Lazy-migrate imageVersions if missing
-    if (!cover.imageVersions) {
-      cover.imageVersions = [];
-      if (cover.originalImage) {
-        cover.imageVersions.push({
-          imageData: cover.originalImage,
-          qualityScore: cover.originalScore,
-          description: cover.description,
+    if (!existingCover.imageVersions) {
+      existingCover.imageVersions = [];
+      if (existingCover.imageData) {
+        existingCover.imageVersions.push({
+          imageData: existingCover.imageData,
+          qualityScore: existingCover.qualityScore,
+          description: existingCover.description,
           createdAt: storyData.createdAt || new Date().toISOString(),
           type: 'original',
           isActive: false,
-          _alreadySaved: true  // Already at DB v0, don't re-save
+          _alreadySaved: true
         });
       }
-      const existingImageData = currentImageData;
-      if (existingImageData && (!cover.originalImage || existingImageData !== cover.originalImage)) {
-        cover.imageVersions.push({
-          imageData: existingImageData,
-          qualityScore: previousScore,
-          description: cover.description,
-          prompt: cover.prompt,
-          modelId: cover.modelId,
-          createdAt: cover.regeneratedAt || cover.generatedAt || new Date().toISOString(),
-          type: cover.wasRegenerated ? 'regeneration' : 'original',
-          isActive: false,
-          _alreadySaved: true  // Already in DB, don't re-save
-        });
-      } else if (existingImageData && cover.imageVersions.length > 0) {
-        cover.imageVersions[0].isActive = false;
-      }
-      log.debug(`✏️ [COVER EDIT] Migrated legacy cover format to imageVersions[] (${cover.imageVersions.length} versions)`);
+      log.debug(`✏️ [COVER EDIT] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
     }
 
     // Mark all existing versions as inactive
-    cover.imageVersions.forEach(v => v.isActive = false);
+    existingCover.imageVersions.forEach(v => v.isActive = false);
 
-    // Create new version entry
+    // Create new edit version entry
     const timestamp = new Date().toISOString();
-    const newVersion = {
+    existingCover.imageVersions.push({
       imageData: editResult.imageData,
-      description: cover.description,
-      prompt: cover.prompt,
-      modelId: cover.modelId,
+      description: existingCover.description,
       createdAt: timestamp,
       generatedAt: timestamp,
       isActive: true,
       type: 'edit',
-      qualityScore,
-      qualityReasoning,
-      editPrompt,
-    };
-    cover.imageVersions.push(newVersion);
+      qualityScore: qualityScore ?? null,
+      qualityReasoning: qualityReasoning || null,
+      lastEditPrompt: editPrompt,
+      _alreadySaved: true  // Will be saved explicitly below
+    });
 
-    // Delete rehydrated imageData to prevent duplicate storage
-    delete cover.imageData;
+    // Update metadata on the cover object (in-place, no replacement)
+    existingCover.wasEdited = true;
+    existingCover.lastEditPrompt = editPrompt;
+    existingCover.qualityScore = qualityScore;
+    existingCover.qualityReasoning = qualityReasoning;
+    existingCover.editedAt = new Date().toISOString();
+    delete existingCover.imageData;
 
     // Query database for actual max version_index to avoid overwriting existing versions
     const maxVersionResult = await dbQuery(
@@ -5032,24 +5010,15 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
        WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
       [id, coverKey]
     );
-    const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
-    const newVersionIndex = currentMaxVersion + 1;
+    const newVersionIndex = (maxVersionResult[0]?.max_version ?? -1) + 1;
 
-    // Save the new cover image directly at the correct version_index
+    // Save the new cover image at the correct version_index
     await saveStoryImage(id, coverKey, null, editResult.imageData, {
       qualityScore,
       generatedAt: timestamp,
       versionIndex: newVersionIndex
     });
-    // Mark as already saved so saveStoryData doesn't re-save it
-    newVersion._alreadySaved = true;
-
-    // Update cover in storyData
-    coverImages[coverKey] = cover;
-    storyData.coverImages = coverImages;
     await saveStoryData(id, storyData);
-
-    // Update active version in metadata
     await setActiveVersion(id, coverKey, newVersionIndex);
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);

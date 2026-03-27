@@ -4979,12 +4979,10 @@ export default function StoryWizard() {
                   log.info('Selecting image version:', { pageNumber, versionIndex });
                   const result = await storyService.setActiveImage(storyId, pageNumber, versionIndex);
                   // Update local state with the active version's image data
-                  // versionIndex is now a DB version_index (sent by modal via version.versionIndex)
-                  // Find the matching version by its versionIndex field, or fall back to array index
+                  // Use array index directly — version objects don't have a reliable versionIndex property
                   setSceneImages(prev => prev.map(img => {
                     if (img.pageNumber === pageNumber && img.imageVersions) {
-                      const activeVersion = img.imageVersions.find(v => v.versionIndex === versionIndex)
-                        ?? img.imageVersions[versionIndex];
+                      const activeVersion = img.imageVersions[versionIndex];
                       if (!activeVersion?.imageData) {
                         log.error(`Version ${versionIndex} has no imageData for page ${pageNumber}`);
                         return img;
@@ -5003,9 +5001,9 @@ export default function StoryWizard() {
                         // Swap bbox data from the selected version (null if version has no bbox yet)
                         bboxDetection: activeVersion.bboxDetection ?? null,
                         bboxOverlayImage: null, // Always regenerate overlay on-demand
-                        imageVersions: img.imageVersions.map(v => ({
+                        imageVersions: img.imageVersions.map((v, i) => ({
                           ...v,
-                          isActive: v.versionIndex === versionIndex
+                          isActive: i === versionIndex
                         }))
                       };
                     }
@@ -5028,9 +5026,8 @@ export default function StoryWizard() {
                     if (!cover) return prev;
                     const coverObj = cover;
                     if (!coverObj.imageVersions) return prev;
-                    // Find version by DB versionIndex field (matching scene handler pattern)
-                    const activeVersion = coverObj.imageVersions.find(v => v.versionIndex === versionIndex)
-                      ?? coverObj.imageVersions[versionIndex];
+                    // Use array index directly — version objects don't have a reliable versionIndex property
+                    const activeVersion = coverObj.imageVersions[versionIndex];
                     if (!activeVersion?.imageData) {
                       log.error(`Version ${versionIndex} has no imageData for ${coverType}`);
                       return prev;
@@ -5040,9 +5037,9 @@ export default function StoryWizard() {
                       [coverType]: {
                         ...coverObj,
                         imageData: activeVersion.imageData,
-                        imageVersions: coverObj.imageVersions.map(v => ({
+                        imageVersions: coverObj.imageVersions.map((v, i) => ({
                           ...v,
-                          isActive: v.versionIndex === versionIndex
+                          isActive: i === versionIndex
                         }))
                       }
                     };
