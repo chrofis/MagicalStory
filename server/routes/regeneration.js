@@ -3950,7 +3950,8 @@ Respond with ONLY the JSON, no explanation.`;
       position: fig.position,
       faceBox: normalizeBox(fig.face_box),
       bodyBox: normalizeBox(fig.body_box),
-      confidence: fig.confidence || 'medium'
+      confidence: fig.confidence || 'medium',
+      _source: 'refined'
     }));
 
     // Merge: refined main characters + unchanged crowd figures + unchanged objects
