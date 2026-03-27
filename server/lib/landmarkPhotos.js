@@ -2284,12 +2284,43 @@ async function getIndexedLandmarks(city, limit = 30) {
   try {
     // Normalize diacritics on both sides (e.g. "Zurich" matches "Zürich")
     const normalizedCity = normalizeForCompare(city);
-    const result = await pool.query(`
+
+    // Try exact match first
+    let result = await pool.query(`
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
       ORDER BY score DESC, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
+
+    // Fallback: comma-normalized exact match (e.g. "Bremgarten Aargau" matches "Bremgarten, Aargau")
+    if (result.rows.length === 0) {
+      const inputNorm = normalizedCity.replace(/,/g, '').replace(/\s+/g, ' ').trim();
+      result = await pool.query(`
+        SELECT * FROM landmark_index
+        WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
+        ORDER BY score DESC, name ASC
+        LIMIT $2
+      `, [inputNorm, limit]);
+      if (result.rows.length > 0) {
+        log.info(`[LANDMARK-INDEX] Comma-normalized match: "${city}" matched ${result.rows.length} landmarks`);
+      }
+    }
+
+    // Last fallback: try just the first word (core city name, e.g. "Bremgarten" from "Bremgarten Aargau")
+    if (result.rows.length === 0 && normalizedCity.includes(' ')) {
+      const firstWord = normalizedCity.split(/[\s,]+/)[0];
+      result = await pool.query(`
+        SELECT * FROM landmark_index
+        WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
+           OR LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%'
+        ORDER BY score DESC, name ASC
+        LIMIT $2
+      `, [firstWord, limit]);
+      if (result.rows.length > 0) {
+        log.info(`[LANDMARK-INDEX] First-word match: "${firstWord}" from "${city}" matched ${result.rows.length} landmarks`);
+      }
+    }
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks for city "${city}"`);
     return result.rows;

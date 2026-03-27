@@ -4306,8 +4306,28 @@ export default function StoryWizard() {
                       if (coverKey) {
                         setCoverImages(prev => {
                           if (!prev) return prev;
-                          const existing = prev[coverKey];
-                          return { ...prev, [coverKey]: { ...existing, imageData } };
+                          const existing = prev[coverKey] as any;
+                          const existingVersions = existing?.imageVersions && existing.imageVersions.length > 0
+                            ? existing.imageVersions
+                            : existing?.imageData
+                              ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                              : [];
+                          const updatedVersions = [
+                            ...existingVersions,
+                            {
+                              imageData,
+                              versionIndex,
+                              createdAt: new Date().toISOString(),
+                              isActive: true,
+                              type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
+                              description: metadata?.description,
+                              prompt: metadata?.prompt,
+                              qualityScore: metadata?.qualityScore,
+                              qualityReasoning: metadata?.qualityReasoning,
+                              modelId: metadata?.modelId,
+                            }
+                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                          return { ...prev, [coverKey]: { ...existing, imageData, imageVersions: updatedVersions } };
                         });
                       }
                     } else {
