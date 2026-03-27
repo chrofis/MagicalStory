@@ -16,7 +16,7 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 
 // Services
 const { log } = require('../utils/logger');
@@ -41,6 +41,7 @@ const {
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
+  extractJsonFromText,
   stripSceneMetadata,
   extractCoverScenes,
   ART_STYLES
@@ -63,6 +64,8 @@ const {
   repairCharacterMismatch,
   detectAllBoundingBoxes,
   createBboxOverlayImage,
+  callGrokVisionAPI,
+  GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
   compareImageStyles,
   compressImageToJPEG
@@ -1893,12 +1896,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     let imageResult;
     if (iterativePlacement) {
       const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+      const { resolveArtStyle: resolveIterStyle } = require('../lib/storyHelpers');
+      const iterArtStyleDesc = resolveIterStyle(storyData.artStyle || 'pixar', iterBackend) || resolveIterStyle('pixar') || '';
       imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
         imageModelOverride,
         imageBackendOverride: iterBackend,
         landmarkPhotos: pageLandmarkPhotos,
         visualBibleGrid,
         pageNumber,
+        artStyle: iterArtStyleDesc,
       });
     } else {
       imageResult = await generateImageWithQualityRetry(
@@ -2173,10 +2179,12 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       ? JSON.parse(story.data)
       : story.data;
 
-    // Get art style (with per-backend variant if available)
+    // Get art style (with per-backend variant for cover model)
     const artStyleId = storyData.artStyle || 'pixar';
     const { resolveArtStyle: resolveStyle } = require('../lib/storyHelpers');
-    const styleDescription = resolveStyle(artStyleId) || resolveStyle('pixar');
+    const coverModelId = MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
+    const coverBackend = IMAGE_MODELS[coverModelId]?.backend || null;
+    const styleDescription = resolveStyle(artStyleId, coverBackend) || resolveStyle('pixar');
 
     // Build character info with main character emphasis
     let characterInfo = '';
@@ -3705,6 +3713,191 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     log.error('❌ [REFRESH-BBOX] Failed:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
     res.status(500).json({ error: isAdmin ? 'Bbox detection failed: ' + err.message : 'Bbox detection failed' });
+  }
+});
+
+// Iterate bbox: send overlay image + current detections back to vision model for refinement
+router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+    if (req.user.role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+
+    const { bboxModel, currentDetection, overlayImage } = req.body;
+    if (!currentDetection || !overlayImage) {
+      return res.status(400).json({ error: 'currentDetection and overlayImage are required' });
+    }
+
+    const modelId = bboxModel || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
+    log.info(`🔄 [ITERATE-BBOX] Page ${pageNumber}: Refining bbox with ${modelId}`);
+
+    // Build a prompt that shows the current detections and asks for refinement
+    const figuresSummary = (currentDetection.figures || []).map((f, i) => {
+      const fb = f.faceBox ? `face:[${f.faceBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no face';
+      const bb = f.bodyBox ? `body:[${f.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no body';
+      return `  ${i + 1}. "${f.name || f.label}" (${f.confidence}) — ${fb}, ${bb}`;
+    }).join('\n');
+
+    const objectsSummary = (currentDetection.objects || []).map((o, i) => {
+      const bb = o.bodyBox ? `box:[${o.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no box';
+      return `  ${i + 1}. "${o.name || o.label}" — ${bb}`;
+    }).join('\n');
+
+    const iteratePrompt = `The attached image shows bounding boxes drawn on an illustration. The colored rectangles represent detected figures and objects.
+
+CURRENT DETECTIONS (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):
+Figures:
+${figuresSummary || '  (none)'}
+Objects:
+${objectsSummary || '  (none)'}
+
+Your task: Look at the image carefully and REFINE these bounding boxes. The boxes may be:
+- Offset (shifted left/right/up/down from the actual element)
+- Too large or too small
+- Missing a face or body region
+
+Return the CORRECTED detections in the same JSON format. Keep the same names and structure, just adjust the coordinates to better fit the actual elements in the illustration.
+
+Output JSON format:
+{
+  "figures": [
+    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
+  ],
+  "objects": [
+    {"name": "ObjName", "label": "description", "position": "left", "found": true, "body_box": [ymin, xmin, ymax, xmax]}
+  ]
+}
+
+Coordinates use 0-1000 scale where [0,0] is top-left and [1000,1000] is bottom-right.
+Respond with ONLY the JSON, no explanation.`;
+
+    // Send overlay image + prompt to vision model
+    const overlayBase64 = overlayImage.replace(/^data:image\/\w+;base64,/, '');
+    const overlayMime = overlayImage.match(/^data:(image\/\w+);base64,/) ?
+      overlayImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const parts = [
+      { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
+      { text: iteratePrompt }
+    ];
+
+    const modelConfig = TEXT_MODELS[modelId];
+    let data;
+
+    if (modelConfig?.provider === 'xai') {
+      const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, iteratePrompt);
+      data = await grokResponse.json();
+    } else {
+      const apiKey = process.env.GEMINI_API_KEY;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+          safetySettings: GEMINI_SAFETY_SETTINGS
+        })
+      });
+      if (!response.ok) {
+        const error = await response.text();
+        return res.status(500).json({ error: `Model error: ${error.substring(0, 200)}` });
+      }
+      data = await response.json();
+    }
+
+    const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!responseText) {
+      return res.status(500).json({ error: 'Model returned no response' });
+    }
+
+    // Parse refined detections
+    let refined;
+    try {
+      refined = extractJsonFromText(responseText);
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to parse model response', raw: responseText.substring(0, 500) });
+    }
+
+    // Normalize coordinates from 0-1000 to 0-1
+    const normalizeBox = (box) => {
+      if (!box || !Array.isArray(box) || box.length !== 4) return null;
+      const [ymin, xmin, ymax, xmax] = box;
+      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
+      return [
+        Math.max(0, Math.min(1, ymin / scale)),
+        Math.max(0, Math.min(1, xmin / scale)),
+        Math.max(0, Math.min(1, ymax / scale)),
+        Math.max(0, Math.min(1, xmax / scale))
+      ];
+    };
+
+    const figures = (refined.figures || []).map(fig => ({
+      name: fig.name || 'UNKNOWN',
+      label: fig.label,
+      position: fig.position,
+      faceBox: normalizeBox(fig.face_box),
+      bodyBox: normalizeBox(fig.body_box),
+      confidence: fig.confidence || 'medium'
+    }));
+
+    const objects = (refined.objects || []).map(obj => ({
+      name: obj.name,
+      found: obj.found !== false,
+      label: obj.label,
+      position: obj.position,
+      bodyBox: normalizeBox(obj.body_box)
+    }));
+
+    const refinedDetection = { figures, objects, iterated: true };
+
+    // Load story to get the original image for overlay
+    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    const isCover = pageNumber < 0;
+    let scene, imageData;
+    if (isCover) {
+      const coverMap = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+      scene = storyData.coverImages?.[coverMap[String(pageNumber)]];
+      imageData = scene?.imageData;
+    } else {
+      scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      imageData = scene?.imageData;
+    }
+
+    // Create new overlay with refined boxes
+    let newOverlay = null;
+    if (imageData) {
+      newOverlay = await createBboxOverlayImage(imageData, refinedDetection);
+    }
+
+    // Save refined detection to scene
+    if (scene) {
+      scene.bboxDetection = refinedDetection;
+      if (scene.imageVersions) {
+        const activeVersion = scene.imageVersions.find(v => v.isActive);
+        if (activeVersion) activeVersion.bboxDetection = refinedDetection;
+      }
+      if (isCover) {
+        saveStoryData(id, storyData).catch(err => log.error('Failed to save iterated bbox:', err.message));
+      } else {
+        saveScenePageData(id, pageNumber, scene).catch(err => {
+          saveStoryData(id, storyData).catch(err2 => log.error('Fallback save failed:', err2.message));
+        });
+      }
+    }
+
+    log.info(`✅ [ITERATE-BBOX] Page ${pageNumber}: Refined to ${figures.length} figures, ${objects.length} objects`);
+    res.json({ bboxDetection: refinedDetection, bboxOverlayImage: newOverlay });
+  } catch (err) {
+    log.error('❌ [ITERATE-BBOX] Failed:', err);
+    res.status(500).json({ error: 'Bbox iteration failed: ' + err.message });
   }
 });
 

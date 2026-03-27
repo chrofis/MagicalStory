@@ -10513,6 +10513,8 @@ module.exports = {
   detectAllBoundingBoxes,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
+  callGrokVisionAPI,  // Grok vision API for bbox/quality eval
+  GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
   detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes
   enrichWithBoundingBoxes,
 

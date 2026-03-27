@@ -103,11 +103,6 @@ export const QUALITY_MODELS = {
     description: 'Grok 4 Fast - Cheapest vision ($0.20/$0.50 per 1M)',
     descriptionDe: 'Grok 4 Fast - Günstigstes Vision ($0.20/$0.50 pro 1M)',
     descriptionFr: 'Grok 4 Fast - Vision la moins chère ($0.20/$0.50 par 1M)'
-  },
-  'grok-3-mini': {
-    description: 'Grok 3 Mini - Fast vision ($0.30/$0.50 per 1M)',
-    descriptionDe: 'Grok 3 Mini - Schnelles Vision ($0.30/$0.50 pro 1M)',
-    descriptionFr: 'Grok 3 Mini - Vision rapide ($0.30/$0.50 par 1M)'
   }
 } as const;
 

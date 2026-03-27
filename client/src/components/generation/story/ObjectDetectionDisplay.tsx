@@ -66,8 +66,7 @@ const BBOX_MODELS = [
   { value: '', label: 'Default' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5' },
   { value: 'gemini-2.0-flash', label: 'Gemini 2.0' },
-  { value: 'grok-4-fast', label: 'Grok 4 Fast' },
-  { value: 'grok-3-mini', label: 'Grok 3 Mini' },
+  { value: 'grok-4-fast', label: 'Grok 4' },
 ];
 
 export function ObjectDetectionDisplay({
@@ -84,6 +83,7 @@ export function ObjectDetectionDisplay({
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isIterating, setIsIterating] = useState(false);
   const [bboxModel, setBboxModel] = useState('');
 
   // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
@@ -137,6 +137,59 @@ export function ObjectDetectionDisplay({
       console.error('Failed to refresh bbox detection:', err);
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  // Iterate bbox: send overlay + current detections to model for refinement
+  const iterateBbox = async () => {
+    if (!storyId || isIterating || !bboxDetection) return;
+    let targetPage: number | undefined;
+    if (coverType) {
+      const coverPageMap: Record<string, number> = { front: -1, initial: -2, back: -3 };
+      targetPage = coverPageMap[coverType];
+    } else {
+      targetPage = pageNumber;
+    }
+    if (targetPage === undefined) return;
+
+    // Need the overlay image — use loaded or direct prop
+    const currentOverlay = loadedOverlay || bboxOverlayImage;
+    if (!currentOverlay) {
+      console.warn('No overlay image available for iteration');
+      return;
+    }
+
+    setIsIterating(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/iterate-bbox/${targetPage}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          bboxModel: bboxModel || undefined,
+          currentDetection: bboxDetection,
+          overlayImage: currentOverlay
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.bboxOverlayImage) {
+          setLoadedOverlay(data.bboxOverlayImage);
+        }
+        if (data.bboxDetection && onBboxRefreshed) {
+          onBboxRefreshed(data.bboxDetection);
+        }
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Bbox iteration failed:', err);
+      }
+    } catch (err) {
+      console.error('Failed to iterate bbox:', err);
+    } finally {
+      setIsIterating(false);
     }
   };
 
@@ -270,7 +323,7 @@ export function ObjectDetectionDisplay({
               </select>
               <button
                 onClick={refreshBbox}
-                disabled={isRefreshing}
+                disabled={isRefreshing || isIterating}
                 className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-200 flex items-center gap-1 disabled:opacity-50"
               >
                 {isRefreshing ? (
@@ -279,6 +332,19 @@ export function ObjectDetectionDisplay({
                   <><RefreshCw size={12} /> {language === 'de' ? 'Neu erkennen' : 'Re-detect'}</>
                 )}
               </button>
+              {bboxDetection && (loadedOverlay || bboxOverlayImage) && (
+                <button
+                  onClick={iterateBbox}
+                  disabled={isIterating || isRefreshing}
+                  className="text-xs px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded border border-purple-200 flex items-center gap-1 disabled:opacity-50"
+                >
+                  {isIterating ? (
+                    <><Loader2 size={12} className="animate-spin" /> {language === 'de' ? 'Verfeinern...' : 'Refining...'}</>
+                  ) : (
+                    <><RefreshCw size={12} /> {language === 'de' ? 'Bbox verfeinern' : 'Refine Bbox'}</>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
