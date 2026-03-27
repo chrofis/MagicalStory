@@ -2243,6 +2243,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
       tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage[provider].calls += 1;
+      // Accumulate direct_cost for providers that use it (Grok, Runware)
+      if (usage.direct_cost != null && tokenUsage[provider].direct_cost !== undefined) {
+        tokenUsage[provider].direct_cost += usage.direct_cost;
+      }
     }
     if (functionName && tokenUsage.byFunction[functionName]) {
       tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
@@ -2251,6 +2255,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage.byFunction[functionName].calls += 1;
       tokenUsage.byFunction[functionName].provider = provider;
       if (modelName) tokenUsage.byFunction[functionName].models.add(modelName);
+      // Accumulate direct_cost on byFunction entries that support it
+      if (usage?.direct_cost != null && tokenUsage.byFunction[functionName].direct_cost !== undefined) {
+        tokenUsage.byFunction[functionName].direct_cost += usage.direct_cost;
+      }
     }
   };
 
@@ -3975,6 +3983,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
     const imageCost = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed']
       .reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
+    // Grok/Runware direct costs are already included in imageCost via calculateImageCost — use these for logging only
+    const grokDirectCost = tokenUsage.grok?.direct_cost || 0;
+    const runwareDirectCost = tokenUsage.runware?.direct_cost || 0;
     const totalCost = anthropicCost.total + geminiTextCost.total + imageCost + geminiQualityCost.total;
 
     log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
@@ -3986,6 +3997,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`   Gemini Text:    ${tokenUsage.gemini_text.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString().padStart(8)} out${thinkingTextStr}  $${geminiTextCost.total.toFixed(4)}`);
     log.debug(`   Gemini Image:   ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr}  $${geminiQualityCost.total.toFixed(4)}`);
+    if (grokDirectCost > 0) {
+      log.debug(`   Grok:           ${tokenUsage.grok.calls} images  $${grokDirectCost.toFixed(4)}`);
+    }
+    if (runwareDirectCost > 0) {
+      log.debug(`   Runware:        ${tokenUsage.runware.calls} images  $${runwareDirectCost.toFixed(4)}`);
+    }
 
     // Log by function
     log.debug(`   BY FUNCTION:`);

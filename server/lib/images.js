@@ -7139,6 +7139,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
     const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext);
     bboxDetectionHistory = enrichResult.detectionHistory;
+    // Track bbox detection tokens (Gemini quality-category)
+    if (bboxDetectionHistory?.usage && usageTracker) {
+      usageTracker(null, bboxDetectionHistory.usage, null, 'gemini-2.5-flash');
+    }
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {
       const figCount = bboxDetectionHistory.figures?.length || 0;

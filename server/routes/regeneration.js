@@ -823,6 +823,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null
     });
 
+    // Persist repair cost in background
+    addRepairCost(id, imageCost, `Regenerate page ${pageNumber}`).catch(err => log.error('Failed to save regen cost:', err.message));
+
   } catch (err) {
     log.error('Error regenerating image:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
@@ -1549,6 +1552,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         };
       }));
 
+      // Persist repair cost in background (fire before return so it's not skipped)
+      const coverIterateCost = calculateImageCost(coverImageModelId, imageResult.totalAttempts || 1);
+      addRepairCost(id, coverIterateCost, `Iterate cover ${coverKey}`).catch(err => log.error('Failed to save cover iterate cost:', err.message));
+
       return res.json({
         success: true,
         pageNumber,
@@ -2119,6 +2126,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         : 'No mismatches found, regenerated with fresh analysis'
     });
 
+    // Persist repair cost in background
+    const iterateImageModelId = imageModelOverride || MODEL_DEFAULTS.pageImage;
+    const iterateCost = calculateImageCost(iterateImageModelId, imageResult.totalAttempts || 1);
+    addRepairCost(id, iterateCost, `Iterate page ${pageNumber}`).catch(err => log.error('Failed to save iterate cost:', err.message));
+
   } catch (err) {
     log.error('Error iterating image:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
@@ -2612,6 +2624,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         isActive: v.isActive
       }))
     });
+
+    // Persist repair cost in background
+    addRepairCost(id, coverImageCost, `Regenerate ${normalizedCoverType} cover`).catch(err => log.error('Failed to save cover regen cost:', err.message));
 
   } catch (err) {
     log.error('Error regenerating cover:', err);
@@ -4255,7 +4270,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const results = [];
-    let totalGeminiRepairs = 0, totalMagicApiRepairs = 0;
+    let totalGeminiRepairs = 0, totalMagicApiRepairs = 0, totalGrokRepairs = 0;
     let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
     const artStyle = storyData.artStyle || 'pixar';
 
@@ -4646,11 +4661,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       if (repairResult.method === 'magicapi') {
         totalMagicApiRepairs++;
       } else if (repairResult.method?.startsWith('grok_')) {
-        // Grok repairs (blended, cutout, blackout) are $0.02 each, tracked via usage
+        totalGrokRepairs++;
       } else {
         totalGeminiRepairs++;
       }
-      if (repairResult.usage) {
+      // Track verify tokens (only for non-Grok methods — Grok returns direct_cost, not token counts)
+      if (repairResult.usage && !repairResult.method?.startsWith('grok_')) {
         totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
         totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
       }
@@ -4750,17 +4766,18 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       results.push({ character: characterName, ...charResult });
     }
 
-    // Calculate and persist repair cost (only Gemini repairs have per-image cost)
+    // Calculate and persist repair cost (Gemini + Grok per-image costs + verify tokens)
     const perImageCost = MODEL_PRICING['gemini-2.5-flash-image']?.perImage ?? 0.04;
-    const imageGenCost = totalGeminiRepairs * perImageCost;
+    const grokPerImageCost = MODEL_PRICING['grok-imagine-image']?.perImage ?? 0.02;
+    const imageGenCost = totalGeminiRepairs * perImageCost + totalGrokRepairs * grokPerImageCost;
     const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
     const apiCost = imageGenCost + verifyTokenCost;
-    const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs;
+    const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs + totalGrokRepairs;
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
     res.json({ results, apiCost });
 
     // Save cost in background
-    addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini)`).catch(err => log.error('Failed to save repair cost:', err.message));
+    addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini, ${totalGrokRepairs} Grok)`).catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in character repair:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
