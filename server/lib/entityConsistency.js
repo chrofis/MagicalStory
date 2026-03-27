@@ -26,7 +26,7 @@ const ENTITY_CHECK_MODEL = 'gemini-2.5-flash';  // Text model for evaluation
 const FACE_CROP_SIZE = 256;   // Size for face crops
 const BODY_CROP_SIZE = 512;   // Size for body crops
 const MIN_APPEARANCES = 2;    // Minimum appearances to check consistency
-const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
+const MAX_GRID_CELLS = 9;     // Maximum cells per grid (3x3)
 
 /**
  * Normalize a clothing category string to a canonical form.
@@ -302,13 +302,62 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
           const refAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const gridLabel = `${charName} (${clothingCategory})`;
-          const gridResult = await createEntityGrid(crops, gridLabel, refAvatar);
-          const evalResult = await evaluateEntityConsistency(
-            gridResult.buffer, gridResult.manifest,
-            { entityType: 'character', entityName: charName, clothingCategory, referencePhoto: refAvatar, cellCount: crops.length }
-          );
 
-          return { charName, clothingCategory, groupAppearances, gridResult, evalResult, crops };
+          // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
+          const maxCrops = refAvatar ? MAX_GRID_CELLS - 1 : MAX_GRID_CELLS;
+          const batches = [];
+          for (let i = 0; i < crops.length; i += maxCrops) {
+            batches.push(crops.slice(i, i + maxCrops));
+          }
+          if (batches.length > 1) {
+            log.info(`🔍 [ENTITY-CHECK] ${charName} (${clothingCategory}): ${crops.length} crops → ${batches.length} grids of max ${maxCrops}`);
+          }
+
+          // Create and evaluate each grid
+          const gridResults = [];
+          const allIssues = [];
+          let worstScore = 10;
+          let overallConsistent = true;
+
+          for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+            const batchCrops = batches[batchIdx];
+            const batchLabel = batches.length > 1
+              ? `${gridLabel} (${batchIdx + 1}/${batches.length})`
+              : gridLabel;
+
+            const gridResult = await createEntityGrid(batchCrops, batchLabel, refAvatar);
+            const evalResult = await evaluateEntityConsistency(
+              gridResult.buffer, gridResult.manifest,
+              { entityType: 'character', entityName: charName, clothingCategory,
+                referencePhoto: refAvatar, cellCount: batchCrops.length }
+            );
+
+            gridResults.push({ gridResult, evalResult, batchCrops });
+            if (evalResult.issues) allIssues.push(...evalResult.issues);
+            if (evalResult.score < worstScore) worstScore = evalResult.score;
+            if (!evalResult.consistent) overallConsistent = false;
+          }
+
+          // Return merged result — first grid as primary display, worst score across all
+          return {
+            charName, clothingCategory, groupAppearances, crops,
+            gridResult: gridResults[0].gridResult,
+            evalResult: {
+              ...gridResults[0].evalResult,
+              issues: allIssues,
+              score: worstScore,
+              consistent: overallConsistent,
+              summary: gridResults.map((g, i) =>
+                batches.length > 1 ? `Grid ${i + 1}: ${g.evalResult.summary}` : g.evalResult.summary
+              ).join(' | ')
+            },
+            additionalGrids: gridResults.slice(1).map(g => ({
+              gridImage: `data:image/jpeg;base64,${g.gridResult.buffer.toString('base64')}`,
+              manifest: g.gridResult.manifest,
+              cellCount: g.batchCrops.length,
+              evalResult: g.evalResult
+            }))
+          };
         } catch (err) {
           log.error(`❌ [ENTITY-CHECK] Error checking ${charName} (${clothingCategory}): ${err.message}`);
           return { charName, clothingCategory, error: err.message };
@@ -329,12 +378,22 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
         const { groupAppearances, gridResult, evalResult, crops } = result;
 
-        // Store grid for dev panel
+        // Store grid(s) for dev panel
         report.grids.push({
           entityName: charName, entityType: 'character', clothingCategory,
           gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
           manifest: gridResult.manifest, cellCount: crops.length
         });
+        // Store additional grids (multi-grid for stories with many pages)
+        if (result.additionalGrids) {
+          for (const addGrid of result.additionalGrids) {
+            report.grids.push({
+              entityName: charName, entityType: 'character', clothingCategory,
+              gridImage: addGrid.gridImage,
+              manifest: addGrid.manifest, cellCount: addGrid.cellCount
+            });
+          }
+        }
 
         if (saveGrids && outputDir) {
           await saveEntityGrid(gridResult.buffer, `${charName}_${clothingCategory}`, 'character', outputDir);
@@ -1011,7 +1070,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
     title: `${entityName} - Entity Consistency`,
     cellSize: FACE_CROP_SIZE,
     showPageInfo: true,
-    maxCols: 4,
+    maxCols: 3,
     maxRows: 3
   });
 }
