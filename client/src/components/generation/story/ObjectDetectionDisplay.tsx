@@ -62,6 +62,14 @@ function downloadAsText(content: string, filename: string) {
  * Standalone Object Detection display component
  * Shows detected figures, objects, expected positions, and mismatches
  */
+const BBOX_MODELS = [
+  { value: '', label: 'Default' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0' },
+  { value: 'grok-4-fast', label: 'Grok 4 Fast' },
+  { value: 'grok-3-mini', label: 'Grok 3 Mini' },
+];
+
 export function ObjectDetectionDisplay({
   retryHistory,
   bboxDetection: directBboxDetection,
@@ -76,6 +84,7 @@ export function ObjectDetectionDisplay({
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [bboxModel, setBboxModel] = useState('');
 
   // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
   const bboxKey = directBboxDetection ? JSON.stringify(directBboxDetection.figures?.length) + (directBboxDetection.objects?.length || 0) : null;
@@ -112,7 +121,8 @@ export function ObjectDetectionDisplay({
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
+        },
+        body: JSON.stringify(bboxModel ? { bboxModel } : {})
       });
       if (response.ok) {
         const data = await response.json();
@@ -246,19 +256,30 @@ export function ObjectDetectionDisplay({
         </summary>
 
         <div className="mt-3 space-y-3">
-          {/* Refresh bbox detection button */}
+          {/* Refresh bbox detection button + model selector */}
           {storyId && (pageNumber !== undefined || coverType) && (
-            <button
-              onClick={refreshBbox}
-              disabled={isRefreshing}
-              className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-200 flex items-center gap-1 disabled:opacity-50"
-            >
-              {isRefreshing ? (
-                <><Loader2 size={12} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
-              ) : (
-                <><RefreshCw size={12} /> {language === 'de' ? 'Neu erkennen' : 'Re-detect'}</>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={bboxModel}
+                onChange={(e) => setBboxModel(e.target.value)}
+                className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white"
+              >
+                {BBOX_MODELS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={refreshBbox}
+                disabled={isRefreshing}
+                className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-200 flex items-center gap-1 disabled:opacity-50"
+              >
+                {isRefreshing ? (
+                  <><Loader2 size={12} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
+                ) : (
+                  <><RefreshCw size={12} /> {language === 'de' ? 'Neu erkennen' : 'Re-detect'}</>
+                )}
+              </button>
+            </div>
           )}
 
           {/* Bbox Overlay Image */}

@@ -1909,17 +1909,18 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null) {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
-  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}...`);
+  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
 
   // Call bbox detection WITH character/object context - AI identifies directly by name
   const allDetections = await detectAllBoundingBoxes(imageData, {
     expectedCharacters,
     expectedObjects,
-    sceneContext
+    sceneContext,
+    bboxModelOverride
   });
 
   if (!allDetections) {
@@ -6008,6 +6009,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     return {
       imageData: finalImageData,
+      blackoutImage: `data:image/jpeg;base64,${blackoutBuffer.toString('base64')}`,
       character: charName,
       usage: grokResult.usage,
       method,

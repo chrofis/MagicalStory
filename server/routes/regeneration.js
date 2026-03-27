@@ -1524,16 +1524,26 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
       log.info(`✅ [ITERATE] Cover ${coverKey}: Iteration complete (score: ${imageResult.score})`);
 
-      // Build image versions for response (without heavy imageData except latest)
-      const imageVersions = existingCover.imageVersions.map((v, idx) => ({
-        description: v.description,
-        prompt: v.prompt,
-        modelId: v.modelId,
-        createdAt: v.createdAt,
-        isActive: v.isActive,
-        type: v.type,
-        qualityScore: v.qualityScore,
-        imageData: idx >= (existingCover.imageVersions.length - 2) ? v.imageData : undefined
+      // Build image versions for response — load all from DB so version picker shows images
+      const imageVersions = await Promise.all(existingCover.imageVersions.map(async (v, idx) => {
+        let imgData = v.imageData || undefined;
+        if (!imgData) {
+          try {
+            const dbImg = await getStoryImage(id, coverKey, null, arrayToDbIndex(idx, coverKey));
+            imgData = dbImg?.imageData || undefined;
+          } catch { /* ignore */ }
+        }
+        return {
+          versionIndex: idx,
+          description: v.description,
+          prompt: v.prompt,
+          modelId: v.modelId,
+          createdAt: v.createdAt,
+          isActive: v.isActive,
+          type: v.type,
+          qualityScore: v.qualityScore,
+          imageData: imgData,
+        };
       }));
 
       return res.json({
@@ -3647,10 +3657,12 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const expectedClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
 
-    // Run enriched bbox detection
+    // Run enriched bbox detection (optional model override from request body)
+    const bboxModelOverride = req.body.bboxModel || null;
     const enrichResult = await enrichWithBoundingBoxes(
       imageData, [], [], [],
-      expectedPositions, expectedObjects, characterDescriptions, expectedClothing
+      expectedPositions, expectedObjects, characterDescriptions, expectedClothing,
+      null, bboxModelOverride
     );
 
     const bboxDetection = enrichResult.detectionHistory || null;
@@ -4255,6 +4267,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 before: sceneImage.imageData,
                 after: grokResult.imageData,
                 reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
+                blackoutImage: grokResult.blackoutImage || null,
               },
             };
           } else {
