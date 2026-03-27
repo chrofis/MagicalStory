@@ -470,7 +470,8 @@ export interface EntityConsistencyIssue {
 
 // Entity check result per clothing category
 export interface EntityClothingResult {
-  gridImage?: string;  // Base64 data URI of the grid
+  gridImage?: string;  // Base64 data URI of the primary grid
+  gridImages?: string[];  // All grid images (multi-grid for stories with many pages)
   consistent: boolean;
   score: number;
   issues: EntityConsistencyIssue[];

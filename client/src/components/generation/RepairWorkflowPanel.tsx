@@ -1048,17 +1048,17 @@ export function RepairWorkflowPanel({
                                   {clothingResult.score}/10
                                 </span>
                               </div>
-                              {clothingResult.gridImage && (
-                                <div className="mt-2 mb-2">
+                              {(clothingResult.gridImages || (clothingResult.gridImage ? [clothingResult.gridImage] : [])).map((img: string, gridIdx: number) => (
+                                <div key={gridIdx} className="mt-2 mb-2">
                                   <img
-                                    src={clothingResult.gridImage}
-                                    alt={`${charName} - ${clothing} consistency grid`}
+                                    src={img}
+                                    alt={`${charName} - ${clothing} consistency grid${(clothingResult.gridImages?.length || 0) > 1 ? ` ${gridIdx + 1}` : ''}`}
                                     className="w-full max-h-48 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                                    onClick={() => setGridLightbox(clothingResult.gridImage!)}
+                                    onClick={() => setGridLightbox(img)}
                                     title="Click to enlarge"
                                   />
                                 </div>
-                              )}
+                              ))}
                               {clothingResult.issues && clothingResult.issues.length > 0 && (
                                 <ul className="mt-1 space-y-1">
                                   {clothingResult.issues.map((issue, i) => (

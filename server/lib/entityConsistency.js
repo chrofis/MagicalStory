@@ -408,9 +408,16 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           await saveEntityGrid(gridResult.buffer, `${charName}_${clothingCategory}`, 'character', outputDir);
         }
 
-        // Store per-clothing result
+        // Store per-clothing result — include all grid images for display
+        const allGridImages = [`data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`];
+        if (result.additionalGrids) {
+          for (const addGrid of result.additionalGrids) {
+            allGridImages.push(addGrid.gridImage);
+          }
+        }
         report.characters[charName].byClothing[clothingCategory] = {
-          gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+          gridImage: allGridImages[0],
+          gridImages: allGridImages.length > 1 ? allGridImages : undefined,  // Only set if multi-grid
           consistent: evalResult.consistent,
           score: evalResult.score,
           issues: evalResult.issues || [],
