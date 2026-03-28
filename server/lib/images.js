@@ -1364,6 +1364,23 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         if (!response.ok) {
           const error = await response.text();
           log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
+          // Try Grok fallback on API error
+          const grokModel = TEXT_MODELS['grok-4-fast'];
+          if (grokModel?.provider === 'xai') {
+            log.info('🔄 [BBOX-DETECT] Gemini API error, falling back to Grok vision...');
+            try {
+              const grokResp = await callGrokVisionAPI('grok-4-fast', grokModel.modelId || 'grok-4-fast', parts, prompt);
+              data = await grokResp.json();
+              if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                inputTokens = data.usage?.prompt_tokens || 0;
+                outputTokens = data.usage?.completion_tokens || 0;
+                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded after API error`);
+                break;
+              }
+            } catch (grokErr) {
+              log.warn(`⚠️  [BBOX-DETECT] Grok fallback also failed: ${grokErr.message}`);
+            }
+          }
           return null;
         }
 
@@ -1386,6 +1403,24 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           log.warn(`⚠️  [BBOX-DETECT] Empty response (0 output tokens), retrying in 2s...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
+          // Gemini failed — try Grok vision as fallback
+          const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
+          if (grokFallbackModel?.provider === 'xai') {
+            log.info('🔄 [BBOX-DETECT] Gemini failed, falling back to Grok vision...');
+            try {
+              const grokResponse = await callGrokVisionAPI('grok-4-fast', grokFallbackModel.modelId || 'grok-4-fast', parts, prompt);
+              data = await grokResponse.json();
+              if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
+                outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
+                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded (${outputTokens} output tokens)`);
+                break; // Got content from Grok
+              }
+              log.warn('⚠️  [BBOX-DETECT] Grok fallback also returned no text');
+            } catch (grokErr) {
+              log.warn(`⚠️  [BBOX-DETECT] Grok fallback failed: ${grokErr.message}`);
+            }
+          }
           log.warn('🔄 [FALLBACK] No response for bbox detection after retry');
           return null;
         }
