@@ -5937,6 +5937,7 @@ Output a single corrected image.`;
         log.info(`✅ [CHAR REPAIR] Character replacement for ${charName} completed successfully`);
         return {
           imageData: repairedImageData,
+          comparison: { before: imageData, after: repairedImageData },
           character: charName,
           usage: { inputTokens, outputTokens, thinkingTokens, model: modelId },
           thinkingText,
@@ -6212,8 +6213,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Blended repair for ${charName} completed. Blend region: ${blendWidth}x${blendHeight}. Cost: $${grokResult.usage?.cost || 0.02}`);
 
+    const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
     return {
       imageData: finalImageData,
+      comparison: { before: originalSceneDataUri, after: finalImageData },
       blackoutImage: `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`,
       grokRawResult: grokResult.imageData,
       blendMask: `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}`,
@@ -6280,10 +6283,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
+    const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
 
     return {
       imageData: finalImageData,
+      comparison: { before: originalSceneDataUri, after: finalImageData },
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
@@ -6307,6 +6312,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     return {
       imageData: grokResult.imageData,
+      comparison: { before: imageData, after: grokResult.imageData },
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
