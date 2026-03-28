@@ -17,7 +17,7 @@ interface AuthContextType extends AuthState {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   updateCredits: (credits: number) => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   refreshToken: () => Promise<boolean>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonating: () => Promise<void>;
@@ -631,16 +631,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<User | null> => {
     const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    if (!token) return;
+    if (!token) return null;
 
     try {
       const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) return;
+      if (!response.ok) return null;
 
       const data = await response.json();
       const user: User = {
@@ -659,8 +659,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...prev,
         user,
       }));
+      return user;
     } catch (error) {
       logger.error('Failed to refresh user:', error);
+      return null;
     }
   }, []);
 

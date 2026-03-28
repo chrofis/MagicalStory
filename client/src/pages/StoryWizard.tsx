@@ -3589,18 +3589,9 @@ export default function StoryWizard() {
     if (!overrides?.skipEmailCheck && !isImpersonating && user && user.emailVerified !== true) {
       // Refresh user state from server to avoid showing modal when email is already verified
       // (React state may be stale from login cache)
-      await refreshUser();
+      const freshUser = await refreshUser();
 
-      // Check localStorage for the latest value since React state won't update synchronously
-      const cachedUser = localStorage.getItem('currentUser');
-      let latestEmailVerified: boolean | undefined = user.emailVerified;
-      if (cachedUser) {
-        try {
-          latestEmailVerified = JSON.parse(cachedUser).emailVerified;
-        } catch { /* use existing value */ }
-      }
-
-      if (latestEmailVerified === true) {
+      if (freshUser?.emailVerified === true) {
         console.log('[generateStory] Email verified (confirmed after refresh), proceeding');
         // Fall through to generation
       } else {
