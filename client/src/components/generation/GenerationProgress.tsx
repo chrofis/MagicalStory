@@ -619,6 +619,30 @@ export function GenerationProgress({
           />
         </div>
 
+        {/* Cancel button - admin only, shown from the start */}
+        {isAdmin && jobId && onCancel && (
+          <button
+            onClick={async () => {
+              if (isCancelling) return;
+              setIsCancelling(true);
+              try {
+                onCancel();
+              } finally {
+                setIsCancelling(false);
+              }
+            }}
+            disabled={isCancelling}
+            className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm"
+          >
+            {isCancelling ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <XCircle size={16} />
+            )}
+            {isCancelling ? t.cancelling : t.cancelJob}
+          </button>
+        )}
+
         {/* Continue in background button */}
         {onMinimize && (
           <button
@@ -646,7 +670,7 @@ export function GenerationProgress({
                       {t.continueWaiting}
                     </button>
                   )}
-                  {onCancel && (
+                  {isAdmin && onCancel && (
                     <button
                       onClick={() => {
                         if (isCancelling) return;
@@ -669,29 +693,6 @@ export function GenerationProgress({
           </div>
         )}
 
-        {/* Cancel button - admin only */}
-        {isAdmin && jobId && onCancel && (
-          <button
-            onClick={async () => {
-              if (isCancelling) return;
-              setIsCancelling(true);
-              try {
-                onCancel();
-              } finally {
-                setIsCancelling(false);
-              }
-            }}
-            disabled={isCancelling}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            {isCancelling ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <XCircle size={16} />
-            )}
-            {isCancelling ? t.cancelling : t.cancelJob}
-          </button>
-        )}
       </div>
     </div>
   );
