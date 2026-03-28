@@ -335,7 +335,7 @@ export default function StoryWizard() {
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
   const [regeneratingCovers, setRegeneratingCovers] = useState<Set<string>>(new Set()); // Track which covers are regenerating
-  const [isEditing, setIsEditing] = useState(false); // Track if edit modal is processing
+  const [editingPages, setEditingPages] = useState<Set<number>>(new Set()); // Track which pages are being edited
   const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
   const [showMinimizeDialog, setShowMinimizeDialog] = useState(false); // Show dialog when user clicks minimize
   const [showSingleCharacterDialog, setShowSingleCharacterDialog] = useState(false); // Show dialog when only 1 character
@@ -4446,6 +4446,7 @@ export default function StoryWizard() {
               completedPageImages={completedPageImages}
               coverImages={coverImages}
               regeneratingCovers={regeneratingCovers}
+              editingPages={editingPages}
               languageLevel={languageLevel}
               storyLanguage={storyLanguage}
               isGenerating={isGenerating}
@@ -5647,21 +5648,7 @@ export default function StoryWizard() {
       )}
 
       {/* Edit Processing Overlay - Shows when editing via prompt modal */}
-      {isEditing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
-            <div className="relative inline-block mb-4">
-              <Loader2 size={40} className="animate-spin text-indigo-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800">
-              {language === 'de' ? 'Bild wird erstellt...' : language === 'fr' ? 'Création de l\'image...' : 'Generating image...'}
-            </h3>
-            <p className="text-sm text-gray-500 mt-2">
-              {language === 'de' ? 'Dies dauert etwa 30 Sekunden' : language === 'fr' ? 'Cela prend environ 30 secondes' : 'This takes about 30 seconds'}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Edit overlay removed — editing now tracked per-page via editingPages */}
 
       {/* Edit Image Modal */}
       {editModalOpen && editTarget && (
@@ -5703,95 +5690,103 @@ export default function StoryWizard() {
                 {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (!editPromptText.trim() || !storyId) return;
+                  const target = { ...editTarget };
+                  const prompt = editPromptText;
+                  // Map cover types to page numbers for tracking
+                  const trackingPage = target.type === 'image' ? target.pageNumber!
+                    : target.coverType === 'front' ? -1 : target.coverType === 'back' ? -3 : -2;
                   setEditModalOpen(false);
-                  setIsEditing(true);
-                  try {
-                    if (editTarget.type === 'image' && editTarget.pageNumber) {
-                      const result = await storyService.editImage(storyId, editTarget.pageNumber, editPromptText);
-                      log.info('Edit result:', { hasImageData: !!result?.imageData, score: result?.qualityScore });
-                      if (!result?.imageData) {
-                        log.error('No imageData in edit response!', result);
-                        throw new Error('No image data returned from server');
+                  setEditTarget(null);
+                  setEditPromptText('');
+                  setEditingPages(prev => new Set(prev).add(trackingPage));
+                  // Fire-and-forget: run edit in background, user can continue working
+                  (async () => {
+                    try {
+                      if (target.type === 'image' && target.pageNumber) {
+                        const result = await storyService.editImage(storyId, target.pageNumber, prompt);
+                        log.info('Edit result:', { hasImageData: !!result?.imageData, score: result?.qualityScore });
+                        if (!result?.imageData) {
+                          log.error('No imageData in edit response!', result);
+                          throw new Error('No image data returned from server');
+                        }
+                        setSceneImages(prev => prev.map(img => {
+                          if (img.pageNumber !== target.pageNumber) return img;
+                          const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                            ? img.imageVersions
+                            : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                          const updatedVersions = [
+                            ...existingVersions,
+                            {
+                              imageData: result.imageData,
+                              createdAt: new Date().toISOString(),
+                              isActive: true,
+                              type: 'edit' as const,
+                              qualityScore: result.qualityScore,
+                            }
+                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                          return {
+                            ...img,
+                            imageData: result.imageData,
+                            qualityScore: result.qualityScore,
+                            qualityReasoning: result.qualityReasoning,
+                            wasEdited: true,
+                            originalImage: result.originalImage,
+                            originalScore: result.originalScore,
+                            originalReasoning: result.originalReasoning,
+                            imageVersions: updatedVersions,
+                          };
+                        }));
+                        log.info('Image edited successfully, updated state with quality info');
+                      } else if (target.type === 'cover' && target.coverType) {
+                        const result = await storyService.editCover(storyId, target.coverType, prompt);
+                        setCoverImages(prev => {
+                          if (!prev) return prev;
+                          const key = target.coverType === 'front' ? 'frontCover'
+                            : target.coverType === 'back' ? 'backCover' : 'initialPage';
+                          const current = prev[key] as any;
+                          const existingVersions = current?.imageVersions && current.imageVersions.length > 0
+                            ? current.imageVersions
+                            : current?.imageData
+                              ? [{ imageData: current.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                              : [];
+                          const updatedVersions = [
+                            ...existingVersions,
+                            {
+                              imageData: result.imageData,
+                              createdAt: new Date().toISOString(),
+                              isActive: true,
+                              type: 'edit' as ImageVersion['type'],
+                              qualityScore: result.qualityScore,
+                            }
+                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                          const updatedCover = {
+                            ...(typeof current === 'object' ? current : {}),
+                            imageData: result.imageData,
+                            qualityScore: result.qualityScore,
+                            qualityReasoning: result.qualityReasoning,
+                            wasEdited: true,
+                            originalImage: result.originalImage,
+                            originalScore: result.originalScore,
+                            originalReasoning: result.originalReasoning,
+                            imageVersions: updatedVersions,
+                          };
+                          return { ...prev, [key]: updatedCover };
+                        });
+                        log.info('Cover edited successfully with quality info');
                       }
-                      setSceneImages(prev => prev.map(img => {
-                        if (img.pageNumber !== editTarget.pageNumber) return img;
-                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
-                          ? img.imageVersions
-                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
-                        const updatedVersions = [
-                          ...existingVersions,
-                          {
-                            imageData: result.imageData,
-                            createdAt: new Date().toISOString(),
-                            isActive: true,
-                            type: 'edit' as const,
-                            qualityScore: result.qualityScore,
-                          }
-                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
-                        return {
-                          ...img,
-                          imageData: result.imageData,
-                          qualityScore: result.qualityScore,
-                          qualityReasoning: result.qualityReasoning,
-                          wasEdited: true,
-                          originalImage: result.originalImage,
-                          originalScore: result.originalScore,
-                          originalReasoning: result.originalReasoning,
-                          imageVersions: updatedVersions,
-                        };
-                      }));
-                      log.info('Image edited successfully, updated state with quality info');
-                    } else if (editTarget.type === 'cover' && editTarget.coverType) {
-                      const result = await storyService.editCover(storyId, editTarget.coverType, editPromptText);
-                      setCoverImages(prev => {
-                        if (!prev) return prev;
-                        const key = editTarget.coverType === 'front' ? 'frontCover'
-                          : editTarget.coverType === 'back' ? 'backCover' : 'initialPage';
-                        const current = prev[key] as any;
-                        const existingVersions = current?.imageVersions && current.imageVersions.length > 0
-                          ? current.imageVersions
-                          : current?.imageData
-                            ? [{ imageData: current.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
-                            : [];
-                        const updatedVersions = [
-                          ...existingVersions,
-                          {
-                            imageData: result.imageData,
-                            createdAt: new Date().toISOString(),
-                            isActive: true,
-                            type: 'edit' as ImageVersion['type'],
-                            qualityScore: result.qualityScore,
-                          }
-                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
-                        const updatedCover = {
-                          ...(typeof current === 'object' ? current : {}),
-                          imageData: result.imageData,
-                          qualityScore: result.qualityScore,
-                          qualityReasoning: result.qualityReasoning,
-                          wasEdited: true,
-                          originalImage: result.originalImage,
-                          originalScore: result.originalScore,
-                          originalReasoning: result.originalReasoning,
-                          imageVersions: updatedVersions,
-                        };
-                        return { ...prev, [key]: updatedCover };
-                      });
-                      log.info('Cover edited successfully with quality info');
+                    } catch (error) {
+                      log.error('Edit failed:', error);
+                      showError(language === 'de'
+                        ? 'Bearbeitung fehlgeschlagen. Bitte versuche es erneut.'
+                        : language === 'fr'
+                        ? 'Échec de la modification. Veuillez réessayer.'
+                        : 'Edit failed. Please try again.');
+                    } finally {
+                      setEditingPages(prev => { const next = new Set(prev); next.delete(trackingPage); return next; });
                     }
-                  } catch (error) {
-                    log.error('Edit failed:', error);
-                    showError(language === 'de'
-                      ? 'Bearbeitung fehlgeschlagen. Bitte versuche es erneut.'
-                      : language === 'fr'
-                      ? 'Échec de la modification. Veuillez réessayer.'
-                      : 'Edit failed. Please try again.');
-                  } finally {
-                    setIsEditing(false);
-                    setEditTarget(null);
-                    setEditPromptText('');
-                  }
+                  })();
                 }}
                 disabled={!editPromptText.trim()}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Sparkles } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
@@ -104,6 +104,7 @@ interface StoryDisplayProps {
   sceneDescriptions?: SceneDescription[];
   coverImages?: CoverImages;
   regeneratingCovers?: Set<string>;  // Track which covers are being regenerated
+  editingPages?: Set<number>;  // Track which pages are being edited (-1/-2/-3 for covers)
   languageLevel?: LanguageLevel;
   storyLanguage?: StoryLanguageCode;  // Language of the story content (for correct labels)
   isGenerating?: boolean;
@@ -177,6 +178,7 @@ export function StoryDisplay({
   sceneDescriptions = [],
   coverImages,
   regeneratingCovers = new Set(),  // Track which covers are being regenerated
+  editingPages = new Set(),  // Track which pages are being edited
   languageLevel = 'standard', // Used to determine layout: '1st-grade' = picture book, others = standard
   storyLanguage,
   isGenerating = false,
@@ -3701,8 +3703,24 @@ export function StoryDisplay({
               )}
             </div>
             {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage) && (
+            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3 flex flex-wrap gap-2">
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('front')}
+                    disabled={isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                  >
+                    {editingPages.has(-1) ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                    ) : (
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                    )}
+                  </button>
+                )}
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-1)}
@@ -3710,12 +3728,12 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'KI verbessert das Bild automatisch' : language === 'fr' ? 'L\'IA améliore automatiquement' : 'AI improves automatically'}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-1) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
                     )}
                   </button>
                 )}
@@ -3726,10 +3744,10 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier et régénérer' : 'Edit and regenerate'}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <RefreshCw size={14} />
-                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                    <Wand2 size={14} />
+                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('frontCover').length > 1 && (
@@ -3748,19 +3766,6 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only (uses same iterate endpoint as pages) */}
                 {onIteratePage && renderIteratePanel(-1)}
-                {/* Edit Button - dev only */}
-                {_onEditCover && (
-                  <button
-                    onClick={() => _onEditCover('front')}
-                    disabled={isGenerating}
-                    className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                    }`}
-                  >
-                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                  </button>
-                )}
-
                 {/* Scene Description */}
                 {frontCoverObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
@@ -3924,8 +3929,24 @@ export function StoryDisplay({
               )}
             </div>
             {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage) && (
+            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3 flex flex-wrap gap-2">
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('initial')}
+                    disabled={isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                  >
+                    {editingPages.has(-2) ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                    ) : (
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                    )}
+                  </button>
+                )}
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-2)}
@@ -3933,11 +3954,12 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-2) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
                     )}
                   </button>
                 )}
@@ -3948,9 +3970,10 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <RefreshCw size={14} />
-                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                    <Wand2 size={14} />
+                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('initialPage').length > 1 && (
@@ -3969,19 +3992,6 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-2)}
-                {/* Edit Button - dev only */}
-                {_onEditCover && (
-                  <button
-                    onClick={() => _onEditCover('initial')}
-                    disabled={isGenerating}
-                    className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                    }`}
-                  >
-                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                  </button>
-                )}
-
                 {/* Scene Description */}
                 {initialPageObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
@@ -4209,9 +4219,25 @@ export function StoryDisplay({
                           </div>
                         )}
                         {/* Image action buttons - shown to all users */}
-                        {(onRegenerateImage || onImproveImage) && (
+                        {(onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
                             <div className="flex flex-wrap gap-2 items-center">
+                              {onEditImage && (
+                                <button
+                                  onClick={() => onEditImage(pageNumber)}
+                                  disabled={isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                                >
+                                  {editingPages.has(pageNumber) ? (
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                                  ) : (
+                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                  )}
+                                </button>
+                              )}
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
@@ -4219,12 +4245,12 @@ export function StoryDisplay({
                                   className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
                                   )}
                                 </button>
                               )}
@@ -4235,10 +4261,10 @@ export function StoryDisplay({
                                   className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier la scène et régénérer' : 'Edit scene and regenerate'}
+                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <RefreshCw size={14} />
-                                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                  <Wand2 size={14} />
+                                  {language === 'de' ? 'Neu denken' : 'Reimagine'}
                                 </button>
                               )}
                               {/* Edit Text button */}
@@ -4319,19 +4345,6 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
                                   </>
                                 )}
-                              </button>
-                            )}
-
-                            {/* Edit button - dev only */}
-                            {onEditImage && (
-                              <button
-                                onClick={() => onEditImage(pageNumber)}
-                                disabled={isGenerating}
-                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                              >
-                                <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
                               </button>
                             )}
 
@@ -4717,9 +4730,25 @@ export function StoryDisplay({
                           )}
                         </div>
                         {/* Image action buttons - shown to all users */}
-                        {(onRegenerateImage || onImproveImage) && (
+                        {(onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
                             <div className="flex flex-wrap gap-2 items-center">
+                              {onEditImage && (
+                                <button
+                                  onClick={() => onEditImage(pageNumber)}
+                                  disabled={isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                                >
+                                  {editingPages.has(pageNumber) ? (
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                                  ) : (
+                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                  )}
+                                </button>
+                              )}
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
@@ -4727,12 +4756,12 @@ export function StoryDisplay({
                                   className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
                                   )}
                                 </button>
                               )}
@@ -4743,10 +4772,10 @@ export function StoryDisplay({
                                   className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier la scène et régénérer' : 'Edit scene and regenerate'}
+                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <RefreshCw size={14} />
-                                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                  <Wand2 size={14} />
+                                  {language === 'de' ? 'Neu denken' : 'Reimagine'}
                                 </button>
                               )}
                               {/* Edit Text button */}
@@ -4827,19 +4856,6 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
                                   </>
                                 )}
-                              </button>
-                            )}
-
-                            {/* Edit button - dev only */}
-                            {onEditImage && (
-                              <button
-                                onClick={() => onEditImage(pageNumber)}
-                                disabled={isGenerating}
-                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                              >
-                                <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
                               </button>
                             )}
 
@@ -5167,8 +5183,24 @@ export function StoryDisplay({
               )}
             </div>
             {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage) && (
+            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3 flex flex-wrap gap-2">
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('back')}
+                    disabled={isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                  >
+                    {editingPages.has(-3) ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                    ) : (
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                    )}
+                  </button>
+                )}
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-3)}
@@ -5176,11 +5208,12 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-3) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
                     )}
                   </button>
                 )}
@@ -5191,9 +5224,10 @@ export function StoryDisplay({
                     className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <RefreshCw size={14} />
-                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                    <Wand2 size={14} />
+                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('backCover').length > 1 && (
@@ -5212,19 +5246,6 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-3)}
-                {/* Edit Button - dev only */}
-                {_onEditCover && (
-                  <button
-                    onClick={() => _onEditCover('back')}
-                    disabled={isGenerating}
-                    className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                    }`}
-                  >
-                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                  </button>
-                )}
-
                 {/* Scene Description */}
                 {backCoverObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
