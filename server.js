@@ -243,7 +243,8 @@ const {
   preloadHistoricalLocations,
   convertClothingToCurrentFormat,
   getPageText,
-  updatePageText
+  updatePageText,
+  resolveArtStyle
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
@@ -3665,6 +3666,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         expandedScenes.map((scene, index) => preparePageData(scene, index))
       );
 
+      // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
+      const sceneBackgrounds = {};
+      if (modelOverrides.generateEmptyScenes !== false) {
+        log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
+        const bgStartTime = Date.now();
+        const bgLimit = pLimit(50);
+
+        const emptyScenes = await Promise.all(
+          pageDataArray.map(pageData => bgLimit(async () => {
+            await checkCancellation();
+            const sceneMetadata = pageData.sceneMetadata;
+            const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
+            if (!settingDesc) return null;
+
+            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
+            const emptyPrompt = `${artStyleDesc}\n\nGenerate an EMPTY scene illustration with NO people, NO characters, NO figures. Show ONLY the environment:\n\n${settingDesc}\n\nThe scene must be completely empty of any human or animal figures. Show only the location, architecture, nature, and objects.`;
+
+            try {
+              const result = await generateImageOnly(emptyPrompt, [], {
+                imageModelOverride: pageData.pageImageModel,
+                imageBackendOverride: pageData.pageImageBackend,
+                pageNumber: pageData.pageNumber,
+                skipCache: true
+              });
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null };
+            } catch (err) {
+              log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
+              return null;
+            }
+          }))
+        );
+
+        for (const bg of emptyScenes) {
+          if (bg?.imageData) sceneBackgrounds[bg.pageNumber] = bg.imageData;
+        }
+        const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
+        log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
+      }
+
       // Phase 5a continued: Generate ALL images (no evaluation)
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();
@@ -3689,7 +3729,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: pageData.visualBibleGrid,
-                pageNumber: pageData.pageNumber
+                pageNumber: pageData.pageNumber,
+                sceneBackground: sceneBackgrounds[pageData.pageNumber] || null
               }
             );
 
@@ -4779,6 +4820,7 @@ async function _processStoryJobImpl(jobId) {
       imageBackend: MODEL_DEFAULTS.imageBackend,
       storyAvatarModel: null,  // null = use default (gemini-2.5-flash-image)
       sceneRouting: null,      // 'auto', 'grok', 'gemini', or null (= 'auto')
+      generateEmptyScenes: MODEL_DEFAULTS.generateEmptyScenes ?? true,
       ...filteredUserOverrides  // Only non-null user overrides
     };
     // Trial mode: use Sonnet for story generation (best narrative quality)

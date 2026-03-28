@@ -1626,6 +1626,7 @@ export const storyService = {
       bboxModel?: string | null;  // Bounding box detection model
       imageBackend?: string | null;  // 'gemini' or 'runware'
       storyAvatarModel?: string | null;  // styled avatar model during story gen
+      generateEmptyScenes?: boolean | null;  // null = server default (on), false = disabled
     };
     // User location for landmark discovery
     userLocation?: { city: string | null; region: string | null; country: string | null };

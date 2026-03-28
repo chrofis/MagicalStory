@@ -3776,6 +3776,7 @@ export default function StoryWizard() {
           bboxModel: modelSelections.bboxModel,
           imageBackend: modelSelections.imageBackend,
           storyAvatarModel: modelSelections.storyAvatarModel,
+          generateEmptyScenes: modelSelections.generateEmptyScenes,
         } : undefined,
         // User location for landmark discovery
         userLocation: userLocation || undefined,

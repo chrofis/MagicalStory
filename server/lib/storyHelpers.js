@@ -1050,27 +1050,27 @@ function getSceneComplexityGuide(sceneCount) {
 const ART_STYLES = {
   // Sentence-based style descriptions — work well with both Gemini and Grok Imagine.
   // Each includes artist/studio references where helpful for style anchoring.
-  pixar: 'A 3D animated children\'s illustration in the style of Pixar and Disney Animation Studios. Stylized cartoon characters with smooth skin, slightly larger eyes, and simplified features. Vibrant colors, soft volumetric lighting, and a warm family-friendly aesthetic. Not photorealistic.',
-  cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic.',
-  anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic.',
-  chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic.',
+  pixar: 'A 3D animated children\'s illustration in the style of Pixar and Disney Animation Studios. Stylized cartoon characters with smooth skin, slightly larger eyes, and simplified features. Vibrant colors, soft volumetric lighting, and a warm family-friendly aesthetic. Not photorealistic. Faces: smooth plastic-like skin with no pores, round cheeks, large expressive eyes with visible iris reflections, small button nose, soft jawline. Consistent 3D-rendered look across all characters.',
+  cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic. Faces: bold outlines around features, flat-colored skin, exaggerated expressions, simple dot or oval eyes. Never realistic or 3D-looking.',
+  anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic. Faces: flat-colored smooth skin, very large eyes (30-40% of face height) with colored irises and highlight dots, tiny triangular nose, pointed chin, minimal shading. All characters must have anime-proportioned faces — never realistic.',
+  chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic. Faces: ultra-simplified kawaii features, huge round eyes taking up most of face, dot nose, tiny mouth, circular blush marks on cheeks.',
   steampunk: {
-    default: 'A steampunk graphic novel illustration with Victorian aesthetic. Intricate gears, brass and copper mechanisms, leather textures, and a sepia-toned muted color palette with detailed linework. Not photorealistic.',
-    grok: 'Steampunk graphic novel illustration in the style of Sean Murphy. Victorian aesthetic with abundant brass and copper gears, cogs, and clockwork mechanisms prominently featured throughout the scene. Visible leather grain, stitching on clothing, and metal patina on gears. Warm brown and muted amber color palette with restrained saturation — earthy tones only. Clean linework with even shading and smooth gradients. Realistic human faces with natural proportions, detailed eyes, and subtle expressions.',
-    gemini: 'Steampunk graphic novel illustration in the style of Sean Murphy and Travis Charest. Victorian aesthetic with brass and copper gears and clockwork mechanisms with leather textures. Warm brown and amber color palette with clear, rich tones — not dark, moody, or desaturated. Well-lit scene with warm natural lighting, no heavy shadows or dark atmospheric overlay. Sharp focus throughout. Detailed character faces with defined features and expressions. Smooth linework with tonal gradients, not flat cel-shading. Smooth texture rendering. Polished graphic novel composition.',
+    default: 'A steampunk graphic novel illustration with Victorian aesthetic. Intricate gears, brass and copper mechanisms, leather textures, and a sepia-toned muted color palette with detailed linework. Not photorealistic. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism.',
+    grok: 'Steampunk graphic novel illustration in the style of Sean Murphy. Victorian aesthetic with abundant brass and copper gears, cogs, and clockwork mechanisms prominently featured throughout the scene. Visible leather grain, stitching on clothing, and metal patina on gears. Warm brown and muted amber color palette with restrained saturation — earthy tones only. Clean linework with even shading and smooth gradients. Realistic human faces with natural proportions, detailed eyes, and subtle expressions. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism.',
+    gemini: 'Steampunk graphic novel illustration in the style of Sean Murphy and Travis Charest. Victorian aesthetic with brass and copper gears and clockwork mechanisms with leather textures. Warm brown and amber color palette with clear, rich tones — not dark, moody, or desaturated. Well-lit scene with warm natural lighting, no heavy shadows or dark atmospheric overlay. Sharp focus throughout. Detailed character faces with defined features and expressions. Smooth linework with tonal gradients, not flat cel-shading. Smooth texture rendering. Polished graphic novel composition. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism.',
   },
-  comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic.',
-  manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic.',
+  comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic. Faces: inked outlines, halftone-style shading, bold features, dramatic expressions. Classic Western comic book rendering.',
+  manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic. Faces: clean ink lines, screen tone shading, large but less extreme eyes than anime, defined noses, expressive mouths. Consistent manga rendering.',
   watercolor: {
-    default: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors.',
-    grok: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm but not overly vibrant color palette with visible paper texture throughout.',
-    gemini: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm, inviting color palette with moderate vibrancy — not washed out or cool-toned. Visible watercolor texture in background elements.',
+    default: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
+    grok: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
+    gemini: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm, inviting color palette with moderate vibrancy — not washed out or cool-toned. Visible watercolor texture in background elements. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
   },
-  oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art.',
-  lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic.',
-  concept: 'Highly detailed digital concept art in the style of Craig Mullins and Karla Ortiz. Realistic human proportions, dramatic lighting, epic composition, smooth rendering with focus on mood and atmosphere. Matte painting aesthetic.',
-  pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic.',
-  cyber: 'A cyberpunk graphic novel illustration with neon reflections, rainy streets, chrome surfaces, and dense visual complexity. High contrast, dark atmosphere with volumetric fog. Not photorealistic.',
+  oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art. Faces: painterly realism with visible brushstrokes, natural proportions, defined bone structure, warm skin tones from impasto technique.',
+  lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic. Faces: geometric faceted surfaces, minimal detail, flat-shaded polygonal features. No smooth skin — everything is angular.',
+  concept: 'Highly detailed digital concept art in the style of Craig Mullins and Karla Ortiz. Realistic human proportions, dramatic lighting, epic composition, smooth rendering with focus on mood and atmosphere. Matte painting aesthetic. Faces: realistic proportions with painterly rendering, defined bone structure, natural eyes, detailed but not photographic. Consistent matte painting quality across all characters.',
+  pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic. Faces: pixel-art rendering, limited color palette per face, clear pixel grid visible. No anti-aliasing on features.',
+  cyber: 'A cyberpunk graphic novel illustration with neon reflections, rainy streets, chrome surfaces, and dense visual complexity. High contrast, dark atmosphere with volumetric fog. Not photorealistic. Faces: detailed with high contrast lighting, neon-reflected highlights on skin, sharp features. Dark atmospheric rendering.',
 };
 
 /**
@@ -2794,6 +2794,19 @@ Compare this against the scene hint above. Your job is to:
       previewFeedbackText = '(No preview available - create scene from hint, run all 17 checks)';
     }
 
+    // Format expected clothing for the prompt (tells Claude which clothing to use during iteration)
+    let expectedClothingText = '';
+    if (characterClothing) {
+      if (typeof characterClothing === 'string' && characterClothing !== 'standard') {
+        expectedClothingText = `- **This page's clothing**: ${characterClothing} (use this for all characters)`;
+      } else if (typeof characterClothing === 'object' && Object.keys(characterClothing).length > 0) {
+        const entries = Object.entries(characterClothing)
+          .map(([name, clothing]) => `${name}: ${clothing}`)
+          .join(', ');
+        expectedClothingText = `- **This page's clothing**: ${entries}`;
+      }
+    }
+
     // Look up maxCharactersPerScene from the current image model config
     const iterImageModelKey = MODEL_DEFAULTS.pageImage;
     const iterImageModelConfig = IMAGE_MODELS[iterImageModelKey];
@@ -2809,6 +2822,7 @@ Compare this against the scene hint above. Your job is to:
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
+      EXPECTED_CLOTHING: expectedClothingText,
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),

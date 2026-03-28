@@ -51,6 +51,7 @@ const MODEL_DEFAULTS: ModelSelections = {
   imageBackend: null,
   avatarModel: null,
   storyAvatarModel: null,
+  generateEmptyScenes: null,
 };
 
 /**

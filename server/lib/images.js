@@ -351,7 +351,7 @@ function hashImageData(imageData) {
  * @param {string|null} sequentialMarker - Optional marker for sequential mode
  * @param {number|null} pageNumber - Optional page number to ensure unique cache keys per page
  */
-function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null, pageNumber = null) {
+function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null, pageNumber = null, ...extraMarkers) {
   // Hash each photo and sort them for consistency
   // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   const photoHashes = characterPhotos
@@ -366,7 +366,8 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 
   // Combine prompt + photo hashes + sequential marker + page number
   // Page number ensures different pages never get the same cached image
-  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}|${pageNumber !== null ? `page${pageNumber}` : ''}`;
+  const extraSuffix = extraMarkers.filter(Boolean).join('|');
+  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}|${pageNumber !== null ? `page${pageNumber}` : ''}${extraSuffix ? `|${extraSuffix}` : ''}`;
   return crypto.createHash('sha256').update(combined).digest('hex');
 }
 
@@ -1337,48 +1338,55 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         return null;
       }
     } else {
-      // Gemini path
+      // Gemini path — retry once on empty response (0 output tokens)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
-      const response = await withRetry(async () => {
-        return fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              maxOutputTokens: 16000,
-              temperature: 0.1,
-              responseMimeType: 'application/json'
-            },
-            safetySettings: GEMINI_SAFETY_SETTINGS
-          })
-        });
-      }, { maxRetries: 2, baseDelay: 1000 });
+      for (let bboxAttempt = 1; bboxAttempt <= 2; bboxAttempt++) {
+        const response = await withRetry(async () => {
+          return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                maxOutputTokens: 16000,
+                temperature: 0.1,
+                responseMimeType: 'application/json'
+              },
+              safetySettings: GEMINI_SAFETY_SETTINGS
+            })
+          });
+        }, { maxRetries: 2, baseDelay: 1000 });
 
-      if (!response.ok) {
-        const error = await response.text();
-        log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
-        return null;
+        if (!response.ok) {
+          const error = await response.text();
+          log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
+          return null;
+        }
+
+        data = await response.json();
+
+        const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+        const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+        log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
+
+        const finishReason = data.candidates?.[0]?.finishReason;
+        if (finishReason && finishReason !== 'STOP') {
+          log.warn(`⚠️  [BBOX-DETECT] Finish reason: ${finishReason}`);
+        }
+
+        if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          break; // Got content
+        }
+
+        if (bboxAttempt < 2) {
+          log.warn(`⚠️  [BBOX-DETECT] Empty response (0 output tokens), retrying in 2s...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          log.warn('🔄 [FALLBACK] No response for bbox detection after retry');
+          return null;
+        }
       }
-
-      data = await response.json();
-    }
-
-    // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
-
-    // Check finish reason for truncation or safety blocks
-    const finishReason = data.candidates?.[0]?.finishReason;
-    if (finishReason && finishReason !== 'STOP') {
-      log.warn(`⚠️  [BBOX-DETECT] Finish reason: ${finishReason}`);
-    }
-
-    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      log.warn('🔄 [FALLBACK] No response for bbox detection');
-      return null;
     }
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
@@ -3036,11 +3044,12 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     pageNumber = null,
     onImageReady = null,
     skipCache = false,
-    artStyle = 'watercolor'
+    artStyle = 'watercolor',
+    sceneBackground = null
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
   const genOnlyCacheKey = `genonly_${cacheKey}`;
@@ -3114,7 +3123,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
       });
 
       let result;
@@ -3176,6 +3185,16 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     });
     currentImageIndex++;
     log.debug(`🖼️  [IMAGE GEN-ONLY] Added cropped previous scene image (SEQUENTIAL MODE)`);
+  }
+
+  // Scene background reference (empty scene for style anchoring)
+  if (sceneBackground && sceneBackground.startsWith('data:image')) {
+    const bgBase64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
+    const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    parts.push({ text: `[Scene background (match this style)]:` });
+    parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
+    currentImageIndex++;
+    log.debug(`🖼️ [IMAGE GEN-ONLY] Added scene background reference`);
   }
 
   // Add character photos as reference images
@@ -5591,10 +5610,17 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     log.debug(`🔄 [ITERATE] Per-character clothing: ${Object.entries(sceneMetadataForClothing.characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')}`);
   }
 
-  // Default clothing for characters not in the per-character map
-  let clothingCategory = typeof pageClothingData?.pageClothing?.[pageNumber] === 'string'
-    ? pageClothingData.pageClothing[pageNumber]
-    : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+  // Resolve clothingCategory — handle both string and object stored formats
+  const storedEntry = pageClothingData?.pageClothing?.[pageNumber];
+  let clothingCategory;
+  if (typeof storedEntry === 'string') {
+    clothingCategory = storedEntry;
+  } else if (storedEntry && typeof storedEntry === 'object') {
+    const firstVal = Object.values(storedEntry)[0];
+    clothingCategory = firstVal || parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+  } else {
+    clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+  }
 
   let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, sceneClothingReqs);
 
@@ -6188,6 +6214,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       blackoutImage: `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`,
       grokRawResult: grokResult.imageData,
       blendMask: `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}`,
+      croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
       method,
@@ -6254,6 +6281,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     return {
       imageData: finalImageData,
+      croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
       method
@@ -6276,6 +6304,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     return {
       imageData: grokResult.imageData,
+      croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
       method

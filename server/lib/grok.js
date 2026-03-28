@@ -302,6 +302,7 @@ async function cropToFrontColumn(buffer) {
  * @param {Array<{name: string, photoData: string}>} refs.landmarkPhotos - Landmark data URIs
  * @param {Array} refs.characterPhotos - Character photos (string data URIs or {name, photoUrl})
  * @param {string|null} refs.previousImage - Previous scene data URI
+ * @param {string|null} refs.sceneBackground - Scene background data URI (style anchor)
  * @returns {Promise<string[]>} Array of data URIs (max 3)
  */
 async function packReferences(refs = {}) {
@@ -310,6 +311,7 @@ async function packReferences(refs = {}) {
     landmarkPhotos = [],
     characterPhotos = [],
     previousImage = null,
+    sceneBackground = null,
   } = refs;
 
   // Extract character photo buffers (handle same formats as Gemini path)
@@ -349,6 +351,15 @@ async function packReferences(refs = {}) {
   // Count how many character slots we need (max 3 total reference slots for Grok)
   const charCount = charBuffers.length;
   const slots = [];
+
+  // Scene background goes first — style anchor for visual consistency
+  if (sceneBackground && sceneBackground.startsWith('data:image')) {
+    const base64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+    const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 [GROK] Slot ${slots.length}: scene background (style anchor)`);
+  }
 
   // Previous image goes FIRST — it's the scene being re-rendered (style transfer)
   // or the previous page for visual continuity (sequential mode)

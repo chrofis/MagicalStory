@@ -102,6 +102,7 @@ const MODEL_DEFAULTS = {
   enableQualityRetry: false,           // Quality retry: regenerate images scoring below threshold
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
+  generateEmptyScenes: true,           // Pre-generate empty scene backgrounds for style anchoring
 };
 
 // Available inpaint backends

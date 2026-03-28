@@ -191,6 +191,7 @@ export interface ModelSelections {
   imageBackend: ImageBackendKey | null;  // gemini or runware (for repair)
   avatarModel: AvatarModelKey | null;  // Character creation avatar model
   storyAvatarModel: StoryAvatarModelKey | null;  // Styled avatar model during story generation
+  generateEmptyScenes: boolean | null;  // null = server default (on), false = disabled
 }
 
 interface ModelSelectorProps {
@@ -249,7 +250,7 @@ function ModelDropdown({ label, icon, value, options, onChange, language }: Mode
 export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
   const { language } = useLanguage();
 
-  const updateSelection = (key: keyof ModelSelections, value: string | null) => {
+  const updateSelection = (key: keyof ModelSelections, value: string | boolean | null) => {
     onChange({ ...selections, [key]: value });
   };
 
@@ -320,6 +321,20 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           onChange={(v) => updateSelection('sceneRouting', v)}
           language={language}
         />
+
+        {/* Empty Scene Pre-generation */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="emptyScenes"
+            checked={selections.generateEmptyScenes !== false}
+            onChange={(e) => updateSelection('generateEmptyScenes', e.target.checked ? null : false)}
+            className="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+          />
+          <label htmlFor="emptyScenes" className="text-xs text-gray-600">
+            Generate empty scenes first (style anchoring, +$0.02/page)
+          </label>
+        </div>
 
         {/* Image Generation Models */}
         <ModelDropdown
