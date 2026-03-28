@@ -4824,15 +4824,28 @@ export default function StoryWizard() {
                   const result = await storyService.repairImage(storyId, pageNumber, fixTargets);
 
                   if (result.repaired) {
-                    // Update the scene image with the repaired version
+                    // Update the scene image with the repaired version + append to imageVersions
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber === pageNumber) {
+                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                          ? img.imageVersions
+                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                        const updatedVersions = [
+                          ...existingVersions,
+                          {
+                            imageData: result.imageData,
+                            createdAt: new Date().toISOString(),
+                            isActive: true,
+                            type: 'repair' as const,
+                          }
+                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
                         return {
                           ...img,
                           imageData: result.imageData,
                           wasAutoRepaired: true,
                           repairHistory: result.repairHistory,
-                          repairedAt: new Date().toISOString()
+                          repairedAt: new Date().toISOString(),
+                          imageVersions: updatedVersions,
                         };
                       }
                       return img;
@@ -5686,20 +5699,33 @@ export default function StoryWizard() {
                         log.error('No imageData in edit response!', result);
                         throw new Error('No image data returned from server');
                       }
-                      setSceneImages(prev => prev.map(img =>
-                        img.pageNumber === editTarget.pageNumber
-                          ? {
-                              ...img,
-                              imageData: result.imageData,
-                              qualityScore: result.qualityScore,
-                              qualityReasoning: result.qualityReasoning,
-                              wasEdited: true,
-                              originalImage: result.originalImage,
-                              originalScore: result.originalScore,
-                              originalReasoning: result.originalReasoning
-                            }
-                          : img
-                      ));
+                      setSceneImages(prev => prev.map(img => {
+                        if (img.pageNumber !== editTarget.pageNumber) return img;
+                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                          ? img.imageVersions
+                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                        const updatedVersions = [
+                          ...existingVersions,
+                          {
+                            imageData: result.imageData,
+                            createdAt: new Date().toISOString(),
+                            isActive: true,
+                            type: 'edit' as const,
+                            qualityScore: result.qualityScore,
+                          }
+                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                        return {
+                          ...img,
+                          imageData: result.imageData,
+                          qualityScore: result.qualityScore,
+                          qualityReasoning: result.qualityReasoning,
+                          wasEdited: true,
+                          originalImage: result.originalImage,
+                          originalScore: result.originalScore,
+                          originalReasoning: result.originalReasoning,
+                          imageVersions: updatedVersions,
+                        };
+                      }));
                       log.info('Image edited successfully, updated state with quality info');
                     } else if (editTarget.type === 'cover' && editTarget.coverType) {
                       const result = await storyService.editCover(storyId, editTarget.coverType, editPromptText);
@@ -5707,7 +5733,22 @@ export default function StoryWizard() {
                         if (!prev) return prev;
                         const key = editTarget.coverType === 'front' ? 'frontCover'
                           : editTarget.coverType === 'back' ? 'backCover' : 'initialPage';
-                        const current = prev[key];
+                        const current = prev[key] as any;
+                        const existingVersions = current?.imageVersions && current.imageVersions.length > 0
+                          ? current.imageVersions
+                          : current?.imageData
+                            ? [{ imageData: current.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                            : [];
+                        const updatedVersions = [
+                          ...existingVersions,
+                          {
+                            imageData: result.imageData,
+                            createdAt: new Date().toISOString(),
+                            isActive: true,
+                            type: 'edit' as ImageVersion['type'],
+                            qualityScore: result.qualityScore,
+                          }
+                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
                         const updatedCover = {
                           ...(typeof current === 'object' ? current : {}),
                           imageData: result.imageData,
@@ -5716,7 +5757,8 @@ export default function StoryWizard() {
                           wasEdited: true,
                           originalImage: result.originalImage,
                           originalScore: result.originalScore,
-                          originalReasoning: result.originalReasoning
+                          originalReasoning: result.originalReasoning,
+                          imageVersions: updatedVersions,
                         };
                         return { ...prev, [key]: updatedCover };
                       });
