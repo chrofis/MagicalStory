@@ -678,6 +678,8 @@ function extractSceneMetadata(sceneDescription) {
       setting: parsedData.setting || null,
       // Scene complexity for model routing ('simple' | 'complex' | null)
       sceneComplexity,
+      // Empty scene prompt from scene expansion (for style-anchor background generation)
+      emptyScenePrompt: parsedData.emptyScenePrompt || null,
       isJsonFormat: true
     };
   }

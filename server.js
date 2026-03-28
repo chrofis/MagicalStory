@@ -3697,7 +3697,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const lighting = sceneMetadata?.setting?.lighting || '';
             const weather = sceneMetadata?.setting?.weather || '';
 
-            const emptyPrompt = `${artStyleDesc}\n\nGenerate a scene illustration with NO people, NO human characters, NO human figures. Show the environment ready for characters to be placed later.\n\n**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}${objectsSection}\n\nThe scene must have NO humans. Animals, vehicles, and objects listed above SHOULD appear. Leave space where characters would naturally stand.`;
+            // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields
+            const emptySceneDesc = sceneMetadata?.emptyScenePrompt
+              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
+
+            const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+              STYLE_DESCRIPTION: artStyleDesc,
+              EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
+              REQUIRED_OBJECTS: objectsSection
+            });
 
             try {
               const result = await generateImageOnly(emptyPrompt, [], {

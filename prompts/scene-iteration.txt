@@ -253,6 +253,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
     "objects": [
       {"id": "LOC001", "name": "Stadtturm", "position": "top-left background, ancient clock tower with blue face"}
     ],
+    "emptyScenePrompt": "A snowy town plaza stretches out beneath a winter afternoon sky with golden hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly onto the cobblestone square. Medium wide shot, slightly low angle. The bottom-right and bottom-left foreground areas are open empty space where figures would stand, with the snowy plaza filling the midground gap between foreground and the distant tower.",
     "translatedSummary": "Sophie steht im Vordergrund und zeigt nach oben links zum entfernten Turm, während Manuel neben ihr auf der linken Seite geht. Der verschneite Platz erstreckt sich zwischen ihnen und dem Turm. Hauptfiguren: Sophie, Manuel."
   }
 }
@@ -265,6 +266,9 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
   - **complex**: Any character positioned as a TINY FIGURE in the far background, OR characters at clearly different size scales due to depth separation.
   - Rule of thumb: if all character positions are "left"/"center"/"right" → simple. If any position contains "far background" or "(tiny figure)" → complex.
   - Default to `"simple"` unless depth separation is clearly needed by the story moment.
+
+**Empty scene prompt (for style-anchor generation):**
+- `emptyScenePrompt`: A 2-4 sentence description of the SAME scene but with NO people or human characters present. Include: location details, architecture, objects, animals, vehicles from the `objects` array, lighting, weather, camera angle, and depth layers. Describe where characters WOULD stand as "open area" or "empty space". This is used to generate a character-free background image as a style anchor.
 
 ---
 
