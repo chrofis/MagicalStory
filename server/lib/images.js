@@ -5261,6 +5261,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           });
 
           if (repairResult?.imageData) {
+            // Basic quality gate: reject corrupt/empty repair results
+            if (repairResult.imageData.length < 1000) {
+              log.warn(`⚠️ [UNIFIED PIPELINE] Character fix for ${fix.charName} on page ${pageNumber} produced too-small image (${repairResult.imageData.length} chars), rejecting`);
+              continue;
+            }
+
             // Track per-character before/after for entityRepairs visualization
             const beforeImageData = currentImageData;
             currentImageData = repairResult.imageData;
@@ -5285,8 +5291,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
 
       if (anyFixApplied) {
+        const preFixScore = bestPerPage.get(pageNumber)?.score ?? 0;
         charFixResults.set(pageNumber, { imageData: currentImageData, source: 'character-fix' });
-        log.info(`✅ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied`);
+        if (preFixScore >= 85) {
+          log.info(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied to high-score page (pre-fix: ${preFixScore}%), monitor for quality regression`);
+        } else {
+          log.info(`✅ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied (pre-fix score: ${preFixScore}%)`);
+        }
       }
     })));
 

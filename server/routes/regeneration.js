@@ -4403,14 +4403,22 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         }
       }
 
-      // Don't switch away from an unevaluated entity-repair version — it was applied
-      // intentionally to fix character issues and hasn't been scored yet
       const activeVersion = activeIndex >= 0 ? scene.imageVersions[activeIndex] : null;
       const isUnevaluatedRepair = activeVersion?.type === 'entity-repair' && activeVersion?.qualityScore == null;
 
-      if (isUnevaluatedRepair) {
-        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: keeping unevaluated entity-repair version (index ${activeIndex})`);
-        results[pageNumber] = { switched: false, toIndex: activeIndex, score: null, reason: 'unevaluated-entity-repair' };
+      if (isUnevaluatedRepair && bestIndex < 0) {
+        // Entity-repair has no score AND no scored alternatives — keep it (no basis for comparison)
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: keeping unevaluated entity-repair (no scored alternatives, index ${activeIndex})`);
+        results[pageNumber] = { switched: false, toIndex: activeIndex, score: null, reason: 'unevaluated-no-alternatives' };
+      } else if (isUnevaluatedRepair && bestIndex >= 0) {
+        // Entity-repair has no score but scored alternatives exist — re-eval likely failed,
+        // switch to best scored version since we can't confirm the repair is good
+        scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
+        const dbIndex = arrayToDbIndex(bestIndex, imageType);
+        const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
+        await setActiveVersion(id, versionId, dbIndex);
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: unevaluated entity-repair replaced by scored version ${bestIndex} (score ${bestScore}, re-eval likely failed)`);
+        results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex, reason: 'unevaluated-repair-replaced' };
       } else if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
@@ -4615,6 +4623,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             if (sceneImage) {
               sceneImage.imageData = lastSuccess.repairResult.updatedImages[0].imageData;
               log.debug(`🔗 [REPAIR-WORKFLOW] Chaining: page ${pageNumber} updated with ${lastSuccess.task.characterName}'s repair for next character`);
+              if (pageTasks.length > 1) {
+                log.info(`⚠️ [REPAIR-WORKFLOW] Page ${pageNumber}: bbox data is stale after chaining (${pageTasks.length} characters on this page)`);
+              }
             }
           }
         }
@@ -4985,6 +4996,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
         if (!existingImage) continue;
 
+          // Carry forward bbox from previously active version — character repair (blended mode)
+          // only changes a localized region, so overall bbox coordinates remain valid
+          const prevActive = existingImage.imageVersions?.find(v => v.isActive);
+          const carryForwardBbox = prevActive?.bboxDetection || existingImage.bboxDetection || null;
+
           if (!existingImage.imageVersions) {
             existingImage.imageVersions = [{
               description: existingImage.description,
@@ -5013,6 +5029,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             qualityScore: null,
             entityRepairedFor: characterName,
             clothingCategory: repairResult.clothingCategory,
+            bboxDetection: carryForwardBbox,
             ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
           });
 
