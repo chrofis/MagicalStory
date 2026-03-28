@@ -3089,6 +3089,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       success: true,
       pageNumber,
       repaired: anyRepaired,
+      noErrorsFound: !anyRepaired && newRetryEntries.some(e => e.noRepairNeeded),
       passesRun: newRetryEntries.length,
       imageData: currentImageData,
       retryEntries: newRetryEntries,
@@ -3568,7 +3569,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
           imageData,
-          scene.description,       // originalPrompt
+          scene.description,       // originalPrompt (stripped inside evaluateImageQuality)
           characterPhotos,         // referenceImages
           evaluationType,          // evaluationType
           qualityModelOverride || null,
@@ -3800,6 +3801,9 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     if (evalType === 'quality') {
       const qualityModelOverride = model || null;
 
+      // Strip scene description to relevant parts (remove Art Director checks, corrections, etc.)
+      const cleanDescription = stripSceneMetadata(scene.description || '') || scene.description || '';
+
       // Build the filled prompt text for visibility
       let evaluationTemplate;
       if (evaluationType === 'cover' && PROMPT_TEMPLATES.coverImageEvaluation) {
@@ -3810,13 +3814,13 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         evaluationTemplate = null;
       }
       const filledPrompt = evaluationTemplate
-        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: scene.description || '' })
+        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: cleanDescription })
         : '(no evaluation template loaded)';
 
       // Run the actual evaluation
       const evaluation = await evaluateImageQuality(
         imageData,
-        scene.description,       // originalPrompt
+        cleanDescription,         // stripped scene description
         characterPhotos,         // referenceImages
         evaluationType,
         qualityModelOverride,

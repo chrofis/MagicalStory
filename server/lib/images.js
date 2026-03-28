@@ -658,6 +658,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return null;
     }
 
+    // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
+    // This reduces prompt size significantly and focuses the model on actual scene content
+    if (originalPrompt && (originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
+      const { stripSceneMetadata } = getStoryHelpers();
+      const stripped = stripSceneMetadata(originalPrompt);
+      if (stripped && stripped !== originalPrompt) {
+        log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
+        originalPrompt = stripped;
+      }
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
