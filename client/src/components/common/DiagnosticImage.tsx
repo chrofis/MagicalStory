@@ -68,8 +68,9 @@ export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageP
       log.error(`🐢 Very slow: ${label || alt} took ${elapsed}ms`, { sizeKB, naturalSize });
     }
 
-    // Log to server for remote debugging (only for slow loads > 1s)
-    if (elapsed > 1000) {
+    // Log to server for remote debugging (only for genuinely slow loads 1-60s)
+    // Anything > 60s for a base64 image is a stale timer from state updates, not a real load
+    if (elapsed > 1000 && elapsed < 60000) {
       logToServer({
         type: 'slow_image_load',
         label: label || alt,
