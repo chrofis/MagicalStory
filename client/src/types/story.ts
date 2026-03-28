@@ -1006,6 +1006,9 @@ export interface RepairPageResult {
   comparison?: RepairComparison | null;
   verification?: RepairVerification | null;
   method?: string;
+  beforeScore?: number | null;
+  afterScore?: number | null;
+  afterReasoning?: string | null;
 }
 
 export interface RepairWorkflowState {

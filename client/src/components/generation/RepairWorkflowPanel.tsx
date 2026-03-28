@@ -1277,6 +1277,7 @@ export function RepairWorkflowPanel({
                         grokRepairMode === 'blackout' ? 'grok-blackout' :
                         grokRepairMode === 'blended' ? 'grok-blended' :
                         useMagicApiRepair ? 'magicapi' :
+                        overrideImageModel === 'gemini-repair' ? 'gemini-repair' :
                         (overrideImageModel || imageModel || '')
                       }
                       onChange={(e) => {
@@ -1293,6 +1294,10 @@ export function RepairWorkflowPanel({
                           setGrokRepairMode('blackout');
                           setUseMagicApiRepair?.(false);
                           setOverrideImageModel(null);
+                        } else if (val === 'gemini-repair') {
+                          setGrokRepairMode(null);
+                          setUseMagicApiRepair?.(false);
+                          setOverrideImageModel('gemini-repair');
                         } else if (val === 'magicapi') {
                           setGrokRepairMode(null);
                           setUseMagicApiRepair?.(true);
@@ -1318,6 +1323,7 @@ export function RepairWorkflowPanel({
                         <option value="grok-blended">Grok Blended — default ($0.02, feathered)</option>
                         <option value="grok-cutout">Grok Cut-Out ($0.02/repair)</option>
                         <option value="grok-blackout">Grok Blackout ($0.02/repair)</option>
+                        <option value="gemini-repair">Gemini Repair (~$0.04/repair)</option>
                         <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
                       </optgroup>
                     </select>
@@ -1365,6 +1371,7 @@ export function RepairWorkflowPanel({
                       useMagicApiRepair,
                       ...(grokRepairMode && { grokRepairMode }),
                       ...(whiteoutTarget !== 'auto' && { whiteoutTarget }),
+                      ...(overrideImageModel === 'gemini-repair' && { useGeminiRepair: true }),
                     });
                     if (onRefreshStory) {
                       await onRefreshStory();
@@ -1424,10 +1431,27 @@ export function RepairWorkflowPanel({
                                     <div className="relative">
                                       <img src={page.comparison.before} alt="Before" className="w-full h-32 object-contain bg-gray-50" />
                                       <span className="absolute top-1 left-1 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-medium">Before</span>
+                                      {page.beforeScore != null && (
+                                        <span className={`absolute top-1 right-1 text-[10px] font-bold text-white px-1.5 py-0.5 rounded ${
+                                          page.beforeScore >= 80 ? 'bg-green-600' : page.beforeScore >= 60 ? 'bg-yellow-600' : 'bg-red-600'
+                                        }`}>{page.beforeScore}%</span>
+                                      )}
                                     </div>
                                     <div className="relative">
                                       <img src={page.comparison.after} alt="After" className="w-full h-32 object-contain bg-gray-50" />
                                       <span className="absolute top-1 left-1 text-[10px] bg-green-600 text-white px-1.5 py-0.5 rounded font-medium">After</span>
+                                      {page.afterScore != null && (
+                                        <span className={`absolute top-1 right-1 text-[10px] font-bold text-white px-1.5 py-0.5 rounded ${
+                                          page.afterScore >= 80 ? 'bg-green-600' : page.afterScore >= 60 ? 'bg-yellow-600' : 'bg-red-600'
+                                        }`}>
+                                          {page.afterScore}%
+                                          {page.beforeScore != null && (
+                                            <span className="ml-0.5 text-[9px] opacity-80">
+                                              ({page.afterScore - page.beforeScore >= 0 ? '+' : ''}{page.afterScore - page.beforeScore})
+                                            </span>
+                                          )}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 )}

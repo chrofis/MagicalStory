@@ -831,7 +831,7 @@ export function useRepairWorkflow({
   }, [storyId, startStep, completeStep, failStep]);
 
   // Step 6: Repair character on specific pages
-  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => {
+  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body'; useGeminiRepair?: boolean }) => {
     if (!storyId || pages.length === 0) return;
 
     startStep('character-repair');
@@ -1217,6 +1217,9 @@ export function useRepairWorkflow({
             verification: r.verification || null,
             method: r.method || 'gemini',
             debug: r.debug || null,
+            beforeScore: r.beforeScore ?? null,
+            afterScore: r.afterScore ?? null,
+            afterReasoning: r.afterReasoning || null,
           }));
           const failedPages = pagesFailed.map(f => ({
             pageNumber: f.pageNumber,

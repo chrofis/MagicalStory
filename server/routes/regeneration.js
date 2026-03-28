@@ -4457,7 +4457,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget, maxCharRepairPages: maxCharRepairPagesOverride } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget, maxCharRepairPages: maxCharRepairPagesOverride, useGeminiRepair } = req.body;
 
     let repairs;
 
@@ -4527,7 +4527,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
-    const repairMethod = grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
+    const repairMethod = useGeminiRepair ? 'Gemini' : grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const results = [];
@@ -4734,7 +4734,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               }
             }
           }
-        } else if (grokRepairMode || isGrokConfigured()) {
+        } else if (!useGeminiRepair && (grokRepairMode || isGrokConfigured())) {
           // Grok repair: blended (default), cutout, or blackout
           const effectiveMode = grokRepairMode || 'blended';
 
@@ -5040,6 +5040,32 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
           });
 
+          // Run immediate quality evaluation on repaired image
+          const beforeScore = prevActive?.qualityScore ?? existingImage.qualityScore ?? null;
+          let afterScore = null;
+          let afterReasoning = null;
+          try {
+            const evalType = isCover ? 'cover' : 'scene';
+            const evalPrompt = existingImage.description || existingImage.prompt || '';
+            const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
+            log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
+            const evalResult = await evaluateImageQuality(update.imageData, evalPrompt, [], evalType, null, pageLabel);
+            if (evalResult) {
+              afterScore = evalResult.score ?? evalResult.qualityScore ?? null;
+              afterReasoning = evalResult.reasoning || null;
+              // Store score on the new version
+              const newVersion = existingImage.imageVersions[existingImage.imageVersions.length - 1];
+              newVersion.qualityScore = afterScore;
+              newVersion.qualityReasoning = afterReasoning;
+              newVersion.issuesSummary = evalResult.issuesSummary || '';
+              newVersion.evaluatedAt = new Date().toISOString();
+              const delta = beforeScore != null && afterScore != null ? afterScore - beforeScore : null;
+              log.info(`🔍 [CHAR REPAIR] ${pageLabel} After: ${afterScore}% (before: ${beforeScore}%, delta: ${delta != null ? (delta >= 0 ? '+' : '') + delta : 'n/a'})`);
+            }
+          } catch (evalErr) {
+            log.warn(`⚠️ [CHAR REPAIR] Evaluation failed for page ${update.pageNumber}: ${evalErr.message}`);
+          }
+
           delete existingImage.imageData;
           existingImage.entityRepaired = true;
           existingImage.entityRepairedAt = new Date().toISOString();
@@ -5066,6 +5092,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             method: repairResult.method || 'gemini',
             cropHistory: repairResult.cropHistory || null,
             debug: repairResult.debug || null,
+            beforeScore,
+            afterScore,
+            afterReasoning,
           });
       }
     }
