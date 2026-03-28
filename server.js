@@ -3718,6 +3718,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 pageNumber: pageData.pageNumber,
                 skipCache: true
               });
+              // Track empty scene token usage
+              if (result?.usage) {
+                const isRunware = result.modelId?.startsWith('runware:');
+                const isGrok = result.modelId?.startsWith('grok-imagine');
+                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+                addUsage(provider, result.usage, 'page_images', result.modelId);
+              }
               return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
