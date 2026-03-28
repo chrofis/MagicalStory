@@ -1312,6 +1312,160 @@ export function StoryDisplay({
     return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.textModelId;
   };
 
+  // Shared iterate options panel used by both scene pages and covers
+  const renderIteratePanel = (pageNum: number) => (
+    <div>
+      <button
+        onClick={() => {
+          if (iterateOptionsPage === pageNum) {
+            setIterateOptionsPage(null);
+          } else {
+            setIterateOptionsPage(pageNum);
+            setIterateMode('fresh');
+          }
+        }}
+        disabled={isGenerating || iteratingPages.has(pageNum) || repairingPage !== null}
+        className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+          isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+        }`}
+        title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
+      >
+        {iteratingPages.has(pageNum) ? (
+          <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}</>
+        ) : (
+          <><RotateCcw size={14} /> {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}</>
+        )}
+      </button>
+      {iterateOptionsPage === pageNum && (
+        <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
+              <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
+              <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
+              <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 ml-6">
+            {iterateMode === 'fresh'
+              ? (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : 'Fresh generation from AI-corrected scene')
+              : iterateMode === 'reference'
+              ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
+              : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
+            <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
+          </label>
+          <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
+            <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
+              <option value="">Scene: Default</option>
+              <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
+              <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
+              <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
+              <option value="grok-3">Grok 3 ($0.038)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
+              <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
+            </select>
+            <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
+              <option value="">Image: Default</option>
+              <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
+              <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
+              <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
+              <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
+            </select>
+          </div>
+          {previewPromptPage === pageNum && previewPromptText != null && (
+            <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
+              <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
+              <textarea
+                value={previewPromptText}
+                onChange={e => setPreviewPromptText(e.target.value)}
+                className="w-full text-xs font-mono bg-gray-50 border border-gray-300 rounded p-2 min-h-[120px] max-h-[300px] resize-y"
+                spellCheck={false}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    setPreviewPromptPage(null);
+                    await handleIteratePage(pageNum, {
+                      useOriginalAsReference: iterateMode === 'reference',
+                      blackoutIssues: iterateMode === 'blackout',
+                      sceneModel: improveSceneModel || undefined,
+                      imageModel: improveImageModel || undefined,
+                      customImagePrompt: previewPromptText || undefined,
+                    });
+                    setPreviewPromptText(null);
+                  }}
+                  className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-700"
+                >
+                  {language === 'de' ? 'Mit diesem Prompt generieren' : 'Generate with this prompt'}
+                </button>
+                <button onClick={() => { setPreviewPromptText(null); setPreviewPromptPage(null); }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              disabled={(reviewPrompt && previewPromptPage === pageNum) || isPreviewingPrompt}
+              onClick={async () => {
+                if (reviewPrompt) {
+                  setIsPreviewingPrompt(true);
+                  try {
+                    const result = await storyService.iteratePage(storyId!, pageNum, improveImageModel || undefined, {
+                      sceneModel: improveSceneModel || undefined,
+                      useOriginalAsReference: iterateMode === 'reference',
+                      blackoutIssues: iterateMode === 'blackout',
+                      previewOnly: true,
+                    });
+                    if (result.previewOnly && result.imagePrompt) {
+                      setPreviewPromptText(result.imagePrompt);
+                      setPreviewPromptPage(pageNum);
+                    }
+                  } catch (err) {
+                    console.error('Failed to preview prompt:', err);
+                  } finally {
+                    setIsPreviewingPrompt(false);
+                  }
+                } else {
+                  handleIteratePage(pageNum, {
+                    useOriginalAsReference: iterateMode === 'reference',
+                    blackoutIssues: iterateMode === 'blackout',
+                    sceneModel: improveSceneModel || undefined,
+                    imageModel: improveImageModel || undefined,
+                  });
+                }
+              }}
+              className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${(reviewPrompt && previewPromptPage === pageNum) || isPreviewingPrompt ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
+            >
+              {isPreviewingPrompt && iterateOptionsPage === pageNum
+                ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
+                : reviewPrompt
+                ? (language === 'de' ? 'Prompt anzeigen' : 'Preview Prompt')
+                : (language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration')}
+            </button>
+            <button
+              onClick={() => setIterateOptionsPage(null)}
+              className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-indigo-100"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Story Title */}
@@ -3593,46 +3747,7 @@ export function StoryDisplay({
             {developerMode && frontCoverObj && (
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only (uses same iterate endpoint as pages) */}
-                {onIteratePage && (
-                  <div>
-                    <button
-                      onClick={() => handleIteratePage(-1, {
-                        sceneModel: improveSceneModel || undefined,
-                        imageModel: improveImageModel || undefined,
-                      })}
-                      disabled={isGenerating || iteratingPages.has(-1)}
-                      className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                        isGenerating || iteratingPages.has(-1) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
-                      }`}
-                    >
-                      {iteratingPages.has(-1) ? (
-                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
-                      ) : (
-                        <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
-                      )}
-                    </button>
-                    <div className="flex gap-2 mt-2">
-                      <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Scene: Default</option>
-                        <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-                        <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
-                        <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-                        <option value="grok-3">Grok 3 ($0.038)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-                        <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
-                      </select>
-                      <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                {onIteratePage && renderIteratePanel(-1)}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button
@@ -3853,46 +3968,7 @@ export function StoryDisplay({
             {developerMode && initialPageObj && (
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
-                {onIteratePage && (
-                  <div>
-                    <button
-                      onClick={() => handleIteratePage(-2, {
-                        sceneModel: improveSceneModel || undefined,
-                        imageModel: improveImageModel || undefined,
-                      })}
-                      disabled={isGenerating || iteratingPages.has(-2)}
-                      className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                        isGenerating || iteratingPages.has(-2) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
-                      }`}
-                    >
-                      {iteratingPages.has(-2) ? (
-                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
-                      ) : (
-                        <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
-                      )}
-                    </button>
-                    <div className="flex gap-2 mt-2">
-                      <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Scene: Default</option>
-                        <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-                        <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
-                        <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-                        <option value="grok-3">Grok 3 ($0.038)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-                        <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
-                      </select>
-                      <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                {onIteratePage && renderIteratePanel(-2)}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button
@@ -4195,172 +4271,15 @@ export function StoryDisplay({
                         {developerMode && (
                           <div className="mt-3 space-y-2">
                             {/* Next Iteration button - dev only */}
-                            {onIteratePage && (
-                              <div>
-                                <button
-                                  onClick={() => {
-                                    if (iterateOptionsPage === pageNumber) {
-                                      setIterateOptionsPage(null);
-                                    } else {
-                                      setIterateOptionsPage(pageNumber);
-                                      setIterateMode('fresh');
-                                    }
-                                  }}
-                                  disabled={isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null}
-                                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                  }`}
-                                  title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
-                                >
-                                  {iteratingPages.has(pageNumber) ? (
-                                    <>
-                                      <Loader size={14} className="animate-spin" />
-                                      {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <RotateCcw size={14} />
-                                      {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}
-                                    </>
-                                  )}
-                                </button>
-                                {iterateOptionsPage === pageNumber && (
-                                  <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
-                                    <div className="space-y-1">
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
-                                      </label>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
-                                      </label>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
-                                      </label>
-                                    </div>
-                                    <p className="text-xs text-gray-500 ml-6">
-                                      {iterateMode === 'fresh'
-                                        ? (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : 'Fresh generation from AI-corrected scene')
-                                        : iterateMode === 'reference'
-                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
-                                        : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
-                                    </p>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                      <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
-                                      <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
-                                    </label>
-                                    <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                      <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                                        <option value="">Scene: Default</option>
-                                        <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
-                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-                                        <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
-                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
-                                        <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-                                        <option value="grok-3">Grok 3 ($0.038)</option>
-                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-                                        <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
-                                      </select>
-                                      <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                                        <option value="">Image: Default</option>
-                                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
-                                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
-                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
-                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
-                                      </select>
-                                    </div>
-                                    {previewPromptPage === pageNumber && previewPromptText != null && (
-                                      <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
-                                        <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
-                                        <textarea
-                                          value={previewPromptText}
-                                          onChange={e => setPreviewPromptText(e.target.value)}
-                                          className="w-full text-xs font-mono bg-gray-50 border border-gray-300 rounded p-2 min-h-[120px] max-h-[300px] resize-y"
-                                          spellCheck={false}
-                                        />
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={async () => {
-                                              setPreviewPromptPage(null);
-                                              await handleIteratePage(pageNumber, {
-                                                useOriginalAsReference: iterateMode === 'reference',
-                                                blackoutIssues: iterateMode === 'blackout',
-                                                sceneModel: improveSceneModel || undefined,
-                                                imageModel: improveImageModel || undefined,
-                                                customImagePrompt: previewPromptText || undefined,
-                                              });
-                                              setPreviewPromptText(null);
-                                            }}
-                                            className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-700"
-                                          >
-                                            {language === 'de' ? 'Mit diesem Prompt generieren' : 'Generate with this prompt'}
-                                          </button>
-                                          <button onClick={() => { setPreviewPromptText(null); setPreviewPromptPage(null); }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                                            ✕
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                    <div className="flex gap-2">
-                                      <button
-                                        disabled={reviewPrompt && previewPromptPage === pageNumber}
-                                        onClick={async () => {
-                                          if (reviewPrompt) {
-                                            setIsPreviewingPrompt(true);
-                                            try {
-                                              const result = await storyService.iteratePage(storyId!, pageNumber, improveImageModel || undefined, {
-                                                sceneModel: improveSceneModel || undefined,
-                                                useOriginalAsReference: iterateMode === 'reference',
-                                                blackoutIssues: iterateMode === 'blackout',
-                                                previewOnly: true,
-                                              });
-                                              if (result.previewOnly && result.imagePrompt) {
-                                                setPreviewPromptText(result.imagePrompt);
-                                                setPreviewPromptPage(pageNumber);
-                                              }
-                                            } catch (err) {
-                                              console.error('Failed to preview prompt:', err);
-                                            } finally {
-                                              setIsPreviewingPrompt(false);
-                                            }
-                                          } else {
-                                            handleIteratePage(pageNumber, {
-                                              useOriginalAsReference: iterateMode === 'reference',
-                                              blackoutIssues: iterateMode === 'blackout',
-                                              sceneModel: improveSceneModel || undefined,
-                                              imageModel: improveImageModel || undefined,
-                                            });
-                                          }
-                                        }}
-                                        className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${reviewPrompt && previewPromptPage === pageNumber ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
-                                      >
-                                        {isPreviewingPrompt
-                                          ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
-                                          : reviewPrompt
-                                          ? (language === 'de' ? 'Prompt anzeigen' : 'Preview Prompt')
-                                          : (language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration')}
-                                      </button>
-                                      <button
-                                        onClick={() => setIterateOptionsPage(null)}
-                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-indigo-100"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                {/* Test Models button */}
-                                <button
-                                  onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
-                                  className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
-                                >
-                                  <Images size={14} />
-                                  Test Models
-                                </button>
-                              </div>
-                            )}
+                            {onIteratePage && renderIteratePanel(pageNumber)}
+                            {/* Test Models button */}
+                            <button
+                              onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
+                              className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                            >
+                              <Images size={14} />
+                              Test Models
+                            </button>
                             {testModelsPage === pageNumber && storyId && (
                               <TestModelsPanel
                                 storyId={storyId}
@@ -4860,172 +4779,15 @@ export function StoryDisplay({
                         {developerMode && (
                           <div className="mt-3 space-y-2">
                             {/* Next Iteration button - dev only */}
-                            {onIteratePage && (
-                              <div>
-                                <button
-                                  onClick={() => {
-                                    if (iterateOptionsPage === pageNumber) {
-                                      setIterateOptionsPage(null);
-                                    } else {
-                                      setIterateOptionsPage(pageNumber);
-                                      setIterateMode('fresh');
-                                    }
-                                  }}
-                                  disabled={isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null}
-                                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                  }`}
-                                  title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
-                                >
-                                  {iteratingPages.has(pageNumber) ? (
-                                    <>
-                                      <Loader size={14} className="animate-spin" />
-                                      {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <RotateCcw size={14} />
-                                      {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}
-                                    </>
-                                  )}
-                                </button>
-                                {iterateOptionsPage === pageNumber && (
-                                  <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
-                                    <div className="space-y-1">
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
-                                      </label>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
-                                      </label>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
-                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
-                                      </label>
-                                    </div>
-                                    <p className="text-xs text-gray-500 ml-6">
-                                      {iterateMode === 'fresh'
-                                        ? (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : 'Fresh generation from AI-corrected scene')
-                                        : iterateMode === 'reference'
-                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
-                                        : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
-                                    </p>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                      <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
-                                      <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
-                                    </label>
-                                    <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                      <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                                        <option value="">Scene: Default</option>
-                                        <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
-                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-                                        <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
-                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
-                                        <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-                                        <option value="grok-3">Grok 3 ($0.038)</option>
-                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-                                        <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
-                                      </select>
-                                      <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                                        <option value="">Image: Default</option>
-                                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
-                                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
-                                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
-                                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
-                                      </select>
-                                    </div>
-                                    {previewPromptPage === pageNumber && previewPromptText != null && (
-                                      <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
-                                        <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
-                                        <textarea
-                                          value={previewPromptText}
-                                          onChange={e => setPreviewPromptText(e.target.value)}
-                                          className="w-full text-xs font-mono bg-gray-50 border border-gray-300 rounded p-2 min-h-[120px] max-h-[300px] resize-y"
-                                          spellCheck={false}
-                                        />
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={async () => {
-                                              setPreviewPromptPage(null);
-                                              await handleIteratePage(pageNumber, {
-                                                useOriginalAsReference: iterateMode === 'reference',
-                                                blackoutIssues: iterateMode === 'blackout',
-                                                sceneModel: improveSceneModel || undefined,
-                                                imageModel: improveImageModel || undefined,
-                                                customImagePrompt: previewPromptText || undefined,
-                                              });
-                                              setPreviewPromptText(null);
-                                            }}
-                                            className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-700"
-                                          >
-                                            {language === 'de' ? 'Mit diesem Prompt generieren' : 'Generate with this prompt'}
-                                          </button>
-                                          <button onClick={() => { setPreviewPromptText(null); setPreviewPromptPage(null); }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                                            ✕
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                    <div className="flex gap-2">
-                                      <button
-                                        disabled={reviewPrompt && previewPromptPage === pageNumber}
-                                        onClick={async () => {
-                                          if (reviewPrompt) {
-                                            setIsPreviewingPrompt(true);
-                                            try {
-                                              const result = await storyService.iteratePage(storyId!, pageNumber, improveImageModel || undefined, {
-                                                sceneModel: improveSceneModel || undefined,
-                                                useOriginalAsReference: iterateMode === 'reference',
-                                                blackoutIssues: iterateMode === 'blackout',
-                                                previewOnly: true,
-                                              });
-                                              if (result.previewOnly && result.imagePrompt) {
-                                                setPreviewPromptText(result.imagePrompt);
-                                                setPreviewPromptPage(pageNumber);
-                                              }
-                                            } catch (err) {
-                                              console.error('Failed to preview prompt:', err);
-                                            } finally {
-                                              setIsPreviewingPrompt(false);
-                                            }
-                                          } else {
-                                            handleIteratePage(pageNumber, {
-                                              useOriginalAsReference: iterateMode === 'reference',
-                                              blackoutIssues: iterateMode === 'blackout',
-                                              sceneModel: improveSceneModel || undefined,
-                                              imageModel: improveImageModel || undefined,
-                                            });
-                                          }
-                                        }}
-                                        className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${reviewPrompt && previewPromptPage === pageNumber ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
-                                      >
-                                        {isPreviewingPrompt
-                                          ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
-                                          : reviewPrompt
-                                          ? (language === 'de' ? 'Prompt anzeigen' : 'Preview Prompt')
-                                          : (language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration')}
-                                      </button>
-                                      <button
-                                        onClick={() => setIterateOptionsPage(null)}
-                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-indigo-100"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                {/* Test Models button */}
-                                <button
-                                  onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
-                                  className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
-                                >
-                                  <Images size={14} />
-                                  Test Models
-                                </button>
-                              </div>
-                            )}
+                            {onIteratePage && renderIteratePanel(pageNumber)}
+                            {/* Test Models button */}
+                            <button
+                              onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
+                              className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                            >
+                              <Images size={14} />
+                              Test Models
+                            </button>
                             {testModelsPage === pageNumber && storyId && (
                               <TestModelsPanel
                                 storyId={storyId}
@@ -5449,46 +5211,7 @@ export function StoryDisplay({
             {developerMode && backCoverObj && (
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
-                {onIteratePage && (
-                  <div>
-                    <button
-                      onClick={() => handleIteratePage(-3, {
-                        sceneModel: improveSceneModel || undefined,
-                        imageModel: improveImageModel || undefined,
-                      })}
-                      disabled={isGenerating || iteratingPages.has(-3)}
-                      className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                        isGenerating || iteratingPages.has(-3) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
-                      }`}
-                    >
-                      {iteratingPages.has(-3) ? (
-                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
-                      ) : (
-                        <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
-                      )}
-                    </button>
-                    <div className="flex gap-2 mt-2">
-                      <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Scene: Default</option>
-                        <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-                        <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
-                        <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-                        <option value="grok-3">Grok 3 ($0.038)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-                        <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
-                      </select>
-                      <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
-                        <option value="">Image: Default</option>
-                        <option value="grok-imagine">Grok Imagine ($0.02/img)</option>
-                        <option value="grok-imagine-pro">Grok Pro ($0.07/img)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash ($0.04/img)</option>
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                {onIteratePage && renderIteratePanel(-3)}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button

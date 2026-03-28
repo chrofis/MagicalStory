@@ -6751,25 +6751,40 @@ async function executeCategorizedRepairPlan(plan, pageData, evaluations, context
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction) {
+async function editImageWithPrompt(imageData, editInstruction, model) {
+  const modelId = model || MODEL_DEFAULTS.pageImage;
+  const modelConfig = IMAGE_MODELS[modelId];
+  const backend = modelConfig?.backend || 'gemini';
+
+  log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend})`);
+
+  // Build the editing prompt from template
+  const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
+    EDIT_INSTRUCTION: editInstruction
+  });
+  log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
+
+  if (backend === 'grok') {
+    // Grok edit path — uses /images/edits endpoint with reference image
+    const grokResult = await editWithGrok(editPrompt, [imageData], { model: modelConfig.modelId });
+    log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
+    return {
+      imageData: grokResult.imageData,
+      usage: { model: modelId, cost: grokResult.usage?.cost }
+    };
+  }
+
+  // Gemini edit path — uses generateContent with responseModalities: IMAGE
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
     }
 
-    log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}"`);
-
     // Extract base64 and mime type from the image
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-
-    // Build the editing prompt from template
-    const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
-      EDIT_INSTRUCTION: editInstruction
-    });
-    log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
     // Build parts array with text FIRST, then image (helps model understand it's an edit instruction)
     const parts = [
@@ -6782,9 +6797,8 @@ async function editImageWithPrompt(imageData, editInstruction) {
       }
     ];
 
-    // Use page image model for editing (optimized for pixel-level manipulation and inpainting)
-    const modelId = MODEL_DEFAULTS.pageImage;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    const geminiModelId = modelConfig?.modelId || modelId;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${apiKey}`;
 
     const systemInstruction = getImageSystemInstruction();
     const response = await fetch(url, {
@@ -6797,7 +6811,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.6,
-          ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
+          ...(modelSupportsThinking(geminiModelId) && { thinkingConfig: { includeThoughts: true } }),
           imageConfig: {
             aspectRatio: "1:1"
           }
