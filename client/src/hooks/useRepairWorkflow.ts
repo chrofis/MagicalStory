@@ -122,6 +122,7 @@ export interface UseRepairWorkflowProps {
     totalAttempts?: number;
     type?: string;
   }) => void;
+  onRefreshStory?: () => Promise<void>;
 }
 
 export interface UseRepairWorkflowReturn {
@@ -157,6 +158,7 @@ export interface UseRepairWorkflowReturn {
 
   // Step 6: Character repair
   repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
+  rejectRepair: (characterName: string, pageNumber: number, previousVersionIndex: number) => Promise<void>;
 
   // Step 7: Inpaint repair (targeted fix-target-based region repair)
   repairInpaint: (pageNumber: number, fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>) => Promise<{
@@ -193,6 +195,7 @@ export function useRepairWorkflow({
   imageModel,
   qualityModel,
   onImageUpdate,
+  onRefreshStory,
 }: UseRepairWorkflowProps): UseRepairWorkflowReturn {
   const [workflowState, setWorkflowState] = useState<RepairWorkflowState>(createInitialState);
   const [redoProgress, setRedoProgress] = useState({ current: 0, total: 0, currentPage: undefined as number | undefined });
@@ -869,6 +872,10 @@ export function useRepairWorkflow({
         verification: r.verification || null,
         method: r.method || 'gemini',
         debug: r.debug || null,
+        versionIndex: r.versionIndex,
+        beforeScore: r.beforeScore ?? null,
+        afterScore: r.afterScore ?? null,
+        afterReasoning: r.afterReasoning || null,
       }));
       const failedPages = pagesFailed.map(f => ({
         pageNumber: f.pageNumber,
@@ -877,24 +884,31 @@ export function useRepairWorkflow({
         comparison: f.comparison || null,
       }));
 
-      setWorkflowState(prev => ({
+      setWorkflowState(prev => {
+        // Merge with existing results (for retries — append, don't replace)
+        const existingRepaired = prev.characterRepairResults.pagesRepaired[characterName] || [];
+        const existingFailed = prev.characterRepairResults.pagesFailed[characterName] || [];
+        return {
         ...prev,
         characterRepairResults: {
-          charactersProcessed: [...prev.characterRepairResults.charactersProcessed, characterName],
+          charactersProcessed: prev.characterRepairResults.charactersProcessed.includes(characterName)
+            ? prev.characterRepairResults.charactersProcessed
+            : [...prev.characterRepairResults.charactersProcessed, characterName],
           pagesRepaired: {
             ...prev.characterRepairResults.pagesRepaired,
-            [characterName]: repairedDetails,
+            [characterName]: [...existingRepaired, ...repairedDetails],
           },
           pagesFailed: {
             ...prev.characterRepairResults.pagesFailed,
-            [characterName]: failedPages,
+            [characterName]: [...existingFailed, ...failedPages],
           },
         },
         stepStatus: {
           ...prev.stepStatus,
           'character-repair': pagesFailed.length > 0 && pagesRepaired.length === 0 ? 'failed' : 'completed',
         },
-      }));
+      };
+      });
 
       // Auto re-evaluate repaired pages so we know if the repair improved things
       const repairedPageNumbers = pagesRepaired.map((r: any) => typeof r === 'number' ? r : r.pageNumber).filter(Boolean);
@@ -910,6 +924,40 @@ export function useRepairWorkflow({
       failStep('character-repair', error instanceof Error ? error.message : 'Unknown error');
     }
   }, [storyId, startStep, failStep, onImageUpdate]);
+
+  // Reject a character repair — revert to the version before repair
+  const rejectRepair = useCallback(async (characterName: string, pageNumber: number, previousVersionIndex: number) => {
+    if (!storyId) return;
+    try {
+      const COVER_PAGE_MAP: Record<number, string> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+      const coverType = COVER_PAGE_MAP[pageNumber];
+      if (coverType) {
+        await storyService.setActiveCoverImage(storyId, coverType as 'frontCover' | 'initialPage' | 'backCover', previousVersionIndex);
+      } else {
+        await storyService.setActiveImage(storyId, pageNumber, previousVersionIndex);
+      }
+      // Mark as rejected in state
+      setWorkflowState(prev => {
+        const charRepaired = prev.characterRepairResults.pagesRepaired[characterName] || [];
+        return {
+          ...prev,
+          characterRepairResults: {
+            ...prev.characterRepairResults,
+            pagesRepaired: {
+              ...prev.characterRepairResults.pagesRepaired,
+              [characterName]: charRepaired.map(r =>
+                r.pageNumber === pageNumber ? { ...r, rejected: true } : r
+              ),
+            },
+          },
+        };
+      });
+      // Refresh images to show reverted version
+      if (onRefreshStory) await onRefreshStory();
+    } catch (err) {
+      console.error(`[RepairWorkflow] Failed to reject repair for page ${pageNumber}:`, err);
+    }
+  }, [storyId, onRefreshStory]);
 
   // Step 7: Inpaint repair — targeted fix-target-based region repair
   const repairInpaint = useCallback(async (pageNumber: number, fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>) => {
@@ -1322,6 +1370,7 @@ export function useRepairWorkflow({
     runConsistencyCheck,
 
     repairCharacter,
+    rejectRepair,
 
     repairInpaint,
 

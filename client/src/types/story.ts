@@ -1013,6 +1013,9 @@ export interface RepairPageResult {
   beforeScore?: number | null;
   afterScore?: number | null;
   afterReasoning?: string | null;
+  versionIndex?: number;
+  rejected?: boolean;
+  retryCount?: number;
 }
 
 export interface RepairWorkflowState {

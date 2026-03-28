@@ -394,6 +394,7 @@ export function RepairWorkflowPanel({
   const [overrideQualityModel, setOverrideQualityModel] = useState<string | null>(null);
   const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | 'blackout' | null>(null);
   const [whiteoutTarget, setWhiteoutTarget] = useState<'auto' | 'face' | 'body'>('auto');
+  const [retryingPages, setRetryingPages] = useState<Set<string>>(new Set()); // "char:pageNum" keys
   const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
@@ -409,6 +410,7 @@ export function RepairWorkflowPanel({
     reEvaluatePages,
     runConsistencyCheck,
     repairCharacter,
+    rejectRepair,
     repairInpaint,
     runFullWorkflow,
     abortWorkflow,
@@ -425,6 +427,7 @@ export function RepairWorkflowPanel({
     imageModel: effectiveImageModel,
     qualityModel: overrideQualityModel,
     onImageUpdate,
+    onRefreshStory,
   });
 
   // Full workflow progress state
@@ -1459,12 +1462,12 @@ export function RepairWorkflowPanel({
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <div className="flex flex-col items-center">
                                     <img
-                                      src={page.comparison.reference}
-                                      alt="Reference avatar"
+                                      src={page.comparison.croppedAvatar || page.comparison.reference}
+                                      alt="Avatar sent to Grok"
                                       className="w-12 h-12 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80"
-                                      onClick={() => setGridLightbox(page.comparison!.reference)}
+                                      onClick={() => setGridLightbox(page.comparison!.croppedAvatar || page.comparison!.reference)}
                                     />
-                                    <span className="text-[10px] text-gray-500">Avatar</span>
+                                    <span className="text-[10px] text-gray-500">{page.comparison.croppedAvatar ? 'Sent to Grok' : 'Avatar'}</span>
                                   </div>
                                   {page.comparison.blackoutImage && (
                                     <div className="flex flex-col items-center">
@@ -1538,6 +1541,77 @@ export function RepairWorkflowPanel({
                                 </details>
                               </div>
                             )}
+                            {/* Reject / Retry buttons */}
+                            {!page.rejected && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={async () => {
+                                    const prevIdx = (page.versionIndex ?? 1) - 1;
+                                    await rejectRepair(char, page.pageNumber, Math.max(0, prevIdx));
+                                  }}
+                                  disabled={retryingPages.has(`${char}:${page.pageNumber}`)}
+                                  className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    const key = `${char}:${page.pageNumber}`;
+                                    setRetryingPages(prev => new Set([...prev, key]));
+                                    try {
+                                      await repairCharacter(char, [page.pageNumber], {
+                                        ...(grokRepairMode && { grokRepairMode }),
+                                        ...(whiteoutTarget !== 'auto' && { whiteoutTarget }),
+                                        ...(useMagicApiRepair && { useMagicApiRepair }),
+                                      });
+                                      if (onRefreshStory) await onRefreshStory();
+                                    } finally {
+                                      setRetryingPages(prev => { const next = new Set(prev); next.delete(key); return next; });
+                                    }
+                                  }}
+                                  disabled={retryingPages.has(`${char}:${page.pageNumber}`)}
+                                  className="px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {retryingPages.has(`${char}:${page.pageNumber}`) ? (
+                                    <><RefreshCw className="w-3 h-3 animate-spin" /> Retrying...</>
+                                  ) : (
+                                    <><RefreshCw className="w-3 h-3" /> Retry</>
+                                  )}
+                                </button>
+                                {page.afterScore != null && page.beforeScore != null && page.afterScore < page.beforeScore && (
+                                  <span className="text-xs text-red-600 font-medium">Score dropped {page.afterScore - page.beforeScore}</span>
+                                )}
+                              </div>
+                            )}
+                            {page.rejected && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-red-600 font-medium">Rejected — reverted to previous version</span>
+                                <button
+                                  onClick={async () => {
+                                    const key = `${char}:${page.pageNumber}`;
+                                    setRetryingPages(prev => new Set([...prev, key]));
+                                    try {
+                                      await repairCharacter(char, [page.pageNumber], {
+                                        ...(grokRepairMode && { grokRepairMode }),
+                                        ...(whiteoutTarget !== 'auto' && { whiteoutTarget }),
+                                        ...(useMagicApiRepair && { useMagicApiRepair }),
+                                      });
+                                      if (onRefreshStory) await onRefreshStory();
+                                    } finally {
+                                      setRetryingPages(prev => { const next = new Set(prev); next.delete(key); return next; });
+                                    }
+                                  }}
+                                  disabled={retryingPages.has(`${char}:${page.pageNumber}`)}
+                                  className="px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {retryingPages.has(`${char}:${page.pageNumber}`) ? (
+                                    <><RefreshCw className="w-3 h-3 animate-spin" /> Retrying...</>
+                                  ) : (
+                                    <><RefreshCw className="w-3 h-3" /> Retry</>
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1566,12 +1640,12 @@ export function RepairWorkflowPanel({
                                 <div className="grid grid-cols-3 gap-2">
                                   <div className="text-center">
                                     <img
-                                      src={page.comparison.reference}
-                                      alt="Reference avatar"
+                                      src={page.comparison.croppedAvatar || page.comparison.reference}
+                                      alt="Avatar sent to Grok"
                                       className="w-full h-24 object-contain rounded border border-red-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                                      onClick={() => setGridLightbox(page.comparison!.reference)}
+                                      onClick={() => setGridLightbox(page.comparison!.croppedAvatar || page.comparison!.reference)}
                                     />
-                                    <span className="text-xs text-gray-500 mt-1 block">Reference</span>
+                                    <span className="text-xs text-gray-500 mt-1 block">{page.comparison.croppedAvatar ? 'Sent to Grok' : 'Reference'}</span>
                                   </div>
                                   <div className="text-center">
                                     {page.comparison.before ? (
@@ -1597,6 +1671,30 @@ export function RepairWorkflowPanel({
                                   </div>
                                 </div>
                               )}
+                              <button
+                                onClick={async () => {
+                                  const key = `${char}:${page.pageNumber}`;
+                                  setRetryingPages(prev => new Set([...prev, key]));
+                                  try {
+                                    await repairCharacter(char, [page.pageNumber], {
+                                      ...(grokRepairMode && { grokRepairMode }),
+                                      ...(whiteoutTarget !== 'auto' && { whiteoutTarget }),
+                                      ...(useMagicApiRepair && { useMagicApiRepair }),
+                                    });
+                                    if (onRefreshStory) await onRefreshStory();
+                                  } finally {
+                                    setRetryingPages(prev => { const next = new Set(prev); next.delete(key); return next; });
+                                  }
+                                }}
+                                disabled={retryingPages.has(`${char}:${page.pageNumber}`)}
+                                className="mt-2 px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {retryingPages.has(`${char}:${page.pageNumber}`) ? (
+                                  <><RefreshCw className="w-3 h-3 animate-spin" /> Retrying...</>
+                                ) : (
+                                  <><RefreshCw className="w-3 h-3" /> Retry</>
+                                )}
+                              </button>
                             </div>
                           ))}
                         </div>
