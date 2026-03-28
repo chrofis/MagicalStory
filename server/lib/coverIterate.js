@@ -97,14 +97,19 @@ async function iterateCover(coverKey, storyData, options = {}) {
       })
     : characters;
 
-  // Character selection: main chars for front, main+extras for initial/back
+  // Character selection: prefer characters mentioned in scene description
   const MAX_COVER_CHARACTERS = 5;
+  const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
+
+  // Extract characters mentioned in the scene description (case-insensitive match)
+  const sceneDescLower = sceneDescription.toLowerCase();
+  const mentionedChars = mergedCharacters.filter(c => sceneDescLower.includes(c.name.toLowerCase()));
+
   const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
   const nonMainChars = mainChars.length > 0
     ? mergedCharacters.filter(c => !c.isMainCharacter)
     : mergedCharacters;
 
-  const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
   let coverCharacterPhotos;
   let selectedCoverCharacters;  // Track character objects for bbox detection
   if (normalizedCoverType === 'front') {
@@ -113,7 +118,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
       selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
     }
     coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+  } else if (mentionedChars.length > 0) {
+    // Use characters mentioned in the scene description (most accurate for iterate)
+    selectedCoverCharacters = mentionedChars.slice(0, MAX_COVER_CHARACTERS);
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: Selected ${selectedCoverCharacters.map(c => c.name).join(', ')} from scene description`);
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
   } else {
+    // Fallback: split characters between initial and back covers
     const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
     const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
     const halfPoint = Math.ceil(nonMainChars.length / 2);
