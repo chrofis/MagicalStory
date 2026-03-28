@@ -2725,7 +2725,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
 
         // Build cover prompt using proper templates (not generic buildImagePrompt)
-        const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
+        const coverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
+        const coverBackend = IMAGE_MODELS[coverModel]?.backend || null;
+        const styleDescription = resolveArtStyle(artStyle, coverBackend) || resolveArtStyle('pixar');
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
         const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
 
@@ -3115,7 +3117,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // This generates reference images for recurring characters, animals, artifacts etc.
     let referenceSheetPromise = null;
     if (!skipImages) {
-      const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
+      const refSheetModel = MODEL_DEFAULTS.image;
+      const refSheetBackend = IMAGE_MODELS[refSheetModel]?.backend || null;
+      const styleDescription = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
         minAppearances: 2, // Elements appearing on 2+ pages
         maxPerBatch: 4,    // Max 4 elements per grid for quality
@@ -3704,7 +3708,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 pageNumber: pageData.pageNumber,
                 skipCache: true
               });
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null };
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
               return null;
@@ -3713,7 +3717,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         for (const bg of emptyScenes) {
-          if (bg?.imageData) sceneBackgrounds[bg.pageNumber] = bg.imageData;
+          if (bg?.imageData) sceneBackgrounds[bg.pageNumber] = { imageData: bg.imageData, prompt: bg.prompt };
         }
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
@@ -3744,7 +3748,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
-                sceneBackground: sceneBackgrounds[pageData.pageNumber] || null
+                sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null
               }
             );
 
@@ -3767,6 +3771,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }, pageData.pageNumber);
             }
 
+            // Attach empty scene data for frontend display
+            const emptySceneData = sceneBackgrounds[pageData.pageNumber] || null;
+
             return {
               pageNumber: pageData.pageNumber,
               imageData: genResult.imageData,
@@ -3778,6 +3785,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               landmarkPhotos: pageData.landmarkPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
               grokRefImages: genResult.grokRefImages || null,
+              emptySceneImage: emptySceneData?.imageData || null,
+              emptyScenePrompt: emptySceneData?.prompt || null,
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
@@ -3864,6 +3873,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           landmarkPhotos: img.landmarkPhotos,
           visualBibleGrid: img.visualBibleGrid || null,
           grokRefImages: img.grokRefImages || null,
+          emptySceneImage: img.emptySceneImage || null,
+          emptyScenePrompt: img.emptyScenePrompt || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           imageVersions: [],
@@ -3930,6 +3941,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           landmarkPhotos: img.landmarkPhotos,
           visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
           grokRefImages: img.grokRefImages || null,
+          emptySceneImage: img.emptySceneImage || null,
+          emptyScenePrompt: img.emptyScenePrompt || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           bboxDetection: img.bboxDetection,

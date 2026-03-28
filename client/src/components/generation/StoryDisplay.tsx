@@ -5092,6 +5092,8 @@ export function StoryDisplay({
                                 landmarkPhotos={image.landmarkPhotos}
                                 visualBibleGrid={image.visualBibleGrid}
                                 hasVisualBibleGrid={image.hasVisualBibleGrid}
+                                emptySceneImage={image.emptySceneImage}
+                                emptyScenePrompt={image.emptyScenePrompt}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}

@@ -727,6 +727,9 @@ export interface SceneImage {
   // Visual Bible grid image (combines VB elements + secondary landmarks)
   visualBibleGrid?: string;  // Base64 data URL
   hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
+  // Empty scene pre-generation (Pass 1: style anchor)
+  emptySceneImage?: string;  // Base64 data URL of generated empty scene
+  emptyScenePrompt?: string;  // Prompt used for empty scene generation
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)
@@ -990,6 +993,7 @@ export interface RepairComparison {
   after: string;
   diff?: string;
   reference: string;
+  croppedAvatar?: string | null;
   blackoutImage?: string | null;
   grokRawResult?: string | null;
   blendMask?: string | null;

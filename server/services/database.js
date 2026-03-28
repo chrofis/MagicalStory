@@ -594,6 +594,7 @@ async function saveStoryData(storyId, storyData) {
       }
       delete img.originalImage;
       delete img.preEntityRepairImage;
+      delete img.emptySceneImage;
     }
   }
 
@@ -791,6 +792,7 @@ async function updateStoryDataOnly(storyId, storyData) {
       }
       delete img.originalImage;
       delete img.preEntityRepairImage;
+      delete img.emptySceneImage;
     }
   }
 
@@ -897,6 +899,7 @@ async function upsertStory(storyId, userId, storyData) {
       }
       delete img.originalImage;
       delete img.preEntityRepairImage;
+      delete img.emptySceneImage;
     }
   }
 

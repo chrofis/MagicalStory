@@ -17,6 +17,8 @@ interface ReferencePhotosDisplayProps {
   visualBibleGrid?: string;  // Base64 data URL of combined VB elements grid
   hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
   grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
+  emptySceneImage?: string | null;  // Pre-generated empty scene (Pass 1)
+  emptyScenePrompt?: string | null;  // Prompt used for empty scene
   language: string;
   // For lazy loading
   storyId?: string;
@@ -32,6 +34,8 @@ export function ReferencePhotosDisplay({
   visualBibleGrid,
   hasVisualBibleGrid,
   grokRefImages,
+  emptySceneImage,
+  emptyScenePrompt,
   language,
   storyId,
   pageNumber
@@ -176,6 +180,37 @@ export function ReferencePhotosDisplay({
       {loadError && (
         <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">
           {loadError}
+        </div>
+      )}
+
+      {/* Pass 1: Empty Scene (if generated) */}
+      {emptySceneImage && (
+        <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+          <div className="text-xs font-semibold text-emerald-700 mb-2 flex items-center gap-1">
+            🎬 {language === 'de' ? 'Pass 1: Leere Szene (Stil-Anker)' : 'Pass 1: Empty Scene (Style Anchor)'}
+          </div>
+          <img
+            src={emptySceneImage}
+            alt="Empty scene background"
+            className="w-full max-h-48 object-contain rounded border border-emerald-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setLightboxImage(emptySceneImage)}
+            title="Click to enlarge"
+          />
+          {emptyScenePrompt && (
+            <details className="mt-2">
+              <summary className="text-[10px] text-emerald-600 cursor-pointer">
+                {language === 'de' ? 'Prompt anzeigen' : 'Show prompt'}
+              </summary>
+              <pre className="mt-1 text-[10px] bg-emerald-100 p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap text-emerald-800">{emptyScenePrompt}</pre>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* Pass 2: Character Placement */}
+      {emptySceneImage && hasCharacterPhotos && (
+        <div className="mt-3 text-xs font-semibold text-pink-700 flex items-center gap-1">
+          👥 {language === 'de' ? 'Pass 2: Charaktere platzieren' : 'Pass 2: Character Placement'}
         </div>
       )}
 
