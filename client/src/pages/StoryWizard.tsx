@@ -910,12 +910,18 @@ export default function StoryWizard() {
             }
 
             // Cover images metadata - MERGE with existing imageData (don't overwrite loaded images)
+            // IMPORTANT: Don't overwrite imageVersions if they already have imageData
+            // (from full image load), because blob versions have imageData stripped
             setCoverImages(prev => {
               const mergeCover = (prevCover: typeof prev.frontCover, newCover: typeof prev.frontCover) => {
                 if (!newCover) return null;
+                // If existing imageVersions have imageData (from full image load), keep them
+                const prevHasVersionImages = (prevCover as any)?.imageVersions?.some((v: any) => v.imageData);
                 return {
                   ...newCover,
                   imageData: prevCover?.imageData || newCover.imageData,
+                  // Keep existing imageVersions if they have imageData loaded from DB
+                  ...(prevHasVersionImages ? { imageVersions: (prevCover as any).imageVersions } : {}),
                 };
               };
               const newCovers = fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null };
@@ -1105,20 +1111,29 @@ export default function StoryWizard() {
 
             // Update cover images with full data (imageVersions, metadata) - batched
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
+            // Merge imageVersions element-by-element to preserve both DB imageData and blob metadata
             const fullCoverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
             const hasFullCoverUpdates = fullCoverTypes.some(ct => fullCovers[ct]);
             if (hasFullCoverUpdates) {
               setCoverImages(prev => {
                 const next = { ...prev };
                 for (const coverType of fullCoverTypes) {
-                  const cover = fullCovers[coverType];
+                  const cover = fullCovers[coverType] as any;
                   if (cover) {
-                    const existing = typeof next[coverType] === 'object' ? next[coverType] : {};
+                    const existing = typeof next[coverType] === 'object' ? next[coverType] : {} as any;
+                    // Merge imageVersions: DB versions have imageData, blob versions have rich metadata
+                    let mergedVersions = cover.imageVersions;
+                    if (cover.imageVersions && existing?.imageVersions) {
+                      mergedVersions = cover.imageVersions.map((dbV: any, i: number) => ({
+                        ...(existing.imageVersions[i] || {}),  // blob metadata (description, type, scores, etc.)
+                        ...dbV,                                  // DB data (imageData, qualityScore, isActive)
+                      }));
+                    }
                     next[coverType] = {
                       ...existing,
                       ...cover,
-                      // Keep existing imageData from fast load (correct active version)
-                      imageData: (existing as { imageData?: string })?.imageData || cover.imageData
+                      imageData: (existing as { imageData?: string })?.imageData || cover.imageData,
+                      ...(mergedVersions ? { imageVersions: mergedVersions } : {}),
                     } as any;
                   }
                 }
