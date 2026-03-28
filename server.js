@@ -3680,13 +3680,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
             if (!settingDesc) return null;
 
+            // Build object list from scene metadata (animals, vehicles, artifacts — NOT characters)
+            const sceneObjects = (sceneMetadata?.fullData?.objects || [])
+              .map(obj => typeof obj === 'string' ? obj : `${obj.name}: ${obj.position || ''}${obj.description ? ' — ' + obj.description : ''}`)
+              .filter(Boolean);
+            const objectsSection = sceneObjects.length > 0
+              ? `\n\nINCLUDE these objects/elements in the scene:\n${sceneObjects.map(o => `- ${o}`).join('\n')}`
+              : '';
+
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
-            const emptyPrompt = `${artStyleDesc}\n\nGenerate an EMPTY scene illustration with NO people, NO characters, NO figures. Show ONLY the environment:\n\n${settingDesc}\n\nThe scene must be completely empty of any human or animal figures. Show only the location, architecture, nature, and objects.`;
+            const camera = sceneMetadata?.setting?.camera || 'wide shot';
+            const lighting = sceneMetadata?.setting?.lighting || '';
+            const weather = sceneMetadata?.setting?.weather || '';
+
+            const emptyPrompt = `${artStyleDesc}\n\nGenerate a scene illustration with NO people, NO human characters, NO human figures. Show the environment ready for characters to be placed later.\n\n**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}${objectsSection}\n\nThe scene must have NO humans. Animals, vehicles, and objects listed above SHOULD appear. Leave space where characters would naturally stand.`;
 
             try {
               const result = await generateImageOnly(emptyPrompt, [], {
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
+                landmarkPhotos: pageData.landmarkPhotos,
+                visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
                 skipCache: true
               });
