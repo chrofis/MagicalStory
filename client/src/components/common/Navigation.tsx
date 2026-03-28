@@ -6,6 +6,7 @@ import { useGenerationOptional } from '@/context/GenerationContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
 import { UserMenu } from './UserMenu';
+import { checkpointToPercent } from '@/components/generation/GenerationProgress';
 
 interface CustomStep {
   key: string;
@@ -184,7 +185,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             >
               <Loader2 size={14} className="animate-spin" />
               <span className="hidden md:inline">
-                {generation?.progress ? `${Math.round((generation.progress.current / generation.progress.total) * 100)}%` : '...'}
+                {generation?.progress ? `${checkpointToPercent(generation.progress.current)}%` : '...'}
               </span>
             </button>
           )}

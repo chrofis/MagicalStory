@@ -6,6 +6,35 @@ import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
 
+// Checkpoint → display % mapping (shared with Navigation bar)
+// Server sends checkpoint numbers: 1=start, 2=arcs, 3=title, 4=clothing, 5=plot,
+// 6=visualBible, 7=covers, 8=text done, 9=avatars, 10=scenes, 11-30=images,
+// 31=covers done, 32-72=quality pipeline, 73=finalize, 100=done
+export function checkpointToPercent(cp: number): number {
+  if (cp <= 1) return 3;
+  if (cp <= 2) return 8;
+  if (cp <= 3) return 12;
+  if (cp <= 4) return 15;
+  if (cp <= 5) return 20;    // Plot streaming — exponential creep fills 20→50% during the wait
+  if (cp <= 6) return 48;
+  if (cp <= 7) return 49;
+  if (cp <= 8) return 50;    // Text complete
+  if (cp <= 9) return 52;
+  if (cp <= 10) return 55;
+  if (cp <= 30) return 55 + Math.round(((cp - 10) / 20) * 17);  // 55-72% for page images
+  if (cp <= 31) return 73;
+  if (cp <= 32) return 75;   // Quality eval starts
+  if (cp <= 40) return 80;
+  if (cp <= 50) return 83;
+  if (cp <= 55) return 86;
+  if (cp <= 65) return 90;
+  if (cp <= 68) return 92;
+  if (cp <= 72) return 95;
+  if (cp <= 73) return 97;
+  if (cp < 100) return 98;
+  return 100;
+}
+
 interface GenerationProgressProps {
   current: number;
   total: number;
@@ -327,32 +356,6 @@ export function GenerationProgress({
   const serverCheckpoint = total === 100 ? current : Math.round((current / total) * 100);
   const isDone = serverCheckpoint >= 100;
 
-  // Checkpoint → target % mapping (based on wall-clock time proportions)
-  const checkpointToPercent = (cp: number): number => {
-    if (cp <= 1) return 3;
-    if (cp <= 2) return 8;
-    if (cp <= 3) return 12;
-    if (cp <= 4) return 15;
-    if (cp <= 5) return 20;
-    if (cp <= 6) return 25;
-    if (cp <= 7) return 28;
-    if (cp <= 8) return 35;
-    if (cp <= 9) return 38;
-    if (cp <= 10) return 40;
-    if (cp <= 30) return 40 + Math.round(((cp - 10) / 20) * 20);
-    if (cp <= 31) return 62;
-    if (cp <= 32) return 65;
-    if (cp <= 40) return 70;
-    if (cp <= 50) return 75;
-    if (cp <= 55) return 80;
-    if (cp <= 65) return 85;
-    if (cp <= 68) return 88;
-    if (cp <= 72) return 92;
-    if (cp <= 73) return 95;
-    if (cp < 100) return 98;
-    return 100;
-  };
-
   const targetPercent = checkpointToPercent(serverCheckpoint);
 
   // Smooth progress: always increasing, never jumping.
@@ -376,10 +379,15 @@ export function GenerationProgress({
         const gap = target - prev;
 
         if (gap <= 0) {
-          // Already at or past target — slow creep toward 98% so bar never looks stuck
-          // Creep speed: ~1% every 8-15s depending on story size
+          if (prev < 50) {
+            // Exponential creep during text generation (cp 5 → cp 6/7/8)
+            // Starts slow, accelerates: covers 20% → ~48% in ~200s
+            const creepStep = 0.02 + Math.max(0, prev - 15) * 0.003;
+            return Math.min(prev + creepStep, 50);
+          }
+          // Above 50%: slow creep toward 98% so bar never looks stuck
           const creepInterval = Math.max(8, Math.min(15, pageCount * 0.6));
-          const creepStep = 0.5 / (creepInterval / 0.5); // 0.5% per creepInterval seconds, ticked every 500ms
+          const creepStep = 0.5 / (creepInterval / 0.5);
           return Math.min(prev + creepStep, 98);
         }
 
