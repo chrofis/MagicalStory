@@ -5507,6 +5507,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       landmarkPhotos: img.landmarkPhotos,
       visualBibleGrid: img.visualBibleGrid,
       grokRefImages: img.grokRefImages || null,
+      emptySceneImage: img.emptySceneImage || null,
+      emptyScenePrompt: img.emptyScenePrompt || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       perCharClothing: img.perCharClothing,
