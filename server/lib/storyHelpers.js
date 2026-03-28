@@ -3186,7 +3186,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
-    console.log(`[IMAGE PROMPT] Using ${templateName} template for language: ${language}`);
+    log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language}`);
     // Fill all placeholders in template
     return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
