@@ -1297,7 +1297,7 @@ router.get('/:id/style-lab/:pageNum/history/:runId', authenticateToken, async (r
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement } = req.body;  // Optional: model overrides + evaluation feedback
+    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement, previewOnly, customImagePrompt } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) {
       return res.status(400).json({ error: 'Invalid page number' });
@@ -1863,6 +1863,27 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         imagePrompt = `${imagePrompt}\n\n${feedbackText}`;
         log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${criticalIssues.length} critical issues as positive instructions (score: ${evaluationFeedback.score ?? 'N/A'})`);
       }
+    }
+
+    // Preview mode: return prompt without generating image
+    if (previewOnly) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Preview mode — returning prompt only (${imagePrompt.length} chars)`);
+      return res.json({
+        success: true,
+        previewOnly: true,
+        pageNumber,
+        imagePrompt,
+        sceneDescription: newSceneDescription,
+        composition: previewFeedback?.composition || null,
+        previewMismatches: previewFeedback?.previewMismatches || [],
+        checksRun: previewFeedback?.checksRun || {},
+      });
+    }
+
+    // Allow custom image prompt override (from preview → edit → generate flow)
+    if (customImagePrompt) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using custom image prompt (${customImagePrompt.length} chars, was ${imagePrompt.length})`);
+      imagePrompt = customImagePrompt;
     }
 
     // Clear cache to force new generation

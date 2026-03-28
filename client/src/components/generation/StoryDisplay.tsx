@@ -120,7 +120,7 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => Promise<void>;
+  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
@@ -281,6 +281,10 @@ export function StoryDisplay({
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
   const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
+  const [reviewPrompt, setReviewPrompt] = useState(false);
+  const [previewPromptText, setPreviewPromptText] = useState<string | null>(null);
+  const [previewPromptPage, setPreviewPromptPage] = useState<number | null>(null);
+  const [isPreviewingPrompt, setIsPreviewingPrompt] = useState(false);
   // Test Models panel: which page is showing the comparison
   const [testModelsPage, setTestModelsPage] = useState<number | null>(null);
 
@@ -680,7 +684,7 @@ export function StoryDisplay({
 
   // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
   // Supports parallel: multiple pages can iterate simultaneously
-  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => {
+  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; customImagePrompt?: string }) => {
     if (!onIteratePage || iteratingPages.has(pageNumber)) return;
     setIteratingPages(prev => new Set(prev).add(pageNumber));
     setIterateOptionsPage(null); // Close options panel
@@ -4243,6 +4247,10 @@ export function StoryDisplay({
                                         ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
                                         : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
+                                      <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
+                                    </label>
                                     <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                       <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Scene: Default</option>
@@ -4263,17 +4271,76 @@ export function StoryDisplay({
                                         <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                                       </select>
                                     </div>
+                                    {previewPromptPage === pageNumber && previewPromptText != null && (
+                                      <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
+                                        <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
+                                        <textarea
+                                          value={previewPromptText}
+                                          onChange={e => setPreviewPromptText(e.target.value)}
+                                          className="w-full text-xs font-mono bg-gray-50 border border-gray-300 rounded p-2 min-h-[120px] max-h-[300px] resize-y"
+                                          spellCheck={false}
+                                        />
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={async () => {
+                                              setPreviewPromptPage(null);
+                                              await handleIteratePage(pageNumber, {
+                                                useOriginalAsReference: iterateMode === 'reference',
+                                                blackoutIssues: iterateMode === 'blackout',
+                                                sceneModel: improveSceneModel || undefined,
+                                                imageModel: improveImageModel || undefined,
+                                                customImagePrompt: previewPromptText || undefined,
+                                              });
+                                              setPreviewPromptText(null);
+                                            }}
+                                            className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-700"
+                                          >
+                                            {language === 'de' ? 'Mit diesem Prompt generieren' : 'Generate with this prompt'}
+                                          </button>
+                                          <button onClick={() => { setPreviewPromptText(null); setPreviewPromptPage(null); }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                                            ✕
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2">
                                       <button
-                                        onClick={() => handleIteratePage(pageNumber, {
-                                          useOriginalAsReference: iterateMode === 'reference',
-                                          blackoutIssues: iterateMode === 'blackout',
-                                          sceneModel: improveSceneModel || undefined,
-                                          imageModel: improveImageModel || undefined,
-                                        })}
-                                        className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                                        disabled={reviewPrompt && previewPromptPage === pageNumber}
+                                        onClick={async () => {
+                                          if (reviewPrompt) {
+                                            setIsPreviewingPrompt(true);
+                                            try {
+                                              const result = await storyService.iteratePage(storyId!, pageNumber, improveImageModel || undefined, {
+                                                sceneModel: improveSceneModel || undefined,
+                                                useOriginalAsReference: iterateMode === 'reference',
+                                                blackoutIssues: iterateMode === 'blackout',
+                                                previewOnly: true,
+                                              });
+                                              if (result.previewOnly && result.imagePrompt) {
+                                                setPreviewPromptText(result.imagePrompt);
+                                                setPreviewPromptPage(pageNumber);
+                                              }
+                                            } catch (err) {
+                                              console.error('Failed to preview prompt:', err);
+                                            } finally {
+                                              setIsPreviewingPrompt(false);
+                                            }
+                                          } else {
+                                            handleIteratePage(pageNumber, {
+                                              useOriginalAsReference: iterateMode === 'reference',
+                                              blackoutIssues: iterateMode === 'blackout',
+                                              sceneModel: improveSceneModel || undefined,
+                                              imageModel: improveImageModel || undefined,
+                                            });
+                                          }
+                                        }}
+                                        className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${reviewPrompt && previewPromptPage === pageNumber ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
                                       >
-                                        {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}
+                                        {isPreviewingPrompt
+                                          ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
+                                          : reviewPrompt
+                                          ? (language === 'de' ? 'Prompt anzeigen' : 'Preview Prompt')
+                                          : (language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration')}
                                       </button>
                                       <button
                                         onClick={() => setIterateOptionsPage(null)}
@@ -4845,6 +4912,10 @@ export function StoryDisplay({
                                         ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
                                         : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
+                                      <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
+                                    </label>
                                     <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                       <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
                                         <option value="">Scene: Default</option>
@@ -4865,17 +4936,76 @@ export function StoryDisplay({
                                         <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
                                       </select>
                                     </div>
+                                    {previewPromptPage === pageNumber && previewPromptText != null && (
+                                      <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
+                                        <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
+                                        <textarea
+                                          value={previewPromptText}
+                                          onChange={e => setPreviewPromptText(e.target.value)}
+                                          className="w-full text-xs font-mono bg-gray-50 border border-gray-300 rounded p-2 min-h-[120px] max-h-[300px] resize-y"
+                                          spellCheck={false}
+                                        />
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={async () => {
+                                              setPreviewPromptPage(null);
+                                              await handleIteratePage(pageNumber, {
+                                                useOriginalAsReference: iterateMode === 'reference',
+                                                blackoutIssues: iterateMode === 'blackout',
+                                                sceneModel: improveSceneModel || undefined,
+                                                imageModel: improveImageModel || undefined,
+                                                customImagePrompt: previewPromptText || undefined,
+                                              });
+                                              setPreviewPromptText(null);
+                                            }}
+                                            className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-700"
+                                          >
+                                            {language === 'de' ? 'Mit diesem Prompt generieren' : 'Generate with this prompt'}
+                                          </button>
+                                          <button onClick={() => { setPreviewPromptText(null); setPreviewPromptPage(null); }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                                            ✕
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2">
                                       <button
-                                        onClick={() => handleIteratePage(pageNumber, {
-                                          useOriginalAsReference: iterateMode === 'reference',
-                                          blackoutIssues: iterateMode === 'blackout',
-                                          sceneModel: improveSceneModel || undefined,
-                                          imageModel: improveImageModel || undefined,
-                                        })}
-                                        className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                                        disabled={reviewPrompt && previewPromptPage === pageNumber}
+                                        onClick={async () => {
+                                          if (reviewPrompt) {
+                                            setIsPreviewingPrompt(true);
+                                            try {
+                                              const result = await storyService.iteratePage(storyId!, pageNumber, improveImageModel || undefined, {
+                                                sceneModel: improveSceneModel || undefined,
+                                                useOriginalAsReference: iterateMode === 'reference',
+                                                blackoutIssues: iterateMode === 'blackout',
+                                                previewOnly: true,
+                                              });
+                                              if (result.previewOnly && result.imagePrompt) {
+                                                setPreviewPromptText(result.imagePrompt);
+                                                setPreviewPromptPage(pageNumber);
+                                              }
+                                            } catch (err) {
+                                              console.error('Failed to preview prompt:', err);
+                                            } finally {
+                                              setIsPreviewingPrompt(false);
+                                            }
+                                          } else {
+                                            handleIteratePage(pageNumber, {
+                                              useOriginalAsReference: iterateMode === 'reference',
+                                              blackoutIssues: iterateMode === 'blackout',
+                                              sceneModel: improveSceneModel || undefined,
+                                              imageModel: improveImageModel || undefined,
+                                            });
+                                          }
+                                        }}
+                                        className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${reviewPrompt && previewPromptPage === pageNumber ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
                                       >
-                                        {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}
+                                        {isPreviewingPrompt
+                                          ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
+                                          : reviewPrompt
+                                          ? (language === 'de' ? 'Prompt anzeigen' : 'Preview Prompt')
+                                          : (language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration')}
                                       </button>
                                       <button
                                         onClick={() => setIterateOptionsPage(null)}

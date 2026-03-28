@@ -1147,7 +1147,7 @@ export const storyService = {
   },
 
   // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
-  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
+  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; previewOnly?: boolean; customImagePrompt?: string; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
     success: boolean;
     pageNumber: number;
     // What the vision model saw
@@ -1188,6 +1188,8 @@ export const storyService = {
     visualBibleGrid?: string;
     grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
     bboxDetection?: BboxSceneDetection | null;  // Bbox detection for the new image
+    // Preview mode
+    previewOnly?: boolean;
     message: string;
   }> {
     const response = await api.post<{
@@ -1222,10 +1224,11 @@ export const storyService = {
       landmarkPhotos?: LandmarkPhoto[];
       visualBibleGrid?: string;
       bboxDetection?: BboxSceneDetection | null;
+      previewOnly?: boolean;
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,
-      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
+      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.previewOnly && { previewOnly: true }), ...(options?.customImagePrompt && { customImagePrompt: options.customImagePrompt }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
     );
     return response;
   },
