@@ -473,13 +473,17 @@ function extractImageStats(jobLines) {
       mode: null,
       avgScore: null,
       entityIssues: null,
+      entityDetails: [],   // Array of { entity, page, severity, issue }
       evalDuration: null,
-      passes: [],        // Array of { pass, pagesRegenerated, duration }
+      passes: [],          // Array of { pass, pagesRegenerated, duration, pages }
       upgradedPages: 0,
       charFixed: 0,
-      pageScores: [],    // Array of { page, quality, semantic, final, fixTargets }
-      lowPages: [],      // Pages below threshold
-      upgradedDetails: [] // Array of { page, from, to, source }
+      charFixAttempts: [], // Array of { character, page, success, error }
+      pageScores: [],      // Array of { page, quality, semantic, final, fixTargets, pass }
+      adjustedScores: [],  // Array of { page, quality, penalty, adjusted }
+      lowPages: [],        // Pages below threshold
+      upgradedDetails: [], // Array of { page, from, to, source }
+      coversInPipeline: [] // Cover types added to repair pipeline
     }
   };
 
@@ -536,19 +540,44 @@ function extractImageStats(jobLines) {
     }
 
     // Per-page scores: "✅ [BATCH EVAL] PAGE 1: Quality 100%, Semantic 100%, Final 100%, 0 fix targets"
-    const pageScoreMatch = msg.match(/\[BATCH EVAL\] PAGE (\d+):\s*Quality (\d+)%,\s*Semantic (\S+)%,\s*Final (\d+)%,\s*(\d+)\s*fix targets/);
+    // Also handles negative pages (covers): PAGE -1, PAGE -2, PAGE -3
+    const pageScoreMatch = msg.match(/\[BATCH EVAL\] PAGE (-?\d+):\s*Quality (\d+)%,\s*Semantic (\S+)%,\s*Final (\d+)%,\s*(\d+)\s*fix targets/);
     if (pageScoreMatch) {
+      // Track which pass this score belongs to (based on current pass count)
+      const currentPass = stats.repairPipeline.passes.length;
       stats.repairPipeline.pageScores.push({
         page: parseInt(pageScoreMatch[1]),
         quality: parseInt(pageScoreMatch[2]),
         semantic: pageScoreMatch[3] === 'N/A' ? null : parseInt(pageScoreMatch[3]),
         final: parseInt(pageScoreMatch[4]),
-        fixTargets: parseInt(pageScoreMatch[5])
+        fixTargets: parseInt(pageScoreMatch[5]),
+        pass: currentPass
       });
     }
 
+    // Entity penalty adjustments: "📊 [UNIFIED PIPELINE] Page -3: quality=50, entity penalty=20, adjusted=30"
+    const adjustedMatch = msg.match(/\[UNIFIED PIPELINE\] Page (-?\d+):\s*quality=(\d+),\s*entity penalty=(\d+),\s*adjusted=(\d+)/);
+    if (adjustedMatch) {
+      stats.repairPipeline.adjustedScores.push({
+        page: parseInt(adjustedMatch[1]),
+        quality: parseInt(adjustedMatch[2]),
+        penalty: parseInt(adjustedMatch[3]),
+        adjusted: parseInt(adjustedMatch[4])
+      });
+    }
+
+    // Entity consistency results: "📋 [ENTITY-CHECK] Complete: Found 1 consistency issue(s) across 1 entities"
+    // (entityIssues count is already captured from Step 1 complete line)
+
+    // Covers added to repair pipeline: "📸 [UNIFIED] Added frontCover (page -1) to repair pipeline"
+    const coverAddedMatch = msg.match(/\[UNIFIED\] Added (\w+) \(page (-?\d+)\) to repair pipeline/);
+    if (coverAddedMatch) {
+      stats.repairPipeline.coversInPipeline.push(coverAddedMatch[1]);
+    }
+
     // Regeneration pass: "🔄 [UNIFIED PIPELINE] Step 2: Regenerating 1 low-scoring pages (pass 1)..."
-    const regenPassMatch = msg.match(/\[UNIFIED PIPELINE\] Step 2: Regenerating (\d+) low-scoring pages \(pass (\d+)\)/);
+    // Also Step 3: "🔄 [UNIFIED PIPELINE] Step 3: Regenerating 2 still-low pages (pass 2)..."
+    const regenPassMatch = msg.match(/\[UNIFIED PIPELINE\] Step \d+: Regenerating (\d+) (?:low-scoring|still-low) pages \(pass (\d+)\)/);
     if (regenPassMatch) {
       stats.repairPipeline.passes.push({
         pass: parseInt(regenPassMatch[2]),
@@ -588,6 +617,29 @@ function extractImageStats(jobLines) {
     const step4Match = msg.match(/\[UNIFIED PIPELINE\] Step 4:\s*(\d+)\s*pages upgraded/);
     if (step4Match) {
       stats.repairPipeline.upgradedPages = parseInt(step4Match[1]);
+    }
+
+    // Character fix attempts: "👤 [UNIFIED PIPELINE] Fixing Lukas on page -3 (bbox: ...)"
+    const charFixStartMatch = msg.match(/\[UNIFIED PIPELINE\] Fixing (\S+) on page (-?\d+)/);
+    if (charFixStartMatch) {
+      stats.repairPipeline.charFixAttempts.push({
+        character: charFixStartMatch[1],
+        page: parseInt(charFixStartMatch[2]),
+        success: true, // Will be overridden if error follows
+        error: null
+      });
+    }
+
+    // Character fix failed: "❌ [UNIFIED PIPELINE] Character fix failed for Lukas on page -3: ..."
+    const charFixFailMatch = msg.match(/\[UNIFIED PIPELINE\] Character fix failed for (\S+) on page (-?\d+):\s*(.*)/);
+    if (charFixFailMatch) {
+      const attempt = stats.repairPipeline.charFixAttempts.find(
+        a => a.character === charFixFailMatch[1] && a.page === parseInt(charFixFailMatch[2])
+      );
+      if (attempt) {
+        attempt.success = false;
+        attempt.error = charFixFailMatch[3];
+      }
     }
 
     // Track current page being processed (from attempt messages)
@@ -959,8 +1011,11 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
   console.log('\n\ud83c\udfa8 IMAGE GENERATION');
 
   // Covers
-  if (imageStats.covers.skipped) {
+  const coversInRepair = imageStats.repairPipeline.coversInPipeline.length;
+  if (imageStats.covers.skipped && coversInRepair === 0) {
     console.log(`   Covers: SKIPPED (${imageStats.covers.skipReason || 'disabled'})`);
+  } else if (coversInRepair > 0) {
+    console.log(`   Covers: ${coversInRepair} generated (${imageStats.repairPipeline.coversInPipeline.join(', ')})`);
   } else if (imageStats.covers.generated) {
     console.log(`   Covers: Generated (${imageStats.covers.count} images)`);
   } else {
@@ -1049,39 +1104,126 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
     const hadRepairs = rp.passes.length > 0;
     console.log(`\n🔧 AUTO-REPAIR PIPELINE`);
     console.log(`   Images: ${rp.imageCount}, Threshold: ${rp.threshold}%, Max passes: ${rp.maxAttempts}`);
-    if (rp.evalDuration) {
-      console.log(`   Evaluation: ${rp.evalDuration}s, Avg score: ${rp.avgScore}%, Entity issues: ${rp.entityIssues}`);
-    }
 
-    if (hadRepairs) {
-      for (const pass of rp.passes) {
-        const dur = pass.duration ? ` in ${pass.duration}s` : '';
-        console.log(`   Pass ${pass.pass}: Regenerated ${pass.pagesRegenerated} pages${dur}`);
+    // Show per-page scores by pass
+    if (rp.pageScores.length > 0) {
+      // Group scores by pass
+      const scoresByPass = new Map();
+      for (const s of rp.pageScores) {
+        if (!scoresByPass.has(s.pass)) scoresByPass.set(s.pass, new Map());
+        scoresByPass.get(s.pass).set(s.page, s);
       }
-      if (rp.upgradedDetails.length > 0) {
-        console.log(`   Upgrades:`);
-        for (const u of rp.upgradedDetails) {
-          console.log(`   - Page ${u.page}: ${u.from} (${u.fromScore}%) → ${u.to} (${u.toScore}%)`);
+
+      // Collect all page numbers (sorted: positive first, then negative)
+      const allPages = [...new Set(rp.pageScores.map(s => s.page))].sort((a, b) => {
+        if (a >= 0 && b >= 0) return a - b;
+        if (a < 0 && b < 0) return a - b;
+        return a >= 0 ? -1 : 1;
+      });
+
+      // Page label helper
+      const pageLabel = (p) => p === -1 ? 'cover' : p === -2 ? 'initial' : p === -3 ? 'back' : `p${p}`;
+
+      // Initial evaluation (pass 0)
+      const pass0 = scoresByPass.get(0);
+      if (pass0) {
+        const evalDur = rp.evalDuration ? ` (${rp.evalDuration}s)` : '';
+        console.log(`\n   Pass 0 — Initial evaluation${evalDur}:`);
+        const scores = allPages.filter(p => pass0.has(p)).map(p => {
+          const s = pass0.get(p);
+          const marker = s.final < rp.threshold ? ' ✗' : '';
+          return `${pageLabel(p)}:${s.final}%${marker}`;
+        });
+        console.log(`     Scores: ${scores.join('  ')}`);
+        // Show entity penalties if any
+        if (rp.adjustedScores.length > 0) {
+          const penalties = rp.adjustedScores.map(a => `${pageLabel(a.page)}: ${a.quality}% - ${a.penalty} penalty = ${a.adjusted}%`);
+          console.log(`     Entity penalties: ${penalties.join(', ')}`);
+        }
+        if (rp.entityIssues > 0) {
+          console.log(`     Entity issues: ${rp.entityIssues}`);
+        }
+        // Pages that need regen
+        const bad = allPages.filter(p => pass0.has(p) && pass0.get(p).final < rp.threshold);
+        if (bad.length > 0) {
+          console.log(`     Below threshold: ${bad.map(p => pageLabel(p)).join(', ')}`);
         }
       }
-      console.log(`   Result: ${rp.upgradedPages} upgraded, ${rp.charFixed} character-fixed`);
-    } else {
-      console.log(`   Result: All pages above threshold, no repairs needed`);
+
+      // Subsequent passes
+      for (const pass of rp.passes) {
+        const passScores = scoresByPass.get(pass.pass);
+        const dur = pass.duration ? ` (${pass.duration}s)` : '';
+        console.log(`\n   Pass ${pass.pass} — Regenerated ${pass.pagesRegenerated} pages${dur}:`);
+        if (passScores) {
+          const scores = allPages.filter(p => passScores.has(p)).map(p => {
+            const s = passScores.get(p);
+            // Find previous score for this page
+            const prevPass = scoresByPass.get(pass.pass - 1);
+            const prev = prevPass?.get(p);
+            const delta = prev ? (s.final - prev.final) : 0;
+            const deltaStr = delta > 0 ? ` (+${delta})` : delta < 0 ? ` (${delta})` : '';
+            const marker = s.final < rp.threshold ? ' ✗' : '';
+            return `${pageLabel(p)}:${s.final}%${deltaStr}${marker}`;
+          });
+          console.log(`     Scores: ${scores.join('  ')}`);
+        }
+        // Pages still below threshold
+        const stillBad = allPages.filter(p => {
+          const s = passScores?.get(p) || scoresByPass.get(pass.pass - 1)?.get(p);
+          return s && s.final < rp.threshold;
+        });
+        if (stillBad.length > 0) {
+          console.log(`     Still below: ${stillBad.map(p => pageLabel(p)).join(', ')}`);
+        }
+      }
     }
 
-    // Show per-page scores (only last evaluation round, sorted by page)
+    // Pick best results
+    if (rp.upgradedDetails.length > 0) {
+      console.log(`\n   Pick best versions:`);
+      for (const u of rp.upgradedDetails) {
+        const pl = u.page === -1 ? 'cover' : u.page === -2 ? 'initial' : u.page === -3 ? 'back' : `p${u.page}`;
+        console.log(`     ${pl}: ${u.from} (${u.fromScore}%) → ${u.to} (${u.toScore}%)`);
+      }
+    }
+
+    // Character fix results
+    if (rp.charFixAttempts.length > 0) {
+      const succeeded = rp.charFixAttempts.filter(a => a.success).length;
+      const failed = rp.charFixAttempts.filter(a => !a.success).length;
+      console.log(`\n   Character fixes: ${succeeded} succeeded, ${failed} failed`);
+      for (const a of rp.charFixAttempts) {
+        const pl = a.page === -1 ? 'cover' : a.page === -2 ? 'initial' : a.page === -3 ? 'back' : `p${a.page}`;
+        if (a.success) {
+          console.log(`     ✓ ${a.character} on ${pl}`);
+        } else {
+          console.log(`     ✗ ${a.character} on ${pl}: ${a.error || 'unknown error'}`);
+        }
+      }
+    }
+
+    // Summary line
+    if (hadRepairs) {
+      console.log(`\n   Result: ${rp.upgradedPages} upgraded, ${rp.charFixed} character-fixed`);
+    } else {
+      console.log(`\n   Result: All pages above threshold, no repairs needed`);
+    }
+
+    // Final scores (last evaluation per page)
     if (rp.pageScores.length > 0) {
-      // Deduplicate: keep last score per page (re-evaluation overwrites)
       const lastScores = new Map();
       for (const s of rp.pageScores) lastScores.set(s.page, s);
-      const sorted = [...lastScores.values()].sort((a, b) => a.page - b.page);
-      const low = sorted.filter(s => s.final < rp.threshold);
-      if (low.length > 0) {
-        console.log(`   Below threshold: ${low.map(s => `p${s.page}(${s.final}%)`).join(', ')}`);
-      }
-      // Compact score line
-      const scoreStr = sorted.map(s => `${s.final}`).join(' ');
-      console.log(`   Final scores: [${scoreStr}]`);
+      const sorted = [...lastScores.values()].sort((a, b) => {
+        if (a.page >= 0 && b.page >= 0) return a.page - b.page;
+        if (a.page < 0 && b.page < 0) return a.page - b.page;
+        return a.page >= 0 ? -1 : 1;
+      });
+      const scoreStr = sorted.map(s => {
+        const pl = s.page === -1 ? 'cv' : s.page === -2 ? 'in' : s.page === -3 ? 'bk' : `${s.page}`;
+        return `${pl}:${s.final}`;
+      }).join(' ');
+      console.log(`   Final: [${scoreStr}]`);
     }
   }
 
