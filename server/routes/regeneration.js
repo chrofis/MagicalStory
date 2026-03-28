@@ -1662,7 +1662,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     // Get expected clothing for this page
     const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
-    log.debug(`🔄 [ITERATE] Expected clothing: ${expectedClothing}`);
+    log.debug(`🔄 [ITERATE] Expected clothing: ${typeof expectedClothing === 'object' ? JSON.stringify(expectedClothing) : expectedClothing}`);
 
     // Build available avatars
     const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
