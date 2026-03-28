@@ -592,6 +592,14 @@ async function saveStoryData(storyId, storyData) {
           }
         }
       }
+      // Save empty scene image separately and set flag for lazy loading
+      if (img.emptySceneImage) {
+        if (!hasSeparateImages) {
+          await saveStoryImage(storyId, 'empty_scene', img.pageNumber, img.emptySceneImage);
+          imagesSaved++;
+        }
+        img.hasEmptySceneImage = true;
+      }
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;
@@ -789,6 +797,12 @@ async function updateStoryDataOnly(storyId, storyData) {
             }
           }
         }
+      }
+      // Save empty scene image separately and set flag for lazy loading
+      if (img.emptySceneImage) {
+        await saveStoryImage(storyId, 'empty_scene', img.pageNumber, img.emptySceneImage);
+        imagesSaved++;
+        img.hasEmptySceneImage = true;
       }
       delete img.originalImage;
       delete img.preEntityRepairImage;

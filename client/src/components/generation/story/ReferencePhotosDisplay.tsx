@@ -19,6 +19,7 @@ interface ReferencePhotosDisplayProps {
   grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
   emptySceneImage?: string | null;  // Pre-generated empty scene (Pass 1)
   emptyScenePrompt?: string | null;  // Prompt used for empty scene
+  hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   language: string;
   // For lazy loading
   storyId?: string;
@@ -36,6 +37,7 @@ export function ReferencePhotosDisplay({
   grokRefImages,
   emptySceneImage,
   emptyScenePrompt,
+  hasEmptySceneImage,
   language,
   storyId,
   pageNumber
@@ -44,6 +46,7 @@ export function ReferencePhotosDisplay({
   const [loadedReferencePhotos, setLoadedReferencePhotos] = useState<ReferencePhoto[] | null>(null);
   const [loadedLandmarkPhotos, setLoadedLandmarkPhotos] = useState<LandmarkPhoto[] | null>(null);
   const [loadedVBGrid, setLoadedVBGrid] = useState<string | null>(null);
+  const [loadedEmptyScene, setLoadedEmptyScene] = useState<{ image: string; prompt?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -51,10 +54,11 @@ export function ReferencePhotosDisplay({
   const needsLazyLoadRef = referencePhotos?.some(p => p.hasPhoto && !p.photoUrl);
   const needsLazyLoadLandmark = landmarkPhotos?.some(p => p.hasPhoto && !p.photoData);
   const needsLazyLoadVBGrid = hasVisualBibleGrid && !visualBibleGrid;
+  const needsLazyLoadEmptyScene = hasEmptySceneImage && !emptySceneImage;
 
   const loadImages = useCallback(async () => {
     if (!storyId || !pageNumber || isLoading) return;
-    if (!needsLazyLoadRef && !needsLazyLoadLandmark && !needsLazyLoadVBGrid) return;
+    if (!needsLazyLoadRef && !needsLazyLoadLandmark && !needsLazyLoadVBGrid && !needsLazyLoadEmptyScene) return;
 
     setIsLoading(true);
     setLoadError(null);
@@ -78,12 +82,20 @@ export function ReferencePhotosDisplay({
           setLoadedLandmarkPhotos(landmarkData.landmarkPhotos as LandmarkPhoto[]);
         }
       }
+
+      // Load empty scene image
+      if (needsLazyLoadEmptyScene) {
+        const emptyData = await storyService.getDevImage(storyId, pageNumber, 'empty_scene');
+        if (emptyData?.emptySceneImage) {
+          setLoadedEmptyScene({ image: emptyData.emptySceneImage as string, prompt: emptyData.emptyScenePrompt as string });
+        }
+      }
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load images');
     } finally {
       setIsLoading(false);
     }
-  }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark, needsLazyLoadVBGrid]);
+  }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark, needsLazyLoadVBGrid, needsLazyLoadEmptyScene]);
 
   // Use loaded photos if available, otherwise use props
   const displayRefPhotos = loadedReferencePhotos || referencePhotos;
@@ -95,7 +107,10 @@ export function ReferencePhotosDisplay({
   const hasLandmarkPhotos = displayLandmarkPhotos && displayLandmarkPhotos.length > 0;
   const hasVBGrid = !!displayVBGrid || hasVisualBibleGrid;
 
-  if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid) return null;
+  const displayEmptySceneImage = loadedEmptyScene?.image || emptySceneImage;
+  const displayEmptyScenePrompt = loadedEmptyScene?.prompt || emptyScenePrompt;
+
+  if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid && !displayEmptySceneImage && !hasEmptySceneImage) return null;
 
   const totalCount = (referencePhotos?.length || 0) + (landmarkPhotos?.length || 0) + (hasVBGrid ? 1 : 0);
 
@@ -147,7 +162,7 @@ export function ReferencePhotosDisplay({
     <details
       className="bg-pink-50 border border-pink-300 rounded-lg p-3"
       onToggle={(e) => {
-        if ((e.target as HTMLDetailsElement).open && (needsLazyLoadRef || needsLazyLoadLandmark || needsLazyLoadVBGrid)) {
+        if ((e.target as HTMLDetailsElement).open && (needsLazyLoadRef || needsLazyLoadLandmark || needsLazyLoadVBGrid || needsLazyLoadEmptyScene)) {
           loadImages();
         }
       }}
@@ -184,7 +199,7 @@ export function ReferencePhotosDisplay({
       )}
 
       {/* ═══ Pass 1: Empty Scene ═══ */}
-      {emptySceneImage && (
+      {displayEmptySceneImage && (
         <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
           <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
             🎬 {language === 'de' ? 'Pass 1: Leere Szene (Stil-Anker)' : 'Pass 1: Empty Scene (Style Anchor)'}
@@ -209,26 +224,26 @@ export function ReferencePhotosDisplay({
           )}
 
           {/* Pass 1 prompt */}
-          {emptyScenePrompt && (
+          {displayEmptyScenePrompt && (
             <details>
               <summary className="text-[10px] text-emerald-600 cursor-pointer">{language === 'de' ? 'Prompt' : 'Prompt'}</summary>
-              <pre className="mt-1 text-[10px] bg-emerald-100 p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap text-emerald-800">{emptyScenePrompt}</pre>
+              <pre className="mt-1 text-[10px] bg-emerald-100 p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap text-emerald-800">{displayEmptyScenePrompt}</pre>
             </details>
           )}
 
           {/* Pass 1 output: generated empty scene */}
           <div className="text-[10px] text-emerald-600 font-medium">{language === 'de' ? 'Ausgabe ↓' : 'Output ↓'}</div>
           <img
-            src={emptySceneImage}
+            src={displayEmptySceneImage}
             alt="Empty scene background"
             className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setLightboxImage(emptySceneImage)}
+            onClick={() => setLightboxImage(displayEmptySceneImage)}
           />
         </div>
       )}
 
       {/* ═══ Pass 2: Character Placement ═══ */}
-      {emptySceneImage && (
+      {displayEmptySceneImage && (
         <div className="mt-3 bg-pink-50 border border-pink-200 rounded-lg p-3 space-y-2">
           <div className="text-xs font-semibold text-pink-700 flex items-center gap-1">
             👥 {language === 'de' ? 'Pass 2: Charaktere platzieren' : 'Pass 2: Character Placement'}
@@ -240,7 +255,7 @@ export function ReferencePhotosDisplay({
           {/* Show scene background thumbnail alongside character photos */}
           <div className="flex gap-2 flex-wrap items-start">
             <div className="relative">
-              <img src={emptySceneImage} alt="Scene bg" className="h-16 rounded border-2 border-emerald-400 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(emptySceneImage)} />
+              <img src={displayEmptySceneImage} alt="Scene bg" className="h-16 rounded border-2 border-emerald-400 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(displayEmptySceneImage)} />
               <span className="absolute -top-1 -left-1 text-[8px] bg-emerald-500 text-white px-1 rounded">BG</span>
             </div>
             {displayRefPhotos?.map((photo, i) => photo.photoUrl && (
@@ -256,7 +271,7 @@ export function ReferencePhotosDisplay({
       {/* ═══ Flat layout (no empty scene) ═══ */}
 
       {/* Character photos */}
-      {!emptySceneImage && hasCharacterPhotos && (
+      {!displayEmptySceneImage && hasCharacterPhotos && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
           {displayRefPhotos!.map((photo, idx) => (
             <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
@@ -301,7 +316,7 @@ export function ReferencePhotosDisplay({
       )}
 
       {/* Landmark photos (flat layout only) */}
-      {!emptySceneImage && hasLandmarkPhotos && (
+      {!displayEmptySceneImage && hasLandmarkPhotos && (
         <div className={hasCharacterPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
           <div className="text-xs font-semibold text-amber-700 mb-2 flex items-center gap-1">
             📍 {language === 'de' ? 'Wahrzeichen-Referenzfotos' : language === 'fr' ? 'Photos de monuments' : 'Landmark Reference Photos'}
@@ -349,7 +364,7 @@ export function ReferencePhotosDisplay({
       )}
 
       {/* Visual Bible Grid (flat layout only) */}
-      {!emptySceneImage && hasVBGrid && (
+      {!displayEmptySceneImage && hasVBGrid && (
         <div className={hasCharacterPhotos || hasLandmarkPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
           <div className="text-xs font-semibold text-indigo-700 mb-2 flex items-center gap-1">
             🔲 {language === 'de' ? 'Visual Bible Referenzgitter' : language === 'fr' ? 'Grille Visual Bible' : 'Visual Bible Reference Grid'}

@@ -730,6 +730,7 @@ export interface SceneImage {
   // Empty scene pre-generation (Pass 1: style anchor)
   emptySceneImage?: string;  // Base64 data URL of generated empty scene
   emptyScenePrompt?: string;  // Prompt used for empty scene generation
+  hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)

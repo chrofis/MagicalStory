@@ -1409,6 +1409,16 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         };
         break;
 
+      case 'empty_scene': {
+        // Load empty scene image from story_images table
+        const emptySceneRow = await getStoryImage(id, 'empty_scene', pageNum, 0);
+        result = {
+          emptySceneImage: emptySceneRow?.imageData || null,
+          emptyScenePrompt: sceneImage.emptyScenePrompt || null
+        };
+        break;
+      }
+
       case 'consistency':
         if (!sceneImage.consistencyRegen) {
           return res.status(404).json({ error: 'No consistency regen data' });

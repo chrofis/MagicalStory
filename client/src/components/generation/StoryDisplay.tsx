@@ -4483,7 +4483,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || (image as any)?.grokRefImages) && image && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.grokRefImages) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -4491,6 +4491,7 @@ export function StoryDisplay({
                                 hasVisualBibleGrid={image.hasVisualBibleGrid}
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
+                                hasEmptySceneImage={image.hasEmptySceneImage}
                                 grokRefImages={(image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}
@@ -4996,7 +4997,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage) && (
+                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage || image.hasEmptySceneImage) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -5004,6 +5005,7 @@ export function StoryDisplay({
                                 hasVisualBibleGrid={image.hasVisualBibleGrid}
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
+                                hasEmptySceneImage={image.hasEmptySceneImage}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}

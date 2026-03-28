@@ -538,7 +538,7 @@ export const storyService = {
   async getDevImage(
     storyId: string,
     pageNumber: number,
-    type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency',
+    type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency' | 'empty_scene',
     options?: { index?: number; field?: string }
   ): Promise<{
     originalImage?: string | null;
@@ -557,6 +557,8 @@ export const storyService = {
       photoData?: string | null;
     }>;
     visualBibleGrid?: string | null;
+    emptySceneImage?: string | null;
+    emptyScenePrompt?: string | null;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');
