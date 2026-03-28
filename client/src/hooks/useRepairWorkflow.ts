@@ -84,6 +84,7 @@ function createInitialState(): RepairWorkflowState {
       pagesRepaired: {},
       pagesFailed: {},
     },
+    stepErrors: {},
     sessionId: `repair-${Date.now()}`,
   };
 }
@@ -236,12 +237,16 @@ export function useRepairWorkflow({
     }));
   }, []);
 
-  const failStep = useCallback((step: RepairWorkflowStep, _error?: string) => {
+  const failStep = useCallback((step: RepairWorkflowStep, error?: string) => {
     setWorkflowState(prev => ({
       ...prev,
       stepStatus: {
         ...prev.stepStatus,
         [step]: 'failed',
+      },
+      stepErrors: {
+        ...prev.stepErrors,
+        [step]: error || 'Unknown error',
       },
     }));
   }, []);

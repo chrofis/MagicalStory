@@ -1052,5 +1052,6 @@ export interface RepairWorkflowState {
     pagesRepaired: Record<string, RepairPageResult[]>;
     pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: RepairComparison | null }>>;
   };
+  stepErrors: Partial<Record<RepairWorkflowStep, string>>;
   sessionId: string;
 }

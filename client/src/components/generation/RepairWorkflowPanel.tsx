@@ -501,31 +501,39 @@ export function RepairWorkflowPanel({
     const config = STEP_CONFIG[step];
     const Icon = config.icon;
     const status = workflowState.stepStatus[step];
+    const errorMsg = workflowState.stepErrors?.[step];
     const isExpandedStep = expandedSteps.has(step);
     const stepNum = getStepNumber(step);
 
     return (
-      <button
-        onClick={() => toggleStepExpanded(step)}
-        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-          status === 'in-progress' ? 'bg-blue-50' :
-          status === 'completed' ? 'bg-green-50' :
-          status === 'failed' ? 'bg-red-50' :
-          'bg-gray-50 hover:bg-gray-100'
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <span className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-sm font-bold">
-            {stepNum}
-          </span>
-          <Icon className={`w-4 h-4 ${status === 'in-progress' ? 'animate-spin text-blue-600' : 'text-gray-600'}`} />
-          <span className="font-medium text-sm">{config.label}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <StepStatusBadge status={status} />
-          {isExpandedStep ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </div>
-      </button>
+      <>
+        <button
+          onClick={() => toggleStepExpanded(step)}
+          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+            status === 'in-progress' ? 'bg-blue-50' :
+            status === 'completed' ? 'bg-green-50' :
+            status === 'failed' ? 'bg-red-50' :
+            'bg-gray-50 hover:bg-gray-100'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-sm font-bold">
+              {stepNum}
+            </span>
+            <Icon className={`w-4 h-4 ${status === 'in-progress' ? 'animate-spin text-blue-600' : 'text-gray-600'}`} />
+            <span className="font-medium text-sm">{config.label}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <StepStatusBadge status={status} />
+            {isExpandedStep ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </div>
+        </button>
+        {status === 'failed' && errorMsg && (
+          <div className="mx-3 mt-1 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+            {errorMsg}
+          </div>
+        )}
+      </>
     );
   };
 
