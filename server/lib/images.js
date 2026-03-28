@@ -2132,7 +2132,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
           expectedLCR: expectedLCR,
           actual: figure.position
         });
-        log.warn(`⚠️ [BBOX-ENRICH] Position mismatch: "${charName}" expected at ${expectedLCR} (${expectedPos}) but detected at ${figure.position}`);
+        log.debug(`📍 [BBOX-ENRICH] Position note: "${charName}" expected at ${expectedLCR} (${expectedPos}) but detected at ${figure.position}`);
       }
     }
   }
@@ -5323,9 +5323,59 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
 
         try {
-          log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber} (bbox: [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
-          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, bbox, fix.charName, {
-            issueDescription: fix.issueDescription
+          // Determine face-only vs full body repair from issue types (same logic as manual pipeline)
+          const issueText = (fix.issueDescription || '').toLowerCase();
+          const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
+          const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
+
+          // Get face and body bboxes from entity report
+          let faceBbox = null;
+          let bodyBbox = bbox; // Default to whatever bbox we found
+          if (entityReport?.characters?.[fix.charName]?.byClothing) {
+            for (const clothingData of Object.values(entityReport.characters[fix.charName].byClothing)) {
+              const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+              if (app?.faceBox) {
+                faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
+              }
+              if (app?.bodyBox) {
+                bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
+              }
+            }
+          }
+
+          const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
+          const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || bbox);
+
+          // Collect face bboxes of OTHER characters on this page to protect during blend
+          const protectedFaces = [];
+          if (entityReport?.characters) {
+            for (const [otherName, otherCharReport] of Object.entries(entityReport.characters)) {
+              if (otherName === fix.charName) continue;
+              if (!otherCharReport?.byClothing) continue;
+              for (const clothingData of Object.values(otherCharReport.byClothing)) {
+                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+                if (app?.faceBox) {
+                  const fb = app.faceBox;
+                  protectedFaces.push(Array.isArray(fb) ? fb : [fb.y, fb.x, fb.y + fb.height, fb.x + fb.width]);
+                }
+              }
+            }
+          }
+
+          // Get clothing and scene descriptions for the prompt
+          const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
+          const sceneDesc = rawImg?.sceneDescription || rawImg?.text || '';
+
+          log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} (bbox: [${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
+          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, fix.charName, {
+            imageBackend: 'grok',
+            useBlended: true,
+            issueDescription: fix.issueDescription,
+            clothingDescription: clothingDesc,
+            sceneDescription: sceneDesc,
+            faceBbox,
+            protectedFaces,
+            whiteoutTarget: useFaceOnly ? 'face' : 'body',
           });
 
           if (repairResult?.imageData) {
