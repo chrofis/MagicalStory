@@ -720,6 +720,14 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   }
   delete dataForStorage.originalImage;
 
+  // Save empty scene image if present (same as saveStoryData)
+  if (dataForStorage.emptySceneImage) {
+    await saveStoryImage(storyId, 'empty_scene', pageNumber, dataForStorage.emptySceneImage);
+    imagesSaved++;
+    dataForStorage.hasEmptySceneImage = true;
+  }
+  delete dataForStorage.emptySceneImage;
+
   if (imagesSaved > 0) {
     console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
   }

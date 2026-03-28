@@ -1614,8 +1614,14 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       // Group images by page/cover type
       const sceneImagesMap = new Map();
       const covers = {};
+      const pagesWithEmptyScene = new Set();
 
       for (const row of separateImages) {
+        if (row.image_type === 'empty_scene') {
+          // Track which pages have empty scene backgrounds (frontend lazy-loads them)
+          pagesWithEmptyScene.add(row.page_number);
+          continue;
+        }
         if (row.image_type === 'scene') {
           const pageNum = row.page_number;
 
@@ -1821,20 +1827,22 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         }
       }
 
-      // Convert map to sorted array
+      // Convert map to sorted array, set hasEmptySceneImage flag for lazy-loading
       const images = Array.from(sceneImagesMap.values())
         .sort((a, b) => a.pageNumber - b.pageNumber)
         .map(img => {
+          const hasEmptySceneImage = pagesWithEmptyScene.has(img.pageNumber) || undefined;
           if (activeOnly) {
             // Fast path: already have active image, no imageVersions
-            return img;
+            return hasEmptySceneImage ? { ...img, hasEmptySceneImage } : img;
           }
           // Full path: mark active versions
           const activeIdx = activeVersions[img.pageNumber.toString()];
           return {
             ...img,
             isActive: activeIdx === 0 || activeIdx === undefined,
-            imageVersions: img.imageVersions.length > 0 ? img.imageVersions : undefined
+            imageVersions: img.imageVersions.length > 0 ? img.imageVersions : undefined,
+            ...(hasEmptySceneImage && { hasEmptySceneImage }),
           };
         });
 
