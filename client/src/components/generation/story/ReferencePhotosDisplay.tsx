@@ -183,39 +183,80 @@ export function ReferencePhotosDisplay({
         </div>
       )}
 
-      {/* Pass 1: Empty Scene (if generated) */}
+      {/* ═══ Pass 1: Empty Scene ═══ */}
       {emptySceneImage && (
-        <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-          <div className="text-xs font-semibold text-emerald-700 mb-2 flex items-center gap-1">
+        <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
             🎬 {language === 'de' ? 'Pass 1: Leere Szene (Stil-Anker)' : 'Pass 1: Empty Scene (Style Anchor)'}
           </div>
-          <img
-            src={emptySceneImage}
-            alt="Empty scene background"
-            className="w-full max-h-48 object-contain rounded border border-emerald-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setLightboxImage(emptySceneImage)}
-            title="Click to enlarge"
-          />
+
+          {/* Pass 1 inputs: landmark photos + VB grid */}
+          <div className="text-[10px] text-emerald-600 font-medium">
+            {language === 'de' ? 'Eingaben →' : 'Inputs →'}
+            {hasLandmarkPhotos && ` 📍 ${displayLandmarkPhotos!.length} landmark`}
+            {hasVBGrid && ' 🔲 VB grid'}
+            {!hasLandmarkPhotos && !hasVBGrid && (language === 'de' ? ' nur Text-Prompt' : ' text prompt only')}
+          </div>
+          {(hasLandmarkPhotos || hasVBGrid) && (
+            <div className="flex gap-2 flex-wrap">
+              {displayLandmarkPhotos?.map((lm, i) => lm.photoData && (
+                <img key={`lm-${i}`} src={lm.photoData} alt={lm.name} className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(lm.photoData!)} title={`📍 ${lm.name}`} />
+              ))}
+              {displayVBGrid && (
+                <img src={displayVBGrid} alt="VB Grid" className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(displayVBGrid)} title="🔲 Visual Bible Grid" />
+              )}
+            </div>
+          )}
+
+          {/* Pass 1 prompt */}
           {emptyScenePrompt && (
-            <details className="mt-2">
-              <summary className="text-[10px] text-emerald-600 cursor-pointer">
-                {language === 'de' ? 'Prompt anzeigen' : 'Show prompt'}
-              </summary>
+            <details>
+              <summary className="text-[10px] text-emerald-600 cursor-pointer">{language === 'de' ? 'Prompt' : 'Prompt'}</summary>
               <pre className="mt-1 text-[10px] bg-emerald-100 p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap text-emerald-800">{emptyScenePrompt}</pre>
             </details>
           )}
+
+          {/* Pass 1 output: generated empty scene */}
+          <div className="text-[10px] text-emerald-600 font-medium">{language === 'de' ? 'Ausgabe ↓' : 'Output ↓'}</div>
+          <img
+            src={emptySceneImage}
+            alt="Empty scene background"
+            className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setLightboxImage(emptySceneImage)}
+          />
         </div>
       )}
 
-      {/* Pass 2: Character Placement */}
-      {emptySceneImage && hasCharacterPhotos && (
-        <div className="mt-3 text-xs font-semibold text-pink-700 flex items-center gap-1">
-          👥 {language === 'de' ? 'Pass 2: Charaktere platzieren' : 'Pass 2: Character Placement'}
+      {/* ═══ Pass 2: Character Placement ═══ */}
+      {emptySceneImage && (
+        <div className="mt-3 bg-pink-50 border border-pink-200 rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-pink-700 flex items-center gap-1">
+            👥 {language === 'de' ? 'Pass 2: Charaktere platzieren' : 'Pass 2: Character Placement'}
+          </div>
+          <div className="text-[10px] text-pink-600 font-medium">
+            {language === 'de' ? 'Eingaben →' : 'Inputs →'}
+            {` 🎬 scene background + ${displayRefPhotos?.length || 0} character photos`}
+          </div>
+          {/* Show scene background thumbnail alongside character photos */}
+          <div className="flex gap-2 flex-wrap items-start">
+            <div className="relative">
+              <img src={emptySceneImage} alt="Scene bg" className="h-16 rounded border-2 border-emerald-400 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(emptySceneImage)} />
+              <span className="absolute -top-1 -left-1 text-[8px] bg-emerald-500 text-white px-1 rounded">BG</span>
+            </div>
+            {displayRefPhotos?.map((photo, i) => photo.photoUrl && (
+              <div key={i} className="relative">
+                <img src={photo.photoUrl} alt={photo.name} className="h-16 rounded border border-pink-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(photo.photoUrl)} />
+                <span className="absolute -top-1 -left-1 text-[8px] bg-pink-500 text-white px-1 rounded">{photo.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* ═══ Flat layout (no empty scene) ═══ */}
 
       {/* Character photos */}
-      {hasCharacterPhotos && (
+      {!emptySceneImage && hasCharacterPhotos && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
           {displayRefPhotos!.map((photo, idx) => (
             <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
@@ -259,8 +300,8 @@ export function ReferencePhotosDisplay({
         </div>
       )}
 
-      {/* Landmark photos */}
-      {hasLandmarkPhotos && (
+      {/* Landmark photos (flat layout only) */}
+      {!emptySceneImage && hasLandmarkPhotos && (
         <div className={hasCharacterPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
           <div className="text-xs font-semibold text-amber-700 mb-2 flex items-center gap-1">
             📍 {language === 'de' ? 'Wahrzeichen-Referenzfotos' : language === 'fr' ? 'Photos de monuments' : 'Landmark Reference Photos'}
@@ -307,8 +348,8 @@ export function ReferencePhotosDisplay({
         </div>
       )}
 
-      {/* Visual Bible Grid (combined VB elements + secondary landmarks) */}
-      {hasVBGrid && (
+      {/* Visual Bible Grid (flat layout only) */}
+      {!emptySceneImage && hasVBGrid && (
         <div className={hasCharacterPhotos || hasLandmarkPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
           <div className="text-xs font-semibold text-indigo-700 mb-2 flex items-center gap-1">
             🔲 {language === 'de' ? 'Visual Bible Referenzgitter' : language === 'fr' ? 'Grille Visual Bible' : 'Visual Bible Reference Grid'}
