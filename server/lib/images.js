@@ -5788,7 +5788,9 @@ OUTPUT: A single image matching the reference style.`;
     { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
   ];
 
-  const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
+  // Style repair always uses a Gemini image model (pageImage may be Grok)
+  const defaultPageImage = MODEL_DEFAULTS.pageImage || '';
+  const modelId = defaultPageImage.startsWith('gemini') ? defaultPageImage : 'gemini-2.5-flash-image';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   const systemInstruction = getImageSystemInstruction();
@@ -5926,7 +5928,9 @@ Output a single corrected image.`;
     { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
   ];
 
-  const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
+  // Character repair always uses a Gemini image model (pageImage may be Grok)
+  const defaultPageImage = MODEL_DEFAULTS.pageImage || '';
+  const modelId = defaultPageImage.startsWith('gemini') ? defaultPageImage : 'gemini-2.5-flash-image';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   const systemInstruction = getImageSystemInstruction();
