@@ -4903,6 +4903,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 before: sceneImage.imageData,
                 after: grokResult.imageData,
                 reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
+                croppedAvatar: grokResult.croppedAvatar || null,
                 blackoutImage: grokResult.blackoutImage || null,
                 grokRawResult: grokResult.grokRawResult || null,
                 blendMask: grokResult.blendMask || null,
@@ -5005,7 +5006,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           // Carry forward bbox from previously active version — character repair (blended mode)
           // only changes a localized region, so overall bbox coordinates remain valid
-          const prevActive = existingImage.imageVersions?.find(v => v.isActive);
+          // Find active version via DB (isActive flags can be stale)
+          const versionKey = isCover ? coverType : update.pageNumber;
+          const activeDbIdx = await getActiveVersion(id, versionKey);
+          const prevActive = existingImage.imageVersions?.[activeDbIdx] || existingImage.imageVersions?.find(v => v.isActive);
           const carryForwardBbox = prevActive?.bboxDetection || existingImage.bboxDetection || null;
 
           if (!existingImage.imageVersions) {
