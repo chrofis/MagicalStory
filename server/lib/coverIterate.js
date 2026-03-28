@@ -124,8 +124,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
     coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
   }
 
-  // Apply styled avatars
-  if (!coverClothing.startsWith('costumed')) {
+  // Apply styled avatars (skip if photos already have styled data from story persistence)
+  const allAlreadyStyled = coverCharacterPhotos.every(p =>
+    p.photoType?.startsWith('styled-') || p.photoType?.startsWith('costumed-')
+  );
+  if (!allAlreadyStyled && !coverClothing.startsWith('costumed')) {
     coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
   }
 

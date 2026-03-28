@@ -1408,13 +1408,13 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
       return 'standard';
     }
 
-    // Found keyword but no valid value - log warning
+    // Found keyword but no valid value - log error and default to standard
     if (warnOnInvalid) {
-      // Extract what value was actually there (first word after colon)
       const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
-      const invalidValue = invalidValueMatch ? invalidValueMatch[1] : 'unknown';
-      log.warn(`[CLOTHING] Invalid clothing value "${invalidValue}" found, defaulting to standard. Valid values: winter, summer, standard, costumed`);
+      const invalidValue = invalidValueMatch ? invalidValueMatch[1] : '(empty)';
+      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"), defaulting to standard. Valid values: winter, summer, standard, costumed`);
     }
+    return 'standard';
   }
 
   return null;

@@ -532,9 +532,21 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
   if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
     const blockReason = data.promptFeedback?.blockReason || 'empty response';
 
-    // Try fallback to gemini-2.0-flash if using a different model
+    // Try fallback to Grok (no PROHIBITED_CONTENT issues), then gemini-2.0-flash as last resort
     if (modelId !== 'gemini-2.0-flash') {
-      log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with gemini-2.0-flash...`);
+      const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
+      if (grokFallbackModel && process.env.XAI_API_KEY) {
+        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with grok-4-fast...`);
+        try {
+          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, {});
+          return { ...grokResult, modelId: grokFallbackModel.modelId };
+        } catch (grokErr) {
+          log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying gemini-2.0-flash...`);
+        }
+      } else {
+        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with gemini-2.0-flash...`);
+      }
+
       response = await callAPI('gemini-2.0-flash');
 
       if (!response.ok) {
@@ -544,7 +556,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
       data = await response.json();
 
       if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-        throw new Error('No text in Gemini response (both models failed)');
+        throw new Error('No text in Gemini response (all fallbacks failed)');
       }
     } else {
       throw new Error('No text in Gemini response');

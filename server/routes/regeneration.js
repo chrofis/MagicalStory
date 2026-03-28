@@ -1698,7 +1698,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Step 5: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
     const effectiveSceneModel = sceneModel || MODEL_DEFAULTS.sceneIteration;
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with ${effectiveSceneModel}...`);
-    const sceneResult = await callClaudeAPI(scenePrompt, 10000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Parse the scene JSON to extract previewMismatches
@@ -1800,7 +1800,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     const artStyle = storyData.artStyle || 'pixar';
     let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, effectiveClothingRequirements);
-    if (!clothingCategory || !clothingCategory.startsWith('costumed')) {
+    const allAlreadyStyled = referencePhotos.every(p =>
+      p.photoType?.startsWith('styled-') || p.photoType?.startsWith('costumed-')
+    );
+    if (!allAlreadyStyled && (!clothingCategory || !clothingCategory.startsWith('costumed'))) {
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
 
