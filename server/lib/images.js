@@ -5269,37 +5269,71 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       // Fixes within a page must stay sequential (each uses previous output)
       for (const fix of pageFixes) {
-        // Find bbox for this character on this page
-        // Priority 1: quality eval matches[].face_bbox from best version
-        // Priority 2: bboxDetection.figures[].faceBox from best version
-        let bbox = null;
+        // 3-tier bbox lookup (same as manual repair pipeline):
+        // 1. Scene bboxDetection from best version (refined Pass 2 data)
+        // 2. Entity report appearances
+        // 3. Fresh detection as fallback
+        let faceBbox = null;
+        let bodyBbox = null;
         const bestEval = best.evaluation;
 
-        if (bestEval?.matches) {
+        // Tier 1: bboxDetection on the scene (from quality eval — has refined Pass 2 data)
+        if (bestEval?.bboxDetection?.figures) {
+          const figure = bestEval.bboxDetection.figures.find(f =>
+            f.name?.toLowerCase() === fix.charName.toLowerCase() ||
+            f.label?.toLowerCase().includes(fix.charName.toLowerCase())
+          );
+          if (figure) {
+            if (figure.faceBox) faceBbox = figure.faceBox;
+            if (figure.bodyBox) bodyBbox = figure.bodyBox;
+          }
+        }
+
+        // Tier 2: entity report appearances
+        if (!faceBbox && !bodyBbox && entityReport?.characters?.[fix.charName]?.byClothing) {
+          for (const clothingData of Object.values(entityReport.characters[fix.charName].byClothing)) {
+            const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+            if (app?.faceBox) {
+              faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
+            }
+            if (app?.bodyBox) {
+              bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
+            }
+            if (faceBbox || bodyBbox) break;
+          }
+        }
+
+        // Tier 3: quality eval matches (less reliable — may only have face_bbox)
+        if (!faceBbox && !bodyBbox && bestEval?.matches) {
           const charMatch = bestEval.matches.find(m =>
             m.name?.toLowerCase() === fix.charName.toLowerCase() ||
             m.character?.toLowerCase() === fix.charName.toLowerCase()
           );
-          if (charMatch?.face_bbox) {
-            bbox = charMatch.face_bbox;
-          } else if (charMatch?.bbox) {
-            bbox = charMatch.bbox;
+          if (charMatch?.face_bbox) faceBbox = charMatch.face_bbox;
+          if (charMatch?.bbox) bodyBbox = charMatch.bbox;
+        }
+
+        if (!faceBbox && !bodyBbox) {
+          // Tier 4: fresh detection as last resort
+          log.info(`🔍 [UNIFIED PIPELINE] No stored bbox for ${fix.charName} on page ${pageNumber}, running fresh detection...`);
+          try {
+            const character = characters.find(c => c.name === fix.charName);
+            const detection = await detectAllBoundingBoxes(currentImageData, {
+              expectedCharacters: [{ name: fix.charName }]
+            });
+            const charFigure = detection?.figures?.find(f =>
+              f.name?.toLowerCase() === fix.charName.toLowerCase()
+            );
+            if (charFigure) {
+              faceBbox = charFigure.faceBox || null;
+              bodyBbox = charFigure.bodyBox || null;
+            }
+          } catch (detectErr) {
+            log.warn(`⚠️ [UNIFIED PIPELINE] Fresh bbox detection failed for ${fix.charName}: ${detectErr.message}`);
           }
         }
 
-        if (!bbox && bestEval?.bboxDetection?.figures) {
-          const figure = bestEval.bboxDetection.figures.find(f =>
-            f.name?.toLowerCase() === fix.charName.toLowerCase() ||
-            f.label?.toLowerCase() === fix.charName.toLowerCase()
-          );
-          if (figure?.faceBox) {
-            bbox = figure.faceBox;
-          } else if (figure?.box) {
-            bbox = figure.box;
-          }
-        }
-
-        if (!bbox) {
+        if (!faceBbox && !bodyBbox) {
           log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}, ${fix.charName}: no bbox found, skipping character fix`);
           continue;
         }
@@ -5328,23 +5362,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
           const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
 
-          // Get face and body bboxes from entity report
-          let faceBbox = null;
-          let bodyBbox = bbox; // Default to whatever bbox we found
-          if (entityReport?.characters?.[fix.charName]?.byClothing) {
-            for (const clothingData of Object.values(entityReport.characters[fix.charName].byClothing)) {
-              const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-              if (app?.faceBox) {
-                faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
-              }
-              if (app?.bodyBox) {
-                bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
-              }
-            }
-          }
-
           const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
-          const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || bbox);
+          const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
           // Collect face bboxes of OTHER characters on this page to protect during blend
           const protectedFaces = [];
