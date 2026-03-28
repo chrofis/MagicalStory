@@ -7019,7 +7019,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const errorMsg = error.message.toLowerCase();
       const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
                            errorMsg.includes('prohibited') || errorMsg.includes('filtered') ||
-                           errorMsg.includes('no candidates');
+                           errorMsg.includes('no candidates') || errorMsg.includes('moderation');
 
       if (isSafetyBlock && !wasSceneRewritten && attempts < MAX_ATTEMPTS && callTextModel) {
         log.debug(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
