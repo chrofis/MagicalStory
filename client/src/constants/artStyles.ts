@@ -157,4 +157,16 @@ export const artStyles: ArtStyle[] = [
     },
     prompt: 'Low poly 3D model, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley',
   },
+  {
+    id: 'realistic',
+    name: { en: 'Realistic', de: 'Realistisch', fr: 'Réaliste' },
+    emoji: '📷',
+    image: '/images/concept art style.jpg',
+    description: {
+      en: 'Photorealistic illustration with natural lighting',
+      de: 'Fotorealistische Illustration mit natürlichem Licht',
+      fr: 'Illustration photoréaliste avec éclairage naturel',
+    },
+    prompt: 'Photorealistic children\'s book illustration, natural lighting, cinematic composition, real-world textures, shallow depth of field, professional photography aesthetic',
+  },
 ];

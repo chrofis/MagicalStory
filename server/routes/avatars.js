@@ -36,7 +36,8 @@ const ART_STYLE_SAMPLES = {
   'chibi': 'chibi style.jpg',
   'manga': 'manga style.jpg',
   'pixel': 'pixel style.jpg',
-  'lowpoly': 'low poly 3-D style.jpg'
+  'lowpoly': 'low poly 3-D style.jpg',
+  'realistic': 'concept art style.jpg'  // Reuse concept art sample (closest to photorealistic)
 };
 
 const styleSampleCache = new Map();
