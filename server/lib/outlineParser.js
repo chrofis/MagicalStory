@@ -78,11 +78,10 @@ function parseCharacterClothingBlock(content) {
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
     // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
-    // IMPORTANT: Uses lazy quantifier [^:\r\n]+? for name to avoid catastrophic backtracking.
-    // The old pattern ((?:[^:\r\n,(]+|\([^)]*\))+) had nested quantifiers that caused O(2^n) backtracking
-    // when AI generated costumed:{description with commas} format.
+    // Name pattern: match name + optional parenthesized metadata (which may contain colons like "depth: background").
+    // Uses (?:[^(:\r\n]+|\([^)]*\))+ to allow colons inside parentheses but not outside.
     // Clothing pattern handles costumed:{...} (braces with commas inside) and costumed:type (plain).
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\r\n]+?):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))/gim;
+    const linePattern = /(?:^|,\s*)[-*]?\s*((?:[^(:\r\n]+|\([^)]*\))+?):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();

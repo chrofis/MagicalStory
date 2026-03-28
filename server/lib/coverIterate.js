@@ -97,42 +97,60 @@ async function iterateCover(coverKey, storyData, options = {}) {
       })
     : characters;
 
-  // Character selection: prefer characters mentioned in scene description
+  // Character selection: use cover hints (authoritative) > scene description > fallback
   const MAX_COVER_CHARACTERS = 5;
   const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
 
-  // Extract characters mentioned in the scene description (case-insensitive match)
-  const sceneDescLower = sceneDescription.toLowerCase();
-  const mentionedChars = mergedCharacters.filter(c => sceneDescLower.includes(c.name.toLowerCase()));
-
-  const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
-  const nonMainChars = mainChars.length > 0
-    ? mergedCharacters.filter(c => !c.isMainCharacter)
-    : mergedCharacters;
+  // Cover hints from outline — authoritative character list with per-character clothing
+  const hintKey = coverKey === 'frontCover' ? 'titlePage' : coverKey === 'initialPage' ? 'initialPage' : 'backCover';
+  const coverHint = storyData.coverHints?.[hintKey];
+  const hintCharClothing = coverHint?.characterClothing;
 
   let coverCharacterPhotos;
-  let selectedCoverCharacters;  // Track character objects for bbox detection
-  if (normalizedCoverType === 'front') {
-    selectedCoverCharacters = mainChars.length > 0 ? mainChars : mergedCharacters;
-    if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
-      selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
+  let selectedCoverCharacters;
+
+  if (hintCharClothing && Object.keys(hintCharClothing).length > 0) {
+    // Primary: use outline's character list (matches initial generation logic)
+    const hintCharNames = Object.keys(hintCharClothing);
+    selectedCoverCharacters = mergedCharacters.filter(c =>
+      hintCharNames.some(name => name.toLowerCase() === c.name.toLowerCase())
+    ).slice(0, MAX_COVER_CHARACTERS);
+    // Merge hint clothing into clothingRequirements for avatar lookup
+    const mergedClothing = { ...clothingRequirements };
+    for (const [charName, clothing] of Object.entries(hintCharClothing)) {
+      mergedClothing[charName] = { ...(mergedClothing[charName] || {}), _currentClothing: clothing };
     }
-    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
-  } else if (mentionedChars.length > 0) {
-    // Use characters mentioned in the scene description (most accurate for iterate)
-    selectedCoverCharacters = mentionedChars.slice(0, MAX_COVER_CHARACTERS);
-    log.info(`🔄 [COVER-ITERATE] ${coverKey}: Selected ${selectedCoverCharacters.map(c => c.name).join(', ')} from scene description`);
-    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, mergedClothing);
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: Selected ${selectedCoverCharacters.map(c => c.name).join(', ')} from coverHints`);
   } else {
-    // Fallback: split characters between initial and back covers
-    const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
-    const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
-    const halfPoint = Math.ceil(nonMainChars.length / 2);
-    const extras = normalizedCoverType === 'initialPage'
-      ? nonMainChars.slice(0, halfPoint).slice(0, extraSlots)
-      : nonMainChars.slice(halfPoint).slice(0, extraSlots);
-    selectedCoverCharacters = [...mainCapped, ...extras];
-    coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    // Fallback: extract characters mentioned in the scene description
+    const sceneDescLower = sceneDescription.toLowerCase();
+    const mentionedChars = mergedCharacters.filter(c => sceneDescLower.includes(c.name.toLowerCase()));
+
+    if (mentionedChars.length > 0) {
+      selectedCoverCharacters = mentionedChars.slice(0, MAX_COVER_CHARACTERS);
+      log.info(`🔄 [COVER-ITERATE] ${coverKey}: Selected ${selectedCoverCharacters.map(c => c.name).join(', ')} from scene description`);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    } else {
+      // Last fallback: main chars for front, split for others
+      const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
+      const nonMainChars = mainChars.length > 0
+        ? mergedCharacters.filter(c => !c.isMainCharacter)
+        : mergedCharacters;
+      if (normalizedCoverType === 'front') {
+        selectedCoverCharacters = mainChars.length > 0 ? mainChars : mergedCharacters;
+      } else {
+        const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
+        const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+        const halfPoint = Math.ceil(nonMainChars.length / 2);
+        const extras = normalizedCoverType === 'initialPage'
+          ? nonMainChars.slice(0, halfPoint).slice(0, extraSlots)
+          : nonMainChars.slice(halfPoint).slice(0, extraSlots);
+        selectedCoverCharacters = [...mainCapped, ...extras];
+      }
+      selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    }
   }
 
   // Apply styled avatars (skip if photos already have styled data from story persistence)

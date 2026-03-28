@@ -4238,6 +4238,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
+      coverHints: coverHints, // Cover scene hints with per-character clothing from outline
       pageClothing: pageClothingData, // Clothing per page
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
