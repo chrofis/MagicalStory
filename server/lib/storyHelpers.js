@@ -3642,17 +3642,23 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
     extractLocFromString(sceneMetadata.setting.location);
   }
 
-  // Then check objects array
+  // Then check objects array (objects can be strings or {id, name, position} objects)
   if (sceneMetadata?.objects) {
     for (const obj of sceneMetadata.objects) {
-      extractLocFromString(obj);
+      if (typeof obj === 'string') {
+        extractLocFromString(obj);
+      } else if (obj && typeof obj === 'object') {
+        extractLocFromString(obj.id);
+        extractLocFromString(obj.name);
+      }
     }
   }
 
   if (locIds.length === 0 && locNames.length === 0) return [];
 
   // Get requested variant number (default to 1)
-  const requestedVariant = sceneMetadata?.landmarkVariant || 1;
+  const requestedVariant = typeof sceneMetadata?.landmarkVariant === 'number' ? sceneMetadata.landmarkVariant :
+    typeof sceneMetadata?.landmarkVariant === 'string' ? parseInt(sceneMetadata.landmarkVariant.replace(/\D/g, '')) || 1 : 1;
 
   // Find matching locations
   const matchingLocations = visualBible.locations.filter(loc =>
@@ -3660,7 +3666,12 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
     loc.isRealLandmark
   );
 
-  if (matchingLocations.length === 0) return [];
+  if (matchingLocations.length === 0) {
+    // Debug: explain why no matches
+    const allVbLocIds = visualBible.locations.map(l => `${l.id}(${l.isRealLandmark ? 'landmark' : 'location'})`);
+    log.debug(`[LANDMARK-SCENE] No matches for IDs=[${locIds.join(',')}] names=[${locNames.join(',')}] in VB locations: [${allVbLocIds.join(', ')}]`);
+    return [];
+  }
 
   // Load photos for each matching location
   const results = [];
@@ -3689,6 +3700,8 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
         source: loc.photoSource,
         variantNumber: 1
       });
+    } else {
+      log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) matched but has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
     }
   }
 
