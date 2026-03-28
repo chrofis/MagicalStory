@@ -78,8 +78,8 @@ export function useDeveloperMode(): DeveloperModeState {
   const [devSkipText, setDevSkipText] = useState(false);
   const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
   const [devSkipImages, setDevSkipImages] = useState(false);
-  // Skip covers by default in dev mode
-  const [devSkipCovers, setDevSkipCovers] = useState(wasDevMode);
+  // Don't skip covers by default (same as normal users)
+  const [devSkipCovers, setDevSkipCovers] = useState(false);
 
   // Full repair after generation (default: ON, persisted to localStorage)
   // When ON: generate all → evaluate all → regen low-scoring (up to 2 passes) → pick best → character fix
@@ -106,11 +106,8 @@ export function useDeveloperMode(): DeveloperModeState {
   const setDeveloperMode = (enabled: boolean) => {
     setDeveloperModeInternal(enabled);
 
-    if (enabled) {
-      // Switching TO developer mode: skip covers by default (saves credits during testing)
-      setDevSkipCovers(true);
-    } else {
-      // Switching FROM developer mode: enable covers
+    if (!enabled) {
+      // Switching FROM developer mode: ensure covers enabled
       setDevSkipCovers(false);
     }
     // Model selections stay the same (server defaults) regardless of dev mode
