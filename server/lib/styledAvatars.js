@@ -736,6 +736,12 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
             if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
             char.avatars.styledAvatars[artStyle].costumed[costumeType] = styledAvatar;
+            // Store costumed clothing description for image prompt use
+            if (costumeDescription) {
+              if (!char.avatars.clothing) char.avatars.clothing = {};
+              if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+              char.avatars.clothing.costumed[costumeType] = costumeDescription;
+            }
             return { type: 'costumed', cacheKey, characterName: charName, clothingCategory, character: char, styledAvatar, success: true };
           })
           .catch(error => {

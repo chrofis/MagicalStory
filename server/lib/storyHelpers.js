@@ -1582,12 +1582,17 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
             actualClothingUsed = 'costumed';
             log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${key}"`);
 
-            // Get clothing description
+            // Get clothing description from avatars.clothing.costumed
             if (avatars?.clothing?.costumed) {
               const clothingDesc = Object.values(avatars.clothing.costumed)[0];
               if (clothingDesc) {
                 clothingDescription = typeof clothingDesc === 'string' ? clothingDesc : formatClothingObject(clothingDesc);
               }
+            }
+            // Fallback: get costume description from clothingRequirements
+            if (!clothingDescription && clothingRequirements?.[char.name]?.costumed?.description) {
+              clothingDescription = clothingRequirements[char.name].costumed.description;
+              log.debug(`[CLOTHING DESC] ${char.name}: using costumed description from clothingRequirements`);
             }
           }
         }
@@ -1727,14 +1732,21 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
       }
 
-      // Fallback 2: use signature from clothingRequirements if still no clothingDescription
-      // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" } } }
+      // Fallback 2: use signature or description from clothingRequirements if still no clothingDescription
+      // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" }, "costumed": { "description": "..." } } }
       if (!clothingDescription && clothingRequirements && clothingRequirements[char.name]) {
         const charReqs = clothingRequirements[char.name];
         const categoryToCheck = actualClothingUsed || resolvedClothing;
-        if (categoryToCheck && charReqs[categoryToCheck]?.signature) {
-          clothingDescription = charReqs[categoryToCheck].signature;
-          log.debug(`[CLOTHING DESC] ${char.name}: using signature from clothingRequirements: "${clothingDescription}"`);
+        if (categoryToCheck && charReqs[categoryToCheck]) {
+          const catReq = charReqs[categoryToCheck];
+          // Prefer signature (detailed clothing text), skip "none"; fall back to description
+          if (catReq.signature && catReq.signature !== 'none') {
+            clothingDescription = catReq.signature;
+            log.debug(`[CLOTHING DESC] ${char.name}: using signature from clothingRequirements: "${clothingDescription}"`);
+          } else if (catReq.description) {
+            clothingDescription = catReq.description;
+            log.debug(`[CLOTHING DESC] ${char.name}: using description from clothingRequirements: "${clothingDescription}"`);
+          }
         }
       }
 
