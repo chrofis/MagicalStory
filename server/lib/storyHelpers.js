@@ -2459,21 +2459,21 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   const characterDetails = characters.map(c => `* **${c.name}**`).join('\n');
 
   // Build Visual Bible recurring elements section (same logic as iteration prompt)
+  // NOTE: Do NOT include element IDs (ART001, LOC001, etc.) — they leak into scene descriptions
+  // and then into image prompts where they confuse image generators.
   let recurringElements = '';
   if (visualBible) {
-    const idLabel = (entry) => entry.id ? ` [${entry.id}]` : '';
-
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}**${idLabel(sc)} (secondary character): ${description}\n`;
+        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
       }
     }
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
         const description = loc.extractedDescription || loc.description;
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-          recurringElements += `* **${loc.name}**${idLabel(loc)} (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
           recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
           for (const variant of loc.photoVariants) {
             const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
@@ -2481,33 +2481,33 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
           }
         } else {
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}**${idLabel(loc)} (${locType}): ${description}\n`;
+          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
         }
       }
     }
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
       for (const veh of visualBible.vehicles) {
         const description = veh.extractedDescription || veh.description;
-        recurringElements += `* **${veh.name}**${idLabel(veh)} (vehicle): ${description}\n`;
+        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
       }
     }
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}**${idLabel(animal)} (animal): ${description}\n`;
+        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
       }
     }
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}**${idLabel(artifact)} (object): ${description}\n`;
+        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
     if (visualBible.clothing && visualBible.clothing.length > 0) {
       for (const item of visualBible.clothing) {
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${description}\n`;
+        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
       }
     }
   }
@@ -2614,17 +2614,15 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   }).join('\n');
 
   // Build Visual Bible recurring elements section - include ALL entries (not filtered by page)
-  // Each entry includes its unique ID for robust matching (e.g., CHR001, LOC001)
+  // NOTE: Do NOT include element IDs (ART001, LOC001, etc.) — they leak into scene descriptions
+  // and then into image prompts where they confuse image generators.
   let recurringElements = '';
   if (visualBible) {
-    // Helper to format ID label
-    const idLabel = (entry) => entry.id ? ` [${entry.id}]` : '';
-
     // Add ALL secondary characters
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}**${idLabel(sc)} (secondary character): ${description}\n`;
+        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
       }
     }
     // Add ALL locations - with photo variants for real landmarks
@@ -2635,7 +2633,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         // Check if this is a real landmark with photo variants
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
           // Show photo variant options for scene description to select from
-          recurringElements += `* **${loc.name}**${idLabel(loc)} (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
           recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
           for (const variant of loc.photoVariants) {
             const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
@@ -2649,7 +2647,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
           }
           // Regular location without photo variants
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}**${idLabel(loc)} (${locType}): ${description}\n`;
+          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
         }
       }
     }
@@ -2657,21 +2655,21 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
       for (const veh of visualBible.vehicles) {
         const description = veh.extractedDescription || veh.description;
-        recurringElements += `* **${veh.name}**${idLabel(veh)} (vehicle): ${description}\n`;
+        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
       }
     }
     // Add ALL animals
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}**${idLabel(animal)} (animal): ${description}\n`;
+        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
       }
     }
     // Add ALL artifacts
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}**${idLabel(artifact)} (object): ${description}\n`;
+        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
     // Add ALL clothing/costumes
@@ -2679,7 +2677,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const item of visualBible.clothing) {
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${description}\n`;
+        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
       }
     }
   }

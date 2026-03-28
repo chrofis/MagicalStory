@@ -691,11 +691,10 @@ These elements are NOT required - only include them if they naturally fit the im
 
   let prompt = `\n${introText}\n\n`;
 
-  // Add all recurring elements with IDs for robust matching
+  // Add all recurring elements (no IDs — they confuse image generators)
   for (const entry of allEntries) {
     const description = entry.extractedDescription || entry.description;
-    const idLabel = entry.id ? ` [${entry.id}]` : '';
-    prompt += `**${entry.name}**${idLabel} (${entry.type}): ${description}\n`;
+    prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
   }
 
   return prompt;
