@@ -3747,7 +3747,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('frontCover').length > 1 && (
@@ -3973,7 +3973,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('initialPage').length > 1 && (
@@ -4264,7 +4264,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={14} />
-                                  {language === 'de' ? 'Neu denken' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
                               {/* Edit Text button */}
@@ -4775,7 +4775,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={14} />
-                                  {language === 'de' ? 'Neu denken' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
                               {/* Edit Text button */}
@@ -5227,7 +5227,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Neu denken' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
                 {getCoverVersions('backCover').length > 1 && (
