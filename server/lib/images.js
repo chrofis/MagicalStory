@@ -1329,6 +1329,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 
     // Route to Grok vision if model is xAI provider
     let data;
+    let inputTokens = 0;
+    let outputTokens = 0;
     if (modelConfig?.provider === 'xai') {
       log.info(`🔲 [BBOX-DETECT] Using Grok vision: ${modelId}`);
       const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
@@ -1337,12 +1339,11 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
         return null;
       }
+      inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
+      outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
     } else {
       // Gemini path — retry once on empty response (0 output tokens)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-      let inputTokens = 0;
-      let outputTokens = 0;
       for (let bboxAttempt = 1; bboxAttempt <= 2; bboxAttempt++) {
         const response = await withRetry(async () => {
           return fetch(url, {
