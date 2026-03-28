@@ -221,7 +221,6 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
     "imageSummary": "Sophie stands in the foreground pointing up-left toward the distant tower while Manuel walks beside her on the left. The snowy plaza stretches between them and the tower. Main characters: Sophie, Manuel.",
     "setting": {
       "location": "Stadtturm [LOC001]",
-      "landmarkPhotoVariant": 1,
       "indoorOutdoor": "outdoor",
       "description": "Snowy town plaza with the ancient clock tower rising in the background",
       "lighting": "Winter afternoon, golden hour light",
@@ -251,7 +250,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
       }
     ],
     "objects": [
-      {"id": "LOC001", "name": "Stadtturm", "position": "top-left background, ancient clock tower with blue face"}
+      {"id": "LOC001.1", "name": "Stadtturm", "position": "top-left background, ancient clock tower with blue face"}
     ],
     "emptyScenePrompt": "A snowy town plaza stretches out beneath a winter afternoon sky with golden hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly onto the cobblestone square. Medium wide shot, slightly low angle. The bottom-right and bottom-left foreground areas are open empty space where figures would stand, with the snowy plaza filling the midground gap between foreground and the distant tower.",
     "translatedSummary": "Sophie steht im Vordergrund und zeigt nach oben links zum entfernten Turm, während Manuel neben ihr auf der linken Seite geht. Der verschneite Platz erstreckt sich zwischen ihnen und dem Turm. Hauptfiguren: Sophie, Manuel."

@@ -632,20 +632,33 @@ function extractSceneMetadata(sceneDescription) {
       return null;
     }).filter(Boolean);
 
-    // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
-    // This ensures landmark photos are passed to image generation
-    if (parsedData.setting?.location) {
-      const locMatch = parsedData.setting.location.match(/\[LOC\d+\]/i);
-      if (locMatch) {
-        objectIds.push(parsedData.setting.location);
-        log.debug(`[SCENE META] Found location with LOC ID: "${parsedData.setting.location}"`);
+    // Extract per-landmark variant selections from LOC IDs like "LOC003.2"
+    const landmarkVariants = {};
+    for (const objStr of objectIds) {
+      const variantMatch = objStr.match(/\[LOC(\d+)\.(\d+)\]/i);
+      if (variantMatch) {
+        landmarkVariants[`LOC${variantMatch[1].padStart(3, '0')}`] = parseInt(variantMatch[2]);
       }
     }
 
-    // Extract landmark photo variant selection (1-4, default 1)
-    const landmarkVariant = parsedData.setting?.landmarkPhotoVariant || 1;
-    if (landmarkVariant > 1) {
-      log.info(`[SCENE META] landmarkPhotoVariant=${landmarkVariant} selected`);
+    // Also extract location from setting.location (e.g., "Kurpark [LOC001]" or "Kurpark [LOC001.2]")
+    // This ensures landmark photos are passed to image generation
+    if (parsedData.setting?.location) {
+      const locMatch = parsedData.setting.location.match(/\[LOC(\d+)(?:\.(\d+))?\]/i);
+      if (locMatch) {
+        objectIds.push(parsedData.setting.location);
+        log.debug(`[SCENE META] Found location with LOC ID: "${parsedData.setting.location}"`);
+        // Extract variant from setting.location too
+        const locId = `LOC${locMatch[1].padStart(3, '0')}`;
+        if (locMatch[2]) {
+          landmarkVariants[locId] = parseInt(locMatch[2]);
+        }
+      }
+    }
+
+    // Log per-landmark variant selections
+    if (Object.keys(landmarkVariants).length > 0) {
+      log.info(`[SCENE META] Landmark variants: ${Object.entries(landmarkVariants).map(([id, v]) => `${id}.${v}`).join(', ')}`);
     }
 
     // Detect scene complexity: explicit field or fallback from character positions
@@ -672,8 +685,8 @@ function extractSceneMetadata(sceneDescription) {
       translatedSummary: parsedData.translatedSummary || null,
       // Extract image summary (English) — new format uses 'description', old uses 'imageSummary'
       imageSummary: parsedData.imageSummary || parsedData.description || null,
-      // Landmark photo variant selection (for Swiss landmarks with multiple photos)
-      landmarkVariant,
+      // Per-landmark photo variant selections (e.g., {LOC003: 2, LOC005: 1})
+      landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       // Store setting for reference
       setting: parsedData.setting || null,
       // Scene complexity for model routing ('simple' | 'complex' | null)
@@ -2476,11 +2489,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
         const description = loc.extractedDescription || loc.description;
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
           recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
-          recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
-          for (const variant of loc.photoVariants) {
-            const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
-            recurringElements += `    - variant ${variant.variantNumber}: ${variantDesc}\n`;
-          }
+          const variantStrs = loc.photoVariants.map(v => {
+            const desc = v.description || `Photo ${v.variantNumber}`;
+            return `[${loc.id}.${v.variantNumber}] ${desc}`;
+          });
+          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
         } else {
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
           recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
@@ -2636,12 +2649,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
           // Show photo variant options for scene description to select from
           recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
-          recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
-          for (const variant of loc.photoVariants) {
-            const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
-            recurringElements += `    - variant ${variant.variantNumber}: ${variantDesc}\n`;
-          }
-          log.info(`[SCENE PROMPT] Added PHOTO OPTIONS for "${loc.name}" with ${loc.photoVariants.length} variants`);
+          const variantStrs = loc.photoVariants.map(v => {
+            const desc = v.description || `Photo ${v.variantNumber}`;
+            return `[${loc.id}.${v.variantNumber}] ${desc}`;
+          });
+          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
+          log.info(`[SCENE PROMPT] Added photo variants for "${loc.name}" with ${loc.photoVariants.length} variants`);
         } else {
           // Debug: why wasn't PHOTO OPTIONS added?
           if (loc.isRealLandmark) {
@@ -3606,30 +3619,39 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
  * Also checks setting.location for landmark references
  * Supports on-demand loading of photo variants for Swiss landmarks
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location, and landmarkVariant
+ * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location, and landmarkVariants
  * @returns {Promise<Array<{name: string, photoData: string, attribution: string, source: string, variantNumber: number}>>} Landmark photos
  */
 async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   if (!visualBible?.locations) return [];
 
-  // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001]"
+  // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]"
   const locIds = [];
   const locNames = [];
+  const variantMap = {};
 
-  // Helper to extract LOC ID and name from a string like "Ruine Stein [LOC001]"
+  // Helper to extract LOC ID and name from a string like "Ruine Stein [LOC001]" or "Ruine Stein [LOC001.2]"
   const extractLocFromString = (str) => {
     if (!str || typeof str !== 'string') return;
-    // Match [LOC###] pattern
-    const bracketMatch = str.match(/\[LOC(\d+)\]/i);
+    // Match [LOC###] or [LOC###.N] pattern
+    const bracketMatch = str.match(/\[LOC(\d+)(?:\.(\d+))?\]/i);
     if (bracketMatch) {
-      locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
+      const locId = `LOC${bracketMatch[1].padStart(3, '0')}`;
+      locIds.push(locId);
+      // Store variant if specified (e.g., [LOC003.2] → variant 2)
+      if (bracketMatch[2]) {
+        variantMap[locId] = parseInt(bracketMatch[2]);
+      }
       // Also extract the name before the bracket
-      const namePart = str.replace(/\s*\[LOC\d+\]\s*/i, '').trim();
+      const namePart = str.replace(/\s*\[LOC\d+(?:\.\d+)?\]\s*/gi, '').trim();
       if (namePart) locNames.push(namePart.toLowerCase());
     }
-    // Also match plain "LOC002" format
-    else if (str.match(/^LOC\d+$/i)) {
-      locIds.push(str.toUpperCase());
+    // Also match plain "LOC002" or "LOC002.3" format
+    else if (str.match(/^LOC\d+(\.\d+)?$/i)) {
+      const parts = str.split('.');
+      const locId = parts[0].toUpperCase();
+      locIds.push(locId);
+      if (parts[1]) variantMap[locId] = parseInt(parts[1]);
     }
     // Fallback: treat as location name (for historical locations)
     else if (str.trim()) {
@@ -3656,9 +3678,8 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
 
   if (locIds.length === 0 && locNames.length === 0) return [];
 
-  // Get requested variant number (default to 1)
-  const requestedVariant = typeof sceneMetadata?.landmarkVariant === 'number' ? sceneMetadata.landmarkVariant :
-    typeof sceneMetadata?.landmarkVariant === 'string' ? parseInt(sceneMetadata.landmarkVariant.replace(/\D/g, '')) || 1 : 1;
+  // Per-landmark variants from [LOC003.2] format, falling back to metadata landmarkVariants
+  const perLandmarkVariants = { ...variantMap, ...(sceneMetadata?.landmarkVariants || {}) };
 
   // Find matching locations
   const matchingLocations = visualBible.locations.filter(loc =>
@@ -3678,7 +3699,8 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   for (const loc of matchingLocations) {
     // Check if this location has photo variants (Swiss pre-indexed)
     if (loc.photoVariants && loc.photoVariants.length > 0) {
-      // Load the selected variant on-demand
+      // Load the selected variant on-demand (per-landmark variant from [LOC003.2] format)
+      const requestedVariant = perLandmarkVariants[loc.id] || 1;
       const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, requestedVariant);
       if (variant) {
         results.push({
