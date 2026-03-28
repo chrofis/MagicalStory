@@ -1341,6 +1341,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       // Gemini path — retry once on empty response (0 output tokens)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
+      let inputTokens = 0;
+      let outputTokens = 0;
       for (let bboxAttempt = 1; bboxAttempt <= 2; bboxAttempt++) {
         const response = await withRetry(async () => {
           return fetch(url, {
@@ -1366,8 +1368,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 
         data = await response.json();
 
-        const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-        const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+        inputTokens = data.usageMetadata?.promptTokenCount || 0;
+        outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
         log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
 
         const finishReason = data.candidates?.[0]?.finishReason;
