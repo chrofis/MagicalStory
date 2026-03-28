@@ -2844,6 +2844,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
       });
 
+      // Attach a no-op catch to prevent unhandled rejection if cover fails before being awaited
+      coverPromise.catch(err => log.warn(`⚠️ [STREAM-COVER] ${coverType} failed (will be handled when awaited): ${err.message}`));
       streamingCoverPromises.set(coverType, coverPromise);
       log.debug(`⚡ [STREAM-COVER] Started generation for ${coverType}`);
     };
