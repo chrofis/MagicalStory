@@ -2141,7 +2141,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   const missingCharacters = Object.keys(expectedPositions)
     .filter(name => !foundCharacters.has(name.toLowerCase()));
   if (missingCharacters.length > 0) {
-    log.warn(`⚠️ [BBOX-ENRICH] Missing characters (expected but not identified): ${missingCharacters.join(', ')}`);
+    log.info(`📍 [BBOX-ENRICH] Missing characters (expected but not identified): ${missingCharacters.join(', ')}`);
   }
 
   // Object tracking is now direct from detection results
