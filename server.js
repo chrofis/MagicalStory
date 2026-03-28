@@ -3828,6 +3828,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
           sceneImages: rawImages.map(r => ({ pageNumber: r.pageNumber, imageData: r.imageData, description: r.sceneDescription })),
+          coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
+          title,
+          dedication: inputData.dedication || '',
         };
 
         const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
