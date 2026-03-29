@@ -2472,7 +2472,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
       });
 
       let result;
@@ -3383,7 +3383,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
       const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
       });
 
       let result;

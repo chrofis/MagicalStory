@@ -1946,6 +1946,22 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
+    // Load empty scene background if prompt says to reuse it
+    let sceneBackground = null;
+    if (iterateSceneMetadata?.reuseEmptyScene) {
+      try {
+        const emptySceneRow = await getStoryImage(id, 'empty_scene', pageNumber, 0);
+        if (emptySceneRow?.imageData) {
+          sceneBackground = emptySceneRow.imageData;
+          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
+        }
+      } catch (e) {
+        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
+      }
+    } else if (iterateSceneMetadata?.reuseEmptyScene === false) {
+      log.info(`🎬 [ITERATE] Page ${pageNumber}: scene changed, skipping empty scene reuse`);
+    }
+
     let imageResult;
     if (iterativePlacement) {
       const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
@@ -1958,13 +1974,14 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         visualBibleGrid,
         pageNumber,
         artStyle: iterArtStyleDesc,
+        sceneBackground,
       });
     } else {
       imageResult = await generateImageWithQualityRetry(
         imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
         { imageModel: imageModelOverride },
         `PAGE ${pageNumber} ITERATE`,
-        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
+        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, sceneBackground }
       );
     }
 

@@ -697,6 +697,8 @@ function extractSceneMetadata(sceneDescription) {
       sceneComplexity,
       // Empty scene prompt from scene expansion (for style-anchor background generation)
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
+      // Whether the existing empty scene background can be reused (iteration only)
+      reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
       isJsonFormat: true
     };
   }
