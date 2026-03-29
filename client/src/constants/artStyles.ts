@@ -161,7 +161,7 @@ export const artStyles: ArtStyle[] = [
     id: 'realistic',
     name: { en: 'Realistic', de: 'Realistisch', fr: 'Réaliste' },
     emoji: '📷',
-    image: '/images/concept art style.jpg',
+    image: '/images/Real person.jpg',
     description: {
       en: 'Photorealistic illustration with natural lighting',
       de: 'Fotorealistische Illustration mit natürlichem Licht',
