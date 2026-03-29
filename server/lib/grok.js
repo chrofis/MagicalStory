@@ -372,31 +372,24 @@ async function packReferences(refs = {}) {
   }
 
   // Strategy: maximize character image quality by giving them separate slots
-  //   1 char:  Slot 1 = VB grid, Slot 2 = landmark(s), Slot 3 = character
-  //   2 chars: Slot 1 = VB + landmarks stitched, Slot 2 = char 1, Slot 3 = char 2
-  //   3+ chars: Slot 1 = VB + landmarks stitched, Slot 2 = chars first half, Slot 3 = chars second half
+  // Available slots after scene background / previous image are already taken
+  const remainingSlots = 3 - slots.length;
+  //   remainingSlots=3: 1 char → VB, landmarks, char | 2 chars → VB+landmarks, char1, char2
+  //   remainingSlots=2: 1 char → VB+landmarks, char | 2 chars → VB+landmarks, char1+char2 stitched
+  //   remainingSlots=1: everything stitched into one slot
 
-  if (charCount <= 1) {
-    // ── 0-1 characters: spread VB and landmarks across separate slots ──
-    if (visualBibleGrid) {
-      const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: VB grid`);
-    }
-
-    if (landmarkBuffers.length > 0 && slots.length < 3) {
-      const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
+  if (remainingSlots <= 1) {
+    // ── Only 1 slot left: stitch everything together ──
+    const allImages = [];
+    if (visualBibleGrid) allImages.push(visualBibleGrid);
+    allImages.push(...landmarkBuffers, ...charBuffers);
+    if (allImages.length > 0) {
+      const stitched = await stitchImagesHorizontally(allImages, 768);
       slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: all refs stitched (VB+${landmarkBuffers.length} landmarks+${charCount} chars)`);
     }
-
-    if (charCount === 1 && slots.length < 3) {
-      const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
-    }
-  } else {
-    // ── 2+ characters: VB + landmarks share one slot, characters get 2 slots ──
+  } else if (remainingSlots === 2) {
+    // ── 2 slots left: context in one, characters in other ──
     const contextImages = [];
     if (visualBibleGrid) contextImages.push(visualBibleGrid);
     contextImages.push(...landmarkBuffers);
@@ -407,29 +400,72 @@ async function packReferences(refs = {}) {
       log.info(`🎨 [GROK] Slot ${slots.length}: VB grid + ${landmarkBuffers.length} landmark(s) stitched`);
     }
 
-    if (charCount === 2) {
-      // 2 characters: one per slot
-      for (const buf of charBuffers) {
-        if (slots.length >= 3) break;
-        const resized = await sharp(buf).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    if (charCount > 0 && slots.length < 3) {
+      if (charCount === 1) {
+        const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
         slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
+      } else {
+        // Stitch all characters into one slot
+        const stitched = await stitchImagesHorizontally(charBuffers, 768);
+        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: ${charCount} characters stitched`);
       }
-      log.info(`🎨 [GROK] Slot ${slots.length - 1}-${slots.length}: 2 character photos (separate)`);
-    } else {
-      // 3+ characters: split into two groups, stitch each
-      const mid = Math.ceil(charCount / 2);
-      const group1 = charBuffers.slice(0, mid);
-      const group2 = charBuffers.slice(mid);
+    }
+  } else {
+    // ── 3 slots available: spread out for maximum quality ──
+    if (charCount <= 1) {
+      if (visualBibleGrid) {
+        const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: VB grid`);
+      }
 
-      if (group1.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group1, 768);
+      if (landmarkBuffers.length > 0 && slots.length < 3) {
+        const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 [GROK] Slot ${slots.length}: ${group1.length} characters stitched`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
       }
-      if (group2.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group2, 768);
+
+      if (charCount === 1 && slots.length < 3) {
+        const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
+      }
+    } else {
+      // 2+ characters with 3 free slots: VB+landmarks share one, characters get 2
+      const contextImages = [];
+      if (visualBibleGrid) contextImages.push(visualBibleGrid);
+      contextImages.push(...landmarkBuffers);
+
+      if (contextImages.length > 0) {
+        const stitched = await stitchImagesHorizontally(contextImages, 768);
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 [GROK] Slot ${slots.length}: ${group2.length} characters stitched`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: VB grid + ${landmarkBuffers.length} landmark(s) stitched`);
+      }
+
+      if (charCount === 2) {
+        for (const buf of charBuffers) {
+          if (slots.length >= 3) break;
+          const resized = await sharp(buf).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+          slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+        }
+        log.info(`🎨 [GROK] Slot ${slots.length - 1}-${slots.length}: 2 character photos (separate)`);
+      } else {
+        const mid = Math.ceil(charCount / 2);
+        const group1 = charBuffers.slice(0, mid);
+        const group2 = charBuffers.slice(mid);
+
+        if (group1.length > 0 && slots.length < 3) {
+          const stitched = await stitchImagesHorizontally(group1, 768);
+          slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+          log.info(`🎨 [GROK] Slot ${slots.length}: ${group1.length} characters stitched`);
+        }
+        if (group2.length > 0 && slots.length < 3) {
+          const stitched = await stitchImagesHorizontally(group2, 768);
+          slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+          log.info(`🎨 [GROK] Slot ${slots.length}: ${group2.length} characters stitched`);
+        }
       }
     }
   }
