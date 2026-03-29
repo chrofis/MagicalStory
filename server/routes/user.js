@@ -15,8 +15,18 @@ const { log } = require('../utils/logger');
 // Uses ip-api.com free service for geolocation
 router.get('/location', async (req, res) => {
   try {
-    // Get client IP (Express req.ip respects trust proxy setting)
-    const ip = req.ip;
+    // Get client IP — try multiple sources for robustness behind proxies
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const cfConnectingIp = req.headers['cf-connecting-ip'];  // Cloudflare
+    const realIp = req.headers['x-real-ip'];
+    // Use the FIRST public IP from x-forwarded-for (leftmost = original client)
+    const forwardedIps = typeof forwardedFor === 'string' ? forwardedFor.split(',').map(s => s.trim()) : [];
+    const firstPublicForwardedIp = forwardedIps.find(ip =>
+      ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.') && !ip.startsWith('172.')
+    );
+    const ip = cfConnectingIp || firstPublicForwardedIp || realIp || req.ip;
+
+    log.debug(`📍 [LOCATION] IP resolution: req.ip=${req.ip}, x-forwarded-for=${forwardedFor || 'none'}, cf-connecting-ip=${cfConnectingIp || 'none'}, chosen=${ip}`);
 
     // Skip for localhost/private IPs
     if (!ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
