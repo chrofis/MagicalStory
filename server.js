@@ -3992,9 +3992,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               coverImages[coverKey].verdict = img.verdict;
               coverImages[coverKey].bboxDetection = img.bboxDetection;
               coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
-              // Only overwrite imageVersions if pipeline produced new ones (cover was regenerated)
-              // Otherwise keep existing versions from prior iterations
-              if (img.wasRegenerated || !coverImages[coverKey].imageVersions?.length) {
+              // Copy imageVersions if pipeline produced new ones (regen, character fix, or first time)
+              if (img.wasRegenerated || img.wasCharacterFixed || !coverImages[coverKey].imageVersions?.length ||
+                  (img.imageVersions?.length > (coverImages[coverKey].imageVersions?.length || 0))) {
                 coverImages[coverKey].imageVersions = img.imageVersions;
               }
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
