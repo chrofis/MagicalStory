@@ -1268,58 +1268,63 @@ export function StoryDisplay({
           )}
         </button>
         {isOpen && !isRepairing && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-30">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <h4 className="text-sm font-semibold text-gray-800">
-                {language === 'de' ? 'Figur reparieren' : 'Fix Character'}
-              </h4>
-            </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1.5">
-                  {language === 'de' ? 'Figur' : 'Character'}
-                </label>
-                <select
-                  value={charRepairSelected}
-                  onChange={e => setCharRepairSelected(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
-                >
-                  {characters.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setCharRepairPopover(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <h4 className="text-base font-bold text-gray-800">
+                  {language === 'de' ? 'Figur reparieren' : 'Fix Character'}
+                </h4>
+                <button onClick={() => setCharRepairPopover(null)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
+                  <X size={18} className="text-gray-500" />
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1.5">
-                  {language === 'de' ? 'Bereich' : 'Target'}
-                </label>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setCharRepairTarget('face')}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      charRepairTarget === 'face'
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
+              <div className="p-5 space-y-5">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">
+                    {language === 'de' ? 'Figur' : 'Character'}
+                  </label>
+                  <select
+                    value={charRepairSelected}
+                    onChange={e => setCharRepairSelected(e.target.value)}
+                    className="w-full text-base border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
                   >
-                    {language === 'de' ? 'Gesicht' : 'Face'}
-                  </button>
-                  <button
-                    onClick={() => setCharRepairTarget('body')}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      charRepairTarget === 'body'
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {language === 'de' ? 'Körper' : 'Body'}
-                  </button>
+                    {characters.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">
+                    {language === 'de' ? 'Bereich' : 'Target'}
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCharRepairTarget('face')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg border-2 transition-colors ${
+                        charRepairTarget === 'face'
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {language === 'de' ? 'Gesicht' : 'Face'}
+                    </button>
+                    <button
+                      onClick={() => setCharRepairTarget('body')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg border-2 transition-colors ${
+                        charRepairTarget === 'body'
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {language === 'de' ? 'Körper' : 'Body'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="px-5 pb-5 flex gap-3">
                 <button
                   onClick={() => setCharRepairPopover(null)}
-                  className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {language === 'de' ? 'Abbrechen' : 'Cancel'}
                 </button>
@@ -1338,7 +1343,7 @@ export function StoryDisplay({
                     }
                   }}
                   disabled={!charRepairSelected}
-                  className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50"
+                  className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
                   {language === 'de' ? 'Reparieren' : 'Repair'}
                 </button>
