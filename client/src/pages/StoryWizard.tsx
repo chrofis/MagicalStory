@@ -1087,7 +1087,14 @@ export default function StoryWizard() {
             const fullImages = fullResult?.images || [];
             const fullCovers = fullResult?.covers || {};
 
-            log.info(`Full images loaded: ${fullImages.length} pages with versions`);
+            const pagesWithVersions = fullImages.filter(img => img.imageVersions && img.imageVersions.length > 1);
+            log.info(`Full images loaded: ${fullImages.length} pages, ${pagesWithVersions.length} with multiple versions`);
+            if (pagesWithVersions.length > 0) {
+              log.info(`Version counts: ${pagesWithVersions.map(img => `p${img.pageNumber}=${img.imageVersions!.length}`).join(', ')}`);
+            } else {
+              // Log ALL version counts to debug
+              log.info(`All version counts: ${fullImages.map(img => `p${img.pageNumber}=${img.imageVersions?.length || 0}`).join(', ')}`);
+            }
 
             // Update scene images with imageVersions
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
