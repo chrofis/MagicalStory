@@ -390,7 +390,7 @@ export function ObjectDetectionDisplay({
                 />
               )}
             </div>
-          ) : hasBboxOverlay && storyId && pageNumber !== undefined ? (
+          ) : hasBboxOverlay && storyId && (pageNumber !== undefined || coverType) ? (
             <button
               onClick={fetchOverlay}
               disabled={isLoading}
