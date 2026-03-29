@@ -625,6 +625,13 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       }
     }
 
+    // Check which pages have empty scene backgrounds in story_images table
+    const emptySceneRows = await dbQuery(
+      'SELECT DISTINCT page_number FROM story_images WHERE story_id = $1 AND image_type = $2',
+      [id, 'empty_scene']
+    );
+    const pagesWithEmptyScene = new Set(emptySceneRows.map(r => r.page_number));
+
     // Extract only dev-relevant fields (no image data, no characters)
     // IMPORTANT: Explicitly list fields to include - never use spread operator on objects
     // that may contain large image data (retryHistory, repairHistory, grids, etc.)
@@ -714,6 +721,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         fixableIssues: img.fixableIssues || [],
         hasVisualBibleGrid: !!img.visualBibleGrid,
         grokRefImages: img.grokRefImages || null,
+        emptyScenePrompt: img.emptyScenePrompt || null,
+        hasEmptySceneImage: pagesWithEmptyScene.has(img.pageNumber) || undefined,
         // Consistency regeneration - flags only, images lazy loaded
         consistencyRegen: img.consistencyRegen ? {
           hasOriginalImage: !!img.consistencyRegen.originalImage,
