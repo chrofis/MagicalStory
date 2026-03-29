@@ -4311,6 +4311,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
     }
 
+    // Initialize image_version_meta for covers too
+    if (storyData.coverImages) {
+      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+        const cover = storyData.coverImages[coverType];
+        if (cover?.imageVersions?.length > 0) {
+          const activeIdx = cover.imageVersions.findIndex(v => v.isActive);
+          await setActiveVersion(storyId, coverType, activeIdx >= 0 ? activeIdx : cover.imageVersions.length - 1);
+        }
+      }
+      log.debug(`📚 [UNIFIED] Initialized image_version_meta for covers`);
+    }
+
     // Persist styled avatars to BOTH story data AND characters table
     if (artStyle !== 'realistic' && inputData.characters) {
       try {
