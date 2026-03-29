@@ -1946,9 +1946,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
-    // Load empty scene background if prompt says to reuse it
+    // Load or generate empty scene background based on prompt decision
     let sceneBackground = null;
     if (iterateSceneMetadata?.reuseEmptyScene) {
+      // Reuse existing empty scene — background didn't change
       try {
         const emptySceneRow = await getStoryImage(id, 'empty_scene', pageNumber, 0);
         if (emptySceneRow?.imageData) {
@@ -1958,8 +1959,35 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       } catch (e) {
         log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
       }
-    } else if (iterateSceneMetadata?.reuseEmptyScene === false) {
-      log.info(`🎬 [ITERATE] Page ${pageNumber}: scene changed, skipping empty scene reuse`);
+    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
+      // Generate fresh empty scene — background/setting changed
+      log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
+      try {
+        const { resolveArtStyle } = require('../lib/storyHelpers');
+        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+        const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar', iterBackend) || resolveArtStyle('pixar') || '';
+        const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+          STYLE_DESCRIPTION: artStyleDesc,
+          EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
+          REQUIRED_OBJECTS: ''
+        });
+        const emptyResult = await generateImageOnly(emptyPrompt, [], {
+          imageModelOverride,
+          imageBackendOverride: iterBackend,
+          landmarkPhotos: pageLandmarkPhotos,
+          visualBibleGrid,
+          pageNumber,
+          skipCache: true
+        });
+        if (emptyResult?.imageData) {
+          sceneBackground = emptyResult.imageData;
+          // Save new empty scene to DB (replaces old one)
+          await saveStoryImage(id, 'empty_scene', pageNumber, sceneBackground);
+          log.info(`🎬 [ITERATE] Page ${pageNumber}: fresh empty scene generated and saved`);
+        }
+      } catch (e) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: fresh empty scene failed: ${e.message}`);
+      }
     }
 
     let imageResult;
