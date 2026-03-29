@@ -4868,6 +4868,43 @@ export default function StoryWizard() {
                   throw error;
                 }
               } : undefined}
+              // Character repair — available to all users
+              onRepairCharacter={storyId ? async (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => {
+                try {
+                  log.info(`Starting character repair: page ${pageNumber}, character ${characterName}, target ${whiteoutTarget}`);
+                  const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages: [pageNumber] }], {
+                    grokRepairMode: 'blended',
+                    whiteoutTarget,
+                  });
+                  const repaired = result.results?.[0]?.pagesRepaired?.[0];
+                  if (repaired?.imageData) {
+                    setSceneImages(prev => prev.map(img => {
+                      if (img.pageNumber !== pageNumber) return img;
+                      const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                        ? img.imageVersions
+                        : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                      const updatedVersions = [
+                        ...existingVersions,
+                        {
+                          imageData: repaired.imageData,
+                          versionIndex: repaired.versionIndex,
+                          createdAt: new Date().toISOString(),
+                          isActive: true,
+                          type: 'entity-repair' as const,
+                        }
+                      ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                      return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions };
+                    }));
+                    log.info('Character repair completed successfully');
+                  } else {
+                    const failReason = result.results?.[0]?.pagesFailed?.[0]?.reason || 'Unknown error';
+                    throw new Error(failReason);
+                  }
+                } catch (error) {
+                  log.error('Character repair failed:', error);
+                  throw error;
+                }
+              } : undefined}
               // Iterate page using 17-check scene description with actual image analysis (dev mode only)
               onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => {
                 try {

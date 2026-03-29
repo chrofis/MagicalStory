@@ -5,7 +5,7 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
 import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
@@ -121,6 +121,7 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
+  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => Promise<void>;
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
@@ -194,6 +195,7 @@ export function StoryDisplay({
   onEditCover: _onEditCover,
   onImproveImage,
   onRepairImage,
+  onRepairCharacter,
   onIteratePage,
   onRevertRepair,
   onVisualBibleChange,
@@ -255,6 +257,12 @@ export function StoryDisplay({
 
   // Cover image history modal state
   const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[] } | null>(null);
+
+  // Character repair popover state
+  const [charRepairPopover, setCharRepairPopover] = useState<{ pageNumber: number } | null>(null);
+  const [charRepairSelected, setCharRepairSelected] = useState<string>('');
+  const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
+  const [charRepairingPages, setCharRepairingPages] = useState<Set<number>>(new Set());
 
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
@@ -1312,6 +1320,83 @@ export function StoryDisplay({
   // Helper to get text model ID used for scene description
   const getSceneTextModelId = (pageNumber: number): string | undefined => {
     return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.textModelId;
+  };
+
+  // Character repair button + inline popover for selecting character and face/body target
+  const renderCharRepairButton = (pageNumber: number) => {
+    if (!onRepairCharacter) return null;
+    const isRepairing = charRepairingPages.has(pageNumber);
+    const isOpen = charRepairPopover?.pageNumber === pageNumber;
+    return (
+      <div className="relative">
+        <button
+          onClick={() => {
+            if (isOpen) {
+              setCharRepairPopover(null);
+            } else {
+              setCharRepairPopover({ pageNumber });
+              // Pre-select first character
+              if (characters.length > 0 && !charRepairSelected) {
+                setCharRepairSelected(characters[0].name);
+              }
+            }
+          }}
+          disabled={isGenerating || isRepairing || !hasEnoughCredits}
+          className={`flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+            isGenerating || isRepairing || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'
+          }`}
+          title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
+        >
+          {isRepairing ? (
+            <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
+          ) : (
+            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'}</>
+          )}
+        </button>
+        {isOpen && !isRepairing && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-30 space-y-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">{language === 'de' ? 'Figur wählen' : 'Select character'}</label>
+              <select
+                value={charRepairSelected}
+                onChange={e => setCharRepairSelected(e.target.value)}
+                className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5"
+              >
+                {characters.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="radio" name={`repair-target-${pageNumber}`} value="face" checked={charRepairTarget === 'face'} onChange={() => setCharRepairTarget('face')} className="accent-orange-500" />
+                {language === 'de' ? 'Gesicht' : 'Face'}
+              </label>
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="radio" name={`repair-target-${pageNumber}`} value="body" checked={charRepairTarget === 'body'} onChange={() => setCharRepairTarget('body')} className="accent-orange-500" />
+                {language === 'de' ? 'Körper' : 'Body'}
+              </label>
+            </div>
+            <button
+              onClick={async () => {
+                if (!charRepairSelected) return;
+                setCharRepairPopover(null);
+                setCharRepairingPages(prev => new Set([...prev, pageNumber]));
+                try {
+                  await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
+                } finally {
+                  setCharRepairingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
+                }
+              }}
+              disabled={!charRepairSelected}
+              className="w-full bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50"
+            >
+              {language === 'de' ? 'Reparieren' : 'Repair'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Shared iterate options panel used by both scene pages and covers
@@ -3857,15 +3942,6 @@ export function StoryDisplay({
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:front': bbox }))}
                 />
 
-                {/* Retry History */}
-                {frontCoverObj.retryHistory && frontCoverObj.retryHistory.length > 0 && (
-                  <RetryHistoryDisplay
-                    retryHistory={frontCoverObj.retryHistory}
-                    totalAttempts={Math.max(frontCoverObj.totalAttempts || 0, frontCoverObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length || 0, frontCoverObj.imageVersions?.length || 0)}
-                    language={language}
-                  />
-                )}
-
                 {/* Previous / Original Image */}
                 {frontCoverObj.previousImage && (
                   <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
@@ -4083,15 +4159,6 @@ export function StoryDisplay({
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:initial': bbox }))}
                 />
 
-                {/* Retry History */}
-                {initialPageObj.retryHistory && initialPageObj.retryHistory.length > 0 && (
-                  <RetryHistoryDisplay
-                    retryHistory={initialPageObj.retryHistory}
-                    totalAttempts={Math.max(initialPageObj.totalAttempts || 0, initialPageObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, initialPageObj.imageVersions?.length || 0)}
-                    language={language}
-                  />
-                )}
-
                 {/* Previous / Original Image */}
                 {initialPageObj.previousImage && (
                   <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
@@ -4267,6 +4334,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
+                              {renderCharRepairButton(pageNumber)}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -4617,18 +4685,6 @@ export function StoryDisplay({
                               onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image?.pageNumber}`]: bbox }))}
                             />
 
-                            {/* Retry History (shows all attempts with images) */}
-                            {image?.retryHistory && image.retryHistory.length > 0 && (
-                              <RetryHistoryDisplay
-                                retryHistory={image.retryHistory}
-                                totalAttempts={Math.max(image?.totalAttempts || 0, image.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, image?.imageVersions?.length || 0)}
-                                language={language}
-                                onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
-                                storyId={storyId}
-                                pageNumber={image.pageNumber}
-                              />
-                            )}
-
                             {/* Regeneration Info (fallback for older data without retryHistory) */}
                             {image?.wasRegenerated && (!image?.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
@@ -4781,6 +4837,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
+                              {renderCharRepairButton(pageNumber)}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -5068,18 +5125,6 @@ export function StoryDisplay({
                               />
                             )}
 
-                            {/* Retry History (shows all attempts with images) */}
-                            {image.retryHistory && image.retryHistory.length > 0 && (
-                              <RetryHistoryDisplay
-                                retryHistory={image.retryHistory}
-                                totalAttempts={Math.max(image.totalAttempts || 0, image.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, image.imageVersions?.length || 0)}
-                                language={language}
-                                onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
-                                storyId={storyId}
-                                pageNumber={image.pageNumber}
-                              />
-                            )}
-
                             {/* Regeneration Info (fallback for older data without retryHistory) */}
                             {image.wasRegenerated && (!image.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
@@ -5340,15 +5385,6 @@ export function StoryDisplay({
                   coverType="back"
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:back': bbox }))}
                 />
-
-                {/* Retry History */}
-                {backCoverObj.retryHistory && backCoverObj.retryHistory.length > 0 && (
-                  <RetryHistoryDisplay
-                    retryHistory={backCoverObj.retryHistory}
-                    totalAttempts={Math.max(backCoverObj.totalAttempts || 0, backCoverObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, backCoverObj.imageVersions?.length || 0)}
-                    language={language}
-                  />
-                )}
 
                 {/* Previous / Original Image */}
                 {backCoverObj.previousImage && (
