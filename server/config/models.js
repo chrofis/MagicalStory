@@ -70,7 +70,7 @@ const MODEL_DEFAULTS = {
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
   sceneDescription: 'claude-haiku',     // Initial scene expansion (better instruction following for clothing/format)
-  sceneIteration: 'gemini-2.5-flash',  // Scene iteration/retry (needs reasoning to catch impossible scenes)
+  sceneIteration: 'claude-haiku',       // Scene iteration/retry (better instruction following for clothing/format)
 
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
