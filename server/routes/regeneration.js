@@ -4071,12 +4071,16 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
 
     // Save to scene + active version
     scene.bboxDetection = bboxDetection;
-    scene.fixTargets = fixTargets;
+    if (fixTargets.length > 0) {
+      scene.fixTargets = fixTargets;
+    }
     if (scene.imageVersions) {
       const activeVersion = scene.imageVersions.find(v => v.isActive);
       if (activeVersion) {
         activeVersion.bboxDetection = bboxDetection;
-        activeVersion.fixTargets = fixTargets;
+        if (fixTargets.length > 0) {
+          activeVersion.fixTargets = fixTargets;
+        }
       }
     }
 
@@ -4190,6 +4194,9 @@ Respond with ONLY the JSON, no explanation.`;
       data = await grokResponse.json();
     } else {
       const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key not configured' });
+      }
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
@@ -4224,7 +4231,7 @@ Respond with ONLY the JSON, no explanation.`;
     const normalizeBox = (box) => {
       if (!box || !Array.isArray(box) || box.length !== 4) return null;
       const [ymin, xmin, ymax, xmax] = box;
-      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
+      const scale = (ymax > 1 || xmax > 1) ? 1000 : 1;
       return [
         Math.max(0, Math.min(1, ymin / scale)),
         Math.max(0, Math.min(1, xmin / scale)),
@@ -4332,6 +4339,16 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
         const rehydratedScene = rehydratedData.sceneImages?.find(s => s.pageNumber === pageNumber);
         const originalScene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
         if (rehydratedScene?.bboxDetection && originalScene) {
+          // Save to canonical locations (scene + active version) so downstream code finds it
+          originalScene.bboxDetection = rehydratedScene.bboxDetection;
+          if (originalScene.imageVersions) {
+            const activeVersion = originalScene.imageVersions.find(v => v.isActive);
+            if (activeVersion) {
+              activeVersion.bboxDetection = rehydratedScene.bboxDetection;
+            }
+          }
+
+          // Also save to retryHistory for audit trail
           if (!originalScene.retryHistory) originalScene.retryHistory = [];
           // Attach bbox data to the last generation entry (bbox is analysis, not a generation attempt)
           const lastGenEntry = [...originalScene.retryHistory].reverse().find(h => h.type === 'generation' || h.type === 'incremental_consistency');
@@ -4721,10 +4738,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                     try {
                       const sharp = require('sharp');
                       const imgMeta = await sharp(sceneBuffer).metadata();
-                      const cropX = Math.round(bbox.x * imgMeta.width);
-                      const cropY = Math.round(bbox.y * imgMeta.height);
-                      const cropW = Math.round(bbox.width * imgMeta.width);
-                      const cropH = Math.round(bbox.height * imgMeta.height);
+                      const [bymin, bxmin, bymax, bxmax] = Array.isArray(bbox) ? bbox : [bbox.y, bbox.x, bbox.y + bbox.height, bbox.x + bbox.width];
+                      const cropX = Math.round(bxmin * imgMeta.width);
+                      const cropY = Math.round(bymin * imgMeta.height);
+                      const cropW = Math.round((bxmax - bxmin) * imgMeta.width);
+                      const cropH = Math.round((bymax - bymin) * imgMeta.height);
                       if (cropW > 0 && cropH > 0) {
                         const cropBuf = await sharp(sceneBuffer)
                           .extract({ left: cropX, top: cropY, width: cropW, height: cropH })

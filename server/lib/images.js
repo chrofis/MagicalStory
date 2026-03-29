@@ -1365,11 +1365,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           const error = await response.text();
           log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
           // Try Grok fallback on API error
-          const grokModel = TEXT_MODELS['grok-4-fast'];
+          const grokFallbackId = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : 'grok-4-fast';
+          const grokModel = TEXT_MODELS[grokFallbackId];
           if (grokModel?.provider === 'xai') {
-            log.info('🔄 [BBOX-DETECT] Gemini API error, falling back to Grok vision...');
+            log.info(`🔄 [BBOX-DETECT] Gemini API error, falling back to Grok vision (${grokFallbackId})...`);
             try {
-              const grokResp = await callGrokVisionAPI('grok-4-fast', grokModel.modelId || 'grok-4-fast', parts, prompt);
+              const grokResp = await callGrokVisionAPI(grokFallbackId, grokModel.modelId || grokFallbackId, parts, prompt);
               data = await grokResp.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
                 inputTokens = data.usage?.prompt_tokens || 0;
@@ -1404,11 +1405,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
           // Gemini failed — try Grok vision as fallback
-          const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
+          const grokFallbackId2 = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : 'grok-4-fast';
+          const grokFallbackModel = TEXT_MODELS[grokFallbackId2];
           if (grokFallbackModel?.provider === 'xai') {
-            log.info('🔄 [BBOX-DETECT] Gemini failed, falling back to Grok vision...');
+            log.info(`🔄 [BBOX-DETECT] Gemini failed, falling back to Grok vision (${grokFallbackId2})...`);
             try {
-              const grokResponse = await callGrokVisionAPI('grok-4-fast', grokFallbackModel.modelId || 'grok-4-fast', parts, prompt);
+              const grokResponse = await callGrokVisionAPI(grokFallbackId2, grokFallbackModel.modelId || grokFallbackId2, parts, prompt);
               data = await grokResponse.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
                 inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
@@ -1513,7 +1515,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       if (!box || !Array.isArray(box) || box.length !== 4) return null;
       const [ymin, xmin, ymax, xmax] = box;
       // Handle both 0-1000 format (Gemini native) and 0-1 format (already normalized)
-      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
+      const scale = (ymax > 1 || xmax > 1) ? 1000 : 1;
       return [
         Math.max(0, Math.min(1, ymin / scale)),
         Math.max(0, Math.min(1, xmin / scale)),
@@ -1792,8 +1794,13 @@ async function detectSubRegion(characterCrop, targetElement) {
     if (parsedResult.found && parsedResult.box && Array.isArray(parsedResult.box) && parsedResult.box.length === 4) {
       const [ymin, xmin, ymax, xmax] = parsedResult.box;
       // Handle both 0-1000 format (Gemini native) and 0-1 format (already normalized)
-      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
-      normalizedBox = [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
+      const scale = (ymax > 1 || xmax > 1) ? 1000 : 1;
+      normalizedBox = [
+        Math.max(0, Math.min(1, ymin / scale)),
+        Math.max(0, Math.min(1, xmin / scale)),
+        Math.max(0, Math.min(1, ymax / scale)),
+        Math.max(0, Math.min(1, xmax / scale))
+      ];
     }
 
     const result = {
