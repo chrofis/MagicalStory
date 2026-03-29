@@ -4878,6 +4878,7 @@ export default function StoryWizard() {
                   });
                   const repaired = result.results?.[0]?.pagesRepaired?.[0];
                   if (repaired?.imageData) {
+                    // Update scene image + append to version history
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber !== pageNumber) return img;
                       const existingVersions = img.imageVersions && img.imageVersions.length > 0
@@ -4895,6 +4896,22 @@ export default function StoryWizard() {
                       ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
                       return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions };
                     }));
+                    // Also trigger a full image refresh so version picker gets DB-sourced versions with imageData
+                    try {
+                      const allImages = await storyService.getAllImages(storyId, false);
+                      if (allImages) {
+                        for (const apiImg of (allImages.images || [])) {
+                          if (apiImg.imageVersions && apiImg.pageNumber === pageNumber) {
+                            setSceneImages(prev => prev.map(scene => {
+                              if (scene.pageNumber !== pageNumber) return scene;
+                              return { ...scene, imageVersions: apiImg.imageVersions as typeof scene.imageVersions };
+                            }));
+                          }
+                        }
+                      }
+                    } catch (refreshErr) {
+                      log.warn('Failed to refresh image versions after repair:', refreshErr);
+                    }
                     log.info('Character repair completed successfully');
                   } else {
                     const failReason = result.results?.[0]?.pagesFailed?.[0]?.reason || 'Unknown error';
