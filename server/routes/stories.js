@@ -1747,10 +1747,26 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       }
 
       // For full mode only: merge cover metadata and process imageVersions
+      // Shared metadata merge function — used for both cover and scene versions
+      const mergeFields = (target, source) => {
+        target.description = source.description || source.sceneDescription || null;
+        target.prompt = source.prompt || null;
+        target.userInput = source.userInput || null;
+        target.modelId = source.modelId || target.modelId || null;
+        target.type = source.type || null;
+        target.qualityReasoning = source.qualityReasoning || null;
+        target.fixTargets = source.fixTargets || [];
+        target.totalAttempts = source.totalAttempts || null;
+        target.referencePhotoNames = source.referencePhotoNames || [];
+        target.semanticScore = source.semanticScore ?? null;
+        target.entityPenalty = source.entityPenalty || 0;
+        target.evaluatedAt = source.evaluatedAt || null;
+        target.issuesSummary = source.issuesSummary || null;
+        target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
+      };
+
       if (!activeOnly) {
         // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
-        // IMPORTANT: Exclude image fields (previousImage, originalImage, bboxOverlayImage, retryHistory)
-        // to avoid bloating the response. These can be lazy-loaded if needed.
         const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
           'regenerationCount', 'previousScore', 'previousReasoning',
           'originalScore', 'originalReasoning', 'referencePhotos',
@@ -1764,15 +1780,19 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 covers[coverType][field] = blobCover[field];
               }
             }
-            // Also merge imageVersions metadata (description, type, createdAt) from blob
-            // IMPORTANT: Only merge up to the number of versions in the DB, not from blob
+            // Merge per-version metadata — same fields as scenes
             if (blobCover.imageVersions && covers[coverType].imageVersions) {
-              for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
-                const blobVersion = blobCover.imageVersions[i];
-                if (blobVersion) {
-                  covers[coverType].imageVersions[i].description = blobVersion.description;
-                  covers[coverType].imageVersions[i].type = blobVersion.type;
-                  covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt || storyData.createdAt || null;
+              for (let i = 0; i < covers[coverType].imageVersions.length; i++) {
+                const dbVersionIdx = covers[coverType].imageVersions[i].versionIndex;
+                if (dbVersionIdx === 0) {
+                  // v0: metadata lives on the cover object itself (not in imageVersions array)
+                  mergeFields(covers[coverType].imageVersions[i], blobCover);
+                } else {
+                  // v1+: metadata in blob imageVersions array
+                  const blobVersion = blobCover.imageVersions?.[dbVersionIdx];
+                  if (blobVersion) {
+                    mergeFields(covers[coverType].imageVersions[i], blobVersion);
+                  }
                 }
               }
             }
@@ -1784,34 +1804,11 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         }
       }
 
-      // Merge scene imageVersions metadata from blob (description, prompt, modelId, etc.)
-      // Uses DB version_index + dbToArrayIndex to correctly map to blob imageVersions.
-      //
-      // Blob structure varies by source:
-      //  - Initial generation: main blob = v0, imageVersions = [] (empty)
-      //  - Repair pipeline: main blob = best version, imageVersions = [v1, v2, ...]
-      //  - After iterate: main blob = LATEST version (overwritten by Object.assign),
-      //    imageVersions[0] = v0 preservation (no source field), imageVersions[1+] = iterate versions
+      // Merge scene imageVersions metadata from blob
       if (!activeOnly && storyData.sceneImages) {
         for (const [pageNum, scene] of sceneImagesMap) {
           const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
           if (blobScene && scene.imageVersions) {
-            const mergeFields = (target, source) => {
-              target.description = source.description || source.sceneDescription || null;
-              target.prompt = source.prompt || null;
-              target.userInput = source.userInput || null;
-              target.modelId = source.modelId || target.modelId || null;
-              target.type = source.type || null;
-              target.qualityReasoning = source.qualityReasoning || null;
-              target.fixTargets = source.fixTargets || [];
-              target.totalAttempts = source.totalAttempts || null;
-              target.referencePhotoNames = source.referencePhotoNames || [];
-              target.semanticScore = source.semanticScore ?? null;
-              target.entityPenalty = source.entityPenalty || 0;
-              target.evaluatedAt = source.evaluatedAt || null;
-              target.issuesSummary = source.issuesSummary || null;
-              target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
-            };
 
             for (let i = 0; i < scene.imageVersions.length; i++) {
               const dbVersionIdx = scene.imageVersions[i].versionIndex;
