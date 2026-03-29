@@ -1247,9 +1247,8 @@ export function StoryDisplay({
     const detectedNames = bboxDetection?.figures
       ?.filter(f => f.name && f.name !== 'UNKNOWN')
       .map(f => f.name!) || [];
-    const availableCharacters = detectedNames.length > 0
-      ? characters.filter(c => detectedNames.includes(c.name))
-      : characters;
+    const availableCharacters = characters.filter(c => detectedNames.includes(c.name));
+    if (availableCharacters.length === 0) return null;
 
     return (
       <div className="relative flex-1">
