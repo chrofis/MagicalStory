@@ -14,6 +14,7 @@ interface ImageHistoryModalProps {
   pageNumber?: number;
   coverType?: 'frontCover' | 'initialPage' | 'backCover';
   versions: ImageVersion[];
+  activeVersionIndex?: number;  // Index of the active version (replaces isActive on versions)
   onClose: () => void;
   onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
@@ -23,6 +24,7 @@ export function ImageHistoryModal({
   pageNumber,
   coverType,
   versions,
+  activeVersionIndex,
   onClose,
   onSelectVersion,
   developerMode = false,
@@ -107,11 +109,13 @@ export function ImageHistoryModal({
           {/* Version grid */}
           <div className="flex-1 overflow-y-auto p-5">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {versions.map((version, idx) => (
+              {versions.map((version, idx) => {
+                const isActiveVersion = activeVersionIndex != null ? idx === activeVersionIndex : idx === versions.length - 1;
+                return (
                 <div
                   key={idx}
                   className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-                    version.isActive
+                    isActiveVersion
                       ? 'border-green-500 ring-2 ring-green-200'
                       : 'border-gray-200 hover:border-indigo-400 hover:shadow-md'
                   }`}
@@ -135,7 +139,7 @@ export function ImageHistoryModal({
                           </span>
                         )}
                       </div>
-                      {version.isActive ? (
+                      {isActiveVersion ? (
                         <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                           <Check size={12} />
                           {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
@@ -172,7 +176,8 @@ export function ImageHistoryModal({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Dev mode: detail panel for selected version */}

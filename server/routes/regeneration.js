@@ -648,7 +648,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         prompt: currentImage.prompt,
         modelId: currentImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
-        isActive: false,
         qualityScore: currentImage.qualityScore ?? null,
         qualityReasoning: currentImage.qualityReasoning || null,
         fixTargets: currentImage.fixTargets || [],
@@ -672,7 +671,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       modelId: imageResult.modelId || null,
       createdAt: regenTimestamp,
       generatedAt: regenTimestamp,  // saveStoryData uses generatedAt for story_images.generated_at
-      isActive: true,
       qualityScore: imageResult.score ?? null,
       qualityReasoning: imageResult.reasoning || null,
       fixTargets: imageResult.fixTargets || [],
@@ -685,9 +683,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     };
 
     if (existingIndex >= 0) {
-      // Set all existing versions to inactive
       if (sceneImages[existingIndex].imageVersions) {
-        sceneImages[existingIndex].imageVersions.forEach(v => v.isActive = false);
         sceneImages[existingIndex].imageVersions.push(newVersion);
       } else {
         sceneImages[existingIndex].imageVersions = [newVersion];
@@ -794,7 +790,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         userInput: blobV.userInput || null,
         modelId: blobV.modelId || null,
         createdAt: blobV.createdAt || row.generated_at,
-        isActive: row.version_index === activeVIdx,
         type: blobV.type || (row.version_index === 0 ? 'original' : null),
         qualityScore: blobV.qualityScore ?? row.quality_score,
         qualityReasoning: blobV.qualityReasoning || null,
@@ -819,6 +814,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       regenerationCount: newImageData.regenerationCount,
       // Version info (with metadata for dev mode scene comparison)
       versionCount,
+      activeVersion: activeVIdx,
       imageVersions,
       creditsUsed: creditCost,
       creditsRemaining: newCredits,
@@ -1434,7 +1430,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
             description: existingCover.description,
             createdAt: storyData.createdAt || new Date().toISOString(),
             type: 'original',
-            isActive: false,
             _alreadySaved: true  // Already at DB v0, don't re-save
           });
         }
@@ -1448,17 +1443,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
             modelId: existingCover.modelId,
             createdAt: existingCover.regeneratedAt || existingCover.generatedAt || new Date().toISOString(),
             type: existingCover.wasRegenerated ? 'regeneration' : 'original',
-            isActive: false,
             _alreadySaved: true  // Already in DB, don't re-save (would collide with new version)
           });
-        } else if (currentImageData && existingCover.imageVersions.length > 0) {
-          existingCover.imageVersions[0].isActive = false;
         }
         log.debug(`🔄 [ITERATE] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
       }
-
-      // Mark all existing versions as inactive
-      existingCover.imageVersions.forEach(v => v.isActive = false);
 
       // Create new version entry
       const timestamp = new Date().toISOString();
@@ -1472,7 +1461,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         createdAt: timestamp,
         generatedAt: timestamp,
         type: 'iteration',
-        isActive: true,
         fixTargets: imageResult.fixTargets || [],
         fixableIssues: imageResult.fixableIssues || [],
         totalAttempts: imageResult.totalAttempts || null,
@@ -1567,7 +1555,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           prompt: v.prompt,
           modelId: v.modelId,
           createdAt: v.createdAt,
-          isActive: v.isActive,
           type: v.type,
           qualityScore: v.qualityScore,
           imageData: imgData,
@@ -2060,7 +2047,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         prompt: currentImage.prompt,
         modelId: currentImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
-        isActive: false,
         type: 'original',
         qualityScore: currentImage.qualityScore ?? null,
         qualityReasoning: currentImage.qualityReasoning || null,
@@ -2083,7 +2069,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       modelId: imageResult.modelId || null,
       createdAt: timestamp,
       generatedAt: timestamp,  // saveStoryData uses generatedAt for story_images.generated_at
-      isActive: true,
       type: 'iteration',
       iterationFeedback: previewFeedback.composition,
       previewMismatches,
@@ -2102,7 +2087,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     if (existingImageIndex >= 0) {
       if (sceneImages[existingImageIndex].imageVersions) {
-        sceneImages[existingImageIndex].imageVersions.forEach(v => v.isActive = false);
         sceneImages[existingImageIndex].imageVersions.push(newVersion);
       } else {
         sceneImages[existingImageIndex].imageVersions = [newVersion];
@@ -2173,7 +2157,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         prompt: v.prompt,
         modelId: v.modelId,
         createdAt: v.createdAt,
-        isActive: v.isActive,
         type: v.type,
         qualityScore: v.qualityScore,
         imageData: imgData,
@@ -2508,8 +2491,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
           qualityScore: existingCover.originalScore,
           description: existingCover.description,
           createdAt: storyData.createdAt || new Date().toISOString(),
-          type: 'original',
-          isActive: false
+          type: 'original'
         });
       }
 
@@ -2523,14 +2505,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
           prompt: existingCover.prompt,
           modelId: existingCover.modelId,
           createdAt: existingCover.regeneratedAt || existingCover.generatedAt || new Date().toISOString(),
-          type: existingCover.wasRegenerated ? 'regeneration' : 'original',
-          isActive: true
+          type: existingCover.wasRegenerated ? 'regeneration' : 'original'
         });
-      } else if (currentImageData) {
-        // originalImage exists and equals currentImageData - mark version 0 as active
-        if (existingCover.imageVersions.length > 0) {
-          existingCover.imageVersions[0].isActive = true;
-        }
       }
 
       log.debug(`📸 [COVER REGEN] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
@@ -2581,13 +2557,11 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       modelId: coverResult.modelId || coverImageModelId,
       createdAt: coverRegenTimestamp,
       generatedAt: coverRegenTimestamp,
-      type: 'regeneration',
-      isActive: true
+      type: 'regeneration'
     };
 
-    // Mark all existing versions as inactive and add new version
-    const updatedVersions = (existingCover.imageVersions || []).map(v => ({ ...v, isActive: false }));
-    updatedVersions.push(newVersion);
+    // Add new version
+    const updatedVersions = [...(existingCover.imageVersions || []), newVersion];
 
     // Query database for actual max version_index (blob data may have stripped imageData)
     // This ensures we don't overwrite existing versions when the blob's imageVersions is incomplete
@@ -2713,7 +2687,6 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         description: v.description,
         createdAt: v.createdAt,
         type: v.type,
-        isActive: v.isActive
       }))
     });
 
@@ -2829,7 +2802,6 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
           prompt: scene.prompt,
           modelId: scene.modelId,
           createdAt: storyData.createdAt || new Date().toISOString(),
-          isActive: false,
           type: 'original',
           qualityScore: previousScore ?? null,
           qualityReasoning: previousReasoning || null,
@@ -2844,9 +2816,6 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
         log.debug(`✏️ [EDIT] Migrated legacy scene format to imageVersions[] (1 version)`);
       }
 
-      // Mark all existing versions as inactive
-      scene.imageVersions.forEach(v => v.isActive = false);
-
       // Create new version entry
       const timestamp = new Date().toISOString();
       scene.imageVersions.push({
@@ -2856,7 +2825,6 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
         modelId: editResult.modelId || scene.modelId,
         createdAt: timestamp,
         generatedAt: timestamp,
-        isActive: true,
         type: 'edit',
         qualityScore: qualityScore ?? null,
         qualityReasoning: qualityReasoning || null,
@@ -3121,7 +3089,6 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             prompt: currentScene.prompt,
             modelId: currentScene.modelId,
             createdAt: storyData.createdAt || new Date().toISOString(),
-            isActive: false,
             type: 'original',
             qualityScore: currentScene.qualityScore ?? null,
             qualityReasoning: currentScene.qualityReasoning || null,
@@ -3136,9 +3103,6 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           log.debug(`🔧 [REPAIR] Migrated legacy scene format to imageVersions[] (1 version)`);
         }
 
-        // Mark all existing versions as inactive
-        currentScene.imageVersions.forEach(v => v.isActive = false);
-
         // Create new version entry
         const timestamp = new Date().toISOString();
         currentScene.imageVersions.push({
@@ -3148,7 +3112,6 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           modelId: currentScene.modelId,
           createdAt: timestamp,
           generatedAt: timestamp,
-          isActive: true,
           type: 'inpaint-repair',
           qualityScore: repairScore,
           repairHistory: allRepairHistory,
@@ -3860,11 +3823,13 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       scene.fixTargets = fixTargets;
     }
     if (scene.imageVersions) {
-      const activeVersion = scene.imageVersions.find(v => v.isActive);
-      if (activeVersion) {
-        activeVersion.bboxDetection = bboxDetection;
+      const versionKey = isCover ? COVER_PAGE_MAP[String(pageNumber)] : pageNumber;
+      const activeIdx = await getActiveVersion(id, versionKey);
+      const activeVer = scene.imageVersions[activeIdx];
+      if (activeVer) {
+        activeVer.bboxDetection = bboxDetection;
         if (fixTargets.length > 0) {
-          activeVersion.fixTargets = fixTargets;
+          activeVer.fixTargets = fixTargets;
         }
       }
     }
@@ -4037,8 +4002,10 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     if (scene) {
       scene.bboxDetection = refinedDetection;
       if (scene.imageVersions) {
-        const activeVersion = scene.imageVersions.find(v => v.isActive);
-        if (activeVersion) activeVersion.bboxDetection = refinedDetection;
+        const iterBboxVersionKey = isCover ? { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)] : pageNumber;
+        const iterBboxActiveIdx = await getActiveVersion(id, iterBboxVersionKey);
+        const activeVer = scene.imageVersions[iterBboxActiveIdx];
+        if (activeVer) activeVer.bboxDetection = refinedDetection;
       }
       if (isCover) {
         saveStoryData(id, storyData).catch(err => log.error('Failed to save iterated bbox:', err.message));
@@ -4095,9 +4062,10 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
           // Save to canonical locations (scene + active version) so downstream code finds it
           originalScene.bboxDetection = rehydratedScene.bboxDetection;
           if (originalScene.imageVersions) {
-            const activeVersion = originalScene.imageVersions.find(v => v.isActive);
-            if (activeVersion) {
-              activeVersion.bboxDetection = rehydratedScene.bboxDetection;
+            const consistencyActiveIdx = await getActiveVersion(id, pageNumber);
+            const activeVer = originalScene.imageVersions[consistencyActiveIdx];
+            if (activeVer) {
+              activeVer.bboxDetection = rehydratedScene.bboxDetection;
             }
           }
 
@@ -4205,19 +4173,18 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       // Find version with highest qualityScore (skip null/unevaluated versions)
       let bestIndex = -1;
       let bestScore = -1;
-      let activeIndex = -1;
+      const pickVersionKey = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
+      const activeIndex = await getActiveVersion(id, pickVersionKey);
       for (let i = 0; i < scene.imageVersions.length; i++) {
-        const v = scene.imageVersions[i];
-        if (v.isActive) activeIndex = i;
-        const score = v.qualityScore;
+        const score = scene.imageVersions[i].qualityScore;
         if (score != null && score > bestScore) {
           bestScore = score;
           bestIndex = i;
         }
       }
 
-      const activeVersion = activeIndex >= 0 ? scene.imageVersions[activeIndex] : null;
-      const isUnevaluatedRepair = activeVersion?.type === 'entity-repair' && activeVersion?.qualityScore == null;
+      const activeVersionEntry = activeIndex >= 0 ? scene.imageVersions[activeIndex] : null;
+      const isUnevaluatedRepair = activeVersionEntry?.type === 'entity-repair' && activeVersionEntry?.qualityScore == null;
 
       if (isUnevaluatedRepair && bestIndex < 0) {
         // Entity-repair has no score AND no scored alternatives — keep it (no basis for comparison)
@@ -4226,16 +4193,14 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       } else if (isUnevaluatedRepair && bestIndex >= 0) {
         // Entity-repair has no score but scored alternatives exist — re-eval likely failed,
         // switch to best scored version since we can't confirm the repair is good
-        scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
         syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
         const dbIndex = arrayToDbIndex(bestIndex, imageType);
-        const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
+        const versionId = pickVersionKey;
         await setActiveVersion(id, versionId, dbIndex);
         log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: unevaluated entity-repair replaced by scored version ${bestIndex} (score ${bestScore}, re-eval likely failed)`);
         results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex, reason: 'unevaluated-repair-replaced' };
       } else if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
-        scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
         syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
 
         const dbIndex = arrayToDbIndex(bestIndex, imageType);
@@ -4828,10 +4793,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           // Carry forward bbox from previously active version — character repair (blended mode)
           // only changes a localized region, so overall bbox coordinates remain valid
-          // Find active version via DB (isActive flags can be stale)
+          // Find active version via DB (source of truth for active version)
           const versionKey = isCover ? coverType : update.pageNumber;
           const activeDbIdx = await getActiveVersion(id, versionKey);
-          const prevActive = existingImage.imageVersions?.[activeDbIdx] || existingImage.imageVersions?.find(v => v.isActive);
+          const prevActive = existingImage.imageVersions?.[activeDbIdx];
           const carryForwardBbox = prevActive?.bboxDetection || existingImage.bboxDetection || null;
 
           if (!existingImage.imageVersions) {
@@ -4840,11 +4805,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               prompt: existingImage.prompt,
               modelId: existingImage.modelId,
               createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
-              isActive: false,
               type: 'original'
             }];
-          } else {
-            existingImage.imageVersions.forEach(v => v.isActive = false);
           }
 
           const isMagicApiMethod = repairResult.method === 'magicapi';
@@ -4857,7 +4819,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             modelId: repairModelId,
             createdAt: new Date().toISOString(),
             generatedAt: new Date().toISOString(),
-            isActive: true,
             type: 'entity-repair',
             qualityScore: null,
             entityRepairedFor: characterName,
@@ -5022,7 +4983,6 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
               description: scene.description,
               prompt: scene.prompt,
               createdAt: new Date().toISOString(),
-              isActive: false,
               type: 'original',
               qualityScore: scene.qualityScore,
               qualityReasoning: scene.qualityReasoning || null,
@@ -5042,18 +5002,12 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
             description: scene.description,
             createdAt: new Date().toISOString(),
             generatedAt: new Date().toISOString(),
-            isActive: true,
             type: 'repair',
             qualityScore: repairResult.score,
             qualityReasoning: repairResult.reasoning || null,
             fixTargets: repairResult.fixTargets || [],
             fixableIssues: repairResult.fixableIssues || [],
             totalAttempts: null,
-          });
-
-          // Mark all other versions as inactive
-          scene.imageVersions.forEach((v, i) => {
-            v.isActive = i === newVersionIndex;
           });
 
           // Update scene metadata (but NOT imageData - that would cause duplicate image storage)
@@ -5187,15 +5141,11 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
           description: existingCover.description,
           createdAt: storyData.createdAt || new Date().toISOString(),
           type: 'original',
-          isActive: false,
           _alreadySaved: true
         });
       }
       log.debug(`✏️ [COVER EDIT] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
     }
-
-    // Mark all existing versions as inactive
-    existingCover.imageVersions.forEach(v => v.isActive = false);
 
     // Create new edit version entry
     const timestamp = new Date().toISOString();
@@ -5204,7 +5154,6 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       description: existingCover.description,
       createdAt: timestamp,
       generatedAt: timestamp,
-      isActive: true,
       type: 'edit',
       qualityScore: qualityScore ?? null,
       qualityReasoning: qualityReasoning || null,

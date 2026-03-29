@@ -1136,7 +1136,7 @@ export default function StoryWizard() {
                     if (cover.imageVersions && existing?.imageVersions) {
                       mergedVersions = cover.imageVersions.map((dbV: any, i: number) => ({
                         ...(existing.imageVersions[i] || {}),  // blob metadata (description, type, scores, etc.)
-                        ...dbV,                                  // DB data (imageData, qualityScore, isActive)
+                        ...dbV,                                  // DB data (imageData, qualityScore, etc.)
                       }));
                     }
                     next[coverType] = {
@@ -4327,7 +4327,7 @@ export default function StoryWizard() {
                           const existingVersions = existing?.imageVersions && existing.imageVersions.length > 0
                             ? existing.imageVersions
                             : existing?.imageData
-                              ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                              ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), type: 'original' as const }]
                               : [];
                           const updatedVersions = [
                             ...existingVersions,
@@ -4335,7 +4335,6 @@ export default function StoryWizard() {
                               imageData,
                               versionIndex,
                               createdAt: new Date().toISOString(),
-                              isActive: true,
                               type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
                               description: metadata?.description,
                               prompt: metadata?.prompt,
@@ -4343,8 +4342,8 @@ export default function StoryWizard() {
                               qualityReasoning: metadata?.qualityReasoning,
                               modelId: metadata?.modelId,
                             }
-                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
-                          return { ...prev, [coverKey]: { ...existing, imageData, imageVersions: updatedVersions } };
+                          ];
+                          return { ...prev, [coverKey]: { ...existing, imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 } };
                         });
                       }
                     } else {
@@ -4356,19 +4355,14 @@ export default function StoryWizard() {
                             : [{
                                 imageData: img.imageData || '',
                                 createdAt: new Date().toISOString(),
-                                isActive: false,
                                 type: 'original' as const
                               }];
-                          return {
-                            ...img,
-                            imageData,
-                            imageVersions: [
+                          const updatedVersions = [
                               ...existingVersions,
                               {
                                 imageData,
                                 versionIndex,
                                 createdAt: new Date().toISOString(),
-                                isActive: true,
                                 type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
                                 description: metadata?.description,
                                 prompt: metadata?.prompt,
@@ -4378,7 +4372,12 @@ export default function StoryWizard() {
                                 fixTargets: metadata?.fixTargets,
                                 totalAttempts: metadata?.totalAttempts,
                               }
-                            ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }))
+                            ];
+                          return {
+                            ...img,
+                            imageData,
+                            imageVersions: updatedVersions,
+                            activeVersion: updatedVersions.length - 1,
                           };
                         }
                         return img;
@@ -4498,11 +4497,11 @@ export default function StoryWizard() {
                           imageData: v.imageData || existingVersions[idx]?.imageData || '',
                           description: v.description, prompt: v.prompt, modelId: v.modelId,
                           createdAt: v.createdAt || new Date().toISOString(),
-                          isActive: v.isActive ?? false,
                           type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                           qualityScore: v.qualityScore
                         }));
-                        return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions };
+                        const newActiveVersion = updatedVersions ? updatedVersions.length - 1 : img.activeVersion;
+                        return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions, activeVersion: newActiveVersion };
                       }));
                     }
                     log.info('Image improved successfully, score:', result.qualityScore);
@@ -4847,16 +4846,15 @@ export default function StoryWizard() {
                       if (img.pageNumber === pageNumber) {
                         const existingVersions = img.imageVersions && img.imageVersions.length > 0
                           ? img.imageVersions
-                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), type: 'original' as const }];
                         const updatedVersions = [
                           ...existingVersions,
                           {
                             imageData: result.imageData,
                             createdAt: new Date().toISOString(),
-                            isActive: true,
                             type: 'repair' as const,
                           }
-                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                        ];
                         return {
                           ...img,
                           imageData: result.imageData,
@@ -4864,6 +4862,7 @@ export default function StoryWizard() {
                           repairHistory: result.repairHistory,
                           repairedAt: new Date().toISOString(),
                           imageVersions: updatedVersions,
+                          activeVersion: updatedVersions.length - 1,
                         };
                       }
                       return img;
@@ -4898,13 +4897,13 @@ export default function StoryWizard() {
                         const existingVersions = existing?.imageVersions?.length > 0
                           ? existing.imageVersions
                           : existing?.imageData
-                            ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                            ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), type: 'original' as const }]
                             : [];
                         const updatedVersions = [
                           ...existingVersions,
-                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), isActive: true, type: 'entity-repair' as const }
-                        ].map((v: any, i: number, arr: any[]) => ({ ...v, isActive: i === arr.length - 1 }));
-                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions } };
+                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
+                        ];
+                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 } };
                       });
                     } else {
                       // Scene repair — update sceneImages
@@ -4912,12 +4911,12 @@ export default function StoryWizard() {
                         if (img.pageNumber !== pageNumber) return img;
                         const existingVersions = img.imageVersions && img.imageVersions.length > 0
                           ? img.imageVersions
-                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), type: 'original' as const }];
                         const updatedVersions = [
                           ...existingVersions,
-                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), isActive: true, type: 'entity-repair' as const }
-                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
-                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions };
+                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
+                        ];
+                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 };
                       }));
                     }
                     // Trigger full image refresh so version picker gets DB-sourced versions
@@ -5011,10 +5010,10 @@ export default function StoryWizard() {
                             prompt: v.prompt,
                             modelId: v.modelId,
                             createdAt: v.createdAt || new Date().toISOString(),
-                            isActive: v.isActive ?? false,
                             type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                             qualityScore: v.qualityScore
                           }));
+                          const newActiveVersion = updatedVersions ? updatedVersions.length - 1 : img.activeVersion;
                           return {
                             ...img,
                             imageData: result.imageData,
@@ -5027,6 +5026,7 @@ export default function StoryWizard() {
                             iterationFeedback: result.composition,
                             previewMismatches: result.previewMismatches,
                             imageVersions: updatedVersions || img.imageVersions,
+                            activeVersion: newActiveVersion,
                             referencePhotos: result.referencePhotos || img.referencePhotos,
                             landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,
                             visualBibleGrid: result.visualBibleGrid || img.visualBibleGrid,
@@ -5115,10 +5115,7 @@ export default function StoryWizard() {
                         // Swap bbox data from the selected version (null if version has no bbox yet)
                         bboxDetection: activeVersion.bboxDetection ?? null,
                         bboxOverlayImage: null, // Always regenerate overlay on-demand
-                        imageVersions: img.imageVersions.map((v, i) => ({
-                          ...v,
-                          isActive: i === versionIndex
-                        }))
+                        activeVersion: versionIndex,
                       };
                     }
                     return img;
@@ -5151,10 +5148,7 @@ export default function StoryWizard() {
                       [coverType]: {
                         ...coverObj,
                         imageData: activeVersion.imageData,
-                        imageVersions: coverObj.imageVersions.map((v, i) => ({
-                          ...v,
-                          isActive: i === versionIndex
-                        }))
+                        activeVersion: versionIndex,
                       }
                     };
                   });
@@ -5779,17 +5773,16 @@ export default function StoryWizard() {
                           if (img.pageNumber !== target.pageNumber) return img;
                           const existingVersions = img.imageVersions && img.imageVersions.length > 0
                             ? img.imageVersions
-                            : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                            : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), type: 'original' as const }];
                           const updatedVersions = [
                             ...existingVersions,
                             {
                               imageData: result.imageData,
                               createdAt: new Date().toISOString(),
-                              isActive: true,
                               type: 'edit' as const,
                               qualityScore: result.qualityScore,
                             }
-                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                          ];
                           return {
                             ...img,
                             imageData: result.imageData,
@@ -5800,6 +5793,7 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
+                            activeVersion: updatedVersions.length - 1,
                           };
                         }));
                         log.info('Image edited successfully, updated state with quality info');
@@ -5813,18 +5807,17 @@ export default function StoryWizard() {
                           const existingVersions = current?.imageVersions && current.imageVersions.length > 0
                             ? current.imageVersions
                             : current?.imageData
-                              ? [{ imageData: current.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                              ? [{ imageData: current.imageData, createdAt: new Date().toISOString(), type: 'original' as const }]
                               : [];
                           const updatedVersions = [
                             ...existingVersions,
                             {
                               imageData: result.imageData,
                               createdAt: new Date().toISOString(),
-                              isActive: true,
                               type: 'edit' as ImageVersion['type'],
                               qualityScore: result.qualityScore,
                             }
-                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                          ];
                           const updatedCover = {
                             ...(typeof current === 'object' ? current : {}),
                             imageData: result.imageData,
@@ -5835,6 +5828,7 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
+                            activeVersion: updatedVersions.length - 1,
                           };
                           return { ...prev, [key]: updatedCover };
                         });

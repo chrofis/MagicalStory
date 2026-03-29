@@ -4299,25 +4299,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
-    // Initialize image_version_meta with active versions for all pages
-    // Versions are in chronological order; the active one has isActive=true.
+    // Initialize image_version_meta with active versions for all pages.
+    // For scenes: if wasCharacterFixed, the last version is the charfix (active).
+    // Otherwise, pick the version with the highest qualityScore (best version).
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
-          await setActiveVersion(storyId, scene.pageNumber, activeIdx >= 0 ? activeIdx : scene.imageVersions.length - 1);
+          let activeIdx;
+          if (scene.wasCharacterFixed) {
+            activeIdx = scene.imageVersions.length - 1;
+          } else {
+            // Find version with highest qualityScore (best version from pipeline)
+            let bestIdx = -1, bestScore = -1;
+            for (let i = 0; i < scene.imageVersions.length; i++) {
+              const s = scene.imageVersions[i].qualityScore;
+              if (s != null && s > bestScore) { bestScore = s; bestIdx = i; }
+            }
+            activeIdx = bestIdx >= 0 ? bestIdx : scene.imageVersions.length - 1;
+          }
+          await setActiveVersion(storyId, scene.pageNumber, activeIdx);
         }
       }
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
     }
 
-    // Initialize image_version_meta for covers too
+    // Initialize image_version_meta for covers too (covers always have one version — use last)
     if (storyData.coverImages) {
       for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
         const cover = storyData.coverImages[coverType];
         if (cover?.imageVersions?.length > 0) {
-          const activeIdx = cover.imageVersions.findIndex(v => v.isActive);
-          await setActiveVersion(storyId, coverType, activeIdx >= 0 ? activeIdx : cover.imageVersions.length - 1);
+          await setActiveVersion(storyId, coverType, cover.imageVersions.length - 1);
         }
       }
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for covers`);

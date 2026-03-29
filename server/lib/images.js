@@ -5449,7 +5449,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalEval = best?.evaluation;
 
     // Build imageVersions array — ALL versions in chronological order.
-    // The best version is marked isActive, NOT moved to index 0.
     // image_version_meta tracks which version_index is active.
     const imageVersions = [];
     const buildVersionEntry = (v) => ({
@@ -5464,7 +5463,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       bboxDetection: v.evaluation?.bboxDetection || null,
       description: img.sceneDescription || null,
       prompt: img.prompt || null,
-      isActive: v === best && !charFix
     });
     // Versions in chronological order (original first, then redo attempts)
     for (const v of versions) {
@@ -5473,8 +5471,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // Add character fix as a version entry if it exists
     if (charFix?.imageData) {
-      // Mark all existing versions as not active
-      imageVersions.forEach(v => v.isActive = false);
       imageVersions.push({
         imageData: charFix.imageData,
         qualityScore: charFix.afterScore ?? charFix.score ?? null,
@@ -5487,7 +5483,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         bboxDetection: null,
         description: img.sceneDescription || null,
         prompt: null,
-        isActive: true
       });
     }
 

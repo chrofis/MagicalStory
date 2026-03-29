@@ -394,7 +394,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         [id]
       );
 
-      // Get active version metadata to set isActive flags correctly
+      // Get active version metadata
       const activeVersions = await getAllActiveVersions(id);
 
       // Get version metadata (description, prompt, modelId, type) from data blob
@@ -469,7 +469,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             qualityScore: row.quality_score,
             generatedAt: versionDate,
             createdAt: versionDate,  // ImageHistoryModal reads createdAt
-            isActive: isActiveVersion,
             // Dev mode metadata from data blob
             description: versionMeta.description,
             prompt: versionMeta.prompt,
@@ -745,7 +744,6 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             userInput: v.userInput || null,
             modelId: v.modelId || null,
             createdAt: v.createdAt || null,
-            isActive: v.isActive || false,
             type: v.type || v.source || null,
             qualityScore: v.qualityScore ?? null,
             qualityReasoning: v.qualityReasoning || null,
@@ -1671,16 +1669,18 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           } else {
             // Full path: build imageVersions array with ALL versions
             if (!sceneImagesMap.has(pageNum)) {
+              const activeIdx = activeVersions[pageNum.toString()] ?? 0;
               sceneImagesMap.set(pageNum, {
                 pageNumber: pageNum,
                 imageData: null,
                 qualityScore: null,
                 generatedAt: null,
-                imageVersions: []
+                imageVersions: [],
+                activeVersion: activeIdx
               });
             }
             const scene = sceneImagesMap.get(pageNum);
-            const activeIdx = activeVersions[pageNum.toString()] ?? 0;
+            const activeIdx = scene.activeVersion;
 
             // Add ALL versions to imageVersions array (including version 0)
             scene.imageVersions.push({
@@ -1689,7 +1689,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               createdAt: row.generated_at, // Alias for frontend compatibility
-              isActive: row.version_index === activeIdx
             });
 
             // Set main imageData to the ACTIVE version (not always version 0)
@@ -1715,17 +1714,18 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             };
           } else {
             // Full path: build imageVersions array
+            const activeCoverVersion = activeVersions[coverType] ?? 0;
             if (!covers[coverType]) {
               covers[coverType] = {
                 imageData: null,
                 qualityScore: null,
                 generatedAt: null,
-                imageVersions: []
+                imageVersions: [],
+                activeVersion: activeCoverVersion
               };
             }
 
             const coverData = covers[coverType];
-            const activeCoverVersion = activeVersions[coverType] ?? 0;
 
             // Add to imageVersions array (include versionIndex for consistent version selection)
             coverData.imageVersions.push({
@@ -1734,7 +1734,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               createdAt: row.generated_at, // Alias for frontend compatibility
-              isActive: row.version_index === activeCoverVersion
             });
 
             // If this is the active version, set as main imageData
@@ -1866,11 +1865,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             // Fast path: already have active image, no imageVersions
             return hasEmptySceneImage ? { ...img, hasEmptySceneImage } : img;
           }
-          // Full path: mark active versions
-          const activeIdx = activeVersions[img.pageNumber.toString()];
+          // Full path: include activeVersion
           return {
             ...img,
-            isActive: activeIdx === 0 || activeIdx === undefined,
             imageVersions: img.imageVersions.length > 0 ? img.imageVersions : undefined,
             ...(hasEmptySceneImage && { hasEmptySceneImage }),
           };
@@ -1892,16 +1889,15 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
     const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
 
     const images = (story.sceneImages || []).map(img => {
-      const activeIdx = activeVersions[img.pageNumber?.toString()];
+      const activeIdx = activeVersions[img.pageNumber?.toString()] ?? 0;
       return {
         pageNumber: img.pageNumber,
         imageData: normalizeImageData(img.imageData),
         qualityScore: img.qualityScore,
-        isActive: activeIdx === 0 || activeIdx === undefined,
+        activeVersion: activeIdx,
         imageVersions: img.imageVersions?.map((v, i) => ({
           imageData: normalizeImageData(v.imageData),
           qualityScore: v.qualityScore,
-          isActive: activeIdx === i,
           versionIndex: i
         }))
       };
@@ -1917,7 +1913,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             const activeCoverIdx = activeVersions[coverType] ?? 0;
             covers[coverType] = {
               imageData: normalizeImageData(imageData),
-              qualityScore: coverData.qualityScore || null
+              qualityScore: coverData.qualityScore || null,
+              activeVersion: activeCoverIdx
             };
             // Include imageVersions if available in blob (more than 1 version)
             if (coverData.imageVersions && coverData.imageVersions.length > 1) {
@@ -1927,7 +1924,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 description: v.description,
                 type: v.type,
                 createdAt: v.createdAt,
-                isActive: i === activeCoverIdx
+                versionIndex: i
               }));
             }
           }
@@ -1947,7 +1944,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
 // GET /api/stories/:id/image/:pageNumber - Get individual page image
 // Optimized: First tries separate story_images table, falls back to data blob
-// Returns isActive flag from image_version_meta column for each version
+// Returns activeVersion from image_version_meta for version selection
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
   const startTime = Date.now();
   try {
@@ -2006,7 +2003,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
           imageData: normalizeImageData(separateImage.imageData),
           qualityScore: separateImage.qualityScore,
           generatedAt: separateImage.generatedAt || versionMeta[0]?.createdAt,
-          isActive: activeVersion === 0,
+          versionIndex: 0,
           description: versionMeta[0]?.description,
           prompt: versionMeta[0]?.prompt,
           userInput: versionMeta[0]?.userInput,
@@ -2019,7 +2016,6 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
           return {
             ...v,
             imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
-            isActive: v.versionIndex === activeVersion,
             description: meta.description,
             prompt: meta.prompt,
             userInput: meta.userInput,
@@ -2034,7 +2030,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, active=${activeVersion}, ${Date.now() - startTime}ms`);
 
       // Return active version's imageData as the main imageData
-      const activeEntry = allVersions.find(v => v.isActive);
+      const activeEntry = allVersions[activeVersion] || allVersions[0];
       const activeImageData = activeEntry?.imageData || normalizeImageData(separateImage.imageData);
 
       return res.json({
@@ -2042,6 +2038,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         imageData: activeImageData,
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
+        activeVersion,
         imageVersions: allVersions
       });
     }
@@ -2058,12 +2055,6 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    // Mark isActive based on image_version_meta
-    const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
-      ...v,
-      isActive: i === dbToArrayIndex(activeVersion, 'scene')
-    }));
-
     const imageSize = sceneImage.imageData?.length || 0;
     const versionsCount = sceneImage.imageVersions?.length || 0;
     console.log(`📷 [IMAGE-FALLBACK] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
@@ -2071,8 +2062,11 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     res.json({
       pageNumber: pageNum,
       imageData: normalizeImageData(sceneImage.imageData),
-      isActive: activeVersion === 0,  // top-level: main blob imageData is v0
-      imageVersions: versionsWithActive
+      activeVersion: dbToArrayIndex(activeVersion, 'scene'),
+      imageVersions: sceneImage.imageVersions?.map((v, i) => ({
+        ...v,
+        versionIndex: i
+      }))
     });
   } catch (err) {
     console.error(`❌ Error fetching page image ${req.params.id}/page${req.params.pageNumber}:`, err);
@@ -2257,8 +2251,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         // Rehydrate only active images (fast path — frontend loads versions via /images endpoint)
         story = await rehydrateStoryImages(id, story);
 
-        // Sync isActive flags in imageVersions with stored active version metadata
-        // and strip imageData from versions (frontend loads these via /images endpoint)
+        // Set activeVersionIndex and strip imageData from non-active versions
+        // (frontend loads version images via /images endpoint)
         if (story.sceneImages && story.sceneImages.length > 0) {
           const activeVersions = await getAllActiveVersions(id);
           for (const scene of story.sceneImages) {
@@ -2267,12 +2261,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
               const activeArrayIdx = dbToArrayIndex(activeDbIndex, 'scene');
               const { arrayToDbIndex: toDbIdx } = require('../lib/versionManager');
               scene.imageVersions.forEach((v, idx) => {
-                v.isActive = idx === activeArrayIdx;
                 if (v.versionIndex === undefined) {
                   v.versionIndex = toDbIdx(idx, 'scene');
                 }
                 // Strip imageData from non-active versions — frontend loads via /images endpoint
-                if (!v.isActive) {
+                if (idx !== activeArrayIdx) {
                   delete v.imageData;
                 }
               });

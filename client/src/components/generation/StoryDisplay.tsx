@@ -268,10 +268,10 @@ export function StoryDisplay({
   const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   // Image history modal state
-  const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[] } | null>(null);
+  const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
 
   // Cover image history modal state
-  const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[] } | null>(null);
+  const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
 
   // Character repair popover state
   const [charRepairPopover, setCharRepairPopover] = useState<{ pageNumber: number } | null>(null);
@@ -797,6 +797,12 @@ export function StoryDisplay({
     return image?.imageVersions || [];
   };
 
+  // Get active version index for a page
+  const getActiveVersionIndex = (pageNumber: number): number | undefined => {
+    const image = sceneImages.find(img => img.pageNumber === pageNumber);
+    return image?.activeVersion;
+  };
+
   // Handle selecting a different image version
   const handleSelectVersion = async (pageNumber: number, versionIndex: number) => {
     if (!onSelectImageVersion) return;
@@ -824,6 +830,12 @@ export function StoryDisplay({
     const cover = coverImages?.[coverType];
     if (!cover) return [];
     return cover.imageVersions || [];
+  };
+
+  // Get active version index for a cover
+  const getCoverActiveVersionIndex = (coverType: 'frontCover' | 'initialPage' | 'backCover'): number | undefined => {
+    const cover = coverImages?.[coverType];
+    return cover?.activeVersion;
   };
 
   // Extract just the Image Summary from a full scene description
@@ -3888,7 +3900,7 @@ export function StoryDisplay({
             {getCoverVersions('frontCover').length > 1 && (
               <div className="mt-2">
                 <button
-                  onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
+                  onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
                   className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
@@ -4111,7 +4123,7 @@ export function StoryDisplay({
             {getCoverVersions('initialPage').length > 1 && (
               <div className="mt-2">
                 <button
-                  onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
+                  onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
                   className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
@@ -4411,7 +4423,7 @@ export function StoryDisplay({
                                 )}
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
-                                    onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                                    onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
@@ -4624,7 +4636,7 @@ export function StoryDisplay({
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
-                                grokRefImages={image?.imageVersions?.find(v => v.isActive)?.grokRefImages ?? (image as any)?.grokRefImages}
+                                grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)]?.grokRefImages ?? (image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -4921,7 +4933,7 @@ export function StoryDisplay({
                                 )}
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
-                                    onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                                    onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
@@ -5358,7 +5370,7 @@ export function StoryDisplay({
             {getCoverVersions('backCover').length > 1 && (
               <div className="mt-2">
                 <button
-                  onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
+                  onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
                   className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
@@ -5852,6 +5864,7 @@ export function StoryDisplay({
         <ImageHistoryModal
           pageNumber={imageHistoryModal.pageNumber}
           versions={imageHistoryModal.versions}
+          activeVersionIndex={imageHistoryModal.activeVersionIndex}
           onClose={() => setImageHistoryModal(null)}
           onSelectVersion={(pageNumber, versionIndex) => handleSelectVersion(pageNumber as number, versionIndex)}
           developerMode={developerMode}
@@ -5863,6 +5876,7 @@ export function StoryDisplay({
         <ImageHistoryModal
           coverType={coverHistoryModal.coverType}
           versions={coverHistoryModal.versions}
+          activeVersionIndex={coverHistoryModal.activeVersionIndex}
           onClose={() => setCoverHistoryModal(null)}
           onSelectVersion={(coverType, versionIndex) => handleSelectCoverVersion(coverType as 'frontCover' | 'initialPage' | 'backCover', versionIndex)}
           developerMode={developerMode}

@@ -410,7 +410,7 @@ export const storyService = {
         userInput: string | null;
         modelId: string | null;
         createdAt: string | null;
-        isActive: boolean;
+        isActive?: boolean;
         type: string | null;
         qualityScore: number | null;
         qualityReasoning: string | null;
