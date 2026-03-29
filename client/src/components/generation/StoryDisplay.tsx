@@ -123,7 +123,6 @@ interface StoryDisplayProps {
   onRepairImage?: (pageNumber: number) => Promise<void>;
   onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => Promise<void>;
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
-  onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   developerMode?: boolean;
@@ -197,7 +196,6 @@ export function StoryDisplay({
   onRepairImage,
   onRepairCharacter,
   onIteratePage,
-  onRevertRepair,
   onVisualBibleChange,
   storyId,
   developerMode = false,
