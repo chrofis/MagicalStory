@@ -16,6 +16,20 @@ const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
+
+// Distinct color per figure — high contrast palette, shared between overlay drawing and prompt building
+const FIGURE_COLORS = [
+  { hex: '#e6194b', name: 'Red' },
+  { hex: '#3cb44b', name: 'Green' },
+  { hex: '#4363d8', name: 'Blue' },
+  { hex: '#f58231', name: 'Orange' },
+  { hex: '#911eb4', name: 'Purple' },
+  { hex: '#42d4f4', name: 'Cyan' },
+  { hex: '#f032e6', name: 'Magenta' },
+  { hex: '#bfef45', name: 'Lime' },
+  { hex: '#fabed4', name: 'Pink' },
+  { hex: '#dcbeff', name: 'Lavender' },
+];
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
 let gridBasedRepairModule = null;
@@ -1944,26 +1958,13 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     // Build SVG overlay — figures and faces only (no object boxes to reduce noise)
     const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
 
-    // Distinct color per figure — high contrast, colorblind-friendly palette
-    const figureColors = [
-      '#e6194b', // Red
-      '#3cb44b', // Green
-      '#4363d8', // Blue
-      '#f58231', // Orange
-      '#911eb4', // Purple
-      '#42d4f4', // Cyan
-      '#f032e6', // Magenta
-      '#bfef45', // Lime
-      '#fabed4', // Pink
-      '#dcbeff', // Lavender
-    ];
     const unknownColor = '#888888'; // Gray for unidentified figures
 
     // Draw figure boxes — each figure gets a unique color for both body and face
     for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
       const fig = bboxDetection.figures[i];
       const isIdentified = fig.name && fig.name !== 'UNKNOWN';
-      const figColor = isIdentified ? figureColors[i % figureColors.length] : unknownColor;
+      const figColor = isIdentified ? FIGURE_COLORS[i % FIGURE_COLORS.length].hex : unknownColor;
 
       // Body box
       if (fig.bodyBox) {
@@ -10868,6 +10869,7 @@ module.exports = {
   detectAllBoundingBoxes,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
+  FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
   detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes

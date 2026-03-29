@@ -64,6 +64,7 @@ const {
   repairCharacterMismatch,
   detectAllBoundingBoxes,
   createBboxOverlayImage,
+  FIGURE_COLORS,
   callGrokVisionAPI,
   GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
@@ -3762,49 +3763,17 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     }
     log.info(`🔄 [ITERATE-BBOX] Refining ${mainCharacters.length} main characters (skipping ${(currentDetection.figures || []).length - mainCharacters.length} crowd figures)`);
 
+    // Build color-aware figures summary so the model knows which color = which character
     const figuresSummary = mainCharacters.map((f, i) => {
+      const color = FIGURE_COLORS[i % FIGURE_COLORS.length].name;
       const fb = f.faceBox ? `face:[${f.faceBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no face';
       const bb = f.bodyBox ? `body:[${f.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no body';
-      return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
+      return `  ${i + 1}. "${f.name}" (${color} boxes) — ${fb}, ${bb}`;
     }).join('\n');
 
-    const iteratePrompt = `The attached image shows bounding boxes drawn on an illustration.
-- THICK GREEN boxes = character BODY region
-- THICK BLUE boxes labeled "FACE" = character FACE region (most important!)
-
-CURRENT FACE & BODY BOXES (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):
-${figuresSummary || '  (none)'}
-
-Your task: Look at the image carefully and REFINE these bounding boxes so they accurately capture each character.
-
-FACE BOX RULES (most important):
-- Must include the COMPLETE face: forehead to chin, ear to ear. Nothing cut off.
-- Include hair/hat if it's part of the head silhouette.
-- Must NOT include shoulders or neck below the jawline.
-- If the face is turned or at an angle, the box should still capture the full visible face area.
-
-BODY BOX RULES:
-- Must include the COMPLETE character from head to feet. Nothing cut off.
-- Include arms, legs, clothing, accessories — everything that is part of the character.
-- If feet are visible, the box must extend to the bottom of the feet.
-- If a character is holding something, include the held object in the body box.
-
-Common issues to fix:
-- Box shifted away from the actual element (move it to center on the character)
-- Box too small — part of the face/body is cut off (EXPAND it)
-- Box too large — includes background or other characters (SHRINK it)
-
-Return CORRECTED coordinates. Keep the same character names. Only adjust the box positions.
-
-Output JSON (ONLY figures, no objects):
-{
-  "figures": [
-    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
-  ]
-}
-
-Coordinates use 0-1000 scale where [0,0] is top-left and [1000,1000] is bottom-right.
-Respond with ONLY the JSON, no explanation.`;
+    const iteratePrompt = PROMPT_TEMPLATES.bboxRefine
+      ? fillTemplate(PROMPT_TEMPLATES.bboxRefine, { figuresSummary })
+      : `Refine bounding boxes for:\n${figuresSummary}\nReturn corrected JSON with figures array.`;
 
     // Send overlay image + prompt to vision model
     const overlayBase64 = overlayImage.replace(/^data:image\/\w+;base64,/, '');
