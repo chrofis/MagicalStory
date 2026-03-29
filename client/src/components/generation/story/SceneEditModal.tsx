@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { RefreshCw, Edit3, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { RetryHistoryDisplay } from './RetryHistoryDisplay';
 import type { RetryAttempt } from '@/types/story';
 
 interface CharacterOption {
@@ -278,16 +277,6 @@ export function SceneEditModal({
                 </div>
               )}
 
-              {/* Retry History (if multiple attempts) */}
-              {consistencyRegen.retryHistory && consistencyRegen.retryHistory.length > 0 && (
-                <div className="mt-4">
-                  <RetryHistoryDisplay
-                    retryHistory={consistencyRegen.retryHistory}
-                    totalAttempts={consistencyRegen.totalAttempts || 1}
-                    language={language}
-                  />
-                </div>
-              )}
             </div>
           )}
 

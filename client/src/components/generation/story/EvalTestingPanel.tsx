@@ -36,14 +36,14 @@ const EVAL_MODELS = [
 ];
 
 function scoreColor(score: number): string {
-  if (score >= 70) return 'text-green-600';
-  if (score >= 50) return 'text-yellow-600';
+  if (score >= 80) return 'text-green-600';
+  if (score >= 60) return 'text-yellow-600';
   return 'text-red-600';
 }
 
 function scoreBgColor(score: number): string {
-  if (score >= 70) return 'bg-green-50 border-green-300';
-  if (score >= 50) return 'bg-yellow-50 border-yellow-300';
+  if (score >= 80) return 'bg-green-50 border-green-300';
+  if (score >= 60) return 'bg-yellow-50 border-yellow-300';
   return 'bg-red-50 border-red-300';
 }
 
