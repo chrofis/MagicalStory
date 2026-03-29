@@ -3858,7 +3858,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
                   </button>
                 )}
                 {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
@@ -4077,7 +4077,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
                   </button>
                 )}
                 {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
@@ -5310,7 +5310,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
                   </button>
                 )}
                 {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
