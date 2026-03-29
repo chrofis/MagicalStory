@@ -6264,52 +6264,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
     const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
 
-    // Pre-compute protected face rects in blend-region pixel coords (with 20% padding)
-    const protectedFaces = options.protectedFaces || [];
-    const protectedRects = protectedFaces.map(([fymin, fxmin, fymax, fxmax]) => {
-      const fw = fxmax - fxmin, fh = fymax - fymin;
-      const pad = 0.2;
-      const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
-      const pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
-      return {
-        left: Math.floor(pxmin * sceneMeta.width) - blendLeft,
-        top: Math.floor(pymin * sceneMeta.height) - blendTop,
-        right: Math.ceil(pxmax * sceneMeta.width) - blendLeft,
-        bottom: Math.ceil(pymax * sceneMeta.height) - blendTop,
-      };
-    }).filter(r => r.right > 0 && r.bottom > 0 && r.left < blendWidth && r.top < blendHeight);
-    if (protectedRects.length > 0) {
-      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} other face(s) from blend`);
-    }
-
     // F. Feathered blend: original outside, Grok inside, gradient at edges
-    // Protected faces get smooth feathered transition (not hard rectangle edges)
+    // No protected face rects needed — all faces were whited out and Grok redrew them all.
+    // The blend only applies the target character's bbox region; other faces are restored
+    // from the original scene automatically (origRegion at alpha=0).
     const blended = Buffer.alloc(blendWidth * blendHeight * 3);
     const maskPixels = Buffer.alloc(blendWidth * blendHeight);
     for (let i = 0; i < blendWidth * blendHeight; i++) {
-      const y = Math.floor(i / blendWidth);
       const x = i % blendWidth;
-
-      // Calculate protection factor: 0 = fully protected, 1 = no protection
-      // Uses distance-to-rect with feathered gradient around protected faces
-      let protectedAlpha = 1;
-      for (const r of protectedRects) {
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-          protectedAlpha = 0;
-          break;
-        }
-        // Euclidean distance to rect boundary — smooth circular feather at corners
-        const dx = Math.max(r.left - x, 0, x - r.right);
-        const dy = Math.max(r.top - y, 0, y - r.bottom);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < FEATHER_PX) {
-          protectedAlpha = Math.min(protectedAlpha, dist / FEATHER_PX);
-        }
-      }
+      const y = Math.floor(i / blendWidth);
 
       const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
-      const edgeAlpha = dMin >= FEATHER_PX ? 1 : dMin / FEATHER_PX;
-      const alpha = edgeAlpha * protectedAlpha;
+      const alpha = dMin >= FEATHER_PX ? 1 : dMin / FEATHER_PX;
       maskPixels[i] = Math.round(alpha * 255);
       const idx = i * 3;
       blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + grokRegion[idx]     * alpha);
