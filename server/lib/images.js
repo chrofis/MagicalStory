@@ -2362,7 +2362,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Buffer|null} visualBibleGrid - Combined grid image of VB elements and secondary landmarks
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null) {
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -5473,6 +5473,26 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageVersions.push(buildVersionEntry(v));
     }
 
+    // Add character fix as a version entry if it exists
+    if (charFix?.imageData) {
+      // Mark all existing versions as not active
+      imageVersions.forEach(v => v.isActive = false);
+      imageVersions.push({
+        imageData: charFix.imageData,
+        qualityScore: charFix.afterScore ?? charFix.score ?? null,
+        source: 'character-fix',
+        type: 'entity-repair',
+        modelId: charFix.modelId || null,
+        generatedAt: new Date().toISOString(),
+        qualityReasoning: null,
+        fixTargets: [],
+        bboxDetection: null,
+        description: img.sceneDescription || null,
+        prompt: null,
+        isActive: true
+      });
+    }
+
     // Build retryHistory
     const retryHistory = versions.map((v, idx) => ({
       attempt: idx + 1,
@@ -7039,6 +7059,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Story text and scene hint for semantic evaluation (text-to-image fidelity)
     storyText = null,
     sceneHint = null,
+    sceneBackground = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -7106,7 +7127,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
