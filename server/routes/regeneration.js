@@ -4171,6 +4171,21 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
     const story = storyResult.rows[0];
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
+    // Sync quality data from a version to the root scene level
+    // (so evaluation-data endpoint and Collect Feedback see the active version's scores)
+    const syncVersionToRoot = (scene, version) => {
+      if (!version) return;
+      if (version.qualityScore != null) scene.qualityScore = version.qualityScore;
+      if (version.qualityReasoning != null) scene.qualityReasoning = version.qualityReasoning;
+      if (version.semanticScore != null) scene.semanticScore = version.semanticScore;
+      if (version.semanticResult != null) scene.semanticResult = version.semanticResult;
+      if (version.fixTargets) scene.fixTargets = version.fixTargets;
+      if (version.fixableIssues) scene.fixableIssues = version.fixableIssues;
+      if (version.issuesSummary != null) scene.issuesSummary = version.issuesSummary;
+      if (version.verdict != null) scene.verdict = version.verdict;
+      if (version.bboxDetection) scene.bboxDetection = version.bboxDetection;
+    };
+
     const results = {};
     for (const pageNumber of pageNumbers) {
       let scene;
@@ -4212,6 +4227,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         // Entity-repair has no score but scored alternatives exist — re-eval likely failed,
         // switch to best scored version since we can't confirm the repair is good
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
+        syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
         const dbIndex = arrayToDbIndex(bestIndex, imageType);
         const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
         await setActiveVersion(id, versionId, dbIndex);
@@ -4220,6 +4236,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       } else if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
+        syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
 
         const dbIndex = arrayToDbIndex(bestIndex, imageType);
 
