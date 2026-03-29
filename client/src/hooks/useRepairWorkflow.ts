@@ -995,8 +995,7 @@ export function useRepairWorkflow({
             repaired: result.repaired,
             preScore: lastEntry?.preRepairScore ?? null,
             postScore: lastEntry?.postRepairScore ?? null,
-            beforeImage: undefined, // Large — don't store in state
-            afterImage: result.repaired ? result.imageData : undefined,
+            afterImage: result.imageData || undefined,
             fixTargetsCount: lastEntry?.fixTargetsCount ?? 0,
             noErrorsFound: result.noErrorsFound,
           },

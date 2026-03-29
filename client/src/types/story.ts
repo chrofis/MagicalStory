@@ -660,7 +660,7 @@ export interface ImageVersion {
   prompt?: string;       // Full API prompt (for dev mode)
   modelId?: string;
   createdAt: string;
-  isActive: boolean;
+  isActive?: boolean;  // DEPRECATED: kept for backward compat with old blob data. Use page.activeVersion instead.
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
   qualityScore?: number;
   semanticScore?: number | null;
@@ -738,6 +738,8 @@ export interface SceneImage {
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)
   imageVersions?: ImageVersion[];
+  // Index of the active version in imageVersions (replaces isActive on individual versions)
+  activeVersion?: number;
   // Auto-repair history (dev mode)
   wasAutoRepaired?: boolean;
   repairHistory?: RepairAttempt[];
@@ -808,6 +810,8 @@ export interface CoverImageData {
   storyTitle?: string;
   // User-initiated image versions (same pattern as scene images)
   imageVersions?: ImageVersion[];
+  // Index of the active version in imageVersions (replaces isActive on individual versions)
+  activeVersion?: number;
 }
 
 export interface CoverImages {
@@ -1071,7 +1075,6 @@ export interface RepairWorkflowState {
     repaired: boolean;
     preScore: number | null;
     postScore: number | null;
-    beforeImage?: string;
     afterImage?: string;
     fixTargetsCount: number;
     noErrorsFound?: boolean;

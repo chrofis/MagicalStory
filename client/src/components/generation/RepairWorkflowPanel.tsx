@@ -1813,6 +1813,10 @@ export function RepairWorkflowPanel({
                       {/* Inpaint result display */}
                       {workflowState.inpaintResults[selectedInpaintPage] && (() => {
                         const ir = workflowState.inpaintResults[selectedInpaintPage];
+                        // Get before image from current scene/cover
+                        const beforeImg = isCover
+                          ? (cover as { imageData?: string })?.imageData
+                          : scene?.imageData;
                         return (
                           <div className={`mt-2 p-3 rounded-lg border ${ir.repaired ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
                             <div className="flex items-center justify-between mb-1">
@@ -1827,7 +1831,24 @@ export function RepairWorkflowPanel({
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-gray-600">
+                            {/* Before / After images */}
+                            {(beforeImg || ir.afterImage) && (
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                {beforeImg && (
+                                  <div>
+                                    <div className="text-[10px] text-gray-500 mb-0.5 font-medium">Before</div>
+                                    <img src={beforeImg} alt="Before" className="w-full rounded border-2 border-red-300" />
+                                  </div>
+                                )}
+                                {ir.afterImage && (
+                                  <div>
+                                    <div className="text-[10px] text-gray-500 mb-0.5 font-medium">After</div>
+                                    <img src={ir.afterImage} alt="After" className="w-full rounded border-2 border-green-300" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-600 mt-1">
                               {ir.fixTargetsCount} fix target{ir.fixTargetsCount !== 1 ? 's' : ''} processed
                               {!ir.repaired && !ir.noErrorsFound && (
                                 <span className="ml-1">— inpainting could not fix these issues. Try regenerating the page instead.</span>
