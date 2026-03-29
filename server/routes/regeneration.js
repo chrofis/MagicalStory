@@ -770,20 +770,39 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       log.info(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
     }
 
-    // Get version info for response (reuse updatedScene from save above)
-    const versionCount = updatedScene?.imageVersions?.length || 1;
-    const imageVersions = updatedScene?.imageVersions?.map((v, idx) => ({
-      description: v.description,
-      prompt: v.prompt,
-      userInput: v.userInput,
-      modelId: v.modelId,
-      createdAt: v.createdAt,
-      isActive: v.isActive,
-      type: v.type,
-      qualityScore: v.qualityScore,
-      // Include imageData for all versions so frontend can display them immediately
-      imageData: v.imageData || undefined
-    })) || [];
+    // Build complete imageVersions from DB (blob may only have the new version, not v0)
+    const allVersionRows = await dbQuery(
+      `SELECT version_index, image_data, quality_score, generated_at
+       FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+       ORDER BY version_index`,
+      [id, pageNumber]
+    );
+    const activeVersionMeta = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [id]);
+    const vMeta = activeVersionMeta[0]?.image_version_meta || {};
+    const activeVIdx = vMeta[String(pageNumber)]?.activeVersion ?? 0;
+    const blobVersions = updatedScene?.imageVersions || [];
+
+    const imageVersions = allVersionRows.map((row) => {
+      // Find matching blob version for metadata (description, prompt, type, etc.)
+      const blobIdx = row.version_index; // arrayToDbIndex is identity
+      const blobV = blobVersions[blobIdx] || {};
+      return {
+        versionIndex: row.version_index,
+        imageData: row.image_data,
+        description: blobV.description || null,
+        prompt: blobV.prompt || null,
+        userInput: blobV.userInput || null,
+        modelId: blobV.modelId || null,
+        createdAt: blobV.createdAt || row.generated_at,
+        isActive: row.version_index === activeVIdx,
+        type: blobV.type || (row.version_index === 0 ? 'original' : null),
+        qualityScore: blobV.qualityScore ?? row.quality_score,
+        qualityReasoning: blobV.qualityReasoning || null,
+        fixTargets: blobV.fixTargets || [],
+        referencePhotoNames: blobV.referencePhotoNames || [],
+      };
+    });
+    const versionCount = imageVersions.length;
 
     res.json({
       success: true,
