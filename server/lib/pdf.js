@@ -598,17 +598,27 @@ async function generateCombinedBookPdf(stories, options = {}) {
       addStoryContentPages(storyData, storyPages);
 
     } else {
-      // STORY 2+: Blank page (LEFT) then title page (RIGHT)
-      // This ensures story content starts on LEFT (text) / RIGHT (image) alignment
-      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      totalStoryPages++;
+      // STORY 2+: Title page (LEFT/even) + dedication page (RIGHT/odd)
+      // Previous story ended with back cover (LEFT) + padding (RIGHT),
+      // so next page is LEFT — perfect for title.
+      // Matches story 1 layout: blank (LEFT) + dedication (RIGHT)
 
+      // Title page (LEFT) — front cover image as internal title
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(frontCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
+      }
+
+      // Dedication/initial page (RIGHT) — same side as story 1's dedication
+      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      totalStoryPages++;
+      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      if (initialPageImageData) {
+        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
       addStoryContentPages(storyData, storyPages);

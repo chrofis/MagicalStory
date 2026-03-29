@@ -1469,10 +1469,10 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     }
 
     // Story 1: 1 page (dedication, blank if trial)
-    // Story 2+: 2 pages (blank + title) + back cover + separator if applicable
+    // Story 2+: 2 pages (title + dedication) + back cover + separator if applicable
     totalPages += 1; // dedication for first story
     for (let si = 1; si < stories.length; si++) {
-      totalPages += 2; // blank + title page
+      totalPages += 2; // title + dedication page
       const hasBackCover = !!stories[si].data?.coverImages?.backCover;
       if (hasBackCover) {
         totalPages += 1; // back cover
