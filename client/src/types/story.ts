@@ -127,6 +127,7 @@ export interface ArtStyle {
   image: string;
   description: LocalizedString;
   prompt: string;
+  category: 'realistic' | 'illustrated' | 'creative';
 }
 
 export interface SceneDescription {
