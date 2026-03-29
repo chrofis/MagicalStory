@@ -1333,17 +1333,17 @@ export function StoryDisplay({
             }
           }}
           disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
-          className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+          className={`w-full bg-indigo-500 text-white px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold ${
             isGenerating || isRepairing || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
-            <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
+            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
           ) : isDetecting ? (
-            <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : 'Detecting...'}</>
+            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : 'Detecting...'}</>
           ) : (
-            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+            <><Users size={12} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -4359,7 +4359,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4375,7 +4375,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4389,7 +4389,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={12} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -4401,21 +4401,21 @@ export function StoryDisplay({
                                   <button
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
-                                    className={`bg-indigo-500 text-white px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold ${
                                       isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                     }`}
                                   >
-                                    <Edit3 size={14} />
+                                    <Edit3 size={12} />
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold hover:bg-indigo-600"
                                   >
-                                    <Images size={14} />
-                                    {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
+                                    <Images size={12} />
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
@@ -4869,7 +4869,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4885,7 +4885,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4899,7 +4899,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={12} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -4911,21 +4911,21 @@ export function StoryDisplay({
                                   <button
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
-                                    className={`bg-indigo-500 text-white px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold ${
                                       isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                     }`}
                                   >
-                                    <Edit3 size={14} />
+                                    <Edit3 size={12} />
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold hover:bg-indigo-600"
                                   >
-                                    <Images size={14} />
-                                    {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
+                                    <Images size={12} />
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
