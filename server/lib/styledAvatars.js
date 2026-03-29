@@ -194,6 +194,9 @@ function buildPhysicalTraitsString(character) {
       parts.push(`Facial hair: ${traits.facialHair}`);
     }
   }
+  if (traits.glasses && traits.glasses !== 'none') {
+    parts.push(`Glasses: ${traits.glasses}`);
+  }
   if (traits.other && traits.other !== 'none') {
     parts.push(`Other features: ${traits.other}`);
   }

@@ -9322,6 +9322,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
       if (physical.skinTone) physicalParts.push(`${physical.skinTone} skin`);
       if (physical.build) physicalParts.push(physical.build);
       if (physical.facialHair && physical.facialHair !== 'none') physicalParts.push(physical.facialHair);
+      if (physical.glasses && physical.glasses !== 'none') physicalParts.push(physical.glasses);
       if (physical.other) physicalParts.push(physical.other);
 
       if (physicalParts.length > 0) {

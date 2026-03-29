@@ -29,7 +29,8 @@ export interface PhysicalTraits {
   skinTone?: string;     // Skin tone (e.g., "fair", "medium", "olive", "dark")
   skinUndertone?: string; // Skin undertone (e.g., "warm", "cool", "neutral")
   skinToneHex?: string;  // Hex color code for skin tone (e.g., "#E8BEAC")
-  other?: string;        // Glasses, birthmarks, always-present accessories
+  other?: string;        // Birthmarks, always-present accessories
+  glasses?: string;      // Glasses description (e.g. 'round black-framed glasses') or 'none'
   detailedHairAnalysis?: string;  // Detailed hair analysis from avatar evaluation
   apparentAge?: AgeCategory; // How old they look in photo (from analysis or user override)
 }
@@ -65,6 +66,7 @@ export interface PhysicalTraitsSource {
   hair?: TraitSource;        // Legacy
   facialHair?: TraitSource;
   other?: TraitSource;
+  glasses?: TraitSource;
   skinTone?: TraitSource;
   apparentAge?: TraitSource; // How old they look (from avatar evaluation or user override)
 }

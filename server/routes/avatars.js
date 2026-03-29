@@ -2934,31 +2934,55 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             // Extracted traits - write to canonical physical.* structure
+            // Respect user-edited fields — don't overwrite them with AI extraction
             if (results.extractedTraits) {
               const t = results.extractedTraits;
-              // Build physical object with only non-null values
+              const existingChar = freshCharacters[freshCharIndex] || {};
+              const existingSources = existingChar.physicalTraitsSource || {};
+
+              // Build physical object with only non-null values, skipping user-edited fields
               const physical = {};
-              if (t.apparentAge) physical.apparentAge = t.apparentAge;
-              if (t.build) physical.build = t.build;
-              if (t.eyeColor) physical.eyeColor = t.eyeColor;
-              if (t.hairColor) physical.hairColor = t.hairColor;
-              if (t.hairLength) physical.hairLength = t.hairLength;
-              if (t.hairStyle) physical.hairStyle = t.hairStyle;
-              if (t.hairDensity) physical.hairDensity = t.hairDensity;
-              if (t.skinTone) physical.skinTone = t.skinTone;
-              if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
-              if (t.facialHair) physical.facialHair = t.facialHair;
-              if (t.face) physical.face = t.face;
-              if (t.other) physical.other = t.other;
-              if (t.eyeColorHex) physical.eyeColorHex = t.eyeColorHex;
-              if (t.hairColorHex) physical.hairColorHex = t.hairColorHex;
-              if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
+              const traitSources = {};
+
+              const setTrait = (field, value) => {
+                if (value && existingSources[field] !== 'user') {
+                  physical[field] = value;
+                  traitSources[field] = 'extracted';
+                }
+              };
+
+              setTrait('apparentAge', t.apparentAge);
+              setTrait('build', t.build);
+              setTrait('eyeColor', t.eyeColor);
+              setTrait('hairColor', t.hairColor);
+              setTrait('hairLength', t.hairLength);
+              setTrait('hairStyle', t.hairStyle);
+              setTrait('hairDensity', t.hairDensity);
+              setTrait('skinTone', t.skinTone);
+              setTrait('skinToneHex', t.skinToneHex);
+              setTrait('facialHair', t.facialHair);
+              setTrait('face', t.face);
+              setTrait('other', t.other);
+              setTrait('glasses', t.glasses);
+              setTrait('eyeColorHex', t.eyeColorHex);
+              setTrait('hairColorHex', t.hairColorHex);
+              if (t.detailedHairAnalysis && existingSources['hairStyle'] !== 'user') {
+                physical.detailedHairAnalysis = t.detailedHairAnalysis;
+              }
 
               // Merge with existing physical object
               dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(data->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(metadata->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
+
+              // Persist trait sources (merge with existing, preserving 'user' entries)
+              if (Object.keys(traitSources).length > 0) {
+                dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},physicalTraitsSource}', COALESCE(data->'characters'->${freshCharIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+                metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physicalTraitsSource}', COALESCE(metadata->'characters'->${freshCharIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+                params.push(JSON.stringify(traitSources));
+                paramIndex += 1;
+              }
             }
 
             // Structured clothing
@@ -3957,31 +3981,56 @@ These corrections OVERRIDE what is visible in the reference photo.
             }
 
             // Extracted traits - write to canonical physical.* structure
+            // Respect user-edited fields — don't overwrite them with AI extraction
             if (results.extractedTraits) {
               const t = results.extractedTraits;
-              // Build physical object with only non-null values
+              const existingChar = characters[charIndex] || {};
+              const existingSources = existingChar.physicalTraitsSource || {};
+
+              // Build physical object with only non-null values, skipping user-edited fields
               const physical = {};
-              if (t.apparentAge) physical.apparentAge = t.apparentAge;
-              if (t.build) physical.build = t.build;
-              if (t.eyeColor) physical.eyeColor = t.eyeColor;
-              if (t.hairColor) physical.hairColor = t.hairColor;
-              if (t.hairLength) physical.hairLength = t.hairLength;
-              if (t.hairStyle) physical.hairStyle = t.hairStyle;
-              if (t.hairDensity) physical.hairDensity = t.hairDensity;
-              if (t.skinTone) physical.skinTone = t.skinTone;
-              if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
-              if (t.facialHair) physical.facialHair = t.facialHair;
-              if (t.face) physical.face = t.face;
-              if (t.other) physical.other = t.other;
-              if (t.eyeColorHex) physical.eyeColorHex = t.eyeColorHex;
-              if (t.hairColorHex) physical.hairColorHex = t.hairColorHex;
-              if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
+              const traitSources = {};
+
+              const setTrait = (field, value) => {
+                if (value && existingSources[field] !== 'user') {
+                  physical[field] = value;
+                  traitSources[field] = 'extracted';
+                }
+              };
+
+              setTrait('apparentAge', t.apparentAge);
+              setTrait('build', t.build);
+              setTrait('eyeColor', t.eyeColor);
+              setTrait('hairColor', t.hairColor);
+              setTrait('hairLength', t.hairLength);
+              setTrait('hairStyle', t.hairStyle);
+              setTrait('hairDensity', t.hairDensity);
+              setTrait('skinTone', t.skinTone);
+              setTrait('skinToneHex', t.skinToneHex);
+              setTrait('facialHair', t.facialHair);
+              setTrait('face', t.face);
+              setTrait('other', t.other);
+              setTrait('glasses', t.glasses);
+              setTrait('eyeColorHex', t.eyeColorHex);
+              setTrait('hairColorHex', t.hairColorHex);
+              if (t.detailedHairAnalysis && existingSources['hairStyle'] !== 'user') {
+                physical.detailedHairAnalysis = t.detailedHairAnalysis;
+              }
 
               // Merge with existing physical object
               dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physical}', COALESCE(data->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(metadata->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
+
+              // Persist trait sources (merge with existing, preserving 'user' entries)
+              if (Object.keys(traitSources).length > 0) {
+                dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physicalTraitsSource}', COALESCE(data->'characters'->${charIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+                metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physicalTraitsSource}', COALESCE(metadata->'characters'->${charIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+                params.push(JSON.stringify(traitSources));
+                paramIndex += 1;
+              }
+
               log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character.physical: apparentAge=${t.apparentAge}`);
             }
 

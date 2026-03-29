@@ -56,6 +56,7 @@ interface CharacterApiResponse {
     skinUndertone?: string;
     skinToneHex?: string;
     other?: string;
+    glasses?: string;
     detailedHairAnalysis?: string;
     apparentAge?: string;
   };
@@ -80,7 +81,8 @@ interface CharacterApiResponse {
   skinToneHex?: string;
   other_features?: string;
   otherFeatures?: string;
-  other?: string;  // Glasses, birthmarks, always-present accessories
+  other?: string;  // Birthmarks, always-present accessories
+  glasses?: string;  // Glasses description or 'none'
   detailed_hair_analysis?: string;
   detailedHairAnalysis?: string;
   physical_traits_source?: PhysicalTraitsSource;
@@ -160,6 +162,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     skinToneHex: p?.skinToneHex || api.skin_tone_hex || api.skinToneHex,
     hair: p?.hairColor || api.hair_color || api.hairColor,
     other: p?.other || api.other,
+    glasses: p?.glasses || api.glasses,
     detailedHairAnalysis: p?.detailedHairAnalysis || api.detailed_hair_analysis || api.detailedHairAnalysis,
     apparentAge: (p?.apparentAge || api.apparent_age || api.apparentAge) as AgeCategory | undefined,
   };
@@ -174,7 +177,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     age: api.age,
     ageCategory,
 
-    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.detailedHairAnalysis || physical.apparentAge) ? physical : undefined,
+    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.glasses || physical.detailedHairAnalysis || physical.apparentAge) ? physical : undefined,
 
     physicalTraitsSource: api.physical_traits_source || api.physicalTraitsSource,
 
@@ -234,7 +237,8 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     skin_undertone: char.physical?.skinUndertone,
     skin_tone_hex: char.physical?.skinToneHex,
     other_features: char.physical?.face,
-    other: char.physical?.other,  // Glasses, birthmarks, always-present accessories
+    other: char.physical?.other,  // Birthmarks, always-present accessories
+    glasses: char.physical?.glasses,  // Glasses description or 'none'
     detailed_hair_analysis: char.physical?.detailedHairAnalysis,
     physical_traits_source: char.physicalTraitsSource,
     // Photos - NOT sent on regular saves (server preserves existing)

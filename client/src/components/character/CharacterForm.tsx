@@ -378,7 +378,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <InlineEditField
           label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
           value={character.physical?.other || ''}
-          placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+          placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : 'e.g. scars, birthmarks'}
           onChange={(v) => updatePhysical('other', v)}
           isAiExtracted={isAiExtracted}
           isChanged={changedTraits?.other}
@@ -387,17 +387,43 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         />
       )}
 
-      {/* Row 5: Other (for non-females) - spans full width */}
+      {/* Row 5: Glasses + Other (for non-females) */}
       {character.gender !== 'female' && (
-        <div className="col-span-2">
+        <>
+          <InlineEditField
+            label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : 'Glasses'}
+            value={character.physical?.glasses || ''}
+            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : 'e.g. round black-framed'}
+            onChange={(v) => updatePhysical('glasses', v)}
+            isAiExtracted={isAiExtracted}
+            isChanged={false}
+            isUserEdited={isUserEdited('glasses')}
+            language={language}
+          />
           <InlineEditField
             label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
             value={character.physical?.other || ''}
-            placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+            placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : 'e.g. scars, birthmarks'}
             onChange={(v) => updatePhysical('other', v)}
             isAiExtracted={isAiExtracted}
             isChanged={changedTraits?.other}
             isUserEdited={isUserEdited('other')}
+            language={language}
+          />
+        </>
+      )}
+
+      {/* Glasses for females (after Other which is inline with skin tone) */}
+      {character.gender === 'female' && (
+        <div className="col-span-2">
+          <InlineEditField
+            label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : 'Glasses'}
+            value={character.physical?.glasses || ''}
+            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : 'e.g. round black-framed'}
+            onChange={(v) => updatePhysical('glasses', v)}
+            isAiExtracted={isAiExtracted}
+            isChanged={false}
+            isUserEdited={isUserEdited('glasses')}
             language={language}
           />
         </div>
@@ -2134,6 +2160,13 @@ export function CharacterForm({
               <div>
                 <span className="text-gray-500 text-xs">Skin Tone:</span>
                 <div className="font-medium">{character.physical?.skinTone || '—'}</div>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Glasses:</span>
+                <div className="font-medium">{character.physical?.glasses || '—'}</div>
+                {character.physicalTraitsSource?.glasses && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.glasses}]</span>
+                )}
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Other:</span>
