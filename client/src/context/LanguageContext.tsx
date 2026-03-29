@@ -12,18 +12,6 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 
 const STORAGE_KEY = 'magicalstory_language';
 
-function detectBrowserLanguage(): Language {
-  const browserLang = navigator.language?.toLowerCase();
-  // If no browser language can be detected, default to German
-  if (!browserLang) return 'de';
-  // Check for supported languages
-  if (browserLang.startsWith('de')) return 'de';
-  if (browserLang.startsWith('fr')) return 'fr';
-  if (browserLang.startsWith('en')) return 'en';
-  // If language is detected but not supported, default to German (Swiss market)
-  return 'de';
-}
-
 function detectUrlLanguage(): Language | null {
   const params = new URLSearchParams(window.location.search);
   const lang = params.get('lang');
@@ -36,11 +24,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     // URL ?lang= param takes highest priority (used by hreflang SEO links)
     const urlLang = detectUrlLanguage();
     if (urlLang) return urlLang;
+    // Saved preference from previous visit
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && ['en', 'de', 'fr'].includes(saved)) {
       return saved as Language;
     }
-    return detectBrowserLanguage();
+    // Default to German (Swiss market, matches server-side default).
+    // This ensures Googlebot and first-time visitors see German content,
+    // consistent with <html lang="de"> and German meta tags.
+    return 'de';
   });
 
   useEffect(() => {
