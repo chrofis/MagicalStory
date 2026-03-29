@@ -2052,6 +2052,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
       bboxDetection: imageResult.bboxDetection || null,
+      grokRefImages: imageResult.grokRefImages || null,
     };
 
     if (existingImageIndex >= 0) {

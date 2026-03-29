@@ -4624,7 +4624,7 @@ export function StoryDisplay({
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
-                                grokRefImages={(image as any)?.grokRefImages}
+                                grokRefImages={image?.imageVersions?.find(v => v.isActive)?.grokRefImages ?? (image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}

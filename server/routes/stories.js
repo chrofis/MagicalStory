@@ -752,6 +752,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             fixTargets: v.fixTargets || [],
             totalAttempts: v.totalAttempts || null,
             referencePhotoNames: v.referencePhotoNames || [],
+            grokRefImages: v.grokRefImages || null,
           }));
         })(),
       })) || [],

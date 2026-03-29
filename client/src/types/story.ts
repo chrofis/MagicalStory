@@ -682,6 +682,8 @@ export interface ImageVersion {
   // Bounding box detection (per-version, computed on this version's image)
   bboxDetection?: BboxSceneDetection | null;
   bboxOverlayImage?: string | null;
+  // Grok reference images sent for this version
+  grokRefImages?: string[] | null;
   // Entity repair specific
   entityRepairedFor?: string;
   clothingCategory?: string;

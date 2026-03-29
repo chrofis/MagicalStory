@@ -526,6 +526,7 @@ export default function StoryWizard() {
                 prompt: meta.prompt ?? v.prompt,
                 description: meta.description ?? v.description,
                 type: (meta.type ?? v.type) as ImageVersion['type'],
+                grokRefImages: (meta as any).grokRefImages ?? (v as any).grokRefImages,
               };
             }) ?? img.imageVersions,
           };
