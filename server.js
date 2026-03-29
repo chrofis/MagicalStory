@@ -4300,14 +4300,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
     // Initialize image_version_meta with active versions for all pages
-    // The unified repair pipeline promotes the best version to the main blob (version_index 0),
-    // so activeVersion should be 0 for pages that went through pick-best.
-    // For pages without versions, no meta entry is needed (defaults to 0).
+    // Versions are in chronological order; the active one has isActive=true.
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          // Best version is always at version_index 0 (main blob) after unified pipeline
-          await setActiveVersion(storyId, scene.pageNumber, 0);
+          const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
+          await setActiveVersion(storyId, scene.pageNumber, activeIdx >= 0 ? activeIdx : scene.imageVersions.length - 1);
         }
       }
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);

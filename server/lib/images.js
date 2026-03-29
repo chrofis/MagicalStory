@@ -5448,8 +5448,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array — ALL versions, best first at index 0.
-    // Index 0 = scene.imageData = DB version_index 0 (unified mapping).
+    // Build imageVersions array — ALL versions in chronological order.
+    // The best version is marked isActive, NOT moved to index 0.
+    // image_version_meta tracks which version_index is active.
     const imageVersions = [];
     const buildVersionEntry = (v) => ({
       imageData: v.imageData,
@@ -5465,11 +5466,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       prompt: img.prompt || null,
       isActive: v === best && !charFix
     });
-    // Best version first (index 0 = active = scene.imageData)
-    if (best) imageVersions.push(buildVersionEntry(best));
-    // Then remaining versions in original order
+    // Versions in chronological order (original first, then redo attempts)
     for (const v of versions) {
-      if (v === best) continue;
       imageVersions.push(buildVersionEntry(v));
     }
 
