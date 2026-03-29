@@ -3865,10 +3865,10 @@ export function StoryDisplay({
                 {getCoverVersions('frontCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
-                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                   >
                     <Images size={14} />
-                    {getCoverVersions('frontCover').length}
+                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('frontCover').length})
                   </button>
                 )}
               </div>
@@ -4084,10 +4084,10 @@ export function StoryDisplay({
                 {getCoverVersions('initialPage').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
-                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                   >
                     <Images size={14} />
-                    {getCoverVersions('initialPage').length}
+                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('initialPage').length})
                   </button>
                 )}
               </div>
@@ -4318,7 +4318,7 @@ export function StoryDisplay({
                         {/* Image action buttons - shown to all users */}
                         {(onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
-                            <div className="flex flex-wrap gap-2 items-center">
+                            <div className="flex flex-wrap gap-2 items-stretch">
                               {onEditImage && (
                                 <button
                                   onClick={() => onEditImage(pageNumber)}
@@ -4381,10 +4381,10 @@ export function StoryDisplay({
                               {getImageVersions(pageNumber).length > 1 && (
                                 <button
                                   onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                                  className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                                 >
                                   <Images size={14} />
-                                  {getImageVersions(pageNumber).length}
+                                  {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
                                 </button>
                               )}
                             </div>
@@ -4823,7 +4823,7 @@ export function StoryDisplay({
                         {/* Image action buttons - shown to all users */}
                         {(onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
-                            <div className="flex flex-wrap gap-2 items-center">
+                            <div className="flex flex-wrap gap-2 items-stretch">
                               {onEditImage && (
                                 <button
                                   onClick={() => onEditImage(pageNumber)}
@@ -4886,10 +4886,10 @@ export function StoryDisplay({
                               {getImageVersions(pageNumber).length > 1 && (
                                 <button
                                   onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                                  className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                                 >
                                   <Images size={14} />
-                                  {getImageVersions(pageNumber).length}
+                                  {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
                                 </button>
                               )}
                             </div>
@@ -5317,10 +5317,10 @@ export function StoryDisplay({
                 {getCoverVersions('backCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
-                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
                   >
                     <Images size={14} />
-                    {getCoverVersions('backCover').length}
+                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('backCover').length})
                   </button>
                 )}
               </div>
