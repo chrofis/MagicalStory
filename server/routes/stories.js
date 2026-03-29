@@ -1226,8 +1226,31 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: `Cover ${cover} not found` });
       }
 
-      // For covers, we support bboxOverlay field
+      // For covers, generate bboxOverlay on-the-fly against the ACTIVE cover image
       if (field === 'bboxOverlay') {
+        const detection = coverImage.bboxDetection;
+        if (detection) {
+          // Load the active cover image from DB (blob may have imageData stripped)
+          let activeCoverImageData = coverImage.imageData;
+          if (!activeCoverImageData) {
+            try {
+              const activeVersion = await getActiveVersion(id, coverKey);
+              const imgRow = await getStoryImage(id, coverKey, null, activeVersion);
+              activeCoverImageData = imgRow?.imageData || null;
+            } catch (dbErr) {
+              console.warn(`⚠️ [DEV-IMAGE] Failed to load active cover image for ${coverKey}: ${dbErr.message}`);
+            }
+          }
+          if (activeCoverImageData) {
+            try {
+              const { createBboxOverlayImage } = require('../lib/images');
+              const overlayImage = await createBboxOverlayImage(activeCoverImageData, detection);
+              return res.json({ bboxOverlayImage: overlayImage });
+            } catch (overlayErr) {
+              console.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for ${coverKey}: ${overlayErr.message}`);
+            }
+          }
+        }
         return res.json({ bboxOverlayImage: coverImage.bboxOverlayImage || null });
       }
       if (field === 'imageData') {
