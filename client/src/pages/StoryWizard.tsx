@@ -4913,6 +4913,12 @@ export default function StoryWizard() {
                       log.warn('Failed to refresh image versions after repair:', refreshErr);
                     }
                     log.info('Character repair completed successfully');
+                    return {
+                      comparison: repaired.comparison || null,
+                      method: repaired.method,
+                      beforeScore: (repaired as any).beforeScore ?? null,
+                      afterScore: (repaired as any).afterScore ?? null,
+                    };
                   } else {
                     const failReason = result.results?.[0]?.pagesFailed?.[0]?.reason || 'Unknown error';
                     throw new Error(failReason);

@@ -121,7 +121,12 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => Promise<void>;
+  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => Promise<{
+    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null } | null;
+    method?: string;
+    beforeScore?: number | null;
+    afterScore?: number | null;
+  } | void>;
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
@@ -261,6 +266,10 @@ export function StoryDisplay({
   const [charRepairSelected, setCharRepairSelected] = useState<string>('');
   const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
   const [charRepairingPages, setCharRepairingPages] = useState<Set<number>>(new Set());
+  const [charRepairResults, setCharRepairResults] = useState<Record<number, {
+    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null } | null;
+    method?: string; beforeScore?: number | null; afterScore?: number | null;
+  }>>({});
 
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
@@ -272,9 +281,7 @@ export function StoryDisplay({
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
-  const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
   const [repairingIssuePage, setRepairingIssuePage] = useState<number | null>(null);
-  const [repairingSingleEntityPage, setRepairingSingleEntityPage] = useState<{ entity: string; page: number } | null>(null);
 
   // Local bbox detection overrides (from refresh-bbox button, keyed by page number or cover type string)
   const [bboxOverrides, setBboxOverrides] = useState<Record<string, BboxSceneDetection | null>>({});
@@ -702,96 +709,6 @@ export function StoryDisplay({
       console.error('Failed to iterate page:', err);
     } finally {
       setIteratingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
-    }
-  };
-
-  // Handle entity consistency repair (dev mode)
-  const handleRepairEntityConsistency = async (entityName: string) => {
-    if (!storyId || repairingEntity !== null) return;
-    setRepairingEntity(entityName);
-    try {
-      const response = await fetch(`/api/stories/${storyId}/repair-entity-consistency`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({ entityName, entityType: 'character' })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Repair failed');
-      }
-
-      const result = await response.json();
-      console.log('Entity repair result:', result);
-
-      // Refresh story data to show updated images
-      if (result.success && !result.noChanges) {
-        if (onRefreshStory) {
-          await onRefreshStory();
-        } else {
-          // Fallback to reload if no refresh callback
-          window.location.reload();
-        }
-      }
-    } catch (err) {
-      console.error('Failed to repair entity consistency:', err);
-      alert(`Failed to repair: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setRepairingEntity(null);
-    }
-  };
-
-  // Handle single-page entity repair (dev mode) - repairs one specific page for a character
-  const handleRepairSingleEntityPage = async (entityName: string, pageNumber: number) => {
-    if (!storyId || repairingSingleEntityPage !== null) return;
-    setRepairingSingleEntityPage({ entity: entityName, page: pageNumber });
-    try {
-      const response = await fetch(`/api/stories/${storyId}/repair-entity-consistency`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({ entityName, entityType: 'character', pageNumber })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Repair failed');
-      }
-
-      const result = await response.json();
-      console.log('Single-page entity repair result:', result);
-
-      // Handle rejected repairs - show comparison so user can see what was rejected
-      if (result.rejected && result.comparison) {
-        setRepairComparison({
-          beforeImage: result.comparison.before,
-          afterImage: result.comparison.after,
-          title: `Repair rejected for ${entityName} on page ${pageNumber}: ${result.reason || 'Did not improve consistency'}`
-        });
-        return;
-      }
-
-      // Refresh story data to show updated image
-      if (result.success) {
-        if (onRefreshStory) {
-          await onRefreshStory();
-        } else {
-          window.location.reload();
-        }
-      } else if (!result.rejected) {
-        // Other failures (not rejections)
-        alert(`Repair failed: ${result.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Failed to repair single page:', err);
-      alert(`Failed to repair page ${pageNumber}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setRepairingSingleEntityPage(null);
     }
   };
 
@@ -1412,7 +1329,10 @@ export function StoryDisplay({
                     setCharRepairPopover(null);
                     setCharRepairingPages(prev => new Set([...prev, pageNumber]));
                     try {
-                      await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
+                      const repairResult = await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
+                      if (repairResult) {
+                        setCharRepairResults(prev => ({ ...prev, [pageNumber]: repairResult }));
+                      }
                     } finally {
                       setCharRepairingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
                     }
@@ -1426,6 +1346,63 @@ export function StoryDisplay({
             </div>
           </div>
         )}
+        {/* Dev mode: show repair debug images (avatar, whiteout, grok raw, blend mask) */}
+        {developerMode && charRepairResults[pageNumber] && (() => {
+          const r = charRepairResults[pageNumber];
+          const c = r.comparison;
+          if (!c) return null;
+          return (
+            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-700">Repair Debug</span>
+                {r.beforeScore != null && r.afterScore != null && (
+                  <span className={`font-bold ${r.afterScore >= r.beforeScore ? 'text-green-600' : 'text-red-600'}`}>
+                    {r.beforeScore}% → {r.afterScore}% ({r.afterScore - r.beforeScore >= 0 ? '+' : ''}{r.afterScore - r.beforeScore})
+                  </span>
+                )}
+                {r.method && <span className="text-gray-500">{r.method}</span>}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {c.croppedAvatar && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.croppedAvatar} alt="Avatar sent" className="w-16 h-16 object-contain rounded border border-gray-200 bg-white cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.croppedAvatar!, title: 'Avatar sent to Grok' })} />
+                    <span className="text-gray-500 mt-0.5">Sent to Grok</span>
+                  </div>
+                )}
+                {c.blackoutImage && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.blackoutImage} alt="Whiteout" className="w-16 h-16 object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blackoutImage!, title: 'Whiteout' })} />
+                    <span className="text-gray-500 mt-0.5">Whiteout</span>
+                  </div>
+                )}
+                {c.grokRawResult && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.grokRawResult} alt="Grok raw" className="w-16 h-16 object-contain rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.grokRawResult!, title: 'Grok raw result' })} />
+                    <span className="text-gray-500 mt-0.5">Grok raw</span>
+                  </div>
+                )}
+                {c.blendMask && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.blendMask} alt="Blend mask" className="w-16 h-16 object-contain rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blendMask!, title: 'Blend mask' })} />
+                    <span className="text-gray-500 mt-0.5">Blend mask</span>
+                  </div>
+                )}
+                {c.before && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.before} alt="Before" className="w-16 h-16 object-contain rounded border border-red-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.before!, title: 'Before repair' })} />
+                    <span className="text-gray-500 mt-0.5">Before</span>
+                  </div>
+                )}
+                {c.after && (
+                  <div className="flex flex-col items-center">
+                    <img src={c.after!} alt="After" className="w-16 h-16 object-contain rounded border border-green-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.after!, title: 'After repair' })} />
+                    <span className="text-gray-500 mt-0.5">After</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -2973,28 +2950,6 @@ export function StoryDisplay({
                                     {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
                                     {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
                                   </button>
-                                  {/* Individual repair button for non-reference cells */}
-                                  {!cell.isReference && storyId && typeof cell.pageNumber === 'number' && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRepairSingleEntityPage(grid.entityName, cell.pageNumber as number);
-                                      }}
-                                      disabled={isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null}
-                                      className={`ml-0.5 px-1 py-0 text-[9px] rounded transition-colors ${
-                                        repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
-                                          ? 'bg-amber-300 text-amber-800'
-                                          : isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null
-                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                            : 'bg-amber-500 text-white hover:bg-amber-600'
-                                      }`}
-                                      title={`Repair page ${cell.pageNumber} for ${grid.entityName}`}
-                                    >
-                                      {repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
-                                        ? '...'
-                                        : '⚡'}
-                                    </button>
-                                  )}
                                 </span>
                               )})}
                             </div>
@@ -3080,35 +3035,6 @@ export function StoryDisplay({
                             </div>
                           )}
 
-                          {/* Repair Button - Only show if there are issues and score < 8 */}
-                          {storyId && (!isConsistent || score < 8) && grid.entityType === 'character' && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <button
-                                onClick={() => handleRepairEntityConsistency(grid.entityName)}
-                                disabled={isGenerating || repairingEntity !== null}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                                  isGenerating || repairingEntity !== null
-                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                    : 'bg-amber-500 text-white hover:bg-amber-600'
-                                }`}
-                              >
-                                {repairingEntity === grid.entityName ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    <span>Repairing...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Wrench className="w-3 h-3" />
-                                    <span>Repair All</span>
-                                  </>
-                                )}
-                              </button>
-                              <p className="text-[10px] text-gray-400 mt-1">
-                                Regenerate all appearances to match reference
-                              </p>
-                            </div>
-                          )}
 
                           {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
                           {finalChecksReport.entityRepairs?.[grid.entityName] && (

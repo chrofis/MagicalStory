@@ -78,7 +78,7 @@ const {
   buildFullVisualBiblePrompt
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
-const { runEntityConsistencyChecks, repairSinglePage, repairEntityConsistency, getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
+const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
@@ -664,6 +664,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     const regenTimestamp = new Date().toISOString();
     const newVersion = {
       imageData: imageResult.imageData,
+      type: 'regeneration',
       userInput: inputDescription !== expandedDescription ? inputDescription : null,  // User's input before expansion
       description: expandedDescription,  // Full expanded scene description used for this version
       prompt: imagePrompt,
@@ -3127,377 +3128,6 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
   }
 });
 
-// Repair entity consistency (regenerate character appearances to match reference) - DEV ONLY
-router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerationLimiter, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { entityName, entityType = 'character', pageNumber } = req.body;
-
-    // Admin-only endpoint (dev mode feature)
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (!entityName) {
-      return res.status(400).json({ error: 'entityName is required' });
-    }
-
-    const isSinglePageMode = typeof pageNumber === 'number';
-    log.info(`🔧 [ENTITY-REPAIR] Starting ${isSinglePageMode ? 'single-page' : 'full'} entity consistency repair for ${entityName}${isSinglePageMode ? ` page ${pageNumber}` : ''} in story ${id}`);
-
-    // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
-
-    if (storyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    const story = storyResult.rows[0];
-    let storyData = typeof story.data === 'string'
-      ? JSON.parse(story.data)
-      : story.data;
-
-    // Rehydrate images from separate table (required for entity appearance collection)
-    storyData = await rehydrateStoryImages(id, storyData);
-
-    // Find the character
-    let character = storyData.characters?.find(c => c.name === entityName);
-    if (!character) {
-      return res.status(404).json({ error: `Character "${entityName}" not found in story` });
-    }
-
-    // Always try to enrich character with full data from characters table
-    // Story data often has stripped/minimal character info
-    const artStyle = storyData.artStyle || 'pixar';
-    const characterSetId = storyData.characterSetId;
-    if (characterSetId) {
-      try {
-        const charSetResult = await getDbPool().query(
-          'SELECT data FROM characters WHERE id = $1',
-          [characterSetId]
-        );
-        if (charSetResult.rows.length > 0) {
-          const charSetData = typeof charSetResult.rows[0].data === 'string'
-            ? JSON.parse(charSetResult.rows[0].data)
-            : charSetResult.rows[0].data;
-          const fullChar = charSetData.characters?.find(c => c.name === entityName);
-          if (fullChar) {
-            // Merge: prefer fullChar data but keep story-specific overrides
-            character = { ...fullChar, ...character, avatars: fullChar.avatars || character.avatars };
-            log.info(`🔧 [ENTITY-REPAIR] Enriched ${entityName} with avatar data from character set`);
-
-            // Log what avatars we have
-            const styledKeys = Object.keys(fullChar.avatars?.styledAvatars?.[artStyle] || {});
-            log.info(`🔧 [ENTITY-REPAIR] ${entityName} styledAvatars[${artStyle}] keys: [${styledKeys.join(', ')}]`);
-          } else {
-            log.warn(`🔧 [ENTITY-REPAIR] Character ${entityName} not found in character set ${characterSetId}`);
-          }
-        } else {
-          log.warn(`🔧 [ENTITY-REPAIR] Character set ${characterSetId} not found in database`);
-        }
-      } catch (enrichErr) {
-        log.warn(`[ENTITY-REPAIR] Failed to enrich character data: ${enrichErr.message}`);
-      }
-    } else {
-      // Fallback: search all user's character sets for matching character by name
-      log.info(`🔧 [ENTITY-REPAIR] No characterSetId, searching user's character sets for ${entityName}...`);
-      try {
-        const userCharSetsResult = await getDbPool().query(
-          'SELECT id, data FROM characters WHERE user_id = $1',
-          [req.user.id]
-        );
-        for (const row of userCharSetsResult.rows) {
-          const charSetData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-          const fullChar = charSetData.characters?.find(c => c.name === entityName);
-          const hasPhoto = hasCharacterPhotos(fullChar);
-          const hasAvatars = fullChar?.avatars?.styledAvatars;
-          if (fullChar && (hasPhoto || hasAvatars)) {
-            character = { ...fullChar, ...character, avatars: fullChar.avatars || character.avatars };
-            log.info(`🔧 [ENTITY-REPAIR] Found ${entityName} in character set ${row.id} (fallback lookup)`);
-            const styledKeys = Object.keys(fullChar.avatars?.styledAvatars?.[artStyle] || {});
-            const allArtStyles = Object.keys(fullChar.avatars?.styledAvatars || {});
-            log.info(`🔧 [ENTITY-REPAIR] ${entityName} styledAvatars[${artStyle}] keys: [${styledKeys.join(', ')}], all art styles: [${allArtStyles.join(', ')}]`);
-            break;
-          }
-        }
-      } catch (fallbackErr) {
-        log.warn(`[ENTITY-REPAIR] Fallback character lookup failed: ${fallbackErr.message}`);
-      }
-    }
-
-    // Log current character avatar state for debugging
-    const hasPhoto = hasCharacterPhotos(character);
-    const hasStyledAvatar = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
-    const allArtStyles = Object.keys(character.avatars?.styledAvatars || {});
-    log.info(`🔧 [ENTITY-REPAIR] ${entityName} avatar state: hasPhoto=${hasPhoto}, hasStyledAvatar[${artStyle}].standard=${hasStyledAvatar}, availableArtStyles=[${allArtStyles.join(', ')}]`);
-
-    // Single-page mode: repair just one page
-    if (isSinglePageMode) {
-
-      // Get issues for this character from the consistency report
-      const entityReport = storyData.finalChecksReport?.entity;
-      const charIssues = entityReport?.characters?.[entityName]?.issues || [];
-      if (charIssues.length > 0) {
-        log.info(`🔧 [ENTITY-REPAIR] Found ${charIssues.length} consistency issues for ${entityName}`);
-      }
-
-      const repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
-
-      // Handle rejected repairs - still return the data so frontend can show it
-      if (!repairResult.success) {
-        if (repairResult.rejected) {
-          // Repair was generated but rejected during verification
-          // Return the comparison data so user can see what was rejected
-          return res.status(200).json({
-            success: false,
-            rejected: true,
-            reason: repairResult.reason,
-            entityName: repairResult.entityName,
-            pageNumber: repairResult.pageNumber,
-            comparison: repairResult.comparison,
-            verification: repairResult.verification,
-            promptUsed: repairResult.promptUsed
-          });
-        }
-        return res.status(400).json({ error: repairResult.error || 'Single-page repair failed' });
-      }
-
-      // Apply updated image to story
-      const sceneImages = storyData.sceneImages || [];
-      const sceneIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
-
-      if (sceneIndex < 0) {
-        log.error(`❌ [ENTITY-REPAIR] Scene not found for page ${pageNumber}`);
-        return res.status(404).json({ error: `Scene not found for page ${pageNumber}` });
-      }
-
-      const existingImage = sceneImages[sceneIndex];
-
-      for (const update of repairResult.updatedImages) {
-        if (update.pageNumber !== pageNumber) continue;
-
-        // Initialize imageVersions if not present (migrate existing as original)
-        if (!existingImage.imageVersions) {
-          existingImage.imageVersions = [{
-            // Don't copy imageData — the original is already stored at DB version_index 0.
-            description: existingImage.description,
-            prompt: existingImage.prompt,
-            modelId: existingImage.modelId,
-            createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
-            isActive: false,
-            type: 'original',
-            qualityScore: existingImage.qualityScore ?? null,
-            qualityReasoning: existingImage.qualityReasoning || null,
-            fixTargets: existingImage.fixTargets || [],
-            totalAttempts: existingImage.totalAttempts || null,
-            referencePhotoNames: (existingImage.referencePhotos || []).map(p => ({
-              name: p.name, photoType: p.photoType,
-              clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
-            })),
-          }];
-        } else {
-          // Mark all previous versions as inactive
-          existingImage.imageVersions.forEach(v => v.isActive = false);
-        }
-
-        // Add new version for entity repair
-        const entityRepairTimestamp = new Date().toISOString();
-        existingImage.imageVersions.push({
-          imageData: update.imageData,
-          description: existingImage.description,
-          prompt: existingImage.prompt,
-          modelId: 'gemini-2.0-flash-preview-image-generation',
-          createdAt: entityRepairTimestamp,
-          generatedAt: entityRepairTimestamp,
-          isActive: true,
-          type: 'entity-repair',
-          entityRepairedFor: entityName,
-          clothingCategory: repairResult.clothingCategory,
-          qualityScore: null,
-          qualityReasoning: null,
-          fixTargets: [],
-          totalAttempts: null,
-        });
-
-        // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
-        delete existingImage.imageData;
-        existingImage.entityRepaired = true;
-        existingImage.entityRepairedAt = entityRepairTimestamp;
-        existingImage.entityRepairedFor = entityName;
-      }
-
-      storyData.sceneImages = sceneImages;
-
-      // Store repair result for dev panel
-      if (!storyData.finalChecksReport) storyData.finalChecksReport = {};
-      if (!storyData.finalChecksReport.entityRepairs) storyData.finalChecksReport.entityRepairs = {};
-      if (!storyData.finalChecksReport.entityRepairs[entityName]) {
-        storyData.finalChecksReport.entityRepairs[entityName] = { pages: {} };
-      }
-      storyData.finalChecksReport.entityRepairs[entityName].pages[pageNumber] = {
-        timestamp: new Date().toISOString(),
-        clothingCategory: repairResult.clothingCategory,
-        comparison: repairResult.comparison,
-        referenceGridUsed: repairResult.referenceGridUsed,
-        usage: repairResult.usage,
-        promptUsed: repairResult.promptUsed
-      };
-
-      const newVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
-
-      await saveStoryData(id, storyData);
-
-      // Note: saveStoryData already saves images from imageVersions to story_images table
-      // No need for separate saveStoryImage call
-
-      // Set the new version as active
-      await setActiveVersion(id, pageNumber, newVersionIndex);
-
-      log.info(`✅ [ENTITY-REPAIR] Single-page repair complete for ${entityName} page ${pageNumber}`);
-
-      return res.json({
-        success: true,
-        mode: 'single-page',
-        entityName,
-        pageNumber,
-        clothingCategory: repairResult.clothingCategory,
-        comparison: repairResult.comparison,
-        referenceGridUsed: repairResult.referenceGridUsed,
-        promptUsed: repairResult.promptUsed
-      });
-    }
-
-    // Full repair mode: repair all pages
-    // Get or run entity consistency check
-    // Note: stored as 'entity' in finalChecksReport, not 'entityConsistency'
-    let entityReport = storyData.finalChecksReport?.entity;
-
-    if (!entityReport || !entityReport.characters?.[entityName]) {
-      // Run entity consistency check first
-      log.info(`🔧 [ENTITY-REPAIR] Running entity consistency check for ${entityName}`);
-      entityReport = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
-        checkCharacters: true,
-        checkObjects: false
-      });
-    }
-
-    // Run the repair
-    const repairResult = await repairEntityConsistency(storyData, character, entityReport);
-
-    if (!repairResult.success) {
-      return res.status(400).json({ error: repairResult.error || 'Repair failed' });
-    }
-
-    if (repairResult.noChanges) {
-      return res.json({
-        success: true,
-        message: repairResult.message,
-        noChanges: true
-      });
-    }
-
-    // Apply updated images to story
-    const sceneImages = storyData.sceneImages || [];
-    for (const update of repairResult.updatedImages) {
-      const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
-      if (sceneIndex >= 0) {
-        const existingImage = sceneImages[sceneIndex];
-
-        // Initialize imageVersions if not present (migrate existing as original)
-        if (!existingImage.imageVersions) {
-          existingImage.imageVersions = [{
-            // Don't copy imageData — the original is already stored at DB version_index 0.
-            description: existingImage.description,
-            prompt: existingImage.prompt,
-            modelId: existingImage.modelId,
-            createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
-            isActive: false,
-            type: 'original'
-          }];
-        } else {
-          // Mark all previous versions as inactive
-          existingImage.imageVersions.forEach(v => v.isActive = false);
-        }
-
-        // Add new version for entity repair
-        const entityRepairTs = new Date().toISOString();
-        existingImage.imageVersions.push({
-          imageData: update.imageData,
-          description: existingImage.description,
-          prompt: existingImage.prompt,
-          modelId: 'gemini-2.0-flash-preview-image-generation',
-          createdAt: entityRepairTs,
-          generatedAt: entityRepairTs,
-          isActive: true,
-          type: 'entity-repair',
-          entityRepairedFor: entityName,
-          clothingCategory: update.clothingCategory
-        });
-
-        // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
-        delete existingImage.imageData;
-        existingImage.entityRepaired = true;
-        existingImage.entityRepairedAt = entityRepairTs;
-        existingImage.entityRepairedFor = entityName;
-      }
-    }
-
-    storyData.sceneImages = sceneImages;
-
-    // Store repair grids in finalChecksReport for dev panel
-    if (!storyData.finalChecksReport) {
-      storyData.finalChecksReport = {};
-    }
-    if (!storyData.finalChecksReport.entityRepairs) {
-      storyData.finalChecksReport.entityRepairs = {};
-    }
-    storyData.finalChecksReport.entityRepairs[entityName] = {
-      timestamp: new Date().toISOString(),
-      originalScore: repairResult.originalScore,
-      cellsRepaired: repairResult.cellsRepaired,
-      gridBeforeRepair: repairResult.gridBeforeRepair,
-      gridAfterRepair: repairResult.gridAfterRepair,
-      gridDiff: repairResult.gridDiff,
-      cellComparisons: repairResult.cellComparisons,
-      usage: repairResult.usage,
-      gridsByClothing: repairResult.gridsByClothing,
-      clothingGroupCount: repairResult.clothingGroupCount
-    };
-
-    // Save updated story (this saves all images from imageVersions to story_images)
-    await saveStoryData(id, storyData);
-
-    // Set correct active version for each updated page
-    // Note: saveStoryData already saved images, so no need for separate saveStoryImage
-    for (const update of repairResult.updatedImages) {
-      const existingImage = sceneImages.find(s => s.pageNumber === update.pageNumber);
-      if (existingImage && existingImage.imageVersions) {
-        const newVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
-        await setActiveVersion(id, update.pageNumber, newVersionIndex);
-      }
-    }
-
-    log.info(`✅ [ENTITY-REPAIR] Entity consistency repair complete for ${entityName}: ${repairResult.cellsRepaired} pages updated`);
-
-    res.json({
-      success: true,
-      entityName,
-      originalScore: repairResult.originalScore,
-      cellsRepaired: repairResult.cellsRepaired,
-      updatedPages: repairResult.updatedImages.map(u => u.pageNumber),
-      gridBeforeRepair: repairResult.gridBeforeRepair,
-      gridAfterRepair: repairResult.gridAfterRepair
-    });
-
-  } catch (err) {
-    log.error('Error in entity consistency repair:', err);
-    const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
-    res.status(500).json({ error: isAdmin ? 'Failed to repair entity consistency: ' + err.message : 'Failed to repair entity consistency' });
-  }
-});
 
 // =============================================================================
 // Repair Workflow Endpoints
@@ -5126,11 +4756,21 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const versionId = isCover ? coverType : update.pageNumber;
           await setActiveVersion(id, versionId, newDbVersionIndex);
 
+          // Build comparison with debug images (blackout, grok raw, blend mask, avatar)
+          const comparison = repairResult.comparison
+            ? {
+                ...repairResult.comparison,
+                blackoutImage: repairResult.blackoutImage || null,
+                grokRawResult: repairResult.grokRawResult || null,
+                blendMask: repairResult.blendMask || null,
+                croppedAvatar: repairResult.croppedAvatar || null,
+              }
+            : null;
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
             imageData: update.imageData,
             versionIndex: newDbVersionIndex,
-            comparison: repairResult.comparison || null,
+            comparison,
             verification: repairResult.verification || null,
             method: repairResult.method || 'gemini',
             cropHistory: repairResult.cropHistory || null,
