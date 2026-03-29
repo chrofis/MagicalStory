@@ -1326,22 +1326,21 @@ export function StoryDisplay({
     const isRepairing = charRepairingPages.has(pageNumber);
     const isOpen = charRepairPopover?.pageNumber === pageNumber;
     return (
-      <div className="relative">
+      <div className="relative flex-1">
         <button
           onClick={() => {
             if (isOpen) {
               setCharRepairPopover(null);
             } else {
               setCharRepairPopover({ pageNumber });
-              // Pre-select first character
               if (characters.length > 0 && !charRepairSelected) {
                 setCharRepairSelected(characters[0].name);
               }
             }
           }}
           disabled={isGenerating || isRepairing || !hasEnoughCredits}
-          className={`flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-            isGenerating || isRepairing || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'
+          className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+            isGenerating || isRepairing || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
@@ -1352,45 +1351,79 @@ export function StoryDisplay({
           )}
         </button>
         {isOpen && !isRepairing && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-30 space-y-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">{language === 'de' ? 'Figur wählen' : 'Select character'}</label>
-              <select
-                value={charRepairSelected}
-                onChange={e => setCharRepairSelected(e.target.value)}
-                className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5"
-              >
-                {characters.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-30">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-800">
+                {language === 'de' ? 'Figur reparieren' : 'Fix Character'}
+              </h4>
             </div>
-            <div className="flex gap-2">
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="radio" name={`repair-target-${pageNumber}`} value="face" checked={charRepairTarget === 'face'} onChange={() => setCharRepairTarget('face')} className="accent-orange-500" />
-                {language === 'de' ? 'Gesicht' : 'Face'}
-              </label>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="radio" name={`repair-target-${pageNumber}`} value="body" checked={charRepairTarget === 'body'} onChange={() => setCharRepairTarget('body')} className="accent-orange-500" />
-                {language === 'de' ? 'Körper' : 'Body'}
-              </label>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1.5">
+                  {language === 'de' ? 'Figur' : 'Character'}
+                </label>
+                <select
+                  value={charRepairSelected}
+                  onChange={e => setCharRepairSelected(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
+                >
+                  {characters.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1.5">
+                  {language === 'de' ? 'Bereich' : 'Target'}
+                </label>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCharRepairTarget('face')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      charRepairTarget === 'face'
+                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {language === 'de' ? 'Gesicht' : 'Face'}
+                  </button>
+                  <button
+                    onClick={() => setCharRepairTarget('body')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      charRepairTarget === 'body'
+                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {language === 'de' ? 'Körper' : 'Body'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCharRepairPopover(null)}
+                  className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  {language === 'de' ? 'Abbrechen' : 'Cancel'}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!charRepairSelected) return;
+                    setCharRepairPopover(null);
+                    setCharRepairingPages(prev => new Set([...prev, pageNumber]));
+                    try {
+                      await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
+                    } finally {
+                      setCharRepairingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
+                    }
+                  }}
+                  disabled={!charRepairSelected}
+                  className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50"
+                >
+                  {language === 'de' ? 'Reparieren' : 'Repair'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={async () => {
-                if (!charRepairSelected) return;
-                setCharRepairPopover(null);
-                setCharRepairingPages(prev => new Set([...prev, pageNumber]));
-                try {
-                  await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
-                } finally {
-                  setCharRepairingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
-                }
-              }}
-              disabled={!charRepairSelected}
-              className="w-full bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50"
-            >
-              {language === 'de' ? 'Reparieren' : 'Repair'}
-            </button>
           </div>
         )}
       </div>
