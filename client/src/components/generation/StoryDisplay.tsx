@@ -266,6 +266,7 @@ export function StoryDisplay({
   const [charRepairSelected, setCharRepairSelected] = useState<string>('');
   const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
   const [charRepairingPages, setCharRepairingPages] = useState<Set<number>>(new Set());
+  const [charDetectingBbox, setCharDetectingBbox] = useState<Set<number>>(new Set());
   const [charRepairResults, setCharRepairResults] = useState<Record<number, {
     comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null } | null;
     method?: string; beforeScore?: number | null; afterScore?: number | null;
@@ -1241,16 +1242,59 @@ export function StoryDisplay({
   const renderCharRepairButton = (pageNumber: number, bboxDetection?: { figures?: Array<{ name?: string }> } | null) => {
     if (!onRepairCharacter) return null;
     const isRepairing = charRepairingPages.has(pageNumber);
+    const isDetecting = charDetectingBbox.has(pageNumber);
     const isOpen = charRepairPopover?.pageNumber === pageNumber;
 
-    // Filter to characters detected in bbox (if available), otherwise show all
+    // Filter to characters detected in bbox (if available)
     const detectedNames = bboxDetection?.figures
       ?.filter(f => f.name && f.name !== 'UNKNOWN')
       .map(f => f.name!) || [];
-    const availableCharacters = detectedNames.length > 0
-      ? characters.filter(c => detectedNames.includes(c.name))
-      : characters;
-    if (availableCharacters.length === 0) return null;
+    const availableCharacters = characters.filter(c => detectedNames.includes(c.name));
+
+    // Run bbox detection on-demand, then open popover if characters found
+    const detectAndOpen = async () => {
+      if (!storyId) return;
+      // Map cover page numbers to the refresh-bbox endpoint format
+      const COVER_PAGE_MAP: Record<number, string> = { [-1]: 'cover:front', [-2]: 'cover:initial', [-3]: 'cover:back' };
+      const overrideKey = COVER_PAGE_MAP[pageNumber] || `page:${pageNumber}`;
+
+      setCharDetectingBbox(prev => new Set(prev).add(pageNumber));
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: '{}'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.bboxDetection) {
+            setBboxOverrides(prev => ({ ...prev, [overrideKey]: data.bboxDetection }));
+            // Check if characters were found
+            const detected = data.bboxDetection.figures
+              ?.filter((f: { name?: string }) => f.name && f.name !== 'UNKNOWN')
+              .map((f: { name: string }) => f.name) || [];
+            const found = characters.filter(c => detected.includes(c.name));
+            if (found.length > 0) {
+              setCharRepairSelected(found[0].name);
+              setCharRepairPopover({ pageNumber });
+            } else {
+              alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : 'No characters detected in this image.');
+            }
+          } else {
+            alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : 'No characters detected in this image.');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to detect bbox:', err);
+        alert(language === 'de' ? 'Erkennung fehlgeschlagen.' : 'Detection failed.');
+      } finally {
+        setCharDetectingBbox(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
+      }
+    };
 
     return (
       <div className="relative flex-1">
@@ -1258,21 +1302,27 @@ export function StoryDisplay({
           onClick={() => {
             if (isOpen) {
               setCharRepairPopover(null);
-            } else {
+            } else if (availableCharacters.length > 0) {
+              // Bbox exists with detected characters — open popover directly
               setCharRepairPopover({ pageNumber });
-              if (availableCharacters.length > 0 && !charRepairSelected) {
+              if (!charRepairSelected) {
                 setCharRepairSelected(availableCharacters[0].name);
               }
+            } else {
+              // No bbox or no characters detected — run detection first
+              detectAndOpen();
             }
           }}
-          disabled={isGenerating || isRepairing || !hasEnoughCredits}
+          disabled={isGenerating || isRepairing || isDetecting || !hasEnoughCredits}
           className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-            isGenerating || isRepairing || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+            isGenerating || isRepairing || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
             <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
+          ) : isDetecting ? (
+            <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : 'Detecting...'}</>
           ) : (
             <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
           )}
