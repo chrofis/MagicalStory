@@ -6287,24 +6287,33 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     }
 
     // F. Feathered blend: original outside, Grok inside, gradient at edges
-    // Protected faces are forced to alpha=0 (100% original preserved)
+    // Protected faces get smooth feathered transition (not hard rectangle edges)
     const blended = Buffer.alloc(blendWidth * blendHeight * 3);
     const maskPixels = Buffer.alloc(blendWidth * blendHeight);
     for (let i = 0; i < blendWidth * blendHeight; i++) {
       const y = Math.floor(i / blendWidth);
       const x = i % blendWidth;
 
-      // Check if pixel is inside a protected face — force original
-      let isProtected = false;
+      // Calculate protection factor: 0 = fully protected, 1 = no protection
+      // Uses distance-to-rect with feathered gradient around protected faces
+      let protectedAlpha = 1;
       for (const r of protectedRects) {
         if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-          isProtected = true;
+          protectedAlpha = 0;
           break;
+        }
+        // Euclidean distance to rect boundary — smooth circular feather at corners
+        const dx = Math.max(r.left - x, 0, x - r.right);
+        const dy = Math.max(r.top - y, 0, y - r.bottom);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < FEATHER_PX) {
+          protectedAlpha = Math.min(protectedAlpha, dist / FEATHER_PX);
         }
       }
 
       const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
-      const alpha = isProtected ? 0 : (dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255)) / 255;
+      const edgeAlpha = dMin >= FEATHER_PX ? 1 : dMin / FEATHER_PX;
+      const alpha = edgeAlpha * protectedAlpha;
       maskPixels[i] = Math.round(alpha * 255);
       const idx = i * 3;
       blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + grokRegion[idx]     * alpha);
