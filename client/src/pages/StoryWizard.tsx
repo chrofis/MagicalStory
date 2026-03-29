@@ -507,6 +507,8 @@ export default function StoryWizard() {
             hasVisualBibleGrid: devData.hasVisualBibleGrid ?? img.hasVisualBibleGrid,
             grokRefImages: (devData as any).grokRefImages ?? (img as any).grokRefImages,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
+            emptyScenePrompt: (devData as any).emptyScenePrompt ?? (img as any).emptyScenePrompt,
+            hasEmptySceneImage: (devData as any).hasEmptySceneImage ?? (img as any).hasEmptySceneImage,
             // Merge per-version metadata into imageVersions
             // Match by versionIndex (DB version_index) instead of array position
             // to avoid off-by-one: blob imageVersions may not include v0
