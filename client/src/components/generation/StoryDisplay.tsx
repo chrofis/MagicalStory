@@ -1238,10 +1238,19 @@ export function StoryDisplay({
   };
 
   // Character repair button + inline popover for selecting character and face/body target
-  const renderCharRepairButton = (pageNumber: number) => {
+  const renderCharRepairButton = (pageNumber: number, bboxDetection?: { figures?: Array<{ name?: string }> } | null) => {
     if (!onRepairCharacter) return null;
     const isRepairing = charRepairingPages.has(pageNumber);
     const isOpen = charRepairPopover?.pageNumber === pageNumber;
+
+    // Filter to characters detected in bbox (if available), otherwise show all
+    const detectedNames = bboxDetection?.figures
+      ?.filter(f => f.name && f.name !== 'UNKNOWN')
+      .map(f => f.name!) || [];
+    const availableCharacters = detectedNames.length > 0
+      ? characters.filter(c => detectedNames.includes(c.name))
+      : characters;
+
     return (
       <div className="relative flex-1">
         <button
@@ -1250,8 +1259,8 @@ export function StoryDisplay({
               setCharRepairPopover(null);
             } else {
               setCharRepairPopover({ pageNumber });
-              if (characters.length > 0 && !charRepairSelected) {
-                setCharRepairSelected(characters[0].name);
+              if (availableCharacters.length > 0 && !charRepairSelected) {
+                setCharRepairSelected(availableCharacters[0].name);
               }
             }
           }}
@@ -1288,7 +1297,7 @@ export function StoryDisplay({
                     onChange={e => setCharRepairSelected(e.target.value)}
                     className="w-full text-base border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
                   >
-                    {characters.map(c => (
+                    {availableCharacters.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
@@ -1351,61 +1360,63 @@ export function StoryDisplay({
             </div>
           </div>
         )}
-        {/* Dev mode: show repair debug images (avatar, whiteout, grok raw, blend mask) */}
+        {/* Dev mode: show repair debug images as collapsible section */}
         {developerMode && charRepairResults[pageNumber] && (() => {
           const r = charRepairResults[pageNumber];
           const c = r.comparison;
           if (!c) return null;
           return (
-            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">Repair Debug</span>
-                {r.beforeScore != null && r.afterScore != null && (
-                  <span className={`font-bold ${r.afterScore >= r.beforeScore ? 'text-green-600' : 'text-red-600'}`}>
-                    {r.beforeScore}% → {r.afterScore}% ({r.afterScore - r.beforeScore >= 0 ? '+' : ''}{r.afterScore - r.beforeScore})
-                  </span>
-                )}
-                {r.method && <span className="text-gray-500">{r.method}</span>}
-              </div>
-              <div className="flex gap-2 flex-wrap">
+            <details className="mt-2 bg-purple-50 border border-purple-300 rounded-lg p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900 flex items-center justify-between">
+                <span>{language === 'de' ? 'Reparatur-Ergebnis' : 'Repair Result'}</span>
+                <span className="flex items-center gap-2">
+                  {r.method && <span className="text-xs font-normal text-purple-600">{r.method}</span>}
+                  {r.beforeScore != null && r.afterScore != null && (
+                    <span className={`text-sm font-bold ${r.afterScore >= r.beforeScore ? 'text-green-600' : 'text-red-600'}`}>
+                      {r.beforeScore}% → {r.afterScore}%
+                    </span>
+                  )}
+                </span>
+              </summary>
+              <div className="mt-2 flex gap-2 flex-wrap">
                 {c.croppedAvatar && (
                   <div className="flex flex-col items-center">
                     <img src={c.croppedAvatar} alt="Avatar sent" className="w-16 h-16 object-contain rounded border border-gray-200 bg-white cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.croppedAvatar!, title: 'Avatar sent to Grok' })} />
-                    <span className="text-gray-500 mt-0.5">Sent to Grok</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">Avatar</span>
                   </div>
                 )}
                 {c.blackoutImage && (
                   <div className="flex flex-col items-center">
                     <img src={c.blackoutImage} alt="Whiteout" className="w-16 h-16 object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blackoutImage!, title: 'Whiteout' })} />
-                    <span className="text-gray-500 mt-0.5">Whiteout</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">Whiteout</span>
                   </div>
                 )}
                 {c.grokRawResult && (
                   <div className="flex flex-col items-center">
                     <img src={c.grokRawResult} alt="Grok raw" className="w-16 h-16 object-contain rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.grokRawResult!, title: 'Grok raw result' })} />
-                    <span className="text-gray-500 mt-0.5">Grok raw</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">Grok raw</span>
                   </div>
                 )}
                 {c.blendMask && (
                   <div className="flex flex-col items-center">
                     <img src={c.blendMask} alt="Blend mask" className="w-16 h-16 object-contain rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blendMask!, title: 'Blend mask' })} />
-                    <span className="text-gray-500 mt-0.5">Blend mask</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">Mask</span>
                   </div>
                 )}
                 {c.before && (
                   <div className="flex flex-col items-center">
                     <img src={c.before} alt="Before" className="w-16 h-16 object-contain rounded border border-red-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.before!, title: 'Before repair' })} />
-                    <span className="text-gray-500 mt-0.5">Before</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">Before</span>
                   </div>
                 )}
                 {c.after && (
                   <div className="flex flex-col items-center">
                     <img src={c.after!} alt="After" className="w-16 h-16 object-contain rounded border border-green-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.after!, title: 'After repair' })} />
-                    <span className="text-gray-500 mt-0.5">After</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">After</span>
                   </div>
                 )}
               </div>
-            </div>
+            </details>
           );
         })()}
       </div>
@@ -3797,7 +3808,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
-                {renderCharRepairButton(-1)}
+                {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
                 {getCoverVersions('frontCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
@@ -4015,7 +4026,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
-                {renderCharRepairButton(-2)}
+                {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
                 {getCoverVersions('initialPage').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
@@ -4298,7 +4309,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber)}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -4801,7 +4812,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber)}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -5243,7 +5254,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
-                {renderCharRepairButton(-3)}
+                {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
                 {getCoverVersions('backCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
