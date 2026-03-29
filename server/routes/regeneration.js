@@ -3698,13 +3698,94 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       null, bboxModelOverride
     );
 
-    const bboxDetection = enrichResult.detectionHistory || null;
+    let bboxDetection = enrichResult.detectionHistory || null;
     const fixTargets = enrichResult.targets || [];
 
     // Create overlay image
     let bboxOverlayImage = null;
     if (bboxDetection) {
       bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
+    }
+
+    // Auto-refine: send overlay back to vision model for a second pass
+    // This significantly improves face box accuracy
+    const mainChars = (bboxDetection?.figures || []).filter(f => f.name && f.name !== 'UNKNOWN');
+    if (bboxOverlayImage && mainChars.length > 0) {
+      try {
+        log.info(`🔄 [REFRESH-BBOX] Auto-refining ${mainChars.length} characters...`);
+        const figuresSummary = mainChars.map((f, i) => {
+          const color = FIGURE_COLORS[i % FIGURE_COLORS.length].name;
+          const fb = f.faceBox ? `face:[${f.faceBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no face';
+          const bb = f.bodyBox ? `body:[${f.bodyBox.map(v => Math.round(v * 1000)).join(',')}]` : 'no body';
+          return `  ${i + 1}. "${f.name}" (${color} boxes) — ${fb}, ${bb}`;
+        }).join('\n');
+
+        const refinePrompt = PROMPT_TEMPLATES.bboxRefine
+          ? fillTemplate(PROMPT_TEMPLATES.bboxRefine, { figuresSummary })
+          : `Refine bounding boxes for:\n${figuresSummary}\nReturn corrected JSON with figures array.`;
+
+        const overlayBase64 = bboxOverlayImage.replace(/^data:image\/\w+;base64,/, '');
+        const overlayMime = 'image/jpeg';
+        const refineParts = [
+          { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
+          { text: refinePrompt }
+        ];
+
+        const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
+        const refineModelConfig = TEXT_MODELS[refineModelId];
+        let refineData;
+
+        if (refineModelConfig?.provider === 'xai') {
+          const grokResp = await callGrokVisionAPI(refineModelId, refineModelConfig.modelId || refineModelId, refineParts, refinePrompt);
+          refineData = await grokResp.json();
+        } else {
+          const apiKey = process.env.GEMINI_API_KEY;
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${refineModelId}:generateContent?key=${apiKey}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: refineParts }],
+              generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+              safetySettings: GEMINI_SAFETY_SETTINGS
+            })
+          });
+          if (resp.ok) refineData = await resp.json();
+        }
+
+        const refineText = refineData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (refineText) {
+          const refined = extractJsonFromText(refineText);
+          const normalizeBox = (box) => {
+            if (!box || !Array.isArray(box) || box.length !== 4) return null;
+            const [ymin, xmin, ymax, xmax] = box;
+            const scale = (ymax > 1 || xmax > 1) ? 1000 : 1;
+            return [
+              Math.max(0, Math.min(1, ymin / scale)),
+              Math.max(0, Math.min(1, xmin / scale)),
+              Math.max(0, Math.min(1, ymax / scale)),
+              Math.max(0, Math.min(1, xmax / scale))
+            ];
+          };
+          const refinedFigures = (refined.figures || []).map(fig => ({
+            name: fig.name || 'UNKNOWN',
+            label: fig.label,
+            position: fig.position,
+            faceBox: normalizeBox(fig.face_box),
+            bodyBox: normalizeBox(fig.body_box),
+            confidence: fig.confidence || 'medium',
+            _source: 'refined'
+          }));
+          if (refinedFigures.length > 0) {
+            const crowdFigures = (bboxDetection.figures || []).filter(f => !f.name || f.name === 'UNKNOWN');
+            bboxDetection = { ...bboxDetection, figures: [...refinedFigures, ...crowdFigures], refined: true };
+            bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
+            log.info(`✅ [REFRESH-BBOX] Auto-refine complete: ${refinedFigures.length} figures refined`);
+          }
+        }
+      } catch (refineErr) {
+        log.warn(`⚠️ [REFRESH-BBOX] Auto-refine failed (using initial detection): ${refineErr.message}`);
+      }
     }
 
     // Save to scene + active version
@@ -4507,8 +4588,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Get scene description for context (what is the character doing?)
           const sceneDesc = sceneImage.description || sceneImage.translatedDescription || '';
 
-          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
-
           // Get face bbox for head whiteout (separate from repair bbox which may be full body)
           let faceBbox = null;
           const faceData = storedAppearance.faceBox;
@@ -4516,21 +4595,19 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             faceBbox = Array.isArray(faceData) ? faceData : [faceData.y, faceData.x, faceData.y + faceData.height, faceData.x + faceData.width];
           }
 
-          // Collect face bboxes of OTHER characters on the same page to protect during blend
+          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
+          log.info(`👤 [CHAR REPAIR] ${characterName} body:[${bbox.map(v => Math.round(v*100)+'%').join(', ')}] face:[${faceBbox ? faceBbox.map(v => Math.round(v*100)+'%').join(', ') : 'none'}]`);
+
+          // Collect face bboxes of OTHER characters from bbox detection (same source as repair target)
           const protectedFaces = [];
-          const entityReportForProtection = storyData.finalChecksReport?.entity;
-          if (entityReportForProtection?.characters) {
-            for (const [otherName, otherCharReport] of Object.entries(entityReportForProtection.characters)) {
-              if (otherName === characterName) continue;
-              if (!otherCharReport?.byClothing) continue;
-              for (const clothingData of Object.values(otherCharReport.byClothing)) {
-                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-                if (app?.faceBox) {
-                  const fb = app.faceBox;
-                  const normalized = Array.isArray(fb) ? fb : [fb.y, fb.x, fb.y + fb.height, fb.x + fb.width];
-                  protectedFaces.push(normalized);
-                  log.info(`🛡️ [CHAR REPAIR] Protecting ${otherName}'s face at [${normalized.map(v => Math.round(v*100)+'%').join(', ')}]`);
-                }
+          if (sceneBbox?.figures) {
+            for (const fig of sceneBbox.figures) {
+              if (!fig.name || fig.name === 'UNKNOWN') continue;
+              if (fig.name.toLowerCase() === characterName.toLowerCase()) continue;
+              if (fig.faceBox) {
+                const fb = Array.isArray(fig.faceBox) ? fig.faceBox : [fig.faceBox.y, fig.faceBox.x, fig.faceBox.y + fig.faceBox.height, fig.faceBox.x + fig.faceBox.width];
+                protectedFaces.push(fb);
+                log.info(`🛡️ [CHAR REPAIR] Protecting ${fig.name}'s face at [${fb.map(v => Math.round(v*100)+'%').join(', ')}] (from bbox detection)`);
               }
             }
           }

@@ -5343,19 +5343,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
           const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
-          // Collect face bboxes of OTHER characters on this page to protect during blend
+          // Collect face bboxes of OTHER characters from bbox detection (same source as repair target)
           const protectedFaces = [];
-          if (entityReport?.characters) {
-            for (const [otherName, otherCharReport] of Object.entries(entityReport.characters)) {
-              if (otherName === fix.charName) continue;
-              if (!otherCharReport?.byClothing) continue;
-              for (const clothingData of Object.values(otherCharReport.byClothing)) {
-                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-                if (app?.faceBox) {
-                  const fb = app.faceBox;
-                  protectedFaces.push(Array.isArray(fb) ? fb : [fb.y, fb.x, fb.y + fb.height, fb.x + fb.width]);
-                }
-              }
+          const bboxFigures = bestEval?.bboxDetection?.figures || [];
+          for (const fig of bboxFigures) {
+            if (!fig.name || fig.name === 'UNKNOWN') continue;
+            if (fig.name.toLowerCase() === fix.charName.toLowerCase()) continue;
+            if (fig.faceBox) {
+              protectedFaces.push(Array.isArray(fig.faceBox) ? fig.faceBox : [fig.faceBox.y, fig.faceBox.x, fig.faceBox.y + fig.faceBox.height, fig.faceBox.x + fig.faceBox.width]);
             }
           }
 
