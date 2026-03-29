@@ -4385,16 +4385,19 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                 </button>
                               )}
-                              {getImageVersions(pageNumber).length > 1 && (
-                                <button
-                                  onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="col-span-1 sm:col-span-2 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
-                                >
-                                  <Images size={14} />
-                                  {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
-                                </button>
-                              )}
                             </div>
+                          </div>
+                        )}
+                        {/* Version history button — always visible when multiple versions exist */}
+                        {getImageVersions(pageNumber).length > 1 && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                              className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                            >
+                              <Images size={14} />
+                              {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
+                            </button>
                           </div>
                         )}
 
@@ -4890,16 +4893,19 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                 </button>
                               )}
-                              {getImageVersions(pageNumber).length > 1 && (
-                                <button
-                                  onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="col-span-1 sm:col-span-2 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
-                                >
-                                  <Images size={14} />
-                                  {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
-                                </button>
-                              )}
                             </div>
+                          </div>
+                        )}
+                        {/* Version history button — always visible when multiple versions exist */}
+                        {getImageVersions(pageNumber).length > 1 && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                              className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                            >
+                              <Images size={14} />
+                              {language === 'de' ? 'Bilder' : 'Images'} ({getImageVersions(pageNumber).length})
+                            </button>
                           </div>
                         )}
 
