@@ -358,7 +358,7 @@ export function ObjectDetectionDisplay({
             <div>
               <div className="text-xs text-gray-500 mb-1 font-medium">
                 {language === 'de' ? 'Erkannte Regionen' : 'Detected Regions'}
-                <span className="ml-2 text-gray-400">(🟢 Body, 🔵 Face, 🩵 Face ✓ refined, 🩷 Face ↻ redetected, 🟠 Object, 🟣 Matched)</span>
+                <span className="ml-2 text-gray-400">(unique color per figure, dashed = face)</span>
               </div>
               {preRefineOverlay && preRefineOverlay !== overlayImage ? (
                 <div className="grid grid-cols-2 gap-2">

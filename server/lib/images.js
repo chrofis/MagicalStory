@@ -1941,21 +1941,31 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     const metadata = await sharp(imageBuffer).metadata();
     const { width, height } = metadata;
 
-    // Build SVG overlay with boxes
+    // Build SVG overlay — figures and faces only (no object boxes to reduce noise)
     const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
 
-    // Confidence level to color mapping
-    const confidenceColors = {
-      high: '#00cc00',    // Green for high confidence
-      medium: '#ffaa00',  // Yellow/amber for medium confidence
-      low: '#ff6600'      // Orange for low confidence
-    };
+    // Distinct color per figure — high contrast, colorblind-friendly palette
+    const figureColors = [
+      '#e6194b', // Red
+      '#3cb44b', // Green
+      '#4363d8', // Blue
+      '#f58231', // Orange
+      '#911eb4', // Purple
+      '#42d4f4', // Cyan
+      '#f032e6', // Magenta
+      '#bfef45', // Lime
+      '#fabed4', // Pink
+      '#dcbeff', // Lavender
+    ];
+    const unknownColor = '#888888'; // Gray for unidentified figures
 
-    // Draw figure boxes - now uses name directly from detection
+    // Draw figure boxes — each figure gets a unique color for both body and face
     for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
       const fig = bboxDetection.figures[i];
+      const isIdentified = fig.name && fig.name !== 'UNKNOWN';
+      const figColor = isIdentified ? figureColors[i % figureColors.length] : unknownColor;
 
-      // Body box - color based on identification confidence
+      // Body box
       if (fig.bodyBox) {
         const [ymin, xmin, ymax, xmax] = fig.bodyBox;
         const x = Math.round(xmin * width);
@@ -1963,68 +1973,29 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
 
-        // Character name comes directly from figure.name (AI identified)
-        const isIdentified = fig.name && fig.name !== 'UNKNOWN';
-        const confidence = fig.confidence || 'low';
-        const boxColor = isIdentified ? (confidenceColors[confidence] || '#aa00ff') : '#888888';  // Gray for UNKNOWN
-        const labelBgColor = boxColor;
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="4"/>`);
 
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="4"/>`);
-
-        // Label - show character name + confidence, or "UNKNOWN" + visual label
-        let label;
-        if (isIdentified) {
-          const confIcon = confidence === 'high' ? '★' : confidence === 'medium' ? '◆' : '○';
-          label = `${confIcon} ${fig.name}`;
-        } else {
-          label = `? ${fig.label ? fig.label.substring(0, 25) : `Figure ${i + 1}`}`;
-        }
+        // Label — character name or "? Figure N"
+        const label = isIdentified ? fig.name : `? ${fig.label ? fig.label.substring(0, 25) : `Figure ${i + 1}`}`;
         const labelWidth = Math.min(label.length * 8 + 10, 200);
-        svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 22)}" width="${labelWidth}" height="22" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
+        svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 22)}" width="${labelWidth}" height="22" fill="${figColor}" opacity="0.9" rx="3"/>`);
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
-      // Face box - blue for original detection, magenta for fallback/iterated detection
+      // Face box — same color as body so the pairing is obvious
       if (fig.faceBox) {
         const [ymin, xmin, ymax, xmax] = fig.faceBox;
         const x = Math.round(xmin * width);
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        const isFallback = fig._source === 'fallback';
-        const isRefined = fig._source === 'refined';
-        const faceColor = isFallback ? '#ff00cc' : isRefined ? '#00cccc' : '#0066ff';  // Magenta=fallback, Cyan=refined, Blue=original
-        const faceLabel = isFallback ? 'FACE ↻' : isRefined ? 'FACE ✓' : 'FACE';
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${faceColor}" stroke-width="5"/>`);
-        // Face label
-        const faceLabelWidth = (isFallback || isRefined) ? 65 : 50;
-        svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${faceColor}" opacity="0.9" rx="2"/>`);
-        svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">${faceLabel}</text>`);
-      }
-    }
-
-    // Draw object boxes - now uses found status directly
-    for (let i = 0; i < (bboxDetection.objects || []).length; i++) {
-      const obj = bboxDetection.objects[i];
-      if (obj.bodyBox) {
-        const [ymin, xmin, ymax, xmax] = obj.bodyBox;
-        const x = Math.round(xmin * width);
-        const y = Math.round(ymin * height);
-        const w = Math.round((xmax - xmin) * width);
-        const h = Math.round((ymax - ymin) * height);
-
-        // Object was found (has bbox) so color indicates it was expected
-        const wasExpected = obj.name && obj.found !== false;
-        const boxColor = wasExpected ? '#00cccc' : '#ff8800';  // Cyan if expected & found, orange otherwise
-        const labelBgColor = boxColor;
-
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="2"/>`);
-
-        // Label - show expected object name if matched
-        const label = wasExpected ? `✓ ${obj.name}` : (obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`);
-        const labelWidth = Math.min(label.length * 7 + 10, 180);
-        svgParts.push(`<rect x="${x}" y="${y + h}" width="${labelWidth}" height="20" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
-        svgParts.push(`<text x="${x + 5}" y="${y + h + 14}" font-family="Arial" font-size="12" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
+        // Dashed stroke to visually distinguish face from body
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="5" stroke-dasharray="8,4"/>`);
+        // Face label with figure index
+        const faceLabel = isIdentified ? `FACE ${fig.name}` : `FACE ${i + 1}`;
+        const faceLabelWidth = Math.min(faceLabel.length * 7 + 10, 160);
+        svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${figColor}" opacity="0.9" rx="2"/>`);
+        svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">${escapeXml(faceLabel)}</text>`);
       }
     }
 
@@ -2039,8 +2010,7 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
 
     const result = 'data:image/jpeg;base64,' + resultBuffer.toString('base64');
     const figCount = bboxDetection.figures?.length || 0;
-    const objCount = bboxDetection.objects?.length || 0;
-    log.debug(`📦 [BBOX-OVERLAY] Created overlay image: ${figCount} figures, ${objCount} objects (${Math.round(resultBuffer.length / 1024)}KB)`);
+    log.debug(`📦 [BBOX-OVERLAY] Created overlay image: ${figCount} figures (${Math.round(resultBuffer.length / 1024)}KB)`);
     return result;
 
   } catch (error) {
