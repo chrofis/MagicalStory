@@ -1339,11 +1339,11 @@ export function StoryDisplay({
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
-            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
+            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}</>
           ) : isDetecting ? (
-            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : 'Detecting...'}</>
+            <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</>
           ) : (
-            <><Users size={12} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
+            <><Users size={12} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1351,7 +1351,7 @@ export function StoryDisplay({
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <h4 className="text-base font-bold text-gray-800">
-                  {language === 'de' ? 'Figur reparieren' : 'Fix Character'}
+                  {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}
                 </h4>
                 <button onClick={() => setCharRepairPopover(null)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
                   <X size={18} className="text-gray-500" />
@@ -3846,9 +3846,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-1) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -3862,9 +3862,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-1) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -3878,7 +3878,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
+                    {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
@@ -4069,9 +4069,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-2) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -4085,9 +4085,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-2) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -4101,7 +4101,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
+                    {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
@@ -4357,9 +4357,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
+                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4373,9 +4373,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
+                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
+                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4389,7 +4389,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={12} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
+                                  {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -4867,9 +4867,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
+                                    <><Pencil size={12} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4883,9 +4883,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
+                                    <><Loader size={12} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
+                                    <><RotateCcw size={12} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4899,7 +4899,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={12} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
+                                  {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'} <span className="opacity-50 text-[10px]">({imageRegenerationCost})</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -5316,9 +5316,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-3) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -5332,9 +5332,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-3) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -5348,7 +5348,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
+                    {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
