@@ -1067,6 +1067,15 @@ export interface RepairWorkflowState {
     pagesRepaired: Record<string, RepairPageResult[]>;
     pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: RepairComparison | null }>>;
   };
+  inpaintResults: Record<number, {
+    repaired: boolean;
+    preScore: number | null;
+    postScore: number | null;
+    beforeImage?: string;
+    afterImage?: string;
+    fixTargetsCount: number;
+    noErrorsFound?: boolean;
+  }>;
   stepErrors: Partial<Record<RepairWorkflowStep, string>>;
   sessionId: string;
 }

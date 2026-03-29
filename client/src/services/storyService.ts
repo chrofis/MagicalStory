@@ -1122,6 +1122,12 @@ export const storyService = {
       success: boolean;
       timestamp: string;
     }>;
+    retryEntries?: Array<{
+      preRepairScore?: number;
+      postRepairScore?: number;
+      fixTargetsCount?: number;
+      noRepairNeeded?: boolean;
+    }>;
   }> {
     const response = await api.post<{
       success: boolean;
@@ -1140,6 +1146,12 @@ export const storyService = {
         afterImage: string | null;
         success: boolean;
         timestamp: string;
+      }>;
+      retryEntries?: Array<{
+        preRepairScore?: number;
+        postRepairScore?: number;
+        fixTargetsCount?: number;
+        noRepairNeeded?: boolean;
       }>;
     }>(
       `/api/stories/${storyId}/repair/image/${pageNumber}`,

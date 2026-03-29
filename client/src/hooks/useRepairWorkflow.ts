@@ -84,6 +84,7 @@ function createInitialState(): RepairWorkflowState {
       pagesRepaired: {},
       pagesFailed: {},
     },
+    inpaintResults: {},
     stepErrors: {},
     sessionId: `repair-${Date.now()}`,
   };
@@ -980,11 +981,25 @@ export function useRepairWorkflow({
         }
       }
 
+      // Extract scores from retry entries
+      const lastEntry = result.retryEntries?.[result.retryEntries.length - 1];
       setWorkflowState(prev => ({
         ...prev,
         stepStatus: {
           ...prev.stepStatus,
           'inpaint-repair': result.repaired ? 'completed' : 'failed',
+        },
+        inpaintResults: {
+          ...prev.inpaintResults,
+          [pageNumber]: {
+            repaired: result.repaired,
+            preScore: lastEntry?.preRepairScore ?? null,
+            postScore: lastEntry?.postRepairScore ?? null,
+            beforeImage: undefined, // Large — don't store in state
+            afterImage: result.repaired ? result.imageData : undefined,
+            fixTargetsCount: lastEntry?.fixTargetsCount ?? 0,
+            noErrorsFound: result.noErrorsFound,
+          },
         },
       }));
 

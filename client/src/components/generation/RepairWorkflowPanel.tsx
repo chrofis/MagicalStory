@@ -1809,6 +1809,33 @@ export function RepairWorkflowPanel({
                           <Loader2 className="w-4 h-4 animate-spin" />
                         )}
                       </button>
+
+                      {/* Inpaint result display */}
+                      {workflowState.inpaintResults[selectedInpaintPage] && (() => {
+                        const ir = workflowState.inpaintResults[selectedInpaintPage];
+                        return (
+                          <div className={`mt-2 p-3 rounded-lg border ${ir.repaired ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-sm font-semibold ${ir.repaired ? 'text-green-800' : 'text-red-800'}`}>
+                                {ir.repaired ? 'Repair applied' : ir.noErrorsFound ? 'No errors detected' : 'Repair rejected'}
+                              </span>
+                              {ir.preScore != null && ir.postScore != null && (
+                                <span className="text-sm font-bold">
+                                  <span className={ir.preScore >= 60 ? 'text-green-600' : 'text-red-600'}>{ir.preScore}%</span>
+                                  <span className="text-gray-400 mx-1">→</span>
+                                  <span className={ir.postScore >= 60 ? 'text-green-600' : 'text-red-600'}>{ir.postScore}%</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {ir.fixTargetsCount} fix target{ir.fixTargetsCount !== 1 ? 's' : ''} processed
+                              {!ir.repaired && !ir.noErrorsFound && (
+                                <span className="ml-1">— inpainting could not fix these issues. Try regenerating the page instead.</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
