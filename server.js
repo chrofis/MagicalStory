@@ -3684,7 +3684,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             await checkCancellation();
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
-            if (!settingDesc) return null;
+            // emptyScenePrompt lives on pageData (from scene expansion), not on sceneMetadata
+            const expandedEmptyPrompt = pageData.emptyScenePrompt || sceneMetadata?.emptyScenePrompt || '';
+            if (!settingDesc && !expandedEmptyPrompt) return null;
 
             // Build object list from scene metadata (animals, vehicles, artifacts — NOT characters)
             const sceneObjects = (sceneMetadata?.fullData?.objects || [])
@@ -3700,7 +3702,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const weather = sceneMetadata?.setting?.weather || '';
 
             // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields
-            const emptySceneDesc = sceneMetadata?.emptyScenePrompt
+            const emptySceneDesc = expandedEmptyPrompt
               || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
