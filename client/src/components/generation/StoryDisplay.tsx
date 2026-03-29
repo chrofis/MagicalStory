@@ -3822,12 +3822,13 @@ export function StoryDisplay({
             </div>
             {/* Cover action buttons - visible to all users */}
             {(_onRegenerateCover || onImproveImage || _onEditCover) && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('front')}
                     disabled={isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
@@ -3835,7 +3836,7 @@ export function StoryDisplay({
                     {editingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -3843,7 +3844,7 @@ export function StoryDisplay({
                   <button
                     onClick={() => handleImproveImage(-1)}
                     disabled={isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
@@ -3851,7 +3852,7 @@ export function StoryDisplay({
                     {improvingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -3859,25 +3860,28 @@ export function StoryDisplay({
                   <button
                     onClick={() => openCoverEditModal('front')}
                     disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
-                {getCoverVersions('frontCover').length > 1 && (
-                  <button
-                    onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
-                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
-                  >
-                    <Images size={14} />
-                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('frontCover').length})
-                  </button>
-                )}
+                </div>
+              </div>
+            )}
+            {getCoverVersions('frontCover').length > 1 && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
+                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                >
+                  <Images size={14} />
+                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('frontCover').length})
+                </button>
               </div>
             )}
             {/* Developer Mode Features for Front Cover */}
@@ -4041,12 +4045,13 @@ export function StoryDisplay({
             </div>
             {/* Cover action buttons - visible to all users */}
             {(_onRegenerateCover || onImproveImage || _onEditCover) && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('initial')}
                     disabled={isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
@@ -4054,7 +4059,7 @@ export function StoryDisplay({
                     {editingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -4062,7 +4067,7 @@ export function StoryDisplay({
                   <button
                     onClick={() => handleImproveImage(-2)}
                     disabled={isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
@@ -4070,7 +4075,7 @@ export function StoryDisplay({
                     {improvingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -4078,25 +4083,28 @@ export function StoryDisplay({
                   <button
                     onClick={() => openCoverEditModal('initial')}
                     disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
-                {getCoverVersions('initialPage').length > 1 && (
-                  <button
-                    onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
-                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
-                  >
-                    <Images size={14} />
-                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('initialPage').length})
-                  </button>
-                )}
+                </div>
+              </div>
+            )}
+            {getCoverVersions('initialPage').length > 1 && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
+                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                >
+                  <Images size={14} />
+                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('initialPage').length})
+                </button>
               </div>
             )}
             {/* Developer Mode Features for Initial Page */}
@@ -5280,12 +5288,13 @@ export function StoryDisplay({
             </div>
             {/* Cover action buttons - visible to all users */}
             {(_onRegenerateCover || onImproveImage || _onEditCover) && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('back')}
                     disabled={isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
@@ -5293,7 +5302,7 @@ export function StoryDisplay({
                     {editingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -5301,7 +5310,7 @@ export function StoryDisplay({
                   <button
                     onClick={() => handleImproveImage(-3)}
                     disabled={isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
@@ -5309,7 +5318,7 @@ export function StoryDisplay({
                     {improvingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -5317,25 +5326,28 @@ export function StoryDisplay({
                   <button
                     onClick={() => openCoverEditModal('back')}
                     disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
-                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <Wand2 size={14} />
-                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
+                    {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70">({imageRegenerationCost})</span>
                   </button>
                 )}
                 {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
-                {getCoverVersions('backCover').length > 1 && (
-                  <button
-                    onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
-                    className="flex-1 px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
-                  >
-                    <Images size={14} />
-                    {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('backCover').length})
-                  </button>
-                )}
+                </div>
+              </div>
+            )}
+            {getCoverVersions('backCover').length > 1 && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
+                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                >
+                  <Images size={14} />
+                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('backCover').length})
+                </button>
               </div>
             )}
             {/* Developer Mode Features for Back Cover */}
