@@ -334,5 +334,173 @@
     "themes": ["sacrifice for the greater good", "one person can change the course of history", "courage in the face of impossible odds"],
     "age": "6+",
     "emoji": "🛡️"
+  },
+  {
+    "id": "sage-beatus-dragon",
+    "title": {
+      "en": "St. Beatus and the Dragon",
+      "de": "Sankt Beatus und der Drache",
+      "fr": "Saint Béat et le Dragon"
+    },
+    "description": {
+      "en": "The holy hermit Beatus climbs to a dragon's cave above Lake Thun. Armed only with a crucifix and his faith, he drives the fearsome beast into the lake. He makes the cave his home, living there as a hermit and preaching to the local people for many years.",
+      "de": "Der heilige Eremit Beatus steigt zur Drachenhöhle über dem Thunersee hinauf. Bewaffnet nur mit einem Kruzifix und seinem Glauben, vertreibt er das furchtbare Tier in den See. Er macht die Höhle zu seinem Zuhause und lebt dort als Einsiedler, wo er viele Jahre lang den Einheimischen predigt.",
+      "fr": "L'ermite saint Béat monte jusqu'à la grotte d'un dragon au-dessus du lac de Thoune. Armé seulement d'un crucifix et de sa foi, il chasse la bête redoutable dans le lac. Il fait de la grotte sa demeure, y vivant en ermite et prêchant aux habitants pendant de longues années."
+    },
+    "context": {
+      "en": "Ancient legend from the Bernese Oberland. Real locations include the Beatushöhlen (St. Beatus Caves) near Beatenberg with spectacular stalactites and underground waterfalls, and Lake Thun.",
+      "de": "Uralte Sage aus dem Berner Oberland. Zu den realen Schauplätzen gehören die Beatushöhlen bei Beatenberg mit spektakulären Stalaktiten und unterirdischen Wasserfällen sowie der Thunersee.",
+      "fr": "Légende ancienne de l'Oberland bernois. Les lieux réels comprennent les grottes de Saint-Béat près de Beatenberg avec des stalactites spectaculaires et des cascades souterraines, et le lac de Thoune."
+    },
+    "themes": ["faith overcomes fear", "courage without weapons", "finding home in unexpected places"],
+    "age": "4+",
+    "emoji": "⛪"
+  },
+  {
+    "id": "sage-pilatus-ghost",
+    "title": {
+      "en": "The Ghost of Pontius Pilate",
+      "de": "Der Geist des Pontius Pilatus",
+      "fr": "Le Fantôme de Ponce Pilate"
+    },
+    "description": {
+      "en": "The restless ghost of Pontius Pilate haunts a dark lake on Mount Pilatus. Every Good Friday he rises, washing his hands endlessly. Disturbing the lake brings terrible storms. For centuries, Lucerne forbade anyone from climbing the mountain — until brave scholars finally broke the spell.",
+      "de": "Der ruhelose Geist des Pontius Pilatus spukt an einem dunklen Bergsee auf dem Pilatus. Jeden Karfreitag erhebt er sich und wäscht sich endlos die Hände. Wer den See stört, bringt schreckliche Stürme. Jahrhundertelang verbot Luzern das Besteigen des Berges — bis mutige Gelehrte den Bann endlich brachen.",
+      "fr": "Le fantôme agité de Ponce Pilate hante un lac sombre sur le Mont Pilate. Chaque Vendredi Saint, il se lève et se lave les mains sans fin. Déranger le lac provoque de terribles tempêtes. Pendant des siècles, Lucerne a interdit l'ascension de la montagne — jusqu'à ce que de courageux savants brisent enfin le sortilège."
+    },
+    "context": {
+      "en": "Medieval legend from the Lucerne region. Mount Pilatus may take its name from this legend (or from Latin 'pileatus' meaning cloud-capped). The ban on climbing was real and lasted centuries until 1585.",
+      "de": "Mittelalterliche Sage aus der Region Luzern. Der Name Pilatus stammt möglicherweise von dieser Sage (oder vom lateinischen «pileatus», wolkenverhüllt). Das Besteigungsverbot war real und dauerte Jahrhunderte bis 1585.",
+      "fr": "Légende médiévale de la région de Lucerne. Le Mont Pilate tire peut-être son nom de cette légende (ou du latin «pileatus», coiffé de nuages). L'interdiction d'ascension était réelle et a duré des siècles jusqu'en 1585."
+    },
+    "themes": ["guilt seeks forgiveness", "superstition yields to knowledge", "courage to question old fears"],
+    "age": "6+",
+    "emoji": "👻"
+  },
+  {
+    "id": "sage-bluemlisalp",
+    "title": {
+      "en": "The Legend of the Blüemlisalp",
+      "de": "Die Sage von der Blüemlisalp",
+      "fr": "La Légende de la Blüemlisalp"
+    },
+    "description": {
+      "en": "A wealthy Alpine dairyman wastes nature's gifts to impress his vain mistress — paving paths with cheese and bathing her in milk. When he turns away a starving beggar woman, she curses the pasture. That night, glaciers bury the once-lush meadow forever. On clear nights, the ghostly bells of buried cattle still ring.",
+      "de": "Ein reicher Senn verschwendet die Gaben der Natur, um seine eitle Geliebte zu beeindrucken — er pflastert Wege mit Käse und badet sie in Milch. Als er eine hungrige Bettlerin abweist, verflucht sie die Alp. In jener Nacht begraben Gletscher die einst üppige Weide für immer. In klaren Nächten klingen noch die Geisterglocken der verschütteten Kühe.",
+      "fr": "Un riche vacher gaspille les dons de la nature pour impressionner sa maîtresse vaniteuse — pavant les chemins de fromage et la baignant dans le lait. Quand il refuse d'aider une mendiante affamée, elle maudit l'alpage. Cette nuit-là, les glaciers ensevelissent le pâturage autrefois luxuriant pour toujours. Les nuits claires, les cloches fantomatiques du bétail enseveli résonnent encore."
+    },
+    "context": {
+      "en": "Legend from the Bernese Oberland. The Blüemlisalp massif (3,661m) between Lake Thun and Kandersteg is a real glacier-covered mountain group. The nearby Oeschinensee is a UNESCO World Heritage site.",
+      "de": "Sage aus dem Berner Oberland. Das Blüemlisalp-Massiv (3661 m) zwischen Thunersee und Kandersteg ist eine reale, gletscherbedeckte Berggruppe. Der nahe Oeschinensee gehört zum UNESCO-Welterbe.",
+      "fr": "Légende de l'Oberland bernois. Le massif de la Blüemlisalp (3661 m) entre le lac de Thoune et Kandersteg est un vrai massif couvert de glaciers. Le lac d'Oeschinen tout proche est un site du patrimoine mondial de l'UNESCO."
+    },
+    "themes": ["respect nature's gifts", "greed and waste bring ruin", "kindness to the poor"],
+    "age": "5+",
+    "emoji": "🧊"
+  },
+  {
+    "id": "sage-venetianer",
+    "title": {
+      "en": "The Venetianer — Secret Treasure Hunters",
+      "de": "Die Venetianer — Geheimnisvolle Schatzsucher",
+      "fr": "Les Vénitiens — Chasseurs de Trésors Secrets"
+    },
+    "description": {
+      "en": "Mysterious Italians called the Venetianer appear in remote Alpine villages carrying ancient maps and strange instruments. They know secret paths to hidden gold and crystal caves. They mine by night, vanish by dawn, and the Mountain Spirit punishes those who grow too greedy.",
+      "de": "Geheimnisvolle Italiener, Venetianer genannt, tauchen in abgelegenen Bergdörfern auf, mit alten Karten und seltsamen Instrumenten. Sie kennen geheime Pfade zu verstecktem Gold und Kristallhöhlen. Sie schürfen bei Nacht, verschwinden bei Morgengrauen, und der Berggeist bestraft die Gierigen.",
+      "fr": "De mystérieux Italiens appelés Vénitiens apparaissent dans des villages alpins reculés, portant d'anciennes cartes et d'étranges instruments. Ils connaissent des chemins secrets vers l'or caché et les grottes de cristaux. Ils exploitent la nuit, disparaissent à l'aube, et l'Esprit de la Montagne punit ceux qui deviennent trop avides."
+    },
+    "context": {
+      "en": "Widespread legend cycle found across the Swiss Alps, especially in Graubünden, Valais, and Uri. May have a historical basis — Italian mining experts did travel to the Alps during medieval and Renaissance periods.",
+      "de": "Weitverbreiteter Sagenzyklus in den Schweizer Alpen, besonders in Graubünden, Wallis und Uri. Möglicherweise historisch fundiert — italienische Bergbauexperten reisten im Mittelalter und der Renaissance tatsächlich in die Alpen.",
+      "fr": "Cycle de légendes répandu dans les Alpes suisses, surtout dans les Grisons, le Valais et Uri. Pourrait avoir un fondement historique — des experts miniers italiens ont effectivement voyagé dans les Alpes au Moyen Âge et à la Renaissance."
+    },
+    "themes": ["respect the mountains' secrets", "greed invites danger", "mystery and adventure"],
+    "age": "5+",
+    "emoji": "🗺️"
+  },
+  {
+    "id": "sage-weisse-frau-wimmis",
+    "title": {
+      "en": "The White Lady of Wimmis",
+      "de": "Die weisse Frau von Wimmis",
+      "fr": "La Dame Blanche de Wimmis"
+    },
+    "description": {
+      "en": "A kind noblewoman was unjustly killed by her cruel husband in Wimmis Castle. Her ghost — the White Lady — now haunts the castle corridors, but she is not fearsome. She appears to warn of coming danger and watches over children and the innocent.",
+      "de": "Eine gütige Edelfrau wurde von ihrem grausamen Gemahl auf Schloss Wimmis zu Unrecht getötet. Ihr Geist — die weisse Frau — spukt nun in den Schlossgängen, doch sie ist nicht furchteinflössend. Sie erscheint, um vor Gefahren zu warnen, und wacht über Kinder und Unschuldige.",
+      "fr": "Une noble femme bienveillante fut injustement tuée par son cruel époux au château de Wimmis. Son fantôme — la Dame Blanche — hante désormais les couloirs du château, mais elle n'est pas effrayante. Elle apparaît pour avertir du danger et veille sur les enfants et les innocents."
+    },
+    "context": {
+      "en": "Legend from the Bernese Oberland. Wimmis Castle (Schloss Wimmis) is a real castle dating to the 10th century, perched on rock above the village at the entrance to the Simmental valley.",
+      "de": "Sage aus dem Berner Oberland. Schloss Wimmis ist eine reale Burg aus dem 10. Jahrhundert, auf einem Felsen über dem Dorf am Eingang zum Simmental thronend.",
+      "fr": "Légende de l'Oberland bernois. Le château de Wimmis est un vrai château datant du Xe siècle, perché sur un rocher au-dessus du village à l'entrée de la vallée du Simmental."
+    },
+    "themes": ["innocence endures", "protection from beyond", "justice will find a way"],
+    "age": "5+",
+    "emoji": "🏰"
+  },
+  {
+    "id": "sage-lindwurm-bern",
+    "title": {
+      "en": "The Dragon of Bern",
+      "de": "Der Lindwurm von Bern",
+      "fr": "Le Dragon de Berne"
+    },
+    "description": {
+      "en": "A fearsome Lindwurm — a serpent-like dragon — terrorizes the forests around young Bern. A brave knight tracks it to its lair and, after a fierce battle, slays the beast. Only then can the city grow and prosper in safety.",
+      "de": "Ein furchtbarer Lindwurm — ein schlangenartiger Drache — terrorisiert die Wälder rund um das junge Bern. Ein tapferer Ritter spürt ihn in seiner Höhle auf und erschlägt das Untier nach einem erbitterten Kampf. Erst dann kann die Stadt in Sicherheit wachsen und gedeihen.",
+      "fr": "Un redoutable lindwurm — un dragon serpentin — terrorise les forêts autour de la jeune Berne. Un brave chevalier le traque jusqu'à son repaire et, après un combat acharné, terrasse la bête. C'est seulement alors que la ville peut croître et prospérer en sécurité."
+    },
+    "context": {
+      "en": "Legend connected to the early history of Bern. The old town of Bern (UNESCO World Heritage) is built on the Aare River peninsula. The Lindwurm is a type of dragon from Germanic legend — serpent-bodied with two front legs but no wings.",
+      "de": "Sage verbunden mit der Frühgeschichte Berns. Die Altstadt von Bern (UNESCO-Welterbe) ist auf der Aareschleife erbaut. Der Lindwurm ist ein Drachentyp der germanischen Sage — schlangenartig mit zwei Vorderbeinen, aber ohne Flügel.",
+      "fr": "Légende liée à l'histoire ancienne de Berne. La vieille ville de Berne (patrimoine mondial de l'UNESCO) est construite sur la presqu'île de l'Aar. Le lindwurm est un type de dragon de la légende germanique — au corps de serpent avec deux pattes avant mais sans ailes."
+    },
+    "themes": ["courage conquers fear", "protecting your community", "clearing the way for growth"],
+    "age": "5+",
+    "emoji": "🐍"
+  },
+  {
+    "id": "sage-pfarrer-von-barglen",
+    "title": {
+      "en": "The Pastor of Bürglen",
+      "de": "Der Pfarrer von Bürglen",
+      "fr": "Le Pasteur de Bürglen"
+    },
+    "description": {
+      "en": "When Habsburg soldiers come to Bürglen searching for Swiss rebels, the brave pastor stands at his church door and refuses to hand over the people sheltering inside. He invokes the right of sanctuary, and his courage inspires the whole village to stand firm.",
+      "de": "Als habsburgische Soldaten nach Bürglen kommen, um Schweizer Aufständische zu suchen, stellt sich der mutige Pfarrer an die Kirchentür und weigert sich, die dort Schutz suchenden Menschen auszuliefern. Er beruft sich auf das Asylrecht, und sein Mut inspiriert das ganze Dorf zum Widerstand.",
+      "fr": "Quand les soldats des Habsbourg viennent à Bürglen chercher des rebelles suisses, le courageux pasteur se tient à la porte de son église et refuse de livrer les gens qui s'y sont réfugiés. Il invoque le droit d'asile, et son courage inspire tout le village à tenir bon."
+    },
+    "context": {
+      "en": "Part of the Tell legend cycle. Bürglen in Canton Uri is the traditional birthplace of Wilhelm Tell. The Tell Museum Bürglen preserves the Tell tradition.",
+      "de": "Teil des Tell-Sagenkreises. Bürglen im Kanton Uri gilt als traditioneller Geburtsort von Wilhelm Tell. Das Tell-Museum Bürglen pflegt die Tell-Tradition.",
+      "fr": "Fait partie du cycle de légendes de Tell. Bürglen dans le canton d'Uri est le lieu de naissance traditionnel de Guillaume Tell. Le musée Tell de Bürglen préserve la tradition."
+    },
+    "themes": ["protecting the vulnerable", "courage without violence", "community solidarity"],
+    "age": "5+",
+    "emoji": "⛪"
+  },
+  {
+    "id": "sage-bettler-sempachersee",
+    "title": {
+      "en": "The Beggar at Lake Sempach",
+      "de": "Der Bettler am Sempachersee",
+      "fr": "Le Mendiant du Lac de Sempach"
+    },
+    "description": {
+      "en": "A mysterious beggar wanders along Lake Sempach seeking shelter. The wealthy slam their doors, but a poor fisherman shares his meager supper. The beggar warns the fisherman to move to higher ground. That night, the lake floods and destroys the houses of those who refused kindness.",
+      "de": "Ein geheimnisvoller Bettler wandert am Sempachersee entlang und sucht Unterschlupf. Die Reichen schlagen ihre Türen zu, doch ein armer Fischer teilt sein karges Abendessen. Der Bettler warnt den Fischer, auf höheres Gelände zu ziehen. In jener Nacht tritt der See über die Ufer und zerstört die Häuser derer, die keine Güte zeigten.",
+      "fr": "Un mendiant mystérieux erre le long du lac de Sempach cherchant un abri. Les riches claquent leurs portes, mais un pauvre pêcheur partage son maigre souper. Le mendiant avertit le pêcheur de monter sur les hauteurs. Cette nuit-là, le lac déborde et détruit les maisons de ceux qui ont refusé la bonté."
+    },
+    "context": {
+      "en": "Legend from the Lucerne region. Lake Sempach (Sempachersee) is a real lake in Canton Lucerne, also famous as the site of the Battle of Sempach (1386).",
+      "de": "Sage aus der Region Luzern. Der Sempachersee ist ein realer See im Kanton Luzern, auch bekannt als Schauplatz der Schlacht bei Sempach (1386).",
+      "fr": "Légende de la région de Lucerne. Le lac de Sempach est un vrai lac du canton de Lucerne, également célèbre comme lieu de la bataille de Sempach (1386)."
+    },
+    "themes": ["kindness is rewarded", "generosity from those who have least", "don't judge by appearances"],
+    "age": "4+",
+    "emoji": "🌊"
   }
 ]

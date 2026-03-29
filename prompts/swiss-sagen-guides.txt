@@ -1,0 +1,871 @@
+# Swiss Sagen (Legends) Story Guides
+#
+# This file contains detailed guides for Swiss legends and fairy tales.
+# The story generation will use these guides to ensure accurate retelling.
+#
+# Format: [sage-id] followed by the guide content.
+# Edit freely - changes take effect on next story generation.
+#
+# NOTE: sage-wilhelm-tell and sage-winkelried-sempach are NOT included here.
+# They have detailed historical guides in historical-guides.txt that are
+# loaded as fallback (wilhelm-tell and battle-sempach respectively).
+
+# =============================================================================
+# CLASSIC SWISS LEGENDS (detailed guides, 20-30 lines)
+# =============================================================================
+
+[sage-heidi]
+LEGEND: Heidi (1881, Johanna Spyri)
+LOCATION: Maienfeld, Canton Graubunden
+
+KEY FIGURES:
+- Heidi (Adelheid): Orphan girl, about 5-6 years old, joyful and free-spirited
+- Alp-Ohi (Grandfather): Gruff old hermit who lives alone on the mountain, former soldier, estranged from the village
+- Geissenpeter (Goatherd Peter): Local boy who tends the village goats up the mountain daily
+- Aunt Dete: Heidi's aunt who brings her to the grandfather, works in Frankfurt
+- Klara Sesemann: Wealthy girl in Frankfurt, uses a wheelchair, lonely and kind
+- Fraulein Rottenmeier: Strict housekeeper in the Sesemann household
+- Herr Sesemann: Klara's wealthy father, often traveling on business
+- Grandmama Sesemann: Klara's wise and kind grandmother
+
+FULL PLOT:
+Heidi's parents died when she was a baby. Her Aunt Dete raised her for five years but now
+has a job opportunity in Frankfurt. She brings Heidi up the mountain to live with the
+grandfather, the Alp-Ohi, who has been a recluse for years, shunned by the village for
+his mysterious past. The villagers warn Dete against leaving the child there.
+
+Despite his gruff exterior, the grandfather is moved by Heidi. He builds her a bed of hay
+in the loft, and she falls in love with the mountain life — the goats, the wildflowers,
+the eagles circling overhead. She befriends Peter the goatherd and spends her days running
+barefoot through the Alpine meadows, drinking fresh goat milk, and eating bread with cheese.
+
+Peter's blind grandmother lives in a run-down cottage. Heidi visits her and brings her
+comfort. The grandmother tells Heidi she wishes someone would read to her from her old
+hymn book. Heidi cannot read yet but resolves to learn.
+
+After three happy years, Aunt Dete returns and takes Heidi to Frankfurt to be a companion
+for Klara Sesemann, a wealthy girl confined to a wheelchair. Heidi is miserable in the city.
+Fraulein Rottenmeier scolds her constantly. But Heidi and Klara become close friends. Heidi
+learns to read (motivated by wanting to read to Peter's grandmother). She secretly collects
+white bread rolls to bring to the grandmother, which causes a scene when they are discovered.
+
+Heidi becomes desperately homesick. She sleepwalks, grows pale and thin. The doctor diagnoses
+her as seriously ill from longing and recommends she be sent home immediately. Heidi returns
+to the Alps and is overjoyed. Her grandfather is transformed by love for the child — he
+reconnects with the village and even agrees to move down for winter so Heidi can attend school.
+
+Later, Klara comes to visit the mountain. At first Peter is jealous of the attention Heidi
+gives Klara and pushes Klara's wheelchair down the mountain, destroying it. Without the chair,
+Klara is forced to try walking. With Heidi's encouragement, the mountain air, the goat milk,
+and daily practice, Klara takes her first steps and learns to walk. Her father and grandmother
+arrive to find Klara standing and walking — a miracle of the mountain.
+
+REAL LOCATIONS:
+- Heididorf: Museum village in Maienfeld (GR) with reconstructed Heidi house and grandfather's hut
+- Heidi Alp above Maienfeld: The actual Alpine meadow setting, accessible by foot
+- Maienfeld old town: The village Heidi walks through
+- Ragaz/Bad Ragaz: Nearby spa town mentioned in the story
+- Frankfurt am Main: Where Klara's family lives (the Sesemann house)
+
+PERIOD COSTUMES:
+- Heidi: Simple cotton or linen Alpine dress in earth tones, apron, barefoot in summer, wooden clogs in winter, later a plain bonnet
+- Alp-Ohi: Worn leather breeches (Lederhosen), rough wool jacket, felt hat, heavy boots, walking stick
+- Geissenpeter: Patched linen shirt, knee-length trousers, barefoot or simple leather shoes, carries a willow switch for the goats
+- Klara: Fine city dress with lace collar and cuffs, petticoat, button boots, bonnet with ribbons
+- Fraulein Rottenmeier: Severe black dress with high collar, white cap, keys on a belt chain
+- Aunt Dete: Town dress slightly finer than mountain clothes, shawl, walking shoes
+
+[sage-devils-bridge]
+LEGEND: The Devil's Bridge (Teufelsbrucke)
+LOCATION: Schollenen Gorge, Canton Uri
+
+KEY FIGURES:
+- The Devil (Teufel): Cunning but outwitted supernatural being
+- The Village Elder / Mayor of Goschenen: Leader who negotiates with the Devil
+- The Villagers of Uri: Resourceful Alpine community
+- A goat: The animal sent across the bridge first
+
+FULL PLOT:
+The Schollenen Gorge was the most dangerous passage on the vital trade route between northern
+and southern Europe through the Gotthard Pass. The wild Reuss River carved a deep, impassable
+ravine through the rock. Travelers and pack mules fell to their deaths regularly. The people
+of Uri desperately needed a bridge but the gorge was too treacherous for any human builder.
+
+In desperation, the village elder called out to the Devil himself for help. The Devil appeared
+and offered a deal: he would build the bridge in a single night, but in return he demanded
+the soul of the first living being to cross it. The villagers had no choice but to agree.
+
+True to his word, the Devil built a magnificent stone arch bridge spanning the roaring gorge
+overnight. At dawn, he stood at the far end, waiting eagerly to claim his prize. But the
+villagers had devised a trick. Instead of sending a person across first, they drove a goat
+onto the bridge. The goat trotted across, and the Devil was forced to accept the animal's
+soul instead of a human one.
+
+The Devil flew into a terrible rage. He seized an enormous boulder and hurled it toward the
+bridge, intending to destroy his own creation. But an old woman (in some versions, she carved
+a cross on the rock) intervened, and the boulder missed, landing in the valley below. This
+boulder, the Teufelsstein (Devil's Stone), weighing approximately 220 tons, sat in the
+valley near Goschenen for centuries. In 1977 it was moved 127 meters to make way for the
+Gotthard motorway tunnel construction.
+
+The bridge stood and opened the Gotthard route to trade between Italy and northern Europe,
+becoming one of the most important Alpine crossings in history.
+
+REAL LOCATIONS:
+- Teufelsbrucke (Devil's Bridge): Three bridges at the site — the legendary medieval one (ruins visible), the 1830 stone arch bridge, and the modern road bridge in the Schollenen Gorge
+- Teufelsstein (Devil's Stone): The 220-ton boulder near Goschenen, relocated in 1977
+- Schollenen Gorge: The dramatic ravine of the Reuss River between Goschenen and Andermatt
+- Andermatt: Town at the southern end of the gorge
+- Goschenen: Town at the northern end of the gorge
+- Gotthard Pass: The historic Alpine crossing that the bridge enabled
+
+PERIOD COSTUMES:
+- Villagers: Rough homespun wool tunics and hose, leather belts, wooden clogs or leather boots, felt caps
+- Village elder: Slightly finer wool tunic, fur-trimmed cloak, leather pouch on belt
+- The Devil: Often depicted in red or black, with horns, tail, and cloven hooves; sometimes dressed as a gentleman traveler
+- Pack mule drivers: Heavy wool cloaks, leather jerkins, broad-brimmed hats for weather protection
+- Medieval travelers: Pilgrims in hooded cloaks, merchants in practical traveling clothes with leather satchels
+
+[sage-dragons-pilatus]
+LEGEND: The Dragons of Mount Pilatus
+LOCATION: Mount Pilatus, near Lucerne, Central Switzerland
+
+KEY FIGURES:
+- Viktor Wick (Stempflin): A farmer or cooper from Lucerne who encounters a dragon (circa 1420)
+- The Dragon(s): Benevolent creatures living in caves on Mount Pilatus
+- Various witnesses: Citizens of Lucerne who reported dragon sightings over centuries
+
+FULL PLOT:
+Mount Pilatus, towering over the city of Lucerne at 2,128 meters, was long believed to be
+the dwelling place of dragons. Unlike the fearsome dragons of other European legends, the
+Pilatus dragons were mostly considered benevolent or at least neutral creatures.
+
+The most famous account comes from 1420 or 1421. A farmer named Viktor (sometimes called
+Stempflin) was walking along a remote path on Mount Pilatus when he slipped and fell into
+a deep cave. Inside, he found two large dragons sleeping. Terrified, he lay still among them.
+Over the following winter months, the dragons kept him warm with their breath and he survived
+by licking a strange, healing slime that the dragons secreted. When spring came, the dragons
+flew out of the cave and the farmer was able to climb out, thin but alive. He brought back
+a piece of the hardened dragon slime — the famous Drachenstein (Dragon Stone).
+
+The Dragon Stone was kept in Lucerne and was believed to have miraculous healing properties.
+It was used to treat the sick and was considered one of the city's greatest treasures.
+The stone was kept in the city hall and shown to important visitors for centuries.
+
+Other sightings were recorded: in 1499, a bright flying dragon was reportedly seen by
+citizens crossing the sky near Pilatus, leaving a trail of fire. In 1649, the city
+chronicler recorded that a dragon was seen flying from Mount Pilatus to Mount Rigi.
+
+The mountain itself was long considered dangerous and forbidden. For centuries, the Lucerne
+city council actually forbade people from climbing Mount Pilatus, fearing they would disturb
+the dragons and bring storms and disasters upon the city. This ban was only lifted in 1585
+when a group of scholars and clergymen climbed to the summit and demonstrated there were no
+dangerous dragons — though the legends lived on.
+
+REAL LOCATIONS:
+- Mount Pilatus (2,128m): The mountain itself, accessible today by cogwheel railway (steepest in the world) and cable car
+- Pilatus Kulm: Summit station with panoramic views of the Alps and lakes
+- Dragon Path (Drachenweg): A themed hiking trail on Mount Pilatus with dragon sculptures
+- Lake Lucerne (Vierwaldstattersee): The lake at the foot of the mountain
+- Lucerne old town: Where the Dragon Stone was kept and displayed
+- Pilatus caves: Various caves on the mountain linked to dragon stories
+
+PERIOD COSTUMES:
+- Viktor/farmers: Simple linen shirt, wool breeches, leather vest, broad-brimmed hat, wooden shoes or leather boots
+- Lucerne citizens (15th century): Wool tunics, linen undershirts, leather belts, cloth caps or felt hats
+- City council members: Fine wool robes with fur trim, chain of office, leather shoes
+- Scholars/clergymen (16th century): Long dark robes, wide-brimmed hats, some with white collars
+
+[sage-st-gall-bear]
+LEGEND: St. Gallus and the Bear (circa 612 AD)
+LOCATION: Steinach Valley, Canton St. Gallen
+
+KEY FIGURES:
+- Gallus (St. Gall): Irish monk and missionary, follower of St. Columban, approximately 60 years old at the time
+- Hiltibod: Gallus's deacon and companion
+- The Bear: A large wild brown bear of the Swiss forests
+- St. Columban: Gallus's teacher, the great Irish missionary (background figure)
+
+FULL PLOT:
+Gallus was an Irish monk who traveled with the great missionary Columban from the monastery
+of Bangor in Ireland across Europe to spread Christianity. When Columban moved on to Italy
+around 612 AD, Gallus stayed behind in the wild forests of what is now northeastern
+Switzerland, near the Steinach River. He was ill with a fever and could not continue the
+journey.
+
+Once recovered, Gallus decided to establish a hermitage in the wilderness. He and his deacon
+Hiltibod ventured into the dense forest along the Steinach. On their first night, Gallus set
+up a simple camp and was praying when a large brown bear emerged from the trees. Hiltibod was
+terrified, but Gallus remained calm. He spoke gently to the bear and offered it a piece of
+his bread.
+
+The bear accepted the bread. Then Gallus commanded the bear: "In the name of the Lord, pick
+up that log and put it on the fire." The bear obeyed, picking up a fallen branch and placing
+it on the campfire. Gallus then told the bear: "Now go from this valley and roam the mountains,
+but harm no man or beast here." The bear departed peacefully.
+
+Gallus took this as a sign from God that this was the place where he should stay. He built a
+simple cell (hermitage) and a small chapel. He lived as a hermit, preaching to the local
+Alemanni people and performing good works. His reputation for holiness grew, and followers
+gathered around him.
+
+Gallus died around 646 AD. About a century later, in 719, Abbot Otmar founded a proper
+Benedictine monastery on the site of Gallus's cell. This grew into the great Abbey of
+St. Gall, which became one of the most important centers of learning and culture in medieval
+Europe. Its library, containing priceless manuscripts, is now a UNESCO World Heritage Site.
+The city of St. Gallen grew up around the abbey, and the bear remains on the city's coat
+of arms to this day.
+
+REAL LOCATIONS:
+- Abbey of St. Gall (Stiftsbezirk): UNESCO World Heritage Site, with the famous Abbey Library containing medieval manuscripts
+- Abbey Library (Stiftsbibliothek): One of the oldest and richest libraries in the world, with its rococo hall
+- St. Gallen old town: Medieval city that grew around the abbey
+- Gallus Chapel: The traditional site of Gallus's original cell
+- Steinach River valley: Where Gallus first encountered the bear
+- Bear symbol: Appears on St. Gallen's coat of arms and throughout the city
+
+PERIOD COSTUMES:
+- Gallus: Simple brown or undyed wool monk's habit with rope belt (Franciscan-style but predating that order), tonsured head, wooden cross around neck, leather sandals
+- Hiltibod: Similar monk's habit, slightly simpler, carrying a staff and leather satchel for provisions
+- Local Alemanni villagers: Rough linen tunics dyed with plant colors, wool cloaks fastened with brooches, leather boots, men with beards and long hair
+- Alemanni women: Long linen dresses, wool shawls, simple jewelry (bronze brooches, glass beads)
+
+[sage-vogel-gryff]
+LEGEND: Vogel Gryff of Basel
+LOCATION: Basel, on the Rhine River
+
+KEY FIGURES:
+- Vogel Gryff (the Griffin): Mythical creature with eagle head, wings, and lion body — represents the Honorable Society "zum Greifen"
+- Wild Maa (Wild Man): Forest creature covered in leaves and branches, carrying an uprooted pine tree — represents the Honorable Society "zur Haren"
+- Leu (Lion): Proud lion figure — represents the Honorable Society "zum Rebhaus"
+- The Raft Man: Figure who floats down the Rhine on a raft to start the festival
+
+FULL PLOT:
+The Vogel Gryff is Basel's most beloved and oldest folk tradition, dating back to the late
+medieval period (first documented in 1275 for the societies, with the current festival form
+from the 16th century). It is the celebration of the three Honorable Societies (Ehrengesellschaften)
+of Kleinbasel (Lesser Basel), the district on the right bank of the Rhine.
+
+The three societies — zum Greifen (Griffin), zur Haren (Wild Man), and zum Rebhaus (Lion) —
+were originally neighborhood associations that combined social, charitable, and civic duties.
+Each year on January 13, 20, or 27 (the date rotates depending on which society leads that
+year), the festival begins.
+
+Early in the morning, the Wild Man floats down the Rhine on a raft, dancing and waving his
+uprooted pine tree. He must face downstream — tradition strictly dictates that neither he
+nor the other figures may look toward Grossbasel (Greater Basel) on the left bank. This
+reflects the old rivalry and proud independence of Kleinbasel from its larger neighbor.
+
+The Wild Man lands and is greeted by cannon fire. He then joins the Griffin and the Lion,
+who emerge from their respective society houses. The three enormous costumed figures dance
+through the streets of Kleinbasel, accompanied by drummers and fifers. They perform at
+specific stops throughout the district, dancing their traditional steps.
+
+At the Mittlere Brucke (Middle Bridge), all three figures dance together but carefully
+never face toward Grossbasel. The festival continues with feasting, the societies hosting
+elaborate meals for their members, and celebrations throughout Kleinbasel.
+
+The tradition has been maintained continuously for centuries and remains entirely organized
+by the three societies, not the city government. It is a deeply local celebration of
+community identity and independence.
+
+REAL LOCATIONS:
+- Mittlere Brucke (Middle Bridge): The stone bridge over the Rhine where the figures dance
+- Kleinbasel (Lesser Basel): The right-bank district that celebrates the tradition
+- Rhine River: The Wild Man arrives floating downstream on his raft
+- Society houses: zum Greifen, zur Haren, and zum Rebhaus in Kleinbasel
+- Basel old town: Medieval city center on both banks of the Rhine
+
+PERIOD COSTUMES:
+- Vogel Gryff: Large costume with golden griffin head, wings, and body worn by a dancing man inside
+- Wild Maa: Costume covered in ivy leaves and natural greenery, wild hair and beard, carrying an uprooted small pine tree
+- Leu: Large golden lion costume with mane, operated by a dancer inside
+- Drummers and fifers: Traditional Basel costume — black coat, white shirt, red and white sash
+- Spectators (traditional): Basel festival clothing, warm winter garb for the January celebration
+
+[sage-white-chamois]
+LEGEND: The White Chamois (Die weisse Gamse)
+LOCATION: Various Swiss Alpine peaks, Bernese Oberland and Valais
+
+KEY FIGURES:
+- The White Chamois: A legendary pure-white chamois (Alpine goat-antelope), supernatural guardian of the mountains
+- The Greedy Hunter: A skilled but selfish hunter who pursues the chamois for glory
+- The Pure-Hearted Traveler: A humble person (shepherd, child, or lost wanderer) who encounters the chamois
+
+FULL PLOT:
+High on the most remote and dangerous Alpine peaks, where glaciers crack and avalanches roar,
+there lives a chamois of pure white — unlike any natural chamois, which are brown. The White
+Chamois is said to be a spirit of the mountains, a guardian placed there to test the hearts
+of those who venture into the high Alps.
+
+Hunters who hear tales of the White Chamois are consumed with desire to capture or kill it
+for its extraordinary pelt. They climb higher and higher, following tracks in the snow,
+catching glimpses of the white creature leaping gracefully from rock to rock. The chamois
+always stays just out of range, luring the hunters further into dangerous terrain — narrow
+ledges, unstable snowfields, the edges of cliffs hidden by cloud.
+
+The greedy hunter, blind with ambition, follows the chamois until he finds himself on a
+crumbling ledge with no way back. The White Chamois stands above, watching. If the hunter
+shows no remorse, he falls to his death. The mountains claim those who treat them with
+disrespect.
+
+But when a person with a pure heart encounters the White Chamois — a lost shepherd seeking
+a missing lamb, a child wandered too far from the village, a traveler caught in a sudden
+storm — the chamois behaves quite differently. It appears through the fog and snow, glowing
+faintly, and walks slowly ahead, looking back to make sure the person follows. It leads
+them safely down the mountain to a known path, then vanishes like mist.
+
+REAL LOCATIONS:
+- Bernese Oberland peaks: Jungfrau, Eiger, and surrounding mountains
+- Valais high Alps: Monte Rosa area, Great St. Bernard region
+- Various Swiss mountain passes where travelers could get lost
+- Alpine huts (Berghutten) where rescued travelers would find shelter
+
+PERIOD COSTUMES:
+- Alpine hunters: Leather breeches (Lederhosen), thick wool jacket with horn buttons, felt hat with chamois beard tuft (Gamsbart), hobnail boots, carrying a long rifle and hunting pouch
+- Shepherds: Simple homespun wool clothes, long wool cloak for weather, crook staff, leather belt with knife
+- Mountain travelers: Wool traveling clothes, heavy cloak, walking stick, leather rucksack, hobnail boots
+
+[sage-beatus-dragon]
+LEGEND: St. Beatus and the Dragon (Beatushohlen)
+LOCATION: Beatenberg, Lake Thun, Bernese Oberland
+
+KEY FIGURES:
+- St. Beatus (Beatus of Lungern): Early Christian hermit and missionary, said to have been ordained by St. Peter in Rome
+- The Dragon: A fearsome fire-breathing dragon that terrorized the shores of Lake Thun
+- Local villagers and fishermen: The people living around Lake Thun who suffered from the dragon
+
+FULL PLOT:
+According to legend, Beatus was a nobleman from either Britain or Ireland who traveled to
+Rome, where the Apostle Peter himself baptized and ordained him. Peter sent Beatus north
+to spread Christianity among the pagan peoples of the Alps. Beatus traveled over the Alps
+and arrived at the shores of Lake Thun in the Bernese Oberland.
+
+The people living around the lake were terrorized by a terrible dragon that dwelled in a
+large cave high on the cliffs above the lake. The dragon would emerge to destroy crops,
+kill livestock, and threaten the villagers. No warrior dared to face it.
+
+Beatus, armed only with his faith, a crucifix, and his walking staff, climbed up to the
+cave entrance. When the dragon emerged, breathing fire and roaring, Beatus held up his
+cross and commanded the beast in the name of God to leave. The dragon, unable to withstand
+the power of the cross, retreated deeper into the cave and fell from the cliffs into
+Lake Thun, where it drowned (in some versions, it simply fled and was never seen again).
+
+Beatus took up residence in the now-empty cave and lived there as a hermit for many years,
+preaching to the local people and converting them to Christianity. He is said to have lived
+to a very old age, dying in the cave around 112 AD (though historians date his actual life
+to the 6th century). The cave became a pilgrimage site.
+
+REAL LOCATIONS:
+- Beatushohlen (St. Beatus Caves): A spectacular cave system near Beatenberg, open to visitors with about 1 km of illuminated walkways showing stalactites and underground waterfalls
+- Lake Thun (Thunersee): The lake at the foot of the caves
+- Beatenberg: The village above the caves, named after St. Beatus
+- Interlaken: Nearby town between Lake Thun and Lake Brienz
+- The cave entrance: A dramatic waterfall cascades from the cave mouth
+
+PERIOD COSTUMES:
+- St. Beatus: Simple monk's robe of undyed wool, rope belt, leather sandals, wooden cross on a cord, walking staff
+- Local villagers (early medieval): Rough linen and wool tunics, leather belts, wooden clogs, wool cloaks
+- Fishermen: Simple tunics with sleeves rolled up, leather aprons, bare feet or leather sandals
+
+[sage-pilatus-ghost]
+LEGEND: The Ghost of Pontius Pilate on Mount Pilatus
+LOCATION: Mount Pilatus, near Lucerne
+
+KEY FIGURES:
+- Pontius Pilate: The Roman governor who condemned Jesus Christ; his restless ghost haunts the mountain
+- Local monks and clergy: Those who attempted to exorcise the ghost
+- Citizens of Lucerne: Who feared the storms caused by Pilate's spirit
+
+FULL PLOT:
+According to medieval legend, after Pontius Pilate condemned Jesus to death, he was overcome
+with guilt and eventually took his own life. His body was cast into the Tiber River in Rome,
+but wherever it was placed, terrible storms arose. It was moved to the Rhone in France —
+same result. Finally, it was carried to a small, dark lake near the summit of a mountain
+above Lucerne.
+
+The mountain became known as Pilatus — named after Pilate himself (though the name more
+likely derives from the Latin "pileatus," meaning "cloud-capped"). The small lake near
+the summit was called the Pilatussee. Every Good Friday, according to the legend, Pilate's
+ghost rises from the lake, dressed in his Roman judge's robes, and washes his hands
+endlessly — trying to cleanse himself of the blood of Christ, as he did at the trial.
+
+If anyone disturbed the lake — threw stones into it, or even approached too closely — Pilate's
+furious ghost would summon terrible storms with thunder, lightning, hail, and flooding that
+would devastate Lucerne and the surrounding countryside. The people of Lucerne lived in
+genuine fear of this.
+
+The city council of Lucerne took the legend so seriously that they officially forbade anyone
+from climbing Mount Pilatus without permission. In the 14th century, six clergymen attempted
+to exorcise Pilate's spirit, but the legend says the storms only grew worse. The ban on
+climbing remained in effect for centuries.
+
+In 1585, the naturalist Johann Muller of Lucerne led an expedition of scholars and city
+officials to the summit. They visited the lake and threw stones into it — and no storms
+came. This finally broke the superstition, and the climbing ban was lifted. The Pilatussee
+has since mostly dried up and silted over.
+
+REAL LOCATIONS:
+- Mount Pilatus (2,128m): The mountain above Lucerne, now a major tourist destination
+- Former Pilatussee: The small summit lake (now largely silted up) where Pilate's body was said to rest
+- Lucerne: The city that feared Pilate's storms
+- Pilatus Kulm: Summit station, accessible by the steepest cogwheel railway in the world
+
+PERIOD COSTUMES:
+- Pontius Pilate's ghost: White Roman toga with purple border (toga praetexta), sandals, wreath on head, washing hands in ghostly water
+- Medieval Lucerne citizens: Wool tunics and hose, leather belts, felt caps, wooden clogs
+- Clergymen/monks: Dark robes with hoods, rope belts, wooden crosses
+- 16th-century scholars: Long dark academic gowns, wide-brimmed hats, carrying notebooks and instruments
+
+[sage-bluemlisalp]
+LEGEND: The Bluemlisalp (Blumisalp Legend)
+LOCATION: Bluemlisalp massif, Bernese Oberland, between Lake Thun and Kandersteg
+
+KEY FIGURES:
+- The Sinful Senn (Alpine dairyman): A wealthy but arrogant and wasteful herdsman
+- His lover/mistress: A vain woman who demands luxury
+- The old grandmother/beggar woman: A humble figure who is turned away and calls down divine punishment
+- The cattle and dairy cows: The wealth of the Alpine pasture
+
+FULL PLOT:
+High on the Bluemlisalp, which is today a barren massif of rock, ice, and glacier, there
+once existed the most beautiful Alpine pasture in all of Switzerland. The meadows were lush
+with flowers and the finest grass. Hundreds of fat, healthy cows grazed there, producing
+the richest milk and the best cheese in the Bernese Oberland.
+
+The Senn (Alpine dairyman) who managed this pasture grew enormously wealthy. But his wealth
+made him arrogant and sinful. He took a vain mistress who demanded ever-greater luxury. To
+please her, the Senn committed terrible acts of waste and blasphemy against nature's gifts.
+He paved paths with fresh cheese so she would not dirty her shoes. He bathed her in warm
+milk. He used butter to grease the doorways and steps.
+
+One day, an old beggar woman (in some versions, the Senn's own elderly mother or grandmother)
+came to the Alp asking for food and shelter. The Senn and his mistress laughed at her and
+turned her away. The old woman departed, and as she left, she cursed the pasture: for the
+sin of wasting God's gifts and showing no mercy to the poor, the beautiful Alp would be
+destroyed.
+
+That night, a terrible storm broke over the mountain. The temperature plummeted. Snow and ice
+fell in torrents. The lush meadows were buried under glaciers. The cows, the cheese stores,
+the huts — everything was entombed in ice. The Senn and his mistress perished. By morning,
+the once-green paradise had become the frozen wasteland of glacier and rock that the
+Bluemlisalp remains to this day.
+
+On clear nights, it is said, you can still hear the ghostly lowing of the buried cattle
+and the clanking of their cowbells beneath the glacier.
+
+REAL LOCATIONS:
+- Bluemlisalp massif (3,661m): The mountain group in the Bernese Oberland, with its glaciers
+- Bluemlisalphutte: SAC mountain hut at 2,840m on the Hohtürli pass
+- Oeschinensee: Beautiful mountain lake below the Bluemlisalp, UNESCO World Heritage area
+- Kandersteg: Village at the foot of the Bluemlisalp
+- Lake Thun: Visible from the Bluemlisalp region
+
+PERIOD COSTUMES:
+- The Senn: Traditional Bernese Oberland dairyman clothes — short leather breeches, embroidered suspenders (Hosentrager), white linen shirt, round felt hat, leather apron for cheesemaking
+- The mistress: Inappropriately fine dress for the Alps — silk or brocade, jewelry, delicate shoes (symbolizing her vanity)
+- The beggar woman: Ragged wool dress, worn shawl, bare or broken shoes, walking stick
+- Other herders: Simple homespun wool and linen, leather belts, felt hats
+
+[sage-venetianer]
+LEGEND: The Venetianer (Venetian Treasure Hunters)
+LOCATION: Various locations throughout the Swiss Alps, especially Graubunden, Valais, and Uri
+
+KEY FIGURES:
+- The Venetianer: Mysterious Italians (said to be from Venice) who knew secret paths and hidden mineral deposits in the Swiss Alps
+- Local Swiss villagers: Who encountered and sometimes helped (or hindered) the strangers
+- The Berggeist (Mountain Spirit): Supernatural guardian of Alpine treasures who sometimes protected treasures from the Venetianer
+
+FULL PLOT:
+Throughout the Swiss Alps, from Graubunden to Valais, a persistent cycle of legends tells of
+mysterious strangers called the Venetianer — said to be Italians, usually from Venice, who
+possessed ancient knowledge of secret paths through the mountains and, most importantly,
+knew where gold, silver, crystals, and precious minerals were hidden deep within the Alps.
+
+The Venetianer would appear in remote Alpine villages, often at night or in misty weather.
+They carried strange instruments and old parchment maps covered in symbols that no Swiss
+farmer could read. They spoke softly to each other in Italian and asked unusual questions
+about local geography — which streams ran reddish, where certain rocks glittered, which
+caves went deepest.
+
+Sometimes a villager would be hired as a guide. The Venetianer would blindfold the guide for
+parts of the journey, so the location of their mining sites would remain secret. In some
+stories, a clever guide would drop seeds or mark trees to find the way back later — only to
+discover that the marks had been magically erased.
+
+The Venetianer mined by night, melting ore in hidden furnaces whose glow could sometimes be
+seen from the valleys. They extracted gold and precious stones, loaded their mules, and
+departed before dawn. By morning, only the remains of their fires and strange marks on rocks
+showed they had been there at all.
+
+In some versions, the Mountain Spirit (Berggeist) protects the treasures. When the Venetianer
+grew too greedy, the spirit would cause rockslides to seal cave entrances, trigger avalanches,
+or lead them astray with phantom lights. The message: the mountains give their riches only
+to those who respect them.
+
+Historians believe these legends may have a factual basis — Italian mining experts did travel
+to the Alps during the medieval and Renaissance periods, and there were real mining operations
+for silver, iron, and other minerals throughout the Swiss Alps.
+
+REAL LOCATIONS:
+- Val Medel and Surselva (GR): Where Venetianer legends are especially common
+- Lötschental (VS): The isolated valley with many Venetianer stories
+- Schächental (UR): Near the Klausenpass, another center of the legends
+- Various abandoned mine shafts throughout the Alps, some dating to medieval times
+- Crystal caves in the Gotthard region
+
+PERIOD COSTUMES:
+- Venetianer: Dark traveling cloaks, broad-brimmed hats pulled low, leather boots, carrying brass instruments and rolled parchments, moneybags on belt
+- Swiss Alpine villagers: Homespun wool and linen, leather vests, felt hats, heavy boots
+- Mule drivers: Practical traveling clothes, heavy cloaks, leading laden pack mules with rope bridles
+
+[sage-weisse-frau-wimmis]
+LEGEND: The White Lady of Wimmis (Die weisse Frau von Wimmis)
+LOCATION: Wimmis Castle, Simmental, Bernese Oberland
+
+KEY FIGURES:
+- The White Lady (Die weisse Frau): Ghost of a noblewoman, said to be a former chatelaine of the castle
+- The Lord of Wimmis: The cruel husband who caused her suffering
+- Castle servants and villagers: Who witness the ghost's appearances
+
+FULL PLOT:
+Wimmis Castle stands on a rocky spur at the entrance to the Simmental valley, guarding the
+passage to the Bernese Oberland. According to legend, the castle was once home to a beautiful
+and kind noblewoman who was married to a cruel lord.
+
+The lord was jealous, violent, and suspicious. He accused his wife of infidelity (in most
+versions, she was entirely innocent) and punished her terribly. In some versions he locked
+her in a tower room; in others, he had her walled up alive in the castle dungeon or thrown
+from the battlements. She died innocent, her last words being a plea for justice.
+
+Since her death, the White Lady has haunted Wimmis Castle. She appears as a tall, slender
+figure dressed in flowing white robes, sometimes carrying a ring of keys. She is seen
+walking the castle corridors at night, standing on the battlements, or drifting through
+the castle courtyard.
+
+Unlike many ghosts, the White Lady of Wimmis is not malevolent. She is a protective spirit.
+She appears to warn of coming danger — before storms, fires, or misfortune. Seeing her is
+an omen: not of death, but of a warning to take care. She is said to especially watch over
+children and the innocent.
+
+Some versions say she can only be released from her haunting when someone addresses her with
+kindness and asks what troubles her. She would then reveal where she buried a treasure or a
+document proving her innocence, and finally find peace.
+
+REAL LOCATIONS:
+- Wimmis Castle (Schloss Wimmis): A real castle dating to the 10th century, perched on rock above the village
+- Wimmis village: At the entrance to the Simmental, Canton Bern
+- Simmental valley: The valley stretching toward Lenk and the mountains
+- Niesen: The pyramid-shaped mountain visible from Wimmis
+- Lake Thun: Visible from the castle
+
+PERIOD COSTUMES:
+- The White Lady: Flowing white gown (medieval style), loose hair, sometimes a white veil, carrying a ring of iron keys
+- The Lord of Wimmis: Dark noble attire — fur-lined cloak, leather belt with sword, chain mail under tunic
+- Castle servants: Simple wool tunics, linen aprons, leather shoes
+- Medieval villagers: Homespun clothing, wool cloaks, felt caps
+
+[sage-lindwurm-bern]
+LEGEND: The Lindwurm of Bern (Dragon of Bern)
+LOCATION: Bern, specifically the Enge Peninsula area
+
+KEY FIGURES:
+- The Lindwurm: A large serpent-like dragon (Lindwurm) living in the forests near Bern
+- A brave knight or nobleman: Who volunteers to slay the beast
+- The citizens of Bern: Who live in fear of the creature
+
+FULL PLOT:
+In the early days of the city of Bern, a terrible Lindwurm (a serpent-like dragon with two
+front legs but no wings, common in Germanic legend) terrorized the surrounding forests. The
+creature lived in the wooded areas near the Enge peninsula, where the Aare River curves
+around the old city. It devoured livestock, destroyed crops, and threatened anyone who
+ventured into the forest.
+
+The people of Bern were desperate. The Lindwurm was too large and fierce for ordinary men
+to confront. Finally, a brave knight (in some versions, a young nobleman or a convict
+offered his freedom in exchange) volunteered to face the creature. He armed himself with
+a strong sword and wore thick leather armor.
+
+The knight tracked the Lindwurm to its lair in the forest. The battle was fierce — the
+creature's scales deflected his sword blows and its tail swept him off his feet. But the
+knight found a vulnerable spot beneath the creature's jaw and drove his sword home,
+slaying the beast.
+
+The knight was celebrated as a hero, and the people of Bern could once again use the
+forests safely. Some versions connect this legend to the founding of Bern — that the city
+could only grow and prosper once the Lindwurm was defeated.
+
+REAL LOCATIONS:
+- Bern old town (Altstadt): UNESCO World Heritage Site, built on the Aare River peninsula
+- Enge Peninsula: Wooded area near old Bern
+- Aare River: The river that loops around Bern's old town
+- Bear Park (Barengraben): While related to the bear legend, near the area of the Lindwurm story
+- Bern Cathedral (Munster): Medieval cathedral with carved creatures on its portal
+
+PERIOD COSTUMES:
+- The knight: Chain mail hauberk over padded gambeson, conical helm with nasal guard, leather belt with sword, kite shield with heraldic device
+- Citizens of medieval Bern: Wool tunics, linen shirts, leather belts, fur cloaks in winter, simple leather shoes
+- Women of Bern: Long wool dresses, linen wimples or head coverings, leather belt with pouch and knife
+
+[sage-pfarrer-von-barglen]
+LEGEND: The Pfarrer von Barglen (Pastor of Burglen, from the Tell Cycle)
+LOCATION: Burglen, Canton Uri
+
+KEY FIGURES:
+- The Pastor (Pfarrer) of Burglen: A brave clergyman who shelters refugees
+- Habsburg soldiers: Austrian troops searching for rebels
+- Villagers of Burglen: The community that resists oppression
+
+FULL PLOT:
+This legend belongs to the broader cycle of Tell stories and the founding of the Swiss
+Confederation. Burglen is the village traditionally identified as Wilhelm Tell's birthplace.
+During the period of Habsburg oppression in the early 14th century, the pastor of Burglen's
+church played a crucial role in protecting his flock.
+
+When Habsburg soldiers came to Burglen searching for men who had participated in the Rutli
+oath or the uprising against the Austrian bailiffs, the pastor hid the rebels in the church
+and refused to surrender them. He stood at the church door, invoking the right of sanctuary,
+and told the soldiers that the house of God would not be violated.
+
+The soldiers threatened him with violence, but the pastor held firm. His courage inspired
+the villagers to stand together. The soldiers, unwilling to commit sacrilege by storming a
+church, eventually withdrew. The pastor's act of defiance became part of the fabric of Uri's
+resistance legend.
+
+The story illustrates how the Swiss uprising was not just the work of warriors and fighters
+but of ordinary people — clergy, farmers, women — who all contributed to the struggle for
+freedom.
+
+REAL LOCATIONS:
+- Burglen: Village in Canton Uri, traditional birthplace of Wilhelm Tell
+- Tell Museum Burglen: Museum dedicated to the Tell legend
+- Parish church of Burglen: The historic church at the center of the legend
+- Altdorf: Nearby town where Tell's apple shot took place
+
+PERIOD COSTUMES:
+- The Pastor: Black clerical robes, white collar, simple cross on chain, tonsured head
+- Habsburg soldiers: Chainmail or leather armor, Austrian surcoats, halberds and swords, kettle helmets
+- Villagers of Uri: Simple Alpine clothing — wool tunics, leather breeches, felt hats, leather boots
+
+# =============================================================================
+# GRIFFIS COLLECTION FAIRY TALES (shorter guides, ~10 lines)
+# =============================================================================
+
+[sage-frost-giants]
+LEGEND: Frost Giants and Sunbeam Fairies (Griffis, 1920)
+LOCATION: Swiss mountains and glaciers
+
+FULL PLOT:
+Long ago, all of Switzerland was a frozen wasteland covered in ice and ruled by cruel Frost
+Giants who kept the land in perpetual winter. Nothing grew — no flowers, no grass, no trees.
+The Fairy Queen saw the suffering and asked the Sun for help. The Sun sent an army of tiny
+Sunbeam Fairies armed with golden spears of light. They flew down to the frozen mountains and
+battled the Frost Giants. Wherever a Sunbeam Fairy struck her spear, the ice melted. Streams
+began to flow, grass sprouted, and flowers bloomed. The Frost Giants retreated higher and
+higher up the mountains until only the glaciers on the highest peaks remained — their last
+strongholds. And that is why Switzerland has green valleys below and ice on the peaks above.
+
+PERIOD COSTUMES:
+- Frost Giants: Massive figures of blue-white ice, icicle beards, crystalline armor, carrying frozen clubs
+- Sunbeam Fairies: Tiny golden beings in gossamer gowns of light, wings like dragonflies, carrying tiny golden spears
+- The Fairy Queen: Larger fairy in a gown of woven sunlight, crown of golden flowers
+
+[sage-cuckoo-clock-fairy]
+LEGEND: The Fairy in the Cuckoo Clock (Griffis, 1920)
+LOCATION: A Swiss mountain village woodworker's workshop
+
+FULL PLOT:
+A skilled Swiss woodcarver was working late in his workshop, carving a beautiful wooden clock.
+A tiny fairy, curious about human craftsmanship, flew in through the window and watched him
+work. She was delighted by the intricate gears and wheels. As a gift, she enchanted a small
+wooden bird he had carved, giving it the ability to pop out of a little door and sing "cuckoo"
+at every hour. The woodcarver awoke the next morning to find the bird calling out the time.
+He was amazed and began making more cuckoo clocks. Word spread through the valleys, and soon
+every village wanted one. The fairy, pleased her magic brought people joy, hid inside a
+different clock each night to make sure the enchantment continued.
+
+PERIOD COSTUMES:
+- The woodcarver: Leather apron over wool shirt, wood shavings in hair, spectacles, felt slippers
+- The fairy: Tiny dress made of flower petals, delicate wings, carrying a wand of pine needle
+
+[sage-edelweiss-fairy]
+LEGEND: The Fairy of the Edelweiss (Griffis, 1920)
+LOCATION: High Alpine peaks and rocky mountain ledges
+
+FULL PLOT:
+The Fairy Queen needed a guardian to watch over the highest mountain peaks where the cruel
+Frost King still lurked. She asked for a volunteer among her fairies. The bravest and smallest
+fairy stepped forward. The Queen transformed her into the edelweiss — a small white flower with
+fuzzy, star-shaped petals that could survive the cold, wind, and snow of the highest altitudes.
+The little edelweiss grew in rocky crevices where no other flower could survive, standing guard
+against the Frost King's return. Mountain climbers who found the edelweiss knew they were in
+the presence of courage. Young men began picking edelweiss as gifts for their sweethearts, to
+prove their bravery in reaching such dangerous heights. But the fairy's spirit lives in every
+edelweiss, still standing guard.
+
+PERIOD COSTUMES:
+- The Fairy Queen: Silver-white gown, crown of ice crystals and starlight
+- The brave fairy/edelweiss: Before transformation — tiny white dress; after — the fuzzy white star-shaped flower
+- Mountain climbers: Rough wool clothes, hobnail boots, ropes, ice axes, felt hats
+
+[sage-alpine-horn]
+LEGEND: The Wonderful Alpine Horn (Griffis, 1920)
+LOCATION: Alpine pastures and mountain valleys
+
+FULL PLOT:
+A young shepherd boy named Perrod tended his cows on a high Alpine pasture. One evening,
+mysterious mountain visitors — some say dwarves or mountain spirits — appeared and gave him
+a magnificent Alpine horn (Alphorn) carved from a single pine tree. When Perrod blew the horn,
+the sound echoed through every valley, bouncing from peak to peak. The cows came running home
+obediently. But more than that, the music brought joy and peace to everyone who heard it.
+Quarreling villagers would stop arguing, sad children would smile, and even the fierce mountain
+storms would calm. Perrod played every evening, and the tradition spread from village to
+village until the Alphorn became the instrument of all Switzerland. The horn's magic was simple:
+its deep, resonant sound reminded people of the beauty of their mountain home.
+
+PERIOD COSTUMES:
+- Perrod: Simple shepherd's clothes — linen shirt, wool trousers, bare feet or leather shoes, straw hat
+- Mountain visitors/dwarves: Small figures in earth-toned clothes, leather caps, beards, carrying tools
+- Villagers: Traditional Alpine clothing — embroidered vests, linen shirts, leather breeches, felt hats
+
+[sage-dwarf-chocolate]
+LEGEND: The Dwarf's Confectionery (Griffis, 1920)
+LOCATION: Swiss mountain pastures and a hidden underground cavern
+
+FULL PLOT:
+A dairy farmer noticed that every morning, some of his best milk had disappeared from his
+pails. He stayed up one night to watch and saw a tiny dwarf carrying a miniature bucket,
+scooping milk and disappearing into a crack in the rock. The farmer followed and discovered
+an enormous underground cavern where the Dwarf King and his people ran a magical confectionery.
+They mixed the stolen milk with cocoa beans, honey, and secret ingredients to make the most
+extraordinary chocolate and candy. The farmer tried to steal the recipe, hiding behind a
+stalactite and memorizing the steps. But the Dwarf King caught him and scolded him for his
+dishonesty. Instead of punishing him, the King offered a deal: if the farmer would willingly
+share his milk, the dwarves would teach him the art of chocolate-making. The farmer agreed,
+and that is how Swiss chocolate was born.
+
+PERIOD COSTUMES:
+- The farmer: Traditional dairy farmer clothes — white linen shirt, leather vest, knee breeches, wooden clogs, milking stool
+- The Dwarf King: Rich earth-toned clothes, tiny golden crown, leather apron, long white beard
+- Dwarf workers: Small leather aprons, rolled-up sleeves, funny pointed caps, chocolate-stained hands
+
+[sage-palace-under-waves]
+LEGEND: The Palace Under the Waves (Griffis, 1920)
+LOCATION: A Swiss lake shore, with a crystal palace underwater
+
+FULL PLOT:
+A young girl (or princess in some versions) sat on the shore of a Swiss lake, weeping over
+a lost treasure (a golden ring that had fallen into the water). The King of the Water Spirits
+heard her tears and rose from the lake, inviting her to visit his underwater realm. She
+descended through the shimmering water and found a crystal palace with halls of pearl and
+coral, gardens of swaying water plants lit by glowing fish, and music played by water sprites.
+The King offered her anything she desired if she would stay. She was tempted by the beauty but
+realized she missed the sun, the wind, the mountain meadows, and her family. She chose to
+return to the surface. The King, respecting her choice, gave her back her golden ring and a
+gift of wisdom: "Every world has its own beauty, but home is where you truly belong." She
+surfaced to find that only a moment had passed, though she had spent what felt like days below.
+
+PERIOD COSTUMES:
+- The girl/princess: Simple dress (or fine gown), barefoot by the lake, hair loose
+- King of Water Spirits: Shimmering robes of blue-green, crown of shells and pearls, translucent skin
+- Water sprites: Flowing garments of water itself, decorated with tiny fish and bubbles
+
+[sage-friendly-dragons]
+LEGEND: Two Good-Natured Dragons (Griffis, 1920)
+LOCATION: A Swiss mountain cave during winter
+
+FULL PLOT:
+A man was crossing a mountain pass when a terrible snowstorm struck. Blinded by wind and snow,
+he stumbled into a cave to take shelter. Deep inside, he found two enormous dragons sleeping
+by an underground spring. He was terrified, but the dragons awoke and, instead of attacking,
+gently warmed him with their breath. Through the long winter months (he was snowed in), the
+dragons shared their cave. They brought him berries and roots to eat. He slept between them
+for warmth. When spring came and the snow melted, the dragons nudged him gently toward the
+cave entrance. He emerged healthy and unharmed. Back in his village, no one believed his
+story — but every winter afterward, he left food at the cave entrance as thanks. And every
+spring, the offerings were gone.
+
+PERIOD COSTUMES:
+- The traveler: Heavy wool cloak, leather boots, fur hat, carrying a walking stick and rucksack
+- The dragons: Friendly, large, scaly creatures with warm golden eyes (not menacing — more like large, gentle lizards with wings)
+
+[sage-gargantua-matterhorn]
+LEGEND: Gargantua and the Matterhorn
+LOCATION: Matterhorn and the Valais Alps, Zermatt
+
+KEY FIGURES:
+- Gargantua: A giant of enormous proportions who shaped the landscape
+- Swiss villagers: Who observe the giant's passing and its effects
+
+FULL PLOT:
+In the oldest times, a colossal giant named Gargantua wandered across the land that would
+become Switzerland. He was so vast that his head brushed the clouds and each stride covered
+an entire valley. As he walked, his footsteps pressed deep hollows into the earth. These
+footprints filled with rain and snowmelt and became the Swiss lakes — Lake Geneva, Lake
+Zurich, Lake Lucerne, and many more.
+
+When Gargantua grew tired from his wandering, he looked for a place to rest. He sat down in
+the Valais, and the weight of his body pressed down the valley floor. He leaned back, and
+as he did, his massive body shaped the ridges and peaks around him. When he finally lay down
+to sleep his last sleep, his form hardened into rock and ice and became the Matterhorn — the
+iconic pyramid-shaped peak that towers over Zermatt at 4,478 meters.
+
+Some say the Matterhorn's distinctive shape — steep on all sides, like a horn pointing at the
+sky — is the profile of Gargantua's nose and brow as he lies on his back. The glaciers are
+his blanket of snow. And on stormy nights, the rumbling of thunder around the Matterhorn is
+Gargantua snoring in his eternal sleep.
+
+REAL LOCATIONS:
+- Matterhorn (4,478m): The iconic pyramid-shaped peak, one of the most famous mountains in the world
+- Zermatt: Car-free village at the foot of the Matterhorn
+- Gorner Glacier: One of the largest glaciers in the Alps, near the Matterhorn
+- Swiss lakes: Lake Geneva, Lake Zurich, Lake Lucerne — said to be Gargantua's footprints
+- Valais valley: The valley shaped by the giant's resting
+
+PERIOD COSTUMES:
+- Gargantua: A giant so large clothes are barely visible — rough animal hides, a tree trunk as a walking stick
+- Swiss villagers (medieval): Wool tunics, leather belts, felt caps, simple leather shoes, rough wool cloaks
+
+# =============================================================================
+# ADDITIONAL SWISS LEGENDS
+# =============================================================================
+
+[sage-bettler-sempachersee]
+LEGEND: The Beggar at Lake Sempach (Die Sage vom Bettler am Sempachersee)
+LOCATION: Lake Sempach, Canton Lucerne
+
+KEY FIGURES:
+- The Beggar: A mysterious old man, possibly a saint or divine messenger in disguise
+- A kind fisherman: Who shows the beggar hospitality
+- Wealthy villagers: Who refuse the beggar shelter
+
+FULL PLOT:
+A ragged old beggar wandered along the shores of Lake Sempach on a cold winter evening, seeking
+food and shelter. He knocked on the doors of the wealthy houses in the village, but every door
+was slammed in his face. The rich farmers, warm inside with their full tables, refused to share
+even a crust of bread.
+
+Finally, the beggar came to the humble cottage of a poor fisherman at the edge of the lake.
+The fisherman, though he had barely enough for his own family, welcomed the old man in, gave
+him a seat by the fire, and shared his meager supper of bread and fish. The fisherman's wife
+gave the beggar a blanket for the night.
+
+In the morning, the beggar revealed himself as more than he appeared. He warned the fisherman:
+"Take your family and move to higher ground before the next full moon. Do not look back."
+The fisherman trusted the old man and moved his family to the hills above the lake.
+
+On the night of the full moon, the lake rose in a sudden, terrible flood. The waters swept
+through the village, destroying the houses of those who had turned the beggar away. The
+fisherman's cottage was spared, perched safely on its hill. When the waters receded, the
+village was rebuilt — but the people never forgot the lesson about hospitality and kindness
+to strangers.
+
+REAL LOCATIONS:
+- Lake Sempach (Sempachersee): A lake in Canton Lucerne, also site of the famous 1386 battle
+- Sempach town: On the northern shore of the lake
+- Surrounding villages and farmland in the Lucerne region
+
+PERIOD COSTUMES:
+- The beggar: Tattered wool cloak, worn leather shoes with holes, walking staff, long grey beard
+- The fisherman: Simple linen shirt, wool vest, leather breeches, bare feet or wooden clogs, mending nets
+- Wealthy villagers: Finer wool tunics, fur-lined cloaks, leather boots, silver buckles on belts

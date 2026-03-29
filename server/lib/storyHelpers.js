@@ -836,11 +836,12 @@ const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educat
 const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
 const ADVENTURE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'adventure-guides.txt'));
 const HISTORICAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'historical-guides.txt'));
+const SWISS_SAGEN_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'swiss-sagen-guides.txt'));
 
 /**
  * Get teaching guide for a specific topic
- * @param {string} category - 'educational', 'life-challenge', 'adventure', or 'historical'
- * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate', 'moon-landing')
+ * @param {string} category - 'educational', 'life-challenge', 'adventure', 'historical', or 'swiss-sagen'
+ * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate', 'moon-landing', 'sage-wilhelm-tell')
  * @returns {string|null} The teaching guide content or null if not found
  */
 function getTeachingGuide(category, topicId) {
@@ -857,6 +858,8 @@ function getTeachingGuide(category, topicId) {
     return ADVENTURE_GUIDES.get(normalizedId) || null;
   } else if (category === 'historical') {
     return HISTORICAL_GUIDES.get(normalizedId) || null;
+  } else if (category === 'swiss-sagen') {
+    return SWISS_SAGEN_GUIDES.get(normalizedId) || null;
   }
   return null;
 }

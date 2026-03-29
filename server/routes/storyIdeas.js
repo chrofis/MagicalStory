@@ -127,7 +127,7 @@ ${historicalGuide}`;
         const sageTitle = typeof sage.title === 'object' ? sage.title.en : sage.title;
         const sageDesc = typeof sage.description === 'object' ? sage.description.en : sage.description;
         const sageContext = sage.context && typeof sage.context === 'object' ? sage.context.en : (sage.context || '');
-        categoryInstructions = `IMPORTANT: This is a SWISS FAIRY TALE / LEGEND (Sage).
+        categoryInstructions = `IMPORTANT: This is a SWISS LEGEND (Sage).
 Story: "${sageTitle}" — ${sageDesc}
 
 ${sageContext}
@@ -136,11 +136,25 @@ Themes: ${(sage.themes || []).join(', ')}
 
 INSTRUCTIONS:
 - Retell this classic Swiss legend with the child characters as participants in the story
-- Keep the core plot and moral but make it age-appropriate and magical
+- Keep the core plot and moral but make it age-appropriate
 - Use vivid Swiss Alpine imagery and real Swiss cultural elements
 - The child becomes part of the legend — they don't just observe it`;
+
+        // Load detailed guide if available (from swiss-sagen-guides.txt or matching historical guide)
+        const { getTeachingGuide: getSageGuide } = require('../lib/storyHelpers');
+        const sageGuide = getSageGuide('swiss-sagen', storyTopic);
+        if (sageGuide) {
+          categoryInstructions += `\n\n**DETAILED LEGEND GUIDE:**\n${sageGuide}`;
+        } else {
+          // Try matching historical event guide (sage-wilhelm-tell → wilhelm-tell)
+          const historicalId = storyTopic.replace('sage-', '');
+          const historicalGuide = getSageGuide('historical', historicalId);
+          if (historicalGuide) {
+            categoryInstructions += `\n\n**DETAILED HISTORICAL CONTEXT:**\n${historicalGuide}`;
+          }
+        }
       } else {
-        categoryInstructions = `This is a SWISS FAIRY TALE. Create an engaging retelling of a Swiss legend.`;
+        categoryInstructions = `This is a SWISS LEGEND. Create an engaging retelling of a Swiss legend.`;
       }
     } else {
       // City-based Swiss story
@@ -201,7 +215,9 @@ ${adventureGuideContent}`
   const singlePromptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-idea-single.txt'), 'utf-8');
 
   // Load category-specific story requirements (separate files for story 1 and story 2)
-  const requirementsBase = effectiveCategory === 'historical'
+  // Sagen (Swiss legends) use the historical template — children become the characters, not generic adventure
+  const isSage = effectiveCategory === 'swiss-stories' && storyTopic?.startsWith('sage-');
+  const requirementsBase = (effectiveCategory === 'historical' || isSage)
     ? 'story-idea-requirements-historical'
     : 'story-idea-requirements-adventure';
   const storyRequirements1 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-1.txt`), 'utf-8');
