@@ -3673,7 +3673,8 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const characterDescriptions = {};
     for (const char of (storyData.characters || [])) {
       characterDescriptions[char.name] = {
-        richDescription: buildCharacterPhysicalDescription(char)
+        richDescription: buildCharacterPhysicalDescription(char),
+        clothingDescriptions: char.avatars?.clothing || {}
       };
     }
 

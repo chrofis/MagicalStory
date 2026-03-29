@@ -1893,7 +1893,21 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
     // Use clothing from characterClothing map, or from parsed description (covers), or empty
-    const clothing = getClothing(name) || desc.clothing || '';
+    let clothingCategory = getClothing(name) || desc.clothing || '';
+    // Resolve category names (standard/winter/summer/costumed:X) to actual descriptions
+    let clothing = clothingCategory;
+    if (desc.clothingDescriptions && clothingCategory) {
+      const category = clothingCategory.startsWith('costumed:') ? clothingCategory : clothingCategory;
+      if (desc.clothingDescriptions[category]) {
+        clothing = desc.clothingDescriptions[category];
+      } else if (clothingCategory === 'standard' && desc.clothingDescriptions.standard) {
+        clothing = desc.clothingDescriptions.standard;
+      }
+    }
+    // Don't show bare category names like "standard" — only show actual descriptions
+    if (clothing === 'standard' || clothing === 'winter' || clothing === 'summer') {
+      clothing = '';
+    }
     let description;
     if (desc.richDescription) {
       // Full physical description from character objects
@@ -3789,7 +3803,8 @@ async function evaluateImageBatch(images, options = {}) {
         characterDescriptions = {};
         for (const char of img.sceneCharacters) {
           characterDescriptions[char.name] = {
-            richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char)
+            richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
+            clothingDescriptions: char.avatars?.clothing || {}
           };
         }
       } else {

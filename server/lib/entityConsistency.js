@@ -671,7 +671,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
         const expectedChars = pageCharNames.map(name => {
           const fullChar = storyCharacters.find(c => c.name === name);
-          const clothing = charClothing[name] || fullChar?.avatars?.clothing?.standard || '';
+          const clothingCategory = charClothing[name] || 'standard';
+          // Resolve category to actual clothing description
+          let clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
+          if (!clothing && clothingCategory.startsWith('costumed:')) {
+            clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
+          }
           const physDesc = fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character';
           const position = sceneMetadata?.characterPositions?.[name] || '';
           return {
