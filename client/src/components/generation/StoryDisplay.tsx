@@ -1359,66 +1359,68 @@ export function StoryDisplay({
             </div>
           </div>
         )}
-        {/* Dev mode: show repair debug images as collapsible section */}
-        {developerMode && charRepairResults[pageNumber] && (() => {
-          const r = charRepairResults[pageNumber];
-          const c = r.comparison;
-          if (!c) return null;
-          return (
-            <details className="mt-2 bg-purple-50 border border-purple-300 rounded-lg p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900 flex items-center justify-between">
-                <span>{language === 'de' ? 'Reparatur-Ergebnis' : 'Repair Result'}</span>
-                <span className="flex items-center gap-2">
-                  {r.method && <span className="text-xs font-normal text-purple-600">{r.method}</span>}
-                  {r.beforeScore != null && r.afterScore != null && (
-                    <span className={`text-sm font-bold ${r.afterScore >= r.beforeScore ? 'text-green-600' : 'text-red-600'}`}>
-                      {r.beforeScore}% → {r.afterScore}%
-                    </span>
-                  )}
-                </span>
-              </summary>
-              <div className="mt-2 flex gap-2 flex-wrap">
-                {c.croppedAvatar && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.croppedAvatar} alt="Avatar sent" className="w-16 h-16 object-contain rounded border border-gray-200 bg-white cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.croppedAvatar!, title: 'Avatar sent to Grok' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">Avatar</span>
-                  </div>
-                )}
-                {c.blackoutImage && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.blackoutImage} alt="Whiteout" className="w-16 h-16 object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blackoutImage!, title: 'Whiteout' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">Whiteout</span>
-                  </div>
-                )}
-                {c.grokRawResult && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.grokRawResult} alt="Grok raw" className="w-16 h-16 object-contain rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.grokRawResult!, title: 'Grok raw result' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">Grok raw</span>
-                  </div>
-                )}
-                {c.blendMask && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.blendMask} alt="Blend mask" className="w-16 h-16 object-contain rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blendMask!, title: 'Blend mask' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">Mask</span>
-                  </div>
-                )}
-                {c.before && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.before} alt="Before" className="w-16 h-16 object-contain rounded border border-red-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.before!, title: 'Before repair' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">Before</span>
-                  </div>
-                )}
-                {c.after && (
-                  <div className="flex flex-col items-center">
-                    <img src={c.after!} alt="After" className="w-16 h-16 object-contain rounded border border-green-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.after!, title: 'After repair' })} />
-                    <span className="text-[10px] text-gray-500 mt-0.5">After</span>
-                  </div>
-                )}
-              </div>
-            </details>
-          );
-        })()}
       </div>
+    );
+  };
+
+  // Character repair result — full-width panel for dev mode, placed outside button row
+  const renderCharRepairResult = (pageNumber: number) => {
+    if (!developerMode || !charRepairResults[pageNumber]) return null;
+    const r = charRepairResults[pageNumber];
+    const c = r.comparison;
+    if (!c) return null;
+    return (
+      <details open className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900 flex items-center justify-between">
+          <span>{language === 'de' ? 'Reparatur-Ergebnis' : 'Repair Result'}</span>
+          <span className="flex items-center gap-2">
+            {r.method && <span className="text-xs font-normal text-purple-600">{r.method}</span>}
+            {r.beforeScore != null && r.afterScore != null && (
+              <span className={`text-sm font-bold ${r.afterScore >= r.beforeScore ? 'text-green-600' : 'text-red-600'}`}>
+                {r.beforeScore}% → {r.afterScore}%
+              </span>
+            )}
+          </span>
+        </summary>
+        <div className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {c.croppedAvatar && (
+            <div className="flex flex-col items-center">
+              <img src={c.croppedAvatar} alt="Avatar sent" className="w-full aspect-square object-contain rounded border border-gray-200 bg-white cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.croppedAvatar!, title: 'Avatar sent to Grok' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Avatar</span>
+            </div>
+          )}
+          {c.blackoutImage && (
+            <div className="flex flex-col items-center">
+              <img src={c.blackoutImage} alt="Whiteout" className="w-full aspect-square object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blackoutImage!, title: 'Whiteout' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Whiteout</span>
+            </div>
+          )}
+          {c.grokRawResult && (
+            <div className="flex flex-col items-center">
+              <img src={c.grokRawResult} alt="Grok raw" className="w-full aspect-square object-contain rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.grokRawResult!, title: 'Grok raw result' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Grok raw</span>
+            </div>
+          )}
+          {c.blendMask && (
+            <div className="flex flex-col items-center">
+              <img src={c.blendMask} alt="Blend mask" className="w-full aspect-square object-contain rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blendMask!, title: 'Blend mask' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Mask</span>
+            </div>
+          )}
+          {c.before && (
+            <div className="flex flex-col items-center">
+              <img src={c.before} alt="Before" className="w-full aspect-square object-contain rounded border-2 border-red-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.before!, title: 'Before repair' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Before</span>
+            </div>
+          )}
+          {c.after && (
+            <div className="flex flex-col items-center">
+              <img src={c.after!} alt="After" className="w-full aspect-square object-contain rounded border-2 border-green-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.after!, title: 'After repair' })} />
+              <span className="text-[10px] text-gray-500 mt-1">After</span>
+            </div>
+          )}
+        </div>
+      </details>
     );
   };
 
@@ -3824,6 +3826,7 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only (uses same iterate endpoint as pages) */}
                 {onIteratePage && renderIteratePanel(-1)}
+                {renderCharRepairResult(-1)}
                 {/* Scene Description */}
                 {frontCoverObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
@@ -4042,6 +4045,7 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-2)}
+                {renderCharRepairResult(-2)}
                 {/* Scene Description */}
                 {initialPageObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
@@ -4340,6 +4344,8 @@ export function StoryDisplay({
                           <div className="mt-3 space-y-2">
                             {/* Next Iteration button - dev only */}
                             {onIteratePage && renderIteratePanel(pageNumber)}
+                            {/* Character repair result - full width */}
+                            {renderCharRepairResult(pageNumber)}
                             {/* Test Models button */}
                             <button
                               onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
@@ -4843,6 +4849,8 @@ export function StoryDisplay({
                           <div className="mt-3 space-y-2">
                             {/* Next Iteration button - dev only */}
                             {onIteratePage && renderIteratePanel(pageNumber)}
+                            {/* Character repair result - full width */}
+                            {renderCharRepairResult(pageNumber)}
                             {/* Test Models button */}
                             <button
                               onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
@@ -5270,6 +5278,7 @@ export function StoryDisplay({
               <div className="mt-3 space-y-2">
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-3)}
+                {renderCharRepairResult(-3)}
                 {/* Scene Description */}
                 {backCoverObj.description && (
                   <details className="bg-green-50 border border-green-300 rounded-lg p-3">
