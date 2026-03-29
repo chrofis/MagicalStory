@@ -4773,16 +4773,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const versionId = isCover ? coverType : update.pageNumber;
           await setActiveVersion(id, versionId, newDbVersionIndex);
 
-          // Build comparison with debug images (blackout, grok raw, blend mask, avatar)
-          const comparison = repairResult.comparison
-            ? {
-                ...repairResult.comparison,
-                blackoutImage: repairResult.blackoutImage || null,
-                grokRawResult: repairResult.grokRawResult || null,
-                blendMask: repairResult.blendMask || null,
-                croppedAvatar: repairResult.croppedAvatar || null,
-              }
-            : null;
+          // Debug images are already inside repairResult.comparison (set during Grok repair)
+          const comparison = repairResult.comparison || null;
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
             imageData: update.imageData,
