@@ -3792,6 +3792,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
+                {renderCharRepairButton(-1)}
                 {getCoverVersions('frontCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
@@ -4009,6 +4010,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
+                {renderCharRepairButton(-2)}
                 {getCoverVersions('initialPage').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
@@ -5236,6 +5238,7 @@ export function StoryDisplay({
                     {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
                   </button>
                 )}
+                {renderCharRepairButton(-3)}
                 {getCoverVersions('backCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}

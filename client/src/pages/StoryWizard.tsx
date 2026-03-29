@@ -4878,25 +4878,39 @@ export default function StoryWizard() {
                   });
                   const repaired = result.results?.[0]?.pagesRepaired?.[0];
                   if (repaired?.imageData) {
-                    // Update scene image + append to version history
-                    setSceneImages(prev => prev.map(img => {
-                      if (img.pageNumber !== pageNumber) return img;
-                      const existingVersions = img.imageVersions && img.imageVersions.length > 0
-                        ? img.imageVersions
-                        : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
-                      const updatedVersions = [
-                        ...existingVersions,
-                        {
-                          imageData: repaired.imageData,
-                          versionIndex: repaired.versionIndex,
-                          createdAt: new Date().toISOString(),
-                          isActive: true,
-                          type: 'entity-repair' as const,
-                        }
-                      ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
-                      return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions };
-                    }));
-                    // Also trigger a full image refresh so version picker gets DB-sourced versions with imageData
+                    const COVER_PAGE_MAP: Record<number, 'frontCover' | 'initialPage' | 'backCover'> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                    const coverKey = COVER_PAGE_MAP[pageNumber];
+                    if (coverKey) {
+                      // Cover repair — update coverImages
+                      setCoverImages(prev => {
+                        if (!prev) return prev;
+                        const existing = prev[coverKey] as any;
+                        const existingVersions = existing?.imageVersions?.length > 0
+                          ? existing.imageVersions
+                          : existing?.imageData
+                            ? [{ imageData: existing.imageData, createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }]
+                            : [];
+                        const updatedVersions = [
+                          ...existingVersions,
+                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), isActive: true, type: 'entity-repair' as const }
+                        ].map((v: any, i: number, arr: any[]) => ({ ...v, isActive: i === arr.length - 1 }));
+                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions } };
+                      });
+                    } else {
+                      // Scene repair — update sceneImages
+                      setSceneImages(prev => prev.map(img => {
+                        if (img.pageNumber !== pageNumber) return img;
+                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                          ? img.imageVersions
+                          : [{ imageData: img.imageData || '', createdAt: new Date().toISOString(), isActive: false, type: 'original' as const }];
+                        const updatedVersions = [
+                          ...existingVersions,
+                          { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), isActive: true, type: 'entity-repair' as const }
+                        ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }));
+                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions };
+                      }));
+                    }
+                    // Trigger full image refresh so version picker gets DB-sourced versions
                     try {
                       const allImages = await storyService.getAllImages(storyId, false);
                       if (allImages) {
@@ -4907,6 +4921,14 @@ export default function StoryWizard() {
                               return { ...scene, imageVersions: apiImg.imageVersions as typeof scene.imageVersions };
                             }));
                           }
+                        }
+                        // Also refresh cover versions
+                        if (coverKey && allImages.covers?.[coverKey]) {
+                          setCoverImages(prev => {
+                            if (!prev) return prev;
+                            const apiCover = allImages.covers![coverKey];
+                            return { ...prev, [coverKey]: { ...(prev[coverKey] as any), ...apiCover, imageData: (prev[coverKey] as any)?.imageData || apiCover?.imageData } };
+                          });
                         }
                       }
                     } catch (refreshErr) {
