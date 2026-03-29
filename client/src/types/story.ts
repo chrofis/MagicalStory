@@ -1052,6 +1052,7 @@ export interface RepairWorkflowState {
       issuesSummary?: string;
       reasoning?: string;
       fixableIssues: EvaluationData['fixableIssues'];
+      fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
       semanticResult?: SemanticEvaluationResult | null;
     }>;
   };

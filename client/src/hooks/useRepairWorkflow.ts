@@ -774,6 +774,7 @@ export function useRepairWorkflow({
     issuesSummary?: string;
     reasoning?: string;
     fixableIssues: EvaluationData['fixableIssues'];
+    fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
   };
 
   const reEvaluatePages = useCallback(async (pageNumbers?: number[], scoreThresholdOverride?: number): Promise<{ evalPages: Record<number, EvalPageResult>; badPages: number[] } | undefined> => {
@@ -806,6 +807,7 @@ export function useRepairWorkflow({
           issuesSummary: pr.issuesSummary,
           reasoning: pr.reasoning,
           fixableIssues: pr.fixableIssues,
+          fixTargets: pr.fixTargets || [],
         };
       }
 

@@ -1745,7 +1745,8 @@ export function RepairWorkflowPanel({
                     })}
                     {/* Scene entries */}
                     {sceneImages.map(scene => {
-                      const fixTargetCount = scene.fixTargets?.length || 0;
+                      const evalTargets = workflowState.reEvaluationResults.pages[scene.pageNumber]?.fixTargets;
+                      const fixTargetCount = evalTargets?.length || scene.fixTargets?.length || 0;
                       return (
                         <button
                           key={scene.pageNumber}
@@ -1772,7 +1773,9 @@ export function RepairWorkflowPanel({
                   const isCover = selectedInpaintPage < 0;
                   const scene = isCover ? null : sceneImages.find(s => s.pageNumber === selectedInpaintPage);
                   const cover = isCover ? coverImages?.[COVER_KEY_MAP[selectedInpaintPage]] : null;
-                  const fixTargets = (isCover ? cover?.fixTargets : scene?.fixTargets) || [];
+                  // Fix targets: prefer workflow re-evaluation results (most recent), then scene data
+                  const evalFixTargets = workflowState.reEvaluationResults.pages[selectedInpaintPage]?.fixTargets;
+                  const fixTargets = evalFixTargets?.length ? evalFixTargets : (isCover ? cover?.fixTargets : scene?.fixTargets) || [];
                   return (
                     <div className="space-y-2">
                       {fixTargets.length > 0 ? (
