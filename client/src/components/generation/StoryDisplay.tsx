@@ -241,6 +241,18 @@ export function StoryDisplay({
   // Check if user has enough credits (-1 means infinite/unlimited, impersonating admins also bypass)
   const hasEnoughCredits = isImpersonating || userCredits === -1 || userCredits >= imageRegenerationCost;
 
+  // Check if a page/cover is busy with any image operation (edit, improve, regenerate, char repair)
+  const isPageBusy = (pageNumber: number): boolean => {
+    if (isGenerating) return true;
+    if (pageNumber < 0) {
+      // Cover
+      const coverKeyMap: Record<number, string> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+      const ck = coverKeyMap[pageNumber];
+      return (ck ? regeneratingCovers.has(ck) : false) || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || charRepairingPages.has(pageNumber);
+    }
+    return editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || charRepairingPages.has(pageNumber);
+  };
+
   // Visual Bible editing state (only used in developer mode)
   const [editingEntry, setEditingEntry] = useState<{ type: string; id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -1320,7 +1332,7 @@ export function StoryDisplay({
               detectAndOpen();
             }
           }}
-          disabled={isGenerating || isRepairing || isDetecting || !hasEnoughCredits}
+          disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
           className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
             isGenerating || isRepairing || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
@@ -3827,7 +3839,7 @@ export function StoryDisplay({
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('front')}
-                    disabled={isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
+                    disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-1) || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -3843,7 +3855,7 @@ export function StoryDisplay({
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-1)}
-                    disabled={isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
+                    disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -3859,7 +3871,7 @@ export function StoryDisplay({
                 {_onRegenerateCover && (
                   <button
                     onClick={() => openCoverEditModal('front')}
-                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
+                    disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -4050,7 +4062,7 @@ export function StoryDisplay({
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('initial')}
-                    disabled={isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                    disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-2) || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -4066,7 +4078,7 @@ export function StoryDisplay({
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-2)}
-                    disabled={isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                    disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -4082,7 +4094,7 @@ export function StoryDisplay({
                 {_onRegenerateCover && (
                   <button
                     onClick={() => openCoverEditModal('initial')}
-                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
+                    disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -4337,7 +4349,7 @@ export function StoryDisplay({
                               {onEditImage && (
                                 <button
                                   onClick={() => onEditImage(pageNumber)}
-                                  disabled={isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -4353,7 +4365,7 @@ export function StoryDisplay({
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -4369,7 +4381,7 @@ export function StoryDisplay({
                               {onRegenerateImage && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
-                                  disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -4843,7 +4855,7 @@ export function StoryDisplay({
                               {onEditImage && (
                                 <button
                                   onClick={() => onEditImage(pageNumber)}
-                                  disabled={isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -4859,7 +4871,7 @@ export function StoryDisplay({
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -4875,7 +4887,7 @@ export function StoryDisplay({
                               {onRegenerateImage && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
-                                  disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                     isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
@@ -5289,7 +5301,7 @@ export function StoryDisplay({
                 {_onEditCover && (
                   <button
                     onClick={() => _onEditCover('back')}
-                    disabled={isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                    disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || editingPages.has(-3) || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -5305,7 +5317,7 @@ export function StoryDisplay({
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-3)}
-                    disabled={isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                    disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
@@ -5321,7 +5333,7 @@ export function StoryDisplay({
                 {_onRegenerateCover && (
                   <button
                     onClick={() => openCoverEditModal('back')}
-                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
+                    disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                       isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
