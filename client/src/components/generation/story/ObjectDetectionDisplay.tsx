@@ -85,6 +85,7 @@ export function ObjectDetectionDisplay({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isIterating, setIsIterating] = useState(false);
   const [bboxModel, setBboxModel] = useState('');
+  const [preRefineOverlay, setPreRefineOverlay] = useState<string | null>(null);
 
   // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
   // But NOT during active refresh/iterate — those set loadedOverlay themselves
@@ -163,6 +164,7 @@ export function ObjectDetectionDisplay({
     }
 
     setIsIterating(true);
+    setPreRefineOverlay(currentOverlay); // Save input overlay for comparison
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/stories/${storyId}/iterate-bbox/${targetPage}`, {
@@ -358,12 +360,35 @@ export function ObjectDetectionDisplay({
                 {language === 'de' ? 'Erkannte Regionen' : 'Detected Regions'}
                 <span className="ml-2 text-gray-400">(🟢 Body, 🔵 Face, 🩵 Face ✓ refined, 🩷 Face ↻ redetected, 🟠 Object, 🟣 Matched)</span>
               </div>
-              <img
-                src={overlayImage}
-                alt="Bbox overlay"
-                className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
-                onClick={() => setEnlargedImg({ src: overlayImage, title: language === 'de' ? 'Erkannte Regionen' : 'Detected Regions' })}
-              />
+              {preRefineOverlay && preRefineOverlay !== overlayImage ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[10px] text-gray-400 mb-0.5 font-medium">{language === 'de' ? 'Vor Verfeinerung (Eingabe)' : 'Before Refine (Input)'}</div>
+                    <img
+                      src={preRefineOverlay}
+                      alt="Pre-refine overlay"
+                      className="w-full border rounded cursor-pointer hover:ring-2 hover:ring-orange-400"
+                      onClick={() => setEnlargedImg({ src: preRefineOverlay, title: language === 'de' ? 'Vor Verfeinerung' : 'Before Refine' })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-gray-400 mb-0.5 font-medium">{language === 'de' ? 'Nach Verfeinerung (Ergebnis)' : 'After Refine (Result)'}</div>
+                    <img
+                      src={overlayImage}
+                      alt="Refined overlay"
+                      className="w-full border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
+                      onClick={() => setEnlargedImg({ src: overlayImage, title: language === 'de' ? 'Nach Verfeinerung' : 'After Refine' })}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={overlayImage}
+                  alt="Bbox overlay"
+                  className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
+                  onClick={() => setEnlargedImg({ src: overlayImage, title: language === 'de' ? 'Erkannte Regionen' : 'Detected Regions' })}
+                />
+              )}
             </div>
           ) : hasBboxOverlay && storyId && pageNumber !== undefined ? (
             <button
