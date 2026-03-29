@@ -4141,6 +4141,23 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
 
+    // Credit check — 5 credits per page to repair
+    const { CREDIT_COSTS } = require('../config/credits');
+    const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
+    const userCreditsResult = await getDbPool().query('SELECT credits, role FROM users WHERE id = $1', [req.user.id]);
+    const userCredits = userCreditsResult.rows[0]?.credits || 0;
+    const userRole = userCreditsResult.rows[0]?.role;
+    const isImpersonating = req.user.impersonating && req.user.originalAdminId;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: creditCost,
+        available: userCredits
+      });
+    }
+
     if (autoSelect) {
       // Auto-select mode: derive repairs from entity report in DB
       const storyEntityReport = storyData.finalChecksReport?.entity;
@@ -4793,8 +4810,23 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
     const apiCost = imageGenCost + verifyTokenCost;
     const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs + totalGrokRepairs;
+    // Deduct credits: 5 per page actually repaired
+    const totalPagesRepaired = results.reduce((sum, r) => sum + (r.pagesRepaired?.length || 0), 0);
+    const totalCreditCost = totalPagesRepaired * creditCost;
+    let creditsRemaining = hasInfiniteCredits ? -1 : userCredits;
+    if (totalPagesRepaired > 0 && !hasInfiniteCredits) {
+      await getDbPool().query('UPDATE users SET credits = credits - $1 WHERE id = $2', [totalCreditCost, req.user.id]);
+      creditsRemaining = userCredits - totalCreditCost;
+      await getDbPool().query(
+        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+         VALUES ($1, $2, $3, 'character_repair', $4)`,
+        [req.user.id, -totalCreditCost, creditsRemaining, `Character repair: ${totalPagesRepaired} page(s)`]
+      );
+      log.info(`💰 [REPAIR-WORKFLOW] Deducted ${totalCreditCost} credits for ${totalPagesRepaired} page(s) repaired (remaining: ${creditsRemaining})`);
+    }
+
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
-    res.json({ results, apiCost });
+    res.json({ results, apiCost, creditsUsed: totalCreditCost, creditsRemaining });
 
     // Save cost in background
     addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini, ${totalGrokRepairs} Grok)`).catch(err => log.error('Failed to save repair cost:', err.message));

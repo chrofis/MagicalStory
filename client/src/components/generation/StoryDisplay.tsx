@@ -1264,7 +1264,7 @@ export function StoryDisplay({
           {isRepairing ? (
             <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
           ) : (
-            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'}</>
+            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-70">({imageRegenerationCost})</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1345,7 +1345,7 @@ export function StoryDisplay({
                   disabled={!charRepairSelected}
                   className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
-                  {language === 'de' ? 'Reparieren' : 'Repair'}
+                  {language === 'de' ? 'Reparieren' : 'Repair'} ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                 </button>
               </div>
             </div>
@@ -3780,7 +3780,7 @@ export function StoryDisplay({
                     {improvingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -3998,7 +3998,7 @@ export function StoryDisplay({
                     {improvingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}
@@ -4281,7 +4281,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -4784,7 +4784,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                                   )}
                                 </button>
                               )}
@@ -5226,7 +5226,7 @@ export function StoryDisplay({
                     {improvingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'}</>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
                     )}
                   </button>
                 )}

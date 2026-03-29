@@ -4934,6 +4934,10 @@ export default function StoryWizard() {
                     } catch (refreshErr) {
                       log.warn('Failed to refresh image versions after repair:', refreshErr);
                     }
+                    // Update user credits if returned
+                    if ((result as any).creditsRemaining !== undefined && updateCredits) {
+                      updateCredits((result as any).creditsRemaining);
+                    }
                     log.info('Character repair completed successfully');
                     return {
                       comparison: repaired.comparison || null,
