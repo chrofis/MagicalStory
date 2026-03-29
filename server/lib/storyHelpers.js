@@ -662,14 +662,18 @@ function extractSceneMetadata(sceneDescription) {
     }
 
     // Detect scene complexity: explicit field or fallback from character positions
-    let sceneComplexity = parsedData.sceneComplexity || null;
-    if (!sceneComplexity && parsedData.characters && Array.isArray(parsedData.characters)) {
-      const hasBackground = parsedData.characters.some(c => {
+    // Determine scene complexity solely from character depth data.
+    // Only scenes with background-depth characters need Gemini (better at placing
+    // characters at different depths). Grok handles everything else fine.
+    // Ignore AI-written sceneComplexity — it over-classifies busy foreground scenes as complex.
+    let sceneComplexity = 'simple';
+    if (parsedData.characters && Array.isArray(parsedData.characters)) {
+      const hasBackgroundCharacter = parsedData.characters.some(c => {
         const pos = (c.position || '').toLowerCase();
         const depth = (c.depth || '').toLowerCase();
         return depth === 'background' || pos.includes('background');
       });
-      sceneComplexity = hasBackground ? 'complex' : 'simple';
+      if (hasBackgroundCharacter) sceneComplexity = 'complex';
     }
 
     return {
