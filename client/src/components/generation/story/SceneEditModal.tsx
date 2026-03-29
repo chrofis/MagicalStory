@@ -337,7 +337,7 @@ export function SceneEditModal({
                 <>
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="text-xs opacity-80">({imageRegenerationCost})</span>
+                  <span className="text-xs opacity-80">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span>
                 </>
               )}
             </button>

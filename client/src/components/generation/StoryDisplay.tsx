@@ -1274,7 +1274,7 @@ export function StoryDisplay({
           {isRepairing ? (
             <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : 'Repairing...'}</>
           ) : (
-            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-70">({imageRegenerationCost})</span></>
+            <><Users size={14} /> {language === 'de' ? 'Figur reparieren' : 'Fix Character'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -3778,7 +3778,7 @@ export function StoryDisplay({
                     {editingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
@@ -3794,7 +3794,7 @@ export function StoryDisplay({
                     {improvingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
@@ -3997,7 +3997,7 @@ export function StoryDisplay({
                     {editingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
@@ -4013,7 +4013,7 @@ export function StoryDisplay({
                     {improvingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
@@ -4281,7 +4281,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                                   )}
                                 </button>
                               )}
@@ -4297,7 +4297,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                                   )}
                                 </button>
                               )}
@@ -4311,7 +4311,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={14} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -4786,7 +4786,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                                   ) : (
-                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                                    <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                                   )}
                                 </button>
                               )}
@@ -4802,7 +4802,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                                   ) : (
-                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                                    <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                                   )}
                                 </button>
                               )}
@@ -4816,7 +4816,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <Wand2 size={14} />
-                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'}
+                                  {language === 'de' ? 'Überarbeiten' : 'Reimagine'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
@@ -5230,7 +5230,7 @@ export function StoryDisplay({
                     {editingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : 'Editing...'}</>
                     ) : (
-                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}</>
+                      <><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
@@ -5246,7 +5246,7 @@ export function StoryDisplay({
                     {improvingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : 'Retrying...'}</>
                     ) : (
-                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70">({imageRegenerationCost})</span></>
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : 'Retry'} <span className="opacity-70"><span className="hidden sm:inline">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span><span className="sm:hidden">({imageRegenerationCost})</span></span></>
                     )}
                   </button>
                 )}
