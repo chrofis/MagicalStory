@@ -1251,24 +1251,31 @@ export function StoryDisplay({
       .map(f => f.name!) || [];
     const availableCharacters = characters.filter(c => detectedNames.includes(c.name));
 
-    // Run bbox detection on-demand, then open popover if characters found
+    // Load existing bbox or detect on-demand, then open popover if characters found
     const detectAndOpen = async () => {
       if (!storyId) return;
-      // Map cover page numbers to the refresh-bbox endpoint format
       const COVER_PAGE_MAP: Record<number, string> = { [-1]: 'cover:front', [-2]: 'cover:initial', [-3]: 'cover:back' };
       const overrideKey = COVER_PAGE_MAP[pageNumber] || `page:${pageNumber}`;
 
       setCharDetectingBbox(prev => new Set(prev).add(pageNumber));
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: '{}'
+        const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+
+        // First try loading existing bbox (fast, no API call to vision model)
+        let response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
+          method: 'POST', headers, body: JSON.stringify({ loadOnly: true })
         });
+
+        // If no existing bbox found, run full detection
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.bboxDetection?.figures?.length) {
+            response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
+              method: 'POST', headers, body: '{}'
+            });
+          }
+        }
         if (response.ok) {
           const data = await response.json();
           if (data.bboxDetection) {

@@ -3683,6 +3683,13 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const expectedClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
 
+    // If loadOnly=true, return existing bbox without re-detecting
+    if (req.body.loadOnly && scene.bboxDetection) {
+      const existingOverlay = await createBboxOverlayImage(imageData, scene.bboxDetection);
+      log.info(`📦 [REFRESH-BBOX] Returning existing bbox for page ${pageNumber} (loadOnly)`);
+      return res.json({ bboxDetection: scene.bboxDetection, bboxOverlayImage: existingOverlay });
+    }
+
     // Run enriched bbox detection (optional model override from request body)
     const bboxModelOverride = req.body.bboxModel || null;
     const enrichResult = await enrichWithBoundingBoxes(
