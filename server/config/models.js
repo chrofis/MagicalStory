@@ -69,7 +69,7 @@ const MODEL_DEFAULTS = {
   idea: 'claude-sonnet',               // Story idea generation
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'grok-4-fast',     // Initial scene expansion (fast/cheap — 4x cheaper than Haiku, 2x faster)
+  sceneDescription: 'claude-haiku',     // Initial scene expansion (better instruction following for clothing/format)
   sceneIteration: 'gemini-2.5-flash',  // Scene iteration/retry (needs reasoning to catch impossible scenes)
 
   // Image models
