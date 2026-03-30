@@ -14,12 +14,27 @@ interface EvalResult {
   score?: number;
   prompt?: string;
   rawOutput?: string;
+  rawResponse?: string;
   parsed?: Record<string, unknown>;
   inputTokens?: number;
   outputTokens?: number;
   elapsedMs?: number;
   modelUsed?: string;
+  modelId?: string;
   error?: string;
+  // Quality eval fields
+  qualityScore?: number;
+  verdict?: string;
+  issuesSummary?: string;
+  fixableIssues?: Array<{ description?: string; issue?: string; severity?: string; type?: string }>;
+  figures?: Array<{ name?: string; confidence?: string; label?: string }>;
+  matches?: Array<{ figure?: string; character?: string; score?: number }>;
+  // Semantic eval fields
+  semanticScore?: number;
+  semanticIssues?: Array<{ problem?: string; type?: string; severity?: string; expected?: string; actual?: string }>;
+  // Visual inventory fields
+  items?: Array<{ name?: string; found?: boolean; description?: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 const EVAL_TYPES: { value: EvalType; label: string; labelDe: string }[] = [
@@ -70,6 +85,10 @@ export function EvalTestingPanel({ storyId, pageNumber, language }: EvalTestingP
       setResult({
         ...data,
         elapsedMs: data.elapsedMs ?? (Date.now() - start),
+        modelUsed: data.modelUsed || data.modelId || undefined,
+        inputTokens: data.inputTokens ?? data.usage?.input_tokens,
+        outputTokens: data.outputTokens ?? data.usage?.output_tokens,
+        rawOutput: data.rawOutput || data.rawResponse || undefined,
       });
     } catch (err) {
       setResult({
@@ -154,15 +173,89 @@ export function EvalTestingPanel({ storyId, pageNumber, language }: EvalTestingP
               </div>
             )}
 
-            {/* Score */}
+            {/* Score + Verdict */}
             {result.score !== undefined && (
-              <div className={`border rounded p-3 flex items-center justify-between ${scoreBgColor(result.score)}`}>
-                <span className="text-sm font-medium text-gray-700">
-                  {isDE ? 'Ergebnis' : 'Score'}
-                </span>
-                <span className={`text-2xl font-bold ${scoreColor(result.score)}`}>
-                  {Math.round(result.score)}
-                </span>
+              <div className={`border rounded p-3 ${scoreBgColor(result.score)}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">
+                    {isDE ? 'Ergebnis' : 'Score'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {result.verdict && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                        result.verdict === 'PASS' ? 'bg-green-200 text-green-800' :
+                        result.verdict === 'SOFT_FAIL' ? 'bg-yellow-200 text-yellow-800' :
+                        'bg-red-200 text-red-800'
+                      }`}>{result.verdict}</span>
+                    )}
+                    <span className={`text-2xl font-bold ${scoreColor(result.score)}`}>
+                      {Math.round(result.score)}
+                    </span>
+                  </div>
+                </div>
+                {result.issuesSummary && (
+                  <p className="mt-2 text-xs text-gray-600 italic">{result.issuesSummary}</p>
+                )}
+              </div>
+            )}
+
+            {/* Fixable Issues */}
+            {result.fixableIssues && result.fixableIssues.length > 0 && (
+              <div className="bg-orange-50 border border-orange-300 rounded p-3">
+                <div className="text-xs font-semibold text-orange-800 mb-1.5">
+                  {result.fixableIssues.length} {isDE ? 'Probleme erkannt' : 'Issues Detected'}:
+                </div>
+                <ul className="space-y-1">
+                  {result.fixableIssues.map((issue, idx) => (
+                    <li key={idx} className="text-xs text-orange-700 flex items-start gap-1.5">
+                      <span className={`shrink-0 px-1 py-0.5 rounded text-[10px] font-bold ${
+                        issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                        issue.severity === 'major' ? 'bg-orange-200 text-orange-800' :
+                        'bg-yellow-200 text-yellow-800'
+                      }`}>{(issue.severity || 'medium').toUpperCase()}</span>
+                      <span>{issue.description || issue.issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Semantic Issues */}
+            {result.semanticIssues && result.semanticIssues.length > 0 && (
+              <div className="bg-purple-50 border border-purple-300 rounded p-3">
+                <div className="text-xs font-semibold text-purple-800 mb-1.5">
+                  {result.semanticIssues.length} {isDE ? 'Semantische Probleme' : 'Semantic Issues'}:
+                </div>
+                <ul className="space-y-1">
+                  {result.semanticIssues.map((issue, idx) => (
+                    <li key={idx} className="text-xs text-purple-700">
+                      <span className="font-medium">{issue.type}: </span>
+                      {issue.problem}
+                      {issue.expected && <span className="text-purple-500"> (expected: {issue.expected})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Character Matches */}
+            {result.figures && result.figures.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded p-3">
+                <div className="text-xs font-semibold text-indigo-800 mb-1.5">
+                  {isDE ? 'Erkannte Figuren' : 'Detected Figures'} ({result.figures.length}):
+                </div>
+                <div className="space-y-0.5">
+                  {result.figures.map((fig, idx) => {
+                    const match = result.matches?.find(m => m.figure === fig.name || m.figure === fig.label);
+                    return (
+                      <div key={idx} className="text-xs text-indigo-700 flex items-center gap-2">
+                        <span className="font-medium">{fig.name || fig.label}</span>
+                        {fig.confidence && <span className="text-indigo-400">({fig.confidence})</span>}
+                        {match && <span className="text-green-600">→ {match.character} {match.score ? `(${match.score}%)` : ''}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -202,18 +295,6 @@ export function EvalTestingPanel({ storyId, pageNumber, language }: EvalTestingP
                 </summary>
                 <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs bg-white p-2 rounded border border-gray-200">
                   {result.rawOutput}
-                </pre>
-              </details>
-            )}
-
-            {/* Parsed Results */}
-            {result.parsed && Object.keys(result.parsed).length > 0 && (
-              <details className="bg-gray-50 border border-gray-200 rounded p-2">
-                <summary className="cursor-pointer text-xs font-medium text-gray-700">
-                  {isDE ? 'Geparste Ergebnisse' : 'Parsed Results'}
-                </summary>
-                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs bg-white p-2 rounded border border-gray-200">
-                  {JSON.stringify(result.parsed, null, 2)}
                 </pre>
               </details>
             )}
