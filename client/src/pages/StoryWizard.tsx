@@ -3372,8 +3372,7 @@ export default function StoryWizard() {
       // Step 3: Story Type - must have story category and topic/theme selected
       if (!storyCategory) return false;
       if (storyCategory === 'adventure' && !storyTheme) return false;
-      if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && !storyTopic) return false;
-      if (storyCategory === 'historical' && !storyTopic) return false;
+      if ((storyCategory === 'life-challenge' || storyCategory === 'educational' || storyCategory === 'swiss-stories' || storyCategory === 'historical') && !storyTopic) return false;
       if (storyCategory === 'custom' && !customThemeText?.trim()) return false;
       return true;
     }
