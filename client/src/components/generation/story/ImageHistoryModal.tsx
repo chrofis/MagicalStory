@@ -412,6 +412,18 @@ export function ImageHistoryModal({
                       Avatars: {detailVersion.referencePhotoNames.map(p => p.name).join(', ')}
                     </div>
                   )}
+                  {detailVersion.grokRefImages && detailVersion.grokRefImages.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-medium text-orange-600 mb-1">
+                        {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'} ({detailVersion.grokRefImages.length}/3 slots)
+                      </div>
+                      <div className="flex gap-1.5">
+                        {detailVersion.grokRefImages.map((img, idx) => (
+                          <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-16 rounded border border-orange-200 cursor-pointer hover:opacity-80" onClick={() => setFullscreenIndex(null)} title={`Slot ${idx + 1}`} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
