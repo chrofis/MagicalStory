@@ -174,7 +174,7 @@ function buildPhysicalTraitsString(character) {
     if (age <= 3) { ageCategory = 'toddler'; headToBody = '1:4'; }
     else if (age <= 6) { ageCategory = 'young child'; headToBody = '1:5'; }
     else if (age <= 10) { ageCategory = 'child'; headToBody = '1:6'; }
-    else if (age <= 14) { ageCategory = 'preteen'; headToBody = '1:6.5'; }
+    else if (age <= 12) { ageCategory = 'preteen'; headToBody = '1:6.5'; }
     else if (age <= 17) { ageCategory = 'teenager'; headToBody = '1:7'; }
     else { ageCategory = 'adult'; headToBody = '1:8'; }
     parts.push(`Age: ${age} years old (${ageCategory}) — head-to-body ratio ${headToBody}`);
