@@ -78,7 +78,7 @@ const MODEL_DEFAULTS = {
 
   // Per-page routing by scene complexity (sceneRouting = 'auto')
   simplePageImage: 'grok-imagine',            // Simple scenes: all chars foreground ($0.02)
-  complexPageImage: 'gemini-2.5-flash-image', // Complex scenes: background chars need Gemini ($0.04)
+  complexPageImage: 'grok-imagine',           // Complex scenes: also Grok by default ($0.02, was Gemini $0.04)
 
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
