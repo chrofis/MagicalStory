@@ -663,6 +663,7 @@ export interface ImageVersion {
   isActive?: boolean;  // DEPRECATED: kept for backward compat with old blob data. Use page.activeVersion instead.
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
   qualityScore?: number;
+  rawQualityScore?: number | null;
   semanticScore?: number | null;
   entityPenalty?: number;
   evaluatedAt?: string;

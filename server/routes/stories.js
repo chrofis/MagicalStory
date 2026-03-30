@@ -1758,6 +1758,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.fixTargets = source.fixTargets || [];
         target.totalAttempts = source.totalAttempts || null;
         target.referencePhotoNames = source.referencePhotoNames || [];
+        target.rawQualityScore = source.rawQualityScore ?? null;
         target.semanticScore = source.semanticScore ?? null;
         target.entityPenalty = source.entityPenalty || 0;
         target.evaluatedAt = source.evaluatedAt || null;

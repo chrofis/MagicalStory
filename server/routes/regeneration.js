@@ -3341,6 +3341,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           activeVersion.fixTargets = scene.fixTargets;
           activeVersion.fixableIssues = allIssues;
           activeVersion.qualityScore = adjustedScore;
+          activeVersion.rawQualityScore = evaluation.qualityScore ?? evaluation.score;
           activeVersion.semanticScore = evaluation.semanticScore ?? null;
           activeVersion.entityPenalty = entityPenalty || 0;
           activeVersion.evaluatedAt = new Date().toISOString();

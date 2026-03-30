@@ -290,31 +290,49 @@ export function ImageHistoryModal({
                 </div>
                 <div className="p-4 space-y-3">
                   {detailVersion.qualityScore != null && (
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <span className="font-semibold text-gray-700">Final:</span>
-                      <span className={`font-bold ${scoreColor(detailVersion.qualityScore)}`}>
-                        {detailVersion.qualityScore}%
-                      </span>
-                      {detailVersion.semanticScore != null && (
-                        <>
-                          <span className="text-gray-400">|</span>
-                          <span className="text-indigo-600">Semantic: {detailVersion.semanticScore}%</span>
-                        </>
-                      )}
-                      {detailVersion.entityPenalty != null && detailVersion.entityPenalty > 0 && (
-                        <>
-                          <span className="text-gray-400">|</span>
-                          <span className="text-orange-600">Entity: -{detailVersion.entityPenalty}</span>
-                        </>
-                      )}
-                      {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
-                        <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
-                      )}
-                      {detailVersion.evaluatedAt && (
-                        <span className="text-xs text-gray-400 ml-auto">
-                          {new Date(detailVersion.evaluatedAt).toLocaleString()}
+                    <div className="space-y-2">
+                      {/* Score breakdown as separate rows */}
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="font-semibold text-gray-700">Final:</span>
+                        <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
+                          {detailVersion.qualityScore}%
                         </span>
-                      )}
+                        {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
+                          <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
+                        )}
+                        {detailVersion.evaluatedAt && (
+                          <span className="text-xs text-gray-400 ml-auto">
+                            {new Date(detailVersion.evaluatedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      {/* Individual score components */}
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        {/* Quality */}
+                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                          <div className="text-gray-500 font-medium mb-0.5">Quality</div>
+                          <div className={`font-bold text-base ${scoreColor(detailVersion.rawQualityScore ?? detailVersion.qualityScore)}`}>
+                            {detailVersion.rawQualityScore ?? detailVersion.qualityScore}%
+                          </div>
+                          <div className="text-gray-400">visual eval</div>
+                        </div>
+                        {/* Semantic */}
+                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
+                          <div className="text-indigo-500 font-medium mb-0.5">Semantic</div>
+                          <div className={`font-bold text-base ${detailVersion.semanticScore != null ? (detailVersion.semanticScore >= 80 ? 'text-green-600' : detailVersion.semanticScore >= 60 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-400'}`}>
+                            {detailVersion.semanticScore != null ? `${detailVersion.semanticScore}%` : 'n/a'}
+                          </div>
+                          <div className="text-indigo-400">prompt match</div>
+                        </div>
+                        {/* Entity */}
+                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                          <div className="text-orange-500 font-medium mb-0.5">Entity</div>
+                          <div className={`font-bold text-base ${detailVersion.entityPenalty ? 'text-orange-600' : 'text-green-600'}`}>
+                            {detailVersion.entityPenalty ? `-${detailVersion.entityPenalty}` : '0'}
+                          </div>
+                          <div className="text-orange-400">penalty</div>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {detailVersion.issuesSummary && (
