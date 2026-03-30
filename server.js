@@ -4523,7 +4523,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 [claimToken, claimExpires, userId]
               );
             }
-            emailOptions.claimUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/claim/${claimToken}`;
+            emailOptions.claimUrl = `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
 
             // Generate a view PDF to attach to the email
             // Fetch the full story data with images (rehydrate from story_images table)
@@ -5428,7 +5428,7 @@ app.get('/robots.txt', (req, res) => {
   if (hasDistFolder && require('fs').existsSync(robotsPath)) {
     res.type('text/plain').sendFile(robotsPath);
   } else {
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://www.magicalstory.ch/sitemap.xml`);
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://magicalstory.ch/sitemap.xml`);
   }
 });
 
