@@ -21,9 +21,9 @@ REQUIREMENTS:
 - Background: Light grey studio
 
 BODY PROPORTIONS (CRITICAL):
-- Use the age and head-to-body ratio from PHYSICAL TRAITS below
-- A 7-year-old child must look like a child, an adult must look like an adult
-- Do NOT make adult bodies look like children or vice versa
+- Use the EXACT age and head-to-body ratio from PHYSICAL TRAITS below
+- Match the age precisely: a toddler, child, teenager, and adult all look very different
+- Do NOT make older children/teenagers look younger than their stated age
 
 PHYSICAL TRAITS TO PRESERVE (must match reference exactly):
 {PHYSICAL_TRAITS}
