@@ -117,12 +117,31 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   // Claude 4+ models don't support assistant prefill — move it into the prompt instead
   const supportsAssistantPrefill = !modelId.match(/claude-(sonnet|opus|haiku)-[4-9]/);
   let effectivePrompt = prompt;
-  const messages = [{ role: 'user', content: prompt }];
+
+  // Build user content — support vision (images) if provided in options
+  let userContent;
+  if (options.images && options.images.length > 0) {
+    // Vision mode: content is an array of image + text blocks
+    userContent = [];
+    for (const img of options.images) {
+      const base64 = img.replace(/^data:image\/\w+;base64,/, '');
+      const mimeType = img.match(/^data:(image\/\w+);base64,/) ? img.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      userContent.push({
+        type: 'image',
+        source: { type: 'base64', media_type: mimeType, data: base64 }
+      });
+    }
+    userContent.push({ type: 'text', text: prompt });
+  } else {
+    userContent = prompt;
+  }
+
+  const messages = [{ role: 'user', content: userContent }];
   if (options.prefill && supportsAssistantPrefill) {
     messages.push({ role: 'assistant', content: options.prefill });
   } else if (options.prefill) {
     effectivePrompt = prompt + `\n\nIMPORTANT: Start your response EXACTLY with: ${options.prefill}`;
-    messages[0] = { role: 'user', content: effectivePrompt };
+    messages[0] = { role: 'user', content: options.images ? [...userContent.slice(0, -1), { type: 'text', text: effectivePrompt }] : effectivePrompt };
   }
 
   const data = await withRetry(async () => {

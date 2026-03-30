@@ -1341,11 +1341,28 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     const modelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
     const modelConfig = TEXT_MODELS[modelId];
 
-    // Route to Grok vision if model is xAI provider
+    // Route based on provider
     let data;
     let inputTokens = 0;
     let outputTokens = 0;
-    if (modelConfig?.provider === 'xai') {
+    if (modelConfig?.provider === 'anthropic') {
+      // Claude vision path — uses callTextModel with images option
+      log.info(`🔲 [BBOX-DETECT] Using Claude vision: ${modelId}`);
+      const { callTextModel } = require('./textModels');
+      const imageDataUri = `data:${mimeType};base64,${base64Data}`;
+      const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri] });
+      if (!claudeResult?.text) {
+        log.warn('⚠️  [BBOX-DETECT] Claude returned no text response');
+        return null;
+      }
+      // Wrap in Gemini-compatible format for downstream parsing
+      data = {
+        candidates: [{ content: { parts: [{ text: claudeResult.text }] } }],
+        usageMetadata: { promptTokenCount: claudeResult.usage?.input_tokens || 0, candidatesTokenCount: claudeResult.usage?.output_tokens || 0 }
+      };
+      inputTokens = claudeResult.usage?.input_tokens || 0;
+      outputTokens = claudeResult.usage?.output_tokens || 0;
+    } else if (modelConfig?.provider === 'xai') {
       log.info(`🔲 [BBOX-DETECT] Using Grok vision: ${modelId}`);
       const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
       data = await grokResponse.json();
