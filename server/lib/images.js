@@ -6139,61 +6139,37 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Gradient whiteout: signals Grok what to redraw while preserving edge context
-    // - Face bbox: completely white (100% opacity)
-    // - Body bbox inner 20%: completely white (100% opacity)
-    // - Body bbox outer ring: strong white overlay (80% opacity) — preserves some context
-    // This prevents the body bbox from erasing important scene elements at its edges
+    // Blur-based repair: preserves body pose/clothing while obscuring face
+    // - Body bbox: light blur (arms, clothing still visible but softened)
+    // - Face bbox: heavy blur (facial features fully obscured)
+    // Grok sees the blurred character + reference avatar → redraws the character
     const faceBbox = options.faceBbox;
     let sceneForGrok = sceneBuffer;
 
-    // Helper: create a gradient whiteout overlay for a bbox region
-    // innerRatio = fraction of box that is fully white (0.0-1.0)
-    // outerOpacity = white opacity for the outer ring (0.0-1.0)
-    const createGradientWhiteout = async (boxCoords, innerRatio, outerOpacity) => {
-      const [bymin, bxmin, bymax, bxmax] = boxCoords;
-      const bLeft = Math.floor(bxmin * sceneMeta.width);
-      const bTop = Math.floor(bymin * sceneMeta.height);
-      const bWidth = Math.max(1, Math.ceil((bxmax - bxmin) * sceneMeta.width));
-      const bHeight = Math.max(1, Math.ceil((bymax - bymin) * sceneMeta.height));
-
-      // Build RGBA overlay: inner = white 100%, outer = white at outerOpacity
-      const overlay = Buffer.alloc(bWidth * bHeight * 4);
-      const centerX = bWidth / 2;
-      const centerY = bHeight / 2;
-      // Inner zone boundaries (fraction of half-width/height from center)
-      const innerHalfW = (bWidth / 2) * innerRatio;
-      const innerHalfH = (bHeight / 2) * innerRatio;
-
-      for (let py = 0; py < bHeight; py++) {
-        for (let px = 0; px < bWidth; px++) {
-          const idx = (py * bWidth + px) * 4;
-          const dx = Math.abs(px - centerX);
-          const dy = Math.abs(py - centerY);
-          // Inside inner zone = fully white
-          if (dx <= innerHalfW && dy <= innerHalfH) {
-            overlay[idx] = 255; overlay[idx + 1] = 255; overlay[idx + 2] = 255;
-            overlay[idx + 3] = 255; // fully opaque white
-          } else {
-            // Outer ring = white at outerOpacity
-            overlay[idx] = 255; overlay[idx + 1] = 255; overlay[idx + 2] = 255;
-            overlay[idx + 3] = Math.round(outerOpacity * 255);
-          }
-        }
-      }
-
-      return { buffer: await sharp(overlay, { raw: { width: bWidth, height: bHeight, channels: 4 } }).png().toBuffer(), left: bLeft, top: bTop, width: bWidth, height: bHeight };
-    };
-
     const composites = [];
 
-    // 1. Body bbox: gradient whiteout (inner 20% fully white, outer 80% opacity overlay)
-    const bodyBox = [ymin, xmin, ymax, xmax];
-    const bodyOverlay = await createGradientWhiteout(bodyBox, 0.2, 0.80);
-    composites.push({ input: bodyOverlay.buffer, left: bodyOverlay.left, top: bodyOverlay.top });
-    log.info(`👤 [CHAR REPAIR GROK] Body gradient whiteout: ${bodyOverlay.width}x${bodyOverlay.height} (inner 20% solid, outer 80% overlay)`);
+    // 1. Body bbox: light blur — preserves pose, clothing, arms but softens details
+    {
+      const bLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
+      const bTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
+      const bWidth = Math.max(1, Math.min(Math.ceil((xmax - xmin) * sceneMeta.width), sceneMeta.width - bLeft));
+      const bHeight = Math.max(1, Math.min(Math.ceil((ymax - ymin) * sceneMeta.height), sceneMeta.height - bTop));
+      const blurRadius = Math.max(5, Math.round(bWidth * 0.06));
+      try {
+        const bodyBlurred = await sharp(sceneBuffer)
+          .extract({ left: bLeft, top: bTop, width: bWidth, height: bHeight })
+          .blur(blurRadius)
+          .toBuffer();
+        composites.push({ input: bodyBlurred, left: bLeft, top: bTop });
+        log.info(`👤 [CHAR REPAIR GROK] Body light blur: ${bWidth}x${bHeight} at (${bLeft},${bTop}), radius ${blurRadius}`);
+      } catch (blurErr) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Body blur failed: ${blurErr.message}, using whiteout fallback`);
+        const white = await sharp({ create: { width: bWidth, height: bHeight, channels: 3, background: { r: 255, g: 255, b: 255 } } }).jpeg().toBuffer();
+        composites.push({ input: white, left: bLeft, top: bTop });
+      }
+    }
 
-    // 2. Face bbox: completely white on top (overrides body overlay in face area)
+    // 2. Face bbox: heavy blur on top — facial features fully obscured
     if (faceBbox) {
       const [fymin, fxmin, fymax, fxmax] = faceBbox;
       // Add 50% padding to face
@@ -6203,21 +6179,29 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const pfxmax = Math.min(1, fxmax + fW * 0.5);
       const pfymax = Math.min(1, fymax + fH * 0.5);
 
-      const fLeft = Math.floor(pfxmin * sceneMeta.width);
-      const fTop = Math.floor(pfymin * sceneMeta.height);
-      const fWidth = Math.max(1, Math.ceil((pfxmax - pfxmin) * sceneMeta.width));
-      const fHeight = Math.max(1, Math.ceil((pfymax - pfymin) * sceneMeta.height));
+      const fLeft = Math.max(0, Math.floor(pfxmin * sceneMeta.width));
+      const fTop = Math.max(0, Math.floor(pfymin * sceneMeta.height));
+      const fWidth = Math.max(1, Math.min(Math.ceil((pfxmax - pfxmin) * sceneMeta.width), sceneMeta.width - fLeft));
+      const fHeight = Math.max(1, Math.min(Math.ceil((pfymax - pfymin) * sceneMeta.height), sceneMeta.height - fTop));
 
-      const faceWhite = await sharp({
-        create: { width: fWidth, height: fHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
-      }).jpeg().toBuffer();
-      composites.push({ input: faceWhite, left: fLeft, top: fTop });
-      log.info(`👤 [CHAR REPAIR GROK] Face solid whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop}) +50% padding`);
+      const faceBlurRadius = Math.max(15, Math.round(fWidth * 0.2));
+      try {
+        const faceBlurred = await sharp(sceneBuffer)
+          .extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight })
+          .blur(faceBlurRadius)
+          .toBuffer();
+        composites.push({ input: faceBlurred, left: fLeft, top: fTop });
+        log.info(`👤 [CHAR REPAIR GROK] Face heavy blur: ${fWidth}x${fHeight} at (${fLeft},${fTop}) +50% padding, radius ${faceBlurRadius}`);
+      } catch (faceBlurErr) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Face blur failed: ${faceBlurErr.message}, using whiteout fallback`);
+        const faceWhite = await sharp({ create: { width: fWidth, height: fHeight, channels: 3, background: { r: 255, g: 255, b: 255 } } }).jpeg().toBuffer();
+        composites.push({ input: faceWhite, left: fLeft, top: fTop });
+      }
     }
 
-    // White out other characters' faces too — Grok will redraw ALL whited-out faces
-    // with the reference character's face. The blend step only takes the target
-    // character's region, so other faces are restored from the original automatically.
+    // Blur other characters' faces too — prevents Grok from copying their features.
+    // The blend step only takes the target character's region, so other faces
+    // are restored from the original automatically.
     const protectedFacesForGrok = options.protectedFaces || [];
     for (const [pfymin, pfxmin, pfymax, pfxmax] of protectedFacesForGrok) {
       const pfW = pfxmax - pfxmin, pfH = pfymax - pfymin;
@@ -6267,9 +6251,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           actionContext,
           issueContext,
         })
-      : `This is a children's book illustration. Some character faces have been whited out. Redraw ALL whited-out faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. Keep poses, art style, and background unchanged.${clothingContext}${actionContext}${issueContext}`;
+      : `This is a children's book illustration. One character's face has been blurred. Redraw the blurred character to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. Preserve the pose and clothing visible through the blur. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'whited out' : 'intact'}, sending to Grok...`);
+    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
 
     if (!grokResult.imageData) {

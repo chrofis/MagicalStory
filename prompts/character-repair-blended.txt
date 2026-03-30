@@ -1,7 +1,7 @@
-This is a children's book illustration. Some character faces have been whited out and need to be redrawn.
+This is a children's book illustration. One character's face has been blurred and needs to be redrawn.
 
-Redraw ALL whited-out faces to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference.
+Redraw the blurred character to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference.
 
-Keep the same poses, body positions, clothing, and actions for all characters. Keep the exact same art style, lighting, and background. Only redraw the whited-out face/head areas — do not change anything else.{clothingContext}{actionContext}{issueContext}
+The blurred area shows the character's pose, clothing, and body position — preserve these. Only redraw the face and head to match the reference photo. Keep the exact same art style, lighting, and background.{clothingContext}{actionContext}{issueContext}
 
-Replace every white area completely. No white patches should remain on any face or head.
+Other characters' faces may also be blurred — do NOT redraw those, leave them blurred. Only fix the target character.
