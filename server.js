@@ -3914,6 +3914,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageClothing: pageClothingData,
           sceneImages: rawImages.map(r => ({ pageNumber: r.pageNumber, imageData: r.imageData, description: r.sceneDescription })),
           coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
+          coverHints,   // Needed by iterateCover for per-character clothing on covers
           title,
           dedication: inputData.dedication || '',
         };
