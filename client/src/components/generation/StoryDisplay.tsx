@@ -5905,6 +5905,7 @@ export function StoryDisplay({
           onClose={() => setImageHistoryModal(null)}
           onSelectVersion={(pageNumber, versionIndex) => handleSelectVersion(pageNumber as number, versionIndex)}
           developerMode={developerMode}
+          grokRefImages={(sceneImages.find(img => img.pageNumber === imageHistoryModal.pageNumber) as any)?.grokRefImages}
         />
       )}
 

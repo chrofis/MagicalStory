@@ -18,6 +18,7 @@ interface ImageHistoryModalProps {
   onClose: () => void;
   onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
+  grokRefImages?: string[] | null;  // Scene-level fallback for active version
 }
 
 export function ImageHistoryModal({
@@ -28,6 +29,7 @@ export function ImageHistoryModal({
   onClose,
   onSelectVersion,
   developerMode = false,
+  grokRefImages: sceneLevelGrokRefImages,
 }: ImageHistoryModalProps) {
   const { language } = useLanguage();
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
@@ -412,18 +414,23 @@ export function ImageHistoryModal({
                       Avatars: {detailVersion.referencePhotoNames.map(p => p.name).join(', ')}
                     </div>
                   )}
-                  {detailVersion.grokRefImages && detailVersion.grokRefImages.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium text-orange-600 mb-1">
-                        {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'} ({detailVersion.grokRefImages.length}/3 slots)
+                  {(() => {
+                    // Use version-specific refs if available, fall back to scene-level for active version
+                    const refs = detailVersion.grokRefImages || (detailVersion.isActive ? sceneLevelGrokRefImages : null);
+                    if (!refs || refs.length === 0) return null;
+                    return (
+                      <div className="mt-2">
+                        <div className="text-xs font-medium text-orange-600 mb-1">
+                          {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'} ({refs.length}/3 slots)
+                        </div>
+                        <div className="flex gap-1.5">
+                          {refs.map((img, idx) => (
+                            <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-16 rounded border border-orange-200 cursor-pointer hover:opacity-80" title={`Slot ${idx + 1}`} />
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex gap-1.5">
-                        {detailVersion.grokRefImages.map((img, idx) => (
-                          <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-16 rounded border border-orange-200 cursor-pointer hover:opacity-80" onClick={() => setFullscreenIndex(null)} title={`Slot ${idx + 1}`} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             )}
