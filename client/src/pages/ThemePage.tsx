@@ -9,7 +9,7 @@ import {
   educationalTopics,
   historicalEvents,
 } from '@/constants/storyTypes';
-import { themeDescriptions } from '@/constants/themeDescriptions';
+import { themeContent } from '@/constants/themeContent';
 import type { LocalizedString } from '@/types/character';
 
 type CategorySlug = 'adventure' | 'life-challenges' | 'educational' | 'historical';
@@ -107,11 +107,43 @@ function getCategoryName(category: CategorySlug, language: string): string {
 }
 
 function getDescription(themeId: string, language: string = 'en'): string {
-  const desc = themeDescriptions[themeId];
-  if (desc) {
-    return desc[language as keyof typeof desc] || desc.en;
+  const content = themeContent[themeId];
+  if (content?.description) {
+    const desc = content.description;
+    return (desc as Record<string, string>)[language] || desc.en;
   }
   return '';
+}
+
+function getLongDescription(themeId: string, language: string = 'en'): string {
+  const content = themeContent[themeId];
+  if (content?.longDescription) {
+    const desc = content.longDescription;
+    return (desc as Record<string, string>)[language] || desc.en;
+  }
+  return '';
+}
+
+function getSkills(themeId: string, language: string = 'en'): string {
+  const content = themeContent[themeId];
+  if (content?.skills) {
+    const skills = content.skills;
+    return (skills as Record<string, string>)[language] || skills.en;
+  }
+  return '';
+}
+
+function getAgeRecommendation(themeId: string): string {
+  return themeContent[themeId]?.ageRecommendation || '';
+}
+
+function getFaq(themeId: string, language: string = 'en'): Array<{ q: string; a: string }> {
+  const content = themeContent[themeId];
+  if (!content?.faq) return [];
+  return content.faq.map(item => ({
+    q: (item.q as Record<string, string>)[language] || item.q.en,
+    a: (item.a as Record<string, string>)[language] || item.a.en,
+  }));
 }
 
 function getExpectBullets(category: CategorySlug, language: string): string[] {
@@ -205,6 +237,10 @@ export default function ThemePage() {
   const themeName = theme.name[language] || theme.name.en;
   const categoryName = getCategoryName(catSlug, language);
   const description = getDescription(themeId!, language);
+  const longDescription = getLongDescription(themeId!, language);
+  const skills = getSkills(themeId!, language);
+  const ageRec = getAgeRecommendation(themeId!);
+  const faq = getFaq(themeId!, language);
   const bullets = getExpectBullets(catSlug, language);
 
   const howSteps = [
@@ -264,6 +300,54 @@ export default function ThemePage() {
       </div>
 
       <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+        {/* Long Description + Skills + Age */}
+        {(longDescription || skills || ageRec) && (
+          <div className="mb-12">
+            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 space-y-4">
+              {longDescription && (
+                <p className="text-stone-600 leading-relaxed">{longDescription}</p>
+              )}
+              {(skills || ageRec) && (
+                <div className="flex flex-wrap gap-4 pt-2 border-t border-stone-100">
+                  {skills && (
+                    <div className="flex-1 min-w-[200px]">
+                      <h3 className="text-sm font-semibold text-stone-500 mb-1">
+                        {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : 'What your child learns'}
+                      </h3>
+                      <p className="text-sm text-stone-700">{skills}</p>
+                    </div>
+                  )}
+                  {ageRec && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-stone-500 mb-1">
+                        {language === 'de' ? 'Empfohlenes Alter' : language === 'fr' ? 'Âge recommandé' : 'Recommended age'}
+                      </h3>
+                      <p className="text-sm text-stone-700">{ageRec} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : 'years'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* FAQ */}
+        {faq.length > 0 && (
+          <div className="mb-12">
+            <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">
+              {language === 'de' ? 'Häufige Fragen' : language === 'fr' ? 'Questions fréquentes' : 'Frequently Asked Questions'}
+            </h2>
+            <div className="space-y-3">
+              {faq.map((item, i) => (
+                <div key={i} className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
+                  <h3 className="font-semibold text-stone-800 mb-2">{item.q}</h3>
+                  <p className="text-sm text-stone-600">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* What to Expect */}
         <div className="mb-12">
           <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">{t.whatToExpect}</h2>
