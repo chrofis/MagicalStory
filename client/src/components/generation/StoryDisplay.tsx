@@ -1346,7 +1346,7 @@ export function StoryDisplay({
           }}
           disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
           className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-            isGenerating || isRepairing || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+            isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
@@ -4364,7 +4364,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -4380,7 +4380,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -4396,7 +4396,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
@@ -4874,7 +4874,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || editingPages.has(pageNumber) || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -4890,7 +4890,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -4906,7 +4906,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
-                                    isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
