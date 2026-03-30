@@ -254,7 +254,7 @@ const STATIC_ROUTES = {
     },
     description: {
       en: 'Magical Story is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
-      de: 'Magical Story wird in der Schweiz entwickelt. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
+      de: 'Magical Story kommt aus der Schweiz. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
       fr: 'Magical Story est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
     },
   },
