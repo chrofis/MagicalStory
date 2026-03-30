@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Images, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Images, X, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { ImageVersion } from '@/types/story';
 
@@ -14,7 +14,7 @@ interface ImageHistoryModalProps {
   pageNumber?: number;
   coverType?: 'frontCover' | 'initialPage' | 'backCover';
   versions: ImageVersion[];
-  activeVersionIndex?: number;  // Index of the active version (replaces isActive on versions)
+  activeVersionIndex?: number;
   onClose: () => void;
   onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
@@ -31,24 +31,22 @@ export function ImageHistoryModal({
 }: ImageHistoryModalProps) {
   const { language } = useLanguage();
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
-  const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
 
   const getTitle = () => {
     if (coverType) {
       const labels = COVER_LABELS[coverType];
       const label = language === 'de' ? labels.de : language === 'fr' ? labels.fr : labels.en;
-      return language === 'de' ? `Bildversionen - ${label}` :
-             language === 'fr' ? `Versions d'image - ${label}` :
-             `Image Versions - ${label}`;
+      return language === 'de' ? `Bild wählen - ${label}` :
+             language === 'fr' ? `Choisir image - ${label}` :
+             `Select Image - ${label}`;
     }
-    return language === 'de' ? `Bildversionen - Seite ${pageNumber}` :
-           language === 'fr' ? `Versions d'image - Page ${pageNumber}` :
-           `Image Versions - Page ${pageNumber}`;
+    return language === 'de' ? `Bild wählen - Seite ${pageNumber}` :
+           language === 'fr' ? `Choisir image - Page ${pageNumber}` :
+           `Select Image - Page ${pageNumber}`;
   };
 
   const handleSelect = (idx: number) => {
-    // Use the DB versionIndex if available (from fast-path story_images),
-    // otherwise fall back to array index (blob path)
     const version = versions[idx];
     const effectiveIndex = version?.versionIndex ?? idx;
     if (coverType) {
@@ -66,39 +64,137 @@ export function ImageHistoryModal({
   const scoreColor = (score: number) =>
     score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : 'text-red-600';
 
+  // Fullscreen navigation
+  const goNext = useCallback(() => {
+    if (fullscreenIndex !== null && fullscreenIndex < versions.length - 1) {
+      setFullscreenIndex(fullscreenIndex + 1);
+    }
+  }, [fullscreenIndex, versions.length]);
+
+  const goPrev = useCallback(() => {
+    if (fullscreenIndex !== null && fullscreenIndex > 0) {
+      setFullscreenIndex(fullscreenIndex - 1);
+    }
+  }, [fullscreenIndex]);
+
+  // Keyboard navigation in fullscreen
+  useEffect(() => {
+    if (fullscreenIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goNext();
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goPrev();
+      else if (e.key === 'Escape') setFullscreenIndex(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fullscreenIndex, goNext, goPrev]);
+
+  // Touch swipe support
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.touches[0].clientX);
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const diff = touchStart - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) goNext();
+      else goPrev();
+    }
+    setTouchStart(null);
+  };
+
   const detailVersion = detailIndex !== null ? versions[detailIndex] : null;
 
   return (
     <>
-      {/* Enlarged image lightbox */}
-      {enlargedImg && (
+      {/* Fullscreen image viewer with swipe */}
+      {fullscreenIndex !== null && versions[fullscreenIndex] && (
         <div
-          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
-          onClick={() => setEnlargedImg(null)}
+          className="fixed inset-0 bg-black z-[60] flex flex-col"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <div className="absolute -top-8 left-0 text-white text-sm">{enlargedImg.title}</div>
-            <img
-              src={enlargedImg.src}
-              alt={enlargedImg.title}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
-            />
-            <button
-              className="absolute -top-8 right-0 text-white hover:text-gray-300"
-              onClick={() => setEnlargedImg(null)}
-            >
-              Close
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-2 bg-black/80 shrink-0">
+            <span className="text-white text-sm font-medium">
+              {versionLabel(fullscreenIndex)} ({fullscreenIndex + 1}/{versions.length})
+              {developerMode && versions[fullscreenIndex].qualityScore != null && (
+                <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(versions[fullscreenIndex].qualityScore!)}`}>
+                  {versions[fullscreenIndex].qualityScore}%
+                </span>
+              )}
+            </span>
+            <button onClick={() => setFullscreenIndex(null)} className="text-white p-1.5 hover:bg-white/20 rounded-lg">
+              <X size={20} />
             </button>
+          </div>
+
+          {/* Image area */}
+          <div className="flex-1 flex items-center justify-center relative min-h-0">
+            {/* Left arrow */}
+            {fullscreenIndex > 0 && (
+              <button onClick={goPrev} className="absolute left-2 z-10 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full">
+                <ChevronLeft size={24} />
+              </button>
+            )}
+
+            <img
+              src={versions[fullscreenIndex].imageData}
+              alt={versionLabel(fullscreenIndex)}
+              className="max-w-full max-h-full object-contain"
+            />
+
+            {/* Right arrow */}
+            {fullscreenIndex < versions.length - 1 && (
+              <button onClick={goNext} className="absolute right-2 z-10 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full">
+                <ChevronRight size={24} />
+              </button>
+            )}
+          </div>
+
+          {/* Bottom bar with select/active button */}
+          <div className="px-4 py-3 bg-black/80 flex items-center justify-between shrink-0">
+            {/* Dots indicator */}
+            <div className="flex gap-1.5">
+              {versions.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setFullscreenIndex(i)}
+                  className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                    i === fullscreenIndex ? 'bg-white' :
+                    (activeVersionIndex != null ? i === activeVersionIndex : i === versions.length - 1) ? 'bg-green-500' : 'bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Select button */}
+            {(() => {
+              const isActive = activeVersionIndex != null ? fullscreenIndex === activeVersionIndex : fullscreenIndex === versions.length - 1;
+              return isActive ? (
+                <span className="bg-green-500 text-white text-sm font-bold px-4 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <Check size={14} />
+                  {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
+                </span>
+              ) : (
+                <button
+                  onClick={() => { handleSelect(fullscreenIndex); setFullscreenIndex(null); }}
+                  className="bg-white text-gray-800 text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  {language === 'de' ? 'Dieses Bild verwenden' : language === 'fr' ? 'Utiliser cette image' : 'Use this image'}
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
 
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      {/* Grid modal */}
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
           {/* Header */}
-          <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Images size={20} />
+          <div className="px-3 sm:px-5 py-2.5 border-b border-gray-200 flex items-center justify-between shrink-0">
+            <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Images size={18} />
               {getTitle()}
             </h3>
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
@@ -106,57 +202,57 @@ export function ImageHistoryModal({
             </button>
           </div>
 
-          {/* Version grid */}
-          <div className="flex-1 overflow-y-auto p-5">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {/* Version grid — tighter on mobile */}
+          <div className="flex-1 overflow-y-auto p-2 sm:p-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-4">
               {versions.map((version, idx) => {
                 const isActiveVersion = activeVersionIndex != null ? idx === activeVersionIndex : idx === versions.length - 1;
                 return (
                 <div
                   key={idx}
-                  className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative rounded-lg overflow-hidden border transition-all ${
                     isActiveVersion
-                      ? 'border-green-500 ring-2 ring-green-200'
+                      ? 'border-green-500 sm:border-2 sm:ring-2 sm:ring-green-200'
                       : 'border-gray-200 hover:border-indigo-400 hover:shadow-md'
                   }`}
                 >
-                  {/* Image — click to enlarge */}
+                  {/* Image — click opens fullscreen viewer */}
                   <img
                     src={version.imageData}
                     alt={versionLabel(idx)}
                     className="w-full aspect-square object-cover cursor-pointer"
-                    onClick={() => setEnlargedImg({ src: version.imageData, title: `${versionLabel(idx)}${version.type && version.type !== 'original' ? ` (${version.type})` : ''}` })}
+                    onClick={() => setFullscreenIndex(idx)}
                   />
 
-                  {/* Overlay bar */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-black/0 pt-8 pb-3 px-3">
+                  {/* Overlay bar — compact on mobile */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-black/0 pt-6 sm:pt-8 pb-1.5 sm:pb-3 px-1.5 sm:px-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white text-sm font-semibold">{versionLabel(idx)}</span>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <span className="text-white text-xs sm:text-sm font-semibold">{versionLabel(idx)}</span>
                         {developerMode && version.qualityScore != null && (
-                          <span className={`text-white text-[11px] font-bold px-1.5 py-0.5 rounded ${scoreBgColor(version.qualityScore)}`}>
+                          <span className={`text-white text-[10px] sm:text-[11px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${scoreBgColor(version.qualityScore)}`}>
                             {version.qualityScore}%
                           </span>
                         )}
                       </div>
                       {isActiveVersion ? (
-                        <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                          <Check size={12} />
+                        <span className="bg-green-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex items-center gap-0.5">
+                          <Check size={10} className="sm:w-3 sm:h-3" />
                           {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
                         </span>
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
-                          className="bg-white/90 hover:bg-white text-gray-800 text-sm font-medium px-4 py-2 min-h-[44px] min-w-[44px] rounded transition-colors cursor-pointer"
+                          className="bg-white/90 hover:bg-white text-gray-800 text-[10px] sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded transition-colors cursor-pointer"
                         >
-                          {language === 'de' ? 'Auswählen' : language === 'fr' ? 'Sélectionner' : 'Select'}
+                          {language === 'de' ? 'Wählen' : language === 'fr' ? 'Choisir' : 'Select'}
                         </button>
                       )}
                     </div>
-                    <div className="text-[11px] text-gray-300 mt-1">
+                    <div className="text-[9px] sm:text-[11px] text-gray-300 mt-0.5">
                       {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
                       {version.type && version.type !== 'original' && (
-                        <span className="ml-1.5 text-gray-400">({version.type})</span>
+                        <span className="ml-1 text-gray-400">({version.type})</span>
                       )}
                     </div>
                   </div>
@@ -165,7 +261,7 @@ export function ImageHistoryModal({
                   {developerMode && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setDetailIndex(detailIndex === idx ? null : idx); }}
-                      className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-colors ${
                         detailIndex === idx
                           ? 'bg-indigo-600 text-white'
                           : 'bg-black/50 text-white hover:bg-black/70'
@@ -193,7 +289,6 @@ export function ImageHistoryModal({
                   </button>
                 </div>
                 <div className="p-4 space-y-3">
-                  {/* Scores row */}
                   {detailVersion.qualityScore != null && (
                     <div className="flex flex-wrap items-center gap-3 text-sm">
                       <span className="font-semibold text-gray-700">Final:</span>
