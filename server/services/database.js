@@ -629,6 +629,7 @@ async function saveStoryData(storyId, storyData) {
 
       // Also save additional cover versions (imageVersions array)
       if (coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
+        console.log(`💾 [SAVE] ${coverType}: ${coverData.imageVersions.length} version entries, hasImageData: ${coverData.imageVersions.map((v, i) => `v${i}=${!!v.imageData}(rehy=${!!v._rehydrated},saved=${!!v._alreadySaved})`).join(', ')}`);
         for (let i = 0; i < coverData.imageVersions.length; i++) {
           const version = coverData.imageVersions[i];
           if (version.imageData) {
