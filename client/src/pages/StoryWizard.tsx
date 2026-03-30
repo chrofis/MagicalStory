@@ -780,10 +780,37 @@ export default function StoryWizard() {
     const loadSavedStory = async () => {
       if (!urlStoryId || !isAuthenticated) return;
 
-      // Skip server reload if we just finished generating - data is already in state
+      // Skip full reload if we just finished generating - data is already in state
+      // But still load image versions (Phase 2b) so version picker works
       if (justFinishedGenerating.current) {
         justFinishedGenerating.current = false;
-        log.info('Skipping story reload - just finished generating');
+        log.info('Skipping full story reload - just finished generating, loading versions only');
+        storyService.getAllImages(urlStoryId, false).then(fullResult => {
+          if (!fullResult) return;
+          const fullImages = fullResult.images || [];
+          const fullCovers = fullResult.covers || {};
+          for (const img of fullImages) {
+            if (img.imageVersions && img.imageVersions.length > 0) {
+              setSceneImages(prev => prev.map(scene => {
+                if (scene.pageNumber !== img.pageNumber) return scene;
+                return { ...scene, imageVersions: img.imageVersions as typeof scene.imageVersions };
+              }));
+            }
+          }
+          const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+          setCoverImages(prev => {
+            const next = { ...prev };
+            for (const ct of coverTypes) {
+              const cover = fullCovers[ct] as any;
+              if (cover?.imageVersions) {
+                const existing = typeof next[ct] === 'object' ? next[ct] : {} as any;
+                next[ct] = { ...existing, imageVersions: cover.imageVersions } as any;
+              }
+            }
+            return next;
+          });
+          log.info(`Versions loaded after generation: ${fullImages.filter(i => (i.imageVersions?.length || 0) > 1).length} pages with multiple versions`);
+        }).catch(err => log.warn('Failed to load versions after generation:', err));
         return;
       }
 
