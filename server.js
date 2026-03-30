@@ -3885,10 +3885,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Add covers to rawImages with negative page numbers
         for (const [coverKey, coverData] of Object.entries(coverImages)) {
           if (coverData?.imageData && COVER_PAGE_MAP[coverKey] != null) {
+            // Include text requirements so cover evaluator knows what text to check
+            let coverEvalPrompt = coverData.description || coverData.prompt || '';
+            if (coverKey === 'frontCover') {
+              const title = inputData.title || inputData.storyTitle || '';
+              if (title) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${title}"`;
+            } else if (coverKey === 'initialPage') {
+              const dedication = inputData.dedication || '';
+              if (dedication) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
+            } else if (coverKey === 'backCover') {
+              coverEvalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
+            }
             rawImages.push({
               pageNumber: COVER_PAGE_MAP[coverKey],
               text: '',
-              sceneDescription: coverData.description,
+              sceneDescription: coverEvalPrompt,
               imageData: coverData.imageData,
               prompt: coverData.prompt,
               characterPhotos: coverData.referencePhotos || [],
