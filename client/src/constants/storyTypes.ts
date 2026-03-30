@@ -212,6 +212,7 @@ export const lifeChallenges: LifeChallenge[] = [
 
 // Popular life challenge IDs (shown in expanded "Popular" section)
 export const popularLifeChallengeIds = [
+  'sibling-fighting', 'table-manners', 'understanding-rules', 'making-friends',
   'going-to-bed', 'cleaning-up', 'first-kindergarten', 'first-school',
   'losing-game', 'dealing-bully', 'telling-truth', 'screen-time',
   'moving-house', 'sharing', 'brushing-teeth', 'eating-vegetables'
