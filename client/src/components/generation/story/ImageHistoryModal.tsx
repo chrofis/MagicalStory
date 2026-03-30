@@ -333,6 +333,29 @@ export function ImageHistoryModal({
                           <div className="text-orange-400">penalty</div>
                         </div>
                       </div>
+                      {/* Penalty details — show entity/image-check issues that contributed to penalties */}
+                      {detailVersion.fixableIssues && detailVersion.fixableIssues.filter(i => i.source === 'entity check' || i.source === 'image checks').length > 0 && (
+                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                          <div className="text-xs font-medium text-orange-700 mb-1">Penalty details:</div>
+                          <div className="space-y-1">
+                            {detailVersion.fixableIssues.filter(i => i.source === 'entity check' || i.source === 'image checks').map((issue, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-xs">
+                                <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${
+                                  issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                                  issue.severity === 'major' ? 'bg-orange-200 text-orange-800' :
+                                  'bg-yellow-200 text-yellow-800'
+                                }`}>
+                                  {issue.severity === 'critical' ? '-30' : issue.severity === 'major' ? '-20' : '-10'}
+                                </span>
+                                <span className="text-gray-700">
+                                  {issue.character && <span className="font-medium">{issue.character}: </span>}
+                                  {issue.description}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {detailVersion.issuesSummary && (
