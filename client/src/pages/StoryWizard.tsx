@@ -802,9 +802,14 @@ export default function StoryWizard() {
             const next = { ...prev };
             for (const ct of coverTypes) {
               const cover = fullCovers[ct] as any;
-              if (cover?.imageVersions) {
+              if (cover) {
                 const existing = typeof next[ct] === 'object' ? next[ct] : {} as any;
-                next[ct] = { ...existing, imageVersions: cover.imageVersions } as any;
+                next[ct] = {
+                  ...existing,
+                  // Set imageData if missing (e.g., streaming didn't deliver this cover)
+                  imageData: (existing as any)?.imageData || cover.imageData,
+                  ...(cover.imageVersions ? { imageVersions: cover.imageVersions } : {}),
+                } as any;
               }
             }
             return next;

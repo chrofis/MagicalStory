@@ -2766,7 +2766,8 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     let qualityScore = null;
     let qualityReasoning = null;
     try {
-      const evaluation = await evaluateImageQuality(editResult.imageData, 'scene');
+      const scenePrompt = currentScene?.prompt || currentScene?.description || '';
+      const evaluation = await evaluateImageQuality(editResult.imageData, scenePrompt, [], 'scene');
       if (evaluation) {
         qualityScore = evaluation.score;
         qualityReasoning = evaluation.reasoning;
@@ -5139,7 +5140,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     let qualityScore = null;
     let qualityReasoning = null;
     try {
-      const evaluation = await evaluateImageQuality(editResult.imageData, 'cover');
+      const coverPrompt = existingCover.prompt || existingCover.description || '';
+      const evaluation = await evaluateImageQuality(editResult.imageData, coverPrompt, [], 'cover');
       if (evaluation) {
         qualityScore = evaluation.score;
         qualityReasoning = evaluation.reasoning;
