@@ -3249,10 +3249,22 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Get scene hint (most direct statement of what image should show)
         const sceneHint = scene.outlineExtract || scene.sceneHint || null;
 
+        // For covers, include text requirements in the prompt so the evaluator knows what text to expect
+        let evalPrompt = scene.description || scene.prompt || '';
+        if (evaluationType === 'cover') {
+          const coverType = getCoverType(pageNumber);
+          if (coverType === 'backCover') {
+            evalPrompt += '\n\nTEXT REQUIREMENT: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
+          } else if (coverType === 'frontCover' || coverType === 'initialPage') {
+            // Front cover has title, initial page has dedication — these are in scene.prompt if stored
+            if (scene.prompt) evalPrompt = scene.prompt;
+          }
+        }
+
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
           imageData,
-          scene.description,       // originalPrompt (stripped inside evaluateImageQuality)
+          evalPrompt,              // originalPrompt with text requirements for covers
           characterPhotos,         // referenceImages
           evaluationType,          // evaluationType
           qualityModelOverride || null,
