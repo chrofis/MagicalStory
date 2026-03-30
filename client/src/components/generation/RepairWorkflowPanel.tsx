@@ -592,9 +592,10 @@ export function RepairWorkflowPanel({
                 className="flex-1 appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 disabled={isFullWorkflowBusy}
               >
-                <option value="">Server Default (gemini-2.0-flash)</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast ($0.005/eval)</option>
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough ($0.026/eval)</option>
+                <option value="">Server Default (gemini-2.5-flash)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast, no bbox ($0.005/eval)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough, bbox ($0.026/eval)</option>
+                <option value="grok-4-fast">Grok 4 Fast — vision ($0.01/eval)</option>
               </select>
             </div>
           )}
