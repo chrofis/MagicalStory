@@ -252,13 +252,37 @@ async function iterateCover(coverKey, storyData, options = {}) {
     log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverLandmarkPhotos.length} landmark photos, VB grid: ${coverVbGrid ? 'yes' : 'no'}`);
   }
 
-  // --- Generate image ---
+  // --- Generate empty scene for style anchoring ---
+  const { generateImageOnly } = require('./images');
   const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+  let coverSceneBackground = null;
+  try {
+    const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar') || '';
+    const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+    const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+      STYLE_DESCRIPTION: artStyleDesc,
+      EMPTY_SCENE_DESCRIPTION: emptyDesc,
+      REQUIRED_OBJECTS: ''
+    });
+    const emptyResult = await generateImageOnly(emptyPrompt, [], {
+      landmarkPhotos: coverLandmarkPhotos,
+      visualBibleGrid: coverVbGrid,
+      skipCache: true
+    });
+    if (emptyResult?.imageData) {
+      coverSceneBackground = emptyResult.imageData;
+      log.info(`🎬 [COVER-ITERATE] ${coverLabel}: empty scene generated for style anchoring`);
+    }
+  } catch (err) {
+    log.warn(`⚠️ [COVER-ITERATE] ${coverLabel}: empty scene failed: ${err.message}`);
+  }
+
+  // --- Generate image ---
   const imageResult = await generateImageWithQualityRetry(
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabel} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
   );
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);

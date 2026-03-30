@@ -2802,8 +2802,38 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
+        // Generate empty scene background for style anchoring (same as regular pages)
+        let coverSceneBackground = null;
+        if (modelOverrides.generateEmptyScenes !== false) {
+          try {
+            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar') || '';
+            const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+            const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+              STYLE_DESCRIPTION: artStyleDesc,
+              EMPTY_SCENE_DESCRIPTION: emptyDesc,
+              REQUIRED_OBJECTS: ''
+            });
+            const emptyResult = await generateImageOnly(emptyPrompt, [], {
+              landmarkPhotos: coverLandmarkPhotos,
+              skipCache: true
+            });
+            if (emptyResult?.imageData) {
+              coverSceneBackground = emptyResult.imageData;
+              log.info(`🎬 [STREAM-COVER] ${coverLabel}: empty scene generated for style anchoring`);
+              if (emptyResult.usage) {
+                const isRunware = emptyResult.modelId?.startsWith('runware:');
+                const isGrok = emptyResult.modelId?.startsWith('grok-imagine');
+                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+                addUsage(provider, emptyResult.usage, 'cover_images', emptyResult.modelId);
+              }
+            }
+          } catch (err) {
+            log.warn(`⚠️ [STREAM-COVER] ${coverLabel}: empty scene failed: ${err.message}`);
+          }
+        }
+
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
@@ -2839,6 +2869,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           totalAttempts: coverResult.totalAttempts,
           retryHistory: coverResult.retryHistory,
           referencePhotos: coverPhotos,
+          landmarkPhotos: coverLandmarkPhotos,
+          emptySceneImage: coverSceneBackground || null,
           modelId: coverResult.modelId,
           grokRefImages: coverResult.grokRefImages || null
         };
