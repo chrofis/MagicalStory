@@ -25,7 +25,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const ENTITY_CHECK_MODEL = 'gemini-2.5-flash';  // Text model for evaluation
 const FACE_CROP_SIZE = 256;   // Size for face crops
 const BODY_CROP_SIZE = 512;   // Size for body crops
-const MIN_APPEARANCES = 2;    // Minimum appearances to check consistency
+const MIN_APPEARANCES = 1;    // Minimum appearances to check consistency (1 = compare even single appearances against reference avatar)
 const MAX_GRID_CELLS = 9;     // Maximum cells per grid (3x3)
 
 /**
