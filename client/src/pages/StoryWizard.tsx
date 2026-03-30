@@ -1097,6 +1097,12 @@ export default function StoryWizard() {
               log.info(`All version counts: ${fullImages.map(img => `p${img.pageNumber}=${img.imageVersions?.length || 0}`).join(', ')}`);
             }
 
+            // Log cover version counts
+            const coverVersionCounts = ['frontCover', 'initialPage', 'backCover']
+              .map(ct => `${ct}=${(fullCovers as any)[ct]?.imageVersions?.length || 0}`)
+              .join(', ');
+            log.info(`Cover version counts: ${coverVersionCounts}`);
+
             // Update scene images with imageVersions
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
             for (const img of fullImages) {
