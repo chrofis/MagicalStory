@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -130,6 +130,7 @@ export default function SharedStoryViewer() {
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
 
@@ -442,12 +443,12 @@ export default function SharedStoryViewer() {
         </button>
 
         {/* Book container */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
           {/* Cover pages (frontCover, initialPage, backCover) */}
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div
-              className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4 cursor-pointer"
-              onClick={() => goToPage(currentPage + 1)}
+              className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-2 sm:p-4 cursor-pointer"
+              onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`)}
             >
               <img
                 src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
@@ -478,10 +479,10 @@ export default function SharedStoryViewer() {
                     Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
                   </div>
                 </div>
-                {/* Image — right on desktop, top on mobile. Tap to go to next page */}
+                {/* Image — right on desktop, top on mobile. Tap to view fullscreen */}
                 <div
                   className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2 cursor-pointer"
-                  onClick={() => goToPage(currentPage + 1)}
+                  onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
@@ -555,7 +556,7 @@ export default function SharedStoryViewer() {
 
 
           {/* Page dots - inside book container */}
-          <div className="flex items-center justify-center gap-2 py-3 bg-white border-t border-indigo-100">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
             {Array.from({ length: Math.min(totalPages, 12) }).map((_, i) => {
               const pageIndex = totalPages <= 12 ? i :
                 i < 5 ? i :
@@ -613,6 +614,23 @@ export default function SharedStoryViewer() {
           <ChevronRight className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Fullscreen image viewer */}
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <img
+            src={fullscreenImage}
+            alt="Fullscreen"
+            className="max-w-full max-h-full object-contain"
+          />
+          <button className="absolute top-3 right-3 text-white/70 hover:text-white p-2" onClick={() => setFullscreenImage(null)}>
+            <X size={24} />
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       {showCreditsModal && <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />}
