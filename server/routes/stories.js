@@ -760,8 +760,15 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.frontCover.prompt || null,
           qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
-          referencePhotosCount: (story.coverImages.frontCover.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.frontCover.landmarkPhotos || []).length,
+          referencePhotos: (story.coverImages.frontCover.referencePhotos || []).map(p => ({
+            name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+          })),
+          landmarkPhotos: (story.coverImages.frontCover.landmarkPhotos || []).map(p => ({
+            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+          })),
+          hasVisualBibleGrid: !!story.coverImages.frontCover.visualBibleGrid,
+          grokRefImages: story.coverImages.frontCover.grokRefImages || null,
           // Full retry history with repair/bbox details (same as page images)
           retryHistory: (story.coverImages.frontCover.retryHistory || []).map(r => ({
             type: r.type,
@@ -791,8 +798,15 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.initialPage.prompt || null,
           qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
-          referencePhotosCount: (story.coverImages.initialPage.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.initialPage.landmarkPhotos || []).length,
+          referencePhotos: (story.coverImages.initialPage.referencePhotos || []).map(p => ({
+            name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+          })),
+          landmarkPhotos: (story.coverImages.initialPage.landmarkPhotos || []).map(p => ({
+            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+          })),
+          hasVisualBibleGrid: !!story.coverImages.initialPage.visualBibleGrid,
+          grokRefImages: story.coverImages.initialPage.grokRefImages || null,
           retryHistory: (story.coverImages.initialPage.retryHistory || []).map(r => ({
             type: r.type,
             score: r.score,
@@ -821,8 +835,15 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.backCover.prompt || null,
           qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
-          referencePhotosCount: (story.coverImages.backCover.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.backCover.landmarkPhotos || []).length,
+          referencePhotos: (story.coverImages.backCover.referencePhotos || []).map(p => ({
+            name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+          })),
+          landmarkPhotos: (story.coverImages.backCover.landmarkPhotos || []).map(p => ({
+            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+          })),
+          hasVisualBibleGrid: !!story.coverImages.backCover.visualBibleGrid,
+          grokRefImages: story.coverImages.backCover.grokRefImages || null,
           retryHistory: (story.coverImages.backCover.retryHistory || []).map(r => ({
             type: r.type,
             score: r.score,
