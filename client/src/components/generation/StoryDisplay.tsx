@@ -243,7 +243,8 @@ export function StoryDisplay({
 
   // Check if a page/cover is busy with any image operation (edit, improve, regenerate, char repair)
   const isPageBusy = (pageNumber: number): boolean => {
-    if (isGenerating) return true;
+    // Don't mark pages as busy during story generation — progressive loading handles
+    // its own placeholder display. Only mark busy for explicit user actions.
     if (pageNumber < 0) {
       // Cover
       const coverKeyMap: Record<number, string> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
