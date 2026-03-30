@@ -4777,6 +4777,15 @@ export function StoryDisplay({
                               onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image?.pageNumber}`]: bbox }))}
                             />
 
+                            {/* Eval Testing (per-page evaluation in dev mode) */}
+                            {storyId && (
+                              <EvalTestingPanel
+                                storyId={storyId}
+                                pageNumber={pageNumber}
+                                language={language}
+                              />
+                            )}
+
                             {/* Regeneration Info (fallback for older data without retryHistory) */}
                             {image?.wasRegenerated && (!image?.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
