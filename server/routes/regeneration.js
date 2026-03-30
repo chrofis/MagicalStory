@@ -3249,15 +3249,23 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Get scene hint (most direct statement of what image should show)
         const sceneHint = scene.outlineExtract || scene.sceneHint || null;
 
-        // For covers, include text requirements in the prompt so the evaluator knows what text to expect
+        // For covers, include text requirements so the evaluator knows what text to expect
+        // Without this, the evaluator marks required text (title, dedication, magicalstory.ch) as "UNWANTED"
         let evalPrompt = scene.description || scene.prompt || '';
         if (evaluationType === 'cover') {
           const coverType = getCoverType(pageNumber);
-          if (coverType === 'backCover') {
-            evalPrompt += '\n\nTEXT REQUIREMENT: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
-          } else if (coverType === 'frontCover' || coverType === 'initialPage') {
-            // Front cover has title, initial page has dedication — these are in scene.prompt if stored
-            if (scene.prompt) evalPrompt = scene.prompt;
+          if (coverType === 'frontCover') {
+            const title = storyData.title || storyData.storyTitle || '';
+            if (title) {
+              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${title}"`;
+            }
+          } else if (coverType === 'initialPage') {
+            const dedication = storyData.dedication || '';
+            if (dedication) {
+              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
+            }
+          } else if (coverType === 'backCover') {
+            evalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
           }
         }
 
