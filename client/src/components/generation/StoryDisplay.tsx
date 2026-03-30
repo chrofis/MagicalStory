@@ -3907,10 +3907,10 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
-                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('frontCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('frontCover').length})
                 </button>
               </div>
             )}
@@ -4135,10 +4135,10 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
-                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('initialPage').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
                 </button>
               </div>
             )}
@@ -5408,10 +5408,10 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
-                  className="w-full px-3 py-2 border-2 border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-sm text-indigo-700 font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bilder' : 'Images'} ({getCoverVersions('backCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('backCover').length})
                 </button>
               </div>
             )}
