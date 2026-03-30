@@ -1385,7 +1385,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
               generationConfig: {
                 maxOutputTokens: 16000,
                 temperature: 0.1,
-                responseMimeType: 'application/json'
+                responseMimeType: 'application/json',
+                ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
               },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })
@@ -1430,6 +1431,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
           break; // Got content
         }
+
+        // Log full response structure for debugging empty responses
+        const candidateCount = data.candidates?.length || 0;
+        const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.blockReason || null;
+        const safetyRatings = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}`).join(', ') || 'none';
+        log.warn(`⚠️  [BBOX-DETECT] Empty response details: candidates=${candidateCount}, finishReason=${finishReason || 'none'}, blockReason=${blockReason || 'none'}, safety=[${safetyRatings}], model=${modelId}`);
 
         if (bboxAttempt < 2) {
           log.warn(`⚠️  [BBOX-DETECT] Empty response (0 output tokens), retrying in 2s...`);
