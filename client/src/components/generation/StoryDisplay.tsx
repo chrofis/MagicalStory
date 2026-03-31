@@ -1322,10 +1322,12 @@ export function StoryDisplay({
           method: 'POST', headers, body: JSON.stringify({ loadOnly: true })
         });
 
-        // If no existing bbox found, run full detection
+        // If no existing bbox with identified characters, run full detection
         if (response.ok) {
           const data = await response.json();
-          if (!data.bboxDetection?.figures?.length) {
+          const identifiedCount = data.bboxDetection?.figures
+            ?.filter((f: { name?: string }) => f.name && f.name !== 'UNKNOWN').length || 0;
+          if (identifiedCount === 0) {
             response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
               method: 'POST', headers, body: '{}'
             });
