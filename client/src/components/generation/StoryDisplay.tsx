@@ -1300,11 +1300,14 @@ export function StoryDisplay({
     const isDetecting = charDetectingBbox.has(pageNumber);
     const isOpen = charRepairPopover?.pageNumber === pageNumber;
 
-    // Filter to characters detected in bbox (if available)
+    // Filter to characters detected in bbox, or fall back to all story characters if figures exist but none identified
     const detectedNames = bboxDetection?.figures
       ?.filter(f => f.name && f.name !== 'UNKNOWN')
       .map(f => f.name!) || [];
-    const availableCharacters = characters.filter(c => detectedNames.includes(c.name));
+    const hasFigures = (bboxDetection?.figures?.length || 0) > 0;
+    const availableCharacters = detectedNames.length > 0
+      ? characters.filter(c => detectedNames.includes(c.name))
+      : hasFigures ? characters : []; // If figures exist but none identified, show all characters
 
     // Load existing bbox or detect on-demand, then open popover if characters found
     const detectAndOpen = async () => {
@@ -1322,26 +1325,39 @@ export function StoryDisplay({
           method: 'POST', headers, body: JSON.stringify({ loadOnly: true })
         });
 
-        // If no existing bbox with identified characters, run full detection
+        // Check if existing bbox has figures (even if not identified by name)
         if (response.ok) {
           const data = await response.json();
+          const figureCount = data.bboxDetection?.figures?.length || 0;
           const identifiedCount = data.bboxDetection?.figures
             ?.filter((f: { name?: string }) => f.name && f.name !== 'UNKNOWN').length || 0;
-          if (identifiedCount === 0) {
+
+          if (figureCount === 0) {
+            // No figures at all — run full detection
             response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
               method: 'POST', headers, body: '{}'
             });
+          } else if (identifiedCount === 0 && figureCount > 0) {
+            // Figures exist but none identified — use bbox as-is, show all characters
+            setBboxOverrides(prev => ({ ...prev, [overrideKey]: data.bboxDetection }));
+            if (characters.length > 0) {
+              setCharRepairSelected(characters[0].name);
+              setCharRepairPopover({ pageNumber });
+            }
+            return;
           }
         }
         if (response.ok) {
           const data = await response.json();
           if (data.bboxDetection) {
             setBboxOverrides(prev => ({ ...prev, [overrideKey]: data.bboxDetection }));
-            // Check if characters were found
+            const hasFigs = (data.bboxDetection.figures?.length || 0) > 0;
             const detected = data.bboxDetection.figures
               ?.filter((f: { name?: string }) => f.name && f.name !== 'UNKNOWN')
               .map((f: { name: string }) => f.name) || [];
-            const found = characters.filter(c => detected.includes(c.name));
+            const found = detected.length > 0
+              ? characters.filter(c => detected.includes(c.name))
+              : hasFigs ? characters : [];
             if (found.length > 0) {
               setCharRepairSelected(found[0].name);
               setCharRepairPopover({ pageNumber });
