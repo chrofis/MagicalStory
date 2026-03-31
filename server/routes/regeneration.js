@@ -2984,20 +2984,29 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           { includeDebugImages: true }  // Include mask/before/after for dev mode
         );
       } else {
-        // No bbox targets — use Grok text-based edit with issue descriptions
-        const fixableIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
-        if (fixableIssues.length > 0) {
-          const editInstruction = fixableIssues
+        // No bbox targets — use Grok text-based edit with ALL issue descriptions
+        // Collect from: quality eval + semantic eval + entity consistency + object checks
+        const allIssues = collectAllIssuesForPage(currentScene, storyData, pageNumber);
+        const qualityIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
+        const semanticIssues = (preEvalResult.semanticResult?.issues || preEvalResult.semanticResult?.semanticIssues || [])
+          .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}`, source: 'semantic' }));
+        const combinedIssues = [...qualityIssues, ...semanticIssues, ...allIssues]
+          .filter((issue, idx, arr) => {
+            const desc = issue.description || issue.issue || '';
+            return desc && arr.findIndex(i => (i.description || i.issue || '') === desc) === idx;
+          });
+        if (combinedIssues.length > 0) {
+          const editInstruction = combinedIssues
             .map(i => i.description || i.issue || i.fix || '')
             .filter(Boolean)
             .join('. ');
-          log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${fixableIssues.length} issues: ${editInstruction.substring(0, 200)}`);
+          log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}, entity: ${allIssues.length}): ${editInstruction.substring(0, 200)}`);
           const editResult = await editImageWithPrompt(currentImageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
           if (editResult?.imageData) {
             repairResult = {
               repaired: true,
               imageData: editResult.imageData,
-              repairs: fixableIssues.map(i => ({
+              repairs: combinedIssues.map(i => ({
                 issue: i.description || i.issue || 'fixed',
                 method: 'grok-text-edit',
                 success: true
@@ -3008,7 +3017,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             repairResult = { repaired: false };
           }
         } else {
-          log.info(`ℹ️ [REPAIR] Pass ${pass}: No fix targets and no fixable issues — skipping`);
+          log.info(`ℹ️ [REPAIR] Pass ${pass}: No fix targets and no issues from any source — skipping`);
           repairResult = { repaired: false };
         }
       }
