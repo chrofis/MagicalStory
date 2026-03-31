@@ -1653,7 +1653,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
                     { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
                     { text: refinePrompt }
                   ] }],
-                  generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+                  generationConfig: {
+                    maxOutputTokens: 16000,
+                    temperature: 0.5,
+                    responseMimeType: 'application/json',
+                    ...(modelSupportsThinking(refineModelId) && { thinkingConfig: { thinkingBudget: 0 } })
+                  },
                   safetySettings: GEMINI_SAFETY_SETTINGS
                 })
               });
