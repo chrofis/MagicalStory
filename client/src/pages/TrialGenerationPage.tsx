@@ -209,6 +209,10 @@ export default function TrialGenerationPage() {
     state?.titlePageData?.title || null
   );
 
+  // Slideshow of page images as they arrive during generation
+  const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
+  const [slideshowIndex, setSlideshowIndex] = useState(0);
+
   // Auth state
   const [email, setEmail] = useState('');
   const [authError, setAuthError] = useState('');
@@ -336,6 +340,11 @@ export default function TrialGenerationPage() {
         setTitlePageImage(data.titlePageImage);
         needTitlePageRef.current = false;
         if (data.titlePageTitle) setTitlePageTitle(data.titlePageTitle);
+      }
+
+      // Collect page images as they arrive
+      if (data.pageImages && data.pageImages.length > 0) {
+        setPageImages(data.pageImages);
       }
 
       if (data.status === 'completed') {
@@ -533,6 +542,20 @@ export default function TrialGenerationPage() {
     }
   };
 
+  // Rotate slideshow every 5 seconds when multiple images available
+  useEffect(() => {
+    if (pageImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setSlideshowIndex(prev => (prev + 1) % pageImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [pageImages.length]);
+
+  // Scroll to top on mount (mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Don't render if no state (will redirect)
   if (!state?.sessionToken) return null;
 
@@ -599,20 +622,39 @@ export default function TrialGenerationPage() {
             )}
           </div>
 
-          {/* ── Image preview (smaller) ────────────────────────────── */}
+          {/* ── Image preview — slideshow of pages as they arrive ──── */}
           {pageState !== 'failed' && (
-            <div className="flex justify-center mb-4">
-              {titlePageImage ? (
+            <div className="flex flex-col items-center mb-4">
+              {pageImages.length > 0 ? (
+                <>
+                  <div className="relative w-[55%] max-w-[220px]">
+                    <img
+                      src={pageImages[slideshowIndex % pageImages.length].imageData}
+                      alt={`Page ${pageImages[slideshowIndex % pageImages.length].pageNumber}`}
+                      className="w-full h-auto rounded-lg shadow-md transition-opacity duration-500 blur-[1px]"
+                    />
+                    {/* Subtle overlay to indicate it's a preview */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg" />
+                  </div>
+                  {pageImages.length > 1 && (
+                    <div className="flex gap-1 mt-2">
+                      {pageImages.map((_, i) => (
+                        <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === slideshowIndex % pageImages.length ? 'bg-indigo-500' : 'bg-gray-300'}`} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : titlePageImage ? (
                 <img
                   src={titlePageImage}
                   alt={titlePageTitle || 'Story cover'}
-                  className="w-[70%] h-auto rounded-xl shadow-lg"
+                  className="w-[55%] max-w-[220px] h-auto rounded-lg shadow-md blur-[1px]"
                 />
               ) : state.previewAvatar ? (
                 <img
                   src={state.previewAvatar}
                   alt={state.characterName || 'Character'}
-                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
+                  className="w-36 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
                 />
               ) : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">

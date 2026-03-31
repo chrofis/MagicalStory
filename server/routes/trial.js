@@ -904,6 +904,48 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
       response.errorMessage = 'Story generation failed';
     }
 
+    // Include partial page images as they become available (small thumbnails for teaser)
+    if (job.status !== 'failed') {
+      try {
+        const { getPool: getImgPool } = require('../services/database');
+        const imgPool = getImgPool();
+        // Get completed page images from story_images (saved progressively during generation)
+        const imgResult = await imgPool.query(
+          `SELECT si.page_number, encode(substring(si.image_data::bytea from 1 for 200000), 'escape') as thumb_prefix
+           FROM story_images si
+           JOIN stories s ON si.story_id = s.id
+           WHERE s.user_id = $1 AND si.image_data IS NOT NULL AND si.page_number >= -3
+           ORDER BY si.page_number`,
+          [userId]
+        );
+        // Return tiny thumbnails (resize on client, or just use as-is since they're base64)
+        if (imgResult.rows.length > 0) {
+          const pageImages = [];
+          for (const row of imgResult.rows) {
+            // Get image_data directly — it's stored as base64 data URI
+            const fullResult = await imgPool.query(
+              `SELECT image_data FROM story_images si
+               JOIN stories s ON si.story_id = s.id
+               WHERE s.user_id = $1 AND si.page_number = $2
+               ORDER BY si.version_index DESC LIMIT 1`,
+              [userId, row.page_number]
+            );
+            if (fullResult.rows[0]?.image_data) {
+              pageImages.push({
+                pageNumber: row.page_number,
+                imageData: fullResult.rows[0].image_data
+              });
+            }
+          }
+          if (pageImages.length > 0) {
+            response.pageImages = pageImages;
+          }
+        }
+      } catch (e) {
+        // Non-critical, ignore
+      }
+    }
+
     // Include pre-generated title page image if requested and available
     if (req.query.needTitlePage === '1') {
       try {

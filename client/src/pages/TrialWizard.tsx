@@ -216,6 +216,7 @@ export default function TrialWizard() {
     }
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
+      window.scrollTo(0, 0);
     }
   };
 
@@ -223,6 +224,7 @@ export default function TrialWizard() {
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
       setCurrentStep(STEPS[prevIndex]);
+      window.scrollTo(0, 0);
     }
   };
 
