@@ -627,19 +627,15 @@ export default function TrialGenerationPage() {
             <div className="flex flex-col items-center mb-4">
               {pageImages.length > 0 ? (
                 <>
-                  <div className="relative w-[55%] max-w-[220px]">
-                    <img
-                      src={pageImages[slideshowIndex % pageImages.length].imageData}
-                      alt={`Page ${pageImages[slideshowIndex % pageImages.length].pageNumber}`}
-                      className="w-full h-auto rounded-lg shadow-md transition-opacity duration-500 blur-[1px]"
-                    />
-                    {/* Subtle overlay to indicate it's a preview */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg" />
-                  </div>
+                  <img
+                    src={pageImages[slideshowIndex % pageImages.length].imageData}
+                    alt={`Page ${pageImages[slideshowIndex % pageImages.length].pageNumber}`}
+                    className="w-full h-auto rounded-xl shadow-lg"
+                  />
                   {pageImages.length > 1 && (
-                    <div className="flex gap-1 mt-2">
+                    <div className="flex gap-1.5 mt-2">
                       {pageImages.map((_, i) => (
-                        <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === slideshowIndex % pageImages.length ? 'bg-indigo-500' : 'bg-gray-300'}`} />
+                        <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i === slideshowIndex % pageImages.length ? 'bg-indigo-500' : 'bg-gray-300'}`} />
                       ))}
                     </div>
                   )}
@@ -648,13 +644,13 @@ export default function TrialGenerationPage() {
                 <img
                   src={titlePageImage}
                   alt={titlePageTitle || 'Story cover'}
-                  className="w-[55%] max-w-[220px] h-auto rounded-lg shadow-md blur-[1px]"
+                  className="w-full h-auto rounded-xl shadow-lg"
                 />
               ) : state.previewAvatar ? (
                 <img
                   src={state.previewAvatar}
                   alt={state.characterName || 'Character'}
-                  className="w-36 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
+                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
                 />
               ) : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
