@@ -4822,15 +4822,32 @@ async function _processStoryJobImpl(jobId) {
       }
     }
 
-    // For swiss-stories, derive city from storyTopic if userLocation not set
-    // Skip for Sagen (fairy tales) — they're not city-bound
-    if (inputData.storyCategory === 'swiss-stories' && inputData.storyTopic && !inputData.storyTopic.startsWith('sage-') && !inputData.userLocation?.city) {
-      const { getSwissCityById } = require('./server/lib/swissStories');
-      const cityId = inputData.storyTopic.replace(/-\d+$/, '');
-      const cityMeta = getSwissCityById(cityId);
-      if (cityMeta) {
-        inputData.userLocation = { city: cityMeta.name.en, country: 'Switzerland' };
-        log.debug(`[SWISS] Auto-set userLocation to ${cityMeta.name.en} from storyTopic ${inputData.storyTopic}`);
+    // For swiss-stories, ALWAYS use the story's city for landmarks (not user's home city)
+    // Swiss stories (including Sagen) are city-bound — landmarks must match the story location
+    if (inputData.storyCategory === 'swiss-stories' && inputData.storyTopic) {
+      let storyCity = null;
+
+      // City-based stories: derive city from topic ID (e.g., "basel-3" → "Basel")
+      if (!inputData.storyTopic.startsWith('sage-')) {
+        const { getSwissCityById } = require('./server/lib/swissStories');
+        const cityId = inputData.storyTopic.replace(/-\d+$/, '');
+        const cityMeta = getSwissCityById(cityId);
+        if (cityMeta) storyCity = cityMeta.name.en;
+      } else {
+        // Sagen: look up city from swiss-sagen.json
+        try {
+          const sagen = require('./server/data/swiss-sagen.json');
+          const sage = sagen.find(s => s.id === inputData.storyTopic);
+          if (sage?.city) storyCity = sage.city;
+        } catch (e) { /* ignore */ }
+      }
+
+      if (storyCity) {
+        if (inputData.userLocation?.city && inputData.userLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
+          log.info(`[SWISS] Overriding userLocation from ${inputData.userLocation.city} to ${storyCity} (story is set in ${storyCity})`);
+        }
+        inputData.userLocation = { city: storyCity, country: 'Switzerland' };
+        log.debug(`[SWISS] Using story city ${storyCity} for landmark discovery (storyTopic: ${inputData.storyTopic})`);
       }
     }
 

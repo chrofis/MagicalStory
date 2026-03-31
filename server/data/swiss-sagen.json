@@ -16,9 +16,14 @@
       "de": "Basierend auf dem Roman von Johanna Spyri aus dem Jahr 1881. Spielt auf den Alpweiden oberhalb von Maienfeld (GR), mit dem Heididorf-Museum und der Alp oberhalb von Maienfeld als reale Schauplätze.",
       "fr": "Basé sur le roman de Johanna Spyri de 1881. Se déroule dans les alpages au-dessus de Maienfeld (GR), avec le musée Heididorf et l'alpage au-dessus de Maienfeld comme lieux réels."
     },
-    "themes": ["nature heals", "kindness transforms hearts", "home is where you belong"],
+    "themes": [
+      "nature heals",
+      "kindness transforms hearts",
+      "home is where you belong"
+    ],
     "age": "3+",
-    "emoji": "🏔️"
+    "emoji": "🏔️",
+    "city": "Maienfeld"
   },
   {
     "id": "sage-devils-bridge",
@@ -37,9 +42,13 @@
       "de": "Schweizer Volkssage aus der Schöllenenschlucht, Kanton Uri. Zu den realen Schauplätzen gehören die Teufelsbrücke, der Teufelsstein und die Ortschaft Andermatt.",
       "fr": "Légende populaire suisse des gorges de Schöllenen, canton d'Uri. Les lieux réels comprennent le Teufelsbrücke, la Pierre du Diable (Teufelsstein) et la ville d'Andermatt."
     },
-    "themes": ["cleverness outwits power", "community problem-solving"],
+    "themes": [
+      "cleverness outwits power",
+      "community problem-solving"
+    ],
     "age": "5+",
-    "emoji": "🌉"
+    "emoji": "🌉",
+    "city": "Andermatt"
   },
   {
     "id": "sage-dragons-pilatus",
@@ -58,9 +67,13 @@
       "de": "Schweizer Volkssage aus der Region Luzern. Zu den realen Schauplätzen gehören der Pilatus, der Vierwaldstättersee und Pilatus Kulm.",
       "fr": "Légende populaire suisse de la région de Lucerne. Les lieux réels comprennent le Mont Pilate, le lac des Quatre-Cantons et Pilatus Kulm."
     },
-    "themes": ["don't judge by appearances", "nature holds hidden wonders"],
+    "themes": [
+      "don't judge by appearances",
+      "nature holds hidden wonders"
+    ],
     "age": "3+",
-    "emoji": "🐉"
+    "emoji": "🐉",
+    "city": "Luzern"
   },
   {
     "id": "sage-st-gall-bear",
@@ -79,9 +92,13 @@
       "de": "Schweizer Legende aus dem 7. Jahrhundert, Kanton St. Gallen. Zu den realen Schauplätzen gehören die Stiftsbibliothek St. Gallen (UNESCO-Weltkulturerbe) und die Altstadt von St. Gallen.",
       "fr": "Légende suisse du 7e siècle, canton de Saint-Gall. Les lieux réels comprennent l'Abbaye de Saint-Gall (patrimoine mondial de l'UNESCO) et la vieille ville de Saint-Gall."
     },
-    "themes": ["kindness tames wild creatures", "sharing creates friendship"],
+    "themes": [
+      "kindness tames wild creatures",
+      "sharing creates friendship"
+    ],
     "age": "3+",
-    "emoji": "🐻"
+    "emoji": "🐻",
+    "city": "St. Gallen"
   },
   {
     "id": "sage-vogel-gryff",
@@ -100,9 +117,13 @@
       "de": "Basler Volkstradition, jahrhundertealt, wird jedes Jahr im Januar noch gefeiert. Zu den realen Schauplätzen gehören die Mittlere Brücke, Kleinbasel und der Rhein.",
       "fr": "Tradition populaire bâloise, vieille de plusieurs siècles, encore célébrée chaque année en janvier. Les lieux réels comprennent le Mittlere Brücke (Pont du Milieu), le Petit-Bâle et le Rhin."
     },
-    "themes": ["community celebration", "tradition brings people together"],
+    "themes": [
+      "community celebration",
+      "tradition brings people together"
+    ],
     "age": "3+",
-    "emoji": "🦅"
+    "emoji": "🦅",
+    "city": "Basel"
   },
   {
     "id": "sage-white-chamois",
@@ -121,9 +142,14 @@
       "de": "Schweizer Alpen-Volkssage. Spielt auf verschiedenen Schweizer Alpengipfeln, unter anderem im Berner Oberland und im Wallis.",
       "fr": "Légende populaire des Alpes suisses. Se déroule sur divers sommets alpins suisses, notamment dans l'Oberland bernois et le Valais."
     },
-    "themes": ["respect nature", "greed leads to danger", "pure hearts find their way"],
+    "themes": [
+      "respect nature",
+      "greed leads to danger",
+      "pure hearts find their way"
+    ],
     "age": "4+",
-    "emoji": "🏔️"
+    "emoji": "🏔️",
+    "city": "Grindelwald"
   },
   {
     "id": "sage-frost-giants",
@@ -142,9 +168,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in den gefrorenen Schweizer Bergen, wo Gletscher sich in Wiesen und alpine Blumenfelder verwandeln.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les montagnes suisses gelées, où les glaciers se transforment en prairies et champs de fleurs alpines."
     },
-    "themes": ["light triumphs over cold", "beauty grows from harsh beginnings"],
+    "themes": [
+      "light triumphs over cold",
+      "beauty grows from harsh beginnings"
+    ],
     "age": "3+",
-    "emoji": "❄️"
+    "emoji": "❄️",
+    "city": "Interlaken"
   },
   {
     "id": "sage-cuckoo-clock-fairy",
@@ -163,9 +193,12 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in der Werkstatt eines Schweizer Holzschnitzers in einem Bergdorf.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans l'atelier d'un artisan du bois suisse dans un village de montagne."
     },
-    "themes": ["magic and craftsmanship create wonder"],
+    "themes": [
+      "magic and craftsmanship create wonder"
+    ],
     "age": "3+",
-    "emoji": "🕰️"
+    "emoji": "🕰️",
+    "city": "Zürich"
   },
   {
     "id": "sage-edelweiss-fairy",
@@ -184,9 +217,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf hohen Alpengipfeln, felsigen Bergsimsen und schneebedeckten Klippen.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule sur les hauts sommets alpins, les corniches rocheuses et les falaises enneigées."
     },
-    "themes": ["bravery means standing firm in hard places", "small things hold great courage"],
+    "themes": [
+      "bravery means standing firm in hard places",
+      "small things hold great courage"
+    ],
     "age": "3+",
-    "emoji": "🌸"
+    "emoji": "🌸",
+    "city": "Zermatt"
   },
   {
     "id": "sage-alpine-horn",
@@ -205,9 +242,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Alpweiden, in Bergtälern und in einem Schweizer Dorf.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les alpages, les vallées montagneuses et un village suisse."
     },
-    "themes": ["music brings people together", "gifts should help others"],
+    "themes": [
+      "music brings people together",
+      "gifts should help others"
+    ],
     "age": "3+",
-    "emoji": "🎶"
+    "emoji": "🎶",
+    "city": "Grindelwald"
   },
   {
     "id": "sage-dwarf-chocolate",
@@ -226,9 +267,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Schweizer Bergweiden und in einer verborgenen unterirdischen Süsswarenhöhle. Verbunden mit der Schweizer Schokoladentradition.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les pâturages de montagne suisses et une caverne souterraine cachée de confiserie. Lié à la tradition chocolatière suisse."
     },
-    "themes": ["respect others' work", "greed leads to trouble"],
+    "themes": [
+      "respect others' work",
+      "greed leads to trouble"
+    ],
     "age": "4+",
-    "emoji": "🍫"
+    "emoji": "🍫",
+    "city": "Broc"
   },
   {
     "id": "sage-palace-under-waves",
@@ -247,9 +292,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt am Ufer eines Schweizer Sees, mit einem Kristallpalast unter Wasser und Wassergärten.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule au bord d'un lac suisse, avec un palais de cristal sous l'eau et des jardins aquatiques."
     },
-    "themes": ["every world has its own beauty", "be grateful for where you belong"],
+    "themes": [
+      "every world has its own beauty",
+      "be grateful for where you belong"
+    ],
     "age": "4+",
-    "emoji": "🏰"
+    "emoji": "🏰",
+    "city": "Luzern"
   },
   {
     "id": "sage-friendly-dragons",
@@ -268,9 +317,13 @@
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in einer Schweizer Berghöhle während eines stürmischen Alpenwetters.",
       "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans une grotte de montagne suisse lors d'une tempête alpine."
     },
-    "themes": ["don't judge by appearances", "kindness in unexpected places"],
+    "themes": [
+      "don't judge by appearances",
+      "kindness in unexpected places"
+    ],
     "age": "3+",
-    "emoji": "🐲"
+    "emoji": "🐲",
+    "city": "Luzern"
   },
   {
     "id": "sage-gargantua-matterhorn",
@@ -289,9 +342,12 @@
       "de": "Schweizer Alpensage. Spielt rund um das Matterhorn, Schweizer Täler und Seen.",
       "fr": "Légende alpine suisse. Se déroule autour du Cervin, des vallées et des lacs suisses."
     },
-    "themes": ["even the mightiest things have a story behind them"],
+    "themes": [
+      "even the mightiest things have a story behind them"
+    ],
     "age": "3+",
-    "emoji": "⛰️"
+    "emoji": "⛰️",
+    "city": "Zermatt"
   },
   {
     "id": "sage-wilhelm-tell",
@@ -310,9 +366,14 @@
       "de": "Die berühmteste Schweizer Sage, angesiedelt im Jahr 1307 in Altdorf, Kanton Uri. Reale Schauplätze sind die Tellskapelle am Vierwaldstättersee, die Rütliwiese und die Hohle Gasse. Friedrich Schillers Schauspiel von 1804 machte die Geschichte weltberühmt.",
       "fr": "La légende suisse la plus célèbre, située en 1307 à Altdorf, canton d'Uri. Les lieux réels incluent la Tellskapelle (chapelle de Tell) au bord du lac des Quatre-Cantons, la prairie du Grütli et la Hohle Gasse (chemin creux). La pièce de Friedrich Schiller de 1804 a rendu l'histoire mondialement célèbre."
     },
-    "themes": ["courage against tyranny", "standing up for what is right", "a father's love"],
+    "themes": [
+      "courage against tyranny",
+      "standing up for what is right",
+      "a father's love"
+    ],
     "age": "5+",
-    "emoji": "🏹"
+    "emoji": "🏹",
+    "city": "Altdorf"
   },
   {
     "id": "sage-winkelried-sempach",
@@ -331,9 +392,14 @@
       "de": "Schlacht bei Sempach, 9. Juli 1386. Der österreichische Herzog Leopold III. fiel in der Schlacht. Reale Schauplätze sind die Schlachtkapelle bei Sempach, Kanton Luzern. Winkelrieds Opfer wurde zum Symbol für Schweizer Heldenmut und Aufopferung.",
       "fr": "Bataille de Sempach, 9 juillet 1386. Le duc autrichien Léopold III fut tué dans la bataille. Les lieux réels incluent la Schlachtkapelle (chapelle de la bataille) près de Sempach, canton de Lucerne. Le sacrifice de Winkelried est devenu un symbole de l'héroïsme et du sacrifice suisses."
     },
-    "themes": ["sacrifice for the greater good", "one person can change the course of history", "courage in the face of impossible odds"],
+    "themes": [
+      "sacrifice for the greater good",
+      "one person can change the course of history",
+      "courage in the face of impossible odds"
+    ],
     "age": "6+",
-    "emoji": "🛡️"
+    "emoji": "🛡️",
+    "city": "Sempach"
   },
   {
     "id": "sage-beatus-dragon",
@@ -352,9 +418,14 @@
       "de": "Uralte Sage aus dem Berner Oberland. Zu den realen Schauplätzen gehören die Beatushöhlen bei Beatenberg mit spektakulären Stalaktiten und unterirdischen Wasserfällen sowie der Thunersee.",
       "fr": "Légende ancienne de l'Oberland bernois. Les lieux réels comprennent les grottes de Saint-Béat près de Beatenberg avec des stalactites spectaculaires et des cascades souterraines, et le lac de Thoune."
     },
-    "themes": ["faith overcomes fear", "courage without weapons", "finding home in unexpected places"],
+    "themes": [
+      "faith overcomes fear",
+      "courage without weapons",
+      "finding home in unexpected places"
+    ],
     "age": "4+",
-    "emoji": "⛪"
+    "emoji": "⛪",
+    "city": "Interlaken"
   },
   {
     "id": "sage-pilatus-ghost",
@@ -373,9 +444,14 @@
       "de": "Mittelalterliche Sage aus der Region Luzern. Der Name Pilatus stammt möglicherweise von dieser Sage (oder vom lateinischen «pileatus», wolkenverhüllt). Das Besteigungsverbot war real und dauerte Jahrhunderte bis 1585.",
       "fr": "Légende médiévale de la région de Lucerne. Le Mont Pilate tire peut-être son nom de cette légende (ou du latin «pileatus», coiffé de nuages). L'interdiction d'ascension était réelle et a duré des siècles jusqu'en 1585."
     },
-    "themes": ["guilt seeks forgiveness", "superstition yields to knowledge", "courage to question old fears"],
+    "themes": [
+      "guilt seeks forgiveness",
+      "superstition yields to knowledge",
+      "courage to question old fears"
+    ],
     "age": "6+",
-    "emoji": "👻"
+    "emoji": "👻",
+    "city": "Luzern"
   },
   {
     "id": "sage-bluemlisalp",
@@ -394,9 +470,14 @@
       "de": "Sage aus dem Berner Oberland. Das Blüemlisalp-Massiv (3661 m) zwischen Thunersee und Kandersteg ist eine reale, gletscherbedeckte Berggruppe. Der nahe Oeschinensee gehört zum UNESCO-Welterbe.",
       "fr": "Légende de l'Oberland bernois. Le massif de la Blüemlisalp (3661 m) entre le lac de Thoune et Kandersteg est un vrai massif couvert de glaciers. Le lac d'Oeschinen tout proche est un site du patrimoine mondial de l'UNESCO."
     },
-    "themes": ["respect nature's gifts", "greed and waste bring ruin", "kindness to the poor"],
+    "themes": [
+      "respect nature's gifts",
+      "greed and waste bring ruin",
+      "kindness to the poor"
+    ],
     "age": "5+",
-    "emoji": "🧊"
+    "emoji": "🧊",
+    "city": "Kandersteg"
   },
   {
     "id": "sage-venetianer",
@@ -415,9 +496,14 @@
       "de": "Weitverbreiteter Sagenzyklus in den Schweizer Alpen, besonders in Graubünden, Wallis und Uri. Möglicherweise historisch fundiert — italienische Bergbauexperten reisten im Mittelalter und der Renaissance tatsächlich in die Alpen.",
       "fr": "Cycle de légendes répandu dans les Alpes suisses, surtout dans les Grisons, le Valais et Uri. Pourrait avoir un fondement historique — des experts miniers italiens ont effectivement voyagé dans les Alpes au Moyen Âge et à la Renaissance."
     },
-    "themes": ["respect the mountains' secrets", "greed invites danger", "mystery and adventure"],
+    "themes": [
+      "respect the mountains' secrets",
+      "greed invites danger",
+      "mystery and adventure"
+    ],
     "age": "5+",
-    "emoji": "🗺️"
+    "emoji": "🗺️",
+    "city": "Vals"
   },
   {
     "id": "sage-weisse-frau-wimmis",
@@ -436,9 +522,14 @@
       "de": "Sage aus dem Berner Oberland. Schloss Wimmis ist eine reale Burg aus dem 10. Jahrhundert, auf einem Felsen über dem Dorf am Eingang zum Simmental thronend.",
       "fr": "Légende de l'Oberland bernois. Le château de Wimmis est un vrai château datant du Xe siècle, perché sur un rocher au-dessus du village à l'entrée de la vallée du Simmental."
     },
-    "themes": ["innocence endures", "protection from beyond", "justice will find a way"],
+    "themes": [
+      "innocence endures",
+      "protection from beyond",
+      "justice will find a way"
+    ],
     "age": "5+",
-    "emoji": "🏰"
+    "emoji": "🏰",
+    "city": "Wimmis"
   },
   {
     "id": "sage-lindwurm-bern",
@@ -457,9 +548,14 @@
       "de": "Sage verbunden mit der Frühgeschichte Berns. Die Altstadt von Bern (UNESCO-Welterbe) ist auf der Aareschleife erbaut. Der Lindwurm ist ein Drachentyp der germanischen Sage — schlangenartig mit zwei Vorderbeinen, aber ohne Flügel.",
       "fr": "Légende liée à l'histoire ancienne de Berne. La vieille ville de Berne (patrimoine mondial de l'UNESCO) est construite sur la presqu'île de l'Aar. Le lindwurm est un type de dragon de la légende germanique — au corps de serpent avec deux pattes avant mais sans ailes."
     },
-    "themes": ["courage conquers fear", "protecting your community", "clearing the way for growth"],
+    "themes": [
+      "courage conquers fear",
+      "protecting your community",
+      "clearing the way for growth"
+    ],
     "age": "5+",
-    "emoji": "🐍"
+    "emoji": "🐍",
+    "city": "Bern"
   },
   {
     "id": "sage-pfarrer-von-barglen",
@@ -478,9 +574,14 @@
       "de": "Teil des Tell-Sagenkreises. Bürglen im Kanton Uri gilt als traditioneller Geburtsort von Wilhelm Tell. Das Tell-Museum Bürglen pflegt die Tell-Tradition.",
       "fr": "Fait partie du cycle de légendes de Tell. Bürglen dans le canton d'Uri est le lieu de naissance traditionnel de Guillaume Tell. Le musée Tell de Bürglen préserve la tradition."
     },
-    "themes": ["protecting the vulnerable", "courage without violence", "community solidarity"],
+    "themes": [
+      "protecting the vulnerable",
+      "courage without violence",
+      "community solidarity"
+    ],
     "age": "5+",
-    "emoji": "⛪"
+    "emoji": "⛪",
+    "city": "Altdorf"
   },
   {
     "id": "sage-bettler-sempachersee",
@@ -499,8 +600,13 @@
       "de": "Sage aus der Region Luzern. Der Sempachersee ist ein realer See im Kanton Luzern, auch bekannt als Schauplatz der Schlacht bei Sempach (1386).",
       "fr": "Légende de la région de Lucerne. Le lac de Sempach est un vrai lac du canton de Lucerne, également célèbre comme lieu de la bataille de Sempach (1386)."
     },
-    "themes": ["kindness is rewarded", "generosity from those who have least", "don't judge by appearances"],
+    "themes": [
+      "kindness is rewarded",
+      "generosity from those who have least",
+      "don't judge by appearances"
+    ],
     "age": "4+",
-    "emoji": "🌊"
+    "emoji": "🌊",
+    "city": "Sempach"
   }
 ]
