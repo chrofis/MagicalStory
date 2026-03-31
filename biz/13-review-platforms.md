@@ -8,13 +8,13 @@
 - **Status**: Account created, AFS pending setup
 
 ## Google Business Profile
-- **Profile**: (not yet created)
-- **Review link**: (pending)
-- **Status**: Not started
+- **Profile**: Active
+- **Review link**: https://g.page/r/CfBmdpci_ko4EBM/review
+- **Status**: Set up, review link in shipped email (all 3 languages)
 
-## Integration Plan
-1. Add Trustpilot BCC to post-purchase email (email.js)
-2. Add Trustpilot TrustBox widget to landing page footer (once 5+ reviews)
-3. Set up Google Business Profile
-4. Add Schema.org AggregateRating structured data (once 5+ reviews on either)
-5. Add "Leave a review" link in post-delivery email (3 days after print delivery)
+## Current Integration Status
+- [x] Trustpilot AFS BCC on shipped email (email.js) — auto review invitations
+- [x] Google review link + button in shipped email template (emails/order-shipped.html) — DE/EN/FR
+- [ ] Trustpilot TrustBox widget on landing page (once 5+ reviews)
+- [ ] Schema.org AggregateRating structured data (once 5+ reviews on either)
+- [ ] Trustpilot review link in shipped email alongside Google link
