@@ -431,6 +431,7 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
+      bcc: 'magicalstory.ch+adf14de298@invite.trustpilot.com',
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
