@@ -4568,7 +4568,9 @@ export function StoryDisplay({
                                 </div>
                                 {repairPanel.fixTargets.length === 0 && (
                                   <div className="text-sm text-amber-700">
-                                    {language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.'}
+                                    {((image as any)?.fixableIssues?.length || 0) > 0
+                                      ? (language === 'de' ? 'Keine Zielregionen, aber Qualitätsprobleme gefunden — Grok repariert per Textbeschreibung.' : 'No target regions, but quality issues found — Grok will repair via text description.')
+                                      : (language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.')}
                                   </div>
                                 )}
                                 {repairPanel.fixTargets.map((target, idx) => (
@@ -4621,9 +4623,9 @@ export function StoryDisplay({
                                   </button>
                                   <button
                                     onClick={executeRepair}
-                                    disabled={repairPanel.fixTargets.length === 0 || repairingPage !== null}
+                                    disabled={(repairPanel.fixTargets.length === 0 && !((image as any)?.fixableIssues?.length)) || repairingPage !== null}
                                     className={`px-4 py-1 text-sm font-semibold text-white rounded ${
-                                      repairPanel.fixTargets.length === 0 || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
+                                      (repairPanel.fixTargets.length === 0 && !((image as any)?.fixableIssues?.length)) || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
                                     }`}
                                   >
                                     {repairingPage !== null ? (language === 'de' ? 'Repariere...' : 'Repairing...') : (language === 'de' ? 'Reparatur starten' : 'Run Repair')}
@@ -5168,7 +5170,9 @@ export function StoryDisplay({
                                 </div>
                                 {repairPanel.fixTargets.length === 0 && (
                                   <div className="text-sm text-amber-700">
-                                    {language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.'}
+                                    {((image as any)?.fixableIssues?.length || 0) > 0
+                                      ? (language === 'de' ? 'Keine Zielregionen, aber Qualitätsprobleme gefunden — Grok repariert per Textbeschreibung.' : 'No target regions, but quality issues found — Grok will repair via text description.')
+                                      : (language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.')}
                                   </div>
                                 )}
                                 {repairPanel.fixTargets.map((target, idx) => (
@@ -5221,9 +5225,9 @@ export function StoryDisplay({
                                   </button>
                                   <button
                                     onClick={executeRepair}
-                                    disabled={repairPanel.fixTargets.length === 0 || repairingPage !== null}
+                                    disabled={(repairPanel.fixTargets.length === 0 && !((image as any)?.fixableIssues?.length)) || repairingPage !== null}
                                     className={`px-4 py-1 text-sm font-semibold text-white rounded ${
-                                      repairPanel.fixTargets.length === 0 || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
+                                      (repairPanel.fixTargets.length === 0 && !((image as any)?.fixableIssues?.length)) || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
                                     }`}
                                   >
                                     {repairingPage !== null ? (language === 'de' ? 'Repariere...' : 'Repairing...') : (language === 'de' ? 'Reparatur starten' : 'Run Repair')}
