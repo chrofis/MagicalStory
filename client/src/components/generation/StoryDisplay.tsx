@@ -198,7 +198,7 @@ export function StoryDisplay({
   onEditImage,
   onEditCover: _onEditCover,
   onImproveImage,
-  onRepairImage,
+  onRepairImage: _onRepairImage,
   onRepairCharacter,
   onIteratePage,
   onVisualBibleChange,
@@ -275,6 +275,9 @@ export function StoryDisplay({
   const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
 
   // Character repair popover state
+  // Inpaint repair panel state
+  const [repairPanel, setRepairPanel] = useState<{ pageNumber: number; fixTargets: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }> } | null>(null);
+
   const [charRepairPopover, setCharRepairPopover] = useState<{ pageNumber: number } | null>(null);
   const [charRepairSelected, setCharRepairSelected] = useState<string>('');
   const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
@@ -684,16 +687,43 @@ export function StoryDisplay({
     setIsEditMode(false);
   };
 
-  // Handle auto-repair image (dev mode)
-  const handleRepairImage = async (pageNumber: number) => {
-    if (!onRepairImage || repairingPage !== null) return;
-    setRepairingPage(pageNumber);
+  // Handle repair image — open panel with fix targets for editing
+  const handleRepairImage = (pageNumber: number) => {
+    if (repairingPage !== null) return;
+    // Get fix targets from evaluation data
+    const image = sceneImages.find(img => img.pageNumber === pageNumber);
+    const fixTargets = (image as any)?.fixTargets || [];
+    const fixableIssues = (image as any)?.fixableIssues || [];
+    // Convert fixableIssues to fixTargets format if no fixTargets
+    const targets = fixTargets.length > 0 ? fixTargets : fixableIssues.map((issue: any) => ({
+      boundingBox: issue.boundingBox || [0, 0, 1, 1],
+      issue: issue.description || issue.issue || '',
+      fixPrompt: issue.fix || issue.fixPrompt || '',
+    }));
+    setRepairPanel({ pageNumber, fixTargets: targets });
+  };
+
+  // Execute repair with edited fix targets
+  const executeRepair = async () => {
+    if (!repairPanel || !storyId || repairingPage !== null) return;
+    setRepairingPage(repairPanel.pageNumber);
     try {
-      await onRepairImage(pageNumber);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/repair/image/${repairPanel.pageNumber}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ fixTargets: repairPanel.fixTargets }),
+      });
+      const data = await response.json();
+      if (data.success && data.imageData) {
+        // Refresh the page to show the repaired image
+        window.location.reload();
+      }
     } catch (err) {
       console.error('Failed to repair image:', err);
     } finally {
       setRepairingPage(null);
+      setRepairPanel(null);
     }
   };
 
@@ -4486,27 +4516,102 @@ export function StoryDisplay({
                             )}
 
                             {/* Auto-Repair button - dev only */}
-                            {onRepairImage && (
+                            {storyId && (
                               <button
-                                onClick={() => handleRepairImage(pageNumber)}
+                                onClick={() => repairPanel?.pageNumber === pageNumber ? setRepairPanel(null) : handleRepairImage(pageNumber)}
                                 disabled={isGenerating || repairingPage !== null}
-                                className={`w-full bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                className={`w-full ${repairPanel?.pageNumber === pageNumber ? 'bg-amber-600' : 'bg-amber-500'} text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                   isGenerating || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
                                 }`}
-                                title={language === 'de' ? 'Physik-Fehler automatisch erkennen und reparieren' : language === 'fr' ? 'Détecter et réparer automatiquement les erreurs physiques' : 'Automatically detect and fix physics errors'}
+                                title={language === 'de' ? 'Inpaint-Reparatur: Fehler erkennen und gezielt reparieren' : 'Inpaint repair: detect and fix specific issues'}
                               >
                                 {repairingPage === pageNumber ? (
                                   <>
                                     <Loader size={14} className="animate-spin" />
-                                    {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}
+                                    {language === 'de' ? 'Repariere...' : 'Repairing...'}
                                   </>
                                 ) : (
                                   <>
                                     <Wrench size={14} />
-                                    {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
+                                    {language === 'de' ? 'Inpaint-Reparatur' : 'Inpaint Repair'}
                                   </>
                                 )}
                               </button>
+                            )}
+
+                            {/* Inpaint Repair Panel */}
+                            {repairPanel?.pageNumber === pageNumber && (
+                              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-semibold text-amber-800">
+                                    {language === 'de' ? 'Inpaint-Reparatur' : 'Inpaint Repair'} — {repairPanel.fixTargets.length} {language === 'de' ? 'Ziele' : 'targets'}
+                                  </span>
+                                  <button onClick={() => setRepairPanel(null)} className="text-amber-600 hover:text-amber-800 text-xs">✕</button>
+                                </div>
+                                {repairPanel.fixTargets.length === 0 && (
+                                  <div className="text-sm text-amber-700">
+                                    {language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.'}
+                                  </div>
+                                )}
+                                {repairPanel.fixTargets.map((target, idx) => (
+                                  <div key={idx} className="bg-white rounded p-2 border border-amber-200 space-y-1">
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-xs font-mono text-gray-400 mt-1">#{idx + 1}</span>
+                                      <div className="flex-1 space-y-1">
+                                        <div className="text-xs text-gray-500">{target.issue}</div>
+                                        <textarea
+                                          value={target.fixPrompt}
+                                          onChange={(e) => {
+                                            const updated = [...repairPanel.fixTargets];
+                                            updated[idx] = { ...updated[idx], fixPrompt: e.target.value };
+                                            setRepairPanel({ ...repairPanel, fixTargets: updated });
+                                          }}
+                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                          rows={2}
+                                        />
+                                        <div className="text-[10px] text-gray-400 font-mono">
+                                          bbox: [{target.boundingBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          const updated = repairPanel.fixTargets.filter((_, i) => i !== idx);
+                                          setRepairPanel({ ...repairPanel, fixTargets: updated });
+                                        }}
+                                        className="text-red-400 hover:text-red-600 text-xs mt-1"
+                                        title={language === 'de' ? 'Entfernen' : 'Remove'}
+                                      >✕</button>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setRepairPanel({
+                                      ...repairPanel,
+                                      fixTargets: [...repairPanel.fixTargets, { boundingBox: [0, 0, 1, 1], issue: '', fixPrompt: '' }]
+                                    })}
+                                    className="text-xs text-amber-700 hover:text-amber-900 underline"
+                                  >
+                                    + {language === 'de' ? 'Ziel hinzufügen' : 'Add target'}
+                                  </button>
+                                  <div className="flex-1" />
+                                  <button
+                                    onClick={() => setRepairPanel(null)}
+                                    className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                                  >
+                                    {language === 'de' ? 'Abbrechen' : 'Cancel'}
+                                  </button>
+                                  <button
+                                    onClick={executeRepair}
+                                    disabled={repairPanel.fixTargets.length === 0 || repairingPage !== null}
+                                    className={`px-4 py-1 text-sm font-semibold text-white rounded ${
+                                      repairPanel.fixTargets.length === 0 || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
+                                    }`}
+                                  >
+                                    {repairingPage !== null ? (language === 'de' ? 'Repariere...' : 'Repairing...') : (language === 'de' ? 'Reparatur starten' : 'Run Repair')}
+                                  </button>
+                                </div>
+                              </div>
                             )}
 
                             {/* Repair History - show if image was auto-repaired */}
@@ -5011,27 +5116,102 @@ export function StoryDisplay({
                             )}
 
                             {/* Auto-Repair button - dev only */}
-                            {onRepairImage && (
+                            {storyId && (
                               <button
-                                onClick={() => handleRepairImage(pageNumber)}
+                                onClick={() => repairPanel?.pageNumber === pageNumber ? setRepairPanel(null) : handleRepairImage(pageNumber)}
                                 disabled={isGenerating || repairingPage !== null}
-                                className={`w-full bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                className={`w-full ${repairPanel?.pageNumber === pageNumber ? 'bg-amber-600' : 'bg-amber-500'} text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                                   isGenerating || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
                                 }`}
-                                title={language === 'de' ? 'Physik-Fehler automatisch erkennen und reparieren' : language === 'fr' ? 'Détecter et réparer automatiquement les erreurs physiques' : 'Automatically detect and fix physics errors'}
+                                title={language === 'de' ? 'Inpaint-Reparatur: Fehler erkennen und gezielt reparieren' : 'Inpaint repair: detect and fix specific issues'}
                               >
                                 {repairingPage === pageNumber ? (
                                   <>
                                     <Loader size={14} className="animate-spin" />
-                                    {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}
+                                    {language === 'de' ? 'Repariere...' : 'Repairing...'}
                                   </>
                                 ) : (
                                   <>
                                     <Wrench size={14} />
-                                    {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
+                                    {language === 'de' ? 'Inpaint-Reparatur' : 'Inpaint Repair'}
                                   </>
                                 )}
                               </button>
+                            )}
+
+                            {/* Inpaint Repair Panel */}
+                            {repairPanel?.pageNumber === pageNumber && (
+                              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-semibold text-amber-800">
+                                    {language === 'de' ? 'Inpaint-Reparatur' : 'Inpaint Repair'} — {repairPanel.fixTargets.length} {language === 'de' ? 'Ziele' : 'targets'}
+                                  </span>
+                                  <button onClick={() => setRepairPanel(null)} className="text-amber-600 hover:text-amber-800 text-xs">✕</button>
+                                </div>
+                                {repairPanel.fixTargets.length === 0 && (
+                                  <div className="text-sm text-amber-700">
+                                    {language === 'de' ? 'Keine Reparaturziele gefunden. Führe zuerst eine Qualitätsbewertung aus.' : 'No fix targets found. Run a quality evaluation first.'}
+                                  </div>
+                                )}
+                                {repairPanel.fixTargets.map((target, idx) => (
+                                  <div key={idx} className="bg-white rounded p-2 border border-amber-200 space-y-1">
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-xs font-mono text-gray-400 mt-1">#{idx + 1}</span>
+                                      <div className="flex-1 space-y-1">
+                                        <div className="text-xs text-gray-500">{target.issue}</div>
+                                        <textarea
+                                          value={target.fixPrompt}
+                                          onChange={(e) => {
+                                            const updated = [...repairPanel.fixTargets];
+                                            updated[idx] = { ...updated[idx], fixPrompt: e.target.value };
+                                            setRepairPanel({ ...repairPanel, fixTargets: updated });
+                                          }}
+                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                          rows={2}
+                                        />
+                                        <div className="text-[10px] text-gray-400 font-mono">
+                                          bbox: [{target.boundingBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          const updated = repairPanel.fixTargets.filter((_, i) => i !== idx);
+                                          setRepairPanel({ ...repairPanel, fixTargets: updated });
+                                        }}
+                                        className="text-red-400 hover:text-red-600 text-xs mt-1"
+                                        title={language === 'de' ? 'Entfernen' : 'Remove'}
+                                      >✕</button>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setRepairPanel({
+                                      ...repairPanel,
+                                      fixTargets: [...repairPanel.fixTargets, { boundingBox: [0, 0, 1, 1], issue: '', fixPrompt: '' }]
+                                    })}
+                                    className="text-xs text-amber-700 hover:text-amber-900 underline"
+                                  >
+                                    + {language === 'de' ? 'Ziel hinzufügen' : 'Add target'}
+                                  </button>
+                                  <div className="flex-1" />
+                                  <button
+                                    onClick={() => setRepairPanel(null)}
+                                    className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                                  >
+                                    {language === 'de' ? 'Abbrechen' : 'Cancel'}
+                                  </button>
+                                  <button
+                                    onClick={executeRepair}
+                                    disabled={repairPanel.fixTargets.length === 0 || repairingPage !== null}
+                                    className={`px-4 py-1 text-sm font-semibold text-white rounded ${
+                                      repairPanel.fixTargets.length === 0 || repairingPage !== null ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
+                                    }`}
+                                  >
+                                    {repairingPage !== null ? (language === 'de' ? 'Repariere...' : 'Repairing...') : (language === 'de' ? 'Reparatur starten' : 'Run Repair')}
+                                  </button>
+                                </div>
+                              </div>
                             )}
 
                             {/* Repair History - show if image was auto-repaired */}
