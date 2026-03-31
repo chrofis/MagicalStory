@@ -3542,17 +3542,21 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         evalType: 'quality',
         pageNumber,
         prompt: filledPrompt,
-        rawResponse: evaluation.reasoning,
-        score: evaluation.score,
+        rawResponse: evaluation.reasoning || evaluation.rawResponse || null,
+        rawOutput: evaluation.rawOutput || evaluation.reasoning || null,
+        score: evaluation.score ?? evaluation.qualityScore ?? null,
         qualityScore: evaluation.qualityScore,
         rawScore: evaluation.rawScore,
         verdict: evaluation.verdict,
         issuesSummary: evaluation.issuesSummary,
         fixableIssues: evaluation.fixableIssues,
+        fixTargets: evaluation.fixTargets,
         figures: evaluation.figures,
         matches: evaluation.matches,
         modelId: evaluation.modelId,
-        usage: evaluation.usage
+        usage: evaluation.usage,
+        semanticScore: evaluation.semanticScore,
+        semanticResult: evaluation.semanticResult,
       });
     }
 

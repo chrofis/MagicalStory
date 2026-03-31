@@ -1120,6 +1120,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         rawScore, // Original 0-10 score (visual only)
         verdict,
         reasoning,
+        rawOutput: responseText,              // Full unparsed API response (for dev testing)
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
@@ -1186,6 +1187,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         qualityScore: qualityScore,           // Visual quality score only
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
         reasoning,
+        rawOutput: responseText,              // Full unparsed API response
         issuesSummary,
         fixTargets,
         semanticResult,
