@@ -3293,7 +3293,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Prepare styled avatars (convert existing avatars to target art style)
     // Skip if early avatar styling already succeeded (avoids duplicate costumed avatar generation)
     // If early styling was attempted but failed (promise exists but succeeded=false), run PHASE 2 as fallback
-    if (avatarRequirements.length > 0 && artStyle !== 'realistic' && !earlyAvatarStylingSucceeded) {
+    // Run avatar styling when: non-realistic style OR costumed clothing exists (costumes need generation even for realistic)
+    const hasCostumedClothing = Object.values(clothingRequirements || {}).some(r => r?.costumed?.used);
+    if (avatarRequirements.length > 0 && (artStyle !== 'realistic' || hasCostumedClothing) && !earlyAvatarStylingSucceeded) {
       // Validate that characters have base avatars
       const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
         !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
@@ -4394,7 +4396,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Persist styled avatars to BOTH story data AND characters table
-    if (artStyle !== 'realistic' && inputData.characters) {
+    if ((artStyle !== 'realistic' || hasCostumedClothing) && inputData.characters) {
       try {
         const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
         if (styledAvatarsMap.size > 0) {
