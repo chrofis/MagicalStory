@@ -269,7 +269,13 @@ export default function TrialWizard() {
             <h1 className="text-xl font-bold text-gray-800 mb-2">{li.title}</h1>
             <p className="text-gray-600 text-sm mb-6">{li.desc}</p>
             <button
-              onClick={() => navigate('/create')}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                const category = params.get('category');
+                const topic = params.get('topic');
+                const qs = category && topic ? `?category=${category}&topic=${topic}` : '';
+                navigate(`/create${qs}`);
+              }}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
             >
               {li.goToCreate}

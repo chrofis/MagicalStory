@@ -206,12 +206,14 @@ export default function StoryWizard() {
   const [storyType, setStoryType] = useState(() => {
     return localStorage.getItem('story_type') || '';
   });
-  // New story category system
+  // New story category system — URL params override localStorage (from theme pages)
   const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | ''>(() => {
-    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
+    const urlCategory = searchParams.get('category');
+    return (urlCategory || localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
   });
   const [storyTopic, setStoryTopic] = useState(() => {
-    return localStorage.getItem('story_topic') || '';
+    const urlTopic = searchParams.get('topic');
+    return urlTopic || localStorage.getItem('story_topic') || '';
   });
   const [storyTheme, setStoryTheme] = useState(() => {
     return localStorage.getItem('story_theme') || '';
