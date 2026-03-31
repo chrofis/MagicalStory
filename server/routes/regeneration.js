@@ -2984,13 +2984,12 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           { includeDebugImages: true }  // Include mask/before/after for dev mode
         );
       } else {
-        // No bbox targets — use Grok text-based edit with ALL issue descriptions
-        // Collect from: quality eval + semantic eval + entity consistency + object checks
-        const allIssues = collectAllIssuesForPage(currentScene, storyData, pageNumber);
+        // No bbox targets — use Grok text-based edit with quality + semantic issues
+        // Entity/consistency issues are excluded — those need bbox detection + face repair
         const qualityIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
         const semanticIssues = (preEvalResult.semanticResult?.issues || preEvalResult.semanticResult?.semanticIssues || [])
           .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}`, source: 'semantic' }));
-        const combinedIssues = [...qualityIssues, ...semanticIssues, ...allIssues]
+        const combinedIssues = [...qualityIssues, ...semanticIssues]
           .filter((issue, idx, arr) => {
             const desc = issue.description || issue.issue || '';
             return desc && arr.findIndex(i => (i.description || i.issue || '') === desc) === idx;
@@ -3000,7 +2999,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             .map(i => i.description || i.issue || i.fix || '')
             .filter(Boolean)
             .join('. ');
-          log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}, entity: ${allIssues.length}): ${editInstruction.substring(0, 200)}`);
+          log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
           const editResult = await editImageWithPrompt(currentImageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
           if (editResult?.imageData) {
             repairResult = {
