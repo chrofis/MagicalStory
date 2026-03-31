@@ -4946,7 +4946,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       score: ev?.score ?? ev?.qualityScore ?? null,
       source: 'original',
       evaluation: ev || null,
-      modelId: img.modelId
+      modelId: img.modelId,
+      grokRefImages: img.grokRefImages || null
     }]);
   }
 
@@ -5062,7 +5063,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             }
           }
 
-          return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId };
+          return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId, grokRefImages: result?.grokRefImages || null };
         } catch (err) {
           log.error(`❌ [UNIFIED PIPELINE] Regen pass 1 failed for page ${img.pageNumber}: ${err.message}`);
           return { pageNumber: img.pageNumber, imageData: null, error: err.message };
@@ -5109,7 +5110,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             score: ev.score ?? ev.qualityScore ?? null,
             source: 'regen-attempt-1',
             evaluation: ev,
-            modelId: regenResult.modelId
+            modelId: regenResult.modelId,
+            grokRefImages: regenResult.grokRefImages || null
           });
         }
       }
@@ -5216,7 +5218,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               }
             }
 
-            return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId };
+            return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId, grokRefImages: result?.grokRefImages || null };
           } catch (err) {
             log.error(`❌ [UNIFIED PIPELINE] Regen pass 2 failed for page ${img.pageNumber}: ${err.message}`);
             return { pageNumber: img.pageNumber, imageData: null, error: err.message };
@@ -5259,7 +5261,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               score: ev.score ?? ev.qualityScore ?? null,
               source: 'regen-attempt-2',
               evaluation: ev,
-              modelId: regenResult.modelId
+              modelId: regenResult.modelId,
+              grokRefImages: regenResult.grokRefImages || null
             });
           }
         }
@@ -5541,6 +5544,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       bboxDetection: v.evaluation?.bboxDetection || null,
       description: img.sceneDescription || null,
       prompt: img.prompt || null,
+      grokRefImages: v.grokRefImages || null,
     });
     // Versions in chronological order (original first, then redo attempts)
     for (const v of versions) {
@@ -5585,7 +5589,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: img.characterPhotos,
       landmarkPhotos: img.landmarkPhotos,
       visualBibleGrid: img.visualBibleGrid,
-      grokRefImages: img.grokRefImages || null,
+      grokRefImages: best?.grokRefImages || img.grokRefImages || null,
       emptySceneImage: img.emptySceneImage || null,
       emptyScenePrompt: img.emptyScenePrompt || null,
       sceneCharacters: img.sceneCharacters,
