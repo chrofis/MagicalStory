@@ -348,6 +348,28 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
 
           if ((faceFail || clothingFail) && attempt < maxRetries) {
             log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — retrying`);
+            // Log the failed attempt so dev mode can show it
+            styledAvatarGenerationLog.push({
+              timestamp: new Date().toISOString(),
+              characterName,
+              artStyle,
+              clothingCategory,
+              durationMs: Date.now() - startTime,
+              success: false,
+              error: `Quality gate failed: face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10`,
+              faceMatchScore,
+              clothingMatchScore,
+              faceMatchDetails,
+              clothingMatchReason,
+              attempt,
+              inputs: {
+                facePhoto: hasMultipleRefs ? { identifier: getImageIdentifier(facePhoto), sizeKB: getImageSizeKB(facePhoto), imageData: facePhoto } : null,
+                originalAvatar: { identifier: getImageIdentifier(originalAvatar), sizeKB: getImageSizeKB(originalAvatar), imageData: originalAvatar },
+                styleSample: styleSample ? { identifier: getImageIdentifier(styleSample), sizeKB: getImageSizeKB(styleSample), imageData: styleSample } : null
+              },
+              output: { identifier: `${characterName}_${artStyle}_attempt${attempt}`, sizeKB: Math.round(downsized.length / 1024), imageData: downsized },
+              prompt: fullPrompt
+            });
             downsized = null; // Clear so we retry
             continue;
           }
