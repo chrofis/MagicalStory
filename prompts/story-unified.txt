@@ -106,7 +106,8 @@ SCENE HINT:
   "setting": "indoor|outdoor",
   "time": "morning|midday|afternoon|sunset|night",
   "weather": "sunny|cloudy|rainy|snowy|n/a",
-  "shot": "close-up|medium|wide|ultra-wide"
+  "shot": "close-up|medium|wide|ultra-wide",
+  "emptyScenePrompt": "2-4 sentences describing the SAME scene with NO people. Include: location details, architecture, objects, animals, lighting, weather, camera angle. Leave open space where characters would stand. Artifacts/objects at real-world size, placed where characters would hold them."
 }
 ```
 
@@ -115,6 +116,13 @@ SCENE HINT:
 - `clothing` (required): must match an available avatar category
 - `depth` (optional, default `foreground`): `foreground`, `midground`, or `background` — how far from the camera
 - `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder` — how the camera sees THIS character
+
+**emptyScenePrompt** (required): Describe the SAME scene but with NO people or human figures. This is used to generate a character-free background as a style anchor. Include:
+- Location, architecture, furniture, landscape details
+- All objects/animals/vehicles from the `objects` array at real-world size
+- Lighting, weather, camera angle from the scene
+- Open space where characters would naturally stand
+- Artifacts (books, maps, swords) placed where a character would hold them, using a translucent ghost silhouette to anchor size and position
 
 **Rules:**
 - **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Pick the most important for this visual moment. Others can be in the story text but NOT in the scene hint.

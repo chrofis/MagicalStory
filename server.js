@@ -3683,6 +3683,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos, { skipVisualBible: isGrokImage }
         );
+        // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
+        // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
+        let outlineEmptyScenePrompt = null;
+        try {
+          const hintJson = scene.sceneHint || scene.outlineExtract || '';
+          if (hintJson.includes('{')) {
+            const parsed = JSON.parse(hintJson.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim());
+            outlineEmptyScenePrompt = parsed?.emptyScenePrompt || null;
+          }
+        } catch { /* not valid JSON — fine */ }
+
         return {
           pageNumber: pageNum,
           index,
@@ -3697,6 +3708,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageImageModel,
           pageImageBackend,
           sceneComplexity,
+          // Outline-level emptyScenePrompt (from Sonnet) — used if scene expansion doesn't produce one
+          emptyScenePrompt: outlineEmptyScenePrompt,
         };
       };
 
