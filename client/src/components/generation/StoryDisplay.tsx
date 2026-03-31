@@ -4419,14 +4419,20 @@ export function StoryDisplay({
                             </p>
                           </div>
                         )}
-                        {/* Image action buttons - shown to all users */}
-                        {(onRegenerateImage || onImproveImage || onEditImage) && (
+                        {/* Image action buttons - always shown (greyed out during generation) */}
+                        {(onRegenerateImage || onImproveImage || onEditImage || isGenerating) && (
                           <div className="mt-3 space-y-2">
+                            {isGenerating && !onImproveImage && (
+                              <div className="text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-1">
+                                <Loader size={12} className="animate-spin" />
+                                {language === 'de' ? 'Geschichte wird erstellt — Bearbeitung nach Abschluss möglich' : 'Story generating — editing available after completion'}
+                              </div>
+                            )}
                             {/* Row 1: Image actions — 4 cols on PC, 2 cols on mobile */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {onEditImage && (
+                              {(onEditImage || isGenerating) && (
                                 <button
-                                  onClick={() => onEditImage(pageNumber)}
+                                  onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
@@ -4440,7 +4446,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {onImproveImage && (
+                              {(onImproveImage || isGenerating) && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -4456,7 +4462,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {onRegenerateImage && (
+                              {(onRegenerateImage || isGenerating) && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -4469,7 +4475,7 @@ export function StoryDisplay({
                                   <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
                             {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (
@@ -5021,14 +5027,20 @@ export function StoryDisplay({
                             </div>
                           )}
                         </div>
-                        {/* Image action buttons - shown to all users */}
-                        {(onRegenerateImage || onImproveImage || onEditImage) && (
+                        {/* Image action buttons - always shown (greyed out during generation) */}
+                        {(onRegenerateImage || onImproveImage || onEditImage || isGenerating) && (
                           <div className="mt-3 space-y-2">
+                            {isGenerating && !onImproveImage && (
+                              <div className="text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-1">
+                                <Loader size={12} className="animate-spin" />
+                                {language === 'de' ? 'Geschichte wird erstellt — Bearbeitung nach Abschluss möglich' : 'Story generating — editing available after completion'}
+                              </div>
+                            )}
                             {/* Row 1: Image actions — 4 cols on PC, 2 cols on mobile */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {onEditImage && (
+                              {(onEditImage || isGenerating) && (
                                 <button
-                                  onClick={() => onEditImage(pageNumber)}
+                                  onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
@@ -5042,7 +5054,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {onImproveImage && (
+                              {(onImproveImage || isGenerating) && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -5058,7 +5070,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {onRegenerateImage && (
+                              {(onRegenerateImage || isGenerating) && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -5071,7 +5083,7 @@ export function StoryDisplay({
                                   <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection)}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
                             {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (

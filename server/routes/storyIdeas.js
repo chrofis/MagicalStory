@@ -273,17 +273,41 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
 
-    // Discover landmarks for user location (await to include in ideas prompt)
+    // For swiss-stories, use the story's city for landmarks (not user's home city)
+    let effectiveLocation = userLocation;
+    if (storyCategory === 'swiss-stories' && storyTopic) {
+      let storyCity = null;
+      if (!storyTopic.startsWith('sage-')) {
+        const { getSwissCityById } = require('../lib/swissStories');
+        const cityId = storyTopic.replace(/-\d+$/, '');
+        const cityMeta = getSwissCityById(cityId);
+        if (cityMeta) storyCity = cityMeta.name.en;
+      } else {
+        try {
+          const sagen = require('../data/swiss-sagen.json');
+          const sage = sagen.find(s => s.id === storyTopic);
+          if (sage?.city) storyCity = sage.city;
+        } catch (e) { /* ignore */ }
+      }
+      if (storyCity) {
+        if (effectiveLocation?.city && effectiveLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
+          log.info(`[SWISS] Idea generation: overriding location from ${effectiveLocation.city} to ${storyCity}`);
+        }
+        effectiveLocation = { city: storyCity, country: 'Switzerland' };
+      }
+    }
+
+    // Discover landmarks for story location (await to include in ideas prompt)
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarks = [];
-    if (userLocation?.city && storyCategory !== 'historical') {
-      log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+    if (effectiveLocation?.city && storyCategory !== 'historical') {
+      log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
 
-      const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+      const cacheKey = `${effectiveLocation.city}_${effectiveLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
       // Check landmark_index table first (works for any city worldwide)
       try {
-        const indexedLandmarks = await getIndexedLandmarks(userLocation.city, 20);
+        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
         if (indexedLandmarks.length > 0) {
           // For story ideas, we just need landmark names (no photos needed)
           availableLandmarks = indexedLandmarks.map(l => ({
@@ -296,7 +320,7 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
             isIndexed: true,
             landmarkIndexId: l.id
           }));
-          log.info(`[LANDMARK] 📍 Using ${availableLandmarks.length} indexed landmarks for ${userLocation.city}`);
+          log.info(`[LANDMARK] 📍 Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
         }
       } catch (indexErr) {
         log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
@@ -304,11 +328,11 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
 
       // If not in index, discover on-demand (with timeout)
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${effectiveLocation.city}, ${effectiveLocation.country || ''}...`);
 
         try {
           // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const discoveryPromise = discoverLandmarksForLocation(effectiveLocation.city, effectiveLocation.country || '', 10);
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
           );
@@ -319,14 +343,14 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
           if (availableLandmarks && availableLandmarks.length > 0) {
             userLandmarkCache.set(cacheKey, {
               landmarks: availableLandmarks,
-              city: userLocation.city,
-              country: userLocation.country || '',
+              city: effectiveLocation.city,
+              country: effectiveLocation.country || '',
               timestamp: Date.now()
             });
-            log.info(`[LANDMARK] ✅ Discovered ${availableLandmarks.length} landmarks for ${userLocation.city}`);
+            log.info(`[LANDMARK] ✅ Discovered ${availableLandmarks.length} landmarks for ${effectiveLocation.city}`);
           }
         } catch (err) {
-          log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          log.warn(`[LANDMARK] Discovery failed or timed out for ${effectiveLocation.city}: ${err.message}`);
           availableLandmarks = [];
         }
       }
@@ -357,8 +381,9 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
     const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
-    if (userLocation?.city && effectiveCategory_loc !== 'historical') {
-      const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
+    const locationForPrompt = effectiveLocation || userLocation;
+    if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
+      const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
@@ -468,17 +493,41 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
 
-    // Discover landmarks for user location (await to include in ideas prompt)
+    // For swiss-stories, use the story's city for landmarks (not user's home city)
+    let effectiveLocation = userLocation;
+    if (storyCategory === 'swiss-stories' && storyTopic) {
+      let storyCity = null;
+      if (!storyTopic.startsWith('sage-')) {
+        const { getSwissCityById } = require('../lib/swissStories');
+        const cityId = storyTopic.replace(/-\d+$/, '');
+        const cityMeta = getSwissCityById(cityId);
+        if (cityMeta) storyCity = cityMeta.name.en;
+      } else {
+        try {
+          const sagen = require('../data/swiss-sagen.json');
+          const sage = sagen.find(s => s.id === storyTopic);
+          if (sage?.city) storyCity = sage.city;
+        } catch (e) { /* ignore */ }
+      }
+      if (storyCity) {
+        if (effectiveLocation?.city && effectiveLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
+          log.info(`[SWISS] [STREAM] Idea generation: overriding location from ${effectiveLocation.city} to ${storyCity}`);
+        }
+        effectiveLocation = { city: storyCity, country: 'Switzerland' };
+      }
+    }
+
+    // Discover landmarks for story location (await to include in ideas prompt)
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarks = [];
-    if (userLocation?.city && storyCategory !== 'historical') {
-      log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+    if (effectiveLocation?.city && storyCategory !== 'historical') {
+      log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
 
-      const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+      const cacheKey = `${effectiveLocation.city}_${effectiveLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
       // Check landmark_index table first (works for any city worldwide)
       try {
-        const indexedLandmarks = await getIndexedLandmarks(userLocation.city, 20);
+        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
         if (indexedLandmarks.length > 0) {
           // For story ideas, we just need landmark names (no photos needed)
           availableLandmarks = indexedLandmarks.map(l => ({
@@ -491,7 +540,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
             isIndexed: true,
             landmarkIndexId: l.id
           }));
-          log.info(`[LANDMARK] 📍 [STREAM] Using ${availableLandmarks.length} indexed landmarks for ${userLocation.city}`);
+          log.info(`[LANDMARK] 📍 [STREAM] Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
         }
       } catch (indexErr) {
         log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
@@ -499,14 +548,14 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
 
       // If not in index, discover on-demand (with timeout)
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${effectiveLocation.city}, ${effectiveLocation.country || ''}...`);
 
         // Send SSE event to inform user about landmark discovery
         res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
 
         try {
           // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const discoveryPromise = discoverLandmarksForLocation(effectiveLocation.city, effectiveLocation.country || '', 10);
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
           );
@@ -517,14 +566,14 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
           if (availableLandmarks && availableLandmarks.length > 0) {
             userLandmarkCache.set(cacheKey, {
               landmarks: availableLandmarks,
-              city: userLocation.city,
-              country: userLocation.country || '',
+              city: effectiveLocation.city,
+              country: effectiveLocation.country || '',
               timestamp: Date.now()
             });
-            log.info(`[LANDMARK] ✅ [STREAM] Discovered ${availableLandmarks.length} landmarks for ${userLocation.city}`);
+            log.info(`[LANDMARK] ✅ [STREAM] Discovered ${availableLandmarks.length} landmarks for ${effectiveLocation.city}`);
           }
         } catch (err) {
-          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${effectiveLocation.city}: ${err.message}`);
           availableLandmarks = [];
         }
       }
@@ -555,8 +604,9 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
     const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
-    if (userLocation?.city && effectiveCategory_loc !== 'historical') {
-      const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
+    const locationForPrompt = effectiveLocation || userLocation;
+    if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
+      const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
