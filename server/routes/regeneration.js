@@ -2973,18 +2973,10 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         break;
       }
 
-      // Step 2: Run repair
+      // Step 2: Run repair — always use Grok text edit (no bbox needed)
+      // Bbox detection is only used for character repair (Figur reparieren button)
       let repairResult;
-      if (fixTargets.length > 0) {
-        // Bbox-targeted inpainting (Runware)
-        repairResult = await autoRepairWithTargets(
-          currentImageData,
-          fixTargets,
-          0,  // No additional inspection-based attempts
-          { includeDebugImages: true }  // Include mask/before/after for dev mode
-        );
-      } else {
-        // No bbox targets — use Grok text-based edit with quality + semantic issues
+      {
         // Entity/consistency issues are excluded — those need bbox detection + face repair
         const qualityIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
         const semanticIssues = (preEvalResult.semanticResult?.issues || preEvalResult.semanticResult?.semanticIssues || [])
