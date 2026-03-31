@@ -1438,6 +1438,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         const safetyRatings = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}`).join(', ') || 'none';
         log.warn(`⚠️  [BBOX-DETECT] Empty response details: candidates=${candidateCount}, finishReason=${finishReason || 'none'}, blockReason=${blockReason || 'none'}, safety=[${safetyRatings}], model=${modelId}`);
 
+        // PROHIBITED_CONTENT is a system-level block — retrying won't help, go straight to fallback
+        if (blockReason === 'PROHIBITED_CONTENT') {
+          log.warn(`⚠️  [BBOX-DETECT] Image blocked by Gemini safety (PROHIBITED_CONTENT), skipping retry`);
+          break;
+        }
+
         if (bboxAttempt < 2) {
           log.warn(`⚠️  [BBOX-DETECT] Empty response (0 output tokens), retrying in 2s...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
