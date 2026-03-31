@@ -4237,6 +4237,7 @@ export default function StoryWizard() {
             storyTheme={storyTheme}
             customThemeText={customThemeText}
             userLocation={userLocation}
+            preselectedFromUrl={!!searchParams.get('topic')}
             onCategoryChange={handleCategoryChange}
             onTopicChange={handleTopicChange}
             onThemeChange={handleThemeChange}
