@@ -4487,14 +4487,21 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
             log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Grid repair failed`);
           }
         } else {
-          // Legacy inpainting repair
-          const fixTargets = evaluation?.enrichedFixTargets || evaluation?.fixTargets || [];
-          const inpaintResult = await autoRepairWithTargets(
-            page.imageData,
-            fixTargets,
-            0,
-            { includeDebugImages: isAdmin }
-          );
+          // Grok text edit repair (no bbox needed)
+          const qualityIssues = evaluation?.fixableIssues || [];
+          const semanticIssues = (evaluation?.semanticResult?.issues || evaluation?.semanticResult?.semanticIssues || [])
+            .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}` }));
+          const repairIssueTexts = [...qualityIssues, ...semanticIssues]
+            .map(i => i.description || i.issue || i.fix || '').filter(Boolean);
+          let inpaintResult = { repaired: false, imageData: null };
+          if (repairIssueTexts.length > 0) {
+            const editInstruction = repairIssueTexts.join('. ');
+            log.info(`🔧 [REPAIR EXEC] Page ${pageNum}: Grok text edit with ${repairIssueTexts.length} issues`);
+            const editResult = await editImageWithPrompt(page.imageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
+            if (editResult?.imageData) {
+              inpaintResult = { repaired: true, imageData: editResult.imageData, usage: editResult.usage };
+            }
+          }
 
           if (inpaintResult.repaired && inpaintResult.imageData) {
             // Re-evaluate repaired image to compare with original
@@ -7494,14 +7501,24 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             log.info(`✅ [QUALITY RETRY] ${pageLabel}Grid repair: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed`);
           }
         } else {
-          // Legacy: Inpainting uses text-based coordinates instead of mask images
-          // This avoids confusion when there are multiple similar elements
-          repairResult = await autoRepairWithTargets(
-            result.imageData,
-            fixTargetsToUse,
-            0,  // No additional inspection attempts
-            { includeDebugImages: isAdmin }  // Include before/after images for admin users
-          );
+          // Grok text edit: send quality + semantic issues as text instruction (no bbox needed)
+          const qualityIssues = result.fixableIssues || [];
+          const semanticIssues = (result.semanticResult?.issues || result.semanticResult?.semanticIssues || [])
+            .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}` }));
+          const allRepairIssues = [...qualityIssues, ...semanticIssues]
+            .map(i => i.description || i.issue || i.fix || '').filter(Boolean);
+          if (allRepairIssues.length > 0) {
+            const editInstruction = allRepairIssues.join('. ');
+            log.info(`🔧 [QUALITY RETRY] ${pageLabel}Using Grok text edit with ${allRepairIssues.length} issues: ${editInstruction.substring(0, 200)}`);
+            const editResult = await editImageWithPrompt(result.imageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
+            repairResult = editResult?.imageData ? {
+              repaired: true, imageData: editResult.imageData,
+              repairHistory: allRepairIssues.map(i => ({ issue: i, method: 'grok-text-edit', success: true })),
+              usage: editResult.usage, modelId: 'grok-text-edit'
+            } : { repaired: false };
+          } else {
+            repairResult = { repaired: false };
+          }
         }
 
         // Validate repair result: must have repaired=true, valid imageData, and be different from original
