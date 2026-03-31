@@ -6949,12 +6949,43 @@ async function editImageWithPrompt(imageData, editInstruction, model) {
 
   if (backend === 'grok') {
     // Grok edit path — uses /images/edits endpoint with reference image
-    const grokResult = await editWithGrok(editPrompt, [imageData], { model: modelConfig.modelId });
-    log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
-    return {
-      imageData: grokResult.imageData,
-      usage: { model: modelId, cost: grokResult.usage?.cost }
-    };
+    try {
+      const grokResult = await editWithGrok(editPrompt, [imageData], { model: modelConfig.modelId });
+      log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
+      return {
+        imageData: grokResult.imageData,
+        usage: { model: modelId, cost: grokResult.usage?.cost }
+      };
+    } catch (grokErr) {
+      // Content moderation block — sanitize prompt and retry, then fall back to Gemini
+      if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
+        log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
+        // Soften violent/weapon language for retry
+        const sanitized = editPrompt
+          .replace(/\b(stab|pierce|impale|kill|slay|attack|strike|hit|slash|cut|wound|bleed|blood|die|dead|death)\b/gi, 'touch')
+          .replace(/\b(spear|sword|knife|blade|weapon|arrow|axe)\s+(go(?:es|ing)?|plung(?:es|ing)?|driv(?:es|ing)?|thrust(?:s|ing)?)\s+(into|through)\b/gi, '$1 reaches toward')
+          .replace(/\b(into|through)\s+(the\s+)?(body|chest|stomach|head|neck|heart|flesh|skin)\b/gi, 'near the $3')
+          .replace(/going into/gi, 'pointing at')
+          .replace(/touch.*chin/gi, 'be positioned near the face');
+        if (sanitized !== editPrompt) {
+          log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
+          try {
+            const retryResult = await editWithGrok(sanitized, [imageData], { model: modelConfig.modelId });
+            log.info(`✅ [IMAGE EDIT] Sanitized retry succeeded via Grok`);
+            return {
+              imageData: retryResult.imageData,
+              usage: { model: modelId, cost: retryResult.usage?.cost }
+            };
+          } catch (retryErr) {
+            log.warn(`⚠️ [IMAGE EDIT] Sanitized retry also blocked, falling back to Gemini`);
+          }
+        }
+        // Fall through to Gemini path below
+        log.info(`🔄 [IMAGE EDIT] Falling back to Gemini for content-moderated edit`);
+      } else {
+        throw grokErr; // Non-moderation error, rethrow
+      }
+    }
   }
 
   // Gemini edit path — uses generateContent with responseModalities: IMAGE
