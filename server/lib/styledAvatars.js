@@ -532,10 +532,11 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
-  // Skip for realistic style (no conversion needed)
-  if (artStyle === 'realistic') {
-    log.debug(`⏭️ [STYLED AVATARS] Skipping conversion for realistic style`);
-    return new Map();
+  // For realistic style, skip standard/winter/summer style conversion (photos are already realistic)
+  // But still generate costumed avatars — costumes need to be drawn on the character
+  const isRealistic = artStyle === 'realistic';
+  if (isRealistic) {
+    log.debug(`🎨 [STYLED AVATARS] Realistic style — skipping style conversion, will only generate costumed avatars if needed`);
   }
 
   // NOTE: We intentionally do NOT preload existing styled avatars from character data.
@@ -711,14 +712,20 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       }
 
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
-        neededAvatars.set(cacheKey, {
-          characterName: charName,
-          clothingCategory,
-          originalAvatar,
-          facePhoto,
-          clothingDescription,
-          character: char  // Pass full character object for physical traits
-        });
+        // For realistic style, skip style conversion of standard/winter/summer avatars
+        // (they're already realistic photos). Only costumed avatars need generation.
+        if (isRealistic && !clothingCategory.startsWith('costumed:')) {
+          log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} - skipping for realistic style (already a photo)`);
+        } else {
+          neededAvatars.set(cacheKey, {
+            characterName: charName,
+            clothingCategory,
+            originalAvatar,
+            facePhoto,
+            clothingDescription,
+            character: char  // Pass full character object for physical traits
+          });
+        }
       } else {
         // Log why we can't convert this avatar - helps debug cache misses later
         const reason = !originalAvatar ? 'no base avatar found' :
