@@ -507,6 +507,8 @@ export default function StoryWizard() {
             referencePhotos: devData.referencePhotos ?? img.referencePhotos,
             landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
             hasVisualBibleGrid: devData.hasVisualBibleGrid ?? img.hasVisualBibleGrid,
+            fixTargets: (devData as any).fixTargets ?? img.fixTargets,
+            fixableIssues: (devData as any).fixableIssues ?? (img as any).fixableIssues,
             grokRefImages: (devData as any).grokRefImages ?? (img as any).grokRefImages,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
             emptyScenePrompt: (devData as any).emptyScenePrompt ?? (img as any).emptyScenePrompt,
