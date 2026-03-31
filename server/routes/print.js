@@ -1493,7 +1493,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 
     // Create checkout session with user-appropriate Stripe client
     const session = await userStripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // payment_method_types omitted — Stripe auto-detects from Dashboard settings (card, TWINT, etc.)
       line_items: [{
         price_data: {
           currency: 'chf',
@@ -1562,7 +1562,7 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
 
     // Create checkout session with server-determined price
     const session = await userStripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // payment_method_types omitted — Stripe auto-detects from Dashboard settings (card, TWINT, etc.)
       line_items: [{
         price_data: {
           currency: 'chf',
