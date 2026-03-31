@@ -1629,7 +1629,33 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
             return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
           }).join('\n');
 
-          const refinePrompt = `The attached image shows bounding boxes drawn on an illustration.\n- THICK GREEN boxes = character BODY region\n- THICK BLUE boxes labeled "FACE" = character FACE region (most important!)\n\nCURRENT FACE & BODY BOXES (coordinates in 0-1000 scale, format [ymin, xmin, ymax, xmax]):\n${figuresSummary}\n\nYour task: Look at the image carefully and REFINE these bounding boxes so they accurately capture each character.\n\nFACE BOX RULES (most important):\n- Must include the COMPLETE face: forehead to chin, ear to ear. Nothing cut off.\n- Include hair/hat if it's part of the head silhouette.\n- Must NOT include shoulders or neck below the jawline.\n- If the face is turned or at an angle, the box should still capture the full visible face area.\n\nBODY BOX RULES:\n- Must include the COMPLETE character from head to feet. Nothing cut off.\n- Include arms, legs, clothing, accessories — everything that is part of the character.\n- If feet are visible, the box must extend to the bottom of the feet.\n- If a character is holding something, include the held object in the body box.\n\nCommon issues to fix:\n- Box shifted away from the actual element (move it to center on the character)\n- Box too small — part of the face/body is cut off (EXPAND it)\n- Box too large — includes background or other characters (SHRINK it)\n\nReturn CORRECTED coordinates. Keep the same character names. Only adjust the box positions.\n\nOutput JSON (ONLY figures, no objects):\n{\n  "figures": [\n    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}\n  ]\n}\n\nCoordinates use 0-1000 scale where [0,0] is top-left and [1000,1000] is bottom-right.\nRespond with ONLY the JSON, no explanation.`;
+          const refinePrompt = `Detect the 2d bounding boxes: verify and correct the drawn boxes in this illustration.
+
+The image shows colored bounding boxes overlaid on a storybook illustration:
+- THICK GREEN boxes = character BODY region
+- THICK BLUE boxes labeled "FACE" = character FACE region
+
+CURRENT BOXES (0-1000 scale, [ymin, xmin, ymax, xmax]):
+${figuresSummary}
+
+CRITICAL CHECK — for each character:
+1. Is the FACE BOX centered on the actual face? If the box only covers half the face or is placed on the shoulder/chest/hair instead of the face, MOVE it to the correct position.
+2. Is the FACE BOX the right size? It must cover forehead-to-chin and ear-to-ear. Include hair/hat. Exclude neck/shoulders.
+3. Is the BODY BOX covering the complete character from head to feet? Nothing cut off.
+
+MOST COMMON ERROR: Face box placed at wrong location — shifted to one side, covering only half the face, or placed on the body instead of the face. Fix this by re-centering the face_box on the actual face in the image.
+
+Return corrected coordinates. Keep the same character names.
+
+Output JSON:
+{
+  "figures": [
+    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
+  ]
+}
+
+Coordinates: 0-1000 scale, [0,0] = top-left, [1000,1000] = bottom-right.
+Respond with ONLY the JSON.`;
 
           const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
           const refineModelConfig = TEXT_MODELS[refineModelId];
