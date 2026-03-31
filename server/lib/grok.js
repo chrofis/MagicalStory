@@ -332,11 +332,12 @@ async function packReferences(refs = {}) {
     if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
       const base64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
       const rawBuffer = Buffer.from(base64, 'base64');
-      // Only crop to front column for styled/costumed avatars (2-column grid: front | side)
-      // Raw photos (face, body, fallback) are single images — cropping them cuts the person in half
+      // Crop to front column for avatar grids (2-column: front | side view)
+      // Avatar types (styled-*, costumed-*, clothing-*) are 2-column grids — crop to left half
+      // Raw photos (face, body, bodyNoBg, fallback) are single images — do NOT crop
       const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
-      const isStyledAvatar = photoType && (photoType.startsWith('styled-') || photoType.startsWith('costumed-'));
-      const croppedBuffer = isStyledAvatar ? await cropToFrontColumn(rawBuffer) : rawBuffer;
+      const isAvatarGrid = photoType && (photoType.startsWith('styled-') || photoType.startsWith('costumed-') || photoType.startsWith('clothing-'));
+      const croppedBuffer = isAvatarGrid ? await cropToFrontColumn(rawBuffer) : rawBuffer;
       charBuffers.push(croppedBuffer);
     } else if (charName) {
       log.warn(`⚠️ [GROK] Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);

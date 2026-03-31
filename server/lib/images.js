@@ -6197,8 +6197,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   // Raw photos are single images — cropping cuts the person in half
   const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
   const avatarBuffer = Buffer.from(avatarBase64, 'base64');
-  const isStyledAvatar = options.photoType && (options.photoType.startsWith('styled-') || options.photoType.startsWith('costumed-'));
-  const croppedAvatar = isStyledAvatar ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
+  const isAvatarGrid = options.photoType && (options.photoType.startsWith('styled-') || options.photoType.startsWith('costumed-') || options.photoType.startsWith('clothing-'));
+  const croppedAvatar = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
   const croppedAvatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;
 
   const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
