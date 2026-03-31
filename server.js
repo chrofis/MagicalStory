@@ -758,6 +758,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
           const orderCoverType = fullSession.metadata?.coverType || 'softcover';
           const orderBookFormat = fullSession.metadata?.bookFormat || 'square';
+          const orderQuantity = parseInt(fullSession.metadata?.quantity) || 1;
 
           // Validate required metadata
           if (!userId) {
@@ -836,15 +837,16 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               customer_name, customer_email,
               shipping_name, shipping_address_line1, shipping_address_line2,
               shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              amount_total, currency, payment_status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+              amount_total, currency, payment_status, quantity
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           `, [
             userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
             customerInfo.name, customerInfo.email,
             fullSession.shipping?.name || customerInfo.name,
             address.line1, address.line2,
             address.city, address.state, address.postal_code, address.country,
-            fullSession.amount_total, fullSession.currency, fullSession.payment_status
+            fullSession.amount_total, fullSession.currency, fullSession.payment_status,
+            orderQuantity
           ]);
 
           // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
@@ -897,7 +899,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
           // Now passing array of storyIds for combined book generation
-          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType, orderBookFormat).catch(async (err) => {
+          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType, orderBookFormat, orderQuantity).catch(async (err) => {
             log.error('❌ [BACKGROUND] Error processing book order:', err);
             log.error('   Error stack:', err.stack);
             log.error('   Session ID:', fullSession.id);

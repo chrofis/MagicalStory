@@ -1429,6 +1429,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
   try {
     // Support both single storyId and array of storyIds
     const { storyId, storyIds, coverType = 'softcover', bookFormat = 'square' } = req.body;
+    const quantity = Math.max(1, Math.min(5, parseInt(req.body.quantity) || 1));
     const userId = req.user.id;
 
     // Normalize to array
@@ -1446,8 +1447,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
       return res.status(500).json({ error: `Stripe not configured. Please set ${keyNeeded}` });
     }
 
-    console.log(`💳 Creating Stripe checkout session for user ${userId}, stories: ${allStoryIds.join(', ')}`);
-    log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}, Cover: ${coverType}`);
+    console.log(`💳 Creating Stripe checkout session for user ${userId}, stories: ${allStoryIds.join(', ')}, quantity: ${quantity}`);
+    log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}, Cover: ${coverType}, Quantity: ${quantity}`);
 
     // Fetch all stories and calculate total pages
     const stories = [];
@@ -1502,7 +1503,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
           },
           unit_amount: price,
         },
-        quantity: 1,
+        quantity: quantity,
       }],
       mode: 'payment',
       success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -1513,7 +1514,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         storyCount: stories.length.toString(),
         totalPages: totalPages.toString(),
         coverType: coverType,
-        bookFormat: bookFormat
+        bookFormat: bookFormat,
+        quantity: quantity.toString()
       },
       shipping_address_collection: {
         allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']

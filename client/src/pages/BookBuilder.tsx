@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer, Plus, Minus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -47,6 +47,7 @@ export default function BookBuilder() {
   const [bookFormat, setBookFormat] = useState<'square' | 'A4'>('square');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
+  const [quantity, setQuantity] = useState(1);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[] | undefined>(undefined);
 
   // Fetch pricing tiers on mount
@@ -99,6 +100,10 @@ export default function BookBuilder() {
       processing: 'Processing...',
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
+      quantity: 'Quantity',
+      shippingSaving: 'Save on shipping!',
+      totalPrice: 'Total',
+      perBook: 'per book',
     },
     de: {
       title: 'Erstelle dein Buch',
@@ -135,6 +140,10 @@ export default function BookBuilder() {
       processing: 'Wird verarbeitet...',
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
+      quantity: 'Anzahl',
+      shippingSaving: 'Spare Versandkosten!',
+      totalPrice: 'Gesamt',
+      perBook: 'pro Buch',
     },
     fr: {
       title: 'Créer votre livre',
@@ -171,6 +180,10 @@ export default function BookBuilder() {
       processing: 'Traitement en cours...',
       printPdf: 'PDF impression (Test)',
       generatingPdf: 'Génération du PDF...',
+      quantity: 'Quantité',
+      shippingSaving: 'Économisez sur la livraison !',
+      totalPrice: 'Total',
+      perBook: 'par livre',
     },
   };
 
@@ -225,9 +238,9 @@ export default function BookBuilder() {
     setIsCheckingOut(true);
     try {
       const storyIds = stories.map(s => s.id);
-      log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages });
+      log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages, quantity });
 
-      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat);
+      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
@@ -547,13 +560,52 @@ export default function BookBuilder() {
               </button>
             </div>
 
+            {/* Quantity selector */}
+            {!isOverLimit && price && (
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-3">{t.quantity}</h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                    disabled={quantity <= 1}
+                    className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-indigo-500 hover:bg-indigo-50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Minus size={18} className="text-gray-600" />
+                  </button>
+                  <span className="text-2xl font-bold text-gray-800 w-8 text-center">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(q => Math.min(5, q + 1))}
+                    disabled={quantity >= 5}
+                    className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-indigo-500 hover:bg-indigo-50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={18} className="text-gray-600" />
+                  </button>
+                  {quantity > 1 && (
+                    <span className="text-sm text-green-600 font-medium">{t.shippingSaving}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Price summary */}
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-700">{t.price}</span>
-                  <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
-                </div>
+                {quantity > 1 ? (
+                  <>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-gray-500 text-sm">{quantity} x CHF {price}.- {t.perBook}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
+                      <span className="text-3xl font-bold text-indigo-700">CHF {price * quantity}.-</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-700">{t.price}</span>
+                    <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
+                  </div>
+                )}
                 <p className="text-sm text-gray-500">{t.includesShipping}</p>
                 <p className="text-sm text-gray-500">{t.shippingTime}</p>
                 <p className="text-sm text-green-600 mt-2 font-medium">{t.creditsRefund}</p>

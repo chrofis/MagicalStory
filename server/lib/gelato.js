@@ -114,14 +114,14 @@ async function getCoverDimensions(productUid, pageCount) {
  * @param {string} coverType - Cover type: 'softcover' or 'hardcover'
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
  */
-async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square') {
+async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square', quantity = 1) {
   // Normalize storyIds to array (backwards compatible with single storyId)
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
   log.debug(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
   log.debug(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
-  log.debug(`   Cover type: ${coverType}, Book format: ${bookFormat}`);
+  log.debug(`   Cover type: ${coverType}, Book format: ${bookFormat}, Quantity: ${quantity}`);
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
@@ -311,7 +311,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
           type: 'default',
           url: pdfUrl
         }],
-        quantity: 1
+        quantity: quantity
       }],
       shipmentMethodUid: 'standard',
       shippingAddress: {

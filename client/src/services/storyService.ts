@@ -2014,12 +2014,13 @@ export const storyService = {
   },
 
   // Stripe checkout for book purchase (supports single story or multiple stories)
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4'): Promise<{ url: string }> {
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
       storyIds: ids,
       coverType: coverType || 'softcover',
       bookFormat: bookFormat || 'square',
+      quantity: quantity || 1,
     });
     return response;
   },
