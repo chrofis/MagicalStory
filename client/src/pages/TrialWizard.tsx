@@ -118,13 +118,16 @@ export default function TrialWizard() {
   // Map UI language to story language (de → de-ch for Swiss German)
   const storyLanguage = language === 'de' ? 'de-ch' : language === 'fr' ? 'fr' : 'en';
 
-  // Story input state
-  const [storyInput, setStoryInput] = useState<StoryInput>({
-    storyCategory: '',
-    storyTopic: '',
-    storyTheme: '',
-    storyDetails: '',
-    language: storyLanguage,
+  // Story input state — pre-fill from URL params (from theme pages)
+  const [storyInput, setStoryInput] = useState<StoryInput>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      storyCategory: params.get('category') || '',
+      storyTopic: params.get('topic') || '',
+      storyTheme: '',
+      storyDetails: '',
+      language: storyLanguage,
+    };
   });
 
   // Sync language when UI language changes
@@ -206,7 +209,11 @@ export default function TrialWizard() {
   const currentStepIndex = STEPS.indexOf(currentStep);
 
   const goNext = () => {
-    const nextIndex = currentStepIndex + 1;
+    let nextIndex = currentStepIndex + 1;
+    // Skip topic step if category+topic already set (from theme page URL params)
+    if (STEPS[nextIndex] === 'topic' && storyInput.storyCategory && storyInput.storyTopic) {
+      nextIndex++;
+    }
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
     }

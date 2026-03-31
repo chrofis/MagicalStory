@@ -290,12 +290,19 @@ export default function ThemePage() {
 
           <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
 
-          <Link
-            to={`/try?category=${catSlug}&topic=${themeId}`}
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
-          >
-            {t.createButton} <ArrowRight size={20} />
-          </Link>
+          {(() => {
+            // Map URL category slugs to internal category IDs for StoryWizard
+            const categoryMap: Record<string, string> = { 'life-challenges': 'life-challenge', 'adventure': 'adventure', 'educational': 'educational', 'historical': 'historical' };
+            const wizardCategory = categoryMap[catSlug] || catSlug;
+            return (
+              <Link
+                to={`/try?category=${wizardCategory}&topic=${themeId}`}
+                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
+              >
+                {t.createButton} <ArrowRight size={20} />
+              </Link>
+            );
+          })()}
         </div>
       </div>
 
@@ -415,12 +422,18 @@ export default function ThemePage() {
         <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
-          <Link
-            to={`/try?category=${catSlug}&topic=${themeId}`}
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
-          >
-            {t.ctaButton} <ArrowRight size={18} />
-          </Link>
+          {(() => {
+            const categoryMap: Record<string, string> = { 'life-challenges': 'life-challenge', 'adventure': 'adventure', 'educational': 'educational', 'historical': 'historical' };
+            const wizardCategory = categoryMap[catSlug] || catSlug;
+            return (
+              <Link
+                to={`/try?category=${wizardCategory}&topic=${themeId}`}
+                className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+              >
+                {t.ctaButton} <ArrowRight size={18} />
+              </Link>
+            );
+          })()}
         </div>
       </div>
 
