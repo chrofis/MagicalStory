@@ -1386,9 +1386,10 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
               contents: [{ parts }],
               generationConfig: {
                 maxOutputTokens: 16000,
-                temperature: 0.1,
+                temperature: 0.5,  // Google recommends >0 for bbox to prevent repetition loops
                 responseMimeType: 'application/json',
-                ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
+                // Disable thinking for bbox — Google says it adds latency without improving spatial accuracy
+                ...(modelSupportsThinking(modelId) && { thinkingConfig: { thinkingBudget: 0 } })
               },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })

@@ -1,4 +1,4 @@
-Detect figures and objects in this storybook illustration.
+Detect the 2d bounding boxes of all figures and objects in this storybook illustration.
 
 {{EXPECTED_CHARACTERS}}
 

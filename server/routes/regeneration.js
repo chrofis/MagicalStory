@@ -3827,7 +3827,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: refineParts }],
-              generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+              generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })
           });
@@ -3973,7 +3973,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { maxOutputTokens: 16000, temperature: 0.1, responseMimeType: 'application/json' },
+          generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
           safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
