@@ -1974,15 +1974,25 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     }
     let description;
     if (desc.richDescription) {
-      // Full physical description from character objects
-      description = clothing ? `${desc.richDescription}. Wearing: ${clothing}` : desc.richDescription;
+      // Full physical description — sanitize age/gender terms to avoid safety triggers
+      const sanitized = desc.richDescription
+        .replace(/\b(\d+)\s*years?\s*old\b/gi, 'age $1')
+        .replace(/\b(boy|girl|little boy|little girl|young boy|young girl)\b/gi, 'character')
+        .replace(/\b(child|kid|toddler|infant|baby)\b/gi, 'young character');
+      description = clothing ? `${sanitized}. Wearing: ${clothing}` : sanitized;
     } else {
-      // Minimal description from prompt parsing
+      // Minimal description from prompt parsing — avoid gendered/age terms
       const descParts = [];
-      if (desc.genderTerm) descParts.push(desc.genderTerm);
-      if (desc.age) descParts.push(`${desc.age} years old`);
-      if (desc.isChild === true) descParts.push('child');
-      else if (desc.isChild === false) descParts.push('adult');
+      if (desc.genderTerm) {
+        // Sanitize: "boy" → "character", "little girl" → "young character"
+        const sanitizedGender = desc.genderTerm
+          .replace(/\b(boy|girl|man|woman)\b/gi, 'character')
+          .replace(/\b(little|young)\s+character\b/gi, 'young character');
+        descParts.push(sanitizedGender);
+      }
+      if (desc.age) descParts.push(`age ${desc.age}`);
+      else if (desc.isChild === true) descParts.push('young character');
+      else if (desc.isChild === false) descParts.push('adult character');
       if (clothing) descParts.push(clothing);
       description = descParts.join(', ') || 'character';
     }

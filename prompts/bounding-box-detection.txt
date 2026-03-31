@@ -1,4 +1,4 @@
-Detect the 2d bounding boxes of all figures and objects in this storybook illustration.
+Detect the 2d bounding boxes of all figures and objects in this illustrated image.
 
 {{EXPECTED_CHARACTERS}}
 
@@ -54,15 +54,15 @@ Return ONLY valid JSON:
   ]
 }
 
-EXAMPLE - Scene with two children and a dog:
-Given expected characters: "Lukas (boy, 7 years old, blonde hair)" and "Mia (girl, 3 years old, brown curly hair)"
+EXAMPLE - Scene with two characters and a dog:
+Given expected characters: "Lukas (young character, age 7, blonde hair)" and "Mia (young character, age 3, brown curly hair)"
 Given expected objects: "golden crown", "brown teddy bear"
 
 {
   "figures": [
     {
       "name": "Lukas",
-      "label": "boy with blonde hair in blue hoodie",
+      "label": "character with blonde hair in blue hoodie",
       "position": "left",
       "face_box": [80, 100, 250, 280],
       "body_box": [70, 50, 650, 300],
@@ -70,7 +70,7 @@ Given expected objects: "golden crown", "brown teddy bear"
     },
     {
       "name": "Mia",
-      "label": "girl with curly brown hair in pink dress",
+      "label": "character with curly brown hair in pink dress",
       "position": "right",
       "face_box": [100, 680, 280, 830],
       "body_box": [90, 600, 680, 900],
@@ -106,6 +106,6 @@ Given expected objects: "golden crown", "brown teddy bear"
 IMPORTANT:
 - Detect ALL visible figures, even if partially visible or UNKNOWN
 - Be precise with bounding boxes - they will be used for inpainting
-- Match characters by AGE and GENDER first (child vs adult, boy vs girl), then use CLOTHING and POSITION to distinguish similar characters
-- Two children of similar age are distinguished by their outfits and scene position
+- Match characters by approximate AGE and BUILD first (young vs adult, short vs tall), then use CLOTHING and POSITION to distinguish similar characters
+- Two characters of similar age are distinguished by their outfits and scene position
 - For creatures/animals/non-humans that are not expected characters, use "UNKNOWN"
