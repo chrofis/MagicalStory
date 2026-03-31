@@ -6171,8 +6171,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     let sceneForGrok = sceneBuffer;
 
     const composites = [];
-    const FACE_BLUR_RADIUS_FACTOR = 0.15; // 15% of face width — enough to obscure identity
-    const FACE_PADDING = 0.3; // 30% padding around face bbox
+    const FACE_BLUR_RADIUS_FACTOR = 0.06; // 6% of face width — slight blur, enough to signal "redraw this"
+    const FACE_PADDING = 0.2; // 20% padding around face bbox
 
     // Helper: blur a single face region
     const blurFace = async (faceCoords, label) => {
