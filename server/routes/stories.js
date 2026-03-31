@@ -966,7 +966,12 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         durationMs: entry.durationMs,
         success: entry.success,
         error: entry.error,
+        attempt: entry.attempt,
         prompt: entry.prompt,
+        faceMatchScore: entry.faceMatchScore ?? null,
+        clothingMatchScore: entry.clothingMatchScore ?? null,
+        faceMatchDetails: entry.faceMatchDetails ?? null,
+        clothingMatchReason: entry.clothingMatchReason ?? null,
         inputs: entry.inputs ? {
           facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
           originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,
