@@ -5373,6 +5373,21 @@ export default function StoryWizard() {
         }}
       />
 
+      {/* Pre-selected topic banner (from theme page URL params) */}
+      {storyCategory && storyTopic && step < 4 && step !== 6 && searchParams.get('topic') && (() => {
+        // Look up the topic name for display
+        const { lifeChallenges, storyTypes: adventureTypes, educationalTopics, historicalEvents } = require('@/constants/storyTypes');
+        const allThemes = [...(lifeChallenges || []), ...(adventureTypes || []), ...(educationalTopics || []), ...(historicalEvents || [])];
+        const found = allThemes.find((t: { id: string; name: Record<string, string> }) => t.id === storyTopic);
+        const topicName = found?.name?.[language] || found?.name?.en || storyTopic;
+        return (
+          <div className="mx-3 md:mx-8 mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
+            <span className="text-indigo-500 font-medium">{language === 'de' ? 'Gewähltes Thema:' : language === 'fr' ? 'Thème choisi :' : 'Selected topic:'}</span>
+            <span className="text-indigo-800 font-semibold">{found?.emoji} {topicName}</span>
+          </div>
+        );
+      })()}
+
       {/* Main content - full width, overflow-x-hidden prevents tiny horizontal scroll on iOS */}
       <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1 overflow-x-hidden">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
