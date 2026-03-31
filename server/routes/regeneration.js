@@ -2973,9 +2973,10 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         break;
       }
 
-      // Step 2: Run auto-repair with targets
+      // Step 2: Run repair
       let repairResult;
       if (fixTargets.length > 0) {
+        // Bbox-targeted inpainting (Runware)
         repairResult = await autoRepairWithTargets(
           currentImageData,
           fixTargets,
@@ -2983,8 +2984,33 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           { includeDebugImages: true }  // Include mask/before/after for dev mode
         );
       } else {
-        // No fix targets from eval - use inspection-based repair
-        repairResult = await autoRepairImage(currentImageData, 1, { includeDebugImages: true });
+        // No bbox targets — use Grok text-based edit with issue descriptions
+        const fixableIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
+        if (fixableIssues.length > 0) {
+          const editInstruction = fixableIssues
+            .map(i => i.description || i.issue || i.fix || '')
+            .filter(Boolean)
+            .join('. ');
+          log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${fixableIssues.length} issues: ${editInstruction.substring(0, 200)}`);
+          const editResult = await editImageWithPrompt(currentImageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
+          if (editResult?.imageData) {
+            repairResult = {
+              repaired: true,
+              imageData: editResult.imageData,
+              repairs: fixableIssues.map(i => ({
+                issue: i.description || i.issue || 'fixed',
+                method: 'grok-text-edit',
+                success: true
+              })),
+              usage: editResult.usage
+            };
+          } else {
+            repairResult = { repaired: false };
+          }
+        } else {
+          log.info(`ℹ️ [REPAIR] Pass ${pass}: No fix targets and no fixable issues — skipping`);
+          repairResult = { repaired: false };
+        }
       }
 
       if (!repairResult || !repairResult.repaired) {
