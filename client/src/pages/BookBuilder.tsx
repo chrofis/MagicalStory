@@ -104,6 +104,8 @@ export default function BookBuilder() {
       shippingSaving: 'Save on shipping!',
       totalPrice: 'Total',
       perBook: 'per book',
+      multiDiscount: (n: number) => `CHF ${n} discount per book for 2+ copies`,
+      youSave: (n: number) => `You save CHF ${n}`,
     },
     de: {
       title: 'Erstelle dein Buch',
@@ -142,6 +144,8 @@ export default function BookBuilder() {
       generatingPdf: 'PDF wird erstellt...',
       quantity: 'Anzahl',
       shippingSaving: 'Spare Versandkosten!',
+      multiDiscount: (n: number) => `CHF ${n} Rabatt pro Buch ab 2 Exemplaren`,
+      youSave: (n: number) => `Du sparst CHF ${n}`,
       totalPrice: 'Gesamt',
       perBook: 'pro Buch',
     },
@@ -182,6 +186,8 @@ export default function BookBuilder() {
       generatingPdf: 'Génération du PDF...',
       quantity: 'Quantité',
       shippingSaving: 'Économisez sur la livraison !',
+      multiDiscount: (n: number) => `CHF ${n} de réduction par livre dès 2 exemplaires`,
+      youSave: (n: number) => `Vous économisez CHF ${n}`,
       totalPrice: 'Total',
       perBook: 'par livre',
     },
@@ -581,7 +587,7 @@ export default function BookBuilder() {
                     <Plus size={18} className="text-gray-600" />
                   </button>
                   {quantity > 1 && (
-                    <span className="text-sm text-green-600 font-medium">{t.shippingSaving}</span>
+                    <span className="text-sm text-green-600 font-medium">{t.multiDiscount(6)}</span>
                   )}
                 </div>
               </div>
@@ -590,22 +596,28 @@ export default function BookBuilder() {
             {/* Price summary */}
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
-                {quantity > 1 ? (
-                  <>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-gray-500 text-sm">{quantity} x CHF {price}.- {t.perBook}</span>
-                    </div>
+                {(() => {
+                  const MULTI_DISCOUNT = 6;
+                  const discountedPrice = quantity > 1 ? price - MULTI_DISCOUNT : price;
+                  const totalSaving = quantity > 1 ? MULTI_DISCOUNT * quantity : 0;
+                  return quantity > 1 ? (
+                    <>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-gray-500 text-sm">{quantity} x <span className="line-through">CHF {price}.-</span> <span className="text-green-600 font-semibold">CHF {discountedPrice}.-</span> {t.perBook}</span>
+                      </div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
+                        <span className="text-3xl font-bold text-indigo-700">CHF {discountedPrice * quantity}.-</span>
+                      </div>
+                      <div className="text-sm text-green-600 font-semibold">{t.youSave(totalSaving)}</div>
+                    </>
+                  ) : (
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
-                      <span className="text-3xl font-bold text-indigo-700">CHF {price * quantity}.-</span>
+                      <span className="text-gray-700">{t.price}</span>
+                      <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
                     </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-700">{t.price}</span>
-                    <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
-                  </div>
-                )}
+                  );
+                })()}
                 <p className="text-sm text-gray-500">{t.includesShipping}</p>
                 <p className="text-sm text-gray-500">{t.shippingTime}</p>
                 <p className="text-sm text-green-600 mt-2 font-medium">{t.creditsRefund}</p>

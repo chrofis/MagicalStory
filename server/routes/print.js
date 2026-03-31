@@ -1484,7 +1484,14 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Calculate price based on pages and cover type (using database pricing)
     const isHardcover = coverType === 'hardcover';
     const priceInChf = await getPriceForPages(totalPages, isHardcover);
-    const price = priceInChf * 100; // Convert CHF to cents for Stripe
+    // Multi-copy discount: CHF 6 off per book when ordering 2+
+    const MULTI_COPY_DISCOUNT = 6; // CHF per book
+    const discountPerBook = quantity > 1 ? MULTI_COPY_DISCOUNT : 0;
+    const discountedPriceInChf = Math.max(1, priceInChf - discountPerBook);
+    const price = discountedPriceInChf * 100; // Convert CHF to cents for Stripe
+    if (discountPerBook > 0) {
+      log.info(`💰 [CHECKOUT] Multi-copy discount: CHF ${discountPerBook}/book × ${quantity} = CHF ${discountPerBook * quantity} total savings (${priceInChf} → ${discountedPriceInChf} per book)`);
+    }
 
     const firstStory = stories[0].data;
     const bookTitle = stories.length === 1
