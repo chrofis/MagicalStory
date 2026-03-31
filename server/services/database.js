@@ -879,6 +879,8 @@ async function upsertStory(storyId, userId, storyData) {
 
   // Extract and save scene images to story_images table
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
+    const emptySceneCount = dataForStorage.sceneImages.filter(i => !!i.emptySceneImage).length;
+    if (emptySceneCount > 0) console.log(`🎬 [UPSERT] ${emptySceneCount} pages have emptySceneImage data`);
     for (const img of dataForStorage.sceneImages) {
       if (img.imageData) {
         // Save to story_images table
