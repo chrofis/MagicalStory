@@ -6199,12 +6199,20 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     };
 
-    // 1. Blur target character's face
-    if (faceBbox) {
-      await blurFace(faceBbox, `target face (${charName})`);
+    const whiteoutTarget = options.whiteoutTarget || 'face';
+
+    if (whiteoutTarget === 'body') {
+      // Body repair: blur the full body region (face + body)
+      const bodyBox = [ymin, xmin, ymax, xmax];
+      await blurFace(bodyBox, `target body (${charName})`);
+    } else {
+      // Face repair: blur only the face
+      if (faceBbox) {
+        await blurFace(faceBbox, `target face (${charName})`);
+      }
     }
 
-    // 2. Blur other characters' faces (same blur strength — Grok redraws all, blend restores originals)
+    // Blur other characters' faces (same blur — Grok redraws all, blend restores originals)
     const protectedFacesForGrok = options.protectedFaces || [];
     for (const pf of protectedFacesForGrok) {
       await blurFace(pf, 'other face');
