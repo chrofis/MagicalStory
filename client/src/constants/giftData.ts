@@ -43,19 +43,19 @@ export const giftPages: GiftPageData[] = [
         'Pick a theme your child is currently passionate about — dinosaurs, unicorns, space, or pirates',
         'Upload a clear front-facing photo for the best character likeness',
         'Add siblings or best friends as secondary characters for extra excitement',
-        'Order the hardcover version (from CHF 38) for a gift that feels special to unwrap',
+        'Order the hardcover version (from CHF 33) for a gift that feels special to unwrap',
       ],
       de: [
         'Wähle ein Thema, für das sich dein Kind gerade begeistert — Dinosaurier, Einhörner, Weltraum oder Piraten',
         'Lade ein klares Frontalfoto hoch, damit der Charakter möglichst ähnlich aussieht',
         'Füge Geschwister oder beste Freunde als Nebenfiguren hinzu für extra Spass',
-        'Bestelle die Hardcover-Version (ab CHF 38) für ein Geschenk, das sich besonders anfühlt',
+        'Bestelle die Hardcover-Version (ab CHF 33) für ein Geschenk, das sich besonders anfühlt',
       ],
       fr: [
         'Choisissez un thème qui passionne votre enfant en ce moment — dinosaures, licornes, espace ou pirates',
         'Téléchargez une photo de face claire pour une ressemblance optimale du personnage',
         'Ajoutez des frères et soeurs ou meilleurs amis comme personnages secondaires',
-        'Commandez la version cartonnée (dès CHF 38) pour un cadeau qui fait plaisir à déballer',
+        'Commandez la version cartonnée (dès CHF 33) pour un cadeau qui fait plaisir à déballer',
       ],
     },
     recommendedThemes: [
@@ -82,7 +82,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Can I try it before buying the printed book?', de: 'Kann ich es ausprobieren, bevor ich das gedruckte Buch kaufe?', fr: 'Puis-je essayer avant d\'acheter le livre imprimé ?' },
-        a: { en: 'Yes! You can create a free trial story to see how your child looks in the illustrations. The printed hardcover book starts at CHF 38.', de: 'Ja! Du kannst kostenlos eine Probegeschichte erstellen, um zu sehen, wie dein Kind in den Illustrationen aussieht. Das gedruckte Hardcover-Buch gibt es ab CHF 38.', fr: 'Oui ! Vous pouvez créer une histoire d\'essai gratuite pour voir à quoi ressemble votre enfant dans les illustrations. Le livre cartonné imprimé est disponible dès CHF 38.' },
+        a: { en: 'Yes! You can create a free trial story to see how your child looks in the illustrations. The printed hardcover book starts at CHF 33.', de: 'Ja! Du kannst kostenlos eine Probegeschichte erstellen, um zu sehen, wie dein Kind in den Illustrationen aussieht. Das gedruckte Hardcover-Buch gibt es ab CHF 33.', fr: 'Oui ! Vous pouvez créer une histoire d\'essai gratuite pour voir à quoi ressemble votre enfant dans les illustrations. Le livre cartonné imprimé est disponible dès CHF 33.' },
       },
       {
         q: { en: 'What makes this better than a regular children\'s book?', de: 'Was macht dieses Geschenk besser als ein normales Kinderbuch?', fr: 'Qu\'est-ce qui rend ce cadeau meilleur qu\'un livre pour enfants ordinaire ?' },
@@ -117,19 +117,19 @@ export const giftPages: GiftPageData[] = [
         'Ask the parents for a recent front-facing photo of the child — that\'s all you need',
         'Add a personal dedication message from Grandma and Grandpa in the book',
         'Choose a theme that matches what the grandchild loves right now',
-        'Order the printed hardcover (from CHF 38) — it becomes a family heirloom',
+        'Order the printed hardcover (from CHF 33) — it becomes a family heirloom',
       ],
       de: [
         'Frag die Eltern nach einem aktuellen Frontalfoto des Kindes — mehr brauchst du nicht',
         'Füge eine persönliche Widmung von Oma und Opa im Buch hinzu',
         'Wähle ein Thema, das zum aktuellen Interesse des Enkelkindes passt',
-        'Bestelle das gedruckte Hardcover (ab CHF 38) — es wird zum Familien-Erbstück',
+        'Bestelle das gedruckte Hardcover (ab CHF 33) — es wird zum Familien-Erbstück',
       ],
       fr: [
         'Demandez aux parents une photo récente de face de l\'enfant — c\'est tout ce qu\'il faut',
         'Ajoutez une dédicace personnelle de Mamie et Papi dans le livre',
         'Choisissez un thème qui correspond aux centres d\'intérêt actuels du petit-enfant',
-        'Commandez le livre cartonné imprimé (dès CHF 38) — il deviendra un héritage familial',
+        'Commandez le livre cartonné imprimé (dès CHF 33) — il deviendra un héritage familial',
       ],
     },
     recommendedThemes: [
@@ -186,19 +186,19 @@ export const giftPages: GiftPageData[] = [
         'Ask the parents casually what the child is into right now — then surprise them with the matching theme',
         'You only need one photo and the child\'s first name to get started',
         'A digital story is ready instantly — perfect if you forgot to plan ahead',
-        'For maximum wow-effect, order the printed hardcover (from CHF 38) and wrap it beautifully',
+        'For maximum wow-effect, order the printed hardcover (from CHF 33) and wrap it beautifully',
       ],
       de: [
         'Frag die Eltern beiläufig, wofür sich das Kind gerade begeistert — dann überrasche mit dem passenden Thema',
         'Du brauchst nur ein Foto und den Vornamen des Kindes',
         'Die digitale Geschichte ist sofort bereit — perfekt wenn du vergessen hast, rechtzeitig zu planen',
-        'Für maximalen Wow-Effekt: bestelle das gedruckte Hardcover (ab CHF 38) und verpacke es schön',
+        'Für maximalen Wow-Effekt: bestelle das gedruckte Hardcover (ab CHF 33) und verpacke es schön',
       ],
       fr: [
         'Demandez discrètement aux parents ce qui passionne l\'enfant en ce moment — puis surprenez-le avec le thème correspondant',
         'Il vous faut juste une photo et le prénom de l\'enfant',
         'L\'histoire numérique est prête instantanément — parfait si vous avez oublié de prévoir',
-        'Pour un effet wow maximal, commandez le livre cartonné (dès CHF 38) et emballez-le joliment',
+        'Pour un effet wow maximal, commandez le livre cartonné (dès CHF 33) et emballez-le joliment',
       ],
     },
     recommendedThemes: [
@@ -255,19 +255,19 @@ export const giftPages: GiftPageData[] = [
         'Add a personal dedication from you as godparent — "From your Godmother/Godfather, with love"',
         'Consider gifting it at the baptism ceremony or first birthday for a meaningful keepsake',
         'Choose a theme that reflects a wish for your godchild\'s future (bravery, curiosity, kindness)',
-        'The printed hardcover (from CHF 38) makes it feel like a proper christening gift',
+        'The printed hardcover (from CHF 33) makes it feel like a proper christening gift',
       ],
       de: [
         'Füge eine persönliche Widmung als Gotte/Götti hinzu — "Von deiner Gotte/deinem Götti, mit Liebe"',
         'Schenke es zur Taufe oder zum ersten Geburtstag als bedeutungsvolles Erinnerungsstück',
         'Wähle ein Thema, das einen Wunsch für die Zukunft deines Patenkindes widerspiegelt (Mut, Neugierde, Freundlichkeit)',
-        'Das gedruckte Hardcover (ab CHF 38) macht es zu einem richtigen Taufgeschenk',
+        'Das gedruckte Hardcover (ab CHF 33) macht es zu einem richtigen Taufgeschenk',
       ],
       fr: [
         'Ajoutez une dédicace personnelle de parrain/marraine — "De ton parrain/ta marraine, avec amour"',
         'Offrez-le lors du baptême ou du premier anniversaire comme souvenir significatif',
         'Choisissez un thème qui reflète un souhait pour l\'avenir de votre filleul(e)',
-        'Le livre cartonné imprimé (dès CHF 38) en fait un vrai cadeau de baptême',
+        'Le livre cartonné imprimé (dès CHF 33) en fait un vrai cadeau de baptême',
       ],
     },
     recommendedThemes: [
@@ -354,7 +354,7 @@ export const giftPages: GiftPageData[] = [
     faq: [
       {
         q: { en: 'What do grandparents give their grandchild?', de: 'Was schenken Grosseltern ihrem Enkelkind?', fr: 'Que donnent les grands-parents à leur petit-enfant ?' },
-        a: { en: 'A personalized storybook is the ideal gift from grandparents — personal, creative, and lasting. Unlike toys, it creates shared reading moments and becomes a family keepsake. From CHF 38 for the printed book.', de: 'Ein personalisiertes Geschichtenbuch ist das ideale Geschenk von Grosseltern — persönlich, kreativ und bleibend. Anders als Spielzeug schafft es gemeinsame Lesemomente und wird zum Familien-Erbstück. Ab CHF 38 für das gedruckte Buch.', fr: 'Un livre personnalisé est le cadeau idéal des grands-parents — personnel, créatif et durable. Dès CHF 38 pour le livre imprimé.' },
+        a: { en: 'A personalized storybook is the ideal gift from grandparents — personal, creative, and lasting. Unlike toys, it creates shared reading moments and becomes a family keepsake. From CHF 33 for the printed book.', de: 'Ein personalisiertes Geschichtenbuch ist das ideale Geschenk von Grosseltern — persönlich, kreativ und bleibend. Anders als Spielzeug schafft es gemeinsame Lesemomente und wird zum Familien-Erbstück. Ab CHF 33 für das gedruckte Buch.', fr: 'Un livre personnalisé est le cadeau idéal des grands-parents — personnel, créatif et durable. Dès CHF 33 pour le livre imprimé.' },
       },
       {
         q: { en: 'Is creating the book difficult for grandparents?', de: 'Ist die Erstellung des Buches für Grosseltern schwierig?', fr: 'La création du livre est-elle difficile pour les grands-parents ?' },
@@ -366,7 +366,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'How much does a personalized book cost?', de: 'Was kostet ein personalisiertes Buch?', fr: 'Combien coûte un livre personnalisé ?' },
-        a: { en: 'You can try it for free! The printed hardcover book starts at CHF 38. A digital version is also available at a lower price.', de: 'Du kannst es kostenlos testen! Das gedruckte Hardcover-Buch gibt es ab CHF 38. Eine digitale Version ist auch zu einem günstigeren Preis verfügbar.', fr: 'Vous pouvez essayer gratuitement ! Le livre cartonné imprimé est disponible dès CHF 38. Une version numérique est aussi disponible.' },
+        a: { en: 'You can try it for free! The printed hardcover book starts at CHF 33. A digital version is also available at a lower price.', de: 'Du kannst es kostenlos testen! Das gedruckte Hardcover-Buch gibt es ab CHF 33. Eine digitale Version ist auch zu einem günstigeren Preis verfügbar.', fr: 'Vous pouvez essayer gratuitement ! Le livre cartonné imprimé est disponible dès CHF 33. Une version numérique est aussi disponible.' },
       },
     ],
   },
@@ -529,9 +529,9 @@ export const giftPages: GiftPageData[] = [
       fr: 'Rendez leur anniversaire inoubliable avec un livre personnalisé. Votre enfant déballe un livre où il est le héros — avec son nom, son visage et sa personnalité sur chaque page.',
     },
     intro: {
-      en: 'Birthdays are the one day where a child should feel like the most important person in the world. A personalized storybook delivers exactly that feeling — a professionally illustrated book where the birthday child is the main character. No two books are alike, because every story is uniquely generated by AI based on the child\'s photo, name, and traits. Whether they\'re turning 3 or 10, this is the birthday gift that stands out from the pile of toys and is still being read months later. Create a free trial first, then order the beautiful hardcover from CHF 38.',
-      de: 'Am Geburtstag soll sich ein Kind fühlen wie die wichtigste Person der Welt. Ein personalisiertes Geschichtenbuch liefert genau dieses Gefühl — ein professionell illustriertes Buch, in dem das Geburtstagskind die Hauptfigur ist. Kein Buch gleicht dem anderen, weil jede Geschichte einzigartig von KI generiert wird, basierend auf Foto, Name und Eigenschaften des Kindes. Ob es 3 oder 10 wird — dieses Geburtstagsgeschenk sticht aus dem Spielzeugberg heraus und wird noch Monate später gelesen. Erstelle zuerst kostenlos eine Probe, dann bestelle das schöne Hardcover ab CHF 38.',
-      fr: 'Le jour de l\'anniversaire, un enfant devrait se sentir comme la personne la plus importante au monde. Un livre personnalisé offre exactement ce sentiment. Que votre enfant ait 3 ou 10 ans, c\'est le cadeau qui se démarque de la pile de jouets. Essayez gratuitement, puis commandez le livre cartonné dès CHF 38.',
+      en: 'Birthdays are the one day where a child should feel like the most important person in the world. A personalized storybook delivers exactly that feeling — a professionally illustrated book where the birthday child is the main character. No two books are alike, because every story is uniquely generated by AI based on the child\'s photo, name, and traits. Whether they\'re turning 3 or 10, this is the birthday gift that stands out from the pile of toys and is still being read months later. Create a free trial first, then order the beautiful hardcover from CHF 33.',
+      de: 'Am Geburtstag soll sich ein Kind fühlen wie die wichtigste Person der Welt. Ein personalisiertes Geschichtenbuch liefert genau dieses Gefühl — ein professionell illustriertes Buch, in dem das Geburtstagskind die Hauptfigur ist. Kein Buch gleicht dem anderen, weil jede Geschichte einzigartig von KI generiert wird, basierend auf Foto, Name und Eigenschaften des Kindes. Ob es 3 oder 10 wird — dieses Geburtstagsgeschenk sticht aus dem Spielzeugberg heraus und wird noch Monate später gelesen. Erstelle zuerst kostenlos eine Probe, dann bestelle das schöne Hardcover ab CHF 33.',
+      fr: 'Le jour de l\'anniversaire, un enfant devrait se sentir comme la personne la plus importante au monde. Un livre personnalisé offre exactement ce sentiment. Que votre enfant ait 3 ou 10 ans, c\'est le cadeau qui se démarque de la pile de jouets. Essayez gratuitement, puis commandez le livre cartonné dès CHF 33.',
     },
     tips: {
       en: [
@@ -607,19 +607,19 @@ export const giftPages: GiftPageData[] = [
       en: [
         'Write a heartfelt dedication from the godparents or family on the first page',
         'Choose a gentle theme like forest animals or unicorns for a young child',
-        'Order the printed hardcover (from CHF 38) — a baptism gift should feel substantial',
+        'Order the printed hardcover (from CHF 33) — a baptism gift should feel substantial',
         'The book grows with the child — they\'ll start reading it themselves in a few years',
       ],
       de: [
         'Schreibe eine herzliche Widmung von den Paten oder der Familie auf die erste Seite',
         'Wähle ein sanftes Thema wie Waldtiere oder Einhörner für ein kleines Kind',
-        'Bestelle das gedruckte Hardcover (ab CHF 38) — ein Taufgeschenk sollte sich wertig anfühlen',
+        'Bestelle das gedruckte Hardcover (ab CHF 33) — ein Taufgeschenk sollte sich wertig anfühlen',
         'Das Buch wächst mit dem Kind — in ein paar Jahren liest es die Geschichte selbst',
       ],
       fr: [
         'Écrivez une dédicace sincère du parrain/marraine ou de la famille sur la première page',
         'Choisissez un thème doux comme les animaux de la forêt ou les licornes pour un jeune enfant',
-        'Commandez le livre cartonné (dès CHF 38) — un cadeau de baptême doit être de qualité',
+        'Commandez le livre cartonné (dès CHF 33) — un cadeau de baptême doit être de qualité',
         'Le livre grandit avec l\'enfant — il le lira seul dans quelques années',
       ],
     },
@@ -841,9 +841,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'ninja', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Every story is uniquely generated in minutes. Printed hardcovers (from CHF 38) delivered in 5–7 business days.',
-      de: 'Jede Geschichte wird in Minuten einzigartig generiert. Gedruckte Hardcover (ab CHF 38) in 5–7 Werktagen geliefert.',
-      fr: 'Chaque histoire est générée de manière unique en quelques minutes. Livres cartonnés (dès CHF 38) livrés en 5 à 7 jours ouvrables.',
+      en: 'Every story is uniquely generated in minutes. Printed hardcovers (from CHF 33) delivered in 5–7 business days.',
+      de: 'Jede Geschichte wird in Minuten einzigartig generiert. Gedruckte Hardcover (ab CHF 33) in 5–7 Werktagen geliefert.',
+      fr: 'Chaque histoire est générée de manière unique en quelques minutes. Livres cartonnés (dès CHF 33) livrés en 5 à 7 jours ouvrables.',
     },
     faq: [
       {
@@ -887,19 +887,19 @@ export const giftPages: GiftPageData[] = [
         'Upload a clear, well-lit front-facing photo for the most accurate character likeness',
         'Add details like hair color, skin tone, and clothing preferences for better results',
         'Include the child\'s real interests and personality traits to make the story even more personal',
-        'Combine with a printed hardcover (from CHF 38) for a gift that feels truly premium',
+        'Combine with a printed hardcover (from CHF 33) for a gift that feels truly premium',
       ],
       de: [
         'Lade ein klares, gut beleuchtetes Frontalfoto hoch für die beste Ähnlichkeit',
         'Füge Details wie Haarfarbe, Hautton und Kleidungsvorlieben hinzu für bessere Ergebnisse',
         'Gib die echten Interessen und Persönlichkeitsmerkmale des Kindes an für eine noch persönlichere Geschichte',
-        'Kombiniere mit einem gedruckten Hardcover (ab CHF 38) für ein wirklich hochwertiges Geschenk',
+        'Kombiniere mit einem gedruckten Hardcover (ab CHF 33) für ein wirklich hochwertiges Geschenk',
       ],
       fr: [
         'Téléchargez une photo de face claire et bien éclairée pour la meilleure ressemblance',
         'Ajoutez des détails comme la couleur des cheveux et le teint pour de meilleurs résultats',
         'Incluez les vrais intérêts de l\'enfant pour une histoire encore plus personnelle',
-        'Combinez avec le livre cartonné (dès CHF 38) pour un cadeau premium',
+        'Combinez avec le livre cartonné (dès CHF 33) pour un cadeau premium',
       ],
     },
     recommendedThemes: [
@@ -911,9 +911,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'mermaid', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Create a free trial story in minutes to see the personalization quality. Printed hardcovers from CHF 38, delivered in 5–7 days.',
-      de: 'Erstelle in Minuten eine kostenlose Probegeschichte, um die Personalisierungsqualität zu sehen. Gedruckte Hardcover ab CHF 38, in 5–7 Tagen geliefert.',
-      fr: 'Créez une histoire d\'essai gratuite en minutes pour voir la qualité de personnalisation. Livres cartonnés dès CHF 38, livrés en 5 à 7 jours.',
+      en: 'Create a free trial story in minutes to see the personalization quality. Printed hardcovers from CHF 33, delivered in 5–7 days.',
+      de: 'Erstelle in Minuten eine kostenlose Probegeschichte, um die Personalisierungsqualität zu sehen. Gedruckte Hardcover ab CHF 33, in 5–7 Tagen geliefert.',
+      fr: 'Créez une histoire d\'essai gratuite en minutes pour voir la qualité de personnalisation. Livres cartonnés dès CHF 33, livrés en 5 à 7 jours.',
     },
     faq: [
       {
@@ -981,9 +981,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'detective', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Try a free trial story to see the educational value in action. Printed hardcovers from CHF 38, delivered in 5–7 business days.',
-      de: 'Teste eine kostenlose Probegeschichte, um den pädagogischen Wert live zu sehen. Gedruckte Hardcover ab CHF 38, in 5–7 Werktagen geliefert.',
-      fr: 'Essayez une histoire d\'essai gratuite pour voir la valeur éducative en action. Livres cartonnés dès CHF 38, livrés en 5 à 7 jours ouvrables.',
+      en: 'Try a free trial story to see the educational value in action. Printed hardcovers from CHF 33, delivered in 5–7 business days.',
+      de: 'Teste eine kostenlose Probegeschichte, um den pädagogischen Wert live zu sehen. Gedruckte Hardcover ab CHF 33, in 5–7 Werktagen geliefert.',
+      fr: 'Essayez une histoire d\'essai gratuite pour voir la valeur éducative en action. Livres cartonnés dès CHF 33, livrés en 5 à 7 jours ouvrables.',
     },
     faq: [
       {
@@ -1099,19 +1099,19 @@ export const giftPages: GiftPageData[] = [
         'Choose simple, visual themes: farm animals, forest, dinosaurs, or unicorns',
         'At this age, the illustrations matter more than complex storylines — our AI adapts accordingly',
         'Read the story as a bedtime ritual — 3-year-olds thrive on routine and repetition',
-        'The hardcover version (from CHF 38) withstands enthusiastic page-turning by little hands',
+        'The hardcover version (from CHF 33) withstands enthusiastic page-turning by little hands',
       ],
       de: [
         'Wähle einfache, visuelle Themen: Bauernhof-Tiere, Wald, Dinosaurier oder Einhörner',
         'In diesem Alter zählen die Illustrationen mehr als komplexe Handlungen — unsere KI passt sich an',
         'Lies die Geschichte als Gutenacht-Ritual vor — 3-Jährige lieben Routine und Wiederholung',
-        'Die Hardcover-Version (ab CHF 38) hält begeistertes Blättern kleiner Hände aus',
+        'Die Hardcover-Version (ab CHF 33) hält begeistertes Blättern kleiner Hände aus',
       ],
       fr: [
         'Choisissez des thèmes simples et visuels : animaux de la ferme, forêt, dinosaures ou licornes',
         'À cet âge, les illustrations comptent plus que les intrigues — notre IA s\'adapte',
         'Lisez l\'histoire comme rituel du coucher — les enfants de 3 ans adorent la routine',
-        'La version cartonnée (dès CHF 38) résiste aux petites mains enthousiastes',
+        'La version cartonnée (dès CHF 33) résiste aux petites mains enthousiastes',
       ],
     },
     recommendedThemes: [
@@ -1191,9 +1191,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'sharing', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Stories are calibrated for 4-year-old language and attention spans. Free trial available — printed hardcover from CHF 38.',
-      de: 'Geschichten sind auf Sprache und Aufmerksamkeitsspanne von 4-Jährigen kalibriert. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 38.',
-      fr: 'Les histoires sont calibrées pour le langage des enfants de 4 ans. Essai gratuit disponible — livre cartonné dès CHF 38.',
+      en: 'Stories are calibrated for 4-year-old language and attention spans. Free trial available — printed hardcover from CHF 33.',
+      de: 'Geschichten sind auf Sprache und Aufmerksamkeitsspanne von 4-Jährigen kalibriert. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 33.',
+      fr: 'Les histoires sont calibrées pour le langage des enfants de 4 ans. Essai gratuit disponible — livre cartonné dès CHF 33.',
     },
     faq: [
       {
@@ -1260,9 +1260,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'first-kindergarten', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Stories for 5-year-olds feature richer plots and vocabulary. Free trial available — printed hardcover from CHF 38.',
-      de: 'Geschichten für 5-Jährige bieten reichhaltigere Handlungen und Wortschatz. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 38.',
-      fr: 'Les histoires pour 5 ans offrent des intrigues et un vocabulaire plus riches. Essai gratuit disponible — livre cartonné dès CHF 38.',
+      en: 'Stories for 5-year-olds feature richer plots and vocabulary. Free trial available — printed hardcover from CHF 33.',
+      de: 'Geschichten für 5-Jährige bieten reichhaltigere Handlungen und Wortschatz. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 33.',
+      fr: 'Les histoires pour 5 ans offrent des intrigues et un vocabulaire plus riches. Essai gratuit disponible — livre cartonné dès CHF 33.',
     },
     faq: [
       {
@@ -1329,9 +1329,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Stories for 6-year-olds support emerging readers with engaging, age-calibrated text. Printed hardcover from CHF 38.',
-      de: 'Geschichten für 6-Jährige unterstützen Leseanfänger mit fesselndem, altersgerechtem Text. Gedrucktes Hardcover ab CHF 38.',
-      fr: 'Les histoires pour 6 ans soutiennent les jeunes lecteurs avec un texte adapté et engageant. Livre cartonné dès CHF 38.',
+      en: 'Stories for 6-year-olds support emerging readers with engaging, age-calibrated text. Printed hardcover from CHF 33.',
+      de: 'Geschichten für 6-Jährige unterstützen Leseanfänger mit fesselndem, altersgerechtem Text. Gedrucktes Hardcover ab CHF 33.',
+      fr: 'Les histoires pour 6 ans soutiennent les jeunes lecteurs avec un texte adapté et engageant. Livre cartonné dès CHF 33.',
     },
     faq: [
       {
@@ -1398,9 +1398,9 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Stories for 7–8-year-olds feature richer plots perfect for independent readers. Printed hardcover from CHF 38.',
-      de: 'Geschichten für 7–8-Jährige bieten reichhaltigere Handlungen, perfekt für selbständige Leser. Gedrucktes Hardcover ab CHF 38.',
-      fr: 'Les histoires pour 7-8 ans offrent des intrigues plus riches pour les lecteurs autonomes. Livre cartonné dès CHF 38.',
+      en: 'Stories for 7–8-year-olds feature richer plots perfect for independent readers. Printed hardcover from CHF 33.',
+      de: 'Geschichten für 7–8-Jährige bieten reichhaltigere Handlungen, perfekt für selbständige Leser. Gedrucktes Hardcover ab CHF 33.',
+      fr: 'Les histoires pour 7-8 ans offrent des intrigues plus riches pour les lecteurs autonomes. Livre cartonné dès CHF 33.',
     },
     faq: [
       {

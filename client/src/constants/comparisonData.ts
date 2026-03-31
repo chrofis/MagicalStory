@@ -117,7 +117,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
-        us: 'CHF 38-53',
+        us: 'CHF 33-48',
         them: 'CHF 35+',
         winner: 'tie',
       },
@@ -290,7 +290,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
-        us: 'CHF 38-53',
+        us: 'CHF 33-48',
         them: 'From ~CHF 39',
         winner: 'tie',
       },
@@ -460,7 +460,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
-        us: 'CHF 38-53',
+        us: 'CHF 33-48',
         them: 'CHF 34.99-44.99',
         winner: 'tie',
       },
@@ -621,7 +621,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
-        us: 'CHF 38-53',
+        us: 'CHF 33-48',
         them: 'CHF 30-40',
         winner: 'them',
       },
@@ -726,7 +726,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
-        us: 'CHF 38-53 (Gelato EU)',
+        us: 'CHF 33-48 (Gelato EU)',
         them: '$25 (US-based)',
         winner: 'them',
       },
@@ -930,7 +930,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Print', de: 'Druck', fr: 'Impression' },
-        us: 'Hardcover CHF 38-53 (Gelato EU)',
+        us: 'Hardcover CHF 33-48 (Gelato EU)',
         them: 'Hardcover $24.99',
         winner: 'them',
       },
@@ -1051,9 +1051,9 @@ export const comparisons: ComparisonData[] = [
           fr: 'Idéal pour : Histoires vraiment uniques, générées par IA',
         },
         price: {
-          en: 'Free first story, then CHF 9.90 digital / CHF 38-53 print',
-          de: 'Erste Geschichte gratis, dann CHF 9.90 digital / CHF 38-53 Druck',
-          fr: 'Première histoire gratuite, puis CHF 9.90 numérique / CHF 38-53 imprimé',
+          en: 'Free first story, then CHF 9.90 digital / CHF 33-48 print',
+          de: 'Erste Geschichte gratis, dann CHF 9.90 digital / CHF 33-48 Druck',
+          fr: 'Première histoire gratuite, puis CHF 9.90 numérique / CHF 33-48 imprimé',
         },
         highlight: {
           en: 'The only platform where every story is created from scratch for your child',
@@ -1183,9 +1183,9 @@ export const comparisons: ComparisonData[] = [
       {
         q: { en: 'Which is the cheapest option?', de: 'Was ist die günstigste Option?', fr: 'Quelle est l\'option la moins chère ?' },
         a: {
-          en: 'MagicalStory offers a free first story (digital). For printed books, prices range from CHF 30-53 across all platforms. Framily starts at CHF 30, Librio at CHF 34.99, Wonderbly at CHF 35, MagicalStory at CHF 38, and Hooray Heroes at CHF 39.',
-          de: 'MagicalStory bietet eine gratis erste Geschichte (digital). Für gedruckte Bücher liegen die Preise bei CHF 30-53 über alle Plattformen. Framily ab CHF 30, Librio ab CHF 34.99, Wonderbly ab CHF 35, MagicalStory ab CHF 38, Hooray Heroes ab CHF 39.',
-          fr: 'MagicalStory offre une première histoire gratuite (numérique). Pour les livres imprimés, les prix varient de CHF 30 à 53. Framily à partir de CHF 30, Librio de CHF 34.99, Wonderbly de CHF 35, MagicalStory de CHF 38, Hooray Heroes de CHF 39.',
+          en: 'MagicalStory offers a free first story (digital). For printed books, prices range from CHF 30-53 across all platforms. Framily starts at CHF 30, Librio at CHF 34.99, Wonderbly at CHF 35, MagicalStory at CHF 33, and Hooray Heroes at CHF 39.',
+          de: 'MagicalStory bietet eine gratis erste Geschichte (digital). Für gedruckte Bücher liegen die Preise bei CHF 30-53 über alle Plattformen. Framily ab CHF 30, Librio ab CHF 34.99, Wonderbly ab CHF 35, MagicalStory ab CHF 33, Hooray Heroes ab CHF 39.',
+          fr: 'MagicalStory offre une première histoire gratuite (numérique). Pour les livres imprimés, les prix varient de CHF 30 à 53. Framily à partir de CHF 30, Librio de CHF 34.99, Wonderbly de CHF 35, MagicalStory de CHF 33, Hooray Heroes de CHF 39.',
         },
       },
     ],
@@ -1230,9 +1230,9 @@ export const comparisons: ComparisonData[] = [
           fr: 'Meilleur choix global pour les familles européennes/suisses',
         },
         price: {
-          en: 'Free first story, then CHF 9.90 digital / CHF 38-53 print',
-          de: 'Erste Geschichte gratis, dann CHF 9.90 digital / CHF 38-53 Druck',
-          fr: 'Première histoire gratuite, puis CHF 9.90 numérique / CHF 38-53 imprimé',
+          en: 'Free first story, then CHF 9.90 digital / CHF 33-48 print',
+          de: 'Erste Geschichte gratis, dann CHF 9.90 digital / CHF 33-48 Druck',
+          fr: 'Première histoire gratuite, puis CHF 9.90 numérique / CHF 33-48 imprimé',
         },
         highlight: {
           en: 'The most comprehensive AI storybook platform with character consistency, Swiss German, and European printing',

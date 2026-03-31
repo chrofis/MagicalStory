@@ -229,9 +229,9 @@ const STATIC_ROUTES = {
       fr: 'Tarifs – Magical Story',
     },
     description: {
-      en: 'Your first story is free. Printed hardcover books start at CHF 38. View all pricing plans for Magical Story.',
-      de: 'Deine erste Geschichte ist gratis. Gedruckte Hardcover-Bücher ab CHF 38. Alle Preise für Magical Story.',
-      fr: 'Votre première histoire est gratuite. Livres cartonnés imprimés dès CHF 38. Tous les tarifs de Magical Story.',
+      en: 'Your first story is free. Printed books start at CHF 33. View all pricing plans for Magical Story.',
+      de: 'Deine erste Geschichte ist gratis. Gedruckte Bücher ab CHF 33. Alle Preise für Magical Story.',
+      fr: 'Votre première histoire est gratuite. Livres imprimés dès CHF 33. Tous les tarifs de Magical Story.',
     },
   },
   '/faq': {
@@ -597,7 +597,7 @@ const FAQ_JSON_LD = {
       name: 'Was kostet MagicalStory?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 38 als hochwertiges Hardcover.',
+        text: 'Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 33 als hochwertiges Hardcover.',
       },
     },
     {
@@ -637,7 +637,7 @@ function buildProductJsonLdForTheme(themeName, category, themeId) {
       price: '0',
       priceCurrency: 'CHF',
       availability: 'https://schema.org/InStock',
-      description: 'Erste Geschichte kostenlos. Hardcover ab CHF 38.',
+      description: 'Erste Geschichte kostenlos. Hardcover ab CHF 33.',
     },
     category: 'Personalized Children\'s Books',
   };
@@ -1009,9 +1009,9 @@ function buildCategoryDescription(catName, lang) {
 
 function buildThemeDescription(themeName, lang) {
   const templates = {
-    de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 38. Erste Geschichte gratis.`,
-    en: `Create a personalized ${themeName} children's book with your child's photo. AI-illustrated, unique, from CHF 38. First story free.`,
-    fr: `Créez un livre personnalisé ${themeName} avec la photo de votre enfant. Illustré par IA, unique, dès CHF 38. Première histoire gratuite.`,
+    de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 33. Erste Geschichte gratis.`,
+    en: `Create a personalized ${themeName} children's book with your child's photo. AI-illustrated, unique, from CHF 33. First story free.`,
+    fr: `Créez un livre personnalisé ${themeName} avec la photo de votre enfant. Illustré par IA, unique, dès CHF 33. Première histoire gratuite.`,
   };
   return templates[lang] || templates.de;
 }
@@ -1060,9 +1060,9 @@ function buildOccasionDescription(occasionSlug, lang) {
   };
   const occ = occasionGifts[occasionSlug] || { de: 'Anlass', en: 'occasion', fr: 'occasion' };
   const templates = {
-    de: `Das perfekte Geschenk zum ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 38. Erste Geschichte gratis.`,
-    en: `The perfect gift for ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 38. First story free.`,
-    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 38. Première histoire gratuite.`,
+    de: `Das perfekte Geschenk zum ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 33. Erste Geschichte gratis.`,
+    en: `The perfect gift for ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 33. First story free.`,
+    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 33. Première histoire gratuite.`,
   };
   return templates[lang] || templates.de;
 }
@@ -1070,107 +1070,107 @@ function buildOccasionDescription(occasionSlug, lang) {
 function buildGiftDescription(giftSlug, lang) {
   const descriptions = {
     'fuer-kinder': {
-      de: 'Ein Geschenk, das Kinderaugen leuchten lässt: ein personalisiertes Kinderbuch mit dem eigenen Foto. 170+ Themen, Hardcover ab CHF 38. Erste Geschichte gratis testen.',
-      en: 'A gift that makes children\'s eyes light up: a personalized book with their own photo. 170+ themes, hardcover from CHF 38. Try the first story free.',
-      fr: 'Un cadeau qui fait briller les yeux des enfants: un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 38. Première histoire gratuite.',
+      de: 'Ein Geschenk, das Kinderaugen leuchten lässt: ein personalisiertes Kinderbuch mit dem eigenen Foto. 170+ Themen, Hardcover ab CHF 33. Erste Geschichte gratis testen.',
+      en: 'A gift that makes children\'s eyes light up: a personalized book with their own photo. 170+ themes, hardcover from CHF 33. Try the first story free.',
+      fr: 'Un cadeau qui fait briller les yeux des enfants: un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 33. Première histoire gratuite.',
     },
     'fuer-enkel': {
-      de: 'Das Geschenk von Oma & Opa, das Enkel nie vergessen: ein personalisiertes Kinderbuch mit eigenem Foto. Einzigartig, liebevoll, ab CHF 38.',
-      en: 'The gift from grandma & grandpa that grandchildren never forget: a personalized book with their photo. Unique, heartfelt, from CHF 38.',
-      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais: un livre personnalisé avec leur photo. Unique et touchant, dès CHF 38.',
+      de: 'Das Geschenk von Oma & Opa, das Enkel nie vergessen: ein personalisiertes Kinderbuch mit eigenem Foto. Einzigartig, liebevoll, ab CHF 33.',
+      en: 'The gift from grandma & grandpa that grandchildren never forget: a personalized book with their photo. Unique, heartfelt, from CHF 33.',
+      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais: un livre personnalisé avec leur photo. Unique et touchant, dès CHF 33.',
     },
     'fuer-nichte-neffe': {
-      de: 'Überrasche Nichte oder Neffe mit einem personalisierten Kinderbuch — mit eigenem Foto als Held der Geschichte. Ab CHF 38, erste Geschichte gratis.',
-      en: 'Surprise your niece or nephew with a personalized book — starring them as the hero. From CHF 38, first story free.',
-      fr: 'Surprenez votre nièce ou neveu avec un livre personnalisé — ils sont le héros. Dès CHF 38, première histoire gratuite.',
+      de: 'Überrasche Nichte oder Neffe mit einem personalisierten Kinderbuch — mit eigenem Foto als Held der Geschichte. Ab CHF 33, erste Geschichte gratis.',
+      en: 'Surprise your niece or nephew with a personalized book — starring them as the hero. From CHF 33, first story free.',
+      fr: 'Surprenez votre nièce ou neveu avec un livre personnalisé — ils sont le héros. Dès CHF 33, première histoire gratuite.',
     },
     'fuer-patenkind': {
-      de: 'Ein besonderes Geschenk vom Götti oder der Gotte: ein personalisiertes Kinderbuch mit dem Foto deines Patenkinds. Ab CHF 38.',
-      en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 38, first story free.',
-      fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 38.',
+      de: 'Ein besonderes Geschenk vom Götti oder der Gotte: ein personalisiertes Kinderbuch mit dem Foto deines Patenkinds. Ab CHF 33.',
+      en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 33, first story free.',
+      fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 33.',
     },
     'geschenk-von-grosseltern': {
-      de: 'Das ideale Geschenk von Grosseltern: ein personalisiertes Kinderbuch, das Enkel zum Helden macht. Einfach online erstellen, ab CHF 38.',
-      en: 'The ideal gift from grandparents: a personalized book that makes grandchildren the hero. Easy to create online, from CHF 38.',
-      fr: 'Le cadeau idéal des grands-parents: un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 38.',
+      de: 'Das ideale Geschenk von Grosseltern: ein personalisiertes Kinderbuch, das Enkel zum Helden macht. Einfach online erstellen, ab CHF 33.',
+      en: 'The ideal gift from grandparents: a personalized book that makes grandchildren the hero. Easy to create online, from CHF 33.',
+      fr: 'Le cadeau idéal des grands-parents: un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 33.',
     },
     'ostergeschenk': {
-      de: 'Das besondere Ostergeschenk für Kinder: ein personalisiertes Kinderbuch statt Schoggi-Hasen. Mit eigenem Foto, ab CHF 38. Kostenlos testen.',
-      en: 'A special Easter gift for kids: a personalized book instead of chocolate bunnies. With their photo, from CHF 38. Try free.',
-      fr: 'Un cadeau de Pâques spécial: un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 38. Essai gratuit.',
+      de: 'Das besondere Ostergeschenk für Kinder: ein personalisiertes Kinderbuch statt Schoggi-Hasen. Mit eigenem Foto, ab CHF 33. Kostenlos testen.',
+      en: 'A special Easter gift for kids: a personalized book instead of chocolate bunnies. With their photo, from CHF 33. Try free.',
+      fr: 'Un cadeau de Pâques spécial: un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 33. Essai gratuit.',
     },
     'weihnachtsgeschenk': {
-      de: 'Das Weihnachtsgeschenk, das Kinder lieben: ein personalisiertes Kinderbuch mit eigenem Foto unter dem Tannenbaum. Ab CHF 38.',
-      en: 'The Christmas gift kids love: a personalized book with their photo under the tree. From CHF 38, first story free.',
-      fr: 'Le cadeau de Noël que les enfants adorent: un livre personnalisé avec leur photo sous le sapin. Dès CHF 38.',
+      de: 'Das Weihnachtsgeschenk, das Kinder lieben: ein personalisiertes Kinderbuch mit eigenem Foto unter dem Tannenbaum. Ab CHF 33.',
+      en: 'The Christmas gift kids love: a personalized book with their photo under the tree. From CHF 33, first story free.',
+      fr: 'Le cadeau de Noël que les enfants adorent: un livre personnalisé avec leur photo sous le sapin. Dès CHF 33.',
     },
     'geburtstagsgeschenk': {
-      de: 'Das perfekte Geburtstagsgeschenk für Kinder: ein personalisiertes Kinderbuch mit dem Geburtstagskind als Held. Ab CHF 38.',
-      en: 'The perfect birthday gift for kids: a personalized book with the birthday child as hero. From CHF 38, first story free.',
-      fr: "Le cadeau d'anniversaire parfait: un livre personnalisé avec l'enfant fêté en héros. Dès CHF 38, première histoire gratuite.",
+      de: 'Das perfekte Geburtstagsgeschenk für Kinder: ein personalisiertes Kinderbuch mit dem Geburtstagskind als Held. Ab CHF 33.',
+      en: 'The perfect birthday gift for kids: a personalized book with the birthday child as hero. From CHF 33, first story free.',
+      fr: "Le cadeau d'anniversaire parfait: un livre personnalisé avec l'enfant fêté en héros. Dès CHF 33, première histoire gratuite.",
     },
     'taufgeschenk': {
-      de: 'Ein Taufgeschenk mit bleibendem Wert: ein personalisiertes Kinderbuch mit dem Namen und Foto des Täuflings. Ab CHF 38.',
-      en: 'A baptism gift with lasting value: a personalized book with the child\'s name and photo. From CHF 38.',
-      fr: 'Un cadeau de baptême à valeur durable: un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 38.',
+      de: 'Ein Taufgeschenk mit bleibendem Wert: ein personalisiertes Kinderbuch mit dem Namen und Foto des Täuflings. Ab CHF 33.',
+      en: 'A baptism gift with lasting value: a personalized book with the child\'s name and photo. From CHF 33.',
+      fr: 'Un cadeau de baptême à valeur durable: un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 33.',
     },
     'einschulungsgeschenk': {
-      de: 'Geschenk zur Einschulung: ein personalisiertes Kinderbuch für den grossen Tag. Mit dem Schulkind als Held der Geschichte. Ab CHF 38.',
-      en: 'First day of school gift: a personalized book for the big day. With the child as hero of the story. From CHF 38.',
-      fr: 'Cadeau de rentrée: un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 38.',
+      de: 'Geschenk zur Einschulung: ein personalisiertes Kinderbuch für den grossen Tag. Mit dem Schulkind als Held der Geschichte. Ab CHF 33.',
+      en: 'First day of school gift: a personalized book for the big day. With the child as hero of the story. From CHF 33.',
+      fr: 'Cadeau de rentrée: un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 33.',
     },
     'nikolausgeschenk': {
-      de: 'Nikolausgeschenk für Kinder: ein personalisiertes Kinderbuch im Samichlaus-Sack. Mit eigenem Foto, ab CHF 38. Kostenlos testen.',
-      en: 'St. Nicholas gift for kids: a personalized book in the gift bag. With their own photo, from CHF 38. Try free.',
-      fr: 'Cadeau de Saint-Nicolas: un livre personnalisé dans la hotte. Avec leur photo, dès CHF 38. Essai gratuit.',
+      de: 'Nikolausgeschenk für Kinder: ein personalisiertes Kinderbuch im Samichlaus-Sack. Mit eigenem Foto, ab CHF 33. Kostenlos testen.',
+      en: 'St. Nicholas gift for kids: a personalized book in the gift bag. With their own photo, from CHF 33. Try free.',
+      fr: 'Cadeau de Saint-Nicolas: un livre personnalisé dans la hotte. Avec leur photo, dès CHF 33. Essai gratuit.',
     },
     'einzigartiges-geschenk': {
-      de: 'Auf der Suche nach einem einzigartigen Kindergeschenk? Ein personalisiertes Kinderbuch mit Foto — gibt es kein zweites Mal. Ab CHF 38.',
-      en: 'Looking for a unique gift for kids? A personalized book with their photo — truly one of a kind. From CHF 38.',
-      fr: 'Vous cherchez un cadeau unique? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 38.',
+      de: 'Auf der Suche nach einem einzigartigen Kindergeschenk? Ein personalisiertes Kinderbuch mit Foto — gibt es kein zweites Mal. Ab CHF 33.',
+      en: 'Looking for a unique gift for kids? A personalized book with their photo — truly one of a kind. From CHF 33.',
+      fr: 'Vous cherchez un cadeau unique? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 33.',
     },
     'personalisiertes-geschenk': {
-      de: 'Personalisiertes Geschenk für Kinder: Kinderbuch mit eigenem Foto, Namen und 170+ Themen. Hardcover ab CHF 38. Erste Geschichte gratis.',
-      en: 'Personalized gift for kids: a book with their photo, name and 170+ themes. Hardcover from CHF 38. First story free.',
-      fr: 'Cadeau personnalisé pour enfants: livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 38. Première histoire gratuite.',
+      de: 'Personalisiertes Geschenk für Kinder: Kinderbuch mit eigenem Foto, Namen und 170+ Themen. Hardcover ab CHF 33. Erste Geschichte gratis.',
+      en: 'Personalized gift for kids: a book with their photo, name and 170+ themes. Hardcover from CHF 33. First story free.',
+      fr: 'Cadeau personnalisé pour enfants: livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 33. Première histoire gratuite.',
     },
     'sinnvolles-geschenk': {
-      de: 'Sinnvolles Geschenk für Kinder: ein personalisiertes Kinderbuch, das Lesen fördert und Selbstvertrauen stärkt. Ab CHF 38.',
-      en: 'A meaningful gift for kids: a personalized book that encourages reading and builds confidence. From CHF 38.',
-      fr: 'Un cadeau éducatif pour enfants: un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 38.',
+      de: 'Sinnvolles Geschenk für Kinder: ein personalisiertes Kinderbuch, das Lesen fördert und Selbstvertrauen stärkt. Ab CHF 33.',
+      en: 'A meaningful gift for kids: a personalized book that encourages reading and builds confidence. From CHF 33.',
+      fr: 'Un cadeau éducatif pour enfants: un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 33.',
     },
     'last-minute-geschenk': {
-      de: 'Last-Minute-Geschenk für Kinder: personalisiertes Kinderbuch sofort als PDF oder in 5 Tagen als Hardcover. Ab CHF 38.',
-      en: 'Last-minute gift for kids: personalized book instantly as PDF or hardcover in 5 days. From CHF 38.',
-      fr: 'Cadeau de dernière minute: livre personnalisé en PDF immédiat ou couverture rigide en 5 jours. Dès CHF 38.',
+      de: 'Last-Minute-Geschenk für Kinder: personalisiertes Kinderbuch sofort als PDF oder in 5 Tagen als Hardcover. Ab CHF 33.',
+      en: 'Last-minute gift for kids: personalized book instantly as PDF or hardcover in 5 days. From CHF 33.',
+      fr: 'Cadeau de dernière minute: livre personnalisé en PDF immédiat ou couverture rigide en 5 jours. Dès CHF 33.',
     },
     'geschenk-3-jahre': {
-      de: 'Geschenk für 3-Jährige: ein personalisiertes Kinderbuch mit grossen Bildern und einfachen Texten. Mit eigenem Foto, ab CHF 38.',
-      en: 'Gift for 3-year-olds: a personalized book with big pictures and simple text. With their photo, from CHF 38.',
-      fr: 'Cadeau pour enfant de 3 ans: un livre personnalisé avec de grandes images et des textes simples. Dès CHF 38.',
+      de: 'Geschenk für 3-Jährige: ein personalisiertes Kinderbuch mit grossen Bildern und einfachen Texten. Mit eigenem Foto, ab CHF 33.',
+      en: 'Gift for 3-year-olds: a personalized book with big pictures and simple text. With their photo, from CHF 33.',
+      fr: 'Cadeau pour enfant de 3 ans: un livre personnalisé avec de grandes images et des textes simples. Dès CHF 33.',
     },
     'geschenk-4-jahre': {
-      de: 'Geschenk für 4-Jährige: ein personalisiertes Kinderbuch voller Abenteuer. Mit dem Kind als Held, ab CHF 38.',
-      en: 'Gift for 4-year-olds: a personalized adventure book. With the child as hero, from CHF 38.',
-      fr: "Cadeau pour enfant de 4 ans: un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 38.",
+      de: 'Geschenk für 4-Jährige: ein personalisiertes Kinderbuch voller Abenteuer. Mit dem Kind als Held, ab CHF 33.',
+      en: 'Gift for 4-year-olds: a personalized adventure book. With the child as hero, from CHF 33.',
+      fr: "Cadeau pour enfant de 4 ans: un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 33.",
     },
     'geschenk-5-jahre': {
-      de: 'Geschenk für 5-Jährige: ein personalisiertes Kinderbuch zum Vorlesen und Selbstentdecken. 170+ Themen, ab CHF 38.',
-      en: 'Gift for 5-year-olds: a personalized book for reading aloud and self-discovery. 170+ themes, from CHF 38.',
-      fr: 'Cadeau pour enfant de 5 ans: un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 38.',
+      de: 'Geschenk für 5-Jährige: ein personalisiertes Kinderbuch zum Vorlesen und Selbstentdecken. 170+ Themen, ab CHF 33.',
+      en: 'Gift for 5-year-olds: a personalized book for reading aloud and self-discovery. 170+ themes, from CHF 33.',
+      fr: 'Cadeau pour enfant de 5 ans: un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 33.',
     },
     'geschenk-6-jahre': {
-      de: 'Geschenk für 6-Jährige: ein personalisiertes Kinderbuch für Erstleser. Spannende Geschichten mit eigenem Foto, ab CHF 38.',
-      en: 'Gift for 6-year-olds: a personalized book for early readers. Exciting stories with their photo, from CHF 38.',
-      fr: 'Cadeau pour enfant de 6 ans: un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 38.',
+      de: 'Geschenk für 6-Jährige: ein personalisiertes Kinderbuch für Erstleser. Spannende Geschichten mit eigenem Foto, ab CHF 33.',
+      en: 'Gift for 6-year-olds: a personalized book for early readers. Exciting stories with their photo, from CHF 33.',
+      fr: 'Cadeau pour enfant de 6 ans: un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 33.',
     },
     'geschenk-7-8-jahre': {
-      de: 'Geschenk für 7–8-Jährige: ein personalisiertes Kinderbuch mit längeren Geschichten und spannenden Abenteuern. Ab CHF 38.',
-      en: 'Gift for 7-8-year-olds: a personalized book with longer stories and exciting adventures. From CHF 38.',
-      fr: 'Cadeau pour enfant de 7-8 ans: un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 38.',
+      de: 'Geschenk für 7–8-Jährige: ein personalisiertes Kinderbuch mit längeren Geschichten und spannenden Abenteuern. Ab CHF 33.',
+      en: 'Gift for 7-8-year-olds: a personalized book with longer stories and exciting adventures. From CHF 33.',
+      fr: 'Cadeau pour enfant de 7-8 ans: un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 33.',
     },
   };
-  return descriptions[giftSlug]?.[lang] || descriptions[giftSlug]?.de || 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 38, erste Geschichte gratis.';
+  return descriptions[giftSlug]?.[lang] || descriptions[giftSlug]?.de || 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 33, erste Geschichte gratis.';
 }
 
 // ─── injectMeta ───────────────────────────────────────────────────────────────

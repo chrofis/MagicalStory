@@ -119,7 +119,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'How much does it cost?',
-            answer: 'Your first story is completely free — no account needed. After that, stories are created with credits. Printed books start at CHF 38 for softcover and CHF 53 for hardcover (including shipping within Switzerland). See our pricing page for details.',
+            answer: 'Your first story is completely free — no account needed. After that, stories are created with credits. Printed books start at CHF 33 for softcover and CHF 48 for hardcover (including shipping within Switzerland). See our pricing page for details.',
           },
         ],
       },
@@ -228,7 +228,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Was kostet es?',
-            answer: 'Deine erste Geschichte ist komplett kostenlos — ohne Konto. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher beginnen ab CHF 38 für Softcover und CHF 53 für Hardcover (inkl. Versand innerhalb der Schweiz). Details findest du auf unserer Preisseite.',
+            answer: 'Deine erste Geschichte ist komplett kostenlos — ohne Konto. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher beginnen ab CHF 33 für Softcover und CHF 48 für Hardcover (inkl. Versand innerhalb der Schweiz). Details findest du auf unserer Preisseite.',
           },
         ],
       },
@@ -337,7 +337,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Combien ça coûte ?',
-            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 38 en brochée et CHF 53 en couverture rigide (livraison en Suisse incluse). Consultez notre page de tarifs pour plus de détails.',
+            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 33 en brochée et CHF 48 en couverture rigide (livraison en Suisse incluse). Consultez notre page de tarifs pour plus de détails.',
           },
         ],
       },

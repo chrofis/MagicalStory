@@ -395,14 +395,14 @@ async function initializeDatabase() {
     const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
     if (parseInt(pricingCheck[0].count) === 0) {
       const defaultTiers = [
-        { maxPages: 30, label: '1-30', softcover: 38, hardcover: 53 },
-        { maxPages: 40, label: '31-40', softcover: 45, hardcover: 60 },
-        { maxPages: 50, label: '41-50', softcover: 51, hardcover: 66 },
-        { maxPages: 60, label: '51-60', softcover: 57, hardcover: 72 },
-        { maxPages: 70, label: '61-70', softcover: 63, hardcover: 78 },
-        { maxPages: 80, label: '71-80', softcover: 69, hardcover: 84 },
-        { maxPages: 90, label: '81-90', softcover: 75, hardcover: 90 },
-        { maxPages: 100, label: '91-100', softcover: 81, hardcover: 96 },
+        { maxPages: 30, label: '1-30', softcover: 33, hardcover: 48 },
+        { maxPages: 40, label: '31-40', softcover: 40, hardcover: 55 },
+        { maxPages: 50, label: '41-50', softcover: 46, hardcover: 61 },
+        { maxPages: 60, label: '51-60', softcover: 52, hardcover: 67 },
+        { maxPages: 70, label: '61-70', softcover: 58, hardcover: 73 },
+        { maxPages: 80, label: '71-80', softcover: 64, hardcover: 79 },
+        { maxPages: 90, label: '81-90', softcover: 70, hardcover: 85 },
+        { maxPages: 100, label: '91-100', softcover: 76, hardcover: 91 },
       ];
       for (const tier of defaultTiers) {
         await dbPool.query(
@@ -411,6 +411,13 @@ async function initializeDatabase() {
         );
       }
       console.log('✓ Default pricing tiers seeded');
+    } else {
+      // Migration: reduce all prices by CHF 5 (2026-03-31)
+      const currentFirst = await dbPool.query('SELECT softcover_price FROM pricing_tiers WHERE max_pages = 30');
+      if (currentFirst.length > 0 && currentFirst[0].softcover_price > 33) {
+        await dbPool.query('UPDATE pricing_tiers SET softcover_price = softcover_price - 5, hardcover_price = hardcover_price - 5');
+        console.log('✓ Pricing tiers reduced by CHF 5');
+      }
     }
 
     // Fix NULL page_number breaking UNIQUE constraint for covers.
