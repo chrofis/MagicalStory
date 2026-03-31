@@ -1484,13 +1484,14 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Calculate price based on pages and cover type (using database pricing)
     const isHardcover = coverType === 'hardcover';
     const priceInChf = await getPriceForPages(totalPages, isHardcover);
-    // Multi-copy discount: CHF 6 off per book when ordering 2+
-    const MULTI_COPY_DISCOUNT = 6; // CHF per book
-    const discountPerBook = quantity > 1 ? MULTI_COPY_DISCOUNT : 0;
-    const discountedPriceInChf = Math.max(1, priceInChf - discountPerBook);
-    const price = discountedPriceInChf * 100; // Convert CHF to cents for Stripe
-    if (discountPerBook > 0) {
-      log.info(`💰 [CHECKOUT] Multi-copy discount: CHF ${discountPerBook}/book × ${quantity} = CHF ${discountPerBook * quantity} total savings (${priceInChf} → ${discountedPriceInChf} per book)`);
+    // Multi-copy discount: CHF 6 off per EXTRA book (1st full price, 2nd+ discounted)
+    const MULTI_COPY_DISCOUNT = 6; // CHF per extra book
+    const extraBooks = Math.max(0, quantity - 1);
+    const totalDiscount = extraBooks * MULTI_COPY_DISCOUNT;
+    const totalPriceChf = (priceInChf * quantity) - totalDiscount;
+    const price = totalPriceChf * 100; // Convert CHF to cents for Stripe (total, not per-unit)
+    if (totalDiscount > 0) {
+      log.info(`💰 [CHECKOUT] Multi-copy discount: CHF ${MULTI_COPY_DISCOUNT} × ${extraBooks} extra books = CHF ${totalDiscount} savings (${priceInChf * quantity} → ${totalPriceChf})`);
     }
 
     const firstStory = stories[0].data;
@@ -1505,12 +1506,12 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         price_data: {
           currency: 'chf',
           product_data: {
-            name: `Personalized Storybook: ${bookTitle}`,
-            description: `${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType}`,
+            name: quantity > 1 ? `${quantity}x Personalized Storybook: ${bookTitle}` : `Personalized Storybook: ${bookTitle}`,
+            description: `${quantity > 1 ? `${quantity} copies, ` : ''}${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType}${totalDiscount > 0 ? ` (CHF ${totalDiscount} discount)` : ''}`,
           },
-          unit_amount: price,
+          unit_amount: price,  // Total price for all copies (discount already applied)
         },
-        quantity: quantity,
+        quantity: 1,
       }],
       mode: 'payment',
       success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,

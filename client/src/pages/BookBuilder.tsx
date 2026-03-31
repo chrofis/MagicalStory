@@ -597,17 +597,21 @@ export default function BookBuilder() {
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
-                  const MULTI_DISCOUNT = 6;
-                  const discountedPrice = quantity > 1 ? price - MULTI_DISCOUNT : price;
-                  const totalSaving = quantity > 1 ? MULTI_DISCOUNT * quantity : 0;
+                  const MULTI_DISCOUNT = 6; // CHF per extra book
+                  const extraBooks = Math.max(0, quantity - 1);
+                  const totalSaving = extraBooks * MULTI_DISCOUNT;
+                  const totalPrice = (price * quantity) - totalSaving;
                   return quantity > 1 ? (
                     <>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-gray-500 text-sm">{quantity} x <span className="line-through">CHF {price}.-</span> <span className="text-green-600 font-semibold">CHF {discountedPrice}.-</span> {t.perBook}</span>
+                        <span className="text-gray-500 text-sm">1 x CHF {price}.- + {extraBooks} x CHF {price - MULTI_DISCOUNT}.-</span>
                       </div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
-                        <span className="text-3xl font-bold text-indigo-700">CHF {discountedPrice * quantity}.-</span>
+                        <div className="text-right">
+                          <span className="text-sm text-gray-400 line-through mr-2">CHF {price * quantity}.-</span>
+                          <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice}.-</span>
+                        </div>
                       </div>
                       <div className="text-sm text-green-600 font-semibold">{t.youSave(totalSaving)}</div>
                     </>
