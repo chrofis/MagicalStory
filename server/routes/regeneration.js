@@ -4654,6 +4654,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const clothingCategory = storedAppearance.clothing || 'standard';
           const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
+          const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';
 
           if (!avatarData) {
             return { task, error: true, failReason: `No avatar for ${characterName}` };
@@ -4728,6 +4729,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               protectedFaces,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
+              photoType: avatarPhotoType,
             }
           );
 

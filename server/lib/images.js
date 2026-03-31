@@ -5381,8 +5381,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // Get clothing for this page from rawImage data
         const rawImg = rawImages.find(img => img.pageNumber === pageNumber);
         const clothingCategory = rawImg?.perCharClothing?.[fix.charName] || 'standard';
-        const avatarPhoto = getStyledAvatarForClothing(character, artStyle, clothingCategory)
-          || getFacePhoto(character);
+        const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+        const avatarPhoto = styledAvatar || getFacePhoto(character);
+        const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';
 
         if (!avatarPhoto) {
           log.warn(`⚠️ [UNIFIED PIPELINE] No avatar photo for ${fix.charName}, skipping character fix`);
@@ -5419,6 +5420,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             useBlended: true,
             issueDescription: fix.issueDescription,
             clothingDescription: clothingDesc,
+            photoType: avatarPhotoType,
             sceneDescription: sceneDesc,
             faceBbox,
             protectedFaces,
@@ -6146,10 +6148,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
-  // Crop character reference to front column (strips back-view from 2x2 avatar grids)
+  // Crop character reference to front column only for styled avatars (2-column grid: front | side)
+  // Raw photos are single images — cropping cuts the person in half
   const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
   const avatarBuffer = Buffer.from(avatarBase64, 'base64');
-  const croppedAvatar = await cropToFrontColumn(avatarBuffer);
+  const isStyledAvatar = options.photoType && (options.photoType.startsWith('styled-') || options.photoType.startsWith('costumed-'));
+  const croppedAvatar = isStyledAvatar ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
   const croppedAvatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;
 
   const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
