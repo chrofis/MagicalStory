@@ -5430,7 +5430,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (!charFixDetails.has(fix.charName)) charFixDetails.set(fix.charName, new Map());
             charFixDetails.get(fix.charName).set(pageNumber, {
               before: beforeImageData,
-              after: currentImageData
+              after: currentImageData,
+              blackoutImage: repairResult.blackoutImage || null,
+              grokRawResult: repairResult.grokRawResult || null,
+              blendMask: repairResult.blendMask || null,
+              croppedAvatar: repairResult.croppedAvatar || null,
+              method: repairResult.method || 'grok_blended',
             });
 
             if (repairResult.usage && usageTracker) {
@@ -5576,8 +5581,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       charFixDetailsObj[charName].pages[pageNum] = {
         comparison: {
           before: data.before.startsWith('data:') ? data.before : `data:image/png;base64,${data.before}`,
-          after: data.after.startsWith('data:') ? data.after : `data:image/png;base64,${data.after}`
-        }
+          after: data.after.startsWith('data:') ? data.after : `data:image/png;base64,${data.after}`,
+          blackoutImage: data.blackoutImage || null,
+          grokRawResult: data.grokRawResult || null,
+          blendMask: data.blendMask || null,
+          croppedAvatar: data.croppedAvatar || null,
+        },
+        method: data.method || 'grok_blended',
       };
     }
   }
