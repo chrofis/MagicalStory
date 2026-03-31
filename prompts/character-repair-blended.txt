@@ -1,7 +1,7 @@
-This is a children's book illustration. One character's face has been blurred and needs to be redrawn.
+This is a children's book illustration. All character faces have been blurred.
 
-Redraw the blurred character to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference.
+Redraw ALL blurred faces to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference.
 
-The blurred area shows the character's pose, clothing, and body position — preserve these. Only redraw the face and head to match the reference photo. Keep the exact same art style, lighting, and background.{clothingContext}{actionContext}{issueContext}
+Each character's body, pose, clothing, and position are fully visible — preserve these exactly. Only redraw the blurred face and head areas to match the reference photo. Keep the exact same art style, lighting, and background.{clothingContext}{actionContext}{issueContext}
 
-Other characters' faces may also be blurred — do NOT redraw those, leave them blurred. Only fix the target character.
+Replace every blurred face completely. No blur should remain on any face.

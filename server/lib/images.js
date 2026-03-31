@@ -6164,108 +6164,50 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Blur-based repair: preserves body pose/clothing while obscuring face
-    // - Body bbox: light blur (arms, clothing still visible but softened)
-    // - Face bbox: heavy blur (facial features fully obscured)
-    // Grok sees the blurred character + reference avatar → redraws the character
+    // Face-only blur: blur ALL faces (target + others), leave body/scene untouched.
+    // Grok sees blurred faces + reference avatar → redraws all blurred faces.
+    // The feathered blend restores non-target faces from the original.
     const faceBbox = options.faceBbox;
     let sceneForGrok = sceneBuffer;
 
     const composites = [];
+    const FACE_BLUR_RADIUS_FACTOR = 0.15; // 15% of face width — enough to obscure identity
+    const FACE_PADDING = 0.3; // 30% padding around face bbox
 
-    // 1. Body bbox: light blur — preserves pose, clothing, arms but softens details
-    {
-      const bLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
-      const bTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
-      const bWidth = Math.max(1, Math.min(Math.ceil((xmax - xmin) * sceneMeta.width), sceneMeta.width - bLeft));
-      const bHeight = Math.max(1, Math.min(Math.ceil((ymax - ymin) * sceneMeta.height), sceneMeta.height - bTop));
-      const blurRadius = Math.max(5, Math.round(bWidth * 0.06));
+    // Helper: blur a single face region
+    const blurFace = async (faceCoords, label) => {
+      const [fymin, fxmin, fymax, fxmax] = faceCoords;
+      const fW = fxmax - fxmin, fH = fymax - fymin;
+      const padXmin = Math.max(0, fxmin - fW * FACE_PADDING);
+      const padYmin = Math.max(0, fymin - fH * FACE_PADDING);
+      const padXmax = Math.min(1, fxmax + fW * FACE_PADDING);
+      const padYmax = Math.min(1, fymax + fH * FACE_PADDING);
+      const fLeft = Math.max(0, Math.floor(padXmin * sceneMeta.width));
+      const fTop = Math.max(0, Math.floor(padYmin * sceneMeta.height));
+      const fWidth = Math.max(1, Math.min(Math.ceil((padXmax - padXmin) * sceneMeta.width), sceneMeta.width - fLeft));
+      const fHeight = Math.max(1, Math.min(Math.ceil((padYmax - padYmin) * sceneMeta.height), sceneMeta.height - fTop));
+      const blurRadius = Math.max(10, Math.round(fWidth * FACE_BLUR_RADIUS_FACTOR));
       try {
-        const bodyBlurred = await sharp(sceneBuffer)
-          .extract({ left: bLeft, top: bTop, width: bWidth, height: bHeight })
+        const blurred = await sharp(sceneBuffer)
+          .extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight })
           .blur(blurRadius)
           .toBuffer();
-        composites.push({ input: bodyBlurred, left: bLeft, top: bTop });
-        log.info(`👤 [CHAR REPAIR GROK] Body light blur: ${bWidth}x${bHeight} at (${bLeft},${bTop}), radius ${blurRadius}`);
-      } catch (blurErr) {
-        log.warn(`⚠️ [CHAR REPAIR GROK] Body blur failed: ${blurErr.message}, skipping`);
+        composites.push({ input: blurred, left: fLeft, top: fTop });
+        log.info(`👤 [CHAR REPAIR GROK] Blur ${label}: ${fWidth}x${fHeight} at (${fLeft},${fTop}), radius ${blurRadius}`);
+      } catch (err) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Blur ${label} failed: ${err.message}`);
       }
-    }
+    };
 
-    // 2. Face bbox: two-zone blur — heavy inner (features gone), medium outer (soft transition)
+    // 1. Blur target character's face
     if (faceBbox) {
-      const [fymin, fxmin, fymax, fxmax] = faceBbox;
-      const fW = fxmax - fxmin, fH = fymax - fymin;
-
-      // Outer zone: face bbox + 50% padding — medium blur
-      const pfxmin = Math.max(0, fxmin - fW * 0.5);
-      const pfymin = Math.max(0, fymin - fH * 0.5);
-      const pfxmax = Math.min(1, fxmax + fW * 0.5);
-      const pfymax = Math.min(1, fymax + fH * 0.5);
-      const fLeft = Math.max(0, Math.floor(pfxmin * sceneMeta.width));
-      const fTop = Math.max(0, Math.floor(pfymin * sceneMeta.height));
-      const fWidth = Math.max(1, Math.min(Math.ceil((pfxmax - pfxmin) * sceneMeta.width), sceneMeta.width - fLeft));
-      const fHeight = Math.max(1, Math.min(Math.ceil((pfymax - pfymin) * sceneMeta.height), sceneMeta.height - fTop));
-      const mediumBlurRadius = Math.max(8, Math.round(fWidth * 0.10));
-      try {
-        const outerBlurred = await sharp(sceneBuffer)
-          .extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight })
-          .blur(mediumBlurRadius)
-          .toBuffer();
-        composites.push({ input: outerBlurred, left: fLeft, top: fTop });
-        log.info(`👤 [CHAR REPAIR GROK] Face outer medium blur: ${fWidth}x${fHeight} at (${fLeft},${fTop}) +50% padding, radius ${mediumBlurRadius}`);
-      } catch (outerErr) {
-        log.warn(`⚠️ [CHAR REPAIR GROK] Face outer blur failed: ${outerErr.message}, skipping`);
-      }
-
-      // Inner zone: face bbox shrunk by 20% — heavy blur (features unrecognizable)
-      const shrink = 0.2;
-      const innerXmin = fxmin + fW * shrink, innerYmin = fymin + fH * shrink;
-      const innerXmax = fxmax - fW * shrink, innerYmax = fymax - fH * shrink;
-      if (innerXmax > innerXmin && innerYmax > innerYmin) {
-        const iLeft = Math.max(0, Math.floor(innerXmin * sceneMeta.width));
-        const iTop = Math.max(0, Math.floor(innerYmin * sceneMeta.height));
-        const iWidth = Math.max(1, Math.min(Math.ceil((innerXmax - innerXmin) * sceneMeta.width), sceneMeta.width - iLeft));
-        const iHeight = Math.max(1, Math.min(Math.ceil((innerYmax - innerYmin) * sceneMeta.height), sceneMeta.height - iTop));
-        const heavyBlurRadius = Math.max(15, Math.round(iWidth * 0.25));
-        try {
-          const innerBlurred = await sharp(sceneBuffer)
-            .extract({ left: iLeft, top: iTop, width: iWidth, height: iHeight })
-            .blur(heavyBlurRadius)
-            .toBuffer();
-          composites.push({ input: innerBlurred, left: iLeft, top: iTop });
-          log.info(`👤 [CHAR REPAIR GROK] Face inner heavy blur: ${iWidth}x${iHeight} at (${iLeft},${iTop}) -20% shrunk, radius ${heavyBlurRadius}`);
-        } catch (innerErr) {
-          log.warn(`⚠️ [CHAR REPAIR GROK] Face inner blur failed: ${innerErr.message}, skipping`);
-        }
-      }
+      await blurFace(faceBbox, `target face (${charName})`);
     }
 
-    // 3. Light blur other characters' faces — prevents Grok from copying their features.
-    // The blend step restores them from the original automatically.
+    // 2. Blur other characters' faces (same blur strength — Grok redraws all, blend restores originals)
     const protectedFacesForGrok = options.protectedFaces || [];
-    for (const [pfymin, pfxmin, pfymax, pfxmax] of protectedFacesForGrok) {
-      const pfW = pfxmax - pfxmin, pfH = pfymax - pfymin;
-      // Add 50% padding around face
-      const padPfxmin = Math.max(0, pfxmin - pfW * 0.5);
-      const padPfymin = Math.max(0, pfymin - pfH * 0.5);
-      const padPfxmax = Math.min(1, pfxmax + pfW * 0.5);
-      const padPfymax = Math.min(1, pfymax + pfH * 0.5);
-      const pfLeft = Math.max(0, Math.floor(padPfxmin * sceneMeta.width));
-      const pfTop = Math.max(0, Math.floor(padPfymin * sceneMeta.height));
-      const pfWidth = Math.max(1, Math.min(Math.ceil((padPfxmax - padPfxmin) * sceneMeta.width), sceneMeta.width - pfLeft));
-      const pfHeight = Math.max(1, Math.min(Math.ceil((padPfymax - padPfymin) * sceneMeta.height), sceneMeta.height - pfTop));
-      try {
-        const pfBlurRadius = Math.max(8, Math.round(pfWidth * 0.12));
-        const faceBlurred = await sharp(sceneBuffer)
-          .extract({ left: pfLeft, top: pfTop, width: pfWidth, height: pfHeight })
-          .blur(pfBlurRadius)
-          .toBuffer();
-        composites.push({ input: faceBlurred, left: pfLeft, top: pfTop });
-        log.info(`🔵 [CHAR REPAIR GROK] Light blur other face: ${pfWidth}x${pfHeight} (${pfLeft},${pfTop}), radius ${pfBlurRadius}`);
-      } catch (blurErr) {
-        log.warn(`⚠️ [CHAR REPAIR GROK] Failed to blur protected face: ${blurErr.message}, skipping`);
-      }
+    for (const pf of protectedFacesForGrok) {
+      await blurFace(pf, 'other face');
     }
 
     if (composites.length > 0) {
@@ -6294,7 +6236,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           actionContext,
           issueContext,
         })
-      : `This is a children's book illustration. One character's face has been blurred. Redraw the blurred character to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. Preserve the pose and clothing visible through the blur. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
+      : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
