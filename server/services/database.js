@@ -829,10 +829,29 @@ async function updateStoryDataOnly(storyId, storyData) {
   for (const coverType of coverTypes) {
     if (dataForStorage.coverImages?.[coverType]) {
       dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
+      // Save main cover imageData to story_images
+      if (dataForStorage.coverImages[coverType].imageData) {
+        await saveStoryImage(storyId, coverType, null, dataForStorage.coverImages[coverType].imageData, {
+          qualityScore: dataForStorage.coverImages[coverType].qualityScore,
+          generatedAt: dataForStorage.coverImages[coverType].generatedAt,
+          versionIndex: 0
+        });
+        imagesSaved++;
+      }
       delete dataForStorage.coverImages[coverType].imageData;
-      // Strip _rehydrated flags from cover versions
+      // Save cover imageVersions to story_images (same as scene versions)
       if (dataForStorage.coverImages[coverType].imageVersions) {
-        for (const version of dataForStorage.coverImages[coverType].imageVersions) {
+        for (let i = 0; i < dataForStorage.coverImages[coverType].imageVersions.length; i++) {
+          const version = dataForStorage.coverImages[coverType].imageVersions[i];
+          if (version.imageData && !version._rehydrated) {
+            await saveStoryImage(storyId, coverType, null, version.imageData, {
+              qualityScore: version.qualityScore ?? version.score,
+              generatedAt: version.generatedAt,
+              versionIndex: arrayToDbIndex(i, coverType)
+            });
+            imagesSaved++;
+          }
+          delete version.imageData;
           delete version._rehydrated;
         }
       }
