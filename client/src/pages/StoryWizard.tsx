@@ -4010,9 +4010,15 @@ export default function StoryWizard() {
             });
           });
           setCoverImages(prev => ({
-            frontCover: resultCoverImages.frontCover ? { ...resultCoverImages.frontCover, imageData: prev.frontCover?.imageData || resultCoverImages.frontCover?.imageData } : null,
-            initialPage: resultCoverImages.initialPage ? { ...resultCoverImages.initialPage, imageData: prev.initialPage?.imageData || resultCoverImages.initialPage?.imageData } : null,
-            backCover: resultCoverImages.backCover ? { ...resultCoverImages.backCover, imageData: prev.backCover?.imageData || resultCoverImages.backCover?.imageData } : null,
+            frontCover: resultCoverImages.frontCover
+              ? { ...resultCoverImages.frontCover, imageData: prev.frontCover?.imageData || resultCoverImages.frontCover?.imageData }
+              : prev.frontCover,  // Keep streaming data if result has no cover
+            initialPage: resultCoverImages.initialPage
+              ? { ...resultCoverImages.initialPage, imageData: prev.initialPage?.imageData || resultCoverImages.initialPage?.imageData }
+              : prev.initialPage,
+            backCover: resultCoverImages.backCover
+              ? { ...resultCoverImages.backCover, imageData: prev.backCover?.imageData || resultCoverImages.backCover?.imageData }
+              : prev.backCover,
           }));
           // Clear progressive state now that we have final data
           setProgressiveStoryData(null);
