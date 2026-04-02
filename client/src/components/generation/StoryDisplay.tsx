@@ -4019,6 +4019,7 @@ export function StoryDisplay({
                     referencePhotos={frontCoverObj.referencePhotos || []}
                     landmarkPhotos={frontCoverObj.landmarkPhotos}
                     visualBibleGrid={frontCoverObj.visualBibleGrid}
+                    grokRefImages={(frontCoverObj as any)?.grokRefImages}
                     language={language}
                   />
                 )}
@@ -4247,6 +4248,7 @@ export function StoryDisplay({
                     referencePhotos={initialPageObj.referencePhotos || []}
                     landmarkPhotos={initialPageObj.landmarkPhotos}
                     visualBibleGrid={initialPageObj.visualBibleGrid}
+                    grokRefImages={(initialPageObj as any)?.grokRefImages}
                     language={language}
                   />
                 )}
@@ -5392,6 +5394,7 @@ export function StoryDisplay({
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
+                                grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions?.length ? image.imageVersions.length - 1 : 0)]?.grokRefImages ?? (image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -5686,6 +5689,7 @@ export function StoryDisplay({
                     referencePhotos={backCoverObj.referencePhotos || []}
                     landmarkPhotos={backCoverObj.landmarkPhotos}
                     visualBibleGrid={backCoverObj.visualBibleGrid}
+                    grokRefImages={(backCoverObj as any)?.grokRefImages}
                     language={language}
                   />
                 )}
