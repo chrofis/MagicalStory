@@ -386,7 +386,7 @@ export default function SharedStoryViewer() {
                   {/* Edit button */}
                   <Link
                     to={`/create?storyId=${story.id}`}
-                    className="inline-flex items-center gap-1 bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-indigo-500 transition-all"
+                    className="inline-flex items-center gap-1 bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-indigo-600 transition-all"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Edit</span>

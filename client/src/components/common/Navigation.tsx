@@ -110,7 +110,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                         canAccess
                           ? isActive
                             ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
-                            : 'bg-indigo-500 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                            : 'bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer hover:scale-110'
                           : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                       }`}
                     >
@@ -148,7 +148,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                         isActive
                           ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
                           : canAccess
-                            ? 'bg-indigo-500 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                            ? 'bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer hover:scale-110'
                             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                       }`}
                     >

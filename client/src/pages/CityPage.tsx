@@ -365,7 +365,7 @@ export default function CityPage() {
             </Link>
             <Link
               to="/try"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border-2 border-indigo-300 text-white font-medium hover:bg-indigo-500 transition-colors text-sm"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border-2 border-indigo-300 text-white font-medium hover:bg-indigo-600 transition-colors text-sm"
             >
               {t.ctaTrialButton}
             </Link>

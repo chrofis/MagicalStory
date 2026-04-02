@@ -355,7 +355,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
             <button
               onClick={() => runModels([modelA])}
               disabled={isRunning || !baseStylePrompt.trim()}
-              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-500 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
               title={`Run ${modelALabel} only`}
             >
               A
@@ -363,7 +363,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
             <button
               onClick={() => runModels([modelB])}
               disabled={isRunning || !baseStylePrompt.trim()}
-              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-500 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
               title={`Run ${modelBLabel} only`}
             >
               B

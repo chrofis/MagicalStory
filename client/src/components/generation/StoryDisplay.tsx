@@ -1395,7 +1395,7 @@ export function StoryDisplay({
           }}
           disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
           className={`w-full min-h-[52px] bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-            isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+            isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
@@ -1483,7 +1483,7 @@ export function StoryDisplay({
                     }
                   }}
                   disabled={!charRepairSelected}
-                  className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
                   {language === 'de' ? 'Reparieren' : 'Repair'} ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                 </button>
@@ -1570,7 +1570,7 @@ export function StoryDisplay({
         }}
         disabled={isGenerating || iteratingPages.has(pageNum) || repairingPage !== null}
         className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-          isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+          isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
         }`}
         title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
       >
@@ -1807,7 +1807,7 @@ export function StoryDisplay({
             onClick={onAddToBook}
             disabled={isGenerating}
             className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
             <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
@@ -1821,7 +1821,7 @@ export function StoryDisplay({
               onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
               disabled={isGenerating}
               className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
-                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
               }`}
             >
               <FileText size={16} />
@@ -1857,7 +1857,7 @@ export function StoryDisplay({
                     onDownloadPdf(pdfFormat);
                     setShowPdfFormatDropdown(false);
                   }}
-                  className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-500"
+                  className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
                 >
                   {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
                 </button>
@@ -1877,7 +1877,7 @@ export function StoryDisplay({
             onClick={onCreateAnother}
             disabled={isGenerating}
             className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
             <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
@@ -3907,7 +3907,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('front')}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -3923,7 +3923,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-1)}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -3939,7 +3939,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('front')}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -3955,7 +3955,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('frontCover').length})
@@ -4136,7 +4136,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('initial')}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -4152,7 +4152,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-2)}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -4168,7 +4168,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('initial')}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -4184,7 +4184,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
@@ -4437,7 +4437,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -4453,7 +4453,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -4469,7 +4469,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
@@ -4487,7 +4487,7 @@ export function StoryDisplay({
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
                                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                     }`}
                                   >
                                     <Edit3 size={14} />
@@ -4497,7 +4497,7 @@ export function StoryDisplay({
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-500"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
                                     {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
@@ -5045,7 +5045,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -5061,7 +5061,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -5077,7 +5077,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
@@ -5095,7 +5095,7 @@ export function StoryDisplay({
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
                                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                     }`}
                                   >
                                     <Edit3 size={14} />
@@ -5105,7 +5105,7 @@ export function StoryDisplay({
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-500"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
                                     {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
@@ -5577,7 +5577,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('back')}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -5593,7 +5593,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-3)}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -5609,7 +5609,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('back')}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -5625,7 +5625,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('backCover').length})
@@ -5784,7 +5784,7 @@ export function StoryDisplay({
                 onClick={onAddToBook}
                 disabled={isGenerating}
                 className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
                 <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
@@ -5798,7 +5798,7 @@ export function StoryDisplay({
                   onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
                   disabled={isGenerating}
                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
-                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                 >
                   <FileText size={16} />
@@ -5834,7 +5834,7 @@ export function StoryDisplay({
                         onDownloadPdf(pdfFormat);
                         setShowPdfFormatDropdown(false);
                       }}
-                      className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-500"
+                      className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
                     >
                       {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
                     </button>
@@ -5854,7 +5854,7 @@ export function StoryDisplay({
                 onClick={onCreateAnother}
                 disabled={isGenerating}
                 className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
                 <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
