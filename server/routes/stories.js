@@ -702,13 +702,14 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        // Reference photos metadata - images lazy loaded via /dev-image endpoint
+        // Reference photos - include actual photo data for dev mode display
         referencePhotos: (img.referencePhotos || []).map(p => ({
           name: p.name,
           photoType: p.photoType,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
-          hasPhoto: !!(p.photoUrl || p.photoData)
+          hasPhoto: !!(p.photoUrl || p.photoData),
+          photoUrl: p.photoUrl || p.photoData || null,
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
@@ -762,7 +763,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
           referencePhotos: (story.coverImages.frontCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.frontCover.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
@@ -800,7 +801,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
           referencePhotos: (story.coverImages.initialPage.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.initialPage.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
@@ -837,7 +838,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
           referencePhotos: (story.coverImages.backCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.backCover.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
