@@ -704,16 +704,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Select evaluation prompt based on type
-    // Cover images use text-focused evaluation (automatic 0 for text errors)
-    // Scene images use standard character/style evaluation
+    // Use standard evaluation for all images (scenes + covers)
+    // Covers get the expected text prepended so the evaluator checks text accuracy too
     let evaluationTemplate;
-    if (evaluationType === 'cover' && PROMPT_TEMPLATES.coverImageEvaluation) {
-      evaluationTemplate = PROMPT_TEMPLATES.coverImageEvaluation;
-      log.verbose('📊 [EVAL] Using COVER evaluation (text-focused)');
-    } else if (PROMPT_TEMPLATES.imageEvaluation) {
+    if (PROMPT_TEMPLATES.imageEvaluation) {
       evaluationTemplate = PROMPT_TEMPLATES.imageEvaluation;
-      log.verbose('📊 [EVAL] Using SCENE evaluation (standard)');
+      log.verbose(`📊 [EVAL] Using standard evaluation (${evaluationType})`);
     } else {
       evaluationTemplate = null;
     }
@@ -725,14 +721,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
     let promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;
 
-    // For cover evaluations: extract the expected text and prepend it prominently
-    // so the evaluator doesn't miss it in the long generation prompt
+    // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
+      // Extract expected text
       const titleMatch = promptForEval.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
       const magicalMatch = promptForEval.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
       const expectedText = titleMatch?.[1] || magicalMatch?.[1];
+
+      // Strip art style description (noise for evaluator)
+      promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
+
       if (expectedText) {
-        promptForEval = `⚠️ EXPECTED TEXT ON THIS IMAGE: "${expectedText}"\n\n${promptForEval}`;
+        promptForEval = `⚠️ EXPECTED TEXT ON THIS IMAGE: "${expectedText}"\nIf text is misspelled or missing, score = 0. If text is correct, evaluate normally.\n\n${promptForEval}`;
       }
     }
 
