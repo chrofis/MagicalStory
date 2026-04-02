@@ -54,15 +54,15 @@ Return ONLY valid JSON:
   ]
 }
 
-EXAMPLE - Scene with two characters and a dog:
-Given expected characters: "Lukas (young character, age 7, blonde hair)" and "Mia (young character, age 3, brown curly hair)"
+EXAMPLE - Scene with two figures and a dog:
+Given expected characters: "Lukas (young male figure, blonde hair)" and "Mia (young female figure, brown curly hair)"
 Given expected objects: "golden crown", "brown teddy bear"
 
 {
   "figures": [
     {
       "name": "Lukas",
-      "label": "character with blonde hair in blue hoodie",
+      "label": "male figure with blonde hair in blue hoodie",
       "position": "left",
       "face_box": [80, 100, 250, 280],
       "body_box": [70, 50, 650, 300],
@@ -70,7 +70,7 @@ Given expected objects: "golden crown", "brown teddy bear"
     },
     {
       "name": "Mia",
-      "label": "character with curly brown hair in pink dress",
+      "label": "female figure with curly brown hair in pink dress",
       "position": "right",
       "face_box": [100, 680, 280, 830],
       "body_box": [90, 600, 680, 900],
