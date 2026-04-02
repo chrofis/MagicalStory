@@ -8,7 +8,7 @@ TOP ROW - EXACT COPIES OF REFERENCE (same style as reference):
 
 BOTTOM ROW - NEW STYLE WITH COSTUME:
 - BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing: {COSTUME_DESCRIPTION}
-- BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Wearing: {COSTUME_DESCRIPTION}
+- BOTTOM-RIGHT: Full body side profile facing RIGHT (90° turn, face in profile, NOT 3/4 view) in same new style. Wearing: {COSTUME_DESCRIPTION}
 
 ⚠️ ONLY THE BOTTOM ROW gets the new art style. Top row stays in reference style.
 
@@ -18,6 +18,8 @@ REQUIREMENTS:
 - BOTTOM ROW: New style ({ART_STYLE_PROMPT}) with costume
 - NO HATS or HEAD COVERINGS - {COSTUME_TYPE} must not cover face or hair
 - FACE MUST BE VISIBLE in all quadrants
+- GLASSES: If the reference person wears glasses, ALL 4 quadrants must show glasses. If no glasses in reference, no glasses in any quadrant.
+- HAIR COLOR: Must be EXACTLY as in the reference photo. Do not darken or lighten. Blonde stays blonde, brown stays brown, red stays red.
 - Background: Light grey studio
 
 BODY PROPORTIONS (CRITICAL):

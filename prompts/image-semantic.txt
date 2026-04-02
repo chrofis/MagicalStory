@@ -18,9 +18,11 @@ List everything you see in the image:
 **STEP 2: COMPARE TO SCENE_HINT**
 
 Check if the image matches what was requested:
-- Are all mentioned characters present?
+- Are all mentioned characters present? (no extra, no missing main characters — background crowds are OK)
+- Are characters wearing the correct clothing/costume? (medieval costume should not appear as modern clothes — MAJOR if wrong)
 - Are all mentioned objects present?
 - Is the setting/location correct?
+- Does the lighting/weather match? (night should be dark, snow scene should have snow, sunny should be bright — MAJOR if wrong)
 - Is the general action correct? (who's doing what to whom)
 
 **DO NOT penalize:**
