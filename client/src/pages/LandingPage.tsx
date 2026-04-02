@@ -249,7 +249,7 @@ export default function LandingPage() {
               <div className="mt-4">
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline"
+                  className="text-indigo-500 hover:text-indigo-800 text-sm font-medium underline"
                 >
                   {t.alreadyHaveAccount || 'Already have an account? Log in'}
                 </button>
@@ -347,7 +347,7 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <Heart className="w-6 h-6 text-indigo-600" />
+                  <Heart className="w-6 h-6 text-indigo-500" />
                 </div>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
@@ -358,7 +358,7 @@ export default function LandingPage() {
               </p>
               <Link
                 to="/science"
-                className="inline-flex items-center gap-1 mt-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                className="inline-flex items-center gap-1 mt-2 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {st.whyLink} <ArrowRight size={16} />
               </Link>
@@ -375,9 +375,9 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <Camera className="w-6 h-6 text-indigo-600" />
+                  <Camera className="w-6 h-6 text-indigo-500" />
                 </div>
-                <span className="text-indigo-600 font-semibold text-lg">{st.step1}</span>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step1}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.createCharacters}
@@ -387,15 +387,15 @@ export default function LandingPage() {
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Users className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.addFamily}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Users className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.defineNames}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Users className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.consistentCharacters}</span>
                 </li>
               </ul>
@@ -420,9 +420,9 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <BookOpen className="w-6 h-6 text-indigo-600" />
+                  <BookOpen className="w-6 h-6 text-indigo-500" />
                 </div>
-                <span className="text-indigo-600 font-semibold text-lg">{st.step2}</span>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step2}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.tellStory}
@@ -432,21 +432,21 @@ export default function LandingPage() {
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <BookOpen className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.selectThemes}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Heart className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Heart className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.customElements}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <BookOpen className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.readingLevel}</span>
                 </li>
               </ul>
               <Link
                 to="/themes"
-                className="inline-flex items-center gap-1 mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : 'Browse all themes'} <ArrowRight size={16} />
               </Link>
@@ -471,9 +471,9 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <Palette className="w-6 h-6 text-indigo-600" />
+                  <Palette className="w-6 h-6 text-indigo-500" />
                 </div>
-                <span className="text-indigo-600 font-semibold text-lg">{st.step3}</span>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step3}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.chooseStyle}
@@ -483,15 +483,15 @@ export default function LandingPage() {
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Palette className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.artStyles}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Palette className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.consistentStyle}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Palette className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.bookLength}</span>
                 </li>
               </ul>
@@ -516,9 +516,9 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <Printer className="w-6 h-6 text-indigo-600" />
+                  <Printer className="w-6 h-6 text-indigo-500" />
                 </div>
-                <span className="text-indigo-600 font-semibold text-lg">{st.step4}</span>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step4}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.printShare}
@@ -528,21 +528,21 @@ export default function LandingPage() {
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <Download className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Download className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.pdfDownload}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Printer className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Printer className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.printOptions}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Printer className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <Printer className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.shipping}</span>
                 </li>
               </ul>
               <Link
                 to="/geschenk"
-                className="inline-flex items-center gap-1 mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {st.giftGuideLink} <ArrowRight size={16} />
               </Link>
@@ -560,7 +560,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-500">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
             {st.readyToCreate}
@@ -570,7 +570,7 @@ export default function LandingPage() {
           </p>
           <button
             onClick={handleStartJourney}
-            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-stone-100 text-indigo-600 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-stone-100 text-indigo-500 shadow-lg hover:shadow-xl"
           >
             <Sparkles size={24} />
             {t.startJourney}

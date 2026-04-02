@@ -530,7 +530,7 @@ export function GenerationProgress({
         {/* Header with animation */}
         <div className="text-center mb-6">
           <div className="relative inline-block mb-3">
-            <Loader2 size={48} className="animate-spin text-indigo-600" />
+            <Loader2 size={48} className="animate-spin text-indigo-500" />
             <span className="absolute -top-1 -right-1 text-xl">✨</span>
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.title}</h2>

@@ -89,7 +89,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
                   <span className="text-gray-500 ml-1">{texts.credits}</span>
                 </div>
               </div>
-              <span className={`text-lg font-bold ${idx === selectedIndex ? 'text-indigo-600' : 'text-gray-700'}`}>
+              <span className={`text-lg font-bold ${idx === selectedIndex ? 'text-indigo-500' : 'text-gray-700'}`}>
                 CHF {pkg.priceCHF}.-
               </span>
             </button>
@@ -109,7 +109,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
           <button
             onClick={handleBuyCredits}
             disabled={isBuyingCredits}
-            className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 bg-indigo-500 text-white py-3 px-4 rounded-lg hover:bg-indigo-600 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isBuyingCredits ? (
               <>

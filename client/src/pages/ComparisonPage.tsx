@@ -150,7 +150,7 @@ function ComparisonTable({
             <th className="text-left py-3 px-4 text-sm font-semibold text-stone-500 w-1/3">
               {t.feature}
             </th>
-            <th className="text-left py-3 px-4 text-sm font-semibold text-indigo-600 w-1/3">
+            <th className="text-left py-3 px-4 text-sm font-semibold text-indigo-500 w-1/3">
               {t.magicalStory}
             </th>
             <th className="text-left py-3 px-4 text-sm font-semibold text-stone-600 w-1/3">
@@ -232,7 +232,7 @@ function ListicleCard({
               </span>
             )}
           </div>
-          <p className="text-sm font-medium text-indigo-600 mt-0.5">
+          <p className="text-sm font-medium text-indigo-500 mt-0.5">
             {entry.bestFor[lang] || entry.bestFor.en}
           </p>
         </div>
@@ -267,7 +267,7 @@ function ListicleCard({
           {isUs ? (
             <Link
               to="/try"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700"
             >
               {t.ctaButton} <ArrowRight size={14} />
             </Link>
@@ -305,7 +305,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
         <div className="bg-white border-b border-stone-100">
           <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
             <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-              <Link to="/vergleich" className="hover:text-indigo-600 transition-colors">
+              <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
                 {t.breadcrumbRoot}
               </Link>
               <ChevronRight size={14} className="text-stone-300" />
@@ -376,12 +376,12 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
           )}
 
           {/* CTA */}
-          <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+          <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
             <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
             <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
             <Link
               to="/try"
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
             >
               {t.ctaButton} <ArrowRight size={18} />
             </Link>
@@ -405,7 +405,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/vergleich" className="hover:text-indigo-600 transition-colors">
+            <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
               {t.breadcrumbRoot}
             </Link>
             <ChevronRight size={14} className="text-stone-300" />
@@ -418,7 +418,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 mb-5">
-            <Shield size={28} className="text-indigo-600" />
+            <Shield size={28} className="text-indigo-500" />
           </div>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">
             {title}
@@ -526,12 +526,12 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
         )}
 
         {/* CTA */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

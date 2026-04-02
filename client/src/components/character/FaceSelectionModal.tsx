@@ -83,7 +83,7 @@ export function FaceSelectionModal({
 
               {/* Select button text */}
               <div className="text-center">
-                <span className="text-sm font-semibold text-indigo-600 group-hover:text-indigo-700">
+                <span className="text-sm font-semibold text-indigo-500 group-hover:text-indigo-700">
                   {t.selectFace} {index + 1}
                 </span>
               </div>

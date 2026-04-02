@@ -127,7 +127,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
           <>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <KeyRound className="w-8 h-8 text-indigo-600" />
+                <KeyRound className="w-8 h-8 text-indigo-500" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.title}</h2>
               <p className="text-gray-500">{t.description}</p>

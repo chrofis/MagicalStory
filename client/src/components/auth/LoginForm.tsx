@@ -96,7 +96,7 @@ export function LoginForm({
             <button
               type="button"
               onClick={onSwitchToRegister}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+              className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-600 transition-colors"
             >
               {notRegisteredTexts.createAccount}
             </button>
@@ -157,7 +157,7 @@ export function LoginForm({
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-sm text-indigo-600 hover:text-indigo-800"
+            className="text-sm text-indigo-500 hover:text-indigo-800"
           >
             {t.forgotPassword}
           </button>
@@ -178,7 +178,7 @@ export function LoginForm({
           {t.noAccount}{' '}
           <button
             onClick={onSwitchToRegister}
-            className="text-indigo-600 font-semibold hover:text-gray-800"
+            className="text-indigo-500 font-semibold hover:text-gray-800"
           >
             {t.signUp}
           </button>

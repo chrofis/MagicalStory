@@ -133,7 +133,7 @@ export default function OccasionPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/anlaesse" className="hover:text-indigo-600 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to="/anlaesse" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{name}</span>
           </nav>
@@ -148,7 +148,7 @@ export default function OccasionPage() {
           <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
           >
             {t.createButton} <ArrowRight size={20} />
           </Link>
@@ -167,7 +167,7 @@ export default function OccasionPage() {
         {/* Gift Tips */}
         <div className="mb-12">
           <div className="flex items-center justify-center gap-2 mb-5">
-            <Gift size={20} className="text-indigo-600" />
+            <Gift size={20} className="text-indigo-500" />
             <h2 className="font-title text-xl font-bold text-stone-900">{t.tipsTitle}</h2>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
@@ -175,7 +175,7 @@ export default function OccasionPage() {
               {tips.map((tip, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center mt-0.5">
-                    <Check size={14} className="text-indigo-600" />
+                    <Check size={14} className="text-indigo-500" />
                   </div>
                   <span className="text-stone-700">{tip}</span>
                 </div>
@@ -199,7 +199,7 @@ export default function OccasionPage() {
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <span className="text-3xl block mb-2">{theme.emoji}</span>
-                  <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-600 transition-colors">
+                  <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-500 transition-colors">
                     {theme.name}
                   </span>
                   <span className="block text-xs text-stone-400 mt-1 group-hover:text-indigo-400 transition-colors">
@@ -228,7 +228,7 @@ export default function OccasionPage() {
         {faq.length > 0 && (
           <div className="mb-12">
             <div className="flex items-center justify-center gap-2 mb-5">
-              <Lightbulb size={20} className="text-indigo-600" />
+              <Lightbulb size={20} className="text-indigo-500" />
               <h2 className="font-title text-xl font-bold text-stone-900">{t.faqTitle}</h2>
             </div>
             <div className="space-y-3">
@@ -264,12 +264,12 @@ export default function OccasionPage() {
         )}
 
         {/* CTA Section */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

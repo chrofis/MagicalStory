@@ -196,7 +196,7 @@ export default function WelcomePage() {
           {/* CTA Button */}
           <button
             onClick={handleStart}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-lg"
+            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-lg"
           >
             {t.cta}
             <ArrowRight className="w-5 h-5" />

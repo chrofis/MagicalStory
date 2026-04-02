@@ -346,7 +346,7 @@ export default function BookBuilder() {
             <p className="text-gray-500 mb-6">{t.noStoriesDesc}</p>
             <button
               onClick={() => navigate('/stories')}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+              className="px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600"
             >
               {t.backToStories}
             </button>
@@ -364,7 +364,7 @@ export default function BookBuilder() {
         {/* Back button */}
         <button
           onClick={() => navigate('/stories')}
-          className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-600 hover:text-indigo-500 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
           {t.backToStories}
@@ -484,12 +484,12 @@ export default function BookBuilder() {
                 onClick={() => setCoverType('softcover')}
                 className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   coverType === 'softcover'
-                    ? 'border-indigo-600 bg-indigo-50'
+                    ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <Book size={32} className={`shrink-0 ${coverType === 'softcover' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <Book size={32} className={`shrink-0 ${coverType === 'softcover' ? 'text-indigo-500' : 'text-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.softcover}</div>
                     <div className="text-sm text-gray-500">{t.softcoverSize}</div>
@@ -507,12 +507,12 @@ export default function BookBuilder() {
                 onClick={() => setCoverType('hardcover')}
                 className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   coverType === 'hardcover'
-                    ? 'border-indigo-600 bg-indigo-50'
+                    ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <BookOpen size={32} className={`shrink-0 ${coverType === 'hardcover' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <BookOpen size={32} className={`shrink-0 ${coverType === 'hardcover' ? 'text-indigo-500' : 'text-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.hardcover}</div>
                     <div className="text-sm text-gray-500">{t.hardcoverSize}</div>
@@ -534,12 +534,12 @@ export default function BookBuilder() {
                 onClick={() => setBookFormat('square')}
                 className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   bookFormat === 'square'
-                    ? 'border-indigo-600 bg-indigo-50'
+                    ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`w-8 h-8 shrink-0 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className={`w-8 h-8 shrink-0 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-500 bg-indigo-100' : 'border-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.squareFormat}</div>
                     <div className="text-sm text-gray-500">{t.squareSize}</div>
@@ -552,12 +552,12 @@ export default function BookBuilder() {
                 onClick={() => setBookFormat('A4')}
                 className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   bookFormat === 'A4'
-                    ? 'border-indigo-600 bg-indigo-50'
+                    ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`w-6 h-8 shrink-0 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className={`w-6 h-8 shrink-0 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-500 bg-indigo-100' : 'border-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.portraitFormat}</div>
                     <div className="text-sm text-gray-500">{t.portraitSize}</div>

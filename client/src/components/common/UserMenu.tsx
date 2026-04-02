@@ -59,7 +59,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
             {user.username} {user.role === 'admin' && '👑'}
           </div>
           <div className={`text-xs px-2 py-1 rounded inline-block ${
-            isUnlimited ? 'bg-indigo-600 text-white' :
+            isUnlimited ? 'bg-indigo-500 text-white' :
             credits === 0 ? 'bg-red-600 text-white' :
             credits < 50 ? 'bg-yellow-600 text-white' :
             'bg-green-600 text-white'
@@ -82,7 +82,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
               }}
               className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${
                 language === lang
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-indigo-500 text-white'
                   : 'bg-gray-700 text-white hover:bg-gray-600'
               }`}
             >

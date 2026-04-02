@@ -33,7 +33,7 @@ export function StoryTypeSelector({
             onClick={() => onSelect(type.id)}
             className={`p-2 rounded-lg border-2 transition-all ${
               selectedType === type.id
-                ? 'border-indigo-600 bg-indigo-50 shadow-lg'
+                ? 'border-indigo-500 bg-indigo-50 shadow-lg'
                 : 'border-gray-200 hover:border-indigo-300'
             }`}
           >
@@ -46,12 +46,12 @@ export function StoryTypeSelector({
         {onAddCustom && (
           <button
             onClick={onAddCustom}
-            className="p-2 rounded-lg border-2 border-dashed border-indigo-300 hover:border-indigo-600 transition-all hover:bg-indigo-50"
+            className="p-2 rounded-lg border-2 border-dashed border-indigo-300 hover:border-indigo-500 transition-all hover:bg-indigo-50"
           >
             <div className="text-2xl mb-1">
-              <Plus size={24} className="mx-auto text-indigo-600" />
+              <Plus size={24} className="mx-auto text-indigo-500" />
             </div>
-            <div className="font-semibold text-xs text-indigo-600">{t.addCustomStoryType}</div>
+            <div className="font-semibold text-xs text-indigo-500">{t.addCustomStoryType}</div>
           </button>
         )}
       </div>

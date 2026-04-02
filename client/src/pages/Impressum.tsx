@@ -95,7 +95,7 @@ export default function Impressum() {
       <div className="flex-1 max-w-4xl mx-auto px-4 py-8">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-6"
+          className="flex items-center gap-2 text-indigo-500 hover:text-indigo-800 mb-6"
         >
           <ArrowLeft size={20} />
           {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : 'Back'}

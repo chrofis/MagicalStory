@@ -236,7 +236,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
       <div className="mt-4 pt-4 border-t border-gray-200">
         {/* Header */}
         <div className="flex items-center gap-2 mb-3">
-          <FlaskConical size={16} className="text-indigo-600" />
+          <FlaskConical size={16} className="text-indigo-500" />
           <h4 className="text-sm font-semibold text-gray-800">Style Lab</h4>
           <span className="text-[10px] text-gray-400">Compare art style convergence between models</span>
         </div>
@@ -280,7 +280,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
               if (!overrideB) setOverrideB(baseStylePrompt);
             }
           }}
-          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 mb-2"
+          className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-800 mb-2"
         >
           {showOverrides ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           Per-model prompt overrides
@@ -347,7 +347,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
             <button
               onClick={() => runModels([modelA, modelB])}
               disabled={isRunning || !baseStylePrompt.trim()}
-              className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1"
+              className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1"
             >
               {isRunning ? <Loader2 size={12} className="animate-spin" /> : null}
               Run Both
@@ -355,7 +355,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
             <button
               onClick={() => runModels([modelA])}
               disabled={isRunning || !baseStylePrompt.trim()}
-              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-500 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
               title={`Run ${modelALabel} only`}
             >
               A
@@ -363,7 +363,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
             <button
               onClick={() => runModels([modelB])}
               disabled={isRunning || !baseStylePrompt.trim()}
-              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+              className="px-2 py-1.5 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-500 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
               title={`Run ${modelBLabel} only`}
             >
               B
@@ -548,7 +548,7 @@ export function StyleLabSection({ storyId, pageNumber, onUseImage }: StyleLabSec
                         const run = history.find(r => r.runId === expandedRunId);
                         if (run) resumeFrom(run);
                       }}
-                      className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1"
+                      className="px-2 py-1 text-xs font-medium rounded bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-1"
                     >
                       <RotateCw size={10} />
                       Resume from this run

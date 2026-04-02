@@ -62,7 +62,7 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
       {/* Animated gradient thumbnail */}
       <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 via-indigo-100 to-pink-100 flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
-        <Loader2 size={48} className="animate-spin text-indigo-600" />
+        <Loader2 size={48} className="animate-spin text-indigo-500" />
       </div>
 
       {/* Content */}
@@ -71,7 +71,7 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
           <h3 className="font-bold text-lg text-gray-800 mb-1 truncate">
             {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Generating...')}
           </h3>
-          <p className="text-sm text-indigo-600 mb-3">
+          <p className="text-sm text-indigo-500 mb-3">
             {percentage > 0
               ? `${percentage}%`
               : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : 'Starting...')}
@@ -224,7 +224,7 @@ const StoryCard = memo(function StoryCard({
         <div className="flex gap-2 mt-auto">
           <button
             onClick={(e) => { e.stopPropagation(); onView(); }}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
           >
             <Eye size={18} />
             {language === 'de' ? 'Lesen' : language === 'fr' ? 'Lire' : 'Read'}
@@ -810,7 +810,7 @@ export default function MyStories() {
             {/* See Pricing button - icon only on mobile */}
             <button
               onClick={() => navigate('/pricing')}
-              className="flex items-center gap-1 px-2 md:px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
+              className="flex items-center gap-1 px-2 md:px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 font-medium transition-colors"
               title={t.seePricing}
             >
               <Tag size={18} />
@@ -822,13 +822,13 @@ export default function MyStories() {
               <button
                 onClick={() => needsPassword ? scrollToPasswordBanner() : goToBookBuilder()}
                 disabled={!needsPassword && (selectedStories.length === 0 || isOverLimit)}
-                className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+                className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed'}`}
                 title={t.createBook}
               >
                 <BookOpen size={18} />
                 <span className="text-sm md:text-base">{t.createBook}</span>
                 {!needsPassword && selectedStories.length > 0 && (
-                  <span className="bg-white text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">
+                  <span className="bg-white text-indigo-500 text-xs px-1.5 py-0.5 rounded-full">
                     {selectedStories.length}
                   </span>
                 )}
@@ -838,7 +838,7 @@ export default function MyStories() {
             {/* Create Story button */}
             <button
               onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/create?new=true')}
-              className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+              className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
               title={t.createStory}
             >
               <span className="text-sm md:text-base">{t.createStory}</span>
@@ -873,7 +873,7 @@ export default function MyStories() {
                 setIsLoading(true);
                 loadStories();
               }}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+              className="px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600"
             >
               {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : 'Try Again'}
             </button>
@@ -894,7 +894,7 @@ export default function MyStories() {
               <p className="text-gray-500 text-lg">{t.noStories}</p>
               <button
                 onClick={() => navigate('/create?new=true')}
-                className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+                className="mt-4 px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600"
               >
                 {t.createStory}
               </button>
@@ -961,7 +961,7 @@ export default function MyStories() {
                 <button
                   onClick={() => loadStories({ loadAll: true })}
                   disabled={isLoadingMore}
-                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-semibold transition-colors disabled:opacity-50"
                 >
                   {isLoadingMore ? (
                     <>
@@ -1001,7 +1001,7 @@ export default function MyStories() {
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${
                 needsPassword || isOverLimit
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-indigo-500 text-white hover:bg-indigo-600'
               }`}
             >
               <BookOpen size={20} />

@@ -111,7 +111,7 @@ export default function CityListing() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <MapPin className="w-8 h-8 text-indigo-600" />
+            <MapPin className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">{t.title}</h1>
           <p className="text-stone-500 text-lg max-w-2xl mx-auto">{t.subtitle}</p>
@@ -132,7 +132,7 @@ export default function CityListing() {
                     className="w-full flex items-center justify-between p-5 hover:bg-stone-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full">{code}</span>
+                      <span className="text-xs font-bold bg-indigo-50 text-indigo-500 px-2.5 py-1 rounded-full">{code}</span>
                       <h2 className="font-title text-lg font-bold text-stone-900">{cantonName}</h2>
                       <span className="text-sm text-stone-400">({cities.length})</span>
                     </div>
@@ -154,7 +154,7 @@ export default function CityListing() {
                               className="flex items-center justify-between p-3 rounded-xl border border-stone-100 hover:border-indigo-200 hover:shadow-sm transition-all group"
                             >
                               <div>
-                                <span className="font-medium text-stone-800 group-hover:text-indigo-600 transition-colors">
+                                <span className="font-medium text-stone-800 group-hover:text-indigo-500 transition-colors">
                                   {cityName}
                                 </span>
                                 {ideaCount > 0 && (
@@ -177,12 +177,12 @@ export default function CityListing() {
         )}
 
         {/* CTA */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

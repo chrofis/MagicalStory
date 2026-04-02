@@ -127,7 +127,7 @@ export default function Science() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <Brain className="w-8 h-8 text-indigo-600" />
+            <Brain className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">{content.heroTitle}</h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto">{content.heroSubtitle}</p>
@@ -169,12 +169,12 @@ export default function Science() {
         </div>
 
         {/* CTA */}
-        <div className="bg-indigo-600 rounded-2xl p-8 text-center">
+        <div className="bg-indigo-500 rounded-2xl p-8 text-center">
           <h3 className="text-xl font-semibold text-white mb-2">{content.ctaTitle}</h3>
           <p className="text-indigo-100 mb-5 max-w-md mx-auto">{content.ctaText}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-indigo-600 font-medium hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-indigo-500 font-medium hover:bg-indigo-50 transition-colors"
           >
             <Sparkles size={18} />
             {content.ctaButton}

@@ -582,7 +582,7 @@ export default function TrialGenerationPage() {
             {/* Progress: spinner + text + bar */}
             {(pageState === 'starting' || pageState === 'generating') && (
               <div className="w-full flex items-center gap-3 mb-2">
-                <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
                 <span className="text-sm text-gray-600">{t.creatingStory}</span>
                 <span className="text-xs text-gray-400 ml-auto">{Math.round(progress)}%</span>
               </div>
@@ -590,7 +590,7 @@ export default function TrialGenerationPage() {
             {(pageState === 'starting' || pageState === 'generating') && (
               <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-2">
                 <div
-                  className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500 ease-out"
+                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${Math.max(progress, 3)}%` }}
                 />
               </div>
@@ -614,7 +614,7 @@ export default function TrialGenerationPage() {
                 <p className="text-gray-500 text-sm mb-4">{t.failedDesc}</p>
                 <button
                   onClick={() => navigate('/try', { replace: true })}
-                  className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                  className="text-indigo-500 hover:text-indigo-800 font-medium text-sm"
                 >
                   {t.tryAgain}
                 </button>
@@ -654,7 +654,7 @@ export default function TrialGenerationPage() {
                 />
               ) : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <BookOpen className="w-8 h-8 text-indigo-600" />
+                  <BookOpen className="w-8 h-8 text-indigo-500" />
                 </div>
               )}
             </div>
@@ -698,7 +698,7 @@ export default function TrialGenerationPage() {
                   <p className="text-xs text-gray-400 mb-3">{t.emailSentNote}</p>
                   <button
                     onClick={() => { setEmailLinked(false); setEmail(''); setAuthError(''); }}
-                    className="text-indigo-600 text-sm font-medium hover:text-indigo-800 underline underline-offset-2"
+                    className="text-indigo-500 text-sm font-medium hover:text-indigo-800 underline underline-offset-2"
                   >
                     {t.differentEmail}
                   </button>
@@ -773,7 +773,7 @@ export default function TrialGenerationPage() {
                     <button
                       type="submit"
                       disabled={isAuthLoading || !email.trim()}
-                      className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isAuthLoading && <Loader2 className="w-5 h-5 animate-spin" />}
                       {t.emailSubmit}

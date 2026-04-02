@@ -107,7 +107,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             onClick={() => setConsent1Checked(!consent1Checked)}
             className="flex items-start gap-3 cursor-pointer group"
           >
-            <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+            <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
               {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
             </span>
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
@@ -125,16 +125,16 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             }}
             className="flex items-start gap-3 cursor-pointer group"
           >
-            <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+            <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
               {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
             </span>
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
               {texts.consent2}{' '}
-              <Link to="/terms" className="text-indigo-600 hover:underline">
+              <Link to="/terms" className="text-indigo-500 hover:underline">
                 {texts.termsLink}
               </Link>{' '}
               {texts.and}{' '}
-              <Link to="/privacy" className="text-indigo-600 hover:underline">
+              <Link to="/privacy" className="text-indigo-500 hover:underline">
                 {texts.privacyLink}
               </Link>
               {texts.period}
@@ -159,7 +159,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
           disabled={!canUpload || isRecordingConsent}
           className={`inline-flex items-center justify-center gap-3 px-10 py-4 rounded-xl text-xl font-bold shadow-lg transition-colors ${
             canUpload && !isRecordingConsent
-              ? 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700'
+              ? 'cursor-pointer bg-indigo-500 text-white hover:bg-indigo-600'
               : 'cursor-not-allowed bg-gray-300 text-gray-500'
           }`}
         >

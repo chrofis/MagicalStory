@@ -324,8 +324,8 @@ export function SceneEditModal({
             <button
               onClick={onRegenerate}
               disabled={isRegenerating || !scene.trim()}
-              className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
-                isRegenerating || !scene.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
+              className={`px-4 py-2 bg-indigo-500 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
+                isRegenerating || !scene.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
               }`}
             >
               {isRegenerating ? (

@@ -556,7 +556,7 @@ export default function AdminDashboard() {
   if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-500" />
       </div>
     );
   }
@@ -580,7 +580,7 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-500" />
       </div>
     );
   }
@@ -633,7 +633,7 @@ export default function AdminDashboard() {
             onClick={() => handleTabChange('stats')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'stats'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-500 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -643,7 +643,7 @@ export default function AdminDashboard() {
             onClick={() => handleTabChange('users')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'users'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-500 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -653,7 +653,7 @@ export default function AdminDashboard() {
             onClick={() => handleTabChange('products')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               activeTab === 'products'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-500 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -664,7 +664,7 @@ export default function AdminDashboard() {
             onClick={() => handleTabChange('tokens')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               activeTab === 'tokens'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-500 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -675,7 +675,7 @@ export default function AdminDashboard() {
             onClick={() => handleTabChange('jobs')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               activeTab === 'jobs'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-500 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -694,13 +694,13 @@ export default function AdminDashboard() {
             {/* Stats Grid */}
             {isLoadingStats ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
                 <span className="ml-3 text-gray-600">Loading statistics...</span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <StatCard
-                  icon={<Users className="w-8 h-8 text-indigo-600" />}
+                  icon={<Users className="w-8 h-8 text-indigo-500" />}
                   title={texts.totalUsers}
                   value={stats?.totalUsers ?? 0}
                 />
@@ -725,7 +725,7 @@ export default function AdminDashboard() {
                   value={stats?.orphanedFiles ?? 0}
                 />
                 <StatCard
-                  icon={<Database className="w-8 h-8 text-indigo-600" />}
+                  icon={<Database className="w-8 h-8 text-indigo-500" />}
                   title={texts.databaseSize}
                   value={stats?.databaseSize ?? 'N/A'}
                   isString
@@ -903,13 +903,13 @@ export default function AdminDashboard() {
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td
-                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-600 hover:underline"
+                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-500 hover:underline"
                         onClick={() => handleViewUserDetails(u)}
                       >
                         {u.username}
                       </td>
                       <td
-                        className="px-4 py-3 text-sm text-gray-600 cursor-pointer hover:text-indigo-600"
+                        className="px-4 py-3 text-sm text-gray-600 cursor-pointer hover:text-indigo-500"
                         onClick={() => handleViewUserDetails(u)}
                       >
                         {u.email}
@@ -924,7 +924,7 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td
-                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-600"
+                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-500"
                         onClick={() => handleViewUserDetails(u)}
                       >
                         {u.credits === -1 ? texts.unlimited : u.credits}
@@ -944,7 +944,7 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => handleToggleRole(u)}
                             className={`p-1 rounded hover:bg-gray-100 ${
-                              u.role === 'admin' ? 'text-yellow-600' : 'text-indigo-600'
+                              u.role === 'admin' ? 'text-yellow-600' : 'text-indigo-500'
                             }`}
                             title={u.role === 'admin' ? texts.removeAdmin : texts.makeAdmin}
                             disabled={u.id === user?.id}
@@ -1073,7 +1073,7 @@ export default function AdminDashboard() {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">{texts.savedProducts}</h3>
               {isLoadingProducts ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
                 </div>
               ) : printProducts.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">{texts.noProducts}</p>
@@ -1125,7 +1125,7 @@ export default function AdminDashboard() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => startEditingProduct(product)}
-                                className="p-1.5 rounded hover:bg-gray-100 text-indigo-600"
+                                className="p-1.5 rounded hover:bg-gray-100 text-indigo-500"
                                 title={texts.editPages}
                                 disabled={isActionLoading}
                               >
@@ -1199,7 +1199,7 @@ export default function AdminDashboard() {
                           {alreadyAdded ? (
                             <Check size={20} className="text-green-600" />
                           ) : (
-                            <Plus size={20} className="text-indigo-600" />
+                            <Plus size={20} className="text-indigo-500" />
                           )}
                         </div>
                       </div>
@@ -1211,7 +1211,7 @@ export default function AdminDashboard() {
 
             {isFetchingGelato && (
               <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-2" />
                 <p className="text-gray-600">{texts.fetching}</p>
               </div>
             )}
@@ -1244,7 +1244,7 @@ export default function AdminDashboard() {
 
             {isLoadingJobs ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
                 <span className="ml-3 text-gray-600">Loading failed jobs...</span>
               </div>
             ) : failedJobs.length === 0 ? (
@@ -1314,7 +1314,7 @@ export default function AdminDashboard() {
                             <button
                               onClick={() => handleRetryJob(job.id)}
                               disabled={retryingJobId === job.id}
-                              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                              className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
                               title="Retry this job"
                             >
                               {retryingJobId === job.id ? (
@@ -1385,7 +1385,7 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           {/* Current Balance */}
           <div className="bg-indigo-50 rounded-lg p-4">
-            <p className="text-sm text-indigo-600 font-medium">{texts.currentBalance || 'Current Balance'}</p>
+            <p className="text-sm text-indigo-500 font-medium">{texts.currentBalance || 'Current Balance'}</p>
             <p className="text-2xl font-bold text-indigo-800">
               {creditHistoryUser?.credits === -1 ? (texts.unlimited || 'Unlimited') : creditHistoryUser?.credits}
             </p>
@@ -1394,7 +1394,7 @@ export default function AdminDashboard() {
           {/* Transaction List */}
           {isLoadingHistory ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
             </div>
           ) : creditHistory.length === 0 ? (
             <p className="text-center text-gray-500 py-8">{texts.noTransactions || 'No transactions found'}</p>
@@ -1465,7 +1465,7 @@ export default function AdminDashboard() {
         <div className="space-y-4 max-h-[70vh] overflow-y-auto">
           {isLoadingDetails ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
             </div>
           ) : userDetails ? (
             <>
@@ -1530,14 +1530,14 @@ export default function AdminDashboard() {
               {/* Credits Info */}
               <div className="bg-indigo-50 rounded-lg p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-indigo-600 font-medium">{texts.currentBalance}</p>
+                  <p className="text-sm text-indigo-500 font-medium">{texts.currentBalance}</p>
                   <p className="text-xl font-bold text-indigo-800">
                     {userDetails.user.credits === -1 ? texts.unlimited : userDetails.user.credits}
                   </p>
                 </div>
                 {userDetails.stats.totalSpent > 0 && (
                   <div className="text-right">
-                    <p className="text-sm text-indigo-600 font-medium">{texts.totalSpent}</p>
+                    <p className="text-sm text-indigo-500 font-medium">{texts.totalSpent}</p>
                     <p className="text-xl font-bold text-indigo-800">
                       ${userDetails.stats.totalSpent.toFixed(2)}
                     </p>

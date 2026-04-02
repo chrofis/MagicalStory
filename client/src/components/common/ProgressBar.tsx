@@ -15,7 +15,7 @@ const sizeClasses = {
 };
 
 const variantClasses = {
-  default: 'bg-indigo-600',
+  default: 'bg-indigo-500',
   success: 'bg-green-500',
   warning: 'bg-yellow-500',
   gradient: 'bg-gradient-to-r from-indigo-500 to-indigo-600',

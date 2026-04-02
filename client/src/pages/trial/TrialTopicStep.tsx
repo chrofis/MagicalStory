@@ -232,7 +232,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </div>
 
         <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Sparkles className="text-indigo-600 w-5 h-5" />
+          <Sparkles className="text-indigo-500 w-5 h-5" />
           {t.pickTheme}
         </h2>
 
@@ -288,7 +288,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </div>
 
         <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Sparkles className="text-indigo-600 w-5 h-5" />
+          <Sparkles className="text-indigo-500 w-5 h-5" />
           {t.pickTopic}
         </h2>
 
@@ -343,7 +343,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
             disabled={!isComplete}
             className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all mb-4 ${
               isComplete
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
+                ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
@@ -387,7 +387,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </div>
 
         <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Sparkles className="text-indigo-600 w-5 h-5" />
+          <Sparkles className="text-indigo-500 w-5 h-5" />
           {t.pickTopic}
         </h2>
 
@@ -490,7 +490,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         disabled={!isComplete}
         className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
           isComplete
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
+            ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200'
             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
         }`}
       >

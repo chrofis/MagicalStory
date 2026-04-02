@@ -690,8 +690,8 @@ export function CharacterForm({
                 {isAnalyzingPhoto ? (
                   <div className="w-24 h-24 rounded-full bg-indigo-100 border-4 border-indigo-400 shadow-lg flex items-center justify-center">
                     <div className="flex flex-col items-center gap-1">
-                      <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[10px] text-indigo-600 font-medium">
+                      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-indigo-500 font-medium">
                         {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse...' : 'Analyzing...'}
                       </span>
                     </div>
@@ -1140,7 +1140,7 @@ export function CharacterForm({
               <button
                 onClick={onSave}
                 disabled={isLoading}
-                className="w-full px-6 py-4 text-lg font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-3 shadow-lg"
+                className="w-full px-6 py-4 text-lg font-bold bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-3 shadow-lg"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1177,7 +1177,7 @@ export function CharacterForm({
             <button
               onClick={onSave}
               disabled={isLoading}
-              className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full px-6 py-4 text-base font-semibold bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1229,7 +1229,7 @@ export function CharacterForm({
             <div className="flex-shrink-0">
               {isAnalyzingPhoto ? (
                 <div className="w-14 h-14 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : displayPhoto ? (
                 <div className="flex items-center gap-1.5">
@@ -1274,7 +1274,7 @@ export function CharacterForm({
                 />
               ) : (
                 <h3
-                  className="text-xl font-bold text-gray-800 cursor-pointer hover:text-indigo-600 flex items-center gap-1 group"
+                  className="text-xl font-bold text-gray-800 cursor-pointer hover:text-indigo-500 flex items-center gap-1 group"
                   onClick={() => setIsEditingName(true)}
                   title={language === 'de' ? 'Klicken zum Bearbeiten' : 'Click to edit'}
                 >
@@ -1362,7 +1362,7 @@ export function CharacterForm({
                   {(isGenerating || isLoadingFullAvatar) ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs text-indigo-600 font-medium px-2 text-center">
+                      <span className="text-xs text-indigo-500 font-medium px-2 text-center">
                         {language === 'de' ? (isLoadingFullAvatar ? 'Lädt...' : 'Wird erstellt...') : (isLoadingFullAvatar ? 'Loading...' : 'Creating...')}
                       </span>
                     </div>
@@ -1398,7 +1398,7 @@ export function CharacterForm({
             {/* Avatar action buttons - full width on mobile, side by side on desktop */}
             <div className="mt-3 flex flex-col sm:flex-row gap-2 w-full">
               {/* Change Photo button */}
-              <label className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 cursor-pointer transition-colors">
+              <label className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-2 cursor-pointer transition-colors">
                 <Upload size={16} />
                 {language === 'de' ? 'Neues Foto' : language === 'fr' ? 'Nouvelle photo' : 'New Photo'}
                 <input
@@ -1411,7 +1411,7 @@ export function CharacterForm({
               {/* Modify Avatar button */}
               <button
                 onClick={() => setIsModifyingAvatar(true)}
-                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-2 transition-colors"
               >
                 <Pencil size={16} />
                 {language === 'de' ? 'Anpassen' : language === 'fr' ? 'Modifier' : 'Modify'}
@@ -1503,7 +1503,7 @@ export function CharacterForm({
             {/* Developer mode: show avatar generation input (source photo + user traits) */}
             {(developerMode || isImpersonating) && (
               <details className="mt-1 text-left">
-                <summary className="text-[10px] font-medium cursor-pointer text-indigo-600">
+                <summary className="text-[10px] font-medium cursor-pointer text-indigo-500">
                   Avatar Gen Input
                 </summary>
                 <div className="mt-1 p-2 rounded text-[9px] border bg-indigo-50 border-indigo-200 space-y-2">
@@ -1969,7 +1969,7 @@ export function CharacterForm({
 
               return (
                 <div key={artStyle} className="border border-indigo-200 rounded-lg p-3 bg-white">
-                  <h5 className="text-xs font-semibold text-indigo-600 mb-2">
+                  <h5 className="text-xs font-semibold text-indigo-500 mb-2">
                     {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
                   </h5>
                   {/* Standard clothing avatars */}
@@ -2472,7 +2472,7 @@ export function CharacterForm({
                   }
                 }}
                 disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !isImpersonating && !canRegenerate)}
-                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
                 title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
               >
                 {isRegeneratingAvatarsWithTraits ? (
@@ -2539,7 +2539,7 @@ export function CharacterForm({
               {/* Use new photo's clothing - DEFAULT */}
               <button
                 onClick={() => handleClothingChoice(false)}
-                className="w-full px-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 bg-indigo-500 text-white rounded-xl font-semibold hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2"
               >
                 {language === 'de' ? 'Kleidung aus neuem Foto verwenden' : language === 'fr' ? 'Utiliser les vêtements de la nouvelle photo' : 'Use clothing from new photo'}
                 <span className="text-xs bg-indigo-500 px-2 py-0.5 rounded">
@@ -2613,7 +2613,7 @@ export function CharacterForm({
               <button
                 onClick={handleSaveSelectedAvatar}
                 disabled={selectedOptionId === null}
-                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-3 bg-indigo-500 text-white rounded-xl font-semibold hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {language === 'de' ? 'Auswahl verwenden' : 'Use Selected'}
               </button>

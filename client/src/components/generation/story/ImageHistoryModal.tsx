@@ -265,7 +265,7 @@ export function ImageHistoryModal({
                       onClick={(e) => { e.stopPropagation(); setDetailIndex(detailIndex === idx ? null : idx); }}
                       className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-colors ${
                         detailIndex === idx
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-indigo-500 text-white'
                           : 'bg-black/50 text-white hover:bg-black/70'
                       }`}
                       title="Show details"

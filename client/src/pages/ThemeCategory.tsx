@@ -177,7 +177,7 @@ export default function ThemeCategory() {
       {/* Breadcrumb */}
       <div className="max-w-5xl mx-auto px-4 pt-6 w-full">
         <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-          <Link to="/themes" className="hover:text-indigo-600 transition-colors">{t.breadcrumbRoot}</Link>
+          <Link to="/themes" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
           <ChevronRight size={14} className="text-stone-300" />
           <span className="text-stone-800 font-medium">{categoryName}</span>
         </nav>
@@ -210,7 +210,7 @@ export default function ThemeCategory() {
                     >
                       <span className="text-2xl flex-shrink-0">{theme.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-600 transition-colors block truncate">
+                        <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-500 transition-colors block truncate">
                           {theme.name[language] || theme.name.en}
                         </span>
                         {category === 'historical' && 'year' in theme && (
@@ -229,12 +229,12 @@ export default function ThemeCategory() {
         </div>
 
         {/* CTA Section */}
-        <div className="mt-16 bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="mt-16 bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

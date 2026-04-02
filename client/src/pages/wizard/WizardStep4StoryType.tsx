@@ -80,7 +80,7 @@ export function WizardStep4StoryType({
             </span>
             <button
               onClick={() => setShowFullSelector(true)}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-50"
+              className="text-xs text-indigo-500 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-50"
             >
               <RefreshCw size={12} />
               {language === 'de' ? 'Ändern' : language === 'fr' ? 'Changer' : 'Change'}

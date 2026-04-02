@@ -134,7 +134,7 @@ export function RegisterForm({
           {t.haveAccount}{' '}
           <button
             onClick={onSwitchToLogin}
-            className="text-indigo-600 font-semibold hover:text-gray-800"
+            className="text-indigo-500 font-semibold hover:text-gray-800"
           >
             {t.signIn}
           </button>

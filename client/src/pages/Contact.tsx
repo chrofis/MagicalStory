@@ -77,7 +77,7 @@ export default function Contact() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <MessageCircle className="w-8 h-8 text-indigo-600" />
+            <MessageCircle className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">{content.title}</h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto">{content.subtitle}</p>
@@ -90,13 +90,13 @@ export default function Contact() {
           {/* Email card */}
           <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="bg-indigo-50 w-11 h-11 rounded-xl flex items-center justify-center mb-4">
-              <Mail className="w-5 h-5 text-indigo-600" />
+              <Mail className="w-5 h-5 text-indigo-500" />
             </div>
             <h2 className="text-lg font-semibold text-stone-800 mb-2">{content.emailTitle}</h2>
             <p className="text-stone-500 text-sm mb-4 leading-relaxed">{content.emailText}</p>
             <a
               href={`mailto:${content.emailAddress}`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-medium text-sm hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-500 text-white font-medium text-sm hover:bg-indigo-600 transition-colors"
             >
               <Mail size={16} />
               {content.emailAddress}
@@ -106,7 +106,7 @@ export default function Contact() {
           {/* Response time card */}
           <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="bg-indigo-50 w-11 h-11 rounded-xl flex items-center justify-center mb-4">
-              <Clock className="w-5 h-5 text-indigo-600" />
+              <Clock className="w-5 h-5 text-indigo-500" />
             </div>
             <h2 className="text-lg font-semibold text-stone-800 mb-2">{content.responseTitle}</h2>
             <p className="text-stone-500 text-sm leading-relaxed">{content.responseText}</p>
@@ -116,7 +116,7 @@ export default function Contact() {
         {/* FAQ nudge */}
         <div className="bg-white rounded-2xl border border-stone-100 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
           <div className="bg-indigo-50 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0">
-            <HelpCircle className="w-5 h-5 text-indigo-600" />
+            <HelpCircle className="w-5 h-5 text-indigo-500" />
           </div>
           <div className="flex-1">
             <h3 className="font-semibold text-stone-800 mb-1">{content.faqTitle}</h3>
@@ -124,7 +124,7 @@ export default function Contact() {
           </div>
           <Link
             to="/faq"
-            className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-indigo-500 bg-indigo-50 hover:bg-indigo-100 transition-colors whitespace-nowrap"
           >
             {content.faqButton}
           </Link>
@@ -136,7 +136,7 @@ export default function Contact() {
           <p className="text-stone-600 mb-5 max-w-md mx-auto">{content.trialText}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors"
           >
             <Sparkles size={18} />
             {content.trialButton}

@@ -275,7 +275,7 @@ export function StorySettings({
                 }}
                 className="w-full inline-flex items-center justify-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-2 hover:border-indigo-400 transition-colors"
               >
-                <Palette size={14} className="text-indigo-600" />
+                <Palette size={14} className="text-indigo-500" />
                 <span className="font-medium text-gray-700 truncate">{getArtStyleName()}</span>
               </button>
               {isArtStyleDropdownOpen && (
@@ -431,7 +431,7 @@ export function StorySettings({
               <button
                 onClick={onGenerateIdeas}
                 disabled={isGeneratingIdeas}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isGeneratingIdeas ? (
                   <>
@@ -481,7 +481,7 @@ export function StorySettings({
                           newIdeas[0] = e.target.value;
                           setEditableIdeas(newIdeas);
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-500 focus:outline-none text-base resize-none"
                         rows={6}
                       />
                       <button
@@ -497,7 +497,7 @@ export function StorySettings({
                       <div className="w-full max-w-xs mb-3">
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                            className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
                             style={{ width: `${ideaProgress1}%` }}
                           />
                         </div>
@@ -522,7 +522,7 @@ export function StorySettings({
                           newIdeas[1] = e.target.value;
                           setEditableIdeas(newIdeas);
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-500 focus:outline-none text-base resize-none"
                         rows={6}
                       />
                       <button
@@ -538,7 +538,7 @@ export function StorySettings({
                       <div className="w-full max-w-xs mb-3">
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                            className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
                             style={{ width: `${ideaProgress2}%` }}
                           />
                         </div>
@@ -560,7 +560,7 @@ export function StorySettings({
                 value={storyDetails}
                 onChange={(e) => onStoryDetailsChange(e.target.value)}
                 placeholder={t.storyDetailsPlaceholder}
-                className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-600 focus:outline-none text-base ${
+                className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-500 focus:outline-none text-base ${
                   storyDetails.trim() ? 'border-gray-300' : 'border-orange-300 bg-orange-50'
                 }`}
                 rows={6}
@@ -590,7 +590,7 @@ export function StorySettings({
               : language === 'fr'
               ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
               : 'e.g. "For my dear daughter Emma on her 5th birthday"'}
-            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
+            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-base"
             rows={2}
             maxLength={200}
           />
@@ -630,7 +630,7 @@ export function StorySettings({
             <div className="flex justify-end pt-4 border-t border-gray-200">
               <button
                 onClick={() => setIsEditSettingsOpen(false)}
-                className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-6 py-2 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
               >
                 {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Done'}
               </button>

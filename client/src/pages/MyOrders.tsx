@@ -269,7 +269,7 @@ function BookOrderCard({
           <div className="flex gap-2">
             <button
               onClick={onViewStory}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 text-sm font-medium"
             >
               <Eye size={16} />
               {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}

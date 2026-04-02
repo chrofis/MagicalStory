@@ -455,7 +455,7 @@ export function ObjectDetectionDisplay({
                     <div className="font-medium text-yellow-700">{mismatch.character}</div>
                     <div className="text-xs text-gray-600 mt-1 flex gap-3">
                       <span>
-                        {language === 'de' ? 'Erwartet' : 'Expected'}: <span className="font-medium text-indigo-600">{mismatch.expected}</span>
+                        {language === 'de' ? 'Erwartet' : 'Expected'}: <span className="font-medium text-indigo-500">{mismatch.expected}</span>
                         <span className="text-gray-400 ml-1">({mismatch.expectedLCR})</span>
                       </span>
                       <span className="text-gray-400">→</span>

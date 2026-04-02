@@ -309,7 +309,7 @@ export default function SharedStoryViewer() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
           <p className="text-indigo-800">Loading story...</p>
         </div>
       </div>
@@ -377,7 +377,7 @@ export default function SharedStoryViewer() {
                   {/* Share button */}
                   <button
                     onClick={handleShare}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 transition-all"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-500 text-white rounded text-xs font-medium hover:bg-indigo-600 transition-all"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Share</span>
@@ -386,7 +386,7 @@ export default function SharedStoryViewer() {
                   {/* Edit button */}
                   <Link
                     to={`/create?storyId=${story.id}`}
-                    className="inline-flex items-center gap-1 bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-indigo-600 transition-all"
+                    className="inline-flex items-center gap-1 bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-indigo-500 transition-all"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Edit</span>
@@ -419,7 +419,7 @@ export default function SharedStoryViewer() {
         <header className="bg-white/80 backdrop-blur-sm border-b border-indigo-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-indigo-600" />
+              <BookOpen className="w-6 h-6 text-indigo-500" />
               <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
             </div>
             <Link
@@ -442,7 +442,7 @@ export default function SharedStoryViewer() {
         <button
           onClick={() => goToPage(currentPage - 1)}
           disabled={currentPage === 0}
-          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors mr-3 lg:mr-6 flex-shrink-0"
+          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors mr-3 lg:mr-6 flex-shrink-0"
           aria-label="Previous page"
         >
           <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
@@ -520,7 +520,7 @@ export default function SharedStoryViewer() {
                     <p className="text-gray-600 mb-4">{et.secureDesc}</p>
                     <button
                       onClick={() => setShowChangePasswordModal(true)}
-                      className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors mb-4"
+                      className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors mb-4"
                     >
                       {et.setPassword}
                     </button>
@@ -536,21 +536,21 @@ export default function SharedStoryViewer() {
                 ) : (
                   <>
                     <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <BookOpenCheck className="w-8 h-8 text-indigo-600" />
+                      <BookOpenCheck className="w-8 h-8 text-indigo-500" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">{et.endTitle}</h2>
                     <p className="text-gray-500 mb-6">{story.title}</p>
                     <div className="flex flex-col gap-3">
                       <button
                         onClick={() => navigate('/stories')}
-                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2"
                       >
                         <BookOpen className="w-5 h-5" />
                         {et.printBook}
                       </button>
                       <button
                         onClick={() => navigate('/create?new=true')}
-                        className="w-full bg-white text-indigo-600 py-3 rounded-lg font-semibold border-2 border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-white text-indigo-500 py-3 rounded-lg font-semibold border-2 border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         {et.newStory}
@@ -596,7 +596,7 @@ export default function SharedStoryViewer() {
         <button
           onClick={() => goToPage(currentPage + 1)}
           disabled={currentPage >= totalPages - 1}
-          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors ml-3 lg:ml-6 flex-shrink-0"
+          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors ml-3 lg:ml-6 flex-shrink-0"
           aria-label="Next page"
         >
           <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
@@ -608,7 +608,7 @@ export default function SharedStoryViewer() {
         <button
           onClick={() => goToPage(currentPage - 1)}
           disabled={currentPage === 0}
-          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Previous page"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -617,7 +617,7 @@ export default function SharedStoryViewer() {
         <button
           onClick={() => goToPage(currentPage + 1)}
           disabled={currentPage >= totalPages - 1}
-          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Next page"
         >
           <ChevronRight className="w-6 h-6" />

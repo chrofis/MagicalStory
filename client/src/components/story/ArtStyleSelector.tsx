@@ -35,7 +35,7 @@ export function ArtStyleSelector({ selectedStyle, onSelect }: ArtStyleSelectorPr
                   onClick={() => onSelect(style.id)}
                   className={`rounded-lg border-2 transition-all overflow-hidden flex flex-col bg-white ${
                     selectedStyle === style.id
-                      ? 'border-indigo-600 shadow-lg ring-2 ring-indigo-200'
+                      ? 'border-indigo-500 shadow-lg ring-2 ring-indigo-200'
                       : 'border-gray-200 hover:border-indigo-300'
                   }`}
                 >

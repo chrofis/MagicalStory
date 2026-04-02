@@ -4461,7 +4461,7 @@ export default function StoryWizard() {
                 />
                 </Suspense>
               )}
-              <Suspense fallback={<div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>}>
+              <Suspense fallback={<div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>}>
               <StoryDisplay
               title={storyTitle}
               dedication={dedication || undefined}
@@ -5227,7 +5227,7 @@ export default function StoryWizard() {
         if (urlStoryId) {
           return (
             <div className="py-12 flex flex-col items-center justify-center">
-              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
               <p className="text-gray-600 font-medium">
                 {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...'}
               </p>
@@ -5392,7 +5392,7 @@ export default function StoryWizard() {
             /* Show loading spinner only for steps 1-5, not for story display (step 6) */
             /* Story display handles its own loading states with placeholders */
             <div className="py-12 flex flex-col items-center justify-center">
-              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
               <p className="text-gray-600 font-medium mb-2">
                 {loadingProgress
                   ? (language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...')
@@ -5404,7 +5404,7 @@ export default function StoryWizard() {
                   {/* Progress bar */}
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-600 transition-all duration-300 ease-out"
+                      className="h-full bg-indigo-500 transition-all duration-300 ease-out"
                       style={{
                         width: loadingProgress.total
                           ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
@@ -5474,7 +5474,7 @@ export default function StoryWizard() {
                     className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
                       !canGoNext()
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-indigo-500 text-white hover:bg-indigo-600'
                     }`}
                   >
                     {t.next} <ArrowRight size={20} />
@@ -5492,7 +5492,7 @@ export default function StoryWizard() {
                     className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                       !canGoNext()
                         ? 'bg-gray-400 text-white cursor-not-allowed'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-indigo-500 text-white hover:bg-indigo-600'
                     }`}
                   >
                     <Sparkles size={20} /> {t.generateStory} ({pages * 10} Credits)
@@ -5580,7 +5580,7 @@ export default function StoryWizard() {
                           type="checkbox"
                           checked={enableFullRepair}
                           onChange={(e) => setEnableFullRepair(e.target.checked)}
-                          className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-indigo-300 text-indigo-500 focus:ring-indigo-500"
                         />
                         <span className="text-gray-700">{language === 'de' ? 'Volle Reparatur nach Generierung' : language === 'fr' ? 'Réparation complète après génération' : 'Full repair after generation'}</span>
                       </label>
@@ -5695,7 +5695,7 @@ export default function StoryWizard() {
                   setShowMinimizeDialog(false);
                   navigate('/create?new=true');
                 }}
-                className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+                className="w-full py-3 px-4 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors font-medium"
               >
                 {language === 'de' ? 'Neue Geschichte erstellen' : language === 'fr' ? 'Créer une autre histoire' : 'Create another story'}
               </button>
@@ -5737,7 +5737,7 @@ export default function StoryWizard() {
                   setShowSingleCharacterDialog(false);
                   startNewCharacter();
                 }}
-                className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+                className="w-full py-3 px-4 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors font-medium"
               >
                 {language === 'de' ? 'Weiteren Charakter erstellen' : language === 'fr' ? 'Créer un autre personnage' : 'Create another character'}
               </button>
@@ -5898,7 +5898,7 @@ export default function StoryWizard() {
                   })();
                 }}
                 disabled={!editPromptText.trim()}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="text-xs opacity-80">(5 {language === 'de' ? 'Credits' : 'credits'})</span>
               </button>

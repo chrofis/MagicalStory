@@ -273,7 +273,7 @@ export default function TrialWizard() {
         <div className="px-3 md:px-8 py-4 md:py-8">
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-8 h-8 text-indigo-600" />
+              <BookOpen className="w-8 h-8 text-indigo-500" />
             </div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">{li.title}</h1>
             <p className="text-gray-600 text-sm mb-6">{li.desc}</p>
@@ -285,7 +285,7 @@ export default function TrialWizard() {
                 const qs = category && topic ? `?category=${category}&topic=${topic}` : '';
                 navigate(`/create${qs}`);
               }}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
             >
               {li.goToCreate}
             </button>
@@ -313,7 +313,7 @@ export default function TrialWizard() {
         <div className="px-3 md:px-8 py-4 md:py-8">
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-8 h-8 text-indigo-600" />
+              <BookOpen className="w-8 h-8 text-indigo-500" />
             </div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">{tu.title}</h1>
             <p className="text-gray-600 text-sm mb-6">{tu.desc}</p>
@@ -322,14 +322,14 @@ export default function TrialWizard() {
                 onClick={() => navigate('/trial-generation', {
                   state: { sessionToken, characterId: '', storyInput: {}, characterName: '' }
                 })}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors mb-3"
+                className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors mb-3"
               >
                 {tu.viewStory}
               </button>
             )}
             <Link
               to="/?signup=true"
-              className={`inline-block w-full ${trialStoryId ? 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'} py-3 rounded-lg font-semibold transition-colors`}
+              className={`inline-block w-full ${trialStoryId ? 'bg-white text-indigo-500 border border-indigo-200 hover:bg-indigo-50' : 'bg-indigo-500 text-white hover:bg-indigo-600'} py-3 rounded-lg font-semibold transition-colors`}
             >
               {tu.signUp}
             </Link>

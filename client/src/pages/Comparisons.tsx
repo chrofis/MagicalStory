@@ -108,7 +108,7 @@ export default function Comparisons() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 mb-5">
-            <Shield size={28} className="text-indigo-600" />
+            <Shield size={28} className="text-indigo-500" />
           </div>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">
             {t.heroTitle}
@@ -135,12 +135,12 @@ export default function Comparisons() {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <Shield size={18} className="text-indigo-500" />
-                    <h3 className="font-semibold text-stone-800 group-hover:text-indigo-600 transition-colors text-sm">
+                    <h3 className="font-semibold text-stone-800 group-hover:text-indigo-500 transition-colors text-sm">
                       {comp.title[lang] || comp.title.en}
                     </h3>
                   </div>
                   <p className="text-xs text-stone-500 mb-3">{desc}</p>
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-500">
                     {t.viewComparison} <ChevronRight size={12} />
                   </span>
                 </Link>
@@ -181,12 +181,12 @@ export default function Comparisons() {
         </div>
 
         {/* CTA */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

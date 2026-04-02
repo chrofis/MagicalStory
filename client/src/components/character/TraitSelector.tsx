@@ -141,7 +141,7 @@ export function TraitSelector({
                 disabled={!customTrait.trim()}
                 className={`flex-shrink-0 w-10 h-10 rounded-lg font-semibold flex items-center justify-center transition-colors ${
                   customTrait.trim()
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    ? 'bg-indigo-500 text-white hover:bg-indigo-600'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >

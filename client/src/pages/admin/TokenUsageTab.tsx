@@ -47,7 +47,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
   if (isLoading && !tokenData) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         <span className="ml-3 text-gray-600">{texts.loadingTokens}</span>
       </div>
     );
@@ -111,12 +111,12 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
         </div>
 
         <div className="bg-gradient-to-br from-indigo-50 to-indigo-50 rounded-xl p-4 border border-indigo-200">
-          <div className="flex items-center gap-2 text-indigo-600 mb-2">
+          <div className="flex items-center gap-2 text-indigo-500 mb-2">
             <TrendingUp size={20} />
             <span className="font-medium">{texts.anthropic}</span>
           </div>
           <p className="text-2xl font-bold text-indigo-700">{formatCost(tokenData.costs.anthropic.total)}</p>
-          <p className="text-xs text-indigo-600 mt-1">
+          <p className="text-xs text-indigo-500 mt-1">
             {formatTokens(tokenData.totals.anthropic.input_tokens)} in / {formatTokens(tokenData.totals.anthropic.output_tokens)} out
           </p>
         </div>
@@ -163,7 +163,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
         >
           <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-indigo-600" />
+            <Calendar size={20} className="text-indigo-500" />
             <span className="font-semibold text-gray-800">{texts.dailyUsage}</span>
             <span className="text-sm text-gray-500">({tokenData.byDay.length} days)</span>
           </div>
@@ -206,7 +206,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{day.date}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{day.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{day.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(day.totalCost)}</td>
@@ -226,7 +226,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
         >
           <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-indigo-600" />
+            <Calendar size={20} className="text-indigo-500" />
             <span className="font-semibold text-gray-800">{texts.monthlyUsage}</span>
             <span className="text-sm text-gray-500">({tokenData.byMonth.length} months)</span>
           </div>
@@ -267,7 +267,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{month.month}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{month.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{month.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(month.totalCost)}</td>
@@ -288,7 +288,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
         >
           <div className="flex items-center gap-2">
-            <Users size={20} className="text-indigo-600" />
+            <Users size={20} className="text-indigo-500" />
             <span className="font-semibold text-gray-800">{texts.byUserUsage}</span>
             <span className="text-sm text-gray-500">({tokenData.byUser.length} users)</span>
           </div>
@@ -336,7 +336,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{user.email || user.name || 'Unknown'}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{user.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{user.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(costPerStory)}</td>

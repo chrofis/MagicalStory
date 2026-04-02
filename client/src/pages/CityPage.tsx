@@ -204,7 +204,7 @@ export default function CityPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/stadt" className="hover:text-indigo-600 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to="/stadt" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{city ? loc(city.name) : '...'}</span>
           </nav>
@@ -215,7 +215,7 @@ export default function CityPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <MapPin className="w-8 h-8 text-indigo-600" />
+            <MapPin className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-2">
             {city ? loc(city.name) : '...'}
@@ -231,13 +231,13 @@ export default function CityPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/create"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
             >
               {t.ctaButton} <ArrowRight size={20} />
             </Link>
             <Link
               to="/try"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-600 font-medium hover:bg-indigo-50 transition-colors text-sm"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
             >
               {t.ctaTrialButton}
             </Link>
@@ -251,7 +251,7 @@ export default function CityPage() {
           <div className="mb-12">
             <div className="text-center mb-6">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <BookOpen size={20} className="text-indigo-600" />
+                <BookOpen size={20} className="text-indigo-500" />
                 <h2 className="font-title text-xl font-bold text-stone-900">{t.ideasTitle}</h2>
               </div>
               <p className="text-sm text-stone-500">{t.ideasSubtitle}</p>
@@ -267,14 +267,14 @@ export default function CityPage() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <button
                           onClick={() => setOpenContext(isOpen ? null : idea.id)}
-                          className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1"
+                          className="text-xs font-medium text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1"
                         >
                           {t.contextLabel}
                           <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
                         <Link
                           to="/create"
-                          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700 transition-colors"
                           title={t.createAccountNote}
                         >
                           {t.createButton} <ArrowRight size={14} />
@@ -299,7 +299,7 @@ export default function CityPage() {
         {relatedSagen.length > 0 && (
           <div className="mb-12">
             <div className="flex items-center justify-center gap-2 mb-5">
-              <Sparkles size={20} className="text-indigo-600" />
+              <Sparkles size={20} className="text-indigo-500" />
               <h2 className="font-title text-xl font-bold text-stone-900">{t.sagenTitle}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -321,7 +321,7 @@ export default function CityPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {t.howSteps.map((step, i) => (
               <div key={i} className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 text-center">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-bold text-lg mb-3">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 font-bold text-lg mb-3">
                   {i + 1}
                 </div>
                 <h3 className="font-title font-bold text-stone-900 mb-1">{step.title}</h3>
@@ -342,7 +342,7 @@ export default function CityPage() {
                   to={`/stadt/${nc.id}`}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
-                  <span className="font-medium text-stone-800 group-hover:text-indigo-600 transition-colors">
+                  <span className="font-medium text-stone-800 group-hover:text-indigo-500 transition-colors">
                     {loc(nc.name)}
                   </span>
                   <span className="block text-xs text-stone-400 mt-1">{Math.round(nc.dist)} km</span>
@@ -353,13 +353,13 @@ export default function CityPage() {
         )}
 
         {/* CTA */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/create"
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
             >
               {t.ctaButton} <ArrowRight size={18} />
             </Link>

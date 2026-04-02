@@ -110,7 +110,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                         canAccess
                           ? isActive
                             ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                            : 'bg-indigo-500 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
                           : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                       }`}
                     >
@@ -148,7 +148,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                         isActive
                           ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
                           : canAccess
-                            ? 'bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                            ? 'bg-indigo-500 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
                             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                       }`}
                     >
@@ -180,7 +180,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           {isGenerationInProgress && (
             <button
               onClick={handleViewProgress}
-              className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-indigo-700 flex items-center gap-2"
+              className="bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-indigo-600 flex items-center gap-2"
               title={language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating story...'}
             >
               <Loader2 size={14} className="animate-spin" />

@@ -293,32 +293,32 @@ export function WizardStep6Summary({
               <>{getTopicName()}{storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}</>
             )}
           </span>
-          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Main Characters */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.mainChars}:</span>
           <span className="font-medium text-indigo-700 truncate">{getMainCharacterNames() || '-'}</span>
-          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Supporting Characters */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.supportingChars}:</span>
           <span className="font-medium text-gray-700 truncate">{getSupportingCharacterNames() || '-'}</span>
-          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Language */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.languageLabel}:</span>
           <span className="font-medium truncate">{getStoryLanguageName()}</span>
-          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Location - hide for historical stories */}
         {storyCategory !== 'historical' && (
           <div className="flex items-center gap-1 group">
             <span className="text-gray-500 whitespace-nowrap">{t.locationLabel}:</span>
             <span className="font-medium truncate">{getLocationLabel()}</span>
-            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
           </div>
         )}
         {/* Season - hide for historical stories */}
@@ -326,26 +326,26 @@ export function WizardStep6Summary({
           <div className="flex items-center gap-1 group">
             <span className="text-gray-500 whitespace-nowrap">{t.seasonLabel}:</span>
             <span className="font-medium truncate">{getSeasonLabel()}</span>
-            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
           </div>
         )}
         {/* Reading Level */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.level}:</span>
           <span className="font-medium truncate">{getReadingLevelLabel()}</span>
-          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Length (Pages) */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.lengthLabel}:</span>
           <span className="font-medium truncate">{pages} {t.pagesLabel}</span>
-          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Art Style */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.artStyleLabel}:</span>
           <span className="font-medium truncate">{getArtStyleName()}</span>
-          <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-500 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
       </div>
 
@@ -364,7 +364,7 @@ export function WizardStep6Summary({
                 }
               }}
               disabled={!customThemeText.trim()}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500 text-white text-sm rounded-lg font-medium hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               <Check size={14} />
               {t.useMyTheme}
@@ -377,7 +377,7 @@ export function WizardStep6Summary({
             className="w-full px-3 py-2 border-2 border-indigo-300 rounded-lg focus:border-indigo-500 focus:outline-none text-base bg-white"
             rows={3}
           />
-          <p className="text-xs text-indigo-600 mt-1">
+          <p className="text-xs text-indigo-500 mt-1">
             {language === 'de'
               ? 'Dieses Thema wird für die Ideengenerierung verwendet. Du kannst es auch direkt als Handlung verwenden.'
               : language === 'fr'
@@ -396,7 +396,7 @@ export function WizardStep6Summary({
           <button
             onClick={onGenerateIdeas}
             disabled={isGeneratingIdeas}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isGeneratingIdeas ? (
               <>
@@ -484,7 +484,7 @@ export function WizardStep6Summary({
                         <div className="mb-4">
                           <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                              className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
                               style={{ width: `${index === 0 ? ideaProgress1 : ideaProgress2}%` }}
                             />
                           </div>
@@ -524,7 +524,7 @@ export function WizardStep6Summary({
                         className={`flex items-center justify-center gap-2 px-4 py-3 font-semibold transition-all ${
                           isSelected
                             ? 'bg-green-600 text-white cursor-default'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            : 'bg-indigo-500 text-white hover:bg-indigo-600'
                         }`}
                       >
                         <Check size={18} />
@@ -556,7 +556,7 @@ export function WizardStep6Summary({
           value={dedication}
           onChange={(e) => onDedicationChange(e.target.value)}
           placeholder={t.dedicationPlaceholder}
-          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
+          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-base"
           rows={2}
           maxLength={500}
         />

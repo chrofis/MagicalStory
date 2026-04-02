@@ -247,7 +247,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
 
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Mail className="w-8 h-8 text-indigo-600" />
+            <Mail className="w-8 h-8 text-indigo-500" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.title}</h2>
           <p className="text-gray-500">{t.description}</p>
@@ -267,7 +267,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
         )}
 
         {isPolling && emailSent && (
-          <div className="flex items-center justify-center gap-2 text-indigo-600 mb-4">
+          <div className="flex items-center justify-center gap-2 text-indigo-500 mb-4">
             <Loader2 size={16} className="animate-spin" />
             <span className="text-sm">
               {language === 'de' ? 'Warte auf Bestätigung...' :
@@ -303,7 +303,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
                 setError('');
                 setSuccess('');
               }}
-              className="w-full text-center text-indigo-600 font-semibold hover:text-indigo-800 flex items-center justify-center gap-2"
+              className="w-full text-center text-indigo-500 font-semibold hover:text-indigo-800 flex items-center justify-center gap-2"
             >
               <Edit3 size={16} />
               {t.changeEmail}

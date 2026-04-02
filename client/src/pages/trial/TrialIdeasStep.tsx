@@ -324,7 +324,7 @@ export default function TrialIdeasStep({
       {isGenerating && !displayIdeas[0].text && !displayIdeas[1].text && !error && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-          <p className="text-indigo-600 font-medium">{t.generating}</p>
+          <p className="text-indigo-500 font-medium">{t.generating}</p>
         </div>
       )}
 
@@ -358,7 +358,7 @@ export default function TrialIdeasStep({
                     {t.idea} {index + 1}
                   </span>
                   {isSelected && (
-                    <span className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">
                       {t.selected}
                     </span>
                   )}
@@ -404,7 +404,7 @@ export default function TrialIdeasStep({
                     onClick={(e) => { e.stopPropagation(); onSelectIdea(index); }}
                     className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold transition-all ${
                       isSelected
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-indigo-500 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700'
                     }`}
                   >
@@ -422,7 +422,7 @@ export default function TrialIdeasStep({
         <div className="text-center mb-4">
           <button
             onClick={generateIdeas}
-            className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-indigo-500 hover:text-indigo-800 font-medium transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             {t.regenerate}
@@ -436,7 +436,7 @@ export default function TrialIdeasStep({
         disabled={!canCreate}
         className={`w-full py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 transition-all ${
           canCreate
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-200 hover:shadow-2xl hover:scale-[1.01]'
+            ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-xl shadow-indigo-200 hover:shadow-2xl hover:scale-[1.01]'
             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
         }`}
       >

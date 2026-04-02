@@ -366,7 +366,7 @@ export function StoryCategorySelector({
     return (
       <div className="space-y-4">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {t.storyType}
         </h2>
 
@@ -429,7 +429,7 @@ export function StoryCategorySelector({
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {t.theme}
         </h2>
 
@@ -497,7 +497,7 @@ export function StoryCategorySelector({
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {t.topic}
         </h2>
 
@@ -567,7 +567,7 @@ export function StoryCategorySelector({
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {t.topic}
         </h2>
 
@@ -637,7 +637,7 @@ export function StoryCategorySelector({
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : 'Historical Event'}
         </h2>
 
@@ -792,7 +792,7 @@ export function StoryCategorySelector({
                   // Store topic name for display in summary (Step 6)
                   localStorage.setItem('story_topic_name', title);
                 }}
-                className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+                className="mt-2 w-full py-1.5 bg-indigo-500 text-white text-xs font-semibold rounded-md hover:bg-indigo-600 transition-colors"
               >
                 {t.sageChoose}
               </button>
@@ -823,7 +823,7 @@ export function StoryCategorySelector({
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Sparkles className="text-indigo-600" size={24} />
+          <Sparkles className="text-indigo-500" size={24} />
           {getCategoryName('swiss-stories')}
         </h2>
 
@@ -1023,7 +1023,7 @@ export function StoryCategorySelector({
                               // Store topic name for display in summary (Step 6)
                               localStorage.setItem('story_topic_name', title);
                             }}
-                            className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+                            className="mt-2 w-full py-1.5 bg-indigo-500 text-white text-xs font-semibold rounded-md hover:bg-indigo-600 transition-colors"
                           >
                             {t.sageChoose}
                           </button>

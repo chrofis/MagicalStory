@@ -75,7 +75,7 @@ export default function GiftHub() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <Gift className="w-8 h-8 text-indigo-600" />
+            <Gift className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">{t.title}</h1>
           <p className="text-stone-500 text-lg max-w-2xl mx-auto">{t.subtitle}</p>
@@ -102,11 +102,11 @@ export default function GiftHub() {
                       className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group"
                     >
                       <span className="text-4xl block mb-3">{gift.emoji}</span>
-                      <h3 className="font-title text-lg font-bold text-stone-900 group-hover:text-indigo-600 transition-colors mb-1.5">
+                      <h3 className="font-title text-lg font-bold text-stone-900 group-hover:text-indigo-500 transition-colors mb-1.5">
                         {name}
                       </h3>
                       <p className="text-sm text-stone-500 mb-3 line-clamp-3">{shortDesc}</p>
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 group-hover:gap-2 transition-all">
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-500 group-hover:gap-2 transition-all">
                         <ArrowRight size={16} />
                       </span>
                     </Link>
@@ -118,12 +118,12 @@ export default function GiftHub() {
         })}
 
         {/* CTA Section */}
-        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
           </Link>

@@ -196,7 +196,7 @@ export default function EmailVerified() {
             status === 'other_window' ? 'bg-indigo-100' : 'bg-green-100'
           }`}>
             {status === 'other_window' ? (
-              <Monitor className="w-10 h-10 text-indigo-600" />
+              <Monitor className="w-10 h-10 text-indigo-500" />
             ) : (
               <CheckCircle className="w-10 h-10 text-green-600" />
             )}
@@ -215,7 +215,7 @@ export default function EmailVerified() {
 
           {status === 'other_window' && (
             <div className="mb-8">
-              <p className="text-indigo-600 font-medium mb-2">
+              <p className="text-indigo-500 font-medium mb-2">
                 {t.generatingInOtherWindow}
               </p>
               <p className="text-gray-500 text-sm">

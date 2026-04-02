@@ -106,7 +106,7 @@ const sections = [
 ] as const;
 
 const colorMap: Record<string, { bg: string; border: string; icon: string; bullet: string }> = {
-  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-600', bullet: 'text-indigo-500' },
+  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-500', bullet: 'text-indigo-500' },
   emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-600', bullet: 'text-emerald-500' },
   amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600', bullet: 'text-amber-500' },
   rose: { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'text-rose-600', bullet: 'text-rose-500' },
@@ -125,7 +125,7 @@ export default function HowItWorks() {
       <section className="pt-24 pb-12 px-4 bg-gradient-to-b from-indigo-50 to-white">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t.title}</h1>
-          <p className="text-xl text-indigo-600 font-medium mb-6">{t.subtitle}</p>
+          <p className="text-xl text-indigo-500 font-medium mb-6">{t.subtitle}</p>
           <p className="text-lg text-gray-600 leading-relaxed">{t.heroDesc}</p>
         </div>
       </section>
@@ -176,7 +176,7 @@ export default function HowItWorks() {
           <p className="text-lg text-gray-600 mb-8">{t.ctaDesc}</p>
           <Link
             to="/try"
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+            className="inline-flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-200"
           >
             <Wand2 size={20} />
             {t.ctaButton}

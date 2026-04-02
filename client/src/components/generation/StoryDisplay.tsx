@@ -1395,7 +1395,7 @@ export function StoryDisplay({
           }}
           disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
           className={`w-full min-h-[52px] bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-            isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+            isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
@@ -1483,7 +1483,7 @@ export function StoryDisplay({
                     }
                   }}
                   disabled={!charRepairSelected}
-                  className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                 >
                   {language === 'de' ? 'Reparieren' : 'Repair'} ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                 </button>
@@ -1570,7 +1570,7 @@ export function StoryDisplay({
         }}
         disabled={isGenerating || iteratingPages.has(pageNum) || repairingPage !== null}
         className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-          isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+          isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
         }`}
         title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
       >
@@ -1584,15 +1584,15 @@ export function StoryDisplay({
         <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
           <div className="space-y-1">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-500" />
               <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-500" />
               <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
+              <input type="radio" name={`iterateMode-${pageNum}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-500" />
               <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
             </label>
           </div>
@@ -1604,7 +1604,7 @@ export function StoryDisplay({
               : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
           </p>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-600 rounded" />
+            <input type="checkbox" checked={reviewPrompt} onChange={e => { setReviewPrompt(e.target.checked); if (!e.target.checked) { setPreviewPromptText(null); setPreviewPromptPage(null); } }} className="text-indigo-500 rounded" />
             <span className="text-sm text-indigo-700 font-medium">{language === 'de' ? 'Prompt prüfen & bearbeiten' : 'Review & edit prompt'}</span>
           </label>
           <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
@@ -1690,7 +1690,7 @@ export function StoryDisplay({
                   });
                 }
               }}
-              className={`flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${(reviewPrompt && previewPromptPage === pageNum) || isPreviewingPrompt ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
+              className={`flex-1 bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold ${(reviewPrompt && previewPromptPage === pageNum) || isPreviewingPrompt ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}
             >
               {isPreviewingPrompt && iterateOptionsPage === pageNum
                 ? (language === 'de' ? 'Lade Prompt...' : 'Loading prompt...')
@@ -1758,7 +1758,7 @@ export function StoryDisplay({
             {onSaveTitleChange && !isGenerating && (
               <button
                 onClick={() => setIsEditingTitle(true)}
-                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
                 title={language === 'de' ? 'Titel bearbeiten' : language === 'fr' ? 'Modifier le titre' : 'Edit title'}
               >
                 <Edit3 size={18} />
@@ -1807,7 +1807,7 @@ export function StoryDisplay({
             onClick={onAddToBook}
             disabled={isGenerating}
             className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
             }`}
           >
             <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
@@ -1821,7 +1821,7 @@ export function StoryDisplay({
               onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
               disabled={isGenerating}
               className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
-                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
               }`}
             >
               <FileText size={16} />
@@ -1837,7 +1837,7 @@ export function StoryDisplay({
                       name="pdfFormat"
                       checked={pdfFormat === 'square'}
                       onChange={() => setPdfFormat('square')}
-                      className="text-indigo-600"
+                      className="text-indigo-500"
                     />
                     <span className="text-sm text-gray-700">Square (20×20cm)</span>
                   </label>
@@ -1847,7 +1847,7 @@ export function StoryDisplay({
                       name="pdfFormat"
                       checked={pdfFormat === 'A4'}
                       onChange={() => setPdfFormat('A4')}
-                      className="text-indigo-600"
+                      className="text-indigo-500"
                     />
                     <span className="text-sm text-gray-700">A4 (21×28cm)</span>
                   </label>
@@ -1857,7 +1857,7 @@ export function StoryDisplay({
                     onDownloadPdf(pdfFormat);
                     setShowPdfFormatDropdown(false);
                   }}
-                  className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
+                  className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-500"
                 >
                   {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
                 </button>
@@ -1877,7 +1877,7 @@ export function StoryDisplay({
             onClick={onCreateAnother}
             disabled={isGenerating}
             className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
             }`}
           >
             <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
@@ -1930,7 +1930,7 @@ export function StoryDisplay({
                   ? (language === 'de' ? 'Vollständige API-Ausgabe (Kombiniert)' : language === 'fr' ? 'Sortie API complète (Combinée)' : 'Full API Output (Combined)')
                   : (language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)')}
                 {outlineModelId && (
-                  <span className="ml-2 text-sm font-normal text-indigo-600">({outlineModelId})</span>
+                  <span className="ml-2 text-sm font-normal text-indigo-500">({outlineModelId})</span>
                 )}
                 {outlineUsage && (
                   <span className="ml-2 text-xs font-normal text-indigo-500">
@@ -2075,7 +2075,7 @@ export function StoryDisplay({
                                 <div className="mt-1 space-y-1">
                                   {Object.entries(char.generatedOutfits).map(([pageNum, outfit]) => (
                                     <div key={pageNum} className="bg-white p-1.5 rounded text-xs">
-                                      <span className="font-medium text-indigo-600">Page {pageNum}:</span>
+                                      <span className="font-medium text-indigo-500">Page {pageNum}:</span>
                                       <span className="text-gray-700 ml-1">{outfit.outfit?.substring(0, 80)}...</span>
                                       <span className={`ml-1 px-1 py-0.5 rounded text-[10px] ${
                                         outfit.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-700' :
@@ -3875,7 +3875,7 @@ export function StoryDisplay({
               {isCoverLazyLoading ? (
                 <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
-                  <p className="text-indigo-600 font-medium">
+                  <p className="text-indigo-500 font-medium">
                     {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : 'Loading cover...'}
                   </p>
                 </div>
@@ -3889,7 +3889,7 @@ export function StoryDisplay({
               )}
               {isPageBusy(-1) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                  <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                  <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
                     {charRepairingPages.has(-1) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
                       : editingPages.has(-1) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
@@ -3907,7 +3907,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('front')}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -3923,7 +3923,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-1)}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -3939,7 +3939,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('front')}
                     disabled={isPageBusy(-1) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -3955,7 +3955,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('frontCover').length})
@@ -4118,7 +4118,7 @@ export function StoryDisplay({
               />
               {isPageBusy(-2) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                  <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                  <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
                     {charRepairingPages.has(-2) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
                       : editingPages.has(-2) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
@@ -4136,7 +4136,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('initial')}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -4152,7 +4152,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-2)}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -4168,7 +4168,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('initial')}
                     disabled={isPageBusy(-2) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -4184,7 +4184,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
@@ -4386,7 +4386,7 @@ export function StoryDisplay({
                     {(isWaitingForImage || isLazyLoading) ? (
                       <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
-                        <p className="text-indigo-600 font-medium">
+                        <p className="text-indigo-500 font-medium">
                           {isLazyLoading
                             ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...')
                             : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : 'Creating image...')
@@ -4409,7 +4409,7 @@ export function StoryDisplay({
                         {/* Busy spinner overlay — any image operation */}
                         {isPageBusy(pageNumber) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                            <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                            <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                             <p className="text-indigo-700 font-medium text-sm">
                               {charRepairingPages.has(pageNumber)
                                 ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
@@ -4437,7 +4437,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -4453,7 +4453,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -4469,7 +4469,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
@@ -4487,7 +4487,7 @@ export function StoryDisplay({
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
                                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                     }`}
                                   >
                                     <Edit3 size={14} />
@@ -4497,7 +4497,7 @@ export function StoryDisplay({
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-500"
                                   >
                                     <Images size={14} />
                                     {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
@@ -4816,7 +4816,7 @@ export function StoryDisplay({
                                     )}
                                     {image.qualityReasoning && (
                                       <details className={image.issuesSummary ? 'mt-2' : ''}>
-                                        <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
+                                        <summary className="cursor-pointer text-indigo-500 hover:text-indigo-800 text-xs">
                                           {image.issuesSummary
                                             ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
                                             : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
@@ -4964,7 +4964,7 @@ export function StoryDisplay({
                         {isGenerating ? (
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
-                            <p className="text-indigo-600 font-medium text-center">
+                            <p className="text-indigo-500 font-medium text-center">
                               {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
                             </p>
                           </>
@@ -5000,7 +5000,7 @@ export function StoryDisplay({
                       <div className="flex flex-col">
                         <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                           <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
-                          <p className="text-indigo-600 font-medium text-sm">
+                          <p className="text-indigo-500 font-medium text-sm">
                             {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...'}
                           </p>
                         </div>
@@ -5016,7 +5016,7 @@ export function StoryDisplay({
                           {/* Busy spinner overlay — any image operation */}
                           {isPageBusy(pageNumber) && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                              <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                              <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                               <p className="text-indigo-700 font-medium text-sm">
                                 {charRepairingPages.has(pageNumber)
                                   ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
@@ -5045,7 +5045,7 @@ export function StoryDisplay({
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
@@ -5061,7 +5061,7 @@ export function StoryDisplay({
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
@@ -5077,7 +5077,7 @@ export function StoryDisplay({
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
@@ -5095,7 +5095,7 @@ export function StoryDisplay({
                                     onClick={() => setIsEditMode(true)}
                                     disabled={isGenerating}
                                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                                     }`}
                                   >
                                     <Edit3 size={14} />
@@ -5105,7 +5105,7 @@ export function StoryDisplay({
                                 {getImageVersions(pageNumber).length > 1 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
-                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
+                                    className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-500"
                                   >
                                     <Images size={14} />
                                     {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
@@ -5424,7 +5424,7 @@ export function StoryDisplay({
                                     )}
                                     {image.qualityReasoning && (
                                       <details className={image.issuesSummary ? 'mt-2' : ''}>
-                                        <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
+                                        <summary className="cursor-pointer text-indigo-500 hover:text-indigo-800 text-xs">
                                           {image.issuesSummary
                                             ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
                                             : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
@@ -5501,7 +5501,7 @@ export function StoryDisplay({
                         {isGenerating ? (
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
-                            <p className="text-indigo-600 font-medium text-center">
+                            <p className="text-indigo-500 font-medium text-center">
                               {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
                             </p>
                           </>
@@ -5559,7 +5559,7 @@ export function StoryDisplay({
               />
               {isPageBusy(-3) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                  <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                  <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
                     {charRepairingPages.has(-3) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
                       : editingPages.has(-3) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
@@ -5577,7 +5577,7 @@ export function StoryDisplay({
                     onClick={() => _onEditCover('back')}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
@@ -5593,7 +5593,7 @@ export function StoryDisplay({
                     onClick={() => handleImproveImage(-3)}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
@@ -5609,7 +5609,7 @@ export function StoryDisplay({
                     onClick={() => openCoverEditModal('back')}
                     disabled={isPageBusy(-3) || !hasEnoughCredits}
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
-                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
@@ -5625,7 +5625,7 @@ export function StoryDisplay({
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
-                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('backCover').length})
@@ -5784,7 +5784,7 @@ export function StoryDisplay({
                 onClick={onAddToBook}
                 disabled={isGenerating}
                 className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                 }`}
               >
                 <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
@@ -5798,7 +5798,7 @@ export function StoryDisplay({
                   onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
                   disabled={isGenerating}
                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
-                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                   }`}
                 >
                   <FileText size={16} />
@@ -5814,7 +5814,7 @@ export function StoryDisplay({
                           name="pdfFormat2"
                           checked={pdfFormat === 'square'}
                           onChange={() => setPdfFormat('square')}
-                          className="text-indigo-600"
+                          className="text-indigo-500"
                         />
                         <span className="text-sm text-gray-700">Square (20×20cm)</span>
                       </label>
@@ -5824,7 +5824,7 @@ export function StoryDisplay({
                           name="pdfFormat2"
                           checked={pdfFormat === 'A4'}
                           onChange={() => setPdfFormat('A4')}
-                          className="text-indigo-600"
+                          className="text-indigo-500"
                         />
                         <span className="text-sm text-gray-700">A4 (21×28cm)</span>
                       </label>
@@ -5834,7 +5834,7 @@ export function StoryDisplay({
                         onDownloadPdf(pdfFormat);
                         setShowPdfFormatDropdown(false);
                       }}
-                      className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
+                      className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-500"
                     >
                       {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
                     </button>
@@ -5854,7 +5854,7 @@ export function StoryDisplay({
                 onClick={onCreateAnother}
                 disabled={isGenerating}
                 className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500'
                 }`}
               >
                 <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
@@ -6096,10 +6096,10 @@ export function StoryDisplay({
                 <button
                   onClick={handleRegenerateCoverWithScene}
                   disabled={regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover') || coverEditModal.selectedCharacterIds.length === 0}
-                  className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
+                  className={`px-4 py-2 bg-indigo-500 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
                     regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover') || coverEditModal.selectedCharacterIds.length === 0
                       ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-indigo-700'
+                      : 'hover:bg-indigo-600'
                   }`}
                 >
                   <RefreshCw size={16} />

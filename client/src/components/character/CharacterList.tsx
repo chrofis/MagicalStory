@@ -102,7 +102,7 @@ export function CharacterList({
                   isOut
                     ? 'border-dashed border-gray-300 bg-gray-50'
                     : isMain
-                    ? 'border-2 border-indigo-600 bg-indigo-50'
+                    ? 'border-2 border-indigo-500 bg-indigo-50'
                     : 'border-gray-200 bg-white'
                 }`}
               >
@@ -131,7 +131,7 @@ export function CharacterList({
                       <div className="min-w-0">
                         <h4 className="font-bold text-sm md:text-base truncate flex items-center gap-1">
                           {char.name}
-                          {isMain && <Star size={14} className="text-indigo-600 fill-indigo-600 flex-shrink-0" />}
+                          {isMain && <Star size={14} className="text-indigo-500 fill-indigo-600 flex-shrink-0" />}
                         </h4>
                         <p className="text-xs text-gray-500">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other},{' '}
@@ -141,7 +141,7 @@ export function CharacterList({
                       <div className="flex gap-1 flex-shrink-0">
                         <button
                           onClick={() => onEdit(char)}
-                          className="bg-indigo-600 text-white p-1.5 rounded text-xs hover:bg-indigo-700"
+                          className="bg-indigo-500 text-white p-1.5 rounded text-xs hover:bg-indigo-600"
                           title={t.editCharacter}
                         >
                           <Edit2 size={14} />
@@ -177,7 +177,7 @@ export function CharacterList({
                           onClick={() => onCharacterRoleChange(char.id, 'in')}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors border-l border-r border-gray-300 ${
                             isIn
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-indigo-500 text-white'
                               : isOut
                               ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                               : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -189,7 +189,7 @@ export function CharacterList({
                           onClick={() => onCharacterRoleChange(char.id, 'main')}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors flex items-center justify-center gap-0.5 ${
                             isMain
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-indigo-500 text-white'
                               : isOut
                               ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                               : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -212,9 +212,9 @@ export function CharacterList({
             className="border-2 border-dashed border-indigo-300 rounded p-4 flex flex-col items-center justify-center gap-2 hover:border-indigo-500 hover:bg-indigo-50 transition-colors min-h-[100px]"
           >
             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-              <Plus size={24} className="text-indigo-600" />
+              <Plus size={24} className="text-indigo-500" />
             </div>
-            <span className="text-sm font-medium text-indigo-600">
+            <span className="text-sm font-medium text-indigo-500">
               {language === 'de'
                 ? 'Weiteren Charakter erstellen'
                 : language === 'fr'

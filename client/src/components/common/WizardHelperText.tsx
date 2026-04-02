@@ -39,7 +39,7 @@ export function WizardHelperText({ step, text }: WizardHelperTextProps) {
       </p>
       <button
         onClick={handleDismiss}
-        className="text-indigo-400 hover:text-indigo-600 transition-colors flex-shrink-0 p-0.5"
+        className="text-indigo-400 hover:text-indigo-500 transition-colors flex-shrink-0 p-0.5"
         aria-label="Dismiss"
       >
         <X size={16} />

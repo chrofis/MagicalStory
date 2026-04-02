@@ -136,7 +136,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
             <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.resetLinkSent}</h2>
             <button
               onClick={() => switchMode('login')}
-              className="mt-4 text-indigo-600 font-semibold hover:text-gray-800"
+              className="mt-4 text-indigo-500 font-semibold hover:text-gray-800"
             >
               {t.backToLogin}
             </button>

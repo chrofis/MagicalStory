@@ -532,7 +532,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 onClick={() => setConsent1Checked(!consent1Checked)}
                 className="flex items-start gap-3 cursor-pointer group"
               >
-                <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+                <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
                   {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
                 </span>
                 <span className="text-sm text-gray-700 group-hover:text-gray-900">
@@ -547,16 +547,16 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 }}
                 className="flex items-start gap-3 cursor-pointer group"
               >
-                <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+                <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
                   {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
                 </span>
                 <span className="text-sm text-gray-700 group-hover:text-gray-900">
                   {t.consent2}{' '}
-                  <Link to="/terms" className="text-indigo-600 hover:underline">
+                  <Link to="/terms" className="text-indigo-500 hover:underline">
                     {t.termsLink}
                   </Link>{' '}
                   {t.and}{' '}
-                  <Link to="/privacy" className="text-indigo-600 hover:underline">
+                  <Link to="/privacy" className="text-indigo-500 hover:underline">
                     {t.privacyLink}
                   </Link>
                   {t.consentPeriod}
@@ -582,7 +582,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
               {isAnalyzing ? (
                 <div className="flex flex-col items-center gap-3 py-4">
                   <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                  <p className="text-sm text-indigo-600 font-medium">{t.analyzing}</p>
+                  <p className="text-sm text-indigo-500 font-medium">{t.analyzing}</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
@@ -674,7 +674,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                     onClick={() => updateField('gender', value)}
                     className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       characterData.gender === value
-                        ? 'bg-indigo-600 text-white shadow-md'
+                        ? 'bg-indigo-500 text-white shadow-md'
                         : hasPhoto && !characterData.gender
                           ? 'bg-red-50/30 border border-red-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
                           : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
@@ -697,7 +697,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                   onClick={() => toggleTrait(trait)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                     characterData.traits.includes(trait)
-                      ? 'bg-indigo-600 text-white shadow-md'
+                      ? 'bg-indigo-500 text-white shadow-md'
                       : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
                   }`}
                 >
@@ -734,7 +734,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           disabled={!canProceed || isCreatingAccount}
           className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
             canProceed && !isCreatingAccount
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
+              ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >

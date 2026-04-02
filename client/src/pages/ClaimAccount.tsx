@@ -243,7 +243,7 @@ export default function ClaimAccount() {
           {/* Loading */}
           {pageState === 'loading' && (
             <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-4" />
+              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-500">{t.loading}</p>
             </div>
           )}
@@ -258,7 +258,7 @@ export default function ClaimAccount() {
               <p className="text-gray-500 mb-6">{t.invalidDesc}</p>
               <button
                 onClick={() => navigate('/welcome')}
-                className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                className="bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
               >
                 {t.goToLogin}
               </button>
@@ -281,7 +281,7 @@ export default function ClaimAccount() {
             <>
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <KeyRound className="w-8 h-8 text-indigo-600" />
+                  <KeyRound className="w-8 h-8 text-indigo-500" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-800 mb-1">
                   {t.welcomeBack}, {userEmail.split('@')[0]}!
@@ -336,7 +336,7 @@ export default function ClaimAccount() {
                 <button
                   type="submit"
                   disabled={isLoading || !password || !confirmPassword}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

@@ -71,7 +71,7 @@ export function PasswordResetForm({
       <div className="mt-4 text-center">
         <button
           onClick={onBack}
-          className="text-indigo-600 font-semibold hover:text-gray-800"
+          className="text-indigo-500 font-semibold hover:text-gray-800"
         >
           {t.backToLogin}
         </button>

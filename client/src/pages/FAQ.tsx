@@ -41,7 +41,7 @@ const faqContent: Record<string, {
       {
         id: 'getting-started',
         icon: BookOpen,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Getting Started',
         items: [
@@ -62,7 +62,7 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Your Story',
         items: [
@@ -83,7 +83,7 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Printing & Quality',
         items: [
@@ -100,7 +100,7 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Shipping',
         items: [
@@ -113,7 +113,7 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Pricing',
         items: [
@@ -126,7 +126,7 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Privacy & Data',
         items: [
@@ -150,7 +150,7 @@ const faqContent: Record<string, {
       {
         id: 'getting-started',
         icon: BookOpen,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Erste Schritte',
         items: [
@@ -171,7 +171,7 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Deine Geschichte',
         items: [
@@ -192,7 +192,7 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Druck & Qualität',
         items: [
@@ -209,7 +209,7 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Versand',
         items: [
@@ -222,7 +222,7 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Preise',
         items: [
@@ -235,7 +235,7 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Datenschutz',
         items: [
@@ -259,7 +259,7 @@ const faqContent: Record<string, {
       {
         id: 'getting-started',
         icon: BookOpen,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Pour commencer',
         items: [
@@ -280,7 +280,7 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Votre histoire',
         items: [
@@ -301,7 +301,7 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Impression & Qualité',
         items: [
@@ -318,7 +318,7 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Livraison',
         items: [
@@ -331,7 +331,7 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Tarifs',
         items: [
@@ -344,7 +344,7 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-indigo-600',
+        color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
         label: 'Confidentialité',
         items: [
@@ -368,11 +368,11 @@ function FAQAccordion({ item, defaultOpen = false }: { item: FAQItem; defaultOpe
         className="w-full flex items-center justify-between py-5 text-left group"
         aria-expanded={open}
       >
-        <span className="text-base font-medium text-stone-800 pr-4 group-hover:text-indigo-600 transition-colors">{item.question}</span>
+        <span className="text-base font-medium text-stone-800 pr-4 group-hover:text-indigo-500 transition-colors">{item.question}</span>
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${open ? 'bg-indigo-100' : 'bg-stone-100 group-hover:bg-indigo-50'}`}>
           <ChevronDown
             size={18}
-            className={`transition-transform duration-300 ${open ? 'rotate-180 text-indigo-600' : 'text-stone-400'}`}
+            className={`transition-transform duration-300 ${open ? 'rotate-180 text-indigo-500' : 'text-stone-400'}`}
           />
         </div>
       </button>
@@ -415,7 +415,7 @@ export default function FAQ() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <HelpCircle className="w-8 h-8 text-indigo-600" />
+            <HelpCircle className="w-8 h-8 text-indigo-500" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">{content.title}</h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto mb-8">{content.subtitle}</p>
@@ -488,13 +488,13 @@ export default function FAQ() {
         {/* Contact CTA */}
         <div className="mt-12 bg-indigo-50 rounded-2xl p-8 text-center border border-indigo-100">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 mb-4">
-            <Mail className="w-6 h-6 text-indigo-600" />
+            <Mail className="w-6 h-6 text-indigo-500" />
           </div>
           <h3 className="text-xl font-semibold text-stone-800 mb-2">{content.contactTitle}</h3>
           <p className="text-stone-600 mb-5 max-w-md mx-auto">{content.contactText}</p>
           <Link
             to="/contact"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors"
           >
             {content.contactButton}
           </Link>

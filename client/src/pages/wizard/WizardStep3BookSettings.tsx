@@ -278,7 +278,7 @@ export function WizardStep3BookSettings({
               <button
                 type="button"
                 onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium bg-white cursor-pointer pr-8 flex items-center gap-1 min-w-[160px]"
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm font-medium bg-white cursor-pointer pr-8 flex items-center gap-1 min-w-[160px]"
               >
                 {getLanguageDisplayText()}
                 <ChevronDown
@@ -304,7 +304,7 @@ export function WizardStep3BookSettings({
                           // Keep dropdown open when switching language family
                         }}
                         className={`w-full text-left px-3 py-1.5 text-sm hover:bg-indigo-50 ${
-                          isCurrentFamily ? 'font-semibold text-indigo-600' : 'text-gray-700'
+                          isCurrentFamily ? 'font-semibold text-indigo-500' : 'text-gray-700'
                         }`}
                       >
                         {lang.name}
@@ -362,7 +362,7 @@ export function WizardStep3BookSettings({
                 />
                 <button
                   onClick={handleSaveLocation}
-                  className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700"
+                  className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600"
                 >
                   OK
                 </button>
@@ -376,7 +376,7 @@ export function WizardStep3BookSettings({
             ) : (
               <button
                 onClick={() => setIsEditingLocation(true)}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="text-sm font-medium text-indigo-500 hover:text-indigo-800 hover:underline"
               >
                 {userLocation?.city
                   ? `${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}`
@@ -394,7 +394,7 @@ export function WizardStep3BookSettings({
               <select
                 value={season}
                 onChange={(e) => onSeasonChange(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
               >
                 {SEASONS.map((s) => (
                   <option key={s} value={s}>
@@ -422,7 +422,7 @@ export function WizardStep3BookSettings({
               onClick={() => onLanguageLevelChange(level.value)}
               className={`flex-shrink-0 w-56 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
                 languageLevel === level.value
-                  ? 'border-indigo-600 ring-2 ring-indigo-200'
+                  ? 'border-indigo-500 ring-2 ring-indigo-200'
                   : 'border-gray-200 hover:border-indigo-300'
               }`}
             >
@@ -486,16 +486,16 @@ export function WizardStep3BookSettings({
                 onChange={(e) => onPagesChange(Math.min(parseInt(e.target.value), effectiveMaxPages))}
                 className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 touch-none
                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
-                           [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:hover:bg-indigo-700
-                           [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-indigo-600
+                           [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:hover:bg-indigo-600
+                           [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-indigo-500
                            [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
               />
 
               {/* Value display with min/max */}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">{minPages}</span>
-                <span className="text-xl font-bold text-indigo-600">
+                <span className="text-xl font-bold text-indigo-500">
                   {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
                 </span>
                 <span className="text-sm text-gray-400">{absoluteMaxPages}</span>

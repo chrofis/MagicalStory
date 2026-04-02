@@ -306,7 +306,7 @@ function PageFeedbackCard({
               {semanticIssues.length > 0 && (
                 <div className="text-xs pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1.5 rounded-r">
                   <div className="font-semibold text-indigo-800 mb-1">Semantic Issues ({semanticIssues.length}):</div>
-                  {renderIssueList(semanticIssues, 'text-indigo-600')}
+                  {renderIssueList(semanticIssues, 'text-indigo-500')}
                 </div>
               )}
               {entityIssues.length > 0 && (
@@ -645,7 +645,7 @@ export function RepairWorkflowPanel({
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-bold text-indigo-800">Automated Full Repair</h4>
-                <p className="text-sm text-indigo-600">
+                <p className="text-sm text-indigo-500">
                   Inpaint-first strategy: up to {devMaxPasses} rounds (inpaint cheap fixes, iterate broken scenes), then pick best, consistency check, character repair (max {devMaxCharRepairPages} pages), final pick.
                 </p>
               </div>
@@ -667,7 +667,7 @@ export function RepairWorkflowPanel({
                 <button
                   onClick={handleRunFullWorkflow}
                   disabled={isRunning || isRunningFullWorkflow}
-                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 font-medium"
                 >
                   {isRunningFullWorkflow ? (
                     <>
@@ -686,9 +686,9 @@ export function RepairWorkflowPanel({
             {fullWorkflowProgress && (
               <div className="mt-3 p-2 bg-white/50 rounded border border-indigo-100">
                 <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
                   <span className="font-medium text-indigo-700">{fullWorkflowProgress.step}:</span>
-                  <span className="text-indigo-600">{fullWorkflowProgress.detail}</span>
+                  <span className="text-indigo-500">{fullWorkflowProgress.detail}</span>
                 </div>
               </div>
             )}
@@ -1245,7 +1245,7 @@ export function RepairWorkflowPanel({
                           setSelectedCharacterPages(severePages);
                         }}
                         disabled={disableForFinalSteps || workflowState.stepStatus['consistency-check'] !== 'completed'}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:opacity-50"
                         title="Auto-select pages with major/critical issues"
                       >
                         <Zap className="w-3 h-3" />
@@ -1442,7 +1442,7 @@ export function RepairWorkflowPanel({
                     }
                   }}
                   disabled={disableForFinalSteps || !selectedCharacter || selectedCharacterPages.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50"
                 >
                   <Wrench className="w-4 h-4" />
                   Repair {selectedCharacter || 'Character'} on {selectedCharacterPages.length} pages

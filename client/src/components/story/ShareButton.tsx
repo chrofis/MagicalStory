@@ -215,7 +215,7 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
         onClick={handleButtonClick}
         disabled={loading}
         className={isFullVariant
-          ? "bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full hover:bg-indigo-600 disabled:opacity-50"
+          ? "bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full hover:bg-indigo-500 disabled:opacity-50"
           : "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50"
         }
         title={t.share}

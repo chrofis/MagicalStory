@@ -124,7 +124,7 @@ export default function Pricing() {
         {/* Back button */}
         <button
           onClick={() => navigate('/stories')}
-          className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-600 hover:text-indigo-500 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
           {t.backToStories}
@@ -144,7 +144,7 @@ export default function Pricing() {
           {/* Loading overlay */}
           {isLoading && (
             <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
             </div>
           )}
           {/* Table Header */}
@@ -209,7 +209,7 @@ export default function Pricing() {
         <div className="text-center">
           <button
             onClick={() => navigate('/create')}
-            className="px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            className="px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
           >
             {t.createStory}
           </button>
