@@ -1289,14 +1289,6 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
       if (issues.fallbacks.length > 5) console.log(`      ... and ${issues.fallbacks.length - 5} more`);
     }
 
-    // Low quality scores shown separately (not counted as issues)
-    if (issues.lowQualityScores.length > 0) {
-      console.log(`\n   📊 Quality Scores Below Threshold (${issues.lowQualityScores.length}) — not issues, just info:`);
-      issues.lowQualityScores.forEach(q => {
-        const pageStr = q.page ? ` Page ${q.page}:` : '';
-        console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
-      });
-    }
 
     if (issues.runtimeErrors.length > 0) {
       console.log(`\n   💥 Runtime Errors (${issues.runtimeErrors.length}):`);
