@@ -246,6 +246,18 @@ const STATIC_ROUTES = {
       fr: 'Questions fréquemment posées sur Magical Story. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
     },
   },
+  '/so-funktionierts': {
+    title: {
+      en: 'Your Book, Your Vision – Full Creative Control | Magical Story',
+      de: 'Dein Buch, deine Vision – Volle kreative Kontrolle | Magical Story',
+      fr: 'Votre livre, votre vision – Contrôle créatif total | Magical Story',
+    },
+    description: {
+      en: 'Edit every text, shape every illustration. MagicalStory gives you full control over your personalized children\'s book. 170+ themes, 8 art styles. First story free.',
+      de: 'Bearbeite jeden Text, gestalte jedes Bild. MagicalStory gibt dir volle Kontrolle über dein personalisiertes Kinderbuch. 170+ Themen, 8 Kunststile. Erste Geschichte gratis.',
+      fr: 'Modifiez chaque texte, façonnez chaque illustration. MagicalStory vous donne le contrôle total. 170+ thèmes, 8 styles. Première histoire gratuite.',
+    },
+  },
   '/about': {
     title: {
       en: 'About – Magical Story',
@@ -1310,6 +1322,7 @@ function generateSitemap() {
     '/vergleich': '0.6',
     '/science': '0.7',
     '/faq': '0.5',
+    '/so-funktionierts': '0.7',
     '/about': '0.5',
     '/contact': '0.5',
     '/terms': '0.3',

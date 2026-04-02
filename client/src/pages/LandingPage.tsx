@@ -18,10 +18,10 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Step 2',
     tellStory: 'Tell Your Story',
-    tellStoryDesc: "Pick a theme or describe your own adventure. Birthday surprise, bedtime tale, or a story to help your child through a life challenge — you decide what happens.",
-    selectThemes: 'Adventure, fantasy, birthday, bedtime stories, and more',
-    customElements: 'Stories for life challenges: first day of school, new sibling, visiting the dentist, overcoming fears',
-    readingLevel: "Adjust reading level to match your child's age",
+    tellStoryDesc: "Choose from 170+ themes or describe your own adventure — from pirates to the first day of school. You're in full control: edit any text and shape every illustration exactly the way you want it.",
+    selectThemes: 'Adventure, fantasy, birthday, bedtime stories, life challenges, and more',
+    customElements: 'Edit text freely — every page, every word',
+    readingLevel: 'Shape images to your vision — change scenes, adjust style, refine details',
     // Section 3: Style
     step3: 'Step 3',
     chooseStyle: 'Choose Your Style',
@@ -56,10 +56,10 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Schritt 2',
     tellStory: 'Erzähle deine Geschichte',
-    tellStoryDesc: 'Wähle ein Thema oder beschreibe dein eigenes Abenteuer. Geburtstagsüberraschung, Gute-Nacht-Geschichte oder eine Geschichte, die deinem Kind bei einer Herausforderung hilft — du bestimmst.',
-    selectThemes: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten und mehr',
-    customElements: 'Geschichten für Herausforderungen: erster Schultag, neues Geschwisterchen, Zahnarztbesuch, Ängste überwinden',
-    readingLevel: 'Passe das Leseniveau an das Alter deines Kindes an',
+    tellStoryDesc: 'Wähle aus 170+ Themen oder beschreibe dein eigenes Abenteuer — von Piraten bis zum ersten Schultag. Du hast die volle Kontrolle: Passe jeden Text an und gestalte jedes Bild genau so, wie du es dir vorstellst.',
+    selectThemes: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten, Herausforderungen und mehr',
+    customElements: 'Texte frei bearbeiten — jede Seite, jedes Wort',
+    readingLevel: 'Bilder anpassen — Szene verändern, Stil wechseln, Details verfeinern',
     // Section 3: Style
     step3: 'Schritt 3',
     chooseStyle: 'Wähle deinen Stil',
@@ -94,10 +94,10 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Étape 2',
     tellStory: 'Racontez votre histoire',
-    tellStoryDesc: "Choisissez un thème ou décrivez votre propre aventure. Surprise d'anniversaire, histoire du soir ou une histoire pour aider votre enfant à surmonter un défi — c'est vous qui décidez.",
-    selectThemes: "Aventure, fantasy, anniversaire, histoires du soir, et plus",
-    customElements: "Histoires pour les défis de la vie : premier jour d'école, nouveau bébé, visite chez le dentiste, surmonter ses peurs",
-    readingLevel: "Ajustez le niveau de lecture à l'âge de votre enfant",
+    tellStoryDesc: "Choisissez parmi 170+ thèmes ou décrivez votre propre aventure — des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
+    selectThemes: 'Aventure, fantasy, anniversaire, histoires du soir, défis de la vie, et plus',
+    customElements: 'Modifiez les textes librement — chaque page, chaque mot',
+    readingLevel: 'Façonnez les images — changez la scène, ajustez le style, affinez les détails',
     // Section 3: Style
     step3: 'Étape 3',
     chooseStyle: 'Choisissez votre style',

@@ -1,0 +1,191 @@
+import { Link } from 'react-router-dom';
+import { Pencil, Image, Wand2, BookOpen, Users, Palette, ArrowRight } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
+import { Navigation, Footer } from '@/components/common';
+
+const translations = {
+  en: {
+    title: 'Your Book, Your Vision',
+    subtitle: 'Complete creative control over every text and every image.',
+    heroDesc: 'Unlike other personalized book services, MagicalStory gives you full control. Edit any text, reshape any illustration, refine any character — until your book is exactly how you imagined it.',
+    // Sections
+    s1Title: 'Edit Every Word',
+    s1Desc: 'Every page of text is fully editable. Change names, rewrite sentences, adjust the story to fit your family perfectly. The AI writes the first draft — you make it yours.',
+    s1b1: 'Click on any text to edit it directly',
+    s1b2: 'Rewrite entire paragraphs or fix individual words',
+    s1b3: 'Adjust reading level for your child\'s age',
+    s2Title: 'Shape Every Image',
+    s2Desc: 'Don\'t like how a scene looks? Describe what you want changed, and a new illustration is generated in seconds. Change the setting, adjust character positions, or try a completely different scene.',
+    s2b1: 'Describe changes in your own words — "make the sky bluer" or "add a rainbow"',
+    s2b2: 'Reimagine entire scenes with a new description',
+    s2b3: 'Try different art styles on the same scene',
+    s3Title: 'Consistent Characters',
+    s3Desc: 'Upload a photo once, and your child appears consistently throughout the book. If a character doesn\'t look quite right on one page, fix just that page without affecting the rest.',
+    s3b1: 'AI maintains character appearance across all pages',
+    s3b2: 'Fix individual characters on specific pages',
+    s3b3: 'Add up to 10 family members as characters',
+    s4Title: '170+ Themes',
+    s4Desc: 'From pirate adventures to stories about the first day of school. Each theme is thoughtfully designed with age-appropriate language and engaging plots.',
+    s4b1: 'Adventure, fantasy, birthday, bedtime stories',
+    s4b2: 'Life challenges: new sibling, dentist visit, overcoming fears',
+    s4b3: 'Local stories: Swiss cities, landmarks, and traditions',
+    s5Title: '8 Art Styles',
+    s5Desc: 'Choose from Pixar-style 3D, watercolor, comic, anime, realistic, and more. Every style is applied consistently across all pages.',
+    ctaTitle: 'Try it free — your first story costs nothing',
+    ctaDesc: 'Upload a photo, pick a theme, and see your personalized book in under 3 minutes. No account needed.',
+    ctaButton: 'Create Your Story',
+  },
+  de: {
+    title: 'Dein Buch, deine Vision',
+    subtitle: 'Volle kreative Kontrolle über jeden Text und jedes Bild.',
+    heroDesc: 'Anders als bei anderen personalisierten Büchern hast du bei MagicalStory die volle Kontrolle. Bearbeite jeden Text, gestalte jede Illustration, verfeinere jeden Charakter — bis dein Buch genau so ist, wie du es dir vorstellst.',
+    s1Title: 'Jeden Text bearbeiten',
+    s1Desc: 'Jede Seite ist vollständig editierbar. Ändere Namen, schreibe Sätze um, passe die Geschichte an deine Familie an. Die KI schreibt den ersten Entwurf — du machst ihn zu deinem.',
+    s1b1: 'Klicke auf einen Text, um ihn direkt zu bearbeiten',
+    s1b2: 'Ganze Absätze umschreiben oder einzelne Wörter anpassen',
+    s1b3: 'Leseniveau an das Alter deines Kindes anpassen',
+    s2Title: 'Jedes Bild gestalten',
+    s2Desc: 'Dir gefällt eine Szene nicht? Beschreibe, was du ändern möchtest, und eine neue Illustration wird in Sekunden erstellt. Ändere die Umgebung, passe Positionen an oder probiere eine komplett neue Szene.',
+    s2b1: 'Beschreibe Änderungen in deinen Worten — "mach den Himmel blauer" oder "füge einen Regenbogen hinzu"',
+    s2b2: 'Szenen komplett neu gestalten mit einer neuen Beschreibung',
+    s2b3: 'Verschiedene Kunststile auf der gleichen Szene ausprobieren',
+    s3Title: 'Einheitliche Charaktere',
+    s3Desc: 'Lade ein Foto hoch und dein Kind erscheint einheitlich im ganzen Buch. Wenn ein Charakter auf einer Seite nicht perfekt aussieht, korrigiere nur diese Seite — ohne den Rest zu beeinflussen.',
+    s3b1: 'KI behält das Aussehen der Charaktere auf allen Seiten bei',
+    s3b2: 'Einzelne Charaktere auf bestimmten Seiten korrigieren',
+    s3b3: 'Bis zu 10 Familienmitglieder als Charaktere hinzufügen',
+    s4Title: '170+ Themen',
+    s4Desc: 'Von Piraten-Abenteuern bis zu Geschichten über den ersten Schultag. Jedes Thema ist sorgfältig gestaltet mit altersgerechter Sprache und spannenden Handlungen.',
+    s4b1: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten',
+    s4b2: 'Herausforderungen: neues Geschwisterchen, Zahnarztbesuch, Ängste überwinden',
+    s4b3: 'Lokale Geschichten: Schweizer Städte, Wahrzeichen und Traditionen',
+    s5Title: '8 Kunststile',
+    s5Desc: 'Wähle aus Pixar-ähnlichem 3D, Aquarell, Comic, Anime, Realistisch und mehr. Jeder Stil wird einheitlich auf allen Seiten angewendet.',
+    ctaTitle: 'Kostenlos ausprobieren — deine erste Geschichte kostet nichts',
+    ctaDesc: 'Lade ein Foto hoch, wähle ein Thema und sieh dein personalisiertes Buch in unter 3 Minuten. Kein Konto nötig.',
+    ctaButton: 'Geschichte erstellen',
+  },
+  fr: {
+    title: 'Votre livre, votre vision',
+    subtitle: 'Contrôle créatif total sur chaque texte et chaque image.',
+    heroDesc: 'Contrairement aux autres services de livres personnalisés, MagicalStory vous donne le contrôle total. Modifiez chaque texte, façonnez chaque illustration, affinez chaque personnage — jusqu\'à ce que votre livre soit exactement comme vous l\'imaginez.',
+    s1Title: 'Modifiez chaque texte',
+    s1Desc: 'Chaque page est entièrement modifiable. Changez les noms, réécrivez des phrases, adaptez l\'histoire à votre famille. L\'IA écrit le premier brouillon — vous le personnalisez.',
+    s1b1: 'Cliquez sur un texte pour le modifier directement',
+    s1b2: 'Réécrivez des paragraphes entiers ou ajustez des mots',
+    s1b3: 'Adaptez le niveau de lecture à l\'âge de votre enfant',
+    s2Title: 'Façonnez chaque image',
+    s2Desc: 'Une scène ne vous plaît pas ? Décrivez ce que vous voulez changer et une nouvelle illustration est créée en secondes.',
+    s2b1: 'Décrivez les changements — "rendre le ciel plus bleu" ou "ajouter un arc-en-ciel"',
+    s2b2: 'Réimaginez des scènes entières avec une nouvelle description',
+    s2b3: 'Essayez différents styles artistiques sur la même scène',
+    s3Title: 'Personnages cohérents',
+    s3Desc: 'Téléchargez une photo et votre enfant apparaît de manière cohérente dans tout le livre. Si un personnage n\'est pas parfait sur une page, corrigez uniquement cette page.',
+    s3b1: 'L\'IA maintient l\'apparence sur toutes les pages',
+    s3b2: 'Corrigez des personnages individuels sur des pages spécifiques',
+    s3b3: 'Ajoutez jusqu\'à 10 membres de la famille',
+    s4Title: '170+ thèmes',
+    s4Desc: 'Des aventures de pirates aux histoires sur le premier jour d\'école. Chaque thème est conçu avec un langage adapté à l\'âge.',
+    s4b1: 'Aventure, fantasy, anniversaire, histoires du soir',
+    s4b2: 'Défis de la vie : nouveau bébé, dentiste, surmonter ses peurs',
+    s4b3: 'Histoires locales : villes suisses, monuments et traditions',
+    s5Title: '8 styles artistiques',
+    s5Desc: 'Pixar 3D, aquarelle, bande dessinée, anime, réaliste et plus. Style cohérent sur toutes les pages.',
+    ctaTitle: 'Essayez gratuitement — votre première histoire est gratuite',
+    ctaDesc: 'Téléchargez une photo, choisissez un thème et découvrez votre livre personnalisé en moins de 3 minutes.',
+    ctaButton: 'Créer votre histoire',
+  },
+};
+
+const sections = [
+  { key: 's1', icon: Pencil, color: 'indigo' },
+  { key: 's2', icon: Image, color: 'emerald' },
+  { key: 's3', icon: Users, color: 'amber' },
+  { key: 's4', icon: BookOpen, color: 'rose' },
+  { key: 's5', icon: Palette, color: 'violet' },
+] as const;
+
+const colorMap: Record<string, { bg: string; border: string; icon: string; bullet: string }> = {
+  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-600', bullet: 'text-indigo-500' },
+  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-600', bullet: 'text-emerald-500' },
+  amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600', bullet: 'text-amber-500' },
+  rose: { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'text-rose-600', bullet: 'text-rose-500' },
+  violet: { bg: 'bg-violet-50', border: 'border-violet-200', icon: 'text-violet-600', bullet: 'text-violet-500' },
+};
+
+export default function HowItWorks() {
+  const { language } = useLanguage();
+  const t = translations[language] || translations.de;
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Navigation currentStep={0} />
+
+      {/* Hero */}
+      <section className="pt-24 pb-12 px-4 bg-gradient-to-b from-indigo-50 to-white">
+        <div className="max-w-3xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t.title}</h1>
+          <p className="text-xl text-indigo-600 font-medium mb-6">{t.subtitle}</p>
+          <p className="text-lg text-gray-600 leading-relaxed">{t.heroDesc}</p>
+        </div>
+      </section>
+
+      {/* Feature Sections */}
+      <section className="py-12 px-4">
+        <div className="max-w-3xl mx-auto space-y-8">
+          {sections.map(({ key, icon: Icon, color }) => {
+            const c = colorMap[color];
+            const title = t[`${key}Title` as keyof typeof t] as string;
+            const desc = t[`${key}Desc` as keyof typeof t] as string;
+            const b1 = t[`${key}b1` as keyof typeof t] as string | undefined;
+            const b2 = t[`${key}b2` as keyof typeof t] as string | undefined;
+            const b3 = t[`${key}b3` as keyof typeof t] as string | undefined;
+            const bullets = [b1, b2, b3].filter(Boolean) as string[];
+
+            return (
+              <div key={key} className={`${c.bg} border ${c.border} rounded-2xl p-6 md:p-8`}>
+                <div className="flex items-start gap-4">
+                  <div className={`shrink-0 w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center ${c.icon}`}>
+                    <Icon size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">{title}</h2>
+                    <p className="text-gray-600 mb-4">{desc}</p>
+                    {bullets.length > 0 && (
+                      <ul className="space-y-2">
+                        {bullets.map((b, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                            <span className={`mt-0.5 ${c.bullet}`}>&#10003;</span>
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-16 px-4 bg-gradient-to-b from-white to-indigo-50">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.ctaTitle}</h2>
+          <p className="text-lg text-gray-600 mb-8">{t.ctaDesc}</p>
+          <Link
+            to="/try"
+            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+          >
+            <Wand2 size={20} />
+            {t.ctaButton}
+            <ArrowRight size={20} />
+          </Link>
+        </div>
+      </section>
+
+      <Footer />
+    </div>
+  );
+}

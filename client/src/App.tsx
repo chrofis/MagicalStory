@@ -23,6 +23,7 @@ const SharedStoryViewer = lazy(() => import('./pages/SharedStoryViewer'));
 const TrialWizard = lazy(() => import('./pages/TrialWizard'));
 const TrialGenerationPage = lazy(() => import('./pages/TrialGenerationPage'));
 const ClaimAccount = lazy(() => import('./pages/ClaimAccount'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const FAQ = lazy(() => import('./pages/FAQ'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -59,6 +60,7 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/impressum" element={<Impressum />} />
+          <Route path="/so-funktionierts" element={<HowItWorks />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
