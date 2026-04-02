@@ -499,7 +499,7 @@ export default function SharedStoryViewer() {
                 </div>
                 {/* Image — right on desktop, top on mobile */}
                 <div
-                  className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2 cursor-pointer"
+                  className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer"
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
                   <img
