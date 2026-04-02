@@ -3518,6 +3518,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               totalAttempts: result.totalAttempts,
               retryHistory: result.retryHistory,
               referencePhotos: result.referencePhotos,
+              landmarkPhotos: result.landmarkPhotos,
+              grokRefImages: result.grokRefImages || null,
               modelId: result.modelId,
               generatedAt: new Date().toISOString()
             };
