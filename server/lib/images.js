@@ -723,7 +723,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
 
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
-    const promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;
+    let promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;
+
+    // For cover evaluations: extract the expected text and prepend it prominently
+    // so the evaluator doesn't miss it in the long generation prompt
+    if (evaluationType === 'cover' && promptForEval) {
+      const titleMatch = promptForEval.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
+      const magicalMatch = promptForEval.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
+      const expectedText = titleMatch?.[1] || magicalMatch?.[1];
+      if (expectedText) {
+        promptForEval = `⚠️ EXPECTED TEXT ON THIS IMAGE: "${expectedText}"\n\n${promptForEval}`;
+      }
+    }
 
     const evaluationPrompt = evaluationTemplate
       ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: promptForEval })
