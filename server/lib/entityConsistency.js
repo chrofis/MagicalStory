@@ -80,9 +80,14 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const getFallbackPhoto = () => getFacePhoto(character);
 
   if (!avatars?.styledAvatars?.[artStyle]) {
-    // Fallback to original photo if no styled avatars
+    // No styled avatars for this art style — try base avatar (2x2 sheet) before face photo
+    const baseAvatar = avatars?.standard || avatars?.[clothingCategory];
+    if (baseAvatar) {
+      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, using base standard avatar`);
+      return baseAvatar;
+    }
     const fallback = getFallbackPhoto();
-    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, fallback=${fallback ? 'photo' : 'null'}`);
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, no base avatar, fallback=${fallback ? 'photo' : 'null'}`);
     return fallback;
   }
 
