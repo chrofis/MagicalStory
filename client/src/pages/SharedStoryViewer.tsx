@@ -131,6 +131,7 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [pageTransition, setPageTransition] = useState<'none' | 'slide-left' | 'slide-right'>('none');
   const menuRef = useRef<HTMLDivElement>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
 
@@ -289,10 +290,15 @@ export default function SharedStoryViewer() {
   }, [currentPage]);
 
   const goToPage = useCallback((page: number) => {
-    if (page >= 0 && page < totalPages) {
-      setCurrentPage(page);
+    if (page >= 0 && page < totalPages && page !== currentPage) {
+      const direction = page > currentPage ? 'slide-left' : 'slide-right';
+      setPageTransition(direction);
+      setTimeout(() => {
+        setCurrentPage(page);
+        setPageTransition('none');
+      }, 250);
     }
-  }, [totalPages]);
+  }, [totalPages, currentPage]);
 
   const swipeHandlers = useSwipe(
     () => goToPage(currentPage + 1), // swipe left = next
@@ -442,8 +448,11 @@ export default function SharedStoryViewer() {
           <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
         </button>
 
-        {/* Book container */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
+        {/* Book container with page turn animation */}
+        <div className={`bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl transition-all duration-300 ease-in-out ${
+          pageTransition === 'slide-left' ? 'opacity-0 translate-x-[-40px]' :
+          pageTransition === 'slide-right' ? 'opacity-0 translate-x-[40px]' : 'opacity-100 translate-x-0'
+        }`}>
           {/* Cover pages (frontCover, initialPage, backCover) */}
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div
@@ -462,24 +471,24 @@ export default function SharedStoryViewer() {
             </div>
           )}
 
-          {/* Story Pages */}
+          {/* Story Pages — text left, image right (desktop) / image top, text bottom (mobile) */}
           {currentEntry && currentEntry.type === 'story' && (() => {
             const page = story.pages[currentEntry.storyPageIdx];
             if (!page) return null;
             return (
-              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
+              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
                 {/* Text — left on desktop, bottom on mobile */}
-                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col md:justify-center bg-indigo-50/50 overflow-hidden order-2 md:order-1">
+                <div className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1">
                   <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
-                    <p className="text-base md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
+                    <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
                       {page.text}
                     </p>
                   </div>
                   <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
-                    Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
+                    {currentEntry.storyPageIdx + 1} / {story.pages.length}
                   </div>
                 </div>
-                {/* Image — right on desktop, top on mobile. Tap to view fullscreen */}
+                {/* Image — right on desktop, top on mobile */}
                 <div
                   className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2 cursor-pointer"
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
