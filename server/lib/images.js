@@ -4966,7 +4966,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     maxRegenAttempts = REPAIR_DEFAULTS.maxPasses,
     evalConcurrency = 100,
     qualityModelOverride = null,
-    useIteratePage = false
+    useIteratePage = false,
+    semanticThresholdForIterate = REPAIR_DEFAULTS.semanticThresholdForIterate,
+    qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate,
+    inpaintMaxPasses = REPAIR_DEFAULTS.inpaintMaxPasses,
   } = options;
 
   const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
@@ -4977,7 +4980,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   if (useIteratePage && !storyData) {
     log.warn('[UNIFIED PIPELINE] useIteratePage=true but storyData not provided; falling back to generateImageOnly');
   }
-  log.info(`🔧 [UNIFIED PIPELINE] Starting: ${imagesWithData.length} images, threshold=${regenThreshold}, maxAttempts=${maxRegenAttempts}, mode=${effectiveUseIteratePage ? 'iteratePage' : 'generateImageOnly'}`);
+  log.info(`🔧 [UNIFIED PIPELINE] Starting: ${imagesWithData.length} images, threshold=${regenThreshold}, maxPasses=${maxRegenAttempts}, mode=${effectiveUseIteratePage ? 'iteratePage' : 'generateImageOnly'}, semThresh=${semanticThresholdForIterate}, qualThresh=${qualityThresholdForIterate}`);
 
   // Helper for progress updates
   const updateProgress = async (percent, message) => {
@@ -5008,43 +5011,47 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       photoUrl: c.avatars?.styled || c.photoUrl
     }));
 
-  // Prepare eval inputs
-  const evalInputs = imagesWithData.map(img => ({
-    imageData: img.imageData,
-    pageNumber: img.pageNumber,
-    prompt: img.prompt,
-    characterPhotos: img.characterPhotos,
-    allCharacterPhotos,
-    sceneDescription: img.sceneDescription,
-    sceneCharacters: img.sceneCharacters,
-    sceneMetadata: img.sceneMetadata,
-    pageText: img.text,
-    sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null,
-    evaluationType: img.evaluationType,  // 'cover' for covers, undefined for scenes
-  }));
+  // Reusable helper: build eval inputs for an array of image entries
+  const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
+    const orig = rawImages.find(img => img.pageNumber === entry.pageNumber) || entry;
+    return {
+      imageData: entry.imageData,
+      pageNumber: entry.pageNumber,
+      prompt: orig.prompt,
+      characterPhotos: orig.characterPhotos,
+      allCharacterPhotos,
+      sceneDescription: orig.sceneDescription,
+      sceneCharacters: orig.sceneCharacters,
+      sceneMetadata: orig.sceneMetadata,
+      pageText: orig.text,
+      sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
+      evaluationType: orig.evaluationType,
+    };
+  });
 
-  // Build entity check data (same structure as final checks in server.js)
-  const imageCheckData = {
-    sceneImages: imagesWithData.map(img => {
-      const metadata = extractSceneMetadata(img.sceneDescription) || {};
-      const perCharClothing = img.perCharClothing || metadata.characterClothing || {};
+  // Reusable helper: build entity check data for an array of image entries
+  const buildEntityCheckData = (imageEntries) => ({
+    sceneImages: imageEntries.map(entry => {
+      const orig = rawImages.find(r => r.pageNumber === entry.pageNumber) || entry;
+      const metadata = extractSceneMetadata(orig.sceneDescription) || {};
+      const perCharClothing = orig.perCharClothing || metadata.characterClothing || {};
       let sceneSummary = '';
       if (metadata.fullData?.imageSummary) {
         sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
-      } else if (img.sceneDescription) {
-        const beforeJson = img.sceneDescription.split('```json')[0].trim();
+      } else if (orig.sceneDescription) {
+        const beforeJson = orig.sceneDescription.split('```json')[0].trim();
         const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
         sceneSummary = lines[0]?.substring(0, 150) || '';
       }
       return {
-        imageData: img.imageData,
-        pageNumber: img.pageNumber,
+        imageData: entry.imageData,
+        pageNumber: entry.pageNumber,
         characters: metadata.characters || [],
         clothing: metadata.clothing || 'standard',
         characterClothing: perCharClothing,
         sceneSummary,
-        referenceCharacters: (img.characterPhotos || []).map(p => p.name).filter(Boolean),
-        referenceClothing: (img.characterPhotos || []).reduce((acc, p) => {
+        referenceCharacters: (orig.characterPhotos || []).map(p => p.name).filter(Boolean),
+        referenceClothing: (orig.characterPhotos || []).reduce((acc, p) => {
           if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
           return acc;
         }, {}),
@@ -5052,7 +5059,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       };
     }),
     artStyle: artStyle || 'pixar'
-  };
+  });
+
+  const evalInputs = buildEvalInputs(imagesWithData);
+  const imageCheckData = buildEntityCheckData(imagesWithData);
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
@@ -5105,9 +5115,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
-  // Step 2: First regeneration of low-scoring pages
+  // Shared helpers for the round loop
   // =========================================================================
-  // Helper: compute entity penalty for a page from entity report
   const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 };
   const getEntityPenalty = (pageNumber, report) => {
     if (!report?.characters) return 0;
@@ -5123,351 +5132,326 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     return penalty;
   };
 
-  // Build eval map for findBadPages: apply entity penalties to scores
-  const pass1EvalPages = {};
-  for (const img of rawImages) {
-    if (!img.imageData) continue;
-    const ev = evalMap.get(img.pageNumber);
-    if (ev?.evaluated && ev.qualityScore != null) {
-      const entityPenalty = getEntityPenalty(img.pageNumber, entityReport);
-      const adjustedScore = Math.max(0, (ev.score ?? ev.qualityScore) - entityPenalty);
-      pass1EvalPages[img.pageNumber] = { ...ev, score: adjustedScore };
-      if (entityPenalty > 0) {
-        log.debug(`📊 [UNIFIED PIPELINE] Page ${img.pageNumber}: quality=${ev.qualityScore}, entity penalty=${entityPenalty}, adjusted=${adjustedScore}`);
-      }
-    }
-  }
-  const pass1BadPageNums = findBadPages(pass1EvalPages, { scoreThreshold: regenThreshold });
-  const lowScoringPages = rawImages.filter(img => pass1BadPageNums.includes(img.pageNumber));
+  // Track which action was taken per page per round: Map<pageNumber, string[]>
+  const pageRoundActions = new Map();
 
-  if (lowScoringPages.length > 0 && maxRegenAttempts >= 1) {
-    await updateProgress(40, `Improving ${lowScoringPages.length} low-scoring images (pass 1)...`);  // 40 = redo pass 1
-    log.info(`🔄 [UNIFIED PIPELINE] Step 2: Regenerating ${lowScoringPages.length} low-scoring pages (pass 1)...`);
-    const regen1Start = Date.now();
-
-    const regenLimit = pLimit(50);
-    const regen1Results = await Promise.all(
-      lowScoringPages.map(img => regenLimit(async () => {
-        try {
-          let result;
-          // iteratePage requires page text + scene description — not available for covers
-          const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
-          if (canIterate) {
-            // Build evaluation feedback from previous eval for iteratePage
-            const ev = evalMap.get(img.pageNumber);
-            const evalFeedback = ev ? {
-              score: ev.score ?? ev.qualityScore,
-              reasoning: ev.reasoning?.substring(0, 1000),
-              fixableIssues: (ev.fixableIssues || []).slice(0, 10),
-            } : null;
-            result = await iteratePage(img.imageData, img.pageNumber, storyData, {
-              modelOverrides,
-              usageTracker: null,
-              evaluationFeedback: evalFeedback,
-            });
-            if (result?.imageData && usageTracker) {
-              // iteratePage tracks its own usage internally via Claude + Gemini calls
-              // We track the image generation portion here
-              if (result.usage) {
-                usageTracker('gemini_image', result.usage, 'unified_pipeline_regen', result.modelId);
-              }
-            }
-          } else if (img.pageNumber < 0 && storyData) {
-            // Cover: use full cover iterate logic (same as manual endpoint)
-            const { iterateCover } = require('./coverIterate');
-            const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
-            const ck = coverKeys[String(img.pageNumber)];
-            // Skip if cover doesn't exist yet (covers may not be in storyData if generated in parallel)
-            if (ck && storyData.coverImages?.[ck]?.imageData) {
-              const ev = evalMap.get(img.pageNumber);
-              const coverFeedback = ev ? {
-                score: ev.score ?? ev.qualityScore,
-                reasoning: ev.reasoning?.substring(0, 1000),
-                fixableIssues: (ev.fixableIssues || []).slice(0, 10),
-              } : null;
-              result = await iterateCover(ck, storyData, {
-                imageModel: modelOverrides?.imageModel,
-                evaluationFeedback: coverFeedback,
-                usageTracker,
-              });
-            } else if (ck) {
-              log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} regen — no image data available yet`);
-            }
-            // No separate usage tracking — iterateCover passes usageTracker through
-          } else {
-            // Inject evaluation feedback so the model knows what to fix
-            const ev = evalMap.get(img.pageNumber);
-            const feedbackSuffix = buildRegenFeedback(ev);
-            const regenPrompt = feedbackSuffix
-              ? `${img.prompt}\n\n${feedbackSuffix}`
-              : img.prompt;
-
-            result = await generateImageOnly(regenPrompt, img.characterPhotos, {
-              imageModelOverride: modelOverrides.imageModel,
-              imageBackendOverride: modelOverrides.imageBackend,
-              landmarkPhotos: img.landmarkPhotos,
-              visualBibleGrid: img.visualBibleGrid,
-              pageNumber: img.pageNumber,
-              skipCache: true
-            });
-            if (result?.usage && usageTracker) {
-              const isRunware = result.modelId && result.modelId.startsWith('runware:');
-              usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_regen', result.modelId);
-            }
-          }
-
-          return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId, grokRefImages: result?.grokRefImages || null };
-        } catch (err) {
-          log.error(`❌ [UNIFIED PIPELINE] Regen pass 1 failed for page ${img.pageNumber}: ${err.message}`);
-          return { pageNumber: img.pageNumber, imageData: null, error: err.message };
-        }
-      }))
-    );
-
-    const regen1Success = regen1Results.filter(r => r.imageData);
-    log.info(`✅ [UNIFIED PIPELINE] Pass 1: ${regen1Success.length}/${lowScoringPages.length} regenerated in ${((Date.now() - regen1Start) / 1000).toFixed(1)}s`);
-
-    // Re-evaluate regenerated images
-    if (regen1Success.length > 0) {
-      await updateProgress(50, 'Re-evaluating improved images...');  // 50 = re-eval pass 1
-      log.info(`🔍 [UNIFIED PIPELINE] Step 2b: Re-evaluating ${regen1Success.length} regenerated images...`);
-
-      const regen1EvalInputs = regen1Success.map(r => {
-        const orig = rawImages.find(img => img.pageNumber === r.pageNumber);
-        return {
-          imageData: r.imageData,
-          pageNumber: r.pageNumber,
-          prompt: orig?.prompt,
-          characterPhotos: orig?.characterPhotos,
-          sceneDescription: orig?.sceneDescription,
-          sceneCharacters: orig?.sceneCharacters,
-          sceneMetadata: orig?.sceneMetadata,
-          pageText: orig?.text,
-          sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null,
-          evaluationType: orig?.evaluationType,
-        };
+  // Helper: execute an iterate action for a page
+  const executeIterateAction = async (img, latestEval) => {
+    const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
+    let result;
+    if (canIterate) {
+      const evalFeedback = latestEval ? {
+        score: latestEval.score ?? latestEval.qualityScore,
+        reasoning: latestEval.reasoning?.substring(0, 1000),
+        fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+      } : null;
+      const versions = pageVersions.get(img.pageNumber) || [];
+      const bestSoFar = selectBestVersion(versions);
+      const inputImage = bestSoFar?.imageData || img.imageData;
+      result = await iteratePage(inputImage, img.pageNumber, storyData, {
+        modelOverrides,
+        usageTracker: null,
+        evaluationFeedback: evalFeedback,
       });
-
-      const regen1Evals = await evaluateImageBatch(regen1EvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
-
-      for (const ev of regen1Evals) {
-        if (ev.usage && usageTracker) {
-          usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality', ev.modelId);
-        }
-        // Add to page versions
-        const versions = pageVersions.get(ev.pageNumber);
-        const regenResult = regen1Success.find(r => r.pageNumber === ev.pageNumber);
-        if (versions && regenResult) {
-          versions.push({
-            imageData: regenResult.imageData,
-            score: ev.score ?? ev.qualityScore ?? null,
-            source: 'regen-attempt-1',
-            evaluation: ev,
-            modelId: regenResult.modelId,
-            grokRefImages: regenResult.grokRefImages || null
-          });
-        }
+      if (result?.usage && usageTracker) {
+        usageTracker('gemini_image', result.usage, 'unified_pipeline_iterate', result.modelId);
+      }
+    } else if (img.pageNumber < 0 && storyData) {
+      const { iterateCover } = require('./coverIterate');
+      const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+      const ck = coverKeys[String(img.pageNumber)];
+      if (ck && storyData.coverImages?.[ck]?.imageData) {
+        const coverFeedback = latestEval ? {
+          score: latestEval.score ?? latestEval.qualityScore,
+          reasoning: latestEval.reasoning?.substring(0, 1000),
+          fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+        } : null;
+        result = await iterateCover(ck, storyData, {
+          imageModel: modelOverrides?.imageModel,
+          evaluationFeedback: coverFeedback,
+          usageTracker,
+        });
+      } else if (ck) {
+        log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} iterate — no image data available yet`);
+      }
+    } else {
+      const feedbackSuffix = buildRegenFeedback(latestEval);
+      const regenPrompt = feedbackSuffix
+        ? `${img.prompt}\n\n${feedbackSuffix}`
+        : img.prompt;
+      result = await generateImageOnly(regenPrompt, img.characterPhotos, {
+        imageModelOverride: modelOverrides.imageModel,
+        imageBackendOverride: modelOverrides.imageBackend,
+        landmarkPhotos: img.landmarkPhotos,
+        visualBibleGrid: img.visualBibleGrid,
+        pageNumber: img.pageNumber,
+        skipCache: true
+      });
+      if (result?.usage && usageTracker) {
+        const isRunware = result.modelId && result.modelId.startsWith('runware:');
+        usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_iterate', result.modelId);
       }
     }
-  }
+    return result;
+  };
+
+  // Helper: execute an inpaint action for a page
+  const executeInpaintAction = async (img, latestEval) => {
+    const versions = pageVersions.get(img.pageNumber) || [];
+    const bestSoFar = selectBestVersion(versions);
+    const inputImage = bestSoFar?.imageData || img.imageData;
+    const result = await inpaintPage(inputImage, latestEval || {});
+    if (result.usage && usageTracker) {
+      usageTracker('gemini_image', {
+        input_tokens: result.usage?.inputTokens || 0,
+        output_tokens: result.usage?.outputTokens || 0,
+        cost: result.usage?.cost,
+      }, 'unified_pipeline_inpaint', result.usage?.model || 'grok-text-edit');
+    }
+    return result;
+  };
 
   // =========================================================================
-  // Step 3: Second regeneration of still-low pages
+  // Step 2: Round loop (1 to maxPasses) — inpaint or iterate per bad page
   // =========================================================================
-  if (maxRegenAttempts >= 2) {
-    // Build eval map from best versions for findBadPages
-    const pass2EvalPages = {};
+  let currentEntityReport = entityReport;
+  let upgradedCount = 0;
+
+  for (let round = 1; round <= maxRegenAttempts; round++) {
+    // Build eval map for this round using best versions so far
+    const roundEvalPages = {};
     for (const img of rawImages) {
       if (!img.imageData) continue;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       if (bestSoFar && bestSoFar.score != null) {
-        const entityPenalty = getEntityPenalty(img.pageNumber, entityReport);
+        const entityPenalty = getEntityPenalty(img.pageNumber, currentEntityReport);
         const adjustedScore = Math.max(0, bestSoFar.score - entityPenalty);
-        pass2EvalPages[img.pageNumber] = {
+        roundEvalPages[img.pageNumber] = {
+          ...bestSoFar.evaluation,
+          score: adjustedScore,
           qualityScore: adjustedScore,
-          fixableIssues: bestSoFar.evaluation?.fixableIssues,
         };
+        if (entityPenalty > 0) {
+          log.debug(`📊 [UNIFIED PIPELINE] Round ${round} Page ${img.pageNumber}: best=${bestSoFar.score}, entity penalty=${entityPenalty}, adjusted=${adjustedScore}`);
+        }
       }
     }
-    const pass2BadPageNums = findBadPages(pass2EvalPages, { scoreThreshold: regenThreshold });
-    const stillLowPages = rawImages.filter(img => pass2BadPageNums.includes(img.pageNumber));
 
-    if (stillLowPages.length > 0) {
-      await updateProgress(55, `Improving ${stillLowPages.length} low-scoring images (pass 2)...`);  // 55 = redo pass 2
-      log.info(`🔄 [UNIFIED PIPELINE] Step 3: Regenerating ${stillLowPages.length} still-low pages (pass 2)...`);
-      const regen2Start = Date.now();
+    const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    const badPages = rawImages.filter(img => badPageNums.includes(img.pageNumber));
 
-      const regenLimit2 = pLimit(50);
-      const regen2Results = await Promise.all(
-        stillLowPages.map(img => regenLimit2(async () => {
-          try {
-            let result;
-            const canIterate2 = effectiveUseIteratePage && img.pageNumber > 0;
-            if (canIterate2) {
-              // For pass 2 with iteratePage, use the best version so far as input
-              const versions = pageVersions.get(img.pageNumber) || [];
-              const bestSoFar = selectBestVersion(versions);
-              const inputImage = bestSoFar?.imageData || img.imageData;
-              // Build evaluation feedback from latest eval
-              const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
-              const evalFeedback2 = latestEval ? {
-                score: latestEval.score ?? latestEval.qualityScore,
-                reasoning: latestEval.reasoning?.substring(0, 1000),
-                fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
-              } : null;
-              result = await iteratePage(inputImage, img.pageNumber, storyData, {
-                modelOverrides,
-                usageTracker: null,
-                evaluationFeedback: evalFeedback2,
-              });
-              if (result?.usage && usageTracker) {
-                usageTracker('gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
-              }
-            } else if (img.pageNumber < 0 && storyData) {
-              // Cover: use full cover iterate logic
-              const { iterateCover } = require('./coverIterate');
-              const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
-              const ck = coverKeys[String(img.pageNumber)];
-              // Skip if cover doesn't exist yet (covers may not be in storyData if generated in parallel)
-              if (ck && storyData.coverImages?.[ck]?.imageData) {
-                const versions = pageVersions.get(img.pageNumber) || [];
-                const latestVersion = versions[versions.length - 1];
-                const latestEval2 = latestVersion?.evaluation || evalMap.get(img.pageNumber);
-                const coverFeedback2 = latestEval2 ? {
-                  score: latestEval2.score ?? latestEval2.qualityScore,
-                  reasoning: latestEval2.reasoning?.substring(0, 1000),
-                  fixableIssues: (latestEval2.fixableIssues || []).slice(0, 10),
-                } : null;
-                result = await iterateCover(ck, storyData, {
-                  imageModel: modelOverrides?.imageModel,
-                  evaluationFeedback: coverFeedback2,
-                  usageTracker,
-                });
-              } else if (ck) {
-                log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} regen pass 2 — no image data available yet`);
-              }
-            } else {
-              // Use latest evaluation (from pass 1 if available) for feedback
-              const versions = pageVersions.get(img.pageNumber) || [];
-              const latestVersion = versions[versions.length - 1];
-              const latestEval = latestVersion?.evaluation || evalMap.get(img.pageNumber);
-              const feedbackSuffix = buildRegenFeedback(latestEval);
-              const regenPrompt = feedbackSuffix
-                ? `${img.prompt}\n\n${feedbackSuffix}`
-                : img.prompt;
+    if (badPages.length === 0) {
+      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, skipping remaining rounds`);
+      break;
+    }
 
-              result = await generateImageOnly(regenPrompt, img.characterPhotos, {
-                imageModelOverride: modelOverrides.imageModel,
-                imageBackendOverride: modelOverrides.imageBackend,
-                landmarkPhotos: img.landmarkPhotos,
-                visualBibleGrid: img.visualBibleGrid,
-                pageNumber: img.pageNumber,
-                skipCache: true
-              });
-              if (result?.usage && usageTracker) {
-                const isRunware = result.modelId && result.modelId.startsWith('runware:');
-                usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
-              }
+    // Progress: spread rounds across 35-60% range
+    const progressBase = 35 + Math.floor((round - 1) / maxRegenAttempts * 25);
+    await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
+
+    // Choose strategy for each bad page
+    const pageStrategies = badPages.map(img => {
+      const versions = pageVersions.get(img.pageNumber) || [];
+      const bestSoFar = selectBestVersion(versions);
+      const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
+      const previousActions = pageRoundActions.get(img.pageNumber) || [];
+      const previousAction = previousActions.length > 0 ? previousActions[previousActions.length - 1] : null;
+
+      const strategy = chooseRepairStrategy(latestEval || {}, round, previousAction, {
+        semanticThresholdForIterate,
+        qualityThresholdForIterate,
+      });
+
+      return { img, strategy, latestEval };
+    });
+
+    const inpaintCount = pageStrategies.filter(p => p.strategy === 'inpaint').length;
+    const iterateCount = pageStrategies.filter(p => p.strategy === 'iterate').length;
+    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${inpaintCount} inpaint, ${iterateCount} iterate`);
+
+    const roundStart = Date.now();
+    const repairLimit = pLimit(50);
+
+    // Execute all repairs in parallel
+    const roundResults = await Promise.all(
+      pageStrategies.map(({ img, strategy, latestEval }) => repairLimit(async () => {
+        const pageNumber = img.pageNumber;
+        try {
+          if (strategy === 'inpaint') {
+            const inpaintResult = await executeInpaintAction(img, latestEval);
+            if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
+            pageRoundActions.get(pageNumber).push('inpaint');
+
+            if (inpaintResult.repaired && inpaintResult.imageData) {
+              return {
+                pageNumber,
+                imageData: inpaintResult.imageData,
+                source: `inpaint-round-${round}`,
+                modelId: inpaintResult.usage?.model || 'grok-text-edit',
+                inpaintInstruction: inpaintResult.instruction,
+                grokRefImages: null,
+              };
             }
+            return { pageNumber, imageData: null, error: 'inpaint produced no result' };
+          } else {
+            // iterate
+            const result = await executeIterateAction(img, latestEval);
+            if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
+            pageRoundActions.get(pageNumber).push('iterate');
 
-            return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId, grokRefImages: result?.grokRefImages || null };
-          } catch (err) {
-            log.error(`❌ [UNIFIED PIPELINE] Regen pass 2 failed for page ${img.pageNumber}: ${err.message}`);
-            return { pageNumber: img.pageNumber, imageData: null, error: err.message };
+            if (result?.imageData) {
+              return {
+                pageNumber,
+                imageData: result.imageData,
+                source: `iterate-round-${round}`,
+                modelId: result.modelId,
+                grokRefImages: result.grokRefImages || null,
+              };
+            }
+            return { pageNumber, imageData: null, error: 'iterate produced no result' };
           }
-        }))
-      );
-
-      const regen2Success = regen2Results.filter(r => r.imageData);
-      log.info(`✅ [UNIFIED PIPELINE] Pass 2: ${regen2Success.length}/${stillLowPages.length} regenerated in ${((Date.now() - regen2Start) / 1000).toFixed(1)}s`);
-
-      // Evaluate pass 2 results
-      if (regen2Success.length > 0) {
-        const regen2EvalInputs = regen2Success.map(r => {
-          const orig = rawImages.find(img => img.pageNumber === r.pageNumber);
-          return {
-            imageData: r.imageData,
-            pageNumber: r.pageNumber,
-            prompt: orig?.prompt,
-            characterPhotos: orig?.characterPhotos,
-            sceneDescription: orig?.sceneDescription,
-            sceneCharacters: orig?.sceneCharacters,
-            sceneMetadata: orig?.sceneMetadata,
-            pageText: orig?.text,
-            sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null,
-            evaluationType: orig?.evaluationType,
-          };
-        });
-
-        const regen2Evals = await evaluateImageBatch(regen2EvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
-
-        for (const ev of regen2Evals) {
-          if (ev.usage && usageTracker) {
-            usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality2', ev.modelId);
-          }
-          const versions = pageVersions.get(ev.pageNumber);
-          const regenResult = regen2Success.find(r => r.pageNumber === ev.pageNumber);
-          if (versions && regenResult) {
-            versions.push({
-              imageData: regenResult.imageData,
-              score: ev.score ?? ev.qualityScore ?? null,
-              source: 'regen-attempt-2',
-              evaluation: ev,
-              modelId: regenResult.modelId,
-              grokRefImages: regenResult.grokRefImages || null
-            });
-          }
+        } catch (err) {
+          log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${strategy} failed for page ${pageNumber}: ${err.message}`);
+          if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
+          pageRoundActions.get(pageNumber).push(strategy);
+          return { pageNumber, imageData: null, error: err.message };
         }
+      }))
+    );
+
+    const roundSuccess = roundResults.filter(r => r.imageData);
+    const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
+    log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
+
+    // Evaluate repaired pages
+    if (roundSuccess.length > 0) {
+      const evalProgressPct = progressBase + 8;
+      await updateProgress(evalProgressPct, `Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
+      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
+
+      const roundEvalInputs = buildEvalInputs(roundSuccess);
+      const roundEvals = await evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+
+      for (const ev of roundEvals) {
+        if (ev.usage && usageTracker) {
+          usageTracker('gemini_quality', ev.usage, `unified_pipeline_quality_r${round}`, ev.modelId);
+        }
+        const versions = pageVersions.get(ev.pageNumber);
+        const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
+        if (versions && repairResult) {
+          versions.push({
+            imageData: repairResult.imageData,
+            score: ev.score ?? ev.qualityScore ?? null,
+            source: repairResult.source,
+            evaluation: ev,
+            modelId: repairResult.modelId,
+            grokRefImages: repairResult.grokRefImages || null,
+            inpaintInstruction: repairResult.inpaintInstruction || null,
+          });
+        }
+      }
+    }
+
+    // On round 2+, run fresh entity consistency before next round's evaluation
+    if (round < maxRegenAttempts && roundSuccess.length > 0) {
+      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency on latest images...`);
+      const latestImages = rawImages.filter(img => img.imageData).map(img => {
+        const versions = pageVersions.get(img.pageNumber) || [];
+        const best = selectBestVersion(versions);
+        return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
+      });
+      const freshEntityCheckData = buildEntityCheckData(latestImages);
+      try {
+        const freshEntity = await runEntityConsistencyChecks(freshEntityCheckData, characters, {
+          checkCharacters: true,
+          checkObjects: true,
+          saveGrids: false
+        });
+        if (freshEntity?.tokenUsage && usageTracker) {
+          usageTracker('gemini_quality', {
+            input_tokens: freshEntity.tokenUsage.inputTokens || 0,
+            output_tokens: freshEntity.tokenUsage.outputTokens || 0
+          }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
+        }
+        currentEntityReport = freshEntity;
+        log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
+      } catch (entityErr) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${entityErr.message}`);
       }
     }
   }
 
   // =========================================================================
-  // Step 4: Select best version per page
+  // Step 3: Pick best versions (across all rounds)
   // =========================================================================
-  await updateProgress(65, 'Selecting best versions...');  // 65 = pick best
-  log.info(`📊 [UNIFIED PIPELINE] Step 4: Selecting best version per page...`);
+  await updateProgress(63, 'Selecting best versions...');
+  log.info(`📊 [UNIFIED PIPELINE] Step 3: Selecting best version per page...`);
 
   const bestPerPage = new Map();
-  let upgradedCount = 0;
-
   for (const [pageNumber, versions] of pageVersions) {
     const best = selectBestVersion(versions);
     bestPerPage.set(pageNumber, best);
-
     if (best.source !== 'original') {
       upgradedCount++;
       log.debug(`📊 [UNIFIED PIPELINE] Page ${pageNumber}: selected ${best.source} (score ${best.score}) over original (score ${versions[0].score})`);
     }
   }
-
-  log.info(`✅ [UNIFIED PIPELINE] Step 4: ${upgradedCount} pages upgraded from regeneration`);
+  log.info(`✅ [UNIFIED PIPELINE] Step 3: ${upgradedCount} pages upgraded from repair rounds`);
 
   // =========================================================================
-  // Step 5: One character fix pass (entity consistency → repairCharacterMismatch)
+  // Step 4: Entity consistency check on picked images
   // =========================================================================
-  const charFixResults = new Map(); // pageNumber -> { imageData, source }
-  const charFixDetails = new Map(); // charName -> Map(pageNumber -> { before, after })
+  await updateProgress(65, 'Running entity consistency on final images...');
+  log.info(`🔍 [UNIFIED PIPELINE] Step 4: Entity consistency check on picked images...`);
 
-  if (entityReport && entityReport.totalIssues > 0) {
-    await updateProgress(68, 'Fixing character consistency...');  // 68 = character repair
-    log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${entityReport.totalIssues} entity issues)...`);
+  let finalEntityReport = currentEntityReport;
+  {
+    const pickedImages = rawImages.filter(img => img.imageData).map(img => {
+      const best = bestPerPage.get(img.pageNumber);
+      return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
+    });
+    const finalEntityCheckData = buildEntityCheckData(pickedImages);
+    try {
+      finalEntityReport = await runEntityConsistencyChecks(finalEntityCheckData, characters, {
+        checkCharacters: true,
+        checkObjects: true,
+        saveGrids: false
+      });
+      if (finalEntityReport?.tokenUsage && usageTracker) {
+        usageTracker('gemini_quality', {
+          input_tokens: finalEntityReport.tokenUsage.inputTokens || 0,
+          output_tokens: finalEntityReport.tokenUsage.outputTokens || 0
+        }, 'entity_consistency_final', finalEntityReport.tokenUsage.model || 'gemini-2.5-flash');
+      }
+      log.info(`✅ [UNIFIED PIPELINE] Step 4: Entity consistency: ${finalEntityReport.totalIssues} issues`);
+    } catch (entityErr) {
+      log.warn(`⚠️ [UNIFIED PIPELINE] Step 4: Entity consistency failed: ${entityErr.message}`);
+      finalEntityReport = currentEntityReport;
+    }
+  }
 
-    // Build page scores map for task prioritization
+  // =========================================================================
+  // Step 5: Character repair (on final picked images)
+  // =========================================================================
+  const charFixResults = new Map();
+  const charFixDetails = new Map();
+
+  if (finalEntityReport && finalEntityReport.totalIssues > 0) {
+    await updateProgress(68, 'Fixing character consistency...');
+    log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${finalEntityReport.totalIssues} entity issues)...`);
+
     const pageScores = new Map();
     for (const [pageNumber, best] of bestPerPage) {
       pageScores.set(pageNumber, best?.score ?? 100);
     }
 
-    const { tasks: fixTasks, dropped } = selectCharRepairTasks(entityReport, { pageScores });
+    const { tasks: fixTasks, dropped } = selectCharRepairTasks(finalEntityReport, { pageScores });
     log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
     if (dropped > 0) {
       log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}).`);
     }
 
-    // Group fix tasks by page — fixes within a page chain (each uses previous output),
-    // but different pages are independent and can run in parallel
     const fixesByPage = new Map();
     for (const task of fixTasks) {
       if (!fixesByPage.has(task.pageNumber)) {
@@ -5487,17 +5471,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       let currentImageData = best.imageData;
       let anyFixApplied = false;
 
-      // Fixes within a page must stay sequential (each uses previous output)
       for (const fix of pageFixes) {
-        // 3-tier bbox lookup (same as manual repair pipeline):
-        // 1. Scene bboxDetection from best version (refined Pass 2 data)
-        // 2. Entity report appearances
-        // 3. Fresh detection as fallback
         let faceBbox = null;
         let bodyBbox = null;
         const bestEval = best.evaluation;
 
-        // Tier 1: bboxDetection on the scene (from quality eval — has refined Pass 2 data)
+        // Tier 1: bboxDetection on the scene
         if (bestEval?.bboxDetection?.figures) {
           const figure = bestEval.bboxDetection.figures.find(f =>
             f.name?.toLowerCase() === fix.charName.toLowerCase() ||
@@ -5510,8 +5489,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
 
         // Tier 2: entity report appearances
-        if (!faceBbox && !bodyBbox && entityReport?.characters?.[fix.charName]?.byClothing) {
-          for (const clothingData of Object.values(entityReport.characters[fix.charName].byClothing)) {
+        if (!faceBbox && !bodyBbox && finalEntityReport?.characters?.[fix.charName]?.byClothing) {
+          for (const clothingData of Object.values(finalEntityReport.characters[fix.charName].byClothing)) {
             const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
             if (app?.faceBox) {
               faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
@@ -5523,7 +5502,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           }
         }
 
-        // Tier 3: quality eval matches (less reliable — may only have face_bbox)
+        // Tier 3: quality eval matches
         if (!faceBbox && !bodyBbox && bestEval?.matches) {
           const charMatch = bestEval.matches.find(m =>
             m.name?.toLowerCase() === fix.charName.toLowerCase() ||
@@ -5534,10 +5513,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
 
         if (!faceBbox && !bodyBbox) {
-          // Tier 4: fresh detection as last resort
+          // Tier 4: fresh detection
           log.info(`🔍 [UNIFIED PIPELINE] No stored bbox for ${fix.charName} on page ${pageNumber}, running fresh detection...`);
           try {
-            const character = characters.find(c => c.name === fix.charName);
             const detection = await detectAllBoundingBoxes(currentImageData, {
               expectedCharacters: [{ name: fix.charName }]
             });
@@ -5558,14 +5536,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           continue;
         }
 
-        // Get character avatar for repair
         const character = characters.find(c => c.name === fix.charName);
         if (!character) {
           log.warn(`⚠️ [UNIFIED PIPELINE] Character ${fix.charName} not found, skipping`);
           continue;
         }
 
-        // Get clothing for this page from rawImage data
         const rawImg = rawImages.find(img => img.pageNumber === pageNumber);
         const clothingCategory = rawImg?.perCharClothing?.[fix.charName] || 'standard';
         const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
@@ -5578,7 +5554,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
 
         try {
-          // Determine face-only vs full body repair from issue types (same logic as manual pipeline)
           const issueText = (fix.issueDescription || '').toLowerCase();
           const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
           const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
@@ -5586,7 +5561,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
           const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
-          // Collect face bboxes of OTHER characters from bbox detection (same source as repair target)
           const protectedFaces = [];
           const bboxFigures = bestEval?.bboxDetection?.figures || [];
           for (const fig of bboxFigures) {
@@ -5597,7 +5571,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             }
           }
 
-          // Get clothing and scene descriptions for the prompt
           const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
           const sceneDesc = rawImg?.sceneDescription || rawImg?.text || '';
 
@@ -5615,13 +5588,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           });
 
           if (repairResult?.imageData) {
-            // Basic quality gate: reject corrupt/empty repair results
             if (repairResult.imageData.length < 1000) {
               log.warn(`⚠️ [UNIFIED PIPELINE] Character fix for ${fix.charName} on page ${pageNumber} produced too-small image (${repairResult.imageData.length} chars), rejecting`);
               continue;
             }
 
-            // Track per-character before/after for entityRepairs visualization
             const beforeImageData = currentImageData;
             currentImageData = repairResult.imageData;
             anyFixApplied = true;
@@ -5665,7 +5636,60 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`✅ [UNIFIED PIPELINE] Step 5: No entity issues, skipping character fix`);
   }
 
-  await updateProgress(72, 'Finalizing repair results...');  // 72 = finalizing repair
+  // =========================================================================
+  // Step 6: Evaluate character-repaired pages
+  // =========================================================================
+  if (charFixResults.size > 0) {
+    await updateProgress(70, `Evaluating ${charFixResults.size} character-repaired pages...`);
+    log.info(`🔍 [UNIFIED PIPELINE] Step 6: Evaluating ${charFixResults.size} character-repaired pages...`);
+
+    const charFixEntries = [...charFixResults.entries()].map(([pageNumber, fix]) => ({
+      imageData: fix.imageData,
+      pageNumber,
+    }));
+
+    const charFixEvalInputs = buildEvalInputs(charFixEntries);
+    const charFixEvals = await evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+
+    for (const ev of charFixEvals) {
+      if (ev.usage && usageTracker) {
+        usageTracker('gemini_quality', ev.usage, 'unified_pipeline_charfix_eval', ev.modelId);
+      }
+      const versions = pageVersions.get(ev.pageNumber);
+      const fix = charFixResults.get(ev.pageNumber);
+      if (versions && fix) {
+        versions.push({
+          imageData: fix.imageData,
+          score: ev.score ?? ev.qualityScore ?? null,
+          source: 'character-fix',
+          evaluation: ev,
+          modelId: fix.modelId || null,
+          grokRefImages: null,
+        });
+        fix.afterScore = ev.score ?? ev.qualityScore ?? null;
+      }
+    }
+  }
+
+  // =========================================================================
+  // Step 7: Final pick best (including character repair versions)
+  // =========================================================================
+  await updateProgress(72, 'Selecting final best versions...');
+  log.info(`📊 [UNIFIED PIPELINE] Step 7: Final pick best (including character repair versions)...`);
+
+  const finalBestPerPage = new Map();
+  let finalUpgradedCount = 0;
+
+  for (const [pageNumber, versions] of pageVersions) {
+    const best = selectBestVersion(versions);
+    finalBestPerPage.set(pageNumber, best);
+    if (best.source !== 'original') {
+      finalUpgradedCount++;
+    }
+  }
+  log.info(`✅ [UNIFIED PIPELINE] Step 7: ${finalUpgradedCount} pages upgraded total`);
+
+  await updateProgress(73, 'Finalizing repair results...');
 
   // =========================================================================
   // Build final results
@@ -5675,21 +5699,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
-    const best = bestPerPage.get(pageNumber) || versions[0];
+    const best = finalBestPerPage.get(pageNumber) || versions[0];
     const charFix = charFixResults.get(pageNumber);
 
-    // Final image: character fix if available, otherwise best version
-    const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
+    // Final image: best version (which may be original, inpaint, iterate, or character-fix)
+    const finalImageData = best?.imageData || img.imageData;
     const finalEval = best?.evaluation;
 
-    // Build imageVersions array — ALL versions in chronological order.
-    // image_version_meta tracks which version_index is active.
+    // Build imageVersions array — ALL versions in chronological order
     const imageVersions = [];
     const buildVersionEntry = (v) => ({
       imageData: v.imageData,
       qualityScore: v.score,
       source: v.source,
-      type: v.source === 'original' ? 'original' : 'repair',
+      type: v.source === 'original' ? 'original' : (v.source === 'character-fix' ? 'entity-repair' : 'repair'),
       modelId: v.modelId,
       generatedAt: new Date().toISOString(),
       qualityReasoning: v.evaluation?.reasoning || null,
@@ -5698,27 +5721,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       description: img.sceneDescription || null,
       prompt: img.prompt || null,
       grokRefImages: v.grokRefImages || null,
+      inpaintInstruction: v.inpaintInstruction || null,
     });
-    // Versions in chronological order (original first, then redo attempts)
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));
-    }
-
-    // Add character fix as a version entry if it exists
-    if (charFix?.imageData) {
-      imageVersions.push({
-        imageData: charFix.imageData,
-        qualityScore: charFix.afterScore ?? charFix.score ?? null,
-        source: 'character-fix',
-        type: 'entity-repair',
-        modelId: charFix.modelId || null,
-        generatedAt: new Date().toISOString(),
-        qualityReasoning: null,
-        fixTargets: [],
-        bboxDetection: null,
-        description: img.sceneDescription || null,
-        prompt: null,
-      });
     }
 
     // Build retryHistory
@@ -5764,14 +5770,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       matches: finalEval?.matches || [],
       imageVersions,
       retryHistory,
-      entityReport: entityReport || null,
+      entityReport: finalEntityReport || null,
       wasRegenerated: best?.source !== 'original',
       wasCharacterFixed: !!charFix,
+      wasInpainted: best?.source?.startsWith('inpaint') || false,
       bestSource: best?.source || 'original'
     };
   });
 
-  log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${upgradedCount} upgraded, ${charFixResults.size} character-fixed`);
+  log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${finalUpgradedCount} upgraded, ${charFixResults.size} character-fixed`);
 
   // Convert charFixDetails Map to plain object for serialization
   const charFixDetailsObj = {};
@@ -11097,6 +11104,8 @@ module.exports = {
   // Unified repair pipeline
   selectBestVersion,
   runUnifiedRepairPipeline,
+  chooseRepairStrategy,
+  inpaintPage,
 
   // Categorized repair system (new)
   classifyIssues,

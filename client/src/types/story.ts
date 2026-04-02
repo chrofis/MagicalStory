@@ -950,7 +950,13 @@ export type RepairWorkflowStep =
   | 're-evaluate'
   | 'consistency-check'
   | 'character-repair'
-  | 'inpaint-repair';
+  | 'inpaint-repair'
+  | 'round-1'
+  | 'round-2'
+  | 'round-3'
+  | 'evaluate'
+  | 'pick-best'
+  | 'final-pick';
 
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
 
@@ -1082,4 +1088,10 @@ export interface RepairWorkflowState {
   }>;
   stepErrors: Partial<Record<RepairWorkflowStep, string>>;
   sessionId: string;
+  roundResults: {
+    [round: number]: {
+      actions: Record<number, 'inpaint' | 'iterate' | 'skip'>;
+      results: Record<number, { success: boolean; newScore?: number; previousScore?: number }>;
+    };
+  };
 }

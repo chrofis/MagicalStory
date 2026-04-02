@@ -66,6 +66,12 @@ const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.Compo
   'consistency-check': { label: 'Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
   'character-repair': { label: 'Character Repair', icon: Users, description: 'Fix character appearance issues' },
   'inpaint-repair': { label: 'Inpaint Repair', icon: Paintbrush, description: 'Fix specific image regions using Grok edit' },
+  'round-1': { label: 'Round 1', icon: Wrench, description: 'First repair pass: inpaint or iterate each bad page' },
+  'round-2': { label: 'Round 2', icon: Wrench, description: 'Second repair pass: alternate strategy from round 1' },
+  'round-3': { label: 'Round 3', icon: Wrench, description: 'Last chance: inpaint only' },
+  'evaluate': { label: 'Evaluate', icon: CheckCircle, description: 'Run quality evaluation on all pages' },
+  'pick-best': { label: 'Pick Best', icon: Trophy, description: 'Select the best version for each page across all attempts' },
+  'final-pick': { label: 'Final Pick', icon: Trophy, description: 'Final version selection including character repairs' },
 };
 
 // Status badge component
@@ -453,6 +459,8 @@ export function RepairWorkflowPanel({
         maxPasses: devMaxPasses,
         maxCharRepairPages: devMaxCharRepairPages,
         scoreThreshold: devScoreThreshold,
+        semanticThresholdForIterate: devSemanticThreshold,
+        qualityThresholdForIterate: devQualityThreshold,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });
         },
@@ -472,6 +480,8 @@ export function RepairWorkflowPanel({
   const [devMaxPasses, setDevMaxPasses] = useState<number>(REPAIR_DEFAULTS.maxPasses);
   const [devMaxCharRepairPages, setDevMaxCharRepairPages] = useState<number>(REPAIR_DEFAULTS.maxCharRepairPages);
   const [devScoreThreshold, setDevScoreThreshold] = useState<number>(REPAIR_DEFAULTS.scoreThreshold);
+  const [devSemanticThreshold, setDevSemanticThreshold] = useState<number>(REPAIR_DEFAULTS.semanticThresholdForIterate);
+  const [devQualityThreshold, setDevQualityThreshold] = useState<number>(REPAIR_DEFAULTS.qualityThresholdForIterate);
 
   // Selected character for repair
   const [selectedCharacter, setSelectedCharacter] = useState<string>('');
@@ -610,21 +620,33 @@ export function RepairWorkflowPanel({
                   className="w-12 px-1 py-0.5 border rounded text-center" min={0} max={100} />
               </label>
               <label className="flex items-center gap-1 text-gray-600">
-                Max passes
+                Max rounds
                 <input type="number" value={devMaxPasses} onChange={e => setDevMaxPasses(Number(e.target.value))}
                   className="w-10 px-1 py-0.5 border rounded text-center" min={1} max={10} />
               </label>
               <label className="flex items-center gap-1 text-gray-600">
-                Char repair pages
+                Char repair
                 <input type="number" value={devMaxCharRepairPages} onChange={e => setDevMaxCharRepairPages(Number(e.target.value))}
                   className="w-10 px-1 py-0.5 border rounded text-center" min={0} max={50} />
+              </label>
+              <label className="flex items-center gap-1 text-gray-600" title="Below this semantic score, iterate instead of inpaint">
+                Sem &lt;
+                <input type="number" value={devSemanticThreshold} onChange={e => setDevSemanticThreshold(Number(e.target.value))}
+                  className="w-12 px-1 py-0.5 border rounded text-center" min={0} max={100} />
+                = iterate
+              </label>
+              <label className="flex items-center gap-1 text-gray-600" title="Below this quality score, iterate instead of inpaint">
+                Qual &lt;
+                <input type="number" value={devQualityThreshold} onChange={e => setDevQualityThreshold(Number(e.target.value))}
+                  className="w-12 px-1 py-0.5 border rounded text-center" min={0} max={100} />
+                = iterate
               </label>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-bold text-indigo-800">Automated Full Repair</h4>
                 <p className="text-sm text-indigo-600">
-                  Runs all steps automatically. Pages retry up to {devMaxPasses} times, keeping the best result. Char repair: max {devMaxCharRepairPages} pages.
+                  Inpaint-first strategy: up to {devMaxPasses} rounds (inpaint cheap fixes, iterate broken scenes), then pick best, consistency check, character repair (max {devMaxCharRepairPages} pages), final pick.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -676,6 +698,44 @@ export function RepairWorkflowPanel({
                   <Square className="w-4 h-4" />
                   <span className="font-medium">Workflow stopped</span>
                 </div>
+              </div>
+            )}
+
+            {/* Round results summary */}
+            {Object.keys(workflowState.roundResults).length > 0 && (
+              <div className="mt-3 space-y-2">
+                {Object.entries(workflowState.roundResults)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([roundStr, roundData]) => {
+                    const round = Number(roundStr);
+                    const actions = roundData.actions;
+                    const results = roundData.results;
+                    const inpaintPages = Object.entries(actions).filter(([, a]) => a === 'inpaint').map(([p]) => Number(p));
+                    const iteratePages = Object.entries(actions).filter(([, a]) => a === 'iterate').map(([p]) => Number(p));
+                    const successCount = Object.values(results).filter(r => r.success).length;
+                    const totalCount = Object.keys(results).length;
+                    return (
+                      <div key={round} className="p-2 bg-white/70 rounded border border-gray-200 text-xs">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-indigo-800">Round {round}</span>
+                          <span className="text-gray-500">{successCount}/{totalCount} succeeded</span>
+                          <StepStatusBadge status={workflowState.stepStatus[`round-${round}` as RepairWorkflowStep] || 'pending'} />
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {inpaintPages.length > 0 && (
+                            <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">
+                              Inpaint: {inpaintPages.map(p => getPageName(p)).join(', ')}
+                            </span>
+                          )}
+                          {iteratePages.length > 0 && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                              Iterate: {iteratePages.map(p => getPageName(p)).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>

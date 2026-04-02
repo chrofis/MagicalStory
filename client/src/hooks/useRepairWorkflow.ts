@@ -61,6 +61,12 @@ function createInitialState(): RepairWorkflowState {
       'consistency-check': 'pending',
       'character-repair': 'pending',
       'inpaint-repair': 'pending',
+      'round-1': 'pending',
+      'round-2': 'pending',
+      'round-3': 'pending',
+      'evaluate': 'pending',
+      'pick-best': 'pending',
+      'final-pick': 'pending',
     },
     collectedFeedback: {
       pages: {},
@@ -87,10 +93,11 @@ function createInitialState(): RepairWorkflowState {
     inpaintResults: {},
     stepErrors: {},
     sessionId: `repair-${Date.now()}`,
+    roundResults: {},
   };
 }
 
-// Step order for progression
+// Step order for progression (includes both manual and automated steps)
 const STEP_ORDER: RepairWorkflowStep[] = [
   'idle',
   'collect-feedback',
@@ -100,6 +107,12 @@ const STEP_ORDER: RepairWorkflowStep[] = [
   'consistency-check',
   'character-repair',
   'inpaint-repair',
+  'round-1',
+  'round-2',
+  'round-3',
+  'evaluate',
+  'pick-best',
+  'final-pick',
 ];
 
 export interface UseRepairWorkflowProps {
@@ -174,6 +187,8 @@ export interface UseRepairWorkflowReturn {
     maxPasses?: number;
     maxCharRepairPages?: number;
     scoreThreshold?: number;
+    semanticThresholdForIterate?: number;
+    qualityThresholdForIterate?: number;
     onProgress?: (step: string, detail: string) => void;
   }) => Promise<void>;
 
@@ -1083,17 +1098,55 @@ export function useRepairWorkflow({
     return Array.from(severePages).sort((a, b) => a - b);
   }, [workflowState.consistencyResults.report]);
 
-  // Full automated workflow - global passes instead of per-page retries
-  // Each pass: evaluate ALL → redo ALL bad → re-evaluate ALL
+  // Frontend-side chooseRepairStrategy — mirrors server/lib/images.js chooseRepairStrategy()
+  const chooseRepairStrategy = useCallback((
+    evaluation: { semanticScore?: number | null; qualityScore?: number; fixableIssues?: unknown[]; fixTargets?: unknown[] },
+    round: number,
+    previousAction: 'inpaint' | 'iterate' | null,
+    opts: { semanticThresholdForIterate: number; qualityThresholdForIterate: number },
+  ): 'inpaint' | 'iterate' => {
+    // Round 3+: inpaint only (last chance, cheap)
+    if (round >= 3) return 'inpaint';
+
+    // Fundamentally broken: iterate
+    if (evaluation.semanticScore != null && evaluation.semanticScore < opts.semanticThresholdForIterate) return 'iterate';
+    if ((evaluation.qualityScore ?? 100) < opts.qualityThresholdForIterate) return 'iterate';
+
+    // Round 2: alternate strategy from round 1
+    if (round === 2 && previousAction) {
+      const hasFixable = (evaluation.fixableIssues?.length ?? 0) > 0 || (evaluation.fixTargets?.length ?? 0) > 0;
+      if (previousAction === 'iterate' && hasFixable) return 'inpaint';
+      if (previousAction === 'inpaint') return 'iterate';
+    }
+
+    // Has specific fixable issues -> inpaint
+    const hasFixableContent = (evaluation.fixableIssues?.length ?? 0) > 0 || (evaluation.fixTargets?.length ?? 0) > 0;
+    if (hasFixableContent) return 'inpaint';
+
+    // No specific issues but bad score -> iterate
+    return 'iterate';
+  }, []);
+
+  // Full automated workflow — inpaint-first strategy with rounds
+  // Pipeline: collect-feedback → rounds 1-3 (inpaint/iterate) → pick-best → consistency → character-repair → evaluate → final-pick
   const runFullWorkflow = useCallback(async (options: {
     maxPasses?: number;
     maxCharRepairPages?: number;
     scoreThreshold?: number;
+    semanticThresholdForIterate?: number;
+    qualityThresholdForIterate?: number;
     onProgress?: (step: string, detail: string) => void;
   } = {}) => {
     if (!storyId) return;
 
-    const { maxPasses = REPAIR_DEFAULTS.maxPasses, maxCharRepairPages, scoreThreshold, onProgress } = options;
+    const {
+      maxPasses = REPAIR_DEFAULTS.maxPasses,
+      maxCharRepairPages,
+      scoreThreshold,
+      semanticThresholdForIterate = REPAIR_DEFAULTS.semanticThresholdForIterate,
+      qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate,
+      onProgress,
+    } = options;
 
     // Create abort controller for this workflow run
     abortControllerRef.current = new AbortController();
@@ -1125,106 +1178,169 @@ export function useRepairWorkflow({
       onProgress?.('collect-feedback', 'Collecting existing issues...');
       await collectFeedback();
 
-      const allRedonePagesAcrossPasses: Set<number> = new Set();
+      const allChangedPages: Set<number> = new Set();
 
-      // === Global passes ===
-      for (let pass = 1; pass <= maxPasses; pass++) {
-        // On pass 2+, run entity consistency first (images changed in previous pass)
-        if (pass >= 2) {
-          checkAborted();
-          onProgress?.('consistency-check', `Pass ${pass}: Running entity consistency...`);
-          startStep('consistency-check');
-          const consistencyResult = await storyService.runEntityConsistency(storyId);
-          const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
+      // Track previous round actions per page (for chooseRepairStrategy alternation)
+      const pageRoundActions: Map<number, ('inpaint' | 'iterate')[]> = new Map();
+
+      // === Round-based repair loop ===
+      for (let round = 1; round <= maxPasses; round++) {
+        const roundStepName = `round-${round}` as RepairWorkflowStep;
+
+        // Evaluate ALL pages (quality + semantic + entity penalties)
+        checkAborted();
+        onProgress?.('evaluate', `Round ${round}/${maxPasses}: Evaluating all pages...`);
+        startStep('evaluate');
+        const evalResult = await reEvaluatePages(allEvalNumbers, scoreThreshold);
+        completeStep('evaluate');
+
+        // Identify bad pages from evaluation
+        const pagesToRepair = evalResult?.badPages ?? [];
+
+        if (pagesToRepair.length === 0) {
+          console.log(`[RepairWorkflow] Round ${round}: No bad pages, stopping early`);
           setWorkflowState(prev => ({
             ...prev,
-            consistencyResults: { report: consistencyReport },
-            stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
+            stepStatus: { ...prev.stepStatus, [roundStepName]: 'skipped' },
           }));
-        }
-
-        // Re-evaluate ALL pages (quality + semantic + entity penalties)
-        // Pass 1: entity data from generation. Pass 2+: freshly updated entity data.
-        checkAborted();
-        onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-        const evalResult = await reEvaluatePages(allEvalNumbers, scoreThreshold);
-
-        // 3. Identify bad pages (server computes these using shared findBadPages)
-        checkAborted();
-        onProgress?.('identify-redo-pages', `Pass ${pass}: Identifying pages needing redo...`);
-        const pagesToRedo = evalResult?.badPages ?? [];
-
-        setWorkflowState(prev => ({
-          ...prev,
-          redoPages: { pageNumbers: pagesToRedo, reasons: {} },
-          stepStatus: { ...prev.stepStatus, 'identify-redo-pages': 'completed' },
-        }));
-
-        // 4. If no bad pages, we're done with passes
-        if (pagesToRedo.length === 0) {
-          console.log(`[RepairWorkflow] Pass ${pass}: No bad pages, stopping early`);
           break;
         }
 
-        // 5. Redo ALL bad pages (batched with concurrency limit)
+        // Start the round step
         checkAborted();
-        onProgress?.('redo-pages', `Pass ${pass}: Redoing ${pagesToRedo.length} pages (${IMAGE_CONCURRENCY} at a time)...`);
-        startStep('redo-pages');
+        onProgress?.(roundStepName, `Round ${round}: Repairing ${pagesToRepair.length} pages...`);
+        startStep(roundStepName);
 
-        let redoCompleted = 0;
-        const redoLimit = pLimit(IMAGE_CONCURRENCY);
+        const roundActions: Record<number, 'inpaint' | 'iterate' | 'skip'> = {};
+        const roundResults: Record<number, { success: boolean; newScore?: number; previousScore?: number }> = {};
 
-        await Promise.all(pagesToRedo.map((pageNumber) => redoLimit(async () => {
+        let roundCompleted = 0;
+        const roundLimit = pLimit(IMAGE_CONCURRENCY);
+        setRedoProgress({ current: 0, total: pagesToRepair.length, currentPage: undefined });
+
+        await Promise.all(pagesToRepair.map((pageNumber) => roundLimit(async () => {
           checkAborted();
-          onProgress?.('redo-pages', `Pass ${pass}: ${pageNumber < 0 ? 'Cover' : 'Page ' + pageNumber} (${redoCompleted + 1}/${pagesToRedo.length})`);
-          setRedoProgress({ current: redoCompleted, total: pagesToRedo.length, currentPage: pageNumber });
+
+          const pageEval = evalResult?.evalPages?.[pageNumber];
+          const previousActions = pageRoundActions.get(pageNumber) || [];
+          const previousAction = previousActions.length > 0 ? previousActions[previousActions.length - 1] : null;
+
+          // Choose repair strategy (same logic as server)
+          const strategy = chooseRepairStrategy(
+            {
+              semanticScore: pageEval?.semanticScore,
+              qualityScore: pageEval?.qualityScore,
+              fixableIssues: pageEval?.fixableIssues as unknown[] | undefined,
+              fixTargets: pageEval?.fixTargets as unknown[] | undefined,
+            },
+            round,
+            previousAction,
+            { semanticThresholdForIterate, qualityThresholdForIterate },
+          );
+
+          roundActions[pageNumber] = strategy;
+          const previousScore = pageEval?.score ?? pageEval?.qualityScore ?? null;
+
+          onProgress?.(roundStepName, `Round ${round}: ${strategy === 'inpaint' ? 'Inpainting' : 'Iterating'} ${pageNumber < 0 ? 'Cover' : 'Page ' + pageNumber} (${roundCompleted + 1}/${pagesToRepair.length})`);
+          setRedoProgress({ current: roundCompleted, total: pagesToRepair.length, currentPage: pageNumber });
 
           try {
-            // Build evaluation feedback so the iterate endpoint knows what to fix
-            const pageEval = evalResult?.evalPages?.[pageNumber];
-            const evalFeedback = pageEval ? {
-              score: pageEval.score ?? pageEval.qualityScore,
-              reasoning: pageEval.reasoning,
-              fixableIssues: pageEval.fixableIssues as Array<{ description?: string; issue?: string }>,
-            } : undefined;
-            const result: any = await redoCoverOrPage(pageNumber, evalFeedback);
-            if (result?.success) {
-              allRedonePagesAcrossPasses.add(pageNumber);
-              if (!signal.aborted) {
-                const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-                const newVersionIndex = (scene?.imageVersions?.length ?? 0);
-                onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
-                  description: result.sceneDescription,
-                  prompt: result.imagePrompt,
-                  qualityScore: result.qualityScore,
-                  qualityReasoning: result.qualityReasoning,
-                  modelId: result.modelId,
-                  totalAttempts: result.totalAttempts,
-                  type: 'repair',
-                });
+            if (strategy === 'inpaint') {
+              // Inpaint: use fix targets from the most recent evaluation
+              const fixTargets = pageEval?.fixTargets;
+              const result = await storyService.repairImage(storyId, pageNumber, fixTargets);
+              if (result?.repaired && result.imageData) {
+                allChangedPages.add(pageNumber);
+                if (!signal.aborted && onImageUpdate) {
+                  onImageUpdate(pageNumber, result.imageData, 0, { type: 'inpaint-repair' });
+                }
+                roundResults[pageNumber] = { success: true, previousScore: previousScore ?? undefined };
+              } else {
+                roundResults[pageNumber] = { success: false, previousScore: previousScore ?? undefined };
+              }
+            } else {
+              // Iterate: full re-expansion + regen
+              const evalFeedback = pageEval ? {
+                score: pageEval.score ?? pageEval.qualityScore,
+                reasoning: pageEval.reasoning,
+                fixableIssues: pageEval.fixableIssues as Array<{ description?: string; issue?: string }>,
+              } : undefined;
+              const result: any = await redoCoverOrPage(pageNumber, evalFeedback);
+              if (result?.success) {
+                allChangedPages.add(pageNumber);
+                if (!signal.aborted) {
+                  const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+                  const newVersionIndex = (scene?.imageVersions?.length ?? 0);
+                  onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
+                    description: result.sceneDescription,
+                    prompt: result.imagePrompt,
+                    qualityScore: result.qualityScore,
+                    qualityReasoning: result.qualityReasoning,
+                    modelId: result.modelId,
+                    totalAttempts: result.totalAttempts,
+                    type: 'repair',
+                  });
+                }
+                roundResults[pageNumber] = { success: true, newScore: result.qualityScore ?? undefined, previousScore: previousScore ?? undefined };
+              } else {
+                roundResults[pageNumber] = { success: false, previousScore: previousScore ?? undefined };
               }
             }
+
+            // Track action for strategy alternation in next round
+            const actions = pageRoundActions.get(pageNumber) || [];
+            actions.push(strategy);
+            pageRoundActions.set(pageNumber, actions);
           } catch (err) {
-            console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo ${pageNumber < 0 ? 'cover' : 'page'} ${pageNumber}:`, err);
+            console.error(`[RepairWorkflow] Round ${round}: Failed ${strategy} on ${pageNumber < 0 ? 'cover' : 'page'} ${pageNumber}:`, err);
+            roundResults[pageNumber] = { success: false, previousScore: previousScore ?? undefined };
           }
 
-          redoCompleted++;
+          roundCompleted++;
+          setRedoProgress({ current: roundCompleted, total: pagesToRepair.length, currentPage: undefined });
         })));
 
+        // Store round results in state
         setWorkflowState(prev => ({
           ...prev,
+          roundResults: {
+            ...prev.roundResults,
+            [round]: { actions: roundActions, results: roundResults },
+          },
           redoResults: {
-            pagesCompleted: Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b),
+            pagesCompleted: Array.from(allChangedPages).sort((a, b) => a - b),
             newVersions: {},
             pageDetails: {},
           },
-          stepStatus: { ...prev.stepStatus, 'redo-pages': 'completed' },
+          stepStatus: { ...prev.stepStatus, [roundStepName]: 'completed' },
         }));
+
+        const inpaintCount = Object.values(roundActions).filter(a => a === 'inpaint').length;
+        const iterateCount = Object.values(roundActions).filter(a => a === 'iterate').length;
+        console.log(`[RepairWorkflow] Round ${round} complete: ${inpaintCount} inpainted, ${iterateCount} iterated out of ${pagesToRepair.length} pages`);
       }
 
-      // === Final steps: consistency → evaluate → character repair → pick best ===
+      // === Post-round steps ===
 
-      // Final entity consistency check (against latest images)
+      // Pick best versions (across all attempts from rounds)
+      const changedPagesArray = Array.from(allChangedPages).sort((a, b) => a - b);
+      if (changedPagesArray.length > 0) {
+        checkAborted();
+        onProgress?.('pick-best', 'Picking best versions...');
+        startStep('pick-best');
+        try {
+          const pickResult = await storyService.pickBestVersions(storyId, changedPagesArray);
+          const switched = Object.values(pickResult.results).filter(r => r.switched).length;
+          console.log(`[RepairWorkflow] Pick-best: ${switched}/${changedPagesArray.length} pages switched to better version`);
+        } catch (err) {
+          console.error('[RepairWorkflow] Pick-best failed:', err);
+        }
+        completeStep('pick-best');
+      } else {
+        skipStep('pick-best');
+      }
+
+      // Entity consistency check (on picked images)
       checkAborted();
       onProgress?.('consistency-check', 'Final consistency check...');
       startStep('consistency-check');
@@ -1236,13 +1352,7 @@ export function useRepairWorkflow({
         stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
       }));
 
-      // Final re-evaluate ALL (with fresh entity data)
-      checkAborted();
-      onProgress?.('re-evaluate', 'Final evaluation of all pages...');
-      await reEvaluatePages(allEvalNumbers);
-
-      // Character repair (before pick-best so repair versions are also considered)
-      // Server handles task selection via autoSelect (shared selectCharRepairTasks logic)
+      // Character repair (on final picked images)
       checkAborted();
       onProgress?.('character-repair', 'Auto-selecting and repairing characters...');
       startStep('character-repair');
@@ -1302,11 +1412,11 @@ export function useRepairWorkflow({
           }));
         }
 
-        // Add character-repaired pages to allRedonePagesAcrossPasses so pick-best considers them
+        // Track character-repaired pages so final pick considers them
         for (const charResult of (repairResult.results || [])) {
           for (const repair of (charResult.pagesRepaired || [])) {
             const pn = typeof repair === 'number' ? repair : repair.pageNumber;
-            if (pn != null) allRedonePagesAcrossPasses.add(pn);
+            if (pn != null) allChangedPages.add(pn);
           }
         }
 
@@ -1322,32 +1432,37 @@ export function useRepairWorkflow({
         }));
       }
 
-      // Re-evaluate character-repaired pages so pick-best has scores to compare
-      const charRepairedPages = Array.from(allRedonePagesAcrossPasses);
+      // Evaluate character-repaired pages so final-pick has scores to compare
+      const charRepairedPages = Array.from(allChangedPages);
       if (charRepairedPages.length > 0) {
         checkAborted();
-        onProgress?.('re-evaluate', 'Re-evaluating repaired pages...');
+        onProgress?.('evaluate', 'Evaluating character-repaired pages...');
+        startStep('evaluate');
         try {
           await reEvaluatePages(charRepairedPages);
-          console.log(`[RepairWorkflow] Post-repair re-evaluation complete for ${charRepairedPages.length} pages`);
+          console.log(`[RepairWorkflow] Post-repair evaluation complete for ${charRepairedPages.length} pages`);
         } catch (err) {
-          console.warn('[RepairWorkflow] Post-repair re-evaluation failed:', err);
+          console.warn('[RepairWorkflow] Post-repair evaluation failed:', err);
         }
+        completeStep('evaluate');
       }
 
-      // Pick best versions last (considers all versions including character repairs)
-      const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
-      const pickBestPages = redonePagesArray;
-      if (pickBestPages.length > 0) {
+      // Final pick best (including character repair versions)
+      const finalPickPages = Array.from(allChangedPages).sort((a, b) => a - b);
+      if (finalPickPages.length > 0) {
         checkAborted();
-        onProgress?.('redo-pages', 'Picking best versions...');
+        onProgress?.('final-pick', 'Final pick best versions...');
+        startStep('final-pick');
         try {
-          const pickResult = await storyService.pickBestVersions(storyId, pickBestPages);
+          const pickResult = await storyService.pickBestVersions(storyId, finalPickPages);
           const switched = Object.values(pickResult.results).filter(r => r.switched).length;
-          console.log(`[RepairWorkflow] Pick-best: ${switched}/${pickBestPages.length} pages switched to better version`);
+          console.log(`[RepairWorkflow] Final pick-best: ${switched}/${finalPickPages.length} pages switched to better version`);
         } catch (err) {
-          console.error('[RepairWorkflow] Pick-best failed:', err);
+          console.error('[RepairWorkflow] Final pick-best failed:', err);
         }
+        completeStep('final-pick');
+      } else {
+        skipStep('final-pick');
       }
 
       onProgress?.('complete', 'Workflow complete!');
@@ -1364,7 +1479,7 @@ export function useRepairWorkflow({
     }
   }, [
     storyId, sceneImages, coverImages, imageModel, onImageUpdate,
-    collectFeedback, reEvaluatePages, startStep, setRedoProgress, redoCoverOrPage,
+    collectFeedback, reEvaluatePages, startStep, completeStep, skipStep, setRedoProgress, redoCoverOrPage, chooseRepairStrategy,
   ]);
 
   return {
