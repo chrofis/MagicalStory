@@ -1085,7 +1085,8 @@ export default function StoryWizard() {
                   if (typeof current === 'object' && current !== null) {
                     next[key] = { ...current, imageData: cover!.imageData } as typeof current;
                   } else {
-                    next[key] = cover!.imageData as any;
+                    // Ensure cover is always an object with imageData property (not a raw string)
+                    next[key] = { imageData: cover!.imageData } as any;
                   }
                 }
                 return next;
