@@ -6,6 +6,7 @@ IMAGE 2: AI-generated avatar based on that person
 TASK 1: FACE MATCH EVALUATION
 Compare facial features between IMAGE 1 and IMAGE 2. Score each feature 1-10 (10 = perfect match).
 IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
+GLASSES CHECK: If reference person wears glasses, avatar MUST have glasses (score 0 for glasses if missing). If no glasses in reference, avatar must NOT have glasses (score 0 if added). Glasses are a critical identity feature.
 
 TASK 2: PHYSICAL TRAITS EXTRACTION (from IMAGE 2 - the generated avatar)
 Extract the person's physical characteristics as shown in the GENERATED AVATAR.
@@ -42,6 +43,7 @@ Return a JSON object with this EXACT structure:
     "nose": {"score": 7, "reason": "Slightly different bridge"},
     "mouth": {"score": 8, "reason": "Lip shape matches"},
     "overallStructure": {"score": 8, "reason": "Proportions match"},
+    "glasses": {"score": 10, "reason": "Both have no glasses / Both have matching glasses"},
     "finalScore": 8
   },
   "ageCheck": {
@@ -64,7 +66,8 @@ Return a JSON object with this EXACT structure:
     "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
     "face": "<brief description of face shape, distinguishing features>",
-    "other": "<glasses, scars, moles, freckles, piercings, or 'none'>"
+    "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses'). Use 'none' if no glasses>",
+    "other": "<scars, moles, freckles, piercings, birthmarks, or 'none'>"
   },
   "clothing": {
     "upperBody": "<e.g. 'red t-shirt', 'blue sweater' - OR null if fullBody is set>",
