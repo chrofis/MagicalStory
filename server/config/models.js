@@ -214,7 +214,7 @@ const IMAGE_MODELS = {
 
 // Repair workflow thresholds — single source of truth for server-side pipeline
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 90,       // Pages scoring below this need redo (0-100)
+  scoreThreshold: 80,       // Pages scoring below this need redo (0-100)
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: 3,             // Global passes over all pages
   maxCharRepairPages: 3,    // Max pages to character-repair per run
