@@ -296,7 +296,7 @@ export default function SharedStoryViewer() {
       setTimeout(() => {
         setCurrentPage(page);
         setPageTransition('none');
-      }, 250);
+      }, 350);
     }
   }, [totalPages, currentPage]);
 
@@ -449,10 +449,22 @@ export default function SharedStoryViewer() {
         </button>
 
         {/* Book container with page turn animation */}
-        <div className={`bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl transition-all duration-300 ease-in-out ${
-          pageTransition === 'slide-left' ? 'opacity-0 translate-x-[-40px]' :
-          pageTransition === 'slide-right' ? 'opacity-0 translate-x-[40px]' : 'opacity-100 translate-x-0'
-        }`}>
+        <div
+          className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl"
+          style={{
+            perspective: '1200px',
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          <div
+            style={{
+              transition: 'transform 0.4s ease-in-out, opacity 0.4s ease-in-out',
+              transformOrigin: pageTransition === 'slide-left' ? 'left center' : 'right center',
+              transform: pageTransition === 'slide-left' ? 'rotateY(-90deg)' :
+                         pageTransition === 'slide-right' ? 'rotateY(90deg)' : 'rotateY(0deg)',
+              opacity: pageTransition !== 'none' ? 0 : 1,
+            }}
+          >
           {/* Cover pages (frontCover, initialPage, backCover) */}
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div
@@ -483,9 +495,6 @@ export default function SharedStoryViewer() {
                     <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
                       {page.text}
                     </p>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
-                    {currentEntry.storyPageIdx + 1} / {story.pages.length}
                   </div>
                 </div>
                 {/* Image — right on desktop, top on mobile */}
@@ -564,32 +573,13 @@ export default function SharedStoryViewer() {
           })()}
 
 
-          {/* Page dots - inside book container */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
-            {Array.from({ length: Math.min(totalPages, 12) }).map((_, i) => {
-              const pageIndex = totalPages <= 12 ? i :
-                i < 5 ? i :
-                i === 5 ? -1 :
-                totalPages - (11 - i);
-
-              if (pageIndex === -1) {
-                return <span key={i} className="text-indigo-300 text-xs">...</span>;
-              }
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => goToPage(pageIndex)}
-                  className={`w-2.5 h-2.5 rounded-full transition-all ${
-                    currentPage === pageIndex
-                      ? 'bg-indigo-500 scale-125'
-                      : 'bg-indigo-200 hover:bg-indigo-300'
-                  }`}
-                  aria-label={`Go to page ${pageIndex}`}
-                />
-              );
-            })}
+          {/* Page counter - inside book container */}
+          <div className="flex items-center justify-center py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
+            <span className="text-indigo-400 text-sm font-medium">
+              {currentPage + 1} / {totalPages}
+            </span>
           </div>
+          </div>{/* close inner animated div */}
         </div>
 
         {/* Right arrow - desktop only */}
