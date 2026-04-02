@@ -164,6 +164,27 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     images = [`data:image/jpeg;base64,${finalBuf.toString('base64')}`];
   }
 
+  // Grok edit output matches input aspect ratio (ignores aspect_ratio param).
+  // Pad all input images to square so output is always 1:1.
+  for (let i = 0; i < images.length; i++) {
+    try {
+      const base64 = images[i].replace(/^data:image\/\w+;base64,/, '');
+      const buf = Buffer.from(base64, 'base64');
+      const meta = await sharp(buf).metadata();
+      if (meta.width && meta.height && meta.width !== meta.height) {
+        const size = Math.max(meta.width, meta.height);
+        const padded = await sharp(buf)
+          .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        images[i] = `data:image/jpeg;base64,${padded.toString('base64')}`;
+        log.debug(`🎨 [GROK] Padded edit image ${i} from ${meta.width}x${meta.height} → ${size}x${size}`);
+      }
+    } catch (padErr) {
+      log.warn(`⚠️ [GROK] Failed to pad edit image ${i}: ${padErr.message}`);
+    }
+  }
+
   log.info(`🎨 [GROK] Starting edit (model: ${model}, refs: ${images.length}, aspect: ${aspectRatio})`);
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
