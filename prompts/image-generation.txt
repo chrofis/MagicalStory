@@ -1,6 +1,4 @@
-**ART STYLE:** {STYLE_DESCRIPTION}
-
-Generate a SINGLE illustration in the art style above. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks to the image.
+Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks.
 
 {CHARACTER_REFERENCE_LIST}
 
@@ -12,5 +10,10 @@ Generate a SINGLE illustration in the art style above. No split screen, no panel
 - Characters face TOWARD what they interact with. Eyes look at objects or other characters, NOT at the camera.
 - If a landmark, building, or object is in the BACKGROUND, characters must face AWAY from the camera toward it — we see their backs or sides as they look at it.
 - Each character must be DOING something specific (reaching, looking at, holding, walking toward). No static posing.
+- Foreground characters must be LARGER than background characters. Use size difference to show depth and perspective.
 
 {REQUIRED_OBJECTS}
+
+**ART STYLE:** {STYLE_DESCRIPTION}
+
+**REMINDER:** Absolutely NO text, letters, words, labels, or watermarks anywhere in the image.

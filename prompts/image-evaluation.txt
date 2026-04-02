@@ -30,6 +30,7 @@ Match each figure to reference photos:
 - HEIGHT order correct? Taller characters should be taller (MAJOR if reversed)
 - Hair match? Color and style
 - CLOTHING match? Colors, type, and style MUST match reference (MAJOR if wrong)
+- GLASSES: If character wears glasses in reference → MUST wear glasses in image (MAJOR if missing). If no glasses in reference → must NOT wear glasses (MAJOR if added).
 
 Check for DUPLICATES: Two figures matching same reference = CRITICAL error
 Check for AGE SWAP: Child looking like adult or vice versa = MAJOR error
@@ -68,7 +69,7 @@ FACES:
 - Expression appropriate for scene
 
 Note: Hidden/occluded parts are OK - only flag VISIBLE errors.
-Note: Minor finger issues are acceptable - only flag severe cases (fused fingers, missing hands).
+Note: Flag hands with 6+ fingers, fused/melted fingers, or missing hands as MAJOR.
 
 ---
 

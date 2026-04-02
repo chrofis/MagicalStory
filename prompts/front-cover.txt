@@ -1,9 +1,9 @@
 Create a front cover illustration for a children's book.
 
-{CHARACTER_REFERENCE_LIST}
-
 **SCENE:**
 {TITLE_PAGE_SCENE}
+
+{CHARACTER_REFERENCE_LIST}
 
 **ART STYLE (secondary):** {STYLE_DESCRIPTION}
 

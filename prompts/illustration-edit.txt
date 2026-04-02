@@ -1,2 +1,7 @@
 Edit this children's storybook illustration: {EDIT_INSTRUCTION}
-Maintain the same artistic style and character appearances.
+
+Change ONLY what is described above. Keep everything else identical.
+- Maintain the same artistic style, lighting, and color palette.
+- Keep all character faces, proportions, and positions unchanged unless specifically asked.
+- Do not add any text, labels, or watermarks.
+- Do not crop or resize the image.
