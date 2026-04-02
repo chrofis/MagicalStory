@@ -1,0 +1,55 @@
+{
+  "model": "claude-haiku",
+  "modelId": "claude-haiku-4-5-20251001",
+  "promptType": "expansion",
+  "elapsed": 6376,
+  "usage": {
+    "input_tokens": 5811,
+    "output_tokens": 590
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {},
+      "imageSummary": "Lukas stands motionless with his back pressed against the broad linden tree, a bright red apple balanced on his head, his gaze fixed straight ahead. The marketplace stretches empty before him, with the crowd blurred in the distant background.",
+      "setting": {
+        "location": "Linde auf dem Marktplatz [LOC002]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "Medieval marketplace with grey-brown cobblestones, broad old linden tree with dark furrowed bark and autumn-yellow foliage at the right edge. Empty plaza stretches across, townspeople gathered in soft focus far behind. Morning light, overcast sky.",
+        "lighting": "Overcast morning light, soft and diffused",
+        "weather": "cloudy",
+        "weatherVisibility": "directly on scene",
+        "camera": "Close-up, slightly from below eye level",
+        "depthLayers": "Lukas large center foreground against tree trunk, empty cobblestone plaza stretches back, crowd tiny and blurred far background"
+      },
+      "characters": [
+        {
+          "name": "Lukas",
+          "position": "center",
+          "action": "Standing motionless with back against tree, staring straight ahead",
+          "expression": "Focused, unnaturally still, holding breath",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "ART003",
+          "name": "Apfel auf Lukas' Kopf",
+          "position": "balanced on Lukas's head, bright red"
+        },
+        {
+          "id": "LOC002",
+          "name": "Linde auf dem Marktplatz",
+          "position": "right, broad dark trunk with moss at base"
+        }
+      ],
+      "translatedSummary": "Lukas steht völlig reglos mit dem Rücken an die breite Linde gedrückt, ein leuchtend roter Apfel balanciert auf seinem Kopf, sein Blick starrt geradeaus. Der Marktplatz erstreckt sich leer vor ihm, die Menschenmenge verwischt im fernen Hintergrund."
+    }
+  },
+  "rawText": "```json\n{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Lukas stands motionless with his back pressed against the broad linden tree, a bright red apple balanced on his head, his gaze fixed straight ahead. The marketplace stretches empty before him, with the crowd blurred in the distant background.\",\n    \"setting\": {\n      \"location\": \"Linde auf dem Marktplatz [LOC002]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"Medieval marketplace with grey-brown cobblestones, broad old linden tree with dark furrowed bark and autumn-yellow foliage at the right edge. Empty plaza stretches across, townspeople gathered in soft focus far behind. Morning light, overcast sky.\",\n      \"lighting\": \"Overcast morning light, soft and diffused\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Close-up, slightly from below eye level\",\n      \"depthLayers\": \"Lukas large center foreground against tree trunk, empty cobblestone plaza stretches back, crowd tiny and blurred far background\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"center\",\n        \"action\": \"Standing motionless with back against tree, staring straight ahead\",\n        \"expression\": \"Focused, unnaturally still, holding breath\",\n        \"holding\": {\"leftHand\": \"empty\", \"rightHand\": \"empty\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\"id\": \"ART003\", \"name\": \"Apfel auf Lukas' Kopf\", \"position\": \"balanced on Lukas's head, bright red\"},\n      {\"id\": \"LOC002\", \"name\": \"Linde auf dem Marktplatz\", \"position\": \"right, broad dark trunk with moss at base\"}\n    ],\n    \"translatedSummary\": \"Lukas steht völlig reglos mit dem Rücken an die breite Linde gedrückt, ein leuchtend roter Apfel balanciert auf seinem Kopf, sein Blick starrt geradeaus. Der Marktplatz erstreckt sich leer vor ihm, die Menschenmenge verwischt im fernen Hintergrund.\"\n  }\n}\n```",
+  "error": null
+}

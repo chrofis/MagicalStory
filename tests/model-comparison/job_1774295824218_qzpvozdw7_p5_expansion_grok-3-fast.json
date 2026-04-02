@@ -1,0 +1,13 @@
+{
+  "model": "grok-3-fast",
+  "modelId": "grok-3-fast",
+  "promptType": "expansion",
+  "elapsed": 5925,
+  "usage": {
+    "input_tokens": 4753,
+    "output_tokens": 355
+  },
+  "parsed": null,
+  "rawText": "{{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Lukas stands against a wide linden tree, a red apple balanced on his head, staring straight ahead.\",\n    \"setting\": {\n      \"location\": \"Linde auf dem Marktplatz [LOC002]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"Empty cobblestone area in front of a broad linden tree with rough bark, blurred crowd of townspeople in medieval clothing in the far background\",\n      \"lighting\": \"Morning light, soft and diffused\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Close-up\",\n      \"depthLayers\": \"Lukas large in center foreground, linden tree directly behind, blurred crowd far background\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"center\",\n        \"action\": \"Standing still, staring ahead\",\n        \"expression\": \"Focused\",\n        \"holding\": {\"leftHand\": \"empty\", \"rightHand\": \"empty\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\"id\": \"LOC002\", \"name\": \"Linde auf dem Marktplatz\", \"position\": \"center behind Lukas, broad tree with rough bark\"},\n      {\"id\": \"ART003\", \"name\": \"Apfel auf Lukas' Kopf\", \"position\": \"balanced on Lukas' head\"}\n    ],\n    \"translatedSummary\": \"Lukas steht regungslos an der Linde, ein roter Apfel balanciert auf seinem Kopf.\"\n  }\n}",
+  "error": null
+}

@@ -1,0 +1,74 @@
+{
+  "model": "claude-haiku",
+  "modelId": "claude-haiku-4-5-20251001",
+  "promptType": "expansion",
+  "elapsed": 8404,
+  "usage": {
+    "input_tokens": 5847,
+    "output_tokens": 870
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {
+        "primary": "LOC001",
+        "position": "spans entire width of composition"
+      },
+      "imageSummary": "Roger stands with crossbow raised on the left side of the empty square. Lukas stands far across the plaza at the linden tree on the right, a bright red apple balanced on his head. The vast cobblestone expanse between them emphasizes the impossible distance and tension of the moment. Silent crowd lines the square edges, watching.",
+      "setting": {
+        "location": "Marktplatz Altdorf [LOC001]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "Medieval town square with grey cobblestones, ancient linden tree anchoring the right side, multi-storey timber-frame houses bordering the plaza. The Gessler pole with hat stands in the distance center. Townspeople line the edges of the square in tense silence, standing back from the open space.",
+        "lighting": "Cloudy midday light, flat and grey",
+        "weather": "overcast",
+        "weatherVisibility": "directly on scene",
+        "camera": "Ultra-wide establishing shot emphasizing the distance",
+        "depthLayers": "Roger left foreground holding crossbow, vast empty cobblestone plaza spans center, Lukas tiny figure right background under linden tree with apple on head"
+      },
+      "characters": [
+        {
+          "name": "Roger",
+          "position": "left",
+          "action": "Raising crossbow, aiming across the square",
+          "expression": "Focused, concentrated",
+          "holding": {
+            "leftHand": "crossbow stock",
+            "rightHand": "crossbow trigger"
+          },
+          "clothing": "costumed:mittelalterlich"
+        },
+        {
+          "name": "Lukas",
+          "position": "far background right (tiny figure, 1/6 the size of Roger)",
+          "action": "Standing still under linden tree, holding still with apple on head",
+          "expression": "Steady, trusting",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "LOC001",
+          "name": "Marktplatz Altdorf",
+          "position": "entire composition, grey cobblestones, linden tree right side, timber-frame houses"
+        },
+        {
+          "id": "ART002",
+          "name": "Roter Apfel",
+          "position": "on Lukas's head in far background"
+        },
+        {
+          "id": "ART003",
+          "name": "Rogers Armbrust",
+          "position": "in Roger's hands, raised and aimed"
+        }
+      ],
+      "translatedSummary": "Roger steht mit erhobener Armbrust auf der linken Seite des leeren Platzes. Lukas steht weit entfernt unter der Linde auf der rechten Seite, ein leuchtend roter Apfel auf seinem Kopf. Die riesige Weite des Kopfsteinpflasters zwischen ihnen unterstreicht die unmoegliche Distanz und die Spannung des Augenblicks. Die stumme Menge saeumt die Plaetzränder und beobachtet."
+    }
+  },
+  "rawText": "```json\n{\n  \"scene\": {\n    \"landmarkPlacement\": {\n      \"primary\": \"LOC001\",\n      \"position\": \"spans entire width of composition\"\n    },\n    \"imageSummary\": \"Roger stands with crossbow raised on the left side of the empty square. Lukas stands far across the plaza at the linden tree on the right, a bright red apple balanced on his head. The vast cobblestone expanse between them emphasizes the impossible distance and tension of the moment. Silent crowd lines the square edges, watching.\",\n    \"setting\": {\n      \"location\": \"Marktplatz Altdorf [LOC001]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"Medieval town square with grey cobblestones, ancient linden tree anchoring the right side, multi-storey timber-frame houses bordering the plaza. The Gessler pole with hat stands in the distance center. Townspeople line the edges of the square in tense silence, standing back from the open space.\",\n      \"lighting\": \"Cloudy midday light, flat and grey\",\n      \"weather\": \"overcast\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Ultra-wide establishing shot emphasizing the distance\",\n      \"depthLayers\": \"Roger left foreground holding crossbow, vast empty cobblestone plaza spans center, Lukas tiny figure right background under linden tree with apple on head\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Roger\",\n        \"position\": \"left\",\n        \"action\": \"Raising crossbow, aiming across the square\",\n        \"expression\": \"Focused, concentrated\",\n        \"holding\": {\n          \"leftHand\": \"crossbow stock\",\n          \"rightHand\": \"crossbow trigger\"\n        },\n        \"clothing\": \"costumed:mittelalterlich\"\n      },\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"far background right (tiny figure, 1/6 the size of Roger)\",\n        \"action\": \"Standing still under linden tree, holding still with apple on head\",\n        \"expression\": \"Steady, trusting\",\n        \"holding\": {\n          \"leftHand\": \"empty\",\n          \"rightHand\": \"empty\"\n        },\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\n        \"id\": \"LOC001\",\n        \"name\": \"Marktplatz Altdorf\",\n        \"position\": \"entire composition, grey cobblestones, linden tree right side, timber-frame houses\"\n      },\n      {\n        \"id\": \"ART002\",\n        \"name\": \"Roter Apfel\",\n        \"position\": \"on Lukas's head in far background\"\n      },\n      {\n        \"id\": \"ART003\",\n        \"name\": \"Rogers Armbrust\",\n        \"position\": \"in Roger's hands, raised and aimed\"\n      }\n    ],\n    \"translatedSummary\": \"Roger steht mit erhobener Armbrust auf der linken Seite des leeren Platzes. Lukas steht weit entfernt unter der Linde auf der rechten Seite, ein leuchtend roter Apfel auf seinem Kopf. Die riesige Weite des Kopfsteinpflasters zwischen ihnen unterstreicht die unmoegliche Distanz und die Spannung des Augenblicks. Die stumme Menge saeumt die Plaetzränder und beobachtet.\"\n  }\n}\n```",
+  "error": null
+}

@@ -1,0 +1,76 @@
+{
+  "model": "claude-sonnet",
+  "modelId": "claude-sonnet-4-6",
+  "promptType": "expansion",
+  "elapsed": 12969,
+  "usage": {
+    "input_tokens": 5847,
+    "output_tokens": 756
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {},
+      "imageSummary": "Roger stands large in the left foreground, crossbow raised and aimed, facing right across the vast empty plaza. Lukas appears tiny in the far right background, standing against the linden tree with a red apple balanced on his head. A silent crowd lines the distant edges of the square.",
+      "setting": {
+        "location": "Marktplatz Altdorf [LOC001]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "Wide medieval town square with grey cobblestones, a large linden tree at the far right edge, the hat-pole visible in the center distance, surrounded by timber-framed houses. A silent crowd stands pressed to the edges of the square, watching without a sound.",
+        "lighting": "Flat midday light under an overcast sky",
+        "weather": "cloudy",
+        "weatherVisibility": "directly on scene",
+        "camera": "Ultra-wide shot, extreme forced perspective",
+        "depthLayers": "Roger large left foreground, vast empty cobblestone plaza fills center, Lukas tiny right background against linden tree"
+      },
+      "characters": [
+        {
+          "name": "Roger",
+          "position": "left",
+          "action": "Raising crossbow, aiming across the plaza toward Lukas",
+          "expression": "Focused, calm",
+          "holding": {
+            "leftHand": "crossbow grip",
+            "rightHand": "crossbow stock"
+          },
+          "clothing": "costumed:mittelalterlich"
+        },
+        {
+          "name": "Lukas",
+          "position": "far background right (tiny figure, 1/5 the size of foreground character)",
+          "action": "Standing with back against linden tree, looking toward Roger",
+          "expression": "Tense, still",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "LOC001",
+          "name": "Marktplatz Altdorf",
+          "position": "entire scene, cobblestone plaza with surrounding houses"
+        },
+        {
+          "id": "ART001",
+          "name": "Gesslers Hut auf der Stange",
+          "position": "center background, hat-pole standing in the middle of the plaza"
+        },
+        {
+          "id": "ART002",
+          "name": "Roter Apfel",
+          "position": "balanced on Lukas's head, far right background"
+        },
+        {
+          "id": "ART003",
+          "name": "Rogers Armbrust",
+          "position": "held by Roger, left foreground, aimed rightward"
+        }
+      ],
+      "translatedSummary": "Roger steht gross im linken Vordergrund und zielt mit der Armbrust über den weiten, leeren Platz. Lukas ist winzig klein am rechten Bildrand zu sehen, mit dem Rücken an der Linde und dem roten Apfel auf dem Kopf."
+    }
+  },
+  "rawText": "{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Roger stands large in the left foreground, crossbow raised and aimed, facing right across the vast empty plaza. Lukas appears tiny in the far right background, standing against the linden tree with a red apple balanced on his head. A silent crowd lines the distant edges of the square.\",\n    \"setting\": {\n      \"location\": \"Marktplatz Altdorf [LOC001]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"Wide medieval town square with grey cobblestones, a large linden tree at the far right edge, the hat-pole visible in the center distance, surrounded by timber-framed houses. A silent crowd stands pressed to the edges of the square, watching without a sound.\",\n      \"lighting\": \"Flat midday light under an overcast sky\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Ultra-wide shot, extreme forced perspective\",\n      \"depthLayers\": \"Roger large left foreground, vast empty cobblestone plaza fills center, Lukas tiny right background against linden tree\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Roger\",\n        \"position\": \"left\",\n        \"action\": \"Raising crossbow, aiming across the plaza toward Lukas\",\n        \"expression\": \"Focused, calm\",\n        \"holding\": {\"leftHand\": \"crossbow grip\", \"rightHand\": \"crossbow stock\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      },\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"far background right (tiny figure, 1/5 the size of foreground character)\",\n        \"action\": \"Standing with back against linden tree, looking toward Roger\",\n        \"expression\": \"Tense, still\",\n        \"holding\": {\"leftHand\": \"empty\", \"rightHand\": \"empty\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\"id\": \"LOC001\", \"name\": \"Marktplatz Altdorf\", \"position\": \"entire scene, cobblestone plaza with surrounding houses\"},\n      {\"id\": \"ART001\", \"name\": \"Gesslers Hut auf der Stange\", \"position\": \"center background, hat-pole standing in the middle of the plaza\"},\n      {\"id\": \"ART002\", \"name\": \"Roter Apfel\", \"position\": \"balanced on Lukas's head, far right background\"},\n      {\"id\": \"ART003\", \"name\": \"Rogers Armbrust\", \"position\": \"held by Roger, left foreground, aimed rightward\"}\n    ],\n    \"translatedSummary\": \"Roger steht gross im linken Vordergrund und zielt mit der Armbrust über den weiten, leeren Platz. Lukas ist winzig klein am rechten Bildrand zu sehen, mit dem Rücken an der Linde und dem roten Apfel auf dem Kopf.\"\n  }\n}",
+  "error": null
+}

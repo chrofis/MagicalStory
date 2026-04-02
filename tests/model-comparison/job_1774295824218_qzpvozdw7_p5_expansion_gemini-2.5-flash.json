@@ -1,0 +1,56 @@
+{
+  "model": "gemini-2.5-flash",
+  "modelId": "gemini-2.5-flash",
+  "promptType": "expansion",
+  "elapsed": 8261,
+  "usage": {
+    "input_tokens": 5065,
+    "output_tokens": 474,
+    "thinking_tokens": 1409
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {},
+      "imageSummary": "Lukas stands extremely still, with a red apple balanced on his head, his back pressed firmly against the rough bark of a large linden tree. A blurred, anxious crowd is visible in the far background.",
+      "setting": {
+        "location": "Linde auf dem Marktplatz [LOC002]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "A quiet, empty area of a medieval market square, with a large, ancient linden tree. A blurred, silent crowd fills the background, observing the scene.",
+        "lighting": "Soft morning light",
+        "weather": "cloudy",
+        "weatherVisibility": "directly on scene",
+        "camera": "Close-up",
+        "depthLayers": "Lukas in foreground, large linden tree directly behind him, blurred crowd in the far background"
+      },
+      "characters": [
+        {
+          "name": "Lukas",
+          "position": "center",
+          "action": "Standing extremely still, back pressed against the tree",
+          "expression": "Focused and very still",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "ART003",
+          "name": "Apfel auf Lukas' Kopf",
+          "position": "on Lukas' head"
+        },
+        {
+          "id": "LOC002",
+          "name": "Linde auf dem Marktplatz",
+          "position": "behind Lukas"
+        }
+      ],
+      "translatedSummary": "Lukas steht extrem still, mit einem roten Apfel auf dem Kopf und seinen Rücken fest an die raue Rinde eines grossen Lindenbaums gedrückt. Eine verschwommene, angespannte Menschenmenge ist im weiten Hintergrund sichtbar."
+    }
+  },
+  "rawText": "```json\n{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Lukas stands extremely still, with a red apple balanced on his head, his back pressed firmly against the rough bark of a large linden tree. A blurred, anxious crowd is visible in the far background.\",\n    \"setting\": {\n      \"location\": \"Linde auf dem Marktplatz [LOC002]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"A quiet, empty area of a medieval market square, with a large, ancient linden tree. A blurred, silent crowd fills the background, observing the scene.\",\n      \"lighting\": \"Soft morning light\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Close-up\",\n      \"depthLayers\": \"Lukas in foreground, large linden tree directly behind him, blurred crowd in the far background\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"center\",\n        \"action\": \"Standing extremely still, back pressed against the tree\",\n        \"expression\": \"Focused and very still\",\n        \"holding\": {\n          \"leftHand\": \"empty\",\n          \"rightHand\": \"empty\"\n        },\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\n        \"id\": \"ART003\",\n        \"name\": \"Apfel auf Lukas' Kopf\",\n        \"position\": \"on Lukas' head\"\n      },\n      {\n        \"id\": \"LOC002\",\n        \"name\": \"Linde auf dem Marktplatz\",\n        \"position\": \"behind Lukas\"\n      }\n    ],\n    \"translatedSummary\": \"Lukas steht extrem still, mit einem roten Apfel auf dem Kopf und seinen Rücken fest an die raue Rinde eines grossen Lindenbaums gedrückt. Eine verschwommene, angespannte Menschenmenge ist im weiten Hintergrund sichtbar.\"\n  }\n}\n```",
+  "error": null
+}

@@ -1,0 +1,55 @@
+{
+  "model": "claude-sonnet",
+  "modelId": "claude-sonnet-4-6",
+  "promptType": "expansion",
+  "elapsed": 10678,
+  "usage": {
+    "input_tokens": 5811,
+    "output_tokens": 539
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {},
+      "imageSummary": "Lukas stands pressed against the wide linden tree trunk, perfectly still, a bright red apple balanced on top of his head. His eyes stare straight ahead, wide and focused, as the blurred crowd watches from the background.",
+      "setting": {
+        "location": "Linde auf dem Marktplatz [LOC002]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "The wide, ancient linden tree with dark furrowed bark and a carved mark at child's eye height. An open cobblestone plaza stretches in front, with a soft blur of medieval-clothed townspeople watching in silence from the background.",
+        "lighting": "Flat overcast morning light, cool and grey",
+        "weather": "cloudy",
+        "weatherVisibility": "directly on scene",
+        "camera": "Close-up, slightly low angle looking up at Lukas against the tree",
+        "depthLayers": "Lukas and tree trunk filling foreground, empty plaza space between, blurred crowd far background"
+      },
+      "characters": [
+        {
+          "name": "Lukas",
+          "position": "center",
+          "action": "Back pressed against tree bark, staring straight ahead, unnaturally still",
+          "expression": "Tense, determined",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "LOC002",
+          "name": "Linde auf dem Marktplatz",
+          "position": "center background, wide trunk directly behind Lukas"
+        },
+        {
+          "id": "ART003",
+          "name": "Apfel auf Lukas' Kopf",
+          "position": "balanced on top of Lukas's head, slightly tilted"
+        }
+      ],
+      "translatedSummary": "Lukas steht reglos an den Stamm der Linde gepresst, den leuchtend roten Apfel auf dem Kopf, den Blick starr geradeaus gerichtet."
+    }
+  },
+  "rawText": "{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Lukas stands pressed against the wide linden tree trunk, perfectly still, a bright red apple balanced on top of his head. His eyes stare straight ahead, wide and focused, as the blurred crowd watches from the background.\",\n    \"setting\": {\n      \"location\": \"Linde auf dem Marktplatz [LOC002]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"The wide, ancient linden tree with dark furrowed bark and a carved mark at child's eye height. An open cobblestone plaza stretches in front, with a soft blur of medieval-clothed townspeople watching in silence from the background.\",\n      \"lighting\": \"Flat overcast morning light, cool and grey\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Close-up, slightly low angle looking up at Lukas against the tree\",\n      \"depthLayers\": \"Lukas and tree trunk filling foreground, empty plaza space between, blurred crowd far background\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"center\",\n        \"action\": \"Back pressed against tree bark, staring straight ahead, unnaturally still\",\n        \"expression\": \"Tense, determined\",\n        \"holding\": {\"leftHand\": \"empty\", \"rightHand\": \"empty\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\"id\": \"LOC002\", \"name\": \"Linde auf dem Marktplatz\", \"position\": \"center background, wide trunk directly behind Lukas\"},\n      {\"id\": \"ART003\", \"name\": \"Apfel auf Lukas' Kopf\", \"position\": \"balanced on top of Lukas's head, slightly tilted\"}\n    ],\n    \"translatedSummary\": \"Lukas steht reglos an den Stamm der Linde gepresst, den leuchtend roten Apfel auf dem Kopf, den Blick starr geradeaus gerichtet.\"\n  }\n}",
+  "error": null
+}

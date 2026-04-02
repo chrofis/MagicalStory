@@ -1,0 +1,62 @@
+{
+  "storyId": "job_1774298143982_fzo4ccxjc",
+  "pageNumber": 5,
+  "promptType": "expansion",
+  "models": [
+    {
+      "model": "claude-sonnet",
+      "modelId": "claude-sonnet-4-6",
+      "time": "13.0s",
+      "inputTokens": 5847,
+      "outputTokens": 756,
+      "jsonParsed": true,
+      "error": null
+    },
+    {
+      "model": "claude-haiku",
+      "modelId": "claude-haiku-4-5-20251001",
+      "time": "8.4s",
+      "inputTokens": 5847,
+      "outputTokens": 870,
+      "jsonParsed": true,
+      "error": null
+    },
+    {
+      "model": "grok-4-fast",
+      "modelId": "grok-4-1-fast-non-reasoning",
+      "time": "2.7s",
+      "inputTokens": 4927,
+      "outputTokens": 468,
+      "jsonParsed": true,
+      "error": null
+    },
+    {
+      "model": "grok-4",
+      "modelId": "grok-4",
+      "time": "30.8s",
+      "inputTokens": 5440,
+      "outputTokens": 498,
+      "jsonParsed": true,
+      "error": null
+    },
+    {
+      "model": "grok-3-fast",
+      "modelId": "grok-3-fast",
+      "time": "6.1s",
+      "inputTokens": 4763,
+      "outputTokens": 470,
+      "jsonParsed": true,
+      "error": null
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "modelId": "gemini-2.5-flash",
+      "time": "12.5s",
+      "inputTokens": 5116,
+      "outputTokens": 614,
+      "jsonParsed": true,
+      "error": null
+    }
+  ],
+  "timestamp": "2026-03-23T21:46:13.890Z"
+}

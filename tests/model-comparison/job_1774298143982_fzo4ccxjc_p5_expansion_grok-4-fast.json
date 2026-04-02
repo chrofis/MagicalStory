@@ -1,0 +1,71 @@
+{
+  "model": "grok-4-fast",
+  "modelId": "grok-4-1-fast-non-reasoning",
+  "promptType": "expansion",
+  "elapsed": 2682,
+  "usage": {
+    "input_tokens": 4927,
+    "output_tokens": 468
+  },
+  "parsed": {
+    "scene": {
+      "landmarkPlacement": {},
+      "imageSummary": "Roger holds crossbow at left edge of vast empty plaza, aims toward tiny Lukas far right under linden tree with red apple on head.",
+      "setting": {
+        "location": "Marktplatz Altdorf [LOC001]",
+        "landmarkPhotoVariant": null,
+        "indoorOutdoor": "outdoor",
+        "description": "Vast empty cobblestone plaza with silent crowd lining distant edges, large linden tree right background, Gessler pole with hat in center.",
+        "lighting": "Overcast midday light",
+        "weather": "cloudy",
+        "weatherVisibility": "directly on scene",
+        "camera": "Ultra-wide shot",
+        "depthLayers": "Roger large left foreground, wide empty plaza center, Lukas tiny far background right under linden tree"
+      },
+      "characters": [
+        {
+          "name": "Roger",
+          "position": "left",
+          "action": "Aiming crossbow across plaza",
+          "expression": "Focused concentration",
+          "holding": {
+            "leftHand": "crossbow",
+            "rightHand": "crossbow"
+          },
+          "clothing": "costumed:mittelalterlich"
+        },
+        {
+          "name": "Lukas",
+          "position": "far background right (tiny figure)",
+          "action": "Standing under linden tree",
+          "expression": "Steady gaze",
+          "holding": {
+            "leftHand": "empty",
+            "rightHand": "empty"
+          },
+          "clothing": "costumed:mittelalterlich"
+        }
+      ],
+      "objects": [
+        {
+          "id": "LOC001",
+          "name": "Marktplatz Altdorf",
+          "position": "main setting"
+        },
+        {
+          "id": "ART002",
+          "name": "Roter Apfel",
+          "position": "on Lukas' head far right"
+        },
+        {
+          "id": "ART003",
+          "name": "Rogers Armbrust",
+          "position": "held by Roger left"
+        }
+      ],
+      "translatedSummary": "Roger zielt mit der Armbrust vom linken Platzrand ueber die Weite des leeren Platzes auf Lukas an der Linde mit Apfel auf dem Kopf."
+    }
+  },
+  "rawText": "{{\n  \"scene\": {\n    \"landmarkPlacement\": {},\n    \"imageSummary\": \"Roger holds crossbow at left edge of vast empty plaza, aims toward tiny Lukas far right under linden tree with red apple on head.\",\n    \"setting\": {\n      \"location\": \"Marktplatz Altdorf [LOC001]\",\n      \"landmarkPhotoVariant\": null,\n      \"indoorOutdoor\": \"outdoor\",\n      \"description\": \"Vast empty cobblestone plaza with silent crowd lining distant edges, large linden tree right background, Gessler pole with hat in center.\",\n      \"lighting\": \"Overcast midday light\",\n      \"weather\": \"cloudy\",\n      \"weatherVisibility\": \"directly on scene\",\n      \"camera\": \"Ultra-wide shot\",\n      \"depthLayers\": \"Roger large left foreground, wide empty plaza center, Lukas tiny far background right under linden tree\"\n    },\n    \"characters\": [\n      {\n        \"name\": \"Roger\",\n        \"position\": \"left\",\n        \"action\": \"Aiming crossbow across plaza\",\n        \"expression\": \"Focused concentration\",\n        \"holding\": {\"leftHand\": \"crossbow\", \"rightHand\": \"crossbow\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      },\n      {\n        \"name\": \"Lukas\",\n        \"position\": \"far background right (tiny figure)\",\n        \"action\": \"Standing under linden tree\",\n        \"expression\": \"Steady gaze\",\n        \"holding\": {\"leftHand\": \"empty\", \"rightHand\": \"empty\"},\n        \"clothing\": \"costumed:mittelalterlich\"\n      }\n    ],\n    \"objects\": [\n      {\"id\": \"LOC001\", \"name\": \"Marktplatz Altdorf\", \"position\": \"main setting\"},\n      {\"id\": \"ART002\", \"name\": \"Roter Apfel\", \"position\": \"on Lukas' head far right\"},\n      {\"id\": \"ART003\", \"name\": \"Rogers Armbrust\", \"position\": \"held by Roger left\"}\n    ],\n    \"translatedSummary\": \"Roger zielt mit der Armbrust vom linken Platzrand ueber die Weite des leeren Platzes auf Lukas an der Linde mit Apfel auf dem Kopf.\"\n  }\n}",
+  "error": null
+}

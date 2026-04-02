@@ -1125,20 +1125,7 @@ export default function StoryWizard() {
             const fullImages = fullResult?.images || [];
             const fullCovers = fullResult?.covers || {};
 
-            const pagesWithVersions = fullImages.filter(img => img.imageVersions && img.imageVersions.length > 1);
-            log.info(`Full images loaded: ${fullImages.length} pages, ${pagesWithVersions.length} with multiple versions`);
-            if (pagesWithVersions.length > 0) {
-              log.info(`Version counts: ${pagesWithVersions.map(img => `p${img.pageNumber}=${img.imageVersions!.length}`).join(', ')}`);
-            } else {
-              // Log ALL version counts to debug
-              log.info(`All version counts: ${fullImages.map(img => `p${img.pageNumber}=${img.imageVersions?.length || 0}`).join(', ')}`);
-            }
-
-            // Log cover version counts
-            const coverVersionCounts = ['frontCover', 'initialPage', 'backCover']
-              .map(ct => `${ct}=${(fullCovers as any)[ct]?.imageVersions?.length || 0}`)
-              .join(', ');
-            log.info(`Cover version counts: ${coverVersionCounts}`);
+            log.info(`Full images loaded: ${fullImages.length} pages, ${Object.keys(fullCovers).length} covers`);
 
             // Update scene images with imageVersions
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
