@@ -131,7 +131,8 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [pageTransition, setPageTransition] = useState<'none' | 'slide-left' | 'slide-right'>('none');
+  const [pageTransition, setPageTransition] = useState<'none' | 'turning'>('none');
+  const [turningPageImage, setTurningPageImage] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
 
@@ -290,15 +291,24 @@ export default function SharedStoryViewer() {
   }, [currentPage]);
 
   const goToPage = useCallback((page: number) => {
-    if (page >= 0 && page < totalPages && page !== currentPage) {
-      const direction = page > currentPage ? 'slide-left' : 'slide-right';
-      setPageTransition(direction);
+    if (page >= 0 && page < totalPages && page !== currentPage && pageTransition === 'none') {
+      // Capture the current page's image as the "turning page" overlay
+      const entry = pageList[currentPage];
+      let oldImageUrl: string | null = null;
+      if (entry?.type === 'story' && story?.pages[entry.storyPageIdx]) {
+        oldImageUrl = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
+      } else if (entry?.type === 'frontCover' || entry?.type === 'initialPage' || entry?.type === 'backCover') {
+        oldImageUrl = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
+      }
+      setTurningPageImage(oldImageUrl);
+      setCurrentPage(page); // Switch content immediately (new page visible underneath)
+      setPageTransition('turning');
       setTimeout(() => {
-        setCurrentPage(page);
         setPageTransition('none');
-      }, 600);
+        setTurningPageImage(null);
+      }, 900);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
   const swipeHandlers = useSwipe(
     () => goToPage(currentPage + 1), // swipe left = next
@@ -339,6 +349,14 @@ export default function SharedStoryViewer() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col">
+      {/* Page turn animation keyframes */}
+      <style>{`
+        @keyframes pageTurnLeft {
+          0% { transform: rotateY(0deg); opacity: 1; }
+          60% { transform: rotateY(-120deg); opacity: 0.6; }
+          100% { transform: rotateY(-180deg); opacity: 0; }
+        }
+      `}</style>
       {/* Header */}
       {isAuthenticated ? (
         <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
@@ -485,25 +503,34 @@ export default function SharedStoryViewer() {
                 </div>
                 {/* Image — right on desktop (page turn animation), top on mobile */}
                 <div
-                  className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer"
-                  style={{
-                    perspective: '1800px',
-                  }}
+                  className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden"
+                  style={{ perspective: '2000px' }}
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
+                  {/* New page image — fades in gently */}
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
                     style={{
-                      transition: 'transform 0.8s ease-in-out, opacity 0.6s ease-in-out',
-                      transformOrigin: 'left center',
-                      transform: pageTransition === 'slide-left' ? 'rotateY(-70deg)' :
-                                 pageTransition === 'slide-right' ? 'rotateY(70deg)' : 'rotateY(0deg)',
-                      opacity: pageTransition !== 'none' ? 0.3 : 1,
+                      transition: 'opacity 0.8s ease-in-out',
+                      opacity: pageTransition === 'turning' ? 0.2 : 1,
                     }}
                   />
+                  {/* Old page turning overlay — flips from right edge toward left */}
+                  {pageTransition === 'turning' && turningPageImage && (
+                    <img
+                      src={turningPageImage}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      style={{
+                        transformOrigin: 'left center',
+                        backfaceVisibility: 'hidden',
+                        animation: 'pageTurnLeft 0.9s ease-in-out forwards',
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             );
