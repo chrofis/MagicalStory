@@ -11,7 +11,7 @@ COORDINATE SYSTEM:
 - Origin is top-left corner
 - Format: [y_min, x_min, y_max, x_max]
 
-FOR EACH FIGURE:
+FOR EACH FIGURE (include ALL figures, even partially visible ones at edges):
 - If you can identify it as an expected character, set "name" to the character name (EXACTLY as listed above)
 - Use CLOTHING + POSITION to distinguish characters (two boys of similar age are distinguished by what they wear and where they stand)
 - If not identifiable as any expected character, set "name" to "UNKNOWN"

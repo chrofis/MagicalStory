@@ -1,8 +1,8 @@
-{STYLE_DESCRIPTION}
-
-Generate a SINGLE illustration with NO people, NO human characters, NO human figures. Show the environment ready for characters to be placed later.
+Generate a SINGLE illustration with NO people, NO human characters, NO human figures, NO human silhouettes or shadows. Show the environment ready for characters to be placed later.
 
 {EMPTY_SCENE_DESCRIPTION}
 {REQUIRED_OBJECTS}
 
-The scene must contain NO humans. Animals, vehicles, and objects listed above SHOULD appear. Leave natural open space where characters would stand.
+The scene must contain NO humans and no human-shaped shadows. Animals, vehicles, and objects listed above SHOULD appear. Fill the entire frame — no cropping, no black bars. Do not add any text, labels, or watermarks.
+
+**ART STYLE:** {STYLE_DESCRIPTION}
