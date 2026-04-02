@@ -1487,6 +1487,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       }
     }
 
+    // Guard: if all attempts failed (e.g., PROHIBITED_CONTENT block), data has no candidates
+    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      log.warn('🔄 [FALLBACK] Detection failed, no bounding boxes available');
+      return null;
+    }
+
     const responseText = data.candidates[0].content.parts[0].text.trim();
 
     // Parse JSON response
@@ -4797,14 +4803,130 @@ function buildRegenFeedback(evaluation) {
 }
 
 /**
- * Unified repair pipeline — replaces phases 5b-5d and final consistency checks.
+ * Choose whether to inpaint or iterate a bad page based on scores and round history.
+ *
+ * Decision logic:
+ * - Round 3: always inpaint (last chance, cheapest)
+ * - Semantic score < threshold OR quality score < threshold: iterate (fundamentally broken)
+ * - Round 2: alternate strategy from round 1 if possible
+ * - Has fixable issues with fix targets: inpaint
+ * - Otherwise: iterate (bad score, no specific issues to fix)
+ *
+ * @param {Object} evaluation - { qualityScore, semanticScore, fixableIssues, fixTargets, enrichedFixTargets }
+ * @param {number} round - Current round (1-based)
+ * @param {string|null} previousAction - What action was taken for this page in previous round ('inpaint'|'iterate'|null)
+ * @param {Object} options - { semanticThresholdForIterate, qualityThresholdForIterate }
+ * @returns {'inpaint'|'iterate'}
+ */
+function chooseRepairStrategy(evaluation, round, previousAction, options = {}) {
+  const {
+    semanticThresholdForIterate = REPAIR_DEFAULTS.semanticThresholdForIterate,
+    qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate
+  } = options;
+
+  // Round 3+: inpaint only (last chance, cheap)
+  if (round >= 3) return 'inpaint';
+
+  // Fundamentally broken: iterate
+  if (evaluation.semanticScore != null && evaluation.semanticScore < semanticThresholdForIterate) return 'iterate';
+  if ((evaluation.qualityScore ?? 100) < qualityThresholdForIterate) return 'iterate';
+
+  // Round 2: alternate strategy from round 1
+  if (round === 2 && previousAction) {
+    const hasFixableIssues = (evaluation.fixableIssues?.length > 0) ||
+      (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
+    if (previousAction === 'iterate' && hasFixableIssues) return 'inpaint';
+    if (previousAction === 'inpaint') return 'iterate';
+  }
+
+  // Has specific fixable issues -> inpaint
+  const hasFixableContent = (evaluation.fixableIssues?.length > 0) ||
+    (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
+  if (hasFixableContent) return 'inpaint';
+
+  // No specific issues but bad score -> iterate
+  return 'iterate';
+}
+
+/**
+ * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
+ * and applies it via editImageWithPrompt().
+ *
+ * Reuses the same logic as the manual repair endpoint (POST /:id/repair/image/:pageNum).
+ *
+ * @param {string} imageData - Current image (base64 data URI)
+ * @param {Object} evaluation - Evaluation result with fixableIssues, semanticResult, etc.
+ * @param {Object} [options] - Optional overrides
+ * @returns {Promise<{imageData: string|null, repaired: boolean, instruction: string|null, usage: Object|null}>}
+ */
+async function inpaintPage(imageData, evaluation, options = {}) {
+  // Collect quality issues
+  const qualityIssues = (evaluation.fixableIssues || []).map(i => ({
+    description: i.description || i.issue || i,
+    source: 'quality'
+  }));
+
+  // Collect semantic issues
+  const semanticIssues = (evaluation.semanticResult?.issues || evaluation.semanticResult?.semanticIssues || [])
+    .map(si => ({
+      description: si.problem || `${si.type}: ${si.item || ''}`,
+      source: 'semantic'
+    }));
+
+  // Combine and deduplicate
+  const combinedIssues = [...qualityIssues, ...semanticIssues]
+    .filter((issue, idx, arr) => {
+      const desc = issue.description || '';
+      return desc && arr.findIndex(i => (i.description || '') === desc) === idx;
+    });
+
+  if (combinedIssues.length === 0) {
+    log.debug(`[INPAINT PAGE] No issues to fix, skipping inpaint`);
+    return { imageData: null, repaired: false, instruction: null, usage: null };
+  }
+
+  const editInstruction = combinedIssues
+    .map(i => i.description)
+    .filter(Boolean)
+    .join('. ');
+
+  const fullInstruction = `Fix these issues in this children's book illustration: ${editInstruction}`;
+  log.info(`[INPAINT PAGE] Inpainting with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
+
+  try {
+    const editResult = await editImageWithPrompt(imageData, fullInstruction);
+    if (editResult?.imageData) {
+      // Validate: reject too-small or identical results
+      if (editResult.imageData.length < 1000) {
+        log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
+        return { imageData: null, repaired: false, instruction: editInstruction, usage: editResult.usage };
+      }
+      return {
+        imageData: editResult.imageData,
+        repaired: true,
+        instruction: editInstruction,
+        usage: editResult.usage
+      };
+    }
+    return { imageData: null, repaired: false, instruction: editInstruction, usage: null };
+  } catch (err) {
+    log.error(`[INPAINT PAGE] Edit failed: ${err.message}`);
+    return { imageData: null, repaired: false, instruction: editInstruction, usage: null, error: err.message };
+  }
+}
+
+/**
+ * Unified repair pipeline — evaluates, inpaints/iterates bad pages, picks best,
+ * then runs character repair on final images.
  *
  * Flow:
  *   1. Evaluate all images + entity consistency (parallel)
- *   2. Regenerate low-scoring images (1st attempt, re-evaluate)
- *   3. 2nd regenerate of still-low images (re-evaluate)
- *   4. Select best version per page
- *   5. One character fix pass (entity issues → repairCharacterMismatch)
+ *   2. Round loop (1 to maxPasses): for each bad page, chooseRepairStrategy() → inpaint or iterate
+ *   3. Pick best versions
+ *   4. Entity consistency check (on picked images)
+ *   5. Character repair (on final images)
+ *   6. Evaluate character-repaired pages
+ *   7. Final pick best
  *
  * @param {Array<Object>} rawImages - Array from Phase 5a, each with imageData, prompt, characterPhotos, etc.
  * @param {Object} context
@@ -4818,11 +4940,14 @@ function buildRegenFeedback(evaluation) {
  * @param {Object} context.storyData - Full story data (needed for iteratePage mode)
  * @param {Object} [options]
  * @param {number} [options.regenThreshold=REPAIR_DEFAULTS.scoreThreshold] - Score below which to regenerate
- * @param {number} [options.maxRegenAttempts=2] - Max regeneration attempts per page
- * @param {number} [options.evalConcurrency=10] - Concurrency for evaluations
+ * @param {number} [options.maxRegenAttempts=REPAIR_DEFAULTS.maxPasses] - Max repair rounds
+ * @param {number} [options.evalConcurrency=100] - Concurrency for evaluations
  * @param {string} [options.qualityModelOverride] - Model override for quality evaluation
  * @param {boolean} [options.useIteratePage=false] - Use iteratePage (re-expansion) instead of generateImageOnly
- * @returns {Promise<Array<Object>>} Array matching rawImages, each with best imageData, imageVersions, qualityScore, etc.
+ * @param {number} [options.semanticThresholdForIterate=30] - Below this → iterate
+ * @param {number} [options.qualityThresholdForIterate=20] - Below this → iterate
+ * @param {number} [options.inpaintMaxPasses=1] - Inpaint attempts per page per round
+ * @returns {Promise<{results: Array<Object>, charFixDetails: Object}>}
  */
 async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const {
