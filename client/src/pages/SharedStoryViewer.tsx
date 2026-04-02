@@ -296,7 +296,7 @@ export default function SharedStoryViewer() {
       setTimeout(() => {
         setCurrentPage(page);
         setPageTransition('none');
-      }, 350);
+      }, 600);
     }
   }, [totalPages, currentPage]);
 
@@ -448,23 +448,9 @@ export default function SharedStoryViewer() {
           <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
         </button>
 
-        {/* Book container with page turn animation */}
-        <div
-          className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl"
-          style={{
-            perspective: '1200px',
-            transformStyle: 'preserve-3d',
-          }}
-        >
-          <div
-            style={{
-              transition: 'transform 0.4s ease-in-out, opacity 0.4s ease-in-out',
-              transformOrigin: pageTransition === 'slide-left' ? 'left center' : 'right center',
-              transform: pageTransition === 'slide-left' ? 'rotateY(-90deg)' :
-                         pageTransition === 'slide-right' ? 'rotateY(90deg)' : 'rotateY(0deg)',
-              opacity: pageTransition !== 'none' ? 0 : 1,
-            }}
-          >
+        {/* Book container */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
+          <div>
           {/* Cover pages (frontCover, initialPage, backCover) */}
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div
@@ -497,9 +483,12 @@ export default function SharedStoryViewer() {
                     </p>
                   </div>
                 </div>
-                {/* Image — right on desktop, top on mobile */}
+                {/* Image — right on desktop (page turn animation), top on mobile */}
                 <div
                   className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer"
+                  style={{
+                    perspective: '1800px',
+                  }}
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
                   <img
@@ -507,6 +496,13 @@ export default function SharedStoryViewer() {
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
+                    style={{
+                      transition: 'transform 0.8s ease-in-out, opacity 0.6s ease-in-out',
+                      transformOrigin: 'left center',
+                      transform: pageTransition === 'slide-left' ? 'rotateY(-70deg)' :
+                                 pageTransition === 'slide-right' ? 'rotateY(70deg)' : 'rotateY(0deg)',
+                      opacity: pageTransition !== 'none' ? 0.3 : 1,
+                    }}
                   />
                 </div>
               </div>
