@@ -1506,12 +1506,16 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
     log.debug(`[LANDMARK-LINK] Try: "${location.name}" query="${location.landmarkQuery}"`);
 
     // Try to find a matching pre-discovered landmark
-    // Match by exact name or by landmarkQuery containing the landmark name
+    // Match by name similarity — require strong match to avoid linking
+    // unrelated landmarks (e.g. "Forum Romanum" should NOT match "Holzbrücke Baden")
     const query = location.landmarkQuery.toLowerCase();
     const preDiscovered = availableLandmarks.find(landmark => {
       const landmarkName = landmark.name.toLowerCase();
-      // Check if the query contains the landmark name or vice versa
-      return query.includes(landmarkName) || landmarkName.includes(query.split(' ')[0]);
+      // Exact match or one fully contains the other
+      if (query === landmarkName) return true;
+      if (query.includes(landmarkName) && landmarkName.length >= 5) return true;
+      if (landmarkName.includes(query) && query.length >= 5) return true;
+      return false;
     });
 
     if (preDiscovered && preDiscovered.photoData) {
