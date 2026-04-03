@@ -39,7 +39,9 @@ It must be detailed enough to illustrate without additional context.
       "indoorOutdoor": "[indoor/outdoor]",
       "description": "[visual setting details: colors, textures, atmosphere]",
       "lighting": "[time of day + light quality]",
-      "weather": "[sunny/cloudy/rainy/snowy/n/a]"
+      "weather": "[sunny/cloudy/rainy/snowy/n/a]",
+      "camera": "[close-up|medium|wide|ultra-wide]",
+      "depthLayers": "[describe what's in foreground, midground, background]"
     },
     "characters": [
       {
@@ -48,20 +50,27 @@ It must be detailed enough to illustrate without additional context.
         "position": "[left/right/center]",
         "action": "[what they're doing]",
         "expression": "[facial expression]",
-        "clothing": "[standard | costumed:{type}]"
+        "clothing": "[standard | costumed:{type}]",
+        "depth": "[foreground|midground|background]",
+        "perspective": "[front|side|back view|over-the-shoulder]"
       }
     ],
     "objects": [
       {"id": "[OBJ001]", "name": "[Object name]", "position": "[where in scene]"}
-    ]
+    ],
+    "background": "[empty|a few passersby|busy crowd|dense forest|etc.]"
   }
 }
 ```
 
 - MAX 4 characters per scene. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
+- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
+- `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` format referencing visual bible location IDs.
+- `setting.camera`: shot type determines facial detail visibility. `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = body language only.
 - `objects`: include visual bible items visible in the scene with their IDs.
+- `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated.
 - Use `"n/a"` for weather in indoor scenes.
 
 # OUTPUT FORMAT
