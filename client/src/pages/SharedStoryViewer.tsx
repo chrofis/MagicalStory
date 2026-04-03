@@ -309,7 +309,7 @@ export default function SharedStoryViewer() {
       setTimeout(() => {
         setPageTransition('none');
         setTurningPageImage(null);
-      }, 800);
+      }, 1300);
     }
   }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
@@ -537,7 +537,7 @@ export default function SharedStoryViewer() {
                       style={{
                         transformOrigin: 'left center',
                         backfaceVisibility: 'hidden',
-                        animation: 'pageTurnLeft 0.8s ease-in-out forwards',
+                        animation: 'pageTurnLeft 1.3s ease-in-out forwards',
                       }}
                     />
                   )}
