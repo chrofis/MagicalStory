@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken, handleRedirectResult } from '@/services/firebase';
+import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -166,13 +167,13 @@ export default function TrialGenerationPage() {
   // Recover state from localStorage if location.state is lost (e.g., after Google redirect)
   const locationState = location.state as LocationState | null;
   const state = locationState || (() => {
-    const savedToken = localStorage.getItem('trial_gen_session_token');
+    const savedToken = storage.getItem('trial_gen_session_token');
     if (savedToken) {
       return {
         sessionToken: savedToken,
-        characterId: localStorage.getItem('trial_gen_character_id') || '',
+        characterId: storage.getItem('trial_gen_character_id') || '',
         storyInput: {},
-        characterName: localStorage.getItem('trial_gen_character_name') || '',
+        characterName: storage.getItem('trial_gen_character_name') || '',
       } as LocationState;
     }
     return null;
@@ -180,7 +181,7 @@ export default function TrialGenerationPage() {
 
   // If we arrived with fresh navigation state, clear stale localStorage from previous sessions
   if (locationState) {
-    localStorage.removeItem('trial_gen_job_id');
+    storage.removeItem('trial_gen_job_id');
   }
 
   // Redirect if no state (and no saved state from localStorage)
@@ -195,7 +196,7 @@ export default function TrialGenerationPage() {
   const [progress, setProgress] = useState(0);
   // Only restore jobId from localStorage if we're recovering from a redirect (no location.state)
   const [jobId, setJobId] = useState<string | null>(
-    locationState ? null : localStorage.getItem('trial_gen_job_id')
+    locationState ? null : storage.getItem('trial_gen_job_id')
   );
   const hasStartedRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -253,8 +254,8 @@ export default function TrialGenerationPage() {
           });
           if (claimRes.ok) {
             const { token } = await claimRes.json();
-            localStorage.setItem('auth_token', token);
-            localStorage.removeItem('trial_session_token');
+            storage.setItem('auth_token', token);
+            storage.removeItem('trial_session_token');
           }
           setIsVerified(true);
         }
@@ -304,7 +305,7 @@ export default function TrialGenerationPage() {
         }
 
         setJobId(data.jobId);
-        localStorage.setItem('trial_gen_job_id', data.jobId);
+        storage.setItem('trial_gen_job_id', data.jobId);
         setPageState('generating');
       } catch {
         setPageState('failed');
@@ -406,10 +407,10 @@ export default function TrialGenerationPage() {
       // Small delay so user sees the "100% complete" state
       const timer = setTimeout(() => {
         // Clean up trial generation state from localStorage
-        localStorage.removeItem('trial_gen_session_token');
-        localStorage.removeItem('trial_gen_character_id');
-        localStorage.removeItem('trial_gen_character_name');
-        localStorage.removeItem('trial_gen_job_id');
+        storage.removeItem('trial_gen_session_token');
+        storage.removeItem('trial_gen_character_id');
+        storage.removeItem('trial_gen_character_name');
+        storage.removeItem('trial_gen_job_id');
         window.location.href = '/stories';
       }, 1500);
       return () => clearTimeout(timer);
@@ -476,17 +477,17 @@ export default function TrialGenerationPage() {
 
     // Store JWT token + user data for authenticated access
     if (data.token) {
-      localStorage.setItem('auth_token', data.token);
+      storage.setItem('auth_token', data.token);
       if (data.user) {
-        localStorage.setItem('current_user', JSON.stringify(data.user));
+        storage.setItem('current_user', JSON.stringify(data.user));
       }
-      localStorage.removeItem('trial_session_token');
+      storage.removeItem('trial_session_token');
     }
 
     // Clean up saved trial state
-    localStorage.removeItem('trial_gen_session_token');
-    localStorage.removeItem('trial_gen_character_id');
-    localStorage.removeItem('trial_gen_character_name');
+    storage.removeItem('trial_gen_session_token');
+    storage.removeItem('trial_gen_character_id');
+    storage.removeItem('trial_gen_character_name');
 
     setGoogleLinked(true);
     setIsVerified(true);
@@ -497,7 +498,7 @@ export default function TrialGenerationPage() {
   useEffect(() => {
     if (redirectHandledRef.current || !state?.sessionToken) return;
     // Only run if we have saved trial state (meaning we initiated a Google redirect)
-    if (!localStorage.getItem('trial_gen_session_token')) return;
+    if (!storage.getItem('trial_gen_session_token')) return;
     redirectHandledRef.current = true;
 
     (async () => {
@@ -524,9 +525,9 @@ export default function TrialGenerationPage() {
 
     // Save trial state to localStorage before Google sign-in
     // (in case popup is blocked and we fall back to redirect, which loses location.state)
-    localStorage.setItem('trial_gen_session_token', state.sessionToken);
-    if (state.characterId) localStorage.setItem('trial_gen_character_id', state.characterId);
-    if (state.characterName) localStorage.setItem('trial_gen_character_name', state.characterName);
+    storage.setItem('trial_gen_session_token', state.sessionToken);
+    if (state.characterId) storage.setItem('trial_gen_character_id', state.characterId);
+    if (state.characterName) storage.setItem('trial_gen_character_name', state.characterName);
 
     try {
       const firebaseUser = await signInWithGoogle();

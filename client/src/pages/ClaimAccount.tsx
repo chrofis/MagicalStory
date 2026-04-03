@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import storage from '@/services/storage';
 import { KeyRound, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken } from '@/services/firebase';
@@ -150,13 +151,13 @@ export default function ClaimAccount() {
 
       // Store JWT + user data and redirect
       if (data.token) {
-        localStorage.setItem('auth_token', data.token);
+        storage.setItem('auth_token', data.token);
         if (data.user) {
-          localStorage.setItem('current_user', JSON.stringify(data.user));
+          storage.setItem('current_user', JSON.stringify(data.user));
         }
         // Clear any stale admin-only flags from previous sessions
         if (!data.user || data.user.role !== 'admin') {
-          localStorage.removeItem('developer_mode');
+          storage.removeItem('developer_mode');
         }
       }
 
@@ -200,13 +201,13 @@ export default function ClaimAccount() {
 
       // Store JWT + user data and redirect
       if (data.token) {
-        localStorage.setItem('auth_token', data.token);
+        storage.setItem('auth_token', data.token);
         if (data.user) {
-          localStorage.setItem('current_user', JSON.stringify(data.user));
+          storage.setItem('current_user', JSON.stringify(data.user));
         }
         // Clear any stale admin-only flags from previous sessions
         if (!data.user || data.user.role !== 'admin') {
-          localStorage.removeItem('developer_mode');
+          storage.removeItem('developer_mode');
         }
       }
 

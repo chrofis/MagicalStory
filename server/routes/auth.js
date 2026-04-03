@@ -264,53 +264,52 @@ router.post('/firebase', authLimiter, async (req, res) => {
 
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
     const { uid, email: firebaseEmail, name } = decodedToken;
-    const username = firebaseEmail || `firebase_${uid}`;
+
+    // Validate Firebase email
+    if (!firebaseEmail || typeof firebaseEmail !== 'string' || !firebaseEmail.includes('@') || firebaseEmail.length > 254) {
+      log.warn(`Firebase auth: invalid email from token (uid: ${uid}, email: ${firebaseEmail})`);
+      return res.status(400).json({ error: 'Invalid email from Google account' });
+    }
+    const username = sanitizeString(firebaseEmail, 254).toLowerCase();
 
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Firebase auth requires database mode' });
     }
 
-    const existingUser = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
-    let user;
+    // Atomic upsert: try INSERT, on conflict (existing user) just update last_login
+    // This prevents race conditions when two concurrent requests try to create the same user
+    const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
+    const isFirstUser = parseInt(userCount[0].count) === 0;
+    const role = isFirstUser ? 'admin' : 'user';
+    const storyQuota = isFirstUser ? 999 : 2;
+    const initialCredits = isFirstUser ? -1 : 500;
 
-    if (existingUser.length > 0) {
-      user = existingUser[0];
-      // Firebase/Google users are already verified by Google - ensure email_verified is TRUE
-      if (user.email_verified !== true) {
-        await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [user.id]);
-        user.email_verified = true;
-      }
-      await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-    } else {
-      // Create new user
-      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
-      const isFirstUser = parseInt(userCount[0].count) === 0;
-      const role = isFirstUser ? 'admin' : 'user';
-      const storyQuota = isFirstUser ? 999 : 2;
-      const initialCredits = isFirstUser ? -1 : 500;
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+    const userId = crypto.randomUUID();
 
-      const randomPassword = crypto.randomBytes(32).toString('hex');
-      const hashedPassword = await bcrypt.hash(randomPassword, 10);
-      const userId = crypto.randomUUID();
+    const result = await dbQuery(
+      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+       ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
+       RETURNING *, (xmax = 0) AS is_new_user`,
+      [userId, username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
+    );
+    const user = result[0];
+    const isNewUser = user.is_new_user;
 
-      const result = await dbQuery(
-        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING *',
-        [userId, username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
-      );
-      user = result[0];
-
+    if (isNewUser) {
       if (initialCredits > 0) {
         await dbQuery(
           'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
           [user.id, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
         );
       }
-
       await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
       log.info(`New Firebase user registered: ${username} (role: ${role})`);
+    } else {
+      await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
     }
-
-    await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     const token = generateToken(user);
 
@@ -332,9 +331,25 @@ router.post('/firebase', authLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    log.error('Firebase auth error:', err);
+    log.error('Firebase auth error:', { code: err.code, message: err.message, constraint: err.constraint });
     if (err.code === 'auth/id-token-expired') {
       return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+    }
+    if (err.code === 'auth/argument-error') {
+      return res.status(400).json({ error: 'Invalid authentication token' });
+    }
+    // PostgreSQL constraint violation (shouldn't happen with ON CONFLICT, but defensive)
+    if (err.code === '23505') {
+      log.warn('Firebase auth: constraint violation (race condition fallback), retrying login');
+      try {
+        const fallbackUser = await dbQuery('SELECT * FROM users WHERE username = $1', [err.detail?.match(/\(([^)]+)\)/)?.[1] || '']);
+        if (fallbackUser.length > 0) {
+          const token = generateToken(fallbackUser[0]);
+          return res.json({ token, user: { id: fallbackUser[0].id, username: fallbackUser[0].username, email: fallbackUser[0].email, role: fallbackUser[0].role, credits: fallbackUser[0].credits, emailVerified: true } });
+        }
+      } catch (retryErr) {
+        log.error('Firebase auth: constraint violation retry also failed:', retryErr.message);
+      }
     }
     res.status(500).json({ error: 'Firebase authentication failed' });
   }

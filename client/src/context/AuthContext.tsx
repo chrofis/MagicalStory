@@ -325,14 +325,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleFirebaseAuth = useCallback(async (firebaseUser: FirebaseUser) => {
     const idToken = await getIdToken(firebaseUser);
 
-    const response = await fetch(`${API_URL}/api/auth/firebase`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
+    // Try backend token exchange with one retry on failure
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}/api/auth/firebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+    } catch (networkErr) {
+      // Network error — retry once after 1s
+      console.warn('Firebase auth backend call failed, retrying in 1s...', networkErr);
+      await new Promise(r => setTimeout(r, 1000));
+      response = await fetch(`${API_URL}/api/auth/firebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+    }
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({ error: 'Firebase authentication failed' }));
+      // Sign out of Firebase to avoid partial auth state
+      try { await firebaseUser.delete?.(); } catch { /* ignore */ }
       throw new Error(error.error || 'Firebase authentication failed');
     }
 

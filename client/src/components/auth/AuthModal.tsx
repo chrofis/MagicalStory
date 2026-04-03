@@ -94,7 +94,11 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
       await loginWithGoogle(redirectUrl);
       handleLoginSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : errors.googleSignInFailed);
+      const msg = err instanceof Error ? err.message : '';
+      // Don't show error when popup was blocked and redirect is happening silently
+      if (!msg.includes('Redirecting')) {
+        setError(msg || errors.googleSignInFailed);
+      }
     } finally {
       setIsLoading(false);
     }
