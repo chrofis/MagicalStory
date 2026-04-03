@@ -2310,6 +2310,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let streamingPagesDetected = 0;
     let lastProgressUpdate = Date.now();
     let landmarkDescriptionsPromise = null; // Promise for loading landmark photo descriptions
+    const sceneBackgrounds = {}; // Populated by trial mode early background generation OR Phase 5a-pre
     let streamingAvatarStylingPromise = null; // Promise for early avatar styling (started when clothing requirements ready)
     let earlyAvatarStylingSucceeded = false; // Track whether early styling actually cached avatars
 
@@ -2994,6 +2995,48 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         landmarkDescriptionsPromise = loadLandmarkPhotoDescriptions(streamingVisualBible);
 
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
+
+        // Trial mode: generate empty scene backgrounds from visual bible immediately
+        // Backgrounds arrive early in the stream, so we can start generating before pages are done
+        if (inputData.trialMode && vb.backgrounds?.length > 0) {
+          log.info(`🎬 [TRIAL] Starting early empty scene generation from ${vb.backgrounds.length} visual bible backgrounds`);
+          const artStyleDesc = resolveArtStyle(inputData.artStyle || 'watercolor') || '';
+          const bgLimit = pLimit(5);
+          const bgPromises = [];
+
+          for (const bg of vb.backgrounds) {
+            if (!bg.description || !bg.pages?.length) continue;
+            for (const pageNum of bg.pages) {
+              bgPromises.push(bgLimit(async () => {
+                try {
+                  const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+                    STYLE_DESCRIPTION: artStyleDesc,
+                    EMPTY_SCENE_DESCRIPTION: bg.description,
+                    REQUIRED_OBJECTS: ''
+                  });
+                  const result = await generateImageOnly(emptyPrompt, [], {
+                    landmarkPhotos: [],
+                    skipCache: true
+                  });
+                  if (result?.imageData) {
+                    sceneBackgrounds[pageNum] = { imageData: result.imageData, prompt: emptyPrompt };
+                    log.info(`🎬 [TRIAL] Empty scene for page ${pageNum} generated (${Math.round(result.imageData.length / 1024)}KB)`);
+                    if (result.usage) {
+                      const isGrok = result.modelId?.startsWith('grok-imagine');
+                      addUsage(isGrok ? 'grok' : 'gemini_image', result.usage, 'trial_empty_scene', result.modelId);
+                    }
+                  }
+                } catch (err) {
+                  log.warn(`⚠️ [TRIAL] Empty scene for page ${pageNum} failed: ${err.message}`);
+                }
+              }));
+            }
+          }
+          // Don't await — let them run in background while outline continues streaming
+          Promise.all(bgPromises).then(() => {
+            log.info(`🎬 [TRIAL] All ${Object.keys(sceneBackgrounds).length} empty scenes ready`);
+          }).catch(() => {});
+        }
       },
       onCoverHints: () => {
         // Cover hints section complete - we'll start covers when we have individual hints
@@ -3725,7 +3768,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       );
 
       // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
-      const sceneBackgrounds = {};
+      // Note: sceneBackgrounds may already have entries from trial mode early generation
       if (modelOverrides.generateEmptyScenes !== false) {
         log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
         const bgStartTime = Date.now();
@@ -3734,6 +3777,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const emptyScenes = await Promise.all(
           pageDataArray.map(pageData => bgLimit(async () => {
             await checkCancellation();
+            // Skip if already generated (e.g., trial mode early generation from visual bible)
+            if (sceneBackgrounds[pageData.pageNumber]) return null;
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
             // emptyScenePrompt lives on pageData (from scene expansion), not on sceneMetadata

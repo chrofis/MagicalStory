@@ -79,6 +79,11 @@ Output ALL sections in this EXACT order. Do not skip any.
   ],
   "locations": [
     { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
+  ],
+  "backgrounds": [
+    { "pages": [1, 2], "description": "A sun-drenched cobblestone village square with a medieval fountain in the center. Warm afternoon light. Wide shot. Open space in foreground where characters would stand." },
+    { "pages": [3, 4], "description": "Inside a dimly lit cave with glowing crystals on the walls. Cool blue-green light from crystal reflections. Empty rocky floor in center." },
+    { "pages": [5], "description": "A hilltop meadow overlooking a valley at sunset. Wildflowers in foreground, mountain silhouettes in background. Golden hour light. Open grassy area." }
   ]
 }
 ```
@@ -90,7 +95,13 @@ Use empty arrays `[]` for categories with no elements.
 - Set `"isRealLandmark": true`
 - Set `"landmarkQuery"` to the EXACT landmark name for photo lookup (e.g. "Holzbrücke Baden")
 
-Keep it minimal: max 2-3 locations, 1-2 key objects, only secondary characters.
+**BACKGROUNDS (style anchors for each scene):**
+Each background describes a scene with NO people, NO human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
+- Use the landmark photo descriptions if available to describe real locations accurately
+- For indoor scenes: describe furniture, walls, lighting, floor
+- For outdoor scenes: describe landscape, sky, vegetation, architecture
+
+Keep it minimal: max 2-3 locations, 1-2 key objects, only secondary characters, 3-5 backgrounds.
 
 ---STORY PAGES---
 
