@@ -120,7 +120,7 @@ export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [story, setStory] = useState<SharedStoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -466,6 +466,22 @@ export default function SharedStoryViewer() {
             </Link>
           </div>
         </header>
+      )}
+
+      {/* Private story banner — shown to owner when story is not shared */}
+      {story.isOwner && !sharingEnabled && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">
+            {language === 'de' ? 'Diese Geschichte ist privat — nur du kannst sie sehen.' : language === 'fr' ? 'Cette histoire est privée — vous seul pouvez la voir.' : 'This story is private — only you can see it.'}
+          </p>
+          <button
+            onClick={handleShare}
+            disabled={sharingLoading}
+            className="flex-shrink-0 bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+          >
+            {sharingLoading ? '...' : language === 'de' ? 'Teilen' : language === 'fr' ? 'Partager' : 'Share'}
+          </button>
+        </div>
       )}
 
       {/* Story Content with side arrows */}

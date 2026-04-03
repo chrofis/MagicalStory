@@ -244,7 +244,7 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
     // Run both queries in parallel for speed
     const [metaResult, coverCheck] = await Promise.all([
       dbQuery(`
-        SELECT id, metadata
+        SELECT id, metadata, share_token
         FROM stories WHERE id = $1 AND user_id = $2
       `, [id, req.user.id]),
       dbQuery(`SELECT 1 FROM story_images WHERE story_id = $1 AND image_type = 'frontCover' LIMIT 1`, [id])
@@ -286,7 +286,8 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
       language: meta.language,
       languageLevel: meta.languageLevel,
       pageCount: meta.sceneCount || 0,
-      hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail
+      hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail,
+      shareToken: metaResult[0].share_token || null,
     });
   } catch (err) {
     console.error('❌ Error fetching quick metadata:', err);

@@ -421,6 +421,7 @@ export default function StoryWizard() {
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [storyRefreshKey, setStoryRefreshKey] = useState(0); // Increment to trigger story reload
   const [jobId, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
@@ -865,6 +866,7 @@ export default function StoryWizard() {
         setStoryTitle(quickMeta.title);
         setStoryLanguage(quickMeta.language);
         setLanguageLevel(quickMeta.languageLevel);
+        if (quickMeta.shareToken) setShareToken(quickMeta.shareToken);
         // Note: dedication and artStyle come from full metadata (not quick-metadata)
 
         // Initialize empty scene images array with page count for lazy loading
@@ -4515,6 +4517,7 @@ export default function StoryWizard() {
               finalChecksReport={finalChecksReport}
               clothingRequirements={clothingRequirements || undefined}
               storyId={storyId}
+              shareToken={shareToken}
               onVisualBibleChange={storyId ? async (updatedBible) => {
                 try {
                   log.info('Updating Visual Bible for story:', storyId);

@@ -211,6 +211,7 @@ export const storyService = {
     languageLevel: LanguageLevel;
     pageCount: number;
     hasFrontCover: boolean;
+    shareToken?: string | null;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');

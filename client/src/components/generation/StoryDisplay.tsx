@@ -130,6 +130,7 @@ interface StoryDisplayProps {
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
+  shareToken?: string | null;
   developerMode?: boolean;
   styledAvatarGeneration?: StyledAvatarGenerationEntry[];
   costumedAvatarGeneration?: CostumedAvatarGenerationEntry[];
@@ -203,6 +204,7 @@ export function StoryDisplay({
   onIteratePage,
   onVisualBibleChange,
   storyId,
+  shareToken,
   developerMode = false,
   styledAvatarGeneration = [],
   costumedAvatarGeneration = [],
@@ -1866,9 +1868,15 @@ export function StoryDisplay({
           </div>
         )}
 
-        {/* Share Story - in grid */}
-        {hasImages && storyId && !isGenerating && (
-          <ShareButton storyId={storyId} variant="full" />
+        {/* View Story (reader view) */}
+        {hasImages && shareToken && !isGenerating && (
+          <a
+            href={`/shared/${shareToken}`}
+            className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-3 rounded-lg text-base font-semibold flex items-center justify-center gap-2 hover:from-indigo-600 hover:to-purple-600 transition-all"
+          >
+            <BookOpen size={18} />
+            {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+          </a>
         )}
 
         {/* Create Another Story */}
