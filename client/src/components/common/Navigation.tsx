@@ -83,13 +83,13 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   }, [showMenu]);
 
   return (
-    <nav className="bg-gray-900 text-white px-3 py-3 sticky top-0 z-40">
-      <div className="flex justify-between items-center">
+    <nav className="bg-gray-900 text-white px-3 py-3 sticky top-0 z-40 overflow-hidden">
+      <div className="flex justify-between items-center min-w-0">
         {/* Left: Title */}
         <div className="flex-shrink-0">
           <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
             <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
-            {t.title}
+            <span className="hidden sm:inline">{t.title}</span>
           </button>
         </div>
 
@@ -180,11 +180,11 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           {isGenerationInProgress && (
             <button
               onClick={handleViewProgress}
-              className="bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-indigo-600 flex items-center gap-2"
+              className="bg-indigo-500 text-white px-2 py-1.5 md:px-3 rounded text-xs font-semibold hover:bg-indigo-600 flex items-center gap-1.5 flex-shrink-0"
               title={language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating story...'}
             >
-              <Loader2 size={14} className="animate-spin" />
-              <span className="hidden md:inline">
+              <Loader2 size={14} className="animate-spin flex-shrink-0" />
+              <span className="hidden sm:inline">
                 {generation?.progress ? `${checkpointToPercent(generation.progress.current)}%` : '...'}
               </span>
             </button>
