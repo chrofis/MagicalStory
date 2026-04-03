@@ -156,7 +156,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Wie funktioniert es?',
-            answer: 'Lade ein Foto deines Kindes hoch, wähle ein Story-Thema und wir erstellen eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als illustrierte Figur auf jeder Seite und behält sein einzigartiges Aussehen im ganzen Buch.',
+            answer: 'Lade ein Foto deines Kindes hoch, wähle ein Thema und wir erstellen eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als illustrierte Figur auf jeder Seite und behält sein einzigartiges Aussehen im ganzen Buch.',
           },
           {
             question: 'Wie lange dauert es?',

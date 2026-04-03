@@ -2440,7 +2440,7 @@ export function CharacterForm({
                               shoes: 'user' as const,
                             },
                           })}
-                          placeholder={language === 'de' ? 'z.B. weiße Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}
+                          placeholder={language === 'de' ? 'z.B. weisse Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
                         />
                       </div>

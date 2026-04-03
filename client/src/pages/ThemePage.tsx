@@ -165,7 +165,7 @@ function getExpectBullets(category: CategorySlug, language: string): string[] {
     },
     historical: {
       en: ['Historically accurate setting and details', 'Your child as a witness to history', 'Educational and entertaining'],
-      de: ['Historisch akkurates Setting und Details', 'Dein Kind als Zeitzeuge', 'Lehrreich und unterhaltsam'],
+      de: ['Historisch akkurate Kulisse und Details', 'Dein Kind als Zeitzeuge', 'Lehrreich und unterhaltsam'],
       fr: ['Un cadre et des détails historiquement précis', 'Votre enfant comme témoin de l\'histoire', 'Éducatif et divertissant'],
     },
   };

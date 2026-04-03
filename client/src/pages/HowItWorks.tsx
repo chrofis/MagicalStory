@@ -43,7 +43,7 @@ const translations = {
     s1Desc: 'Jede Seite ist vollständig editierbar. Ändere Namen, schreibe Sätze um, passe die Geschichte an deine Familie an. Die KI schreibt den ersten Entwurf — du machst ihn zu deinem.',
     s1b1: 'Klicke auf einen Text, um ihn direkt zu bearbeiten',
     s1b2: 'Ganze Absätze umschreiben oder einzelne Wörter anpassen',
-    s1b3: 'Leseniveau an das Alter deines Kindes anpassen',
+    s1b3: 'Lesestufe an das Alter deines Kindes anpassen',
     s2Title: 'Jedes Bild gestalten',
     s2Desc: 'Dir gefällt eine Szene nicht? Beschreibe, was du ändern möchtest, und eine neue Illustration wird in Sekunden erstellt. Ändere die Umgebung, passe Positionen an oder probiere eine komplett neue Szene.',
     s2b1: 'Beschreibe Änderungen in deinen Worten — "mach den Himmel blauer" oder "füge einen Regenbogen hinzu"',

@@ -963,7 +963,7 @@ export const giftPages: GiftPageData[] = [
         'Wähle ein Lebensherausforderungs-Thema, wenn das Kind einen Übergang durchmacht (neue Schule, neues Geschwisterchen)',
         'Auch Abenteuer-Themen vermitteln Werte: Teamarbeit, Mut, Freundlichkeit und Problemlösung',
         'Ein lesefreundliches Geschenk fördert Lese-Kompetenz und Buchliebe',
-        'Kombiniere mit Quality Time: Lest die Geschichte zusammen als Gutenacht-Ritual',
+        'Kombiniere mit gemeinsamer Zeit: Lest die Geschichte zusammen als Gutenacht-Ritual',
       ],
       fr: [
         'Choisissez un thème de défi de vie si l\'enfant traverse une transition (nouvelle école, nouveau bébé)',

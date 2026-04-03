@@ -163,7 +163,7 @@ export const comparisons: ComparisonData[] = [
       ],
       de: [
         'Enorme Markenbekanntheit: 11 Mio.+ verkaufte Bücher, unterstützt von Penguin Random House',
-        '82.000+ Trustpilot-Bewertungen (4,5 Sterne) — unübertroffener Social Proof',
+        '82.000+ Trustpilot-Bewertungen (4,5 Sterne) — unübertroffener Vertrauensbeweis',
         '15+ Sprachen — viel breitere internationale Abdeckung',
         'Bewährte, konstante Qualität durch vorlagenbasierten Ansatz',
       ],
@@ -329,7 +329,7 @@ export const comparisons: ComparisonData[] = [
         'Meister des emotionalen Marketings — ihre Unboxing-Videos rühren Eltern zu Tränen',
         '3 Mio.+ verkaufte Bücher in 19 Märkten — bewährte Erfolgsgeschichte',
         'Familienfokus: Haustiere, Grosseltern und Geschwister in einem Buch',
-        'Meilenstein-Bücher (Baby, Geburtstag, Hochzeit) mit emotionalem Storytelling',
+        'Meilenstein-Bücher (Baby, Geburtstag, Hochzeit) mit emotionaler Erzählkunst',
       ],
       fr: [
         'Maîtres du marketing émotionnel — leurs vidéos d\'unboxing font pleurer les parents',

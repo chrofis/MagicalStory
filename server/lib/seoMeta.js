@@ -345,12 +345,12 @@ const STATIC_ROUTES = {
   '/themes': {
     title: {
       en: 'Story Themes – Magical Story',
-      de: 'Story-Themen – Magical Story',
+      de: 'Geschichten-Themen – Magical Story',
       fr: 'Thèmes d\'histoires – Magical Story',
     },
     description: {
       en: 'Browse all story themes: adventure, life challenges, educational, and historical. Create a personalized book for your child.',
-      de: 'Alle Story-Themen entdecken: Abenteuer, Lebensherausforderungen, Lehrreiches und Historisches. Ein personalisiertes Buch erstellen.',
+      de: 'Alle Geschichten-Themen entdecken: Abenteuer, Lebensherausforderungen, Lehrreiches und Historisches. Ein personalisiertes Buch erstellen.',
       fr: 'Parcourez tous les thèmes: aventure, défis de vie, éducatif et historique. Créez un livre personnalisé pour votre enfant.',
     },
   },
@@ -577,7 +577,7 @@ const FAQ_JSON_LD = {
       name: 'Wie funktioniert MagicalStory?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Lade ein Foto deines Kindes hoch, wähle ein Story-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite.',
+        text: 'Lade ein Foto deines Kindes hoch, wähle ein Geschichten-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite.',
       },
     },
     {

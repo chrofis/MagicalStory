@@ -36,8 +36,8 @@ const texts: Record<string, {
     ctaButton: 'Start Creating',
   },
   de: {
-    title: 'Story-Themen',
-    subtitle: 'Entdecke über 170 einzigartige Story-Themen in vier Kategorien. Jedes Thema erschafft ein einzigartiges personalisiertes Abenteuer für dein Kind.',
+    title: 'Geschichten-Themen',
+    subtitle: 'Entdecke über 170 einzigartige Geschichten-Themen in vier Kategorien. Jedes Thema erschafft ein einzigartiges personalisiertes Abenteuer für dein Kind.',
     popularTitle: 'Beliebte Themen',
     popularSubtitle: 'Unsere beliebtesten Themen aus allen Kategorien',
     browseAll: 'Alle ansehen',

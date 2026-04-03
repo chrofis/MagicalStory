@@ -114,7 +114,7 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
         name: { en: 'Learning Themes', de: 'Lern-Themen', fr: 'Thèmes d\'apprentissage' },
         description: {
           en: 'Make learning fun with personalized stories about letters, numbers, science, animals, and more. Your child discovers new concepts on every page.',
-          de: 'Mach Lernen zum Spaß mit personalisierten Geschichten über Buchstaben, Zahlen, Wissenschaft, Tiere und mehr. Dein Kind entdeckt auf jeder Seite neue Konzepte.',
+          de: 'Mach Lernen zum Spass mit personalisierten Geschichten über Buchstaben, Zahlen, Wissenschaft, Tiere und mehr. Dein Kind entdeckt auf jeder Seite neue Konzepte.',
           fr: 'Rendez l\'apprentissage amusant avec des histoires personnalisées sur les lettres, les nombres, les sciences, les animaux et plus. Votre enfant découvre de nouveaux concepts à chaque page.',
         },
         groups: educationalGroups
