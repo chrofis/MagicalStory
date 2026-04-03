@@ -5,10 +5,8 @@ import {
   storyCategories,
   storyTypes,
   lifeChallenges,
-  historicalEvents,
   getStoryTypesByGroup,
   getLifeChallengesByGroup,
-  getHistoricalEventsByGroup,
 } from '@/constants/storyTypes';
 import type { Language } from '@/types/story';
 
@@ -24,11 +22,11 @@ interface Props {
   characterGender?: string;
 }
 
-type TrialCategory = 'adventure' | 'life-challenge' | 'historical';
+type TrialCategory = 'adventure' | 'life-challenge';
 
-// Only show these 3 categories for trial
+// Only show these 2 categories for trial
 const trialCategories = storyCategories.filter(
-  (c) => c.id === 'adventure' || c.id === 'life-challenge' || c.id === 'historical'
+  (c) => c.id === 'adventure' || c.id === 'life-challenge'
 );
 
 // ─── Localized strings ──────────────────────────────────────────────────────
@@ -159,7 +157,6 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
   const isComplete = (() => {
     if (!storyInput.storyCategory) return false;
     if (storyInput.storyCategory === 'adventure') return !!storyInput.storyTheme;
-    if (storyInput.storyCategory === 'historical') return !!storyInput.storyTopic;
     if (storyInput.storyCategory === 'life-challenge') return !!storyInput.storyTopic && !!storyInput.storyTheme;
     return !!storyInput.storyTopic;
   })();
@@ -363,60 +360,6 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     );
   }
 
-  // ─── Render: Historical event selection ──────────────────────────────────
-
-  if (storyInput.storyCategory === 'historical' && !storyInput.storyTopic) {
-    const catData = trialCategories.find((c) => c.id === 'historical');
-
-    return (
-      <div className="max-w-4xl mx-auto pt-4">
-        {avatarBanner}
-        <div className="flex items-center gap-2 mb-5">
-          <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
-            <span className="text-lg">{catData?.emoji}</span>
-            <span className="font-semibold text-gray-700">
-              {catData?.name[lang] || catData?.name.en}
-            </span>
-            <button
-              onClick={handleResetCategory}
-              className="ml-1 text-indigo-500 hover:text-indigo-700 text-xs font-medium"
-            >
-              {t.change}
-            </button>
-          </div>
-        </div>
-
-        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Sparkles className="text-indigo-500 w-5 h-5" />
-          {t.pickTopic}
-        </h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
-          {getHistoricalEventsByGroup('popular').map((event) => (
-            <button
-              key={event.id}
-              onClick={() => { handleTopicSelect(event.id); onNext(); }}
-              className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
-            >
-              <span className="text-xl">{event.emoji}</span>
-              <span className="text-sm font-medium text-gray-700">
-                {event.name[lang] || event.name.en}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors mx-auto"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {t.back}
-        </button>
-      </div>
-    );
-  }
-
   // ─── Render: Selection complete — show summary + Next ──────────────────────
 
   const categoryData = trialCategories.find((c) => c.id === storyInput.storyCategory);
@@ -427,9 +370,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
   const selectedTopic =
     storyInput.storyCategory === 'life-challenge'
       ? lifeChallenges.find((c) => c.id === storyInput.storyTopic)
-      : storyInput.storyCategory === 'historical'
-        ? historicalEvents.find((e) => e.id === storyInput.storyTopic)
-        : null;
+      : null;
 
   return (
     <div className="max-w-4xl mx-auto pt-4">
