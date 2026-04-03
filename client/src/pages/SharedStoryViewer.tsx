@@ -309,7 +309,7 @@ export default function SharedStoryViewer() {
       setTimeout(() => {
         setPageTransition('none');
         setTurningPageImage(null);
-      }, 1800);
+      }, 800);
     }
   }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
@@ -498,7 +498,13 @@ export default function SharedStoryViewer() {
             return (
               <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
                 {/* Text — left on desktop, bottom on mobile */}
-                <div className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1">
+                <div
+                  className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1"
+                  style={{
+                    transition: 'opacity 0.6s ease-in',
+                    opacity: pageTransition === 'turning' ? 0 : 1,
+                  }}
+                >
                   <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
                     <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
                       {page.text}
@@ -511,14 +517,14 @@ export default function SharedStoryViewer() {
                   style={{ perspective: '2000px' }}
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
-                  {/* New page image — starts invisible, fades in after old page turns */}
+                  {/* New page image — fades in as old page turns */}
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
                     style={{
-                      transition: pageTransition === 'turning' ? 'none' : 'opacity 1.2s ease-in 0.4s',
+                      transition: pageTransition === 'turning' ? 'none' : 'opacity 0.6s ease-in',
                       opacity: pageTransition === 'turning' ? 0 : 1,
                     }}
                   />
@@ -531,7 +537,7 @@ export default function SharedStoryViewer() {
                       style={{
                         transformOrigin: 'left center',
                         backfaceVisibility: 'hidden',
-                        animation: 'pageTurnLeft 1.8s ease-in-out forwards',
+                        animation: 'pageTurnLeft 0.8s ease-in-out forwards',
                       }}
                     />
                   )}
