@@ -89,7 +89,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
         <div className="flex-shrink-0">
           <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
             <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
-            <span className="hidden sm:inline">{t.title}</span>
+            <span className={isGenerationInProgress ? 'hidden sm:inline' : ''}>{t.title}</span>
           </button>
         </div>
 
