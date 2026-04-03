@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { BookOpen, MapPin, ChevronDown } from 'lucide-react';
+import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -167,6 +167,13 @@ export function WizardStep3BookSettings({
       region: null,
       country: editCountry || null,
     });
+    setIsEditingLocation(false);
+  };
+
+  const handleClearLocation = () => {
+    onLocationChange({ city: null, region: null, country: null });
+    setEditCity('');
+    setEditCountry('');
     setIsEditingLocation(false);
   };
 
@@ -339,8 +346,8 @@ export function WizardStep3BookSettings({
           </div>
 
           {/* Location */}
-          <div className="flex items-center gap-2">
-            <MapPin className="text-gray-500" size={16} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <MapPin className="text-gray-500 shrink-0" size={16} />
             <span className="text-sm text-gray-600">
               {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
             </span>
@@ -373,15 +380,39 @@ export function WizardStep3BookSettings({
                   ✕
                 </button>
               </div>
+            ) : userLocation?.city ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-800">
+                  {userLocation.city}{userLocation.country ? `, ${userLocation.country}` : ''}
+                </span>
+                <button
+                  onClick={() => setIsEditingLocation(true)}
+                  className="p-0.5 text-gray-400 hover:text-indigo-500 transition-colors"
+                  title={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  onClick={handleClearLocation}
+                  className="p-0.5 text-gray-400 hover:text-red-500 transition-colors"
+                  title={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : 'Remove location'}
+                >
+                  <X size={12} />
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => setIsEditingLocation(true)}
-                className="text-sm font-medium text-indigo-500 hover:text-indigo-800 hover:underline"
-              >
-                {userLocation?.city
-                  ? `${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}`
-                  : (language === 'de' ? 'Festlegen' : language === 'fr' ? 'Définir' : 'Set')}
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400 italic">
+                  {language === 'de' ? 'Kein Ort' : language === 'fr' ? 'Aucun lieu' : 'No location'}
+                </span>
+                <button
+                  onClick={() => setIsEditingLocation(true)}
+                  className="text-xs font-medium text-indigo-500 hover:text-indigo-600 flex items-center gap-0.5"
+                >
+                  <Plus size={12} />
+                  {language === 'de' ? 'Ort hinzufügen' : language === 'fr' ? 'Ajouter un lieu' : 'Add location'}
+                </button>
+              </div>
             )}
           </div>
 
