@@ -724,6 +724,9 @@ export default function SharedStoryViewer() {
         </button>
       </div>
 
+      {/* Invisible spacer — makes page barely scrollable so Safari auto-hides URL bar */}
+      <div className="h-[1px] md:hidden" aria-hidden="true" />
+
       {/* Fullscreen image viewer */}
       {fullscreenImage && (
         <div
