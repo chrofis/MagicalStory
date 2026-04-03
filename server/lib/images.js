@@ -437,83 +437,6 @@ async function cropImageForSequential(imageBase64) {
  * Compress PNG image to JPEG format
  * Converts base64 PNG to JPEG with compression to reduce file size
  * @param {string} pngBase64 - Base64 encoded PNG image (with or without data URI prefix)
- * Detect and crop uniform-color borders from generated images.
- * AI models sometimes render the scene inside a frame/border instead of edge-to-edge.
- * Detects borders > 3% of image size on any edge and crops them out.
- * @param {string} imageDataUri - Base64 image data URI
- * @returns {Promise<string>} Cropped image data URI (or original if no border detected)
- */
-async function cropBordersIfPresent(imageDataUri) {
-  try {
-    const base64 = imageDataUri.replace(/^data:image\/\w+;base64,/, '');
-    const buf = Buffer.from(base64, 'base64');
-    const meta = await sharp(buf).metadata();
-    if (!meta.width || !meta.height || meta.width < 200 || meta.height < 200) return imageDataUri;
-
-    const { data: raw, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
-    const { width, height, channels } = info;
-    const minBorderPx = Math.round(Math.min(width, height) * 0.03); // 3% threshold
-
-    // Sample a pixel at (x, y)
-    const px = (x, y) => {
-      const idx = (y * width + x) * channels;
-      return { r: raw[idx], g: raw[idx + 1], b: raw[idx + 2] };
-    };
-
-    // Check if a row/column is uniform color (within tolerance)
-    const isUniformRow = (y, tolerance = 30) => {
-      const ref = px(width >> 1, y);
-      const sampleCount = 10;
-      for (let i = 0; i < sampleCount; i++) {
-        const x = Math.floor((i / sampleCount) * width);
-        const p = px(x, y);
-        if (Math.abs(p.r - ref.r) > tolerance || Math.abs(p.g - ref.g) > tolerance || Math.abs(p.b - ref.b) > tolerance) return false;
-      }
-      return true;
-    };
-    const isUniformCol = (x, tolerance = 30) => {
-      const ref = px(x, height >> 1);
-      const sampleCount = 10;
-      for (let i = 0; i < sampleCount; i++) {
-        const y = Math.floor((i / sampleCount) * height);
-        const p = px(x, y);
-        if (Math.abs(p.r - ref.r) > tolerance || Math.abs(p.g - ref.g) > tolerance || Math.abs(p.b - ref.b) > tolerance) return false;
-      }
-      return true;
-    };
-
-    // Detect border width on each side
-    let top = 0, bottom = 0, left = 0, right = 0;
-    while (top < height * 0.3 && isUniformRow(top)) top++;
-    while (bottom < height * 0.3 && isUniformRow(height - 1 - bottom)) bottom++;
-    while (left < width * 0.3 && isUniformCol(left)) left++;
-    while (right < width * 0.3 && isUniformCol(width - 1 - right)) right++;
-
-    // Only crop if border is significant (> 3% on at least one side)
-    if (top < minBorderPx && bottom < minBorderPx && left < minBorderPx && right < minBorderPx) {
-      return imageDataUri; // No significant border
-    }
-
-    const cropW = width - left - right;
-    const cropH = height - top - bottom;
-    if (cropW < width * 0.5 || cropH < height * 0.5) {
-      log.warn(`⚠️ [BORDER-CROP] Border too large (${left},${top},${right},${bottom}) — skipping crop`);
-      return imageDataUri;
-    }
-
-    log.info(`✂️ [BORDER-CROP] Detected borders: top=${top} bottom=${bottom} left=${left} right=${right} → cropping ${width}x${height} to ${cropW}x${cropH}`);
-    const cropped = await sharp(buf)
-      .extract({ left, top, width: cropW, height: cropH })
-      .resize(width, height, { fit: 'fill' }) // Resize back to original dimensions
-      .jpeg({ quality: 90 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${cropped.toString('base64')}`;
-  } catch (err) {
-    log.warn(`⚠️ [BORDER-CROP] Detection failed: ${err.message}`);
-    return imageDataUri;
-  }
-}
-
 /**
  * @param {number} quality - JPEG quality (1-100, default 85)
  * @param {number|null} maxDimension - Maximum width/height in pixels (null = no resize)
@@ -2682,11 +2605,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         return finalResult;
       }
 
-      // Auto-crop any borders before evaluation
-      if (evaluationType !== 'avatar') {
-        result.imageData = await cropBordersIfPresent(result.imageData);
-      }
-
       // Evaluate quality using Gemini
       const qualityResult = await evaluateImageQuality(
         result.imageData,
@@ -3128,12 +3046,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
         const pngImageData = `data:image/png;base64,${inlineData.data}`;
 
-        // Compress PNG to JPEG and auto-crop any borders
+        // Compress PNG to JPEG
         log.debug('🗜️  [COMPRESSION] Compressing image to JPEG...');
-        let compressedImageData = await compressImageToJPEG(pngImageData);
-        if (evaluationType !== 'avatar') {
-          compressedImageData = await cropBordersIfPresent(compressedImageData);
-        }
+        const compressedImageData = await compressImageToJPEG(pngImageData);
 
         // Call onImageReady callback immediately (before quality eval) for progressive display
         if (onImageReady) {
