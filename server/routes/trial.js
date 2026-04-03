@@ -1741,22 +1741,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         styledAvatarsData[charName] = avatars;
       }
 
-      // Store result on character data in DB
-      try {
-        charData.characters[0].preGeneratedTitlePage = titlePageImage;
-        charData.characters[0].preGeneratedTitle = title;
-        charData.characters[0].preGeneratedCostumeType = costumeType;
-        charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
-        charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
-        await pool.query(
-          'UPDATE characters SET data = $1 WHERE id = $2',
-          [JSON.stringify(charData), characterId]
-        );
-        log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
-      } catch (dbErr) {
-        log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
-      }
-
       // Clear this title-page's scoped cache to free memory
       clearStyledAvatarCache();
 
@@ -1778,6 +1762,22 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         }
       } catch (splitErr) {
         log.debug(`[TRIAL TITLE] Avatar split failed (non-critical): ${splitErr.message}`);
+      }
+
+      // Store result on character data in DB (title page MUST save even if avatar slides fail)
+      try {
+        charData.characters[0].preGeneratedTitlePage = titlePageImage;
+        charData.characters[0].preGeneratedTitle = title;
+        charData.characters[0].preGeneratedCostumeType = costumeType;
+        charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
+        if (avatarSlides.length > 0) charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
+        await pool.query(
+          'UPDATE characters SET data = $1 WHERE id = $2',
+          [JSON.stringify(charData), characterId]
+        );
+        log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
+      } catch (dbErr) {
+        log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
       }
 
       log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType}, avatarSlides: ${avatarSlides.length})`);
