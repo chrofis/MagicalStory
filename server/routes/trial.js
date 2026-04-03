@@ -1898,7 +1898,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     titlePageOnly: true, // Only generate title page, skip initialPage and backCover
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
-    trialMode: true, // Use lightweight story prompt
+    trialMode: false, // Use full story prompt + scene expansion for best image quality
     preGeneratedTitlePage: preGeneratedTitlePage || null, // Pre-generated from prepare-title endpoint
     ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };
