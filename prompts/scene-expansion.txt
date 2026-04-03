@@ -130,9 +130,9 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
   - Default to `"simple"` unless depth separation is clearly needed by the story moment.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of the SAME scene but with NO people or human characters present. Include: location details, architecture, objects, animals, vehicles from the `objects` array, lighting, weather, camera angle, and depth layers. For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). This is used to generate a character-free background image as a style anchor.
-  - **ARTIFACTS AT REAL SIZE**: All objects/artifacts from the scene (books, maps, staffs, tools, etc.) must appear at their real-world size, placed where the character would hold or use them. Use a translucent ghost silhouette holding the artifact in the correct position — this anchors the object's size and placement for later character compositing.
-  - **BOOKS AND MAPS FACE INWARD**: Books, maps, scrolls, and similar flat objects are always seen from the BACK or SPINE — the character is reading the front, so the viewer sees the back cover or the reverse side. Never show the front cover or readable text facing the viewer.
+- `emptyScenePrompt`: A 2-4 sentence description of the SAME scene but with NO people, NO human figures, NO silhouettes, NO ghost shapes, NO human-shaped shadows. Include: location details, architecture, objects, animals, vehicles from the `objects` array, lighting, weather, camera angle, and depth layers. For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). This is used to generate a character-free background image as a style anchor.
+  - **NO GHOSTS OR SILHOUETTES**: Do NOT add translucent figures, ghost silhouettes, placeholder shapes, or any human-shaped forms. The scene must be completely empty of people in any form.
+  - **OBJECTS WITHOUT HOLDERS**: If a character holds an object (book, staff, toy), place the object on a surface (table, ground, railing) — NOT floating in mid-air and NOT held by a ghost/silhouette.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.
