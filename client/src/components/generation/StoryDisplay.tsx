@@ -4421,18 +4421,19 @@ export function StoryDisplay({
                             </p>
                           </div>
                         )}
-                        {/* Image action buttons - always shown (greyed out during generation) */}
-                        {(onRegenerateImage || onImproveImage || onEditImage || isGenerating) && (
+                        {/* During generation: show status banner only, no action buttons */}
+                        {isGenerating && !onImproveImage && (
+                          <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <Loader size={12} className="animate-spin" />
+                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                          </div>
+                        )}
+                        {/* Image action buttons - hidden during generation */}
+                        {!isGenerating && (onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
-                            {isGenerating && !onImproveImage && (
-                              <div className="text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-1">
-                                <Loader size={12} className="animate-spin" />
-                                {language === 'de' ? 'Geschichte wird erstellt — Bearbeitung nach Abschluss möglich' : 'Story generating — editing available after completion'}
-                              </div>
-                            )}
                             {/* Row 1: Image actions — 4 cols on PC, 2 cols on mobile */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {(onEditImage || isGenerating) && (
+                              {onEditImage && (
                                 <button
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -4448,7 +4449,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {(onImproveImage || isGenerating) && (
+                              {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -4464,7 +4465,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {(onRegenerateImage || isGenerating) && (
+                              {onRegenerateImage && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -5029,18 +5030,19 @@ export function StoryDisplay({
                             </div>
                           )}
                         </div>
-                        {/* Image action buttons - always shown (greyed out during generation) */}
-                        {(onRegenerateImage || onImproveImage || onEditImage || isGenerating) && (
+                        {/* During generation: show status banner only, no action buttons */}
+                        {isGenerating && !onImproveImage && (
+                          <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <Loader size={12} className="animate-spin" />
+                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                          </div>
+                        )}
+                        {/* Image action buttons - hidden during generation */}
+                        {!isGenerating && (onRegenerateImage || onImproveImage || onEditImage) && (
                           <div className="mt-3 space-y-2">
-                            {isGenerating && !onImproveImage && (
-                              <div className="text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-1">
-                                <Loader size={12} className="animate-spin" />
-                                {language === 'de' ? 'Geschichte wird erstellt — Bearbeitung nach Abschluss möglich' : 'Story generating — editing available after completion'}
-                              </div>
-                            )}
                             {/* Row 1: Image actions — 4 cols on PC, 2 cols on mobile */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {(onEditImage || isGenerating) && (
+                              {onEditImage && (
                                 <button
                                   onClick={() => onEditImage?.(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -5056,7 +5058,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {(onImproveImage || isGenerating) && (
+                              {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
@@ -5072,7 +5074,7 @@ export function StoryDisplay({
                                   )}
                                 </button>
                               )}
-                              {(onRegenerateImage || isGenerating) && (
+                              {onRegenerateImage && (
                                 <button
                                   onClick={() => openSceneEditModal(pageNumber)}
                                   disabled={isPageBusy(pageNumber) || !hasEnoughCredits}
