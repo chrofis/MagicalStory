@@ -724,12 +724,13 @@ export default function StoryWizard() {
       });
     }
     // If generation completed and we have a story ID, navigate to it
-    log.debug('Auto-nav check:', { generationComplete, completedStoryId, urlStoryId, hasActiveJob: !!activeJob });
-    if (generationComplete && completedStoryId && !urlStoryId) {
+    // Guard: only auto-nav if user is on step 6 (viewing generation), not if they reset to step 1
+    log.debug('Auto-nav check:', { generationComplete, completedStoryId, urlStoryId, hasActiveJob: !!activeJob, step });
+    if (generationComplete && completedStoryId && !urlStoryId && step === 6) {
       log.info('Generation completed, navigating to story:', completedStoryId);
       setSearchParams({ storyId: completedStoryId }, { replace: true });
     }
-  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages]);
+  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages, step]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
@@ -769,6 +770,15 @@ export default function StoryWizard() {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('new');
       setSearchParams(newParams, { replace: true });
+
+      // Clear generation state from previous story
+      setProgressiveStoryData(null);
+      setCompletedPageImages({});
+      setCoverImages({ frontCover: null, initialPage: null, backCover: null });
+      setGeneratedStory('');
+      setIsGenerating(false);
+      setIsProgressMinimized(false);
+      storyTextReceivedRef.current = false;
 
       // Clear any character being edited and reset to character list
       setCurrentCharacter(null);
@@ -3929,11 +3939,15 @@ export default function StoryWizard() {
         }
 
         // Update story text for progressive display (text available before images)
-        if (status.storyText && !storyTextReceivedRef.current) {
-          storyTextReceivedRef.current = true;
-          setProgressiveStoryData(status.storyText);
-          setStoryTitle(status.storyText.title);
-          log.info(`Story text loaded: ${status.storyText.totalPages} pages`);
+        // Allow updates when more pages become available (not just first arrival)
+        if (status.storyText) {
+          const newPageCount = Object.keys(status.storyText.pageTexts || {}).length;
+          if (!storyTextReceivedRef.current || newPageCount > Object.keys(progressiveStoryData?.pageTexts || {}).length) {
+            storyTextReceivedRef.current = true;
+            setProgressiveStoryData(status.storyText);
+            setStoryTitle(status.storyText.title);
+            log.info(`Story text loaded/updated: ${newPageCount} pages (total: ${status.storyText.totalPages})`);
+          }
         }
 
         // Update completed page images as they become available
