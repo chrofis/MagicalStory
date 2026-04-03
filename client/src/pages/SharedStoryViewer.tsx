@@ -301,12 +301,15 @@ export default function SharedStoryViewer() {
         oldImageUrl = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
       }
       setTurningPageImage(oldImageUrl);
-      setCurrentPage(page); // Switch content immediately (new page visible underneath)
       setPageTransition('turning');
+      // Switch content after a tiny delay so new image starts hidden (opacity 0)
+      requestAnimationFrame(() => {
+        setCurrentPage(page);
+      });
       setTimeout(() => {
         setPageTransition('none');
         setTurningPageImage(null);
-      }, 900);
+      }, 1800);
     }
   }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
@@ -353,7 +356,8 @@ export default function SharedStoryViewer() {
       <style>{`
         @keyframes pageTurnLeft {
           0% { transform: rotateY(0deg); opacity: 1; }
-          60% { transform: rotateY(-120deg); opacity: 0.6; }
+          50% { transform: rotateY(-90deg); opacity: 0.7; }
+          75% { transform: rotateY(-140deg); opacity: 0.3; }
           100% { transform: rotateY(-180deg); opacity: 0; }
         }
       `}</style>
@@ -507,15 +511,15 @@ export default function SharedStoryViewer() {
                   style={{ perspective: '2000px' }}
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
-                  {/* New page image — fades in gently */}
+                  {/* New page image — starts invisible, fades in after old page turns */}
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
                     style={{
-                      transition: 'opacity 0.8s ease-in-out',
-                      opacity: pageTransition === 'turning' ? 0.2 : 1,
+                      transition: pageTransition === 'turning' ? 'none' : 'opacity 1.2s ease-in 0.4s',
+                      opacity: pageTransition === 'turning' ? 0 : 1,
                     }}
                   />
                   {/* Old page turning overlay — flips from right edge toward left */}
@@ -527,7 +531,7 @@ export default function SharedStoryViewer() {
                       style={{
                         transformOrigin: 'left center',
                         backfaceVisibility: 'hidden',
-                        animation: 'pageTurnLeft 0.9s ease-in-out forwards',
+                        animation: 'pageTurnLeft 1.8s ease-in-out forwards',
                       }}
                     />
                   )}
