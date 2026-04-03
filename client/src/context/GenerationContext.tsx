@@ -42,7 +42,25 @@ const POLL_INTERVAL = 3000;
 
 export function GenerationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
+  // Load active job synchronously from localStorage so it's available on first render
+  const [activeJob, setActiveJob] = useState<ActiveJob | null>(() => {
+    const stored = storage.getItem(ACTIVE_JOB_KEY);
+    if (stored) {
+      try {
+        const job = JSON.parse(stored) as ActiveJob;
+        const maxAge = 30 * 60 * 1000;
+        if (Date.now() - job.startedAt < maxAge) {
+          logger.info('[GenerationContext] Restoring active job from storage:', job.jobId);
+          return job;
+        }
+        logger.info('[GenerationContext] Stored job too old, clearing');
+        storage.removeItem(ACTIVE_JOB_KEY);
+      } catch {
+        storage.removeItem(ACTIVE_JOB_KEY);
+      }
+    }
+    return null;
+  });
   const [progress, setProgress] = useState<GenerationProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [completedStoryId, setCompletedStoryId] = useState<string | null>(null);
@@ -52,27 +70,6 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
-
-  // Load active job from localStorage on mount
-  useEffect(() => {
-    const stored = storage.getItem(ACTIVE_JOB_KEY);
-    if (stored) {
-      try {
-        const job = JSON.parse(stored) as ActiveJob;
-        // Check if job is not too old (max 30 minutes)
-        const maxAge = 30 * 60 * 1000;
-        if (Date.now() - job.startedAt < maxAge) {
-          logger.info('[GenerationContext] Restoring active job from storage:', job.jobId);
-          setActiveJob(job);
-        } else {
-          logger.info('[GenerationContext] Stored job too old, clearing');
-          storage.removeItem(ACTIVE_JOB_KEY);
-        }
-      } catch {
-        storage.removeItem(ACTIVE_JOB_KEY);
-      }
-    }
-  }, []);
 
   // Fetch active jobs from server when user changes (e.g., impersonation)
   useEffect(() => {

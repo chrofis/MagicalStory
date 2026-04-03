@@ -179,6 +179,14 @@ export default function StoryWizard() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('storyId')) return 6;
     if (params.get('new') === 'true') return 1;  // New story starts at step 1
+    // If there's an active generation job, go straight to step 6 (avoid flash of wrong step)
+    try {
+      const stored = localStorage.getItem('active_story_job');
+      if (stored) {
+        const job = JSON.parse(stored);
+        if (Date.now() - job.startedAt < 30 * 60 * 1000) return 6;
+      }
+    } catch { /* ignore */ }
     const savedStep = localStorage.getItem('wizard_step');
     return savedStep ? parseInt(savedStep, 10) : 1;
   });
