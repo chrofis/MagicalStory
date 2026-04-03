@@ -130,9 +130,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
   - Default to `"simple"` unless depth separation is clearly needed by the story moment.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of the SAME scene but with NO people, NO human figures, NO silhouettes, NO ghost shapes, NO human-shaped shadows. Include: location details, architecture, objects, animals, vehicles from the `objects` array, lighting, weather, camera angle, and depth layers. For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). This is used to generate a character-free background image as a style anchor.
-  - **NO GHOSTS OR SILHOUETTES**: Do NOT add translucent figures, ghost silhouettes, placeholder shapes, or any human-shaped forms. The scene must be completely empty of people in any form.
-  - **OBJECTS WITHOUT HOLDERS**: If a character holds an object (book, staff, toy), place the object on a surface (table, ground, railing) — NOT floating in mid-air and NOT held by a ghost/silhouette.
+- `emptyScenePrompt`: A 2-3 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts. Just the location, architecture, lighting, weather, and camera angle. For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). This is used to generate a clean background image as a style anchor. Objects and characters are added separately.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.

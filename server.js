@@ -3739,14 +3739,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const expandedEmptyPrompt = pageData.emptyScenePrompt || sceneMetadata?.emptyScenePrompt || '';
             if (!settingDesc && !expandedEmptyPrompt) return null;
 
-            // Build object list from scene metadata (animals, vehicles, artifacts — NOT characters)
-            const sceneObjects = (sceneMetadata?.fullData?.objects || [])
-              .map(obj => typeof obj === 'string' ? obj : `${obj.name}: ${obj.position || ''}${obj.description ? ' — ' + obj.description : ''}`)
-              .filter(Boolean);
-            const objectsSection = sceneObjects.length > 0
-              ? `\n\nINCLUDE these objects/elements in the scene:\n${sceneObjects.map(o => `- ${o}`).join('\n')}`
-              : '';
-
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
             const camera = sceneMetadata?.setting?.camera || 'wide shot';
             const lighting = sceneMetadata?.setting?.lighting || '';
@@ -3759,7 +3751,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
-              REQUIRED_OBJECTS: objectsSection
             });
 
             try {
