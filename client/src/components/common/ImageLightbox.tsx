@@ -89,12 +89,12 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
     resetZoom();
   }, [resetZoom]);
 
-  // Handle background click (only close if not zoomed or clicking outside image area)
+  // Handle background click — close when clicking outside the image
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === containerRef.current && scale === 1) {
+    if (e.target === containerRef.current) {
       onClose();
     }
-  }, [onClose, scale]);
+  }, [onClose]);
 
   const zoomIn = useCallback(() => {
     setScale(prev => Math.min(MAX_SCALE, prev + ZOOM_STEP * 2));
@@ -115,13 +115,21 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Control buttons */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+      {/* Close button — always visible, large touch target */}
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-10"
+        aria-label="Close"
+      >
+        <X size={28} />
+      </button>
+
+      {/* Zoom controls — desktop only (scroll/drag don't work on touch) */}
+      <div className="hidden md:flex absolute top-4 right-20 items-center gap-2 z-10">
         <button
           onClick={zoomOut}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
           aria-label="Zoom out"
-          title="Zoom out"
         >
           <ZoomOut size={20} />
         </button>
@@ -132,7 +140,6 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
           onClick={zoomIn}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
           aria-label="Zoom in"
-          title="Zoom in"
         >
           <ZoomIn size={20} />
         </button>
@@ -140,22 +147,13 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
           onClick={resetZoom}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
           aria-label="Reset zoom"
-          title="Reset zoom (or double-click)"
         >
           <RotateCcw size={20} />
         </button>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors ml-2"
-          aria-label="Close"
-          title="Close (Esc)"
-        >
-          <X size={24} />
-        </button>
       </div>
 
-      {/* Zoom hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/50 text-white/70 text-xs z-10">
+      {/* Zoom hint — desktop only */}
+      <div className="hidden md:block absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/50 text-white/70 text-xs z-10">
         Scroll to zoom • Drag to pan • Double-click to reset
       </div>
 

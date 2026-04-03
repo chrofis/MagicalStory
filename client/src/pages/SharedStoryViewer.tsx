@@ -315,7 +315,8 @@ export default function SharedStoryViewer() {
       setTimeout(() => {
         setTurningOut(false);
         setCurrentPage(page);
-        setNewImageVisible(true);
+        // Delay by one frame so new page mounts at opacity 0 first, then fades in
+        requestAnimationFrame(() => setNewImageVisible(true));
       }, 850);
 
       // Allow navigation again after new image has faded in
