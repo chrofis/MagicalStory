@@ -271,7 +271,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
 - `reuseEmptyScene`: `true` if the previously generated empty scene background can be reused as style anchor. `false` if the background/setting/location/camera/lighting changed significantly and a fresh empty scene should be generated. Rule of thumb: if only characters changed (pose, expression, position) → `true`. If setting, location, camera angle, or lighting changed → `false`.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of the SAME scene but with NO people or human characters present. Include: location details, architecture, objects, animals, vehicles from the `objects` array, lighting, weather, camera angle, and depth layers. Describe where characters WOULD stand as "open area" or "empty space". This is used to generate a character-free background image as a style anchor.
+- `emptyScenePrompt`: A 2-4 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location details, architecture, natural landscape, lighting, weather, camera angle, and depth layers. Describe where characters WOULD stand as "open area" or "empty space". This is used to generate a pure background image as a style anchor.
 
 ---
 
