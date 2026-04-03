@@ -3763,11 +3763,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             });
 
             try {
+              // Generate clean empty scene — no VB elements, no landmarks (just the background)
               const result = await generateImageOnly(emptyPrompt, [], {
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
-                landmarkPhotos: pageData.landmarkPhotos,
-                visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
                 skipCache: true
               });
@@ -3778,7 +3777,80 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                 addUsage(provider, result.usage, 'page_images', result.modelId);
               }
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt };
+
+              // Stitch VB elements + landmarks onto the scene as reference strips
+              // Right side: up to 5 elements. Bottom: overflow elements.
+              let finalImageData = result?.imageData || null;
+              if (finalImageData) {
+                try {
+                  const refImages = [];
+                  // Collect landmark photos
+                  if (pageData.landmarkPhotos?.length > 0) {
+                    for (const lm of pageData.landmarkPhotos) {
+                      if (lm.photoData) refImages.push(lm.photoData);
+                    }
+                  }
+                  // Collect VB grid (already a composite image)
+                  if (pageData.visualBibleGrid) {
+                    const vbData = typeof pageData.visualBibleGrid === 'string'
+                      ? pageData.visualBibleGrid
+                      : `data:image/jpeg;base64,${pageData.visualBibleGrid.toString('base64')}`;
+                    refImages.push(vbData);
+                  }
+
+                  if (refImages.length > 0) {
+                    const sceneBase64 = finalImageData.replace(/^data:image\/\w+;base64,/, '');
+                    const sceneBuf = Buffer.from(sceneBase64, 'base64');
+                    const sceneMeta = await sharp(sceneBuf).metadata();
+                    const sceneSize = sceneMeta.width || 1024;
+
+                    // Resize each ref image to fit as a strip (max 20% of scene width per element)
+                    const stripWidth = Math.round(sceneSize * 0.2);
+                    const strips = [];
+                    for (const ref of refImages.slice(0, 6)) {
+                      const refBase64 = ref.replace(/^data:image\/\w+;base64,/, '');
+                      const refBuf = Buffer.from(refBase64, 'base64');
+                      const resized = await sharp(refBuf)
+                        .resize(stripWidth, stripWidth, { fit: 'contain', background: { r: 240, g: 240, b: 240, alpha: 1 } })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                      strips.push(resized);
+                    }
+
+                    if (strips.length > 0) {
+                      // Stitch: scene on left, strips stacked on right
+                      const rightStrips = strips.slice(0, 5);
+                      const bottomStrips = strips.slice(5);
+                      const rightHeight = rightStrips.length * stripWidth;
+                      const totalWidth = sceneSize + stripWidth;
+                      const totalHeight = Math.max(sceneSize, rightHeight) + (bottomStrips.length > 0 ? stripWidth : 0);
+
+                      // Create canvas and composite
+                      const composites = [{ input: sceneBuf, left: 0, top: 0 }];
+                      rightStrips.forEach((strip, i) => {
+                        composites.push({ input: strip, left: sceneSize, top: i * stripWidth });
+                      });
+                      bottomStrips.forEach((strip, i) => {
+                        composites.push({ input: strip, left: i * stripWidth, top: sceneSize });
+                      });
+
+                      const stitched = await sharp({
+                        create: { width: totalWidth, height: totalHeight, channels: 3, background: { r: 240, g: 240, b: 240 } }
+                      })
+                        .composite(composites)
+                        .jpeg({ quality: 85 })
+                        .toBuffer();
+
+                      finalImageData = `data:image/jpeg;base64,${stitched.toString('base64')}`;
+                      log.info(`🖼️ [EMPTY SCENE] Page ${pageData.pageNumber}: stitched ${strips.length} VB refs (${totalWidth}x${totalHeight})`);
+                    }
+                  }
+                } catch (stitchErr) {
+                  log.warn(`⚠️ [EMPTY SCENE] VB stitch failed: ${stitchErr.message}, using clean scene`);
+                }
+              }
+
+              return { pageNumber: pageData.pageNumber, imageData: finalImageData, prompt: emptyPrompt };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
               return null;
