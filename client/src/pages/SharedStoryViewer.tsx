@@ -132,7 +132,7 @@ export default function SharedStoryViewer() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [pageTransition, setPageTransition] = useState<'none' | 'turning'>('none');
-  const [turningPageImage, setTurningPageImage] = useState<string | null>(null);
+  const [turningOut, setTurningOut] = useState(false); // true = current page image is turning away
   const [newImageVisible, setNewImageVisible] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
@@ -296,7 +296,7 @@ export default function SharedStoryViewer() {
       const fromEntry = pageList[currentPage];
       const toEntry = pageList[page];
 
-      // Page turn only between pages with right-panel images (initialPage, story)
+      // Page turn only between pages with right-panel images (initialPage, story), forward only
       const fromHasPanel = fromEntry?.type === 'initialPage' || fromEntry?.type === 'story';
       const toHasPanel = toEntry?.type === 'initialPage' || toEntry?.type === 'story';
 
@@ -306,27 +306,22 @@ export default function SharedStoryViewer() {
         return;
       }
 
-      // Capture old image for turn overlay
-      let oldImageUrl: string | null = null;
-      if (fromEntry?.type === 'story' && story?.pages[fromEntry.storyPageIdx]) {
-        oldImageUrl = `/api/shared/${shareToken}/image/${story.pages[fromEntry.storyPageIdx].pageNumber}${tokenParam}`;
-      } else if (fromEntry?.type === 'initialPage') {
-        oldImageUrl = `/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`;
-      }
-
-      setTurningPageImage(oldImageUrl);
+      // Animate current page's image turning away, then switch pages
       setPageTransition('turning');
+      setTurningOut(true);
       setNewImageVisible(false);
-      requestAnimationFrame(() => {
+
+      // Switch page after image is past 90° (edge-on, barely visible)
+      setTimeout(() => {
+        setTurningOut(false);
         setCurrentPage(page);
-      });
-      // Reveal new image while old page is still turning
-      setTimeout(() => setNewImageVisible(true), 900);
-      // Remove overlay after full animation
+        setNewImageVisible(true);
+      }, 850);
+
+      // Allow navigation again after new image has faded in
       setTimeout(() => {
         setPageTransition('none');
-        setTurningPageImage(null);
-      }, 1600);
+      }, 1300);
     }
   }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
@@ -536,25 +531,16 @@ export default function SharedStoryViewer() {
                   alt="Dedication"
                   className="max-h-full max-w-full object-contain pointer-events-none rounded-lg shadow-lg"
                   loading="eager"
-                  style={{
+                  style={turningOut ? {
+                    transformOrigin: 'left center',
+                    backfaceVisibility: 'hidden',
+                    animation: 'pageTurnLeft 1.6s ease-in-out forwards',
+                  } : {
                     transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
                     opacity: newImageVisible ? 1 : 0,
                   }}
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
-                {/* Turn overlay */}
-                {pageTransition === 'turning' && turningPageImage && (
-                  <img
-                    src={turningPageImage}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                    style={{
-                      transformOrigin: 'left center',
-                      backfaceVisibility: 'hidden',
-                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                    }}
-                  />
-                )}
               </div>
             </div>
           )}
@@ -591,24 +577,15 @@ export default function SharedStoryViewer() {
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
-                    style={{
+                    style={turningOut ? {
+                      transformOrigin: 'left center',
+                      backfaceVisibility: 'hidden',
+                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
+                    } : {
                       transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
                       opacity: newImageVisible ? 1 : 0,
                     }}
                   />
-                  {/* Old page turning overlay — flips from right edge toward left */}
-                  {pageTransition === 'turning' && turningPageImage && (
-                    <img
-                      src={turningPageImage}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                      style={{
-                        transformOrigin: 'left center',
-                        backfaceVisibility: 'hidden',
-                        animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                      }}
-                    />
-                  )}
                 </div>
               </div>
             );
