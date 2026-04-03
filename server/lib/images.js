@@ -10738,59 +10738,48 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
     const dropped = allElements.slice(6).map(e => `${e.name} (${e.type})`).join(', ');
     log.warn(`⚠️ [VB-GRID] Grid overflow: ${allElements.length} elements, keeping first 6, dropping: ${dropped}`);
   }
-  const cellSize = 256;
-  const labelHeight = 24;
-  const cols = 2;
-  const rows = Math.ceil(gridElements.length / cols);
+  // Single column vertical stack — each element gets full width for maximum visibility
+  const cellWidth = 512;
+  const labelHeight = 28;
+  const gap = 4;
 
-  const gridWidth = cols * cellSize;
-  const gridHeight = rows * (cellSize + labelHeight);
-
-  log.debug(`🔲 [VB-GRID] Building grid with ${gridElements.length} elements (${cols}x${rows})`);
+  log.debug(`🔲 [VB-GRID] Building vertical stack with ${gridElements.length} elements`);
 
   try {
-    // Create composite operations for each cell
-    const composites = [];
-
-    for (let i = 0; i < gridElements.length; i++) {
-      const el = gridElements[i];
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const x = col * cellSize;
-      const y = row * (cellSize + labelHeight);
-
-      // Extract base64 data from data URL
+    // First pass: resize all images and calculate total height
+    const resizedElements = [];
+    for (const el of gridElements) {
       const base64Data = el.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64Data, 'base64');
+      const resized = await sharp(imageBuffer)
+        .resize({ width: cellWidth, withoutEnlargement: true })
+        .toBuffer({ resolveWithObject: true });
+      resizedElements.push({ el, buffer: resized.data, width: resized.info.width, height: resized.info.height });
+    }
 
-      // Resize image to fit cell (maintaining aspect ratio, cover)
-      const resizedImage = await sharp(imageBuffer)
-        .resize(cellSize, cellSize, { fit: 'cover' })
-        .toBuffer();
+    const gridWidth = cellWidth;
+    const gridHeight = resizedElements.reduce((sum, r) => sum + r.height + labelHeight + gap, 0) - gap;
 
-      composites.push({
-        input: resizedImage,
-        left: x,
-        top: y
-      });
-
-      // Create label text as SVG
+    // Create composite operations — stack vertically
+    const composites = [];
+    let y = 0;
+    for (const { el, buffer, height } of resizedElements) {
+      // Label above the image
       const labelText = `${el.name} (${el.type})`;
-      // Truncate if too long
-      const displayText = labelText.length > 28 ? labelText.substring(0, 25) + '...' : labelText;
+      const displayText = labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText;
       const labelSvg = `
-        <svg width="${cellSize}" height="${labelHeight}">
-          <rect width="${cellSize}" height="${labelHeight}" fill="#333"/>
-          <text x="${cellSize / 2}" y="17" font-family="Arial, sans-serif" font-size="12"
+        <svg width="${cellWidth}" height="${labelHeight}">
+          <rect width="${cellWidth}" height="${labelHeight}" fill="#333"/>
+          <text x="${cellWidth / 2}" y="20" font-family="Arial, sans-serif" font-size="14"
                 fill="white" text-anchor="middle">${displayText}</text>
         </svg>
       `;
+      composites.push({ input: Buffer.from(labelSvg), left: 0, top: y });
+      y += labelHeight;
 
-      composites.push({
-        input: Buffer.from(labelSvg),
-        left: x,
-        top: y + cellSize
-      });
+      // Image below the label
+      composites.push({ input: buffer, left: 0, top: y });
+      y += height + gap;
     }
 
     // Create base image and composite all elements
@@ -10806,7 +10795,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    log.info(`🔲 [VB-GRID] Created grid: ${gridElements.length} elements, ${gridWidth}x${gridHeight}px, ${Math.round(gridBuffer.length / 1024)}KB`);
+    log.info(`🔲 [VB-GRID] Created vertical stack: ${gridElements.length} elements, ${gridWidth}x${gridHeight}px, ${Math.round(gridBuffer.length / 1024)}KB`);
 
     return gridBuffer;
   } catch (error) {
