@@ -2,6 +2,11 @@ Generate a SINGLE illustration of ONLY the background environment. NO people, NO
 
 {EMPTY_SCENE_DESCRIPTION}
 
+{CHARACTER_SPACE}
+
 Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not add any text, labels, or watermarks.
+Lighting must come from a consistent direction — all shadows point the same way.
+The ground, floor, or surface where characters would stand must be clearly visible.
+Use the exact camera angle and perspective described above.
 
 **ART STYLE:** {STYLE_DESCRIPTION}

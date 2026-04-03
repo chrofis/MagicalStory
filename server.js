@@ -3748,9 +3748,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptySceneDesc = expandedEmptyPrompt
               || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
 
+            // Count foreground vs background characters for space allocation
+            const characters = sceneMetadata?.fullData?.characters || [];
+            let fgCount = 0, bgCount = 0;
+            for (const char of characters) {
+              const pos = (char.position || '').toLowerCase();
+              if (pos.includes('far background') || pos.includes('tiny figure')) {
+                bgCount++;
+              } else {
+                fgCount++;
+              }
+            }
+            let characterSpace = '';
+            if (fgCount > 0 || bgCount > 0) {
+              const parts = [];
+              if (fgCount > 0) parts.push(`${fgCount} character${fgCount > 1 ? 's' : ''} in the foreground`);
+              if (bgCount > 0) parts.push(`${bgCount} tiny figure${bgCount > 1 ? 's' : ''} in the far background`);
+              characterSpace = `Leave open, uncluttered space for ${parts.join(' and ')}. Don't fill those areas with detail.`;
+            }
+
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
+              CHARACTER_SPACE: characterSpace,
             });
 
             try {
