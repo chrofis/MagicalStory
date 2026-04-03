@@ -1760,8 +1760,9 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // Clear this title-page's scoped cache to free memory
       clearStyledAvatarCache();
 
-      // Split styled avatars into individual images for the generation slideshow
-      // Each styled avatar is a 2-column grid (front | side) — we crop to just the front half
+      // Split styled avatars into individual front-view images for the generation slideshow
+      // Uses cropToFrontColumn which detects the actual separator via Python variance analysis
+      const { cropToFrontColumn } = require('../lib/grok');
       const avatarSlides = [];
       try {
         for (const [clothingKey, avatarData] of Object.entries(styledAvatarsData)) {
@@ -1769,17 +1770,8 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
           if (!imgData || typeof imgData !== 'string' || !imgData.startsWith('data:image')) continue;
           const base64 = imgData.replace(/^data:image\/\w+;base64,/, '');
           const buf = Buffer.from(base64, 'base64');
-          const meta = await sharp(buf).metadata();
-          if (meta.width && meta.height && meta.width > meta.height) {
-            // Landscape = 2-column grid, crop left half (front view)
-            const halfWidth = Math.floor(meta.width / 2);
-            const cropped = await sharp(buf).extract({ left: 0, top: 0, width: halfWidth, height: meta.height }).jpeg({ quality: 85 }).toBuffer();
-            avatarSlides.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
-          } else {
-            // Single image, use as-is
-            const resized = await sharp(buf).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-            avatarSlides.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-          }
+          const cropped = await cropToFrontColumn(buf);
+          avatarSlides.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
         }
         if (avatarSlides.length > 0) {
           log.info(`[TRIAL TITLE] Split ${avatarSlides.length} styled avatars for slideshow`);
