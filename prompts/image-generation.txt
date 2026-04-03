@@ -1,4 +1,4 @@
-Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks.
+Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. Do NOT add any text, letters, words, labels, signatures, or watermarks.
 
 {CHARACTER_REFERENCE_LIST}
 
