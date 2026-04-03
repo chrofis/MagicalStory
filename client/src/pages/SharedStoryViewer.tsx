@@ -368,7 +368,7 @@ export default function SharedStoryViewer() {
   if (!story) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Page turn animation keyframes */}
       <style>{`
         @keyframes pageTurnLeft {
@@ -511,7 +511,7 @@ export default function SharedStoryViewer() {
               <img
                 src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
                 alt={currentEntry.type === 'frontCover' ? story.title : 'Back Cover'}
-                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg pointer-events-none"
+                className="max-h-[calc(100dvh-200px)] max-w-full object-contain rounded-lg shadow-lg pointer-events-none"
                 loading="eager"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -522,7 +522,7 @@ export default function SharedStoryViewer() {
 
           {/* Initial/dedication page — blank left + image right (like a real book) */}
           {currentEntry && currentEntry.type === 'initialPage' && (
-            <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
+            <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
               {/* Blank page — left on desktop, bottom on mobile */}
               <div className="h-1/2 md:h-full bg-white order-2 md:order-1" />
               {/* Image — right on desktop, top on mobile (matches story page image area) */}
@@ -564,7 +564,7 @@ export default function SharedStoryViewer() {
             const page = story.pages[currentEntry.storyPageIdx];
             if (!page) return null;
             return (
-              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
+              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
                 {/* Text — left on desktop, bottom on mobile */}
                 <div
                   className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1"
@@ -619,7 +619,7 @@ export default function SharedStoryViewer() {
             const lang = (story.language || 'en').split('-')[0].toLowerCase();
             const et = endPageText[lang] || endPageText.en;
             return (
-            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 min-h-[400px] h-[calc(100vh-200px)] max-h-[800px] p-6">
+            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 min-h-[400px] h-[calc(100dvh-200px)] max-h-[800px] p-6">
               <div className="text-center max-w-md">
                 {story.needsPassword ? (
                   <>
@@ -723,9 +723,6 @@ export default function SharedStoryViewer() {
           <ChevronRight className="w-6 h-6" />
         </button>
       </div>
-
-      {/* Invisible spacer — makes page barely scrollable so Safari auto-hides URL bar */}
-      <div className="h-[1px] md:hidden" aria-hidden="true" />
 
       {/* Fullscreen image viewer */}
       {fullscreenImage && (
