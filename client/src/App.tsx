@@ -5,6 +5,16 @@ import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { GenerationProvider } from './context/GenerationContext';
 
+// Fix iOS Safari blank page when restoring old tabs from bfcache
+// Safari freezes the page state and restores it later — but JS state is stale
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+}
+
 // Lazy load pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const WelcomePage = lazy(() => import('./pages/WelcomePage'));
