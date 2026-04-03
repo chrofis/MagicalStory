@@ -13,6 +13,7 @@ Each cell shows ONE element in isolation against a simple neutral background.
 - Consistent art style across ALL cells matching the style description above
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
 - Clear visual separation between grid cells (visible gap or thin border)
+- **NO TEXT whatsoever** — no labels, no names, no captions, no titles, no watermarks, no letters. The image must contain ZERO text of any kind.
 - All content must be safe, family-friendly, and age-appropriate
 
 **FOR CHARACTERS:**
