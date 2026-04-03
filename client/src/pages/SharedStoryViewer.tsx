@@ -600,8 +600,8 @@ export default function SharedStoryViewer() {
           })()}
 
 
-          {/* Page counter - inside book container */}
-          <div className="flex items-center justify-center py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
+          {/* Page counter - desktop only, inside book */}
+          <div className="hidden md:flex items-center justify-center py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
             <span className="text-indigo-400 text-sm font-medium">
               {currentPage + 1} / {totalPages}
             </span>
@@ -630,7 +630,7 @@ export default function SharedStoryViewer() {
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <p className="text-indigo-400 text-sm">Swipe or tap</p>
+        <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">{currentPage + 1} / {totalPages}</span>
         <button
           onClick={() => goToPage(currentPage + 1)}
           disabled={currentPage >= totalPages - 1}
