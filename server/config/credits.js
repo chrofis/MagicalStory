@@ -25,7 +25,7 @@ const CREDIT_CONFIG = {
   // Credit limits
   LIMITS: {
     MAX_PURCHASE: 4000,       // Maximum credits to purchase (largest package)
-    INITIAL_USER: 300,        // Credits for new users
+    INITIAL_USER: 500,        // Credits for new users (all paths: direct signup, trial conversion, Google)
     INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
   },
 
