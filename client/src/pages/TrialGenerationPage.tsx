@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
@@ -213,6 +213,7 @@ export default function TrialGenerationPage() {
   // Slideshow of page images as they arrive during generation
   const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const [funnyMsgIndex, setFunnyMsgIndex] = useState(0);
 
   // Auth state
   const [email, setEmail] = useState('');
@@ -543,14 +544,45 @@ export default function TrialGenerationPage() {
     }
   };
 
-  // Rotate slideshow every 5 seconds when multiple images available
+  // Build combined slideshow: avatar + title + page images
+  const slideshowItems = useMemo(() => {
+    const items: Array<{ type: 'avatar' | 'title' | 'page'; src: string; label: string }> = [];
+    if (state?.previewAvatar) items.push({ type: 'avatar', src: state.previewAvatar, label: state.characterName || 'Character' });
+    if (titlePageImage) items.push({ type: 'title', src: titlePageImage, label: titlePageTitle || 'Cover' });
+    for (const img of pageImages) items.push({ type: 'page', src: img.imageData, label: `Page ${img.pageNumber}` });
+    return items;
+  }, [state?.previewAvatar, state?.characterName, titlePageImage, titlePageTitle, pageImages]);
+
+  // Funny messages (same as normal story generation)
+  const funnyMessages = [
+    { en: '{name} is getting ready for their big adventure...', de: '{name} macht sich bereit für das grosse Abenteuer...', fr: '{name} se prépare pour sa grande aventure...' },
+    { en: '{name} is practicing their hero pose...', de: '{name} übt gerade die Heldenpose...', fr: '{name} s\'entraîne à prendre la pose du héros...' },
+    { en: '{name} can\'t wait to see what happens next!', de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!', fr: '{name} a hâte de voir ce qui va se passer !' },
+    { en: '{name} just found a magic feather! Adding it to the story...', de: '{name} hat gerade eine Zauberfeder gefunden!', fr: '{name} vient de trouver une plume magique !' },
+    { en: '{name} is whispering secrets to the story wizard...', de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...', fr: '{name} chuchote des secrets au magicien des histoires...' },
+    { en: '{name} is doing a little happy dance!', de: '{name} macht einen kleinen Freudentanz!', fr: '{name} fait une petite danse de joie !' },
+    { en: '{name} is painting the next scene with imagination...', de: '{name} malt die nächste Szene mit viel Fantasie...', fr: '{name} peint la prochaine scène avec imagination...' },
+    { en: '{name} made friends with a talking squirrel!', de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!', fr: '{name} s\'est fait ami avec un écureuil parlant !' },
+    { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}...' },
+    { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...' },
+  ];
+
+  const currentFunnyMsg = useMemo(() => {
+    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
+    const msg = funnyMessages[funnyMsgIndex % funnyMessages.length];
+    const template = msg[lang] || msg.en;
+    return template.replace('{name}', state?.characterName || 'Your hero');
+  }, [funnyMsgIndex, state?.characterName, state?.storyInput?.language]);
+
+  // Rotate slideshow every 4 seconds
   useEffect(() => {
-    if (pageImages.length <= 1) return;
+    if (slideshowItems.length === 0) return;
     const interval = setInterval(() => {
-      setSlideshowIndex(prev => (prev + 1) % pageImages.length);
-    }, 5000);
+      setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
+      setFunnyMsgIndex(prev => prev + 1);
+    }, 4000);
     return () => clearInterval(interval);
-  }, [pageImages.length]);
+  }, [slideshowItems.length]);
 
   // Scroll to top on mount (mobile)
   useEffect(() => {
@@ -623,36 +655,25 @@ export default function TrialGenerationPage() {
             )}
           </div>
 
-          {/* ── Image preview — slideshow of pages as they arrive ──── */}
+          {/* ── Image preview — rotating slideshow: avatar → title → pages ──── */}
           {pageState !== 'failed' && (
             <div className="flex flex-col items-center mb-4">
-              {pageImages.length > 0 ? (
+              {slideshowItems.length > 0 ? (
                 <>
                   <img
-                    src={pageImages[slideshowIndex % pageImages.length].imageData}
-                    alt={`Page ${pageImages[slideshowIndex % pageImages.length].pageNumber}`}
-                    className="w-full h-auto rounded-xl shadow-lg"
+                    src={slideshowItems[slideshowIndex % slideshowItems.length].src}
+                    alt={slideshowItems[slideshowIndex % slideshowItems.length].label}
+                    className={`w-full h-auto rounded-xl shadow-lg transition-opacity duration-500 ${
+                      slideshowItems[slideshowIndex % slideshowItems.length].type === 'avatar' ? 'max-w-xs border-4 border-indigo-100' : ''
+                    }`}
                   />
-                  {pageImages.length > 1 && (
-                    <div className="flex gap-1.5 mt-2">
-                      {pageImages.map((_, i) => (
-                        <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i === slideshowIndex % pageImages.length ? 'bg-indigo-500' : 'bg-gray-300'}`} />
-                      ))}
-                    </div>
+                  {/* Funny character message */}
+                  {pageState !== 'completed' && (
+                    <p className="mt-3 text-sm text-indigo-600 font-medium text-center italic transition-opacity duration-300">
+                      {currentFunnyMsg}
+                    </p>
                   )}
                 </>
-              ) : titlePageImage ? (
-                <img
-                  src={titlePageImage}
-                  alt={titlePageTitle || 'Story cover'}
-                  className="w-full h-auto rounded-xl shadow-lg"
-                />
-              ) : state.previewAvatar ? (
-                <img
-                  src={state.previewAvatar}
-                  alt={state.characterName || 'Character'}
-                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
-                />
               ) : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
                   <BookOpen className="w-8 h-8 text-indigo-500" />
@@ -674,10 +695,10 @@ export default function TrialGenerationPage() {
                     <CheckCircle className="w-7 h-7 text-green-600" />
                   </div>
                   <h2 className="text-lg font-bold text-gray-800 mb-1">{t.accountReady}</h2>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-3 text-left">
-                    <p className="text-amber-800 text-sm font-semibold mb-2">{t.creditsReceived}</p>
-                    <ul className="text-amber-700 text-xs space-y-0.5">
-                      {t.upsellFeatures.map((f, i) => <li key={i}>&#x2022; {f}</li>)}
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-4 mb-3 text-left">
+                    <p className="text-amber-800 text-sm font-bold mb-2">{t.creditsReceived}</p>
+                    <ul className="text-amber-700 text-sm space-y-1.5">
+                      {t.upsellFeatures.map((f, i) => <li key={i} className="flex items-center gap-2"><span className="text-amber-500 font-bold">&#x2022;</span> {f}</li>)}
                     </ul>
                   </div>
                   {pageState !== 'completed' ? (
@@ -794,13 +815,13 @@ export default function TrialGenerationPage() {
                     .
                   </p>
 
-                  {/* Upsell — compact */}
-                  <div className="mt-5 bg-indigo-50 rounded-xl p-3 border border-indigo-100 text-left">
-                    <p className="text-xs font-semibold text-indigo-700 mb-1">{t.upsellTitle}</p>
-                    <ul className="text-xs text-gray-600 space-y-0.5">
+                  {/* Upsell — account benefits */}
+                  <div className="mt-5 bg-indigo-50 rounded-xl p-4 border border-indigo-100 text-left">
+                    <p className="text-sm font-bold text-indigo-700 mb-2">{t.upsellTitle}</p>
+                    <ul className="text-sm text-gray-700 space-y-1.5">
                       {t.upsellFeatures.map((f, i) => (
-                        <li key={i} className="flex items-center gap-1.5">
-                          <span className="text-indigo-500 font-bold">+</span> {f}
+                        <li key={i} className="flex items-center gap-2">
+                          <span className="text-indigo-500 font-bold text-base">+</span> {f}
                         </li>
                       ))}
                     </ul>
