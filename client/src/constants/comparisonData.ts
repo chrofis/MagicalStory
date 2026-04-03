@@ -514,7 +514,7 @@ export const comparisons: ComparisonData[] = [
     verdict: {
       en: 'Librio is the trusted Swiss classic — beautiful template books with sustainability at heart and the beloved Globi character. MagicalStory creates stories that have never existed before, featuring your child\'s actual face and set in their own town. These two Swiss brands complement each other: a Globi book from Librio AND a personalized adventure from MagicalStory make a wonderful combination.',
       de: 'Librio ist der vertrauenswürdige Schweizer Klassiker — schöne Vorlagenbücher mit Nachhaltigkeit im Herzen und dem beliebten Globi. MagicalStory erschafft Geschichten, die es noch nie gab, mit dem echten Gesicht deines Kindes in seiner eigenen Stadt. Diese beiden Schweizer Marken ergänzen sich: ein Globi-Buch von Librio UND ein personalisiertes Abenteuer von MagicalStory sind eine wunderbare Kombination.',
-      fr: 'Librio est le classique suisse de confiance — de beaux livres modèles avec la durabilité au coeur et le personnage Globi adoré. MagicalStory crée des histoires qui n\'ont jamais existé, avec le vrai visage de votre enfant dans sa propre ville. Ces deux marques suisses se complètent : un livre Globi de Librio ET une aventure personnalisée de MagicalStory forment une belle combinaison.',
+      fr: 'Librio est le classique suisse de confiance — de beaux livres modèles avec la durabilité au cœur et le personnage Globi adoré. MagicalStory crée des histoires qui n\'ont jamais existé, avec le vrai visage de votre enfant dans sa propre ville. Ces deux marques suisses se complètent : un livre Globi de Librio ET une aventure personnalisée de MagicalStory forment une belle combinaison.',
     },
     faq: [
       {
