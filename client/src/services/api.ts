@@ -1,5 +1,7 @@
 // Base API client with authentication
 
+import storage, { STORAGE_KEYS } from './storage';
+
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface RequestOptions extends RequestInit {
@@ -8,7 +10,7 @@ interface RequestOptions extends RequestInit {
 
 class ApiClient {
   private getToken(): string | null {
-    return localStorage.getItem('auth_token');
+    return storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   }
 
   private getHeaders(skipAuth = false): HeadersInit {
@@ -38,6 +40,12 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // On 401, clear token and notify listeners (AuthContext handles redirect)
+      if (response.status === 401) {
+        storage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+      }
+
       const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
       // Include details from server if available (e.g., print provider errors)
       let errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;

@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const redirectCheckedRef = useRef(false);
   const authInProgressRef = useRef(false);
-  const tokenRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tokenRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check storage availability and warn user if limited
   useEffect(() => {
@@ -105,8 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Schedule token refresh
   const scheduleTokenRefresh = useCallback((token: string) => {
     // Clear any existing interval
-    if (tokenRefreshIntervalRef.current) {
-      clearInterval(tokenRefreshIntervalRef.current);
+    if (tokenRefreshTimeoutRef.current) {
+      clearInterval(tokenRefreshTimeoutRef.current);
     }
 
     const expiry = getTokenExpiry(token);
@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (timeUntilRefresh > 0) {
       // Schedule refresh
-      tokenRefreshIntervalRef.current = setTimeout(async () => {
+      tokenRefreshTimeoutRef.current = setTimeout(async () => {
         const success = await refreshToken();
         if (success) {
           const newToken = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
@@ -347,7 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Firebase authentication failed' }));
       // Sign out of Firebase to avoid partial auth state
-      try { await firebaseUser.delete?.(); } catch { /* ignore */ }
+      try { await firebaseSignOut(); } catch { /* ignore */ }
       throw new Error(error.error || 'Firebase authentication failed');
     }
 
@@ -440,9 +440,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info('Logging out...');
 
     // Clear refresh timer
-    if (tokenRefreshIntervalRef.current) {
-      clearTimeout(tokenRefreshIntervalRef.current);
-      tokenRefreshIntervalRef.current = null;
+    if (tokenRefreshTimeoutRef.current) {
+      clearTimeout(tokenRefreshTimeoutRef.current);
+      tokenRefreshTimeoutRef.current = null;
     }
 
     // Try to invalidate token on server (best effort)
@@ -719,11 +719,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info('Photo consent recorded');
   }, []);
 
+  // Listen for 401 auth:expired events from api.ts and trigger logout
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      logger.warn('Auth token expired (401), logging out...');
+      logout();
+    };
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('auth:expired', handleAuthExpired);
+    };
+  }, [logout]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (tokenRefreshIntervalRef.current) {
-        clearTimeout(tokenRefreshIntervalRef.current);
+      if (tokenRefreshTimeoutRef.current) {
+        clearTimeout(tokenRefreshTimeoutRef.current);
       }
     };
   }, []);

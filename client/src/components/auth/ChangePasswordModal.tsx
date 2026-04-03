@@ -20,7 +20,7 @@ const translations = {
     confirmPassword: 'Confirm new password',
     changePassword: 'Change Password',
     passwordsMatch: 'Passwords must match',
-    passwordTooShort: 'Password must be at least 6 characters',
+    passwordTooShort: 'Password must be at least 8 characters',
     success: 'Password changed successfully!',
     successDesc: 'Your password has been updated.',
     close: 'Close',
@@ -33,7 +33,7 @@ const translations = {
     confirmPassword: 'Neues Passwort bestätigen',
     changePassword: 'Passwort ändern',
     passwordsMatch: 'Passwörter müssen übereinstimmen',
-    passwordTooShort: 'Passwort muss mindestens 6 Zeichen lang sein',
+    passwordTooShort: 'Passwort muss mindestens 8 Zeichen lang sein',
     success: 'Passwort erfolgreich geändert!',
     successDesc: 'Ihr Passwort wurde aktualisiert.',
     close: 'Schliessen',
@@ -46,7 +46,7 @@ const translations = {
     confirmPassword: 'Confirmer le nouveau mot de passe',
     changePassword: 'Changer le mot de passe',
     passwordsMatch: 'Les mots de passe doivent correspondre',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caracteres',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caracteres',
     success: 'Mot de passe change avec succes!',
     successDesc: 'Votre mot de passe a ete mis a jour.',
     close: 'Fermer',
@@ -71,7 +71,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     e.preventDefault();
     setError('');
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       setError(t.passwordTooShort);
       return;
     }

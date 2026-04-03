@@ -340,7 +340,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     editInstruction: 'What should be changed?',
     applyEdit: 'Apply Edit',
     // Validation messages
-    passwordMinChars: 'Minimum 6 characters',
+    passwordMinChars: 'Minimum 8 characters',
     selectStrengthsFlaws: 'Please select at least 3 strengths and 2 flaws',
     fillAllFields: 'Please fill in all fields',
     networkError: 'Network error. Please check your connection and try again.',
@@ -518,7 +518,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     editInstruction: 'Was soll geändert werden?',
     applyEdit: 'Änderung anwenden',
     // Validation messages
-    passwordMinChars: 'Mindestens 6 Zeichen',
+    passwordMinChars: 'Mindestens 8 Zeichen',
     selectStrengthsFlaws: 'Bitte mindestens 3 Stärken und 2 Schwächen wählen',
     fillAllFields: 'Bitte alle Felder ausfüllen',
     networkError: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
@@ -696,7 +696,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     editInstruction: 'Que faut-il changer ?',
     applyEdit: 'Appliquer la Modification',
     // Validation messages
-    passwordMinChars: 'Minimum 6 caractères',
+    passwordMinChars: 'Minimum 8 caractères',
     selectStrengthsFlaws: 'Veuillez sélectionner au moins 3 forces et 2 défauts',
     fillAllFields: 'Veuillez remplir tous les champs',
     networkError: 'Erreur réseau. Veuillez vérifier votre connexion et réessayer.',

@@ -17,7 +17,7 @@ const translations = {
     confirmPassword: 'Confirm password',
     resetPassword: 'Reset Password',
     passwordsMatch: 'Passwords must match',
-    passwordTooShort: 'Password must be at least 6 characters',
+    passwordTooShort: 'Password must be at least 8 characters',
     success: 'Password reset successfully!',
     successDesc: 'You can now log in with your new password.',
     goToLogin: 'Go to Login',
@@ -32,7 +32,7 @@ const translations = {
     confirmPassword: 'Passwort bestätigen',
     resetPassword: 'Passwort zurücksetzen',
     passwordsMatch: 'Passwörter müssen übereinstimmen',
-    passwordTooShort: 'Passwort muss mindestens 6 Zeichen lang sein',
+    passwordTooShort: 'Passwort muss mindestens 8 Zeichen lang sein',
     success: 'Passwort erfolgreich zurückgesetzt!',
     successDesc: 'Sie können sich jetzt mit Ihrem neuen Passwort anmelden.',
     goToLogin: 'Zur Anmeldung',
@@ -47,7 +47,7 @@ const translations = {
     confirmPassword: 'Confirmer le mot de passe',
     resetPassword: 'Reinitialiser le mot de passe',
     passwordsMatch: 'Les mots de passe doivent correspondre',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caracteres',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caracteres',
     success: 'Mot de passe reinitialise avec succes!',
     successDesc: 'Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.',
     goToLogin: 'Aller a la connexion',
@@ -74,7 +74,7 @@ export default function ResetPassword() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(t.passwordTooShort);
       return;
     }

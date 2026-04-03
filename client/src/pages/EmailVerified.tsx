@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import storage, { STORAGE_KEYS } from '@/services/storage';
 import { Navigation } from '@/components/common';
 import { Button } from '@/components/common/Button';
 import { CheckCircle, Loader2, Monitor, Sparkles, LogIn } from 'lucide-react';
@@ -87,8 +88,10 @@ export default function EmailVerified() {
     const token = searchParams.get('token');
     const isTrial = searchParams.get('trial') === 'true';
     if (token && isTrial) {
-      localStorage.setItem('auth_token', token);
-      localStorage.removeItem('trial_session_token');
+      // Strip JWT from URL immediately to prevent leakage via referrer/history
+      window.history.replaceState({}, '', window.location.pathname + (isTrial ? '?trial=true' : ''));
+      storage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      storage.removeItem('trial_session_token');
       // Fetch user profile before redirecting — AuthContext requires both
       // auth_token AND current_user in localStorage to restore the session
       const API_URL = import.meta.env.VITE_API_URL || '';
@@ -98,7 +101,7 @@ export default function EmailVerified() {
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data?.user) {
-            localStorage.setItem('current_user', JSON.stringify(data.user));
+            storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
           }
         })
         .catch(() => {}) // Best-effort — AuthContext will still try to refresh

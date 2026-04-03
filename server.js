@@ -575,8 +575,9 @@ const corsOptions = {
       'https://magicalstory.ch'
     ];
 
-    // Also allow any Railway.app domain
-    if (origin.includes('railway.app') || allowedOrigins.includes(origin)) {
+    // Also allow any Railway.app domain (strict suffix check to prevent spoofing)
+    const isRailway = origin.endsWith('.railway.app') || origin === 'https://railway.app';
+    if (isRailway || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       log.warn('⚠️  CORS blocked origin:', origin);

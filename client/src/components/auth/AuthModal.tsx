@@ -138,6 +138,9 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
           <div className="text-center">
             <div className="text-5xl mb-4">📧</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.resetLinkSent}</h2>
+            {sharedEmail && (
+              <p className="text-gray-500 text-sm mb-2">{sharedEmail}</p>
+            )}
             <button
               onClick={() => switchMode('login')}
               className="mt-4 text-indigo-500 font-semibold hover:text-gray-800"

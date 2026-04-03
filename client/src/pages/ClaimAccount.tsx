@@ -17,7 +17,7 @@ const translations = {
     password: 'New password',
     confirmPassword: 'Confirm password',
     submit: 'Set Password & Log In',
-    passwordTooShort: 'Password must be at least 6 characters',
+    passwordTooShort: 'Password must be at least 8 characters',
     passwordsMismatch: 'Passwords do not match',
     orGoogle: 'Or sign in with Google',
     googleButton: 'Continue with Google',
@@ -36,7 +36,7 @@ const translations = {
     password: 'Neues Passwort',
     confirmPassword: 'Passwort bestätigen',
     submit: 'Passwort setzen & Anmelden',
-    passwordTooShort: 'Passwort muss mindestens 6 Zeichen lang sein',
+    passwordTooShort: 'Passwort muss mindestens 8 Zeichen lang sein',
     passwordsMismatch: 'Passwörter stimmen nicht überein',
     orGoogle: 'Oder mit Google anmelden',
     googleButton: 'Weiter mit Google',
@@ -55,7 +55,7 @@ const translations = {
     password: 'Nouveau mot de passe',
     confirmPassword: 'Confirmer le mot de passe',
     submit: 'Définir le mot de passe et se connecter',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères',
     passwordsMismatch: 'Les mots de passe ne correspondent pas',
     orGoogle: 'Ou connectez-vous avec Google',
     googleButton: 'Continuer avec Google',
@@ -119,7 +119,7 @@ export default function ClaimAccount() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(t.passwordTooShort);
       return;
     }

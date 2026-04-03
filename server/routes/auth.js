@@ -68,29 +68,34 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
     const password = req.body.password; // Don't sanitize password
     const email = sanitizeString(req.body.email, 254).toLowerCase();
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     let newUser;
 
     if (isDatabaseMode()) {
-      // Check if user already exists
+      // Check if user already exists BEFORE expensive bcrypt hash
       const existing = await dbQuery('SELECT id FROM users WHERE username = $1', [username]);
       if (existing.length > 0) {
         return res.status(400).json({ error: 'This email is already registered' });
       }
 
-      // Check if first user (will be admin)
-      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
-      const isFirstUser = parseInt(userCount[0].count) === 0;
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       const userId = crypto.randomUUID();
-      const role = isFirstUser ? 'admin' : 'user';
-      const storyQuota = isFirstUser ? -1 : 2;
-      const initialCredits = isFirstUser ? -1 : 500;
 
-      await dbQuery(
-        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]
+      // Atomic role/credits selection: prevents race condition where two concurrent
+      // registrations both see count=0 and both become admin
+      const insertResult = await dbQuery(
+        `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits)
+         VALUES ($1, $2, $3, $4,
+           CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
+           CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 2 END,
+           0,
+           CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END)
+         RETURNING role, story_quota, credits`,
+        [userId, username, username, hashedPassword]
       );
+      const role = insertResult[0].role;
+      const storyQuota = insertResult[0].story_quota;
+      const initialCredits = insertResult[0].credits;
 
       // Create initial credit transaction
       if (initialCredits > 0) {
@@ -166,7 +171,7 @@ router.post('/login', authLimiter, async (req, res) => {
         storiesGenerated: dbUser.stories_generated,
         credits: dbUser.credits !== undefined ? dbUser.credits : 500,
         preferredLanguage: dbUser.preferred_language || 'English',
-        emailVerified: dbUser.email_verified !== false,
+        emailVerified: dbUser.email_verified === true,
         photoConsentAt: dbUser.photo_consent_at || null
       };
     } else {
@@ -196,7 +201,7 @@ router.post('/login', authLimiter, async (req, res) => {
         storiesGenerated: user.storiesGenerated || 0,
         credits: user.credits != null ? user.credits : 500,
         preferredLanguage: user.preferredLanguage || 'English',
-        emailVerified: user.emailVerified !== false,
+        emailVerified: user.emailVerified === true,
         photoConsentAt: user.photoConsentAt || null
       }
     });
@@ -222,7 +227,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 
       const dbUser = rows[0];
       log.debug(`[AUTH /me] User ${dbUser.username}: email_verified=${dbUser.email_verified}`);
-      const emailVerifiedResult = dbUser.email_verified !== false;
+      const emailVerifiedResult = dbUser.email_verified === true;
       res.json({
         user: {
           id: dbUser.id,
@@ -276,37 +281,36 @@ router.post('/firebase', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Firebase auth requires database mode' });
     }
 
-    // Atomic upsert: try INSERT, on conflict (existing user) just update last_login
-    // This prevents race conditions when two concurrent requests try to create the same user
-    const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
-    const isFirstUser = parseInt(userCount[0].count) === 0;
-    const role = isFirstUser ? 'admin' : 'user';
-    const storyQuota = isFirstUser ? 999 : 2;
-    const initialCredits = isFirstUser ? -1 : 500;
-
+    // Atomic upsert: try INSERT with inline role selection, on conflict (existing user) just update last_login
+    // The inline CASE WHEN prevents race conditions where two concurrent requests both see count=0
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
     const userId = crypto.randomUUID();
 
     const result = await dbQuery(
       `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+       VALUES ($1, $2, $3, $4,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
+         0,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END,
+         TRUE)
        ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
        RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
+      [userId, username, firebaseEmail, hashedPassword]
     );
     const user = result[0];
     const isNewUser = user.is_new_user;
 
     if (isNewUser) {
-      if (initialCredits > 0) {
+      if (user.credits > 0) {
         await dbQuery(
           'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
-          [user.id, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
+          [user.id, user.credits, user.credits, 'initial', 'Welcome credits for new account']
         );
       }
       await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-      log.info(`New Firebase user registered: ${username} (role: ${role})`);
+      log.info(`New Firebase user registered: ${username} (role: ${user.role})`);
     } else {
       await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
     }
@@ -461,12 +465,12 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
 
     const user = result.rows[0];
 
-    if (!user.password) {
-      return res.status(400).json({ error: 'No password set. Use Google sign-in or set a password first.' });
-    }
-
     if (user.firebase_uid && !user.password) {
       return res.status(400).json({ error: 'Cannot change password for Google accounts.' });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({ error: 'No password set. Use Google sign-in or set a password first.' });
     }
 
     const validPassword = await bcrypt.compare(currentPassword, user.password);
@@ -475,7 +479,7 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+    await pool.query('UPDATE users SET password = $1, has_set_password = true WHERE id = $2', [hashedPassword, userId]);
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
