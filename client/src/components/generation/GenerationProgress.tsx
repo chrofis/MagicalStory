@@ -358,11 +358,15 @@ export function GenerationProgress({
 
   const targetPercent = checkpointToPercent(serverCheckpoint);
 
-  // Smooth progress: always increasing, never jumping.
-  // On each tick, move toward targetPercent. Between checkpoints, creep slowly
-  // so the bar never looks stuck. When a new checkpoint arrives ahead, speed up.
-  const [displayProgress, setDisplayProgress] = useState(3);
-  const targetRef = useRef(3);
+  // Progress strategy:
+  // Phase 1 (0-35%): Linear increase at 1% per second — gives immediate visual feedback
+  // Phase 2 (35%+): Checkpoint-driven — when checkpoints arrive ahead, speed up to catch up.
+  //                  Between checkpoints, slow creep so bar never looks stuck.
+  const LINEAR_CAP = 35;
+  const LINEAR_RATE = 0.5; // 0.5% per 500ms tick = 1%/sec
+
+  const [displayProgress, setDisplayProgress] = useState(1);
+  const targetRef = useRef(1);
 
   // Update target when checkpoint changes
   if (targetPercent > targetRef.current) {
@@ -376,26 +380,27 @@ export function GenerationProgress({
     const interval = setInterval(() => {
       setDisplayProgress(prev => {
         const target = targetRef.current;
+
+        // Phase 1: Linear growth up to LINEAR_CAP (35%), regardless of checkpoints
+        if (prev < LINEAR_CAP && target <= LINEAR_CAP) {
+          return Math.min(prev + LINEAR_RATE, LINEAR_CAP);
+        }
+
+        // Phase 2: Checkpoint-driven
         const gap = target - prev;
 
         if (gap <= 0) {
-          if (prev < 50) {
-            // Exponential creep during text generation (cp 5 → cp 6/7/8)
-            // Starts slow, accelerates: covers 20% → ~48% in ~200s
-            const creepStep = 0.02 + Math.max(0, prev - 15) * 0.003;
-            return Math.min(prev + creepStep, 50);
+          // No checkpoint ahead — slow creep so bar never looks stuck
+          if (prev < 55) {
+            return Math.min(prev + 0.15, 55);  // gentle creep through text gen phase
           }
-          // Above 50%: slow creep toward 98% so bar never looks stuck
+          // Above 55%: slower creep toward 98%
           const creepInterval = Math.max(8, Math.min(15, pageCount * 0.6));
           const creepStep = 0.5 / (creepInterval / 0.5);
           return Math.min(prev + creepStep, 98);
         }
 
-        // Approaching target — move faster when gap is large, slower when close
-        // This creates the "always increasing at different speeds" effect
-        // Small gap (<3%): move 0.3% per tick (smooth catchup)
-        // Medium gap (3-10%): move 0.5-1% per tick
-        // Large gap (>10%): move 1-2% per tick (fast but not instant)
+        // Checkpoint ahead — move toward it, faster when gap is large
         let step: number;
         if (gap < 3) {
           step = 0.3;
