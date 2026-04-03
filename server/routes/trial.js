@@ -960,6 +960,8 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
         if (titlePageImage) {
           response.titlePageImage = titlePageImage;
           response.titlePageTitle = titleText || null;
+          const slides = charData?.characters?.[0]?.preGeneratedAvatarSlides;
+          if (slides?.length) response.avatarSlides = slides;
         }
       } catch (e) {
         // Non-critical, ignore
@@ -1745,6 +1747,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         charData.characters[0].preGeneratedTitle = title;
         charData.characters[0].preGeneratedCostumeType = costumeType;
         charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
+        charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
         await pool.query(
           'UPDATE characters SET data = $1 WHERE id = $2',
           [JSON.stringify(charData), characterId]

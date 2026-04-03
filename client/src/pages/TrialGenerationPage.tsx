@@ -28,6 +28,7 @@ interface LocationState {
     titlePageImage: string | null;
     title: string | null;
     costumeType: string | null;
+    avatarSlides?: string[];
   } | null;
 }
 
@@ -212,6 +213,7 @@ export default function TrialGenerationPage() {
 
   // Slideshow of page images as they arrive during generation
   const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
+  const [avatarSlides, setAvatarSlides] = useState<string[]>(state?.titlePageData?.avatarSlides || []);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
   const [funnyMsgIndex, setFunnyMsgIndex] = useState(0);
 
@@ -337,11 +339,12 @@ export default function TrialGenerationPage() {
 
       if (data.progress !== undefined) setProgress(data.progress);
 
-      // Pick up title page image from poll response (stop asking once received)
+      // Pick up title page image and avatar slides from poll response
       if (data.titlePageImage) {
         setTitlePageImage(data.titlePageImage);
         needTitlePageRef.current = false;
         if (data.titlePageTitle) setTitlePageTitle(data.titlePageTitle);
+        if (data.avatarSlides?.length) setAvatarSlides(data.avatarSlides);
       }
 
       // Collect page images as they arrive
@@ -544,14 +547,18 @@ export default function TrialGenerationPage() {
     }
   };
 
-  // Build combined slideshow: avatar + title + page images
+  // Build combined slideshow: avatar → styled avatars → title → page images
   const slideshowItems = useMemo(() => {
     const items: Array<{ type: 'avatar' | 'title' | 'page'; src: string; label: string }> = [];
     if (state?.previewAvatar) items.push({ type: 'avatar', src: state.previewAvatar, label: state.characterName || 'Character' });
+    // Styled avatar slides (arrive with title page, before story pages)
+    for (let i = 0; i < avatarSlides.length; i++) {
+      items.push({ type: 'avatar', src: avatarSlides[i], label: `${state?.characterName || 'Character'} - Style ${i + 1}` });
+    }
     if (titlePageImage) items.push({ type: 'title', src: titlePageImage, label: titlePageTitle || 'Cover' });
     for (const img of pageImages) items.push({ type: 'page', src: img.imageData, label: `Page ${img.pageNumber}` });
     return items;
-  }, [state?.previewAvatar, state?.characterName, titlePageImage, titlePageTitle, pageImages]);
+  }, [state?.previewAvatar, state?.characterName, avatarSlides, titlePageImage, titlePageTitle, pageImages]);
 
   // Funny messages (same as normal story generation)
   const funnyMessages = [
