@@ -912,7 +912,9 @@ export default function MyStories() {
                   onView={() => navigate('/create')}
                 />
               )}
-              {stories.map((story) => (
+              {stories
+                .filter(story => !(isGeneratingStory && generation?.activeJob?.jobId === story.id))
+                .map((story) => (
                 <StoryCard
                   key={story.id}
                   story={story}
