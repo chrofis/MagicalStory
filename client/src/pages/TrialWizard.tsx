@@ -209,11 +209,9 @@ export default function TrialWizard() {
   const currentStepIndex = STEPS.indexOf(currentStep);
 
   const goNext = () => {
-    let nextIndex = currentStepIndex + 1;
-    // Skip topic step if category+topic already set (from theme page URL params)
-    if (STEPS[nextIndex] === 'topic' && storyInput.storyCategory && storyInput.storyTopic) {
-      nextIndex++;
-    }
+    const nextIndex = currentStepIndex + 1;
+    // Always show topic step — user should be able to change topic and select art style
+    // even when coming from theme page with pre-selected category/topic
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
       window.scrollTo(0, 0);

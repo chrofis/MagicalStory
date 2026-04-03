@@ -742,6 +742,12 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
             </>
+          ) : isGeneratingAvatar ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : 'is being created'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
           ) : (
             <>
               {t.next}
