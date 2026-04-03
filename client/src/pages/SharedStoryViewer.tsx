@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -300,8 +300,8 @@ export default function SharedStoryViewer() {
       const fromHasPanel = fromEntry?.type === 'initialPage' || fromEntry?.type === 'story';
       const toHasPanel = toEntry?.type === 'initialPage' || toEntry?.type === 'story';
 
-      if (!fromHasPanel || !toHasPanel) {
-        // Instant transition for cover pages
+      if (!fromHasPanel || !toHasPanel || page < currentPage) {
+        // Instant: cover pages or going backwards
         setCurrentPage(page);
         return;
       }
@@ -477,15 +477,27 @@ export default function SharedStoryViewer() {
         className="flex-1 flex items-center justify-center px-2 md:px-4 py-4 md:py-6"
         {...swipeHandlers}
       >
-        {/* Left arrow - desktop only */}
-        <button
-          onClick={() => goToPage(currentPage - 1)}
-          disabled={currentPage === 0}
-          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors mr-3 lg:mr-6 flex-shrink-0"
-          aria-label="Previous page"
-        >
-          <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
-        </button>
+        {/* Left navigation - desktop only */}
+        <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 0}
+            className="p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
+          </button>
+          {currentPage > 1 && (
+            <button
+              onClick={() => setCurrentPage(0)}
+              className="p-1.5 rounded-full bg-white shadow border border-indigo-200 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+              aria-label="Go to first page"
+              title="Go to first page"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {/* Book container */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
@@ -511,11 +523,11 @@ export default function SharedStoryViewer() {
           {/* Initial/dedication page — blank left + image right (like a real book) */}
           {currentEntry && currentEntry.type === 'initialPage' && (
             <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
-              {/* Blank page — left on desktop, hidden on mobile */}
-              <div className="hidden md:block bg-white order-2 md:order-1" />
-              {/* Image — right on desktop, full on mobile */}
+              {/* Blank page — left on desktop, bottom on mobile */}
+              <div className="h-1/2 md:h-full bg-white order-2 md:order-1" />
+              {/* Image — right on desktop, top on mobile (matches story page image area) */}
               <div
-                className="h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden p-2 sm:p-4"
+                className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden p-2 sm:p-4"
                 style={{ perspective: '2000px' }}
                 onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`)}
               >
@@ -683,7 +695,16 @@ export default function SharedStoryViewer() {
       </main>
 
       {/* Mobile navigation - bottom */}
-      <div className="md:hidden flex items-center justify-center gap-6 pb-4">
+      <div className="md:hidden flex items-center justify-center gap-4 pb-4">
+        {currentPage > 1 && (
+          <button
+            onClick={() => setCurrentPage(0)}
+            className="p-2.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
+            aria-label="Go to first page"
+          >
+            <ChevronsLeft className="w-5 h-5" />
+          </button>
+        )}
         <button
           onClick={() => goToPage(currentPage - 1)}
           disabled={currentPage === 0}
