@@ -133,6 +133,7 @@ export default function SharedStoryViewer() {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [pageTransition, setPageTransition] = useState<'none' | 'turning'>('none');
   const [turningPageImage, setTurningPageImage] = useState<string | null>(null);
+  const [newImageVisible, setNewImageVisible] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
 
@@ -292,24 +293,40 @@ export default function SharedStoryViewer() {
 
   const goToPage = useCallback((page: number) => {
     if (page >= 0 && page < totalPages && page !== currentPage && pageTransition === 'none') {
-      // Capture the current page's image as the "turning page" overlay
-      const entry = pageList[currentPage];
-      let oldImageUrl: string | null = null;
-      if (entry?.type === 'story' && story?.pages[entry.storyPageIdx]) {
-        oldImageUrl = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
-      } else if (entry?.type === 'frontCover' || entry?.type === 'initialPage' || entry?.type === 'backCover') {
-        oldImageUrl = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
+      const fromEntry = pageList[currentPage];
+      const toEntry = pageList[page];
+
+      // Page turn only between pages with right-panel images (initialPage, story)
+      const fromHasPanel = fromEntry?.type === 'initialPage' || fromEntry?.type === 'story';
+      const toHasPanel = toEntry?.type === 'initialPage' || toEntry?.type === 'story';
+
+      if (!fromHasPanel || !toHasPanel) {
+        // Instant transition for cover pages
+        setCurrentPage(page);
+        return;
       }
+
+      // Capture old image for turn overlay
+      let oldImageUrl: string | null = null;
+      if (fromEntry?.type === 'story' && story?.pages[fromEntry.storyPageIdx]) {
+        oldImageUrl = `/api/shared/${shareToken}/image/${story.pages[fromEntry.storyPageIdx].pageNumber}${tokenParam}`;
+      } else if (fromEntry?.type === 'initialPage') {
+        oldImageUrl = `/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`;
+      }
+
       setTurningPageImage(oldImageUrl);
       setPageTransition('turning');
-      // Switch content after a tiny delay so new image starts hidden (opacity 0)
+      setNewImageVisible(false);
       requestAnimationFrame(() => {
         setCurrentPage(page);
       });
+      // Reveal new image while old page is still turning
+      setTimeout(() => setNewImageVisible(true), 900);
+      // Remove overlay after full animation
       setTimeout(() => {
         setPageTransition('none');
         setTurningPageImage(null);
-      }, 1300);
+      }, 1600);
     }
   }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
 
@@ -473,21 +490,60 @@ export default function SharedStoryViewer() {
         {/* Book container */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
           <div>
-          {/* Cover pages (frontCover, initialPage, backCover) */}
-          {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
+          {/* Cover pages (frontCover, backCover) — centered full-width */}
+          {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'backCover') && (
             <div
               className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-2 sm:p-4 cursor-pointer"
               onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`)}
             >
               <img
                 src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
-                alt={currentEntry.type === 'frontCover' ? story.title : currentEntry.type === 'initialPage' ? 'Dedication' : 'Back Cover'}
+                alt={currentEntry.type === 'frontCover' ? story.title : 'Back Cover'}
                 className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg pointer-events-none"
                 loading="eager"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
+            </div>
+          )}
+
+          {/* Initial/dedication page — blank left + image right (like a real book) */}
+          {currentEntry && currentEntry.type === 'initialPage' && (
+            <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[900px]">
+              {/* Blank page — left on desktop, hidden on mobile */}
+              <div className="hidden md:block bg-white order-2 md:order-1" />
+              {/* Image — right on desktop, full on mobile */}
+              <div
+                className="h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden p-2 sm:p-4"
+                style={{ perspective: '2000px' }}
+                onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`)}
+              >
+                <img
+                  src={`/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`}
+                  alt="Dedication"
+                  className="max-h-full max-w-full object-contain pointer-events-none rounded-lg shadow-lg"
+                  loading="eager"
+                  style={{
+                    transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
+                    opacity: newImageVisible ? 1 : 0,
+                  }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+                {/* Turn overlay */}
+                {pageTransition === 'turning' && turningPageImage && (
+                  <img
+                    src={turningPageImage}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    style={{
+                      transformOrigin: 'left center',
+                      backfaceVisibility: 'hidden',
+                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -501,8 +557,8 @@ export default function SharedStoryViewer() {
                 <div
                   className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1"
                   style={{
-                    transition: 'opacity 0.6s ease-in',
-                    opacity: pageTransition === 'turning' ? 0 : 1,
+                    transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
+                    opacity: newImageVisible ? 1 : 0,
                   }}
                 >
                   <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
@@ -517,15 +573,15 @@ export default function SharedStoryViewer() {
                   style={{ perspective: '2000px' }}
                   onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
                 >
-                  {/* New page image — fades in as old page turns */}
+                  {/* New page image — fades in while old page turns */}
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
                     style={{
-                      transition: pageTransition === 'turning' ? 'none' : 'opacity 0.6s ease-in',
-                      opacity: pageTransition === 'turning' ? 0 : 1,
+                      transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
+                      opacity: newImageVisible ? 1 : 0,
                     }}
                   />
                   {/* Old page turning overlay — flips from right edge toward left */}
@@ -537,7 +593,7 @@ export default function SharedStoryViewer() {
                       style={{
                         transformOrigin: 'left center',
                         backfaceVisibility: 'hidden',
-                        animation: 'pageTurnLeft 1.3s ease-in-out forwards',
+                        animation: 'pageTurnLeft 1.6s ease-in-out forwards',
                       }}
                     />
                   )}
