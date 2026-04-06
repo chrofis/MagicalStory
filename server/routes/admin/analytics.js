@@ -622,15 +622,15 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           const pricing = MODEL_PRICING[modelId];
           const perImage = pricing?.perImage || 0.04; // Default to flash pricing
           return sum + (usage.calls * perImage);
-        }, 0) || (totals.gemini_image.calls * 0.065), // Fallback if no byFunction data
+        }, 0) || (totals.gemini_image.calls * 0.04), // Fallback: gemini-2.5-flash-image
         byModel: totals.imageByModel,
         total: 0
       },
       gemini_quality: {
-        // Gemini 2.0 Flash for quality eval
-        input: (totals.gemini_quality.input_tokens / 1000000) * 0.10,
-        output: (totals.gemini_quality.output_tokens / 1000000) * 0.40,
-        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.40,
+        // Gemini 2.5 Flash for quality eval (was 2.0 — pricing 3-6x higher)
+        input: (totals.gemini_quality.input_tokens / 1000000) * 0.30,
+        output: (totals.gemini_quality.output_tokens / 1000000) * 2.50,
+        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 2.50,
         total: 0
       },
       runware: {
@@ -688,8 +688,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
 
     // Helper to calculate cost for a day/month entry (using same pricing as totals)
+    // NOTE: Anthropic uses Sonnet rates as approximation. Actual per-model split (Sonnet vs Haiku)
+    // would require per-byFunction tracking on aggregations — left as a future improvement.
     const calculateEntryCost = (entry) => {
-      // Claude: $3 input / $15 output per 1M tokens
+      // Claude: $3 input / $15 output per 1M tokens (Sonnet pricing — over-estimates Haiku)
       const anthropicCost = ((entry.anthropic?.input_tokens || 0) / 1000000) * 3.00 +
                            ((entry.anthropic?.output_tokens || 0) / 1000000) * 15.00 +
                            ((entry.anthropic?.thinking_tokens || 0) / 1000000) * 15.00;
@@ -697,12 +699,12 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       const geminiTextCost = ((entry.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
                             ((entry.gemini_text?.output_tokens || 0) / 1000000) * 2.50 +
                             ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 2.50;
-      // Gemini image gen: ~$0.065 per image weighted avg (estimate based on call count)
-      const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.065;
-      // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output per 1M tokens
-      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
-                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
-                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
+      // Gemini image gen: ~$0.04 per image (gemini-2.5-flash-image)
+      const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.04;
+      // Gemini 2.5 Flash (quality): $0.30 input / $2.50 output per 1M tokens (was 2.0 Flash $0.10/$0.40)
+      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.30 +
+                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 2.50 +
+                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 2.50;
       const runwareCost = entry.runware?.direct_cost || 0;
       const grokCost = entry.grok?.direct_cost || 0;
       return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost + grokCost;

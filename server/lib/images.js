@@ -5190,7 +5190,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       });
       if (result?.usage && usageTracker) {
         const isRunware = result.modelId && result.modelId.startsWith('runware:');
-        usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_iterate', result.modelId);
+        const isGrok = result.modelId && result.modelId.startsWith('grok-imagine');
+        const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+        // Route to page_images function so it shows up in the proper bucket
+        usageTracker(provider, result.usage, 'page_images', result.modelId);
       }
     }
     return result;
@@ -5203,11 +5206,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const inputImage = bestSoFar?.imageData || img.imageData;
     const result = await inpaintPage(inputImage, latestEval || {});
     if (result.usage && usageTracker) {
-      usageTracker('gemini_image', {
+      // Detect actual provider from the model used
+      const inpaintModel = result.usage?.model || '';
+      const isRunware = inpaintModel.startsWith('runware:');
+      const isGrok = inpaintModel.startsWith('grok');
+      const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+      usageTracker(provider, {
         input_tokens: result.usage?.inputTokens || 0,
         output_tokens: result.usage?.outputTokens || 0,
         cost: result.usage?.cost,
-      }, 'unified_pipeline_inpaint', result.usage?.model || 'grok-text-edit');
+        direct_cost: result.usage?.cost,  // Grok/Runware track via direct_cost
+      }, 'inpaint', inpaintModel || 'grok-text-edit');
     }
     return result;
   };
