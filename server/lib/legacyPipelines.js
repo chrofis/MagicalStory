@@ -2465,8 +2465,8 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
   const { getLanguageNameEnglish } = require('./languages');
   const langText = getLanguageNameEnglish(lang);
   const printPages = inputData.pages;
-  const isPictureBookLayout = inputData.languageLevel === '1st-grade';
-  const sceneCount = isPictureBookLayout ? printPages : Math.floor(printPages / 2);
+  // Picture-book layout for all reading levels: 1 page = 1 scene
+  const sceneCount = printPages;
   const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
   const enableIncrementalConsistency = incrementalConsistencyConfig?.enabled === true;
   const incrementalConsistencyDryRun = incrementalConsistencyConfig?.dryRun === true;
@@ -3393,11 +3393,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       pageTextMap[page.pageNumber] = page.content;
     });
 
-    // Calculate actual print page count:
-    // Picture book (1st-grade): 1 page per scene
-    // Standard/Advanced: 2 pages per scene (text page + image page)
-    // Note: isPictureBookLayout is already defined above based on generationMode
-    const printPageCount = isPictureBookLayout ? sceneCount : sceneCount * 2;
+    // Picture-book layout for all reading levels: 1 scene = 1 print page
+    const printPageCount = sceneCount;
 
     await saveCheckpoint(jobId, 'story_text', {
       title: storyTitle,

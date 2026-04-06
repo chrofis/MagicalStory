@@ -428,9 +428,8 @@ router.get('/:userId/details', authenticateToken, requireAdmin, async (req, res)
         }
 
         const sceneCount = meta.sceneCount || 0;
-        const isPictureBook = meta.languageLevel === '1st-grade';
-        const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
-        const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+        // Picture-book layout for all reading levels: 1 scene = 1 print page
+        const pageCount = sceneCount > 0 ? sceneCount + 3 : 0;
         // Estimate image count: scenes + up to 3 cover images
         const imageCount = sceneCount + (meta.hasThumbnail ? 3 : 0);
         totalImages += imageCount;
@@ -568,9 +567,8 @@ router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res)
       }
 
       const sceneCount = meta.sceneCount || 0;
-      const isPictureBook = meta.languageLevel === '1st-grade';
-      const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
-      const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+      // Picture-book layout for all reading levels: 1 scene = 1 print page
+      const pageCount = sceneCount > 0 ? sceneCount + 3 : 0;
 
       return {
         id: meta.id,

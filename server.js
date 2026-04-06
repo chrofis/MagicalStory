@@ -2275,13 +2275,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
   };
 
-  // Calculate scene count based on layout:
-  // - Picture Book (1st-grade): 1 scene per page (image + text combined)
-  // - Standard/Advanced: 1 scene per 2 pages (text page + image page)
-  const isPictureBookLayout = inputData.languageLevel === '1st-grade';
-  const sceneCount = isPictureBookLayout ? inputData.pages : Math.floor(inputData.pages / 2);
+  // Picture-book layout for all reading levels: 1 page = 1 scene
+  // (image on top, text below). The reading level controls text density only.
+  const sceneCount = inputData.pages;
   const lang = inputData.language || 'en';
-  log.debug(`📖 [UNIFIED] Input: ${inputData.pages} pages, level: ${inputData.languageLevel}, layout: ${isPictureBookLayout ? 'Picture Book' : 'Standard'} → ${sceneCount} scenes`);
+  log.debug(`📖 [UNIFIED] Input: ${inputData.pages} pages, level: ${inputData.languageLevel} → ${sceneCount} scenes`);
   const { getLanguageNameEnglish } = require('./server/lib/languages');
   const langText = getLanguageNameEnglish(lang);
 
@@ -3351,11 +3349,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     storyPages.forEach(page => {
       pageTextMap[page.pageNumber] = page.text;
     });
-    // Calculate actual print page count:
-    // Picture book (1st-grade): 1 page per scene
-    // Standard/Advanced: 2 pages per scene (text page + image page)
-    const isPictureBook = inputData.languageLevel === '1st-grade';
-    const printPageCount = isPictureBook ? storyPages.length : storyPages.length * 2;
+    // Picture-book layout for all reading levels: 1 scene = 1 print page
+    const printPageCount = storyPages.length;
 
     // Frontend expects: { title, dedication, pageTexts, sceneDescriptions, totalPages, totalScenes }
     await saveCheckpoint(jobId, 'story_text', {
@@ -4204,7 +4199,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
-          usageTracker: (provider, usage, funcName, modelId) => addUsage(provider, usage, funcName, modelId),
+          usageTracker: (provider, usage, funcName, modelId) => {
+            // Some legacy call sites in images.js call this as (null, usage, null, modelId).
+            // Infer provider + function name from the model so the tokens aren't lost.
+            if (provider == null && usage && modelId) {
+              const m = String(modelId).toLowerCase();
+              if (m.includes('claude') || m.includes('haiku') || m.includes('sonnet') || m.includes('opus')) {
+                provider = 'anthropic';
+                if (!funcName) funcName = 'scene_expansion';
+              } else if (m.includes('gemini')) {
+                // Default Gemini calls without a function name to quality eval
+                provider = 'gemini_quality';
+                if (!funcName) funcName = 'consistency_check';
+              }
+            }
+            return addUsage(provider, usage, funcName, modelId);
+          },
           visualBible,
           artStyle: inputData.artStyle,
           jobId,
@@ -5227,12 +5237,9 @@ async function _processStoryJobImpl(jobId) {
     const { getLanguageNameEnglish } = require('./server/lib/languages');
     const langText = getLanguageNameEnglish(lang);
 
-    // Calculate number of story scenes to generate:
-    // - Picture Book (1st-grade): 1 scene per page (image + text on same page)
-    // - Standard/Advanced: 1 scene per 2 print pages (text page + facing image page)
+    // Picture-book layout for all reading levels: 1 page = 1 scene
     const printPages = inputData.pages;  // Total pages when printed
-    const isPictureBookLayout = inputData.languageLevel === '1st-grade';
-    const sceneCount = isPictureBookLayout ? printPages : Math.floor(printPages / 2);
+    const sceneCount = printPages;
     log.debug(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${generationMode}, Scenes to generate: ${sceneCount}`);
 
     if (skipImages) {

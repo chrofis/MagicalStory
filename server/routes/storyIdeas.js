@@ -59,8 +59,10 @@ async function buildIdeasPromptContext({
 }) {
   const { getLanguageInstruction } = require('../lib/languages');
 
-  // Calculate scene count based on reading level
-  const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
+  // Picture-book layout (default for all reading levels): 1 page = 1 scene
+  // (image on top, text below). The reading level controls text density,
+  // not the layout, so the page count maps directly to scene count.
+  const sceneCount = pages;
 
   // Build character descriptions
   const characterDescriptions = characters.map(c => {

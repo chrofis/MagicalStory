@@ -180,8 +180,8 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     let storyContentPages = 0;
     for (let si = 0; si < stories.length; si++) {
       const storyPages = parseStoryPages(stories[si].data);
-      const isPictureBook = stories[si].data.languageLevel === '1st-grade';
-      storyContentPages += isPictureBook ? storyPages.length : storyPages.length * 2;
+      // Picture-book layout for all reading levels: 1 scene = 1 print page
+      storyContentPages += storyPages.length;
       if (si > 0) {
         storyContentPages += 2; // title + dedication page (always)
         const hasBackCover = !!stories[si].data?.coverImages?.backCover;

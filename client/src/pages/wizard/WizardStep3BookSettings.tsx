@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus } from 'lucide-react';
+import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus, Baby, Book, BookText } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -224,44 +224,42 @@ export function WizardStep3BookSettings({
     }
   }, [pages, minPages, effectiveMaxPages, onPagesChange]);
 
+  // All reading levels use the same picture-book layout (image on top, text below).
+  // The only difference is text density: short, medium, or long text per page.
+  // Approximate words/page comes from server/lib/storyHelpers.js LANGUAGE_LEVELS.
+  const wordsLabel = language === 'de' ? 'Wörter pro Seite' : language === 'fr' ? 'mots par page' : 'words per page';
   const readingLevels = [
     {
       value: '1st-grade' as LanguageLevel,
       label: t.firstGrade,
       desc: t.firstGradeDesc,
-      image: '/images/text and image on each page.jpg',
+      icon: Baby,
+      wordRange: `~20-35 ${wordsLabel}`,
     },
     {
       value: 'standard' as LanguageLevel,
       label: t.standard,
       desc: t.standardDesc,
-      image: '/images/left page text, right page image.jpg',
+      icon: Book,
+      wordRange: `~120-150 ${wordsLabel}`,
     },
     {
       value: 'advanced' as LanguageLevel,
       label: t.advanced,
       desc: t.advancedDesc,
-      image: '/images/dense text left.jpg',
+      icon: BookText,
+      wordRange: `~250-300 ${wordsLabel}`,
     },
   ];
 
-  // Generate page option label based on language level
+  // Page label is now uniform across reading levels: each page = 1 scene
+  // (image + text combined on the same page in picture-book layout).
   const getPageLabel = (pageCount: number, isTest = false) => {
     const testSuffix = isTest ? ' (Test)' : '';
     const creditsCost = pageCount * 10;
     const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits';
-
-    if (languageLevel === '1st-grade') {
-      return `${pageCount} ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    }
-    const textPages = Math.floor(pageCount / 2);
-    const imagePages = Math.floor(pageCount / 2);
-    if (language === 'de') {
-      return `${pageCount} Seiten (${textPages} Text + ${imagePages} Bilder) = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    } else if (language === 'fr') {
-      return `${pageCount} pages (${textPages} texte + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    }
-    return `${pageCount} pages (${textPages} text + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
+    const pagesLabel = language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages';
+    return `${pageCount} ${pagesLabel} = ${creditsCost} ${creditsLabel}${testSuffix}`;
   };
 
   return (
@@ -447,29 +445,28 @@ export function WizardStep3BookSettings({
       <div>
         <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
         <div className="flex overflow-x-auto gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 -mx-3 px-3 md:mx-0 md:px-0">
-          {readingLevels.map((level) => (
-            <button
-              key={level.value}
-              onClick={() => onLanguageLevelChange(level.value)}
-              className={`flex-shrink-0 w-56 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
-                languageLevel === level.value
-                  ? 'border-indigo-500 ring-2 ring-indigo-200'
-                  : 'border-gray-200 hover:border-indigo-300'
-              }`}
-            >
-              <div className="w-full bg-gray-100 p-2 h-48 md:h-56">
-                <img
-                  src={level.image}
-                  alt={level.label}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="p-2 md:p-2.5">
-                <div className="font-semibold text-sm mb-0.5">{level.label}</div>
+          {readingLevels.map((level) => {
+            const Icon = level.icon;
+            const isSelected = languageLevel === level.value;
+            return (
+              <button
+                key={level.value}
+                onClick={() => onLanguageLevelChange(level.value)}
+                className={`flex-shrink-0 w-56 md:w-auto text-left rounded-lg border-2 p-4 transition-all ${
+                  isSelected
+                    ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300 bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon size={28} className={isSelected ? 'text-indigo-500' : 'text-gray-400'} />
+                  <div className="font-semibold text-base">{level.label}</div>
+                </div>
+                <div className="text-xs text-indigo-600 font-medium mb-1">{level.wordRange}</div>
                 <div className="text-xs text-gray-500 whitespace-pre-line">{level.desc}</div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -549,10 +546,7 @@ export function WizardStep3BookSettings({
                   {getPageLabel(pages, pages === 4)}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  {languageLevel === '1st-grade'
-                    ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
-                    : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
-                  }
+                  {language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below'}
                 </p>
               </div>
             </div>

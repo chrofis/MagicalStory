@@ -1133,10 +1133,9 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     for (const story of stories) {
       const storyText = story.data.storyText || story.data.generatedStory || story.data.story || story.data.text || '';
       const storyPages = parseStoryPages(storyText);
-      const isPictureBook = story.data.languageLevel === '1st-grade';
-      const pagesFromStory = isPictureBook ? storyPages.length : storyPages.length * 2;
-      console.log(`📊 [BOOK PDF] Story "${story.data.title}": ${storyPages.length} parsed pages, contentPages=${pagesFromStory}`);
-      storyContentPages += pagesFromStory;
+      // Picture-book layout for all reading levels: 1 scene = 1 print page
+      console.log(`📊 [BOOK PDF] Story "${story.data.title}": ${storyPages.length} pages`);
+      storyContentPages += storyPages.length;
     }
     const estimatedPageCount = 1 + storyContentPages + 1;
     console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${storyContentPages} story content pages)`);
@@ -1250,15 +1249,14 @@ router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async
 
     const storyData = JSON.parse(storyResult.rows[0].data);
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const isPictureBook = storyData.languageLevel === '1st-grade';
 
     // Calculate total PDF pages (cover spread + blank + dedication + story pages)
-    // Must match what generatePrintPdf() produces
+    // Picture-book layout for all reading levels: 1 scene = 1 print page
     const frontMatterPages = 2; // blank left page + dedication right page
-    let interiorPages = frontMatterPages + (isPictureBook ? storyScenes : storyScenes * 2);
+    let interiorPages = frontMatterPages + storyScenes;
     if (interiorPages % 2 !== 0) interiorPages += 1; // Pad to even
     const printPageCount = 1 + interiorPages; // +1 for cover spread
-    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, total=${printPageCount}`);
+    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, interior=${interiorPages}, total=${printPageCount}`);
 
     // Get print product UID - prefer softcover for retry (can be changed in admin UI)
     const productsResult = await getDbPool().query(
@@ -1463,10 +1461,9 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         : storyResult.rows[0].data;
       stories.push({ id: sid, data: storyData });
 
-      // Calculate pages for this story
-      const isPictureBook = storyData.languageLevel === '1st-grade';
+      // Picture-book layout for all reading levels: 1 scene = 1 print page
       const sceneCount = storyData.sceneImages?.length || storyData.pages || 5;
-      totalPages += isPictureBook ? sceneCount : sceneCount * 2;
+      totalPages += sceneCount;
     }
 
     // Story 1: 1 page (dedication, blank if trial)

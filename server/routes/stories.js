@@ -133,12 +133,10 @@ router.get('/', authenticateToken, async (req, res) => {
           return null; // Skip invalid rows
         }
 
-        // Calculate page count from scene count
+        // Picture-book layout for all reading levels: 1 scene = 1 print page
         const sceneCount = meta.sceneCount || 0;
-        const isPictureBook = meta.languageLevel === '1st-grade';
-        const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
         const hasCovers = meta.hasThumbnail || row.has_cover_image;
-        const pageCount = sceneCount > 0 ? storyPages + (hasCovers ? 3 : 0) : 0;
+        const pageCount = sceneCount > 0 ? sceneCount + (hasCovers ? 3 : 0) : 0;
 
         return {
           id: meta.id,

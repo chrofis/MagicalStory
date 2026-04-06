@@ -1224,8 +1224,8 @@ function getTokensPerPage(languageLevel) {
 
 /**
  * Calculate the actual page count for a story
- * Picture book (1st-grade): 1 scene = 1 page (text + image combined)
- * Standard book: 1 scene = 2 pages (text page + image page)
+ * Picture-book layout is the default for all reading levels: 1 scene = 1 page
+ * (image on top, text below). Reading level only controls text density, not layout.
  * @param {Object} storyData - The story data object
  * @param {boolean} includeCoverPages - Whether to add 3 pages for covers (default: true)
  * @returns {number} Total page count
@@ -1234,12 +1234,9 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
   const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
   if (sceneCount === 0) return 0;
 
-  // Picture book (1st-grade): 1 scene = 1 page. Standard book: 1 scene = 2 pages
-  const isPictureBook = storyData?.languageLevel === '1st-grade';
-  const scenePageCount = isPictureBook ? sceneCount : sceneCount * 2;
-
+  // 1 scene = 1 physical page in picture-book layout
   // Add 3 pages for front cover, back cover, and initial page (title page)
-  return includeCoverPages ? scenePageCount + 3 : scenePageCount;
+  return includeCoverPages ? sceneCount + 3 : sceneCount;
 }
 
 // ============================================================================
@@ -2173,14 +2170,8 @@ function extractPageClothing(outline, totalPages = 20) {
  */
 function buildBasePrompt(inputData, textPageCount = null) {
   const mainCharacterIds = inputData.mainCharacters || [];
-  // Use textPageCount if provided, otherwise calculate from total pages
-  // For advanced/standard: total PDF pages / 2 = text pages (since each scene = 1 text + 1 image page)
-  // For 1st-grade: total PDF pages = text pages (combined layout)
-  const actualTextPages = textPageCount || (
-    inputData.languageLevel === '1st-grade'
-      ? (inputData.pages || 15)
-      : Math.ceil((inputData.pages || 15) / 2)
-  );
+  // Picture-book layout for all reading levels: 1 page = 1 scene = 1 text page.
+  const actualTextPages = textPageCount || (inputData.pages || 15);
 
   // For story text generation, we use BASIC character info (no strengths/weaknesses)
   // Strengths/weaknesses are only used in outline generation to avoid repetitive trait mentions
