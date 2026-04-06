@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
-import { getPriceForPages, MAX_BOOK_PAGES } from './Pricing';
+import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF } from './Pricing';
 import { createLogger } from '@/services/logger';
 
 // Type for pricing tier
@@ -44,7 +44,7 @@ export default function BookBuilder() {
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
-  const [bookFormat, setBookFormat] = useState<'square' | 'A4'>('square');
+  const [bookFormat, setBookFormat] = useState<'square' | 'A4'>('A4');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -89,7 +89,8 @@ export default function BookBuilder() {
       portraitFormat: 'Portrait',
       portraitSize: '21 × 28 cm',
       price: 'Price',
-      includesShipping: 'Includes shipping & taxes (Switzerland)',
+      bookPriceLabel: 'Book',
+      shippingLabel: 'Shipping (Switzerland)',
       shippingTime: 'Delivery in 5-7 business days',
       creditsRefund: 'All credits used to generate the stories will be refunded',
       orderBook: 'Order Book',
@@ -101,11 +102,9 @@ export default function BookBuilder() {
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
       quantity: 'Quantity',
-      shippingSaving: 'Save on shipping!',
+      shippingSavingHint: 'Save on shipping by ordering multiple books at once — shipping is paid only once.',
       totalPrice: 'Total',
       perBook: 'per book',
-      multiDiscount: (n: number) => `CHF ${n} discount per book for 2+ copies`,
-      youSave: (n: number) => `You save CHF ${n}`,
     },
     de: {
       title: 'Erstelle dein Buch',
@@ -131,7 +130,8 @@ export default function BookBuilder() {
       portraitFormat: 'Hochformat',
       portraitSize: '21 × 28 cm',
       price: 'Preis',
-      includesShipping: 'Inkl. Versand & Steuern (Schweiz)',
+      bookPriceLabel: 'Buch',
+      shippingLabel: 'Versand (Schweiz)',
       shippingTime: 'Lieferung in 5-7 Werktagen',
       creditsRefund: 'Alle Credits für die Geschichten werden zurückerstattet',
       orderBook: 'Buch bestellen',
@@ -143,9 +143,7 @@ export default function BookBuilder() {
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
       quantity: 'Anzahl',
-      shippingSaving: 'Spare Versandkosten!',
-      multiDiscount: (n: number) => `CHF ${n} Rabatt pro Buch ab 2 Exemplaren`,
-      youSave: (n: number) => `Du sparst CHF ${n}`,
+      shippingSavingHint: 'Spare Versandkosten, indem du mehrere Bücher auf einmal bestellst — Versand wird nur einmal berechnet.',
       totalPrice: 'Gesamt',
       perBook: 'pro Buch',
     },
@@ -173,7 +171,8 @@ export default function BookBuilder() {
       portraitFormat: 'Portrait',
       portraitSize: '21 × 28 cm',
       price: 'Prix',
-      includesShipping: 'Livraison & taxes incluses (Suisse)',
+      bookPriceLabel: 'Livre',
+      shippingLabel: 'Livraison (Suisse)',
       shippingTime: 'Livraison en 5-7 jours ouvrables',
       creditsRefund: 'Tous les crédits utilisés pour les histoires seront remboursés',
       orderBook: 'Commander le livre',
@@ -185,9 +184,7 @@ export default function BookBuilder() {
       printPdf: 'PDF impression (Test)',
       generatingPdf: 'Génération du PDF...',
       quantity: 'Quantité',
-      shippingSaving: 'Économisez sur la livraison !',
-      multiDiscount: (n: number) => `CHF ${n} de réduction par livre dès 2 exemplaires`,
-      youSave: (n: number) => `Vous économisez CHF ${n}`,
+      shippingSavingHint: 'Économisez sur la livraison en commandant plusieurs livres à la fois — la livraison n\'est facturée qu\'une seule fois.',
       totalPrice: 'Total',
       perBook: 'par livre',
     },
@@ -586,10 +583,8 @@ export default function BookBuilder() {
                   >
                     <Plus size={18} className="text-gray-600" />
                   </button>
-                  {quantity > 1 && (
-                    <span className="text-sm text-green-600 font-medium">{t.multiDiscount(6)}</span>
-                  )}
                 </div>
+                <p className="text-sm text-green-600 mt-2">{t.shippingSavingHint}</p>
               </div>
             )}
 
@@ -597,34 +592,29 @@ export default function BookBuilder() {
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
-                  const MULTI_DISCOUNT = 6; // CHF per extra book
-                  const extraBooks = Math.max(0, quantity - 1);
-                  const totalSaving = extraBooks * MULTI_DISCOUNT;
-                  const totalPrice = (price * quantity) - totalSaving;
-                  return quantity > 1 ? (
+                  const booksSubtotal = price * quantity;
+                  const totalPrice = booksSubtotal + SHIPPING_COST_CHF;
+                  return (
                     <>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-gray-500 text-sm">1 x CHF {price}.- + {extraBooks} x CHF {price - MULTI_DISCOUNT}.-</span>
+                      <div className="flex items-center justify-between mb-1 text-sm text-gray-600">
+                        <span>
+                          {quantity > 1 ? `${quantity} × CHF ${price}.- ${t.perBook}` : t.bookPriceLabel}
+                        </span>
+                        <span>CHF {booksSubtotal}.-</span>
                       </div>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-2 text-sm text-gray-600">
+                        <span>{t.shippingLabel}</span>
+                        <span>CHF {SHIPPING_COST_CHF}.-</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-indigo-200">
                         <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
-                        <div className="text-right">
-                          <span className="text-sm text-gray-400 line-through mr-2">CHF {price * quantity}.-</span>
-                          <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice}.-</span>
-                        </div>
+                        <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice}.-</span>
                       </div>
-                      <div className="text-sm text-green-600 font-semibold">{t.youSave(totalSaving)}</div>
                     </>
-                  ) : (
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-700">{t.price}</span>
-                      <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
-                    </div>
                   );
                 })()}
-                <p className="text-sm text-gray-500">{t.includesShipping}</p>
-                <p className="text-sm text-gray-500">{t.shippingTime}</p>
-                <p className="text-sm text-green-600 mt-2 font-medium">{t.creditsRefund}</p>
+                <p className="text-sm text-gray-500 mt-2">{t.shippingTime}</p>
+                <p className="text-sm text-green-600 mt-1 font-medium">{t.creditsRefund}</p>
               </div>
             )}
 

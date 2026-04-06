@@ -1482,17 +1482,14 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     }
 
     // Calculate price based on pages and cover type (using database pricing)
+    // Pricing tiers store the BOOK price only — shipping is added once per order.
     const isHardcover = coverType === 'hardcover';
     const priceInChf = await getPriceForPages(totalPages, isHardcover);
-    // Multi-copy discount: CHF 6 off per EXTRA book (1st full price, 2nd+ discounted)
-    const MULTI_COPY_DISCOUNT = 6; // CHF per extra book
-    const extraBooks = Math.max(0, quantity - 1);
-    const totalDiscount = extraBooks * MULTI_COPY_DISCOUNT;
-    const totalPriceChf = (priceInChf * quantity) - totalDiscount;
+    const SHIPPING_COST_CHF = 10; // Flat CHF 10 shipping per order (Switzerland)
+    const booksSubtotal = priceInChf * quantity;
+    const totalPriceChf = booksSubtotal + SHIPPING_COST_CHF;
     const price = totalPriceChf * 100; // Convert CHF to cents for Stripe (total, not per-unit)
-    if (totalDiscount > 0) {
-      log.info(`💰 [CHECKOUT] Multi-copy discount: CHF ${MULTI_COPY_DISCOUNT} × ${extraBooks} extra books = CHF ${totalDiscount} savings (${priceInChf * quantity} → ${totalPriceChf})`);
-    }
+    log.info(`💰 [CHECKOUT] ${quantity}× CHF ${priceInChf} (${booksSubtotal}) + CHF ${SHIPPING_COST_CHF} shipping = CHF ${totalPriceChf}`);
 
     const firstStory = stories[0].data;
     const bookTitle = stories.length === 1
@@ -1507,9 +1504,9 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
           currency: 'chf',
           product_data: {
             name: quantity > 1 ? `${quantity}x Personalized Storybook: ${bookTitle}` : `Personalized Storybook: ${bookTitle}`,
-            description: `${quantity > 1 ? `${quantity} copies, ` : ''}${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType}${totalDiscount > 0 ? ` (CHF ${totalDiscount} discount)` : ''}`,
+            description: `${quantity > 1 ? `${quantity} copies, ` : ''}${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType} — incl. CHF ${SHIPPING_COST_CHF} shipping`,
           },
-          unit_amount: price,  // Total price for all copies (discount already applied)
+          unit_amount: price,  // Total price for all copies (book × qty + shipping)
         },
         quantity: 1,
       }],

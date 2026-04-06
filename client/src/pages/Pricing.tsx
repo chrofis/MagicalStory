@@ -14,16 +14,20 @@ interface PricingTier {
 }
 
 // Fallback pricing tiers (used while loading or if API fails)
+// Prices are PER BOOK, shipping (CHF 10) is added once at checkout
 const fallbackPricingTiers: PricingTier[] = [
-  { maxPages: 30, label: '1-30', softcover: 38, hardcover: 53 },
-  { maxPages: 40, label: '31-40', softcover: 45, hardcover: 60 },
-  { maxPages: 50, label: '41-50', softcover: 51, hardcover: 66 },
-  { maxPages: 60, label: '51-60', softcover: 57, hardcover: 72 },
-  { maxPages: 70, label: '61-70', softcover: 63, hardcover: 78 },
-  { maxPages: 80, label: '71-80', softcover: 69, hardcover: 84 },
-  { maxPages: 90, label: '81-90', softcover: 75, hardcover: 90 },
-  { maxPages: 100, label: '91-100', softcover: 81, hardcover: 96 },
+  { maxPages: 30, label: '1-30', softcover: 28, hardcover: 43 },
+  { maxPages: 40, label: '31-40', softcover: 35, hardcover: 50 },
+  { maxPages: 50, label: '41-50', softcover: 41, hardcover: 56 },
+  { maxPages: 60, label: '51-60', softcover: 47, hardcover: 62 },
+  { maxPages: 70, label: '61-70', softcover: 53, hardcover: 68 },
+  { maxPages: 80, label: '71-80', softcover: 59, hardcover: 74 },
+  { maxPages: 90, label: '81-90', softcover: 65, hardcover: 80 },
+  { maxPages: 100, label: '91-100', softcover: 71, hardcover: 86 },
 ];
+
+// Flat shipping cost per order (Switzerland), regardless of quantity
+export const SHIPPING_COST_CHF = 10;
 
 // Helper function to get price for a page count (uses fallback if tiers not loaded)
 export function getPriceForPages(pageCount: number, isHardcover: boolean, tiers?: PricingTier[]): number | null {
@@ -60,12 +64,12 @@ export default function Pricing() {
   const translations = {
     en: {
       title: 'Book Pricing',
-      subtitle: 'Price includes shipping and taxes within Switzerland',
-      internationalNote: 'International shipping available at additional cost',
+      subtitle: `Per book — plus CHF ${SHIPPING_COST_CHF} flat shipping per order (Switzerland)`,
+      internationalNote: 'Order multiple books and pay shipping only once',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '20 × 20 cm or 21 × 28 cm',
+      hardcoverSize: '20 × 20 cm or 21 × 28 cm',
       pages: 'Pages',
       features: 'What\'s included',
       feature1: 'High-quality print',
@@ -78,12 +82,12 @@ export default function Pricing() {
     },
     de: {
       title: 'Buchpreise',
-      subtitle: 'Preis inkl. Versand und Steuern innerhalb der Schweiz',
-      internationalNote: 'Internationaler Versand gegen Aufpreis möglich',
+      subtitle: `Pro Buch — zzgl. CHF ${SHIPPING_COST_CHF} Pauschalversand pro Bestellung (Schweiz)`,
+      internationalNote: 'Mehrere Bücher bestellen und Versand nur einmal zahlen',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '20 × 20 cm oder 21 × 28 cm',
+      hardcoverSize: '20 × 20 cm oder 21 × 28 cm',
       pages: 'Seiten',
       features: 'Was enthalten ist',
       feature1: 'Hochwertiger Druck',
@@ -96,12 +100,12 @@ export default function Pricing() {
     },
     fr: {
       title: 'Tarifs des livres',
-      subtitle: 'Prix incluant livraison et taxes en Suisse',
-      internationalNote: 'Livraison internationale disponible avec supplément',
+      subtitle: `Par livre — plus CHF ${SHIPPING_COST_CHF} de livraison forfaitaire par commande (Suisse)`,
+      internationalNote: 'Commandez plusieurs livres et ne payez la livraison qu\'une fois',
       softcover: 'Couverture souple',
       hardcover: 'Couverture rigide',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '20 × 20 cm ou 21 × 28 cm',
+      hardcoverSize: '20 × 20 cm ou 21 × 28 cm',
       pages: 'Pages',
       features: 'Ce qui est inclus',
       feature1: 'Impression haute qualité',
