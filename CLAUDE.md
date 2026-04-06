@@ -66,6 +66,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Do not automatically deploy.** Always ask before deploying.
 - **Ask if unclear.** If there are different implementation options, ask rather than assuming.
 - **Unified mode is primary.** All new features and developer options must work in unified mode (the default story generation mode). Don't implement features only for legacy modes (pictureBook, outlineAndText) - unified mode is the mode the user wants to use.
+- **Action button styling MUST be identical across rows.** When adding or modifying any button in an action button row (e.g. the StoryDisplay top/bottom action bars: Buch erstellen, PDF herunterladen, Geschichte ansehen, Neue Geschichte), copy the EXACT className from a sibling button. Never invent new gradient/padding/text-size combos for "this one special CTA" — they all share the row, they all look the same. The standard for `StoryDisplay` action buttons is: `bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600` with icon `size={16}`. If you find yourself writing different styling for one button in a row, STOP — copy the sibling instead.
 
 ## Folder Organization Rules
 
