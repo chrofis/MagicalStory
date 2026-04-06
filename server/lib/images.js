@@ -5151,12 +5151,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const inputImage = bestSoFar?.imageData || img.imageData;
       result = await iteratePage(inputImage, img.pageNumber, storyData, {
         modelOverrides,
-        usageTracker: null,
+        usageTracker, // pass through so Haiku scene re-expansion + image gen are tracked
         evaluationFeedback: evalFeedback,
       });
-      if (result?.usage && usageTracker) {
-        usageTracker('gemini_image', result.usage, 'unified_pipeline_iterate', result.modelId);
-      }
+      // iteratePage tracks its own usage internally; nothing to add here
     } else if (img.pageNumber < 0 && storyData) {
       const { iterateCover } = require('./coverIterate');
       const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
@@ -5944,9 +5942,9 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const sceneResult = await callClaudeAPI(scenePrompt, 16000, modelOverrides?.sceneIterationModel || MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
   const newSceneDescription = sceneResult.text;
 
-  // Track usage
+  // Track usage (Claude Haiku scene re-expansion)
   if (usageTracker && sceneResult.usage) {
-    usageTracker(null, sceneResult.usage, null, sceneResult.modelId || 'claude');
+    usageTracker('anthropic', sceneResult.usage, 'scene_expansion', sceneResult.modelId || MODEL_DEFAULTS.sceneIteration);
   }
 
   // Parse the scene JSON to extract previewMismatches
