@@ -58,6 +58,7 @@ const {
   deleteFromImageCache,
   generateImageCacheKey,
   buildVisualBibleGrid,
+  buildEmptySceneVbGrid,
   blackoutIssueRegions,
   enrichWithBoundingBoxes,
   collectAllIssuesForPage,
@@ -1950,19 +1951,27 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Generate fresh empty scene — background/setting changed
       log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
       try {
-        const { resolveArtStyle } = require('../lib/storyHelpers');
+        const { resolveArtStyleForEmptyScene, resolveArtStyle } = require('../lib/storyHelpers');
         const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-        const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar', iterBackend) || resolveArtStyle('pixar') || '';
+        // Use the anatomy-stripped style description — explicit eye/face details cause
+        // stray faces to appear in empty backgrounds.
+        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
+          || resolveArtStyleForEmptyScene('pixar')
+          || resolveArtStyle(storyData.artStyle || 'pixar', iterBackend)
+          || '';
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: ''
         });
+        // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
+        // (chars/animals/artifacts excluded — they belong on the populated page).
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           imageModelOverride,
           imageBackendOverride: iterBackend,
           landmarkPhotos: pageLandmarkPhotos,
-          visualBibleGrid,
+          visualBibleGrid: emptySceneVbGrid,
           pageNumber,
           skipCache: true
         });
@@ -4587,16 +4596,26 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // Determine clothing for this character on this page
-          // Priority: scene metadata > clothingRequirements > 'standard'
+          // Determine clothing for this character on this page.
+          // Priority: sceneCharacterClothing (persisted from generation — source of truth)
+          //         > scene metadata > clothingRequirements > 'standard'
+          // sceneCharacterClothing was set by the unified pipeline at generation time and
+          // holds the actual perCharClothing used to render the page, so the styled avatar
+          // we pick to repair will match the avatar that drew the page.
           let pageClothing = 'standard';
-          const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
-          if (sceneMetadata?.characterClothing?.[characterName]) {
-            pageClothing = sceneMetadata.characterClothing[characterName];
-          } else if (storyData.clothingRequirements?.[characterName]) {
-            const charReqs = storyData.clothingRequirements[characterName];
-            if (charReqs?.costumed?.used && charReqs.costumed.costume) {
-              pageClothing = `costumed:${charReqs.costumed.costume}`;
+          const persistedClothing = sceneImage.sceneCharacterClothing || sceneImage.characterClothing || null;
+          if (persistedClothing && persistedClothing[characterName]) {
+            pageClothing = persistedClothing[characterName];
+            log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: using persisted clothing "${pageClothing}" (from generation)`);
+          } else {
+            const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
+            if (sceneMetadata?.characterClothing?.[characterName]) {
+              pageClothing = sceneMetadata.characterClothing[characterName];
+            } else if (storyData.clothingRequirements?.[characterName]) {
+              const charReqs = storyData.clothingRequirements[characterName];
+              if (charReqs?.costumed?.used && charReqs.costumed.costume) {
+                pageClothing = `costumed:${charReqs.costumed.costume}`;
+              }
             }
           }
 

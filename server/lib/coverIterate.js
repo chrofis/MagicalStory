@@ -8,7 +8,7 @@
 
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
-const { resolveArtStyle } = require('./storyHelpers');
+const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 
@@ -56,6 +56,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     deleteFromImageCache,
     blackoutIssueRegions,
     buildVisualBibleGrid,
+    buildEmptySceneVbGrid,
   } = require('./images');
 
   const { getElementReferenceImagesForPage, buildFullVisualBiblePrompt } = require('./visualBible');
@@ -257,16 +258,23 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
   let coverSceneBackground = null;
   try {
-    const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar') || '';
+    // Use the anatomy-stripped style description for empty scenes — explicit eye/face
+    // details in the style prompt cause stray faces to appear in empty backgrounds.
+    const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar')
+      || resolveArtStyle(storyData.artStyle || 'pixar')
+      || '';
     const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
     const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
       STYLE_DESCRIPTION: artStyleDesc,
       EMPTY_SCENE_DESCRIPTION: emptyDesc,
       REQUIRED_OBJECTS: ''
     });
+    // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
+    // (chars/animals/artifacts excluded — they belong on the populated cover).
+    const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, 0, coverLandmarkPhotos);
     const emptyResult = await generateImageOnly(emptyPrompt, [], {
       landmarkPhotos: coverLandmarkPhotos,
-      visualBibleGrid: coverVbGrid,
+      visualBibleGrid: emptySceneVbGrid,
       skipCache: true
     });
     if (emptyResult?.imageData) {

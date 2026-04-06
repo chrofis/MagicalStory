@@ -1775,6 +1775,63 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData)
  * @param {number} maxRefs - Maximum reference images to return (default 4)
  * @returns {Array} Elements with reference images for this page
  */
+/**
+ * Get reference images appropriate for EMPTY SCENE generation.
+ *
+ * Empty scenes should contain SETTING-defining elements (vehicles, non-landmark locations)
+ * but NOT mobile/scene-specific things (characters, animals, artifacts).
+ *
+ * Why this filter exists:
+ * - Vehicles like ships, cars, carriages are part of the setting and need to be present
+ *   in the empty scene so the page builds on top of them.
+ * - Locations (e.g. "magical forest clearing") anchor the setting.
+ * - Characters/animals belong on the populated page, not in the background.
+ * - Artifacts (e.g. a book) caused doubling — they appeared both in the empty scene AND
+ *   later in the character's hand on the page.
+ *
+ * @param {Object} visualBible
+ * @param {number} pageNumber
+ * @param {number} maxRefs
+ * @returns {Array} Vehicle + non-landmark location references for this page
+ */
+function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
+  if (!visualBible) return [];
+
+  const refs = [];
+
+  // Vehicles (ships, cars, carriages, spacecraft) — part of the setting
+  for (const entry of visualBible.vehicles || []) {
+    if (!entry.referenceImageData) continue;
+    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    refs.push({
+      id: entry.id,
+      name: entry.name,
+      type: 'vehicle',
+      description: entry.extractedDescription || entry.description,
+      referenceImageData: entry.referenceImageData,
+      priority: 1,
+    });
+  }
+
+  // Non-landmark locations (real landmarks use real photos via getLandmarkPhotosForScene)
+  for (const entry of visualBible.locations || []) {
+    if (entry.isRealLandmark) continue;
+    if (!entry.referenceImageData) continue;
+    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    refs.push({
+      id: entry.id,
+      name: entry.name,
+      type: 'location',
+      description: entry.extractedDescription || entry.description,
+      referenceImageData: entry.referenceImageData,
+      priority: 2,
+    });
+  }
+
+  refs.sort((a, b) => a.priority - b.priority);
+  return refs.slice(0, maxRefs);
+}
+
 function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) {
   if (!visualBible) return [];
 
@@ -1925,5 +1982,6 @@ module.exports = {
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
   getElementReferenceImagesForPage,
+  getEmptySceneElementReferences,
   getElementReferenceImagesByIds
 };

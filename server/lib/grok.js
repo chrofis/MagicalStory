@@ -378,16 +378,30 @@ async function packReferences(refs = {}) {
   const charCount = charBuffers.length;
   const slots = [];
 
-  // Scene background goes first — style anchor for visual consistency
-  // When present, VB grid and landmarks are already baked into it (generated with those refs),
-  // so we skip them below to free slots for character photos
+  // Decide whether to bake VB elements into the scene background as a border.
+  // Border mode is ONLY used when 2+ characters need their own slots — there's
+  // no free slot for a standalone VB grid. With 0–1 characters we have a free
+  // slot, so the scene stays clean and the VB grid gets its own slot at full size.
   const hasSceneBackground = sceneBackground && sceneBackground.startsWith('data:image');
+  const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
+    ? visualBibleGrid.rawElements
+    : [];
+  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0 && charCount >= 2;
+
+  // Scene background goes first — style anchor for visual consistency
   if (hasSceneBackground) {
     const base64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
-    const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
-    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 [GROK] Slot ${slots.length}: scene background (style anchor, includes VB+landmarks)`);
+
+    if (useBorderedScene) {
+      const bordered = await composeSceneWithVbBorder(buf, rawVbElements);
+      slots.push(`data:image/jpeg;base64,${bordered.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: scene background + ${Math.min(rawVbElements.length, 9)} VB cells (bordered 1280x1280)`);
+    } else {
+      const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: scene background (clean style anchor)`);
+    }
   }
 
   // Previous image goes FIRST — it's the scene being re-rendered (style transfer)
@@ -400,22 +414,26 @@ async function packReferences(refs = {}) {
     log.info(`🎨 [GROK] Slot ${slots.length}: previous/source image`);
   }
 
-  // Strategy: maximize character image quality by giving them separate slots
-  // When scene background is present, VB grid and landmarks are already embedded in it,
-  // so we skip them and use the freed slots for character photos.
+  // Strategy: maximize character image quality by giving them separate slots.
+  // When the scene background is BORDERED (2+ chars), VB+landmarks are already
+  // embedded in it, so we skip them below to free slots for character photos.
+  // With a CLEAN scene background (0–1 chars), the VB grid gets its own slot.
   //
-  // With scene background (slots used: 1 for bg):
-  //   1 char:  Slot 2 = character
+  // Bordered scene (slots used: 1 for bg with VB baked in):
   //   2 chars: Slot 2 = char 1, Slot 3 = char 2
   //   3+ chars: Slot 2 = chars first half, Slot 3 = chars second half
   //
-  // Without scene background (all 3 slots free):
+  // Clean scene + 0–1 chars (slot 1 = scene, slots 2-3 free):
+  //   0 chars: Slot 2 = VB grid, Slot 3 = landmark(s)
+  //   1 char:  Slot 2 = VB grid, Slot 3 = character
+  //
+  // No scene background (all 3 slots free):
   //   1 char:  Slot 1 = VB grid, Slot 2 = landmark(s), Slot 3 = character
   //   2 chars: Slot 1 = VB + landmarks stitched, Slot 2 = char 1, Slot 3 = char 2
   //   3+ chars: Slot 1 = VB + landmarks stitched, Slot 2 = chars first half, Slot 3 = chars second half
 
-  // Skip VB grid and landmarks when scene background already includes them
-  const skipContext = hasSceneBackground;
+  // Skip VB grid and landmarks only when they are baked into the bordered scene
+  const skipContext = useBorderedScene;
 
   if (charCount <= 1) {
     // ── 0-1 characters ──
@@ -503,6 +521,112 @@ async function packReferences(refs = {}) {
 
   log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
   return squareSlots;
+}
+
+/**
+ * Compose the empty scene with VB reference elements arranged around it as a border.
+ *
+ * Layout (1280x1280 canvas, black background):
+ *   ┌──────────────────────┬─────┐
+ *   │                      │  1  │
+ *   │                      ├─────┤
+ *   │     Empty scene      │  2  │
+ *   │      1024x1024       ├─────┤
+ *   │                      │  3  │
+ *   │                      ├─────┤
+ *   │                      │  4  │
+ *   ├─────┬─────┬─────┬─────┬────┤
+ *   │  5  │  6  │  7  │  8  │  9 │
+ *   └─────┴─────┴─────┴─────┴────┘
+ *
+ * Each cell is 256x256. Right column = slots 1-4, bottom row = slots 5-9.
+ * Capped at 9 elements total.
+ *
+ * @param {Buffer} sceneBuffer - Empty scene image buffer (any size, will be resized to 1024x1024)
+ * @param {Array<{imageData: string, name: string, type: string}>} vbElements - Up to 9 VB elements
+ * @returns {Promise<Buffer>} JPEG buffer of the composited 1280x1280 image
+ */
+async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
+  const CANVAS = 1280;
+  const SCENE = 1024;
+  const CELL = 256;
+  const MAX_ELEMENTS = 9;
+
+  // Resize scene to exactly 1024x1024 (contain so we don't crop the artwork)
+  const sceneResized = await sharp(sceneBuffer)
+    .resize(SCENE, SCENE, { fit: 'contain', background: { r: 0, g: 0, b: 0 } })
+    .toBuffer();
+
+  // Cell positions: 4 right column, then 5 bottom row
+  const cellPositions = [
+    // Right column (x = 1024, y = 0/256/512/768)
+    { left: SCENE, top: 0 },
+    { left: SCENE, top: CELL },
+    { left: SCENE, top: CELL * 2 },
+    { left: SCENE, top: CELL * 3 },
+    // Bottom row (y = 1024, x = 0/256/512/768/1024) — fills full 1280 width
+    { left: 0, top: SCENE },
+    { left: CELL, top: SCENE },
+    { left: CELL * 2, top: SCENE },
+    { left: CELL * 3, top: SCENE },
+    { left: CELL * 4, top: SCENE },
+  ];
+
+  const elements = vbElements.slice(0, MAX_ELEMENTS);
+  const composites = [{ input: sceneResized, left: 0, top: 0 }];
+
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    const pos = cellPositions[i];
+    if (!el.imageData) continue;
+
+    try {
+      const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const elBuf = Buffer.from(base64, 'base64');
+
+      // Fill the cell with the element image (cover crops to fit, maximizes visibility)
+      const cellImage = await sharp(elBuf)
+        .resize(CELL, CELL, { fit: 'cover' })
+        .toBuffer();
+      composites.push({ input: cellImage, left: pos.left, top: pos.top });
+
+      // Caption strip overlay at the bottom of the cell (40px tall, dark translucent)
+      const labelText = `${el.name} (${el.type})`;
+      const displayText = labelText.length > 28 ? labelText.substring(0, 25) + '...' : labelText;
+      // Escape XML special chars
+      const safeText = displayText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const captionHeight = 36;
+      const captionSvg = `
+        <svg width="${CELL}" height="${captionHeight}">
+          <rect width="${CELL}" height="${captionHeight}" fill="black" fill-opacity="0.65"/>
+          <text x="${CELL / 2}" y="24" font-family="Arial, sans-serif" font-size="18"
+                font-weight="bold" fill="white" text-anchor="middle">${safeText}</text>
+        </svg>
+      `;
+      composites.push({
+        input: Buffer.from(captionSvg),
+        left: pos.left,
+        top: pos.top + CELL - captionHeight,
+      });
+    } catch (err) {
+      log.warn(`⚠️ [GROK] composeSceneWithVbBorder: failed to render cell ${i} (${el.name}): ${err.message}`);
+    }
+  }
+
+  const out = await sharp({
+    create: {
+      width: CANVAS,
+      height: CANVAS,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  })
+    .composite(composites)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  log.info(`🖼️ [GROK] Composed scene+VB border: ${CANVAS}x${CANVAS}, scene=${SCENE}px, ${elements.length} VB cells (${CELL}x${CELL})`);
+  return out;
 }
 
 /**

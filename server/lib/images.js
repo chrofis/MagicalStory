@@ -10731,6 +10731,26 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
  *   Each landmark: { name, photoData }
  * @returns {Promise<Buffer|null>} - JPEG buffer of the grid image, or null if no elements
  */
+/**
+ * Build a VB grid filtered for EMPTY SCENE generation: vehicles + non-landmark locations only.
+ * Skips characters, animals, and artifacts (these belong on the populated page, not the
+ * empty background — and including artifacts caused doubling, e.g. a book rendered both
+ * in the background and later in the character's hand).
+ *
+ * @param {Object} visualBible - Story visual bible
+ * @param {number} pageNumber - Page number to filter elements for
+ * @param {Array} pageLandmarkPhotos - Landmark photos already loaded for this page
+ * @returns {Promise<Buffer|null>} VB grid buffer (with rawElements property), or null if empty
+ */
+async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos = []) {
+  if (!visualBible) return null;
+  const { getEmptySceneElementReferences } = require('./visualBible');
+  const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9);
+  const secondaryLandmarks = (pageLandmarkPhotos || []).slice(1);
+  if (vehicleAndLocationRefs.length === 0 && secondaryLandmarks.length === 0) return null;
+  return buildVisualBibleGrid(vehicleAndLocationRefs, secondaryLandmarks);
+}
+
 async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
   const allElements = [];
 
@@ -10760,11 +10780,11 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
     return null;
   }
 
-  // Max 6 elements in grid (2x3)
-  const gridElements = allElements.slice(0, 6);
-  if (allElements.length > 6) {
-    const dropped = allElements.slice(6).map(e => `${e.name} (${e.type})`).join(', ');
-    log.warn(`⚠️ [VB-GRID] Grid overflow: ${allElements.length} elements, keeping first 6, dropping: ${dropped}`);
+  // Max 9 elements (4 right column + 5 bottom row in Grok's bordered scene layout)
+  const gridElements = allElements.slice(0, 9);
+  if (allElements.length > 9) {
+    const dropped = allElements.slice(9).map(e => `${e.name} (${e.type})`).join(', ');
+    log.warn(`⚠️ [VB-GRID] Grid overflow: ${allElements.length} elements, keeping first 9, dropping: ${dropped}`);
   }
   // Single column vertical stack — each element gets full width for maximum visibility
   const cellWidth = 512;
@@ -10824,6 +10844,12 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
       .toBuffer();
 
     log.info(`🔲 [VB-GRID] Created vertical stack: ${gridElements.length} elements, ${gridWidth}x${gridHeight}px, ${Math.round(gridBuffer.length / 1024)}KB`);
+
+    // Attach raw elements so Grok's packReferences can lay them out individually
+    // around the empty scene (256x256 cells in a right column + bottom row).
+    // Buffers are mutable objects in Node, so adding a property is safe and the
+    // buffer continues to behave like a normal Buffer for image consumers.
+    gridBuffer.rawElements = gridElements;
 
     return gridBuffer;
   } catch (error) {
@@ -11107,6 +11133,7 @@ module.exports = {
   generateImageWithQualityRetry,
   rewriteBlockedScene,
   buildVisualBibleGrid,
+  buildEmptySceneVbGrid,
 
   // Separated evaluation pipeline functions (new architecture)
   generateImageOnly,
