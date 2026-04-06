@@ -26,36 +26,33 @@ export default defineConfig((env) => {
         ? undefined
         : {
             manualChunks(id) {
-              // React core — KEEP REACT, REACT-DOM, SCHEDULER, AND REACT-ROUTER IN ONE CHUNK.
-              // React 19 + Rollup chunk-splitting: separating react / react-dom / scheduler
-              // creates a circular-init order where vendor-other (anything that imports
-              // React.forwardRef at module top level) runs before React has finished
-              // evaluating, throwing "Cannot read properties of undefined (reading
-              // 'forwardRef')". One atomic React chunk avoids the problem.
-              if (
-                id.includes('node_modules/react/') ||
-                id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/react-router') ||
-                id.includes('node_modules/scheduler/') ||
-                id.includes('node_modules/use-sync-external-store/')
-              ) {
-                return 'vendor-react';
-              }
-              // Firebase (large)
+              // Big standalone libraries that don't talk to React → own chunks.
               if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
                 return 'vendor-firebase';
               }
-              // Icons (lucide-react is large)
               if (id.includes('node_modules/lucide-react')) {
                 return 'vendor-icons';
               }
-              // PDF generation
               if (id.includes('node_modules/html2pdf') || id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
                 return 'vendor-pdf';
               }
-              // Other node_modules
+
+              // EVERYTHING ELSE from node_modules goes into one vendor-react chunk.
+              //
+              // Why a single chunk for React + every React-using library:
+              //   Splitting vendor-react and vendor-other causes a circular import
+              //   between them — React Router pulls helpers that live in vendor-other,
+              //   vendor-other pulls React from vendor-react. Whichever chunk evaluates
+              //   first sees `undefined` for the cyclic binding and crashes with
+              //   "Cannot read properties of undefined (reading 'forwardRef')" the
+              //   moment a library like @marsidev/react-turnstile calls
+              //   `React.forwardRef(...)` at module init.
+              //
+              //   React 18 happened to mask the cycle; React 19's module structure
+              //   exposes it. Bundling everything React-adjacent into one chunk
+              //   eliminates the cycle by construction.
               if (id.includes('node_modules')) {
-                return 'vendor-other';
+                return 'vendor-react';
               }
             },
           },
