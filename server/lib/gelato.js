@@ -239,7 +239,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     } else {
       // Multiple stories - generate combined book PDF
       log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
-      const result = await generateCombinedBookPdf(stories, { gelatoCoverDims: coverDims });
+      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     }

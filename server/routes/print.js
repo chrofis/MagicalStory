@@ -1183,7 +1183,7 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     } else {
-      const result = await generateCombinedBookPdf(stories, { gelatoCoverDims: coverDims });
+      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     }

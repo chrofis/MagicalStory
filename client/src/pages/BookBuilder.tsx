@@ -44,7 +44,8 @@ export default function BookBuilder() {
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
-  const [bookFormat, setBookFormat] = useState<'square' | 'A4'>('A4');
+  // Format is locked to A4 portrait (square is hidden in UI but still works in code)
+  const [bookFormat] = useState<'square' | 'A4'>('A4');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -81,8 +82,8 @@ export default function BookBuilder() {
       chooseFormat: 'Choose Format',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '21 × 28 cm',
+      hardcoverSize: '21 × 28 cm',
       bookSize: 'Book Size',
       squareFormat: 'Square',
       squareSize: '20 × 20 cm',
@@ -122,8 +123,8 @@ export default function BookBuilder() {
       chooseFormat: 'Format wählen',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '21 × 28 cm',
+      hardcoverSize: '21 × 28 cm',
       bookSize: 'Buchgrösse',
       squareFormat: 'Quadrat',
       squareSize: '20 × 20 cm',
@@ -163,8 +164,8 @@ export default function BookBuilder() {
       chooseFormat: 'Choisir le format',
       softcover: 'Couverture souple',
       hardcover: 'Couverture rigide',
-      softcoverSize: '20 × 20 cm',
-      hardcoverSize: '20 × 20 cm',
+      softcoverSize: '21 × 28 cm',
+      hardcoverSize: '21 × 28 cm',
       bookSize: 'Taille du livre',
       squareFormat: 'Carré',
       squareSize: '20 × 20 cm',
@@ -523,45 +524,8 @@ export default function BookBuilder() {
               </button>
             </div>
 
-            {/* Book size selection */}
-            <h2 className="text-xl font-bold text-gray-800 mb-3 mt-6">{t.bookSize}</h2>
-            <div className="space-y-3 mb-6">
-              {/* Square */}
-              <button
-                onClick={() => setBookFormat('square')}
-                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
-                  bookFormat === 'square'
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`w-8 h-8 shrink-0 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-500 bg-indigo-100' : 'border-gray-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800">{t.squareFormat}</div>
-                    <div className="text-sm text-gray-500">{t.squareSize}</div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Portrait */}
-              <button
-                onClick={() => setBookFormat('A4')}
-                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
-                  bookFormat === 'A4'
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`w-6 h-8 shrink-0 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-500 bg-indigo-100' : 'border-gray-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800">{t.portraitFormat}</div>
-                    <div className="text-sm text-gray-500">{t.portraitSize}</div>
-                  </div>
-                </div>
-              </button>
-            </div>
+            {/* Book format is fixed to portrait (21 × 28 cm) — square is hidden but
+                still works in code if needed for legacy/admin orders. */}
 
             {/* Quantity selector */}
             {!isOverLimit && price && (
