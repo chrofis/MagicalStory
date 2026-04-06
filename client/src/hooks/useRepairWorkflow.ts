@@ -1465,6 +1465,17 @@ export function useRepairWorkflow({
         skipStep('final-pick');
       }
 
+      // Refresh story state so the UI shows the picked active versions
+      // (otherwise sceneImages.activeVersion stays stuck on the last regenerated index,
+      // making the image viewer modal mark the wrong version as active).
+      if (onRefreshStory && allChangedPages.size > 0) {
+        try {
+          await onRefreshStory();
+        } catch (err) {
+          console.error('[RepairWorkflow] Post-workflow refresh failed:', err);
+        }
+      }
+
       onProgress?.('complete', 'Workflow complete!');
     } catch (error) {
       // Don't log abort as an error
@@ -1478,7 +1489,7 @@ export function useRepairWorkflow({
       abortControllerRef.current = null;
     }
   }, [
-    storyId, sceneImages, coverImages, imageModel, onImageUpdate,
+    storyId, sceneImages, coverImages, imageModel, onImageUpdate, onRefreshStory,
     collectFeedback, reEvaluatePages, startStep, completeStep, skipStep, setRedoProgress, redoCoverOrPage, chooseRepairStrategy,
   ]);
 
