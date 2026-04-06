@@ -38,8 +38,14 @@ COPY . .
 ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
 
-# Build the React client (outputs to ./dist in root, per vite.config.ts)
-RUN cd client && npm run build
+# Build the React client + SSR bundle, then pre-render all SEO routes.
+# `cd client && npm run build` runs: tsc -b && vite build && vite build --ssr ...
+#   → produces dist/ (client bundle + manifest) and client/dist-ssr/ (SSR bundle)
+# `node scripts/prerender.mjs` then writes dist/prerendered/{path}.{lang}.html
+# for all 333 SEO routes × 3 languages (~999 files, ~5 seconds).
+# Vite has emptyOutDir:true so any committed dist/prerendered/ from the repo
+# is wiped first — the prerender step is what populates it in production.
+RUN cd client && npm run build && cd .. && node scripts/prerender.mjs
 
 # Expose ports
 EXPOSE 3000 5000
