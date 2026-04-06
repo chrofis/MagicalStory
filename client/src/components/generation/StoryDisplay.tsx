@@ -7,7 +7,6 @@ import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
-import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
 
@@ -1872,9 +1871,9 @@ export function StoryDisplay({
         {hasImages && shareToken && !isGenerating && (
           <a
             href={`/shared/${shareToken}`}
-            className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-3 rounded-lg text-base font-semibold flex items-center justify-center gap-2 hover:from-indigo-600 hover:to-purple-600 transition-all"
+            className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
           >
-            <BookOpen size={18} />
+            <BookOpen size={16} />
             {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
           </a>
         )}
@@ -5853,9 +5852,15 @@ export function StoryDisplay({
               </div>
             )}
 
-            {/* Share Story */}
-            {storyId && !isGenerating && (
-              <ShareButton storyId={storyId} variant="full" />
+            {/* View Story (reader view) */}
+            {shareToken && !isGenerating && (
+              <a
+                href={`/shared/${shareToken}`}
+                className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
+              >
+                <BookOpen size={16} />
+                {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+              </a>
             )}
 
             {/* Create Another Story */}
