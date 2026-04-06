@@ -2337,8 +2337,9 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // FAST PATH: Try to get cover from separate images table first
-    const separateImage = await getStoryImage(id, 'frontCover', null, 0);
+    // FAST PATH: Try to get cover from separate images table first (active version, not always 0)
+    const activeFrontVersion = await getActiveVersion(id, 'frontCover');
+    const separateImage = await getStoryImage(id, 'frontCover', null, activeFrontVersion);
     if (separateImage) {
       return res.json({ coverImage: separateImage.imageData });
     }

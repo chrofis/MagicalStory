@@ -269,7 +269,9 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    const separateImage = await getStoryImage(storyId, coverType, null, 0);
+    // Use the active version (selected by user), not always version 0
+    const activeVersionIdx = await getActiveVersion(storyId, coverType);
+    const separateImage = await getStoryImage(storyId, coverType, null, activeVersionIdx);
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64, 'base64');
@@ -318,7 +320,9 @@ async function ogImageHandler(req, res) {
     }
 
     log.debug(`[OG-IMAGE] Fetching frontCover for story ${storyId}`);
-    const coverImageResult = await getStoryImage(storyId, 'frontCover', null, 0);
+    // Use the active version (user-selected), not always version 0
+    const activeFrontCoverVersion = await getActiveVersion(storyId, 'frontCover');
+    const coverImageResult = await getStoryImage(storyId, 'frontCover', null, activeFrontCoverVersion);
     let coverImage = coverImageResult?.imageData?.replace(/^data:image\/\w+;base64,/, '') || null;
 
     if (coverImage) {
@@ -348,7 +352,8 @@ async function ogImageHandler(req, res) {
     // Fallback 2: use first page image if no cover exists (covers may be skipped)
     if (!coverImage) {
       log.debug(`[OG-IMAGE] No cover found, trying first page image...`);
-      const pageImageResult = await getStoryImage(storyId, 'scene', 1, 0);
+      const activePage1Version = await getActiveVersion(storyId, 1);
+      const pageImageResult = await getStoryImage(storyId, 'scene', 1, activePage1Version);
       if (pageImageResult?.imageData) {
         coverImage = pageImageResult.imageData.replace(/^data:image\/\w+;base64,/, '');
         log.debug(`[OG-IMAGE] Using page 1 image as fallback (${coverImage.length} chars)`);
