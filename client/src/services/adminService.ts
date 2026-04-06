@@ -158,6 +158,7 @@ export interface TokenUsageTotals {
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
   runware: RunwareUsage;
+  grok: RunwareUsage;
   avatarByModel: Record<string, ModelUsage>;
   imageByModel: Record<string, ModelUsage>;
 }
@@ -173,6 +174,7 @@ export interface TokenUsageCosts {
   gemini_image: GeminiImageCost;
   gemini_quality: ProviderCost;
   runware: { total: number };
+  grok: { total: number };
   avatarByModel: Record<string, ModelUsage>;
   totalAvatarCost: number;
   grandTotal: number;
@@ -190,6 +192,7 @@ export interface TokenUsageByUser {
   gemini_quality: ProviderTokens;
   avatarByModel: Record<string, ModelUsage>;
   runware: RunwareUsage;
+  grok: RunwareUsage;
 }
 
 export interface TokenUsageByDay {
@@ -201,6 +204,7 @@ export interface TokenUsageByDay {
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
   runware: RunwareUsage;
+  grok: RunwareUsage;
   totalCost: number;
 }
 
@@ -213,6 +217,7 @@ export interface TokenUsageByMonth {
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
   runware: RunwareUsage;
+  grok: RunwareUsage;
   totalCost: number;
 }
 

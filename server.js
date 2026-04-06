@@ -252,7 +252,7 @@ const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const legacyPipelines = require('./server/lib/legacyPipelines');
 const { GenerationLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
-const { getMetaForRoute, injectMeta, generateSitemap } = require('./server/lib/seoMeta');
+const { generateSitemap } = require('./server/lib/seoMeta');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -2208,9 +2208,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     byFunction: {
       unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Avatar generation tracking
@@ -4925,9 +4925,9 @@ async function _processStoryJobImpl(jobId) {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
       scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
       story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Avatar generation tracking
@@ -5733,36 +5733,41 @@ app.get('/sitemap.xml', (req, res) => {
 
 // NOTE: Public shared story routes moved to server/routes/sharing.js
 
-// Cache the HTML template at startup for SPA fallback with SEO meta injection
-let cachedHtmlTemplate = null;
-const indexHtmlPath = hasDistFolder
-  ? path.join(distPath, 'index.html')
-  : path.join(__dirname, 'client', 'index.html');
+// Pre-rendered SEO files live under dist/prerendered/{path}.{lang}.html
+// Built by `node scripts/prerender.mjs` after the client + SSR builds.
+const PRERENDER_DIR = path.join(distPath, 'prerendered');
+const SUPPORTED_LANGS = new Set(['de', 'en', 'fr']);
 
-try {
-  cachedHtmlTemplate = require('fs').readFileSync(indexHtmlPath, 'utf-8');
-  log.debug('Cached HTML template for SEO meta injection');
-} catch (err) {
-  log.warn(`Could not cache HTML template from ${indexHtmlPath}: ${err.message}`);
+function resolvePrerenderedFile(routePath, lang) {
+  // Path traversal guard: only allow alnum, dash, underscore, slash, dot
+  if (!/^[a-zA-Z0-9/_.-]*$/.test(routePath)) return null;
+  if (routePath.includes('..')) return null;
+  const slug = routePath === '/' ? '/index' : routePath.replace(/\/$/, '');
+  const filePath = path.join(PRERENDER_DIR, `${slug}.${lang}.html`);
+  // Ensure the resolved path stays within PRERENDER_DIR (defensive)
+  if (!filePath.startsWith(PRERENDER_DIR)) return null;
+  return require('fs').existsSync(filePath) ? filePath : null;
 }
 
-// SPA fallback - serve index.html with injected SEO meta tags
-// This must be the LAST route, after all API routes
+// SPA fallback — serves pre-rendered HTML for SEO routes, raw index.html for app routes
 app.get('*', (req, res, next) => {
   // Skip API routes
   if (req.path.startsWith('/api')) {
     return next();
   }
 
-  // If we have a cached HTML template, inject SEO meta and serve
-  if (cachedHtmlTemplate) {
-    const lang = req.query.lang || 'de';
-    const meta = getMetaForRoute(req.path, lang);
-    const html = injectMeta(cachedHtmlTemplate, meta, lang);
-    // Cache SEO pages for crawlers — content only changes on deploy
+  const lang = SUPPORTED_LANGS.has(req.query.lang) ? req.query.lang : 'de';
+
+  // Try pre-rendered file first (SEO routes)
+  const prerenderedFile = resolvePrerenderedFile(req.path, lang);
+  if (prerenderedFile) {
+    // Long CDN cache — files only change on deploy
     res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
-    res.type('html').send(html);
-  } else if (hasDistFolder) {
+    return res.type('html').sendFile(prerenderedFile);
+  }
+
+  // App routes (/create, /wizard, /admin, etc.) — serve SPA shell
+  if (hasDistFolder) {
     res.sendFile(path.join(distPath, 'index.html'));
   } else {
     res.sendFile(path.join(__dirname, 'index.html'));

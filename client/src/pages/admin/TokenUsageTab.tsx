@@ -98,7 +98,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
           <div className="flex items-center gap-2 text-green-600 mb-2">
             <DollarSign size={20} />
@@ -144,6 +144,17 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
           </p>
         </div>
 
+        <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-4 border border-purple-200">
+          <div className="flex items-center gap-2 text-purple-600 mb-2">
+            <TrendingUp size={20} />
+            <span className="font-medium">Grok (xAI)</span>
+          </div>
+          <p className="text-2xl font-bold text-purple-700">{formatCost(tokenData.costs.grok?.total || 0)}</p>
+          <p className="text-xs text-purple-600 mt-1">
+            {tokenData.totals.grok?.calls || 0} {texts.calls} (~$0.02/img)
+          </p>
+        </div>
+
         <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-200">
           <div className="flex items-center gap-2 text-orange-600 mb-2">
             <TrendingUp size={20} />
@@ -179,6 +190,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.bookPages}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.anthropic}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Gemini</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Grok</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.runware}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.totalCost}</th>
                 </tr>
@@ -199,6 +211,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiQualityCost = ((day.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
                                            ((day.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
                   const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
+                  const grokCost = day.grok?.direct_cost || 0;
                   const runwareCost = day.runware?.direct_cost || 0;
 
                   return (
@@ -208,6 +221,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{day.totalBookPages}</td>
                       <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(grokCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(day.totalCost)}</td>
                     </tr>
@@ -242,6 +256,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.bookPages}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.anthropic}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Gemini</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Grok</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.runware}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.totalCost}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.costPerStory}</th>
@@ -259,6 +274,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiQualityCost = ((month.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
                                            ((month.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
                   const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
+                  const grokCost = month.grok?.direct_cost || 0;
                   const runwareCost = month.runware?.direct_cost || 0;
                   const costPerStory = month.storyCount > 0 ? month.totalCost / month.storyCount : 0;
 
@@ -269,6 +285,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{month.totalBookPages}</td>
                       <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(grokCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(month.totalCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{formatCost(costPerStory)}</td>
@@ -304,6 +321,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.bookPages}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.anthropic}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Gemini</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Grok</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.runware}</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{texts.costPerStory}</th>
                 </tr>
@@ -327,8 +345,9 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                     }
                   }
                   const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost + avatarCost;
+                  const grokCost = user.grok?.direct_cost || 0;
                   const runwareCost = user.runware?.direct_cost || 0;
-                  const totalCost = anthropicCost + geminiCost + runwareCost;
+                  const totalCost = anthropicCost + geminiCost + grokCost + runwareCost;
                   const costPerStory = user.storyCount > 0 ? totalCost / user.storyCount : 0;
 
                   return (
@@ -338,6 +357,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{user.totalBookPages}</td>
                       <td className="px-4 py-3 text-sm text-right text-indigo-500">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(grokCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(costPerStory)}</td>
                     </tr>
