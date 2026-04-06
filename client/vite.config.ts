@@ -26,11 +26,19 @@ export default defineConfig((env) => {
         ? undefined
         : {
             manualChunks(id) {
-              // React core
-              if (id.includes('node_modules/react-dom')) {
-                return 'vendor-react-dom';
-              }
-              if (id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+              // React core — KEEP REACT, REACT-DOM, SCHEDULER, AND REACT-ROUTER IN ONE CHUNK.
+              // React 19 + Rollup chunk-splitting: separating react / react-dom / scheduler
+              // creates a circular-init order where vendor-other (anything that imports
+              // React.forwardRef at module top level) runs before React has finished
+              // evaluating, throwing "Cannot read properties of undefined (reading
+              // 'forwardRef')". One atomic React chunk avoids the problem.
+              if (
+                id.includes('node_modules/react/') ||
+                id.includes('node_modules/react-dom/') ||
+                id.includes('node_modules/react-router') ||
+                id.includes('node_modules/scheduler/') ||
+                id.includes('node_modules/use-sync-external-store/')
+              ) {
                 return 'vendor-react';
               }
               // Firebase (large)
