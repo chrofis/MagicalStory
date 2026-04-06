@@ -31,6 +31,12 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Gemini 2.5 Flash - Fast with large output'
   },
+  'gemini-2.5-flash-lite': {
+    provider: 'google',
+    modelId: 'gemini-2.5-flash-lite',
+    maxOutputTokens: 65536,
+    description: 'Gemini 2.5 Flash Lite - Cheapest ($0.10/$0.40 per 1M, ~6× cheaper than Flash)'
+  },
   'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
@@ -241,6 +247,7 @@ const MODEL_PRICING = {
   // Source: https://ai.google.dev/gemini-api/docs/pricing
   'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },
   'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50 },
+  'gemini-2.5-flash-lite': { input: 0.10, output: 0.40, thinking: 0.40 },
   'gemini-2.0-flash': { input: 0.10, output: 0.40, thinking: 0.40 },
   'gemini-pro-latest': { input: 1.25, output: 10.00, thinking: 10.00 },
 

@@ -186,18 +186,18 @@ export function WizardStep3BookSettings({
   };
 
   // Page slider configuration
+  // 1 page = 1 scene = 1 image (picture-book layout for all reading levels).
+  // Max 25 pages keeps a 24-page story around $3 / 250 credits.
   const minPages = developerMode ? 4 : 10;
-  const absoluteMaxPages = 50;
-  const pageStep = 2; // Only even values
+  const absoluteMaxPages = 25;
+  const pageStep = 1;
   const creditsPerPage = 10;
 
   // Calculate max pages based on user credits (-1 = unlimited)
   const hasUnlimitedCredits = userCredits === -1;
-  const affordablePages = hasUnlimitedCredits
+  const maxAffordablePages = hasUnlimitedCredits
     ? absoluteMaxPages
     : Math.floor(userCredits / creditsPerPage);
-  // Round down to nearest even number
-  const maxAffordablePages = Math.floor(affordablePages / 2) * 2;
   // Check if user can't afford even the minimum
   const minCreditsNeeded = minPages * creditsPerPage;
   const cannotAffordMinimum = !hasUnlimitedCredits && userCredits < minCreditsNeeded;
@@ -208,17 +208,9 @@ export function WizardStep3BookSettings({
     : Math.min(absoluteMaxPages, Math.max(minPages, maxAffordablePages));
   const isLimitedByCredits = !hasUnlimitedCredits && maxAffordablePages < absoluteMaxPages;
 
-  // Ensure pages value is even and within range
+  // Clamp pages to the affordable range
   useEffect(() => {
-    let validPages = pages;
-
-    // Ensure even
-    if (validPages % 2 !== 0) {
-      validPages = Math.round(validPages / 2) * 2;
-    }
-    // Ensure in range (use effectiveMaxPages to respect credit limit)
-    validPages = Math.max(minPages, Math.min(effectiveMaxPages, validPages));
-
+    const validPages = Math.max(minPages, Math.min(effectiveMaxPages, pages));
     if (validPages !== pages) {
       onPagesChange(validPages);
     }

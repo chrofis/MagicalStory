@@ -89,15 +89,20 @@ export const IMAGE_MODELS = {
 
 // Available quality evaluation models (also used for bbox detection)
 export const QUALITY_MODELS = {
+  'gemini-2.5-flash-lite': {
+    description: 'Gemini 2.5 Flash Lite - Cheapest ($0.10/$0.40 per 1M, ~6× cheaper than Flash)',
+    descriptionDe: 'Gemini 2.5 Flash Lite - Am günstigsten ($0.10/$0.40 pro 1M, ~6× günstiger als Flash)',
+    descriptionFr: 'Gemini 2.5 Flash Lite - Le moins cher ($0.10/$0.40 par 1M, ~6× moins cher que Flash)'
+  },
   'gemini-2.0-flash': {
     description: 'Gemini 2.0 Flash - Fast evaluation',
     descriptionDe: 'Gemini 2.0 Flash - Schnelle Bewertung',
     descriptionFr: 'Gemini 2.0 Flash - Évaluation rapide'
   },
   'gemini-2.5-flash': {
-    description: 'Gemini 2.5 Flash - More thorough',
-    descriptionDe: 'Gemini 2.5 Flash - Gründlicher',
-    descriptionFr: 'Gemini 2.5 Flash - Plus approfondi'
+    description: 'Gemini 2.5 Flash - More thorough ($0.30/$2.50 per 1M)',
+    descriptionDe: 'Gemini 2.5 Flash - Gründlicher ($0.30/$2.50 pro 1M)',
+    descriptionFr: 'Gemini 2.5 Flash - Plus approfondi ($0.30/$2.50 par 1M)'
   },
   'grok-4-fast': {
     description: 'Grok 4 Fast - Cheapest vision ($0.20/$0.50 per 1M)',

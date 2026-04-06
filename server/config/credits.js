@@ -30,11 +30,12 @@ const CREDIT_CONFIG = {
   },
 
   // Story page limits
+  // 1 page = 1 scene = 1 illustration (picture-book layout for all reading levels)
   STORY_PAGES: {
-    MIN: 4,      // Minimum 4 pages (2 scenes for standard, 4 for picture book) - dev mode uses this
-    MIN_PUBLIC: 10,  // Minimum for non-dev users
-    MAX: 100,
-    DEFAULT: 20,
+    MIN: 4,         // Dev mode minimum
+    MIN_PUBLIC: 10, // Public minimum
+    MAX: 25,        // Max 25 pages keeps a typical story under ~$3 / 250 credits
+    DEFAULT: 15,
   },
 };
 

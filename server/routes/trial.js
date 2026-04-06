@@ -1951,7 +1951,10 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     throw err;
   }
 
-  const pages = 10;
+  // Trial generates 5 scenes (= 5 pages in picture-book layout). Previously
+  // this was pages=10 with the implicit pages/2 conversion for non-1st-grade,
+  // which is gone now — set the explicit scene count directly.
+  const pages = 5;
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
