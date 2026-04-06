@@ -6434,13 +6434,41 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const sceneDataUri = `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`;
 
-    // Extract what the character should be doing from scene description
+    // Extract structured character data (expression, gaze, pose) from scene metadata.
+    // The face must match the original emotion and gaze direction — not a generic smile.
     let actionContext = '';
     if (sceneDescription) {
-      const charNameLower = charName.toLowerCase();
-      const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
-      if (lines.length > 0) {
-        actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
+      try {
+        const sceneMetadata = getStoryHelpers().extractSceneMetadata(sceneDescription);
+        const charData = sceneMetadata?.fullData?.characters?.find(
+          c => c.name?.toLowerCase() === charName.toLowerCase()
+        );
+        if (charData) {
+          const parts = [];
+          if (charData.expression) parts.push(`Expression: ${charData.expression}`);
+          if (charData.pose) parts.push(`Pose: ${charData.pose}`);
+          if (charData.action) parts.push(`Action: ${charData.action}`);
+          if (charData.gaze) parts.push(`Gaze: ${charData.gaze}`);
+          if (charData.holding && typeof charData.holding === 'object') {
+            const holding = [];
+            if (charData.holding.leftHand && charData.holding.leftHand !== 'empty') holding.push(`left hand: ${charData.holding.leftHand}`);
+            if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') holding.push(`right hand: ${charData.holding.rightHand}`);
+            if (holding.length > 0) parts.push(`Holding: ${holding.join(', ')}`);
+          }
+          if (parts.length > 0) {
+            actionContext = `\n\n${charName}'s state in this scene (MUST be preserved in the redrawn face):\n- ${parts.join('\n- ')}`;
+          }
+        }
+      } catch (err) {
+        // Fall back to text-based extraction
+      }
+      // Fallback: search for character mentions in plain text if no structured data found
+      if (!actionContext) {
+        const charNameLower = charName.toLowerCase();
+        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
+        if (lines.length > 0) {
+          actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
+        }
       }
     }
 
@@ -6452,7 +6480,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           actionContext,
           issueContext,
         })
-      : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
+      : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. CRITICAL: preserve the original expression (look at body language and scene context — match the emotion, do not default to a smile) and gaze direction (do not make the character face the camera if they were not). Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);

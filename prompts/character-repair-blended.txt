@@ -2,6 +2,13 @@ This is a children's book illustration. All character faces have been blurred.
 
 Redraw ALL blurred faces to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference. Preserve any distinctive features visible in the reference (glasses, freckles, birthmarks, facial hair).
 
-Each character's body, pose, clothing, and position are fully visible — preserve these exactly. Keep the same age and body proportions — do not make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo.
+CRITICAL — preserve the original emotion and direction:
+- Look at the surrounding body language (shoulders, posture, head tilt) and the scene context to understand what the character is feeling and where they are looking.
+- Match the EXPRESSION shown in the scene (worried, surprised, sad, focused, smiling, etc.) — do NOT default to a generic smile.
+- Match the GAZE DIRECTION — if the character is looking left, right, up, down, at another character, or away from the camera, the new face must look the same way.
+- Do NOT make the character face the camera unless they were already facing the camera in the original.
+- Do NOT change the head tilt or angle — the head was facing a specific direction for a reason.
+
+Each character's body, pose, clothing, and position are fully visible — preserve these exactly. Keep the same age and body proportions — do not make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
 
 Maintain the exact same art style, lighting, and color palette as the rest of the illustration. The repaired face must blend seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}
