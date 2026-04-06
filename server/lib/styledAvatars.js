@@ -887,7 +887,7 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
   let styledAvatar = styledAvatarCache.get(cacheKey);
   if (!styledAvatar && (clothingCategory.startsWith('costumed:') || clothingCategory === 'costumed')) {
     // Prefix match: find any costumed avatar for this character+style (within current scope)
-    const prefix = `${getCacheScope()}${characterName.toLowerCase()}_costumed:`;
+    const prefix = `${getCacheScope()}${characterName.trim().toLowerCase()}_costumed:`;
     const suffix = `_${artStyle}`;
     for (const [key, value] of styledAvatarCache.entries()) {
       if (key.startsWith(prefix) && key.endsWith(suffix)) {
@@ -1003,7 +1003,7 @@ function getStyledAvatarCacheStats() {
  * @param {Object} character - Optional character object to also clear styledAvatars from character data
  */
 function invalidateStyledAvatarForCategory(characterName, clothingCategory, character = null) {
-  const charLower = characterName.toLowerCase();
+  const charLower = characterName.trim().toLowerCase();
   const scope = getCacheScope();
   let clearedCount = 0;
 
@@ -1341,7 +1341,7 @@ function getStyledAvatarsForCharacter(characterName, artStyle) {
   }
 
   // Check for costumed sub-types in cache (pattern: scope::charactername_costumed:type_artstyle)
-  const charPrefix = `${getCacheScope()}${characterName.toLowerCase()}_costumed:`;
+  const charPrefix = `${getCacheScope()}${characterName.trim().toLowerCase()}_costumed:`;
   const styleSuffix = `_${artStyle}`;
   for (const [key, value] of styledAvatarCache.entries()) {
     if (key.startsWith(charPrefix) && key.endsWith(styleSuffix)) {

@@ -55,6 +55,11 @@ const titlePageLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Registry of in-flight title-page generation promises, keyed by userId.
+// The trial /start route awaits these so styled avatars are persisted before
+// the story job reads the character DB — avoiding duplicate avatar styling.
+const inFlightTitlePagePromises = new Map(); // userId -> Promise
+
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
 const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
@@ -774,6 +779,20 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
         return res.status(404).json({ error: 'Account not found' });
       }
       return res.status(409).json({ error: 'Trial story already used', code: 'TRIAL_USED' });
+    }
+
+    // If a prepare-title call is still in flight for this user, wait for it
+    // (with a safety timeout) so preGeneratedStyledAvatars are persisted before
+    // the trial story job reads the character DB. Avoids duplicate styling work.
+    const inFlightTitlePromise = inFlightTitlePagePromises.get(userId);
+    if (inFlightTitlePromise) {
+      log.info(`[TRIAL] Awaiting in-flight prepare-title for user ${userId} (avoid duplicate avatar styling)`);
+      const startWait = Date.now();
+      await Promise.race([
+        inFlightTitlePromise,
+        new Promise(resolve => setTimeout(resolve, 60000)), // 60s max wait
+      ]);
+      log.info(`[TRIAL] prepare-title wait complete after ${Date.now() - startWait}ms`);
     }
 
     const characterId = `characters_${userId}`;
@@ -1589,8 +1608,16 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
  * Protected by: session token + rate limit.
  */
 router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, res) => {
+  // Register an in-flight promise so /start can await title-page completion
+  // (which persists preGeneratedStyledAvatars to DB) before reading character data.
+  // Resolves when this handler returns — successfully or with error — guaranteeing
+  // any DB writes have happened before /start reads the character row.
+  const { userId } = req.sessionUser;
+  let resolveInFlight;
+  const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
+  inFlightTitlePagePromises.set(userId, inFlightPromise);
+
   try {
-    const { userId } = req.sessionUser;
     const { storyTopic, storyCategory, storyTheme, language } = req.body;
 
     if (!storyCategory || (!storyTopic && !storyTheme)) {
@@ -1721,18 +1748,55 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
       // Generate the cover image (use cover model, not page model)
       const { MODEL_DEFAULTS } = require('../config/models');
+      const { evaluateImageQuality } = require('../lib/images');
       log.info(`[TRIAL TITLE] Generating title page image for "${title}" (model: ${MODEL_DEFAULTS.coverImage})`);
-      const result = await generateImageOnly(coverPrompt, coverPhotos, {
-        imageModelOverride: MODEL_DEFAULTS.coverImage,
-      });
 
-      if (!result || !result.imageData) {
-        log.warn(`[TRIAL TITLE] Image generation returned no image`);
+      // Generate + verify text up to 2 attempts
+      const MAX_TITLE_ATTEMPTS = 2;
+      let result = null;
+      let titlePageImage = null;
+      for (let attempt = 1; attempt <= MAX_TITLE_ATTEMPTS; attempt++) {
+        result = await generateImageOnly(coverPrompt, coverPhotos, {
+          imageModelOverride: MODEL_DEFAULTS.coverImage,
+        });
+        if (!result || !result.imageData) {
+          log.warn(`[TRIAL TITLE] Image generation returned no image (attempt ${attempt})`);
+          break;
+        }
+        titlePageImage = result.imageData;
+
+        // Verify the title text on the image (cover-mode quality eval checks text)
+        try {
+          const evalResult = await evaluateImageQuality(
+            titlePageImage,
+            coverPrompt,
+            [],
+            'cover'
+          );
+          if (!evalResult) {
+            log.info(`[TRIAL TITLE] Eval skipped (attempt ${attempt}) — accepting image`);
+            break;
+          }
+          const textIssue = evalResult.textIssue;
+          const textOk = !textIssue || textIssue === 'NONE';
+          if (textOk) {
+            log.info(`[TRIAL TITLE] Title text verified on attempt ${attempt} (score: ${evalResult.score})`);
+            break;
+          }
+          log.warn(`[TRIAL TITLE] Title text issue on attempt ${attempt}: ${textIssue} — expected: "${evalResult.expectedText}", actual: "${evalResult.actualText}"`);
+          if (attempt < MAX_TITLE_ATTEMPTS) {
+            log.info(`[TRIAL TITLE] Regenerating title page...`);
+          }
+        } catch (evalErr) {
+          log.warn(`[TRIAL TITLE] Eval failed (attempt ${attempt}): ${evalErr.message} — accepting image`);
+          break;
+        }
+      }
+
+      if (!titlePageImage) {
         res.json({ titlePageImage: null, title: null, costumeType: null });
         return;
       }
-
-      const titlePageImage = result.imageData;
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)
       const styledAvatarExport = exportStyledAvatarsForPersistence(characters, 'watercolor');
@@ -1788,6 +1852,12 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     log.error(`[TRIAL TITLE] Error generating title page: ${err.message}`);
     // Non-critical optimization — return nulls gracefully
     res.json({ titlePageImage: null, title: null, costumeType: null });
+  } finally {
+    // Always resolve and clean up the in-flight registry, regardless of outcome.
+    if (inFlightTitlePagePromises.get(userId) === inFlightPromise) {
+      inFlightTitlePagePromises.delete(userId);
+    }
+    resolveInFlight();
   }
 });
 

@@ -2766,7 +2766,8 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     let qualityScore = null;
     let qualityReasoning = null;
     try {
-      const scenePrompt = currentScene?.prompt || currentScene?.description || '';
+      const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+      const scenePrompt = sceneDesc?.prompt || sceneDesc?.description || '';
       const evaluation = await evaluateImageQuality(editResult.imageData, scenePrompt, [], 'scene');
       if (evaluation) {
         qualityScore = evaluation.score;

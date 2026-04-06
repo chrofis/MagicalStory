@@ -2317,6 +2317,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
     const streamingCoverPromises = new Map(); // coverType -> promise
+    const streamingTrialPageImagePromises = new Map(); // pageNum -> promise (trial mode only)
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
     let coversStartedDuringStreaming = false;
 
@@ -2549,6 +2550,120 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       streamingSceneExpansionPromises.set(page.pageNumber, expansionPromise);
       log.debug(`⚡ [STREAM-SCENE] Started expansion for page ${page.pageNumber}`);
+    };
+
+    // Helper: Start trial page image generation as soon as a page completes streaming
+    // For trial mode only — generates the page image in parallel with the rest of streaming.
+    // Skips empty scene generation, ref sheets, and landmark photos (trial stories are simple).
+    const startTrialPageImageGeneration = (page) => {
+      if (!inputData.trialMode || skipImages) return;
+      if (streamingTrialPageImagePromises.has(page.pageNumber)) return;
+
+      const imagePromise = (async () => {
+        try {
+          // Wait for prerequisites: visual bible + early avatar styling
+          while (!streamingVisualBible) {
+            await new Promise(r => setTimeout(r, 100));
+          }
+          if (streamingAvatarStylingPromise) {
+            await streamingAvatarStylingPromise;
+          }
+
+          // Build per-character clothing for this page
+          const perCharClothing = page.characterClothing || {};
+          // Trial mode fallback: if no clothing parsed, use the trial costume type for main characters
+          if (inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
+            const mainCharIds = inputData.mainCharacters || [];
+            for (const char of (inputData.characters || [])) {
+              const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
+              if (isMain) {
+                perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+              }
+            }
+          }
+
+          // Determine which characters appear in this scene
+          const sceneCharacters = getCharactersInScene(
+            (page.sceneHint || '') + '\n' + (page.text || ''),
+            inputData.characters
+          );
+
+          // Build clothing requirements with _currentClothing per character
+          const sceneClothingRequirements = { ...(inputData._trialClothingRequirements || {}) };
+          for (const char of sceneCharacters) {
+            const charClothing = perCharClothing[char.name] || 'standard';
+            if (!sceneClothingRequirements[char.name]) {
+              sceneClothingRequirements[char.name] = {};
+            }
+            sceneClothingRequirements[char.name]._currentClothing = charClothing;
+          }
+
+          // Get character photos with styled avatars applied
+          let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
+          pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+
+          // Build the image prompt — trial uses rich scene hint as scene description
+          const sceneDescription = page.sceneHint || page.text || '';
+          const pageImageModel = MODEL_DEFAULTS.simplePageImage;
+          const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
+          const isGrokImage = pageImageBackend === 'grok';
+
+          const imagePrompt = buildImagePrompt(
+            sceneDescription, inputData, sceneCharacters, false, streamingVisualBible,
+            page.pageNumber, true, pagePhotos, { skipVisualBible: isGrokImage }
+          );
+
+          log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)`);
+          const startTime = Date.now();
+
+          const genResult = await generateImageOnly(imagePrompt, pagePhotos, {
+            imageModelOverride: pageImageModel,
+            imageBackendOverride: pageImageBackend,
+            pageNumber: page.pageNumber,
+          });
+
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          log.info(`✅ [TRIAL-STREAM] Page ${page.pageNumber} image ready in ${elapsed}s`);
+
+          // Track usage
+          if (genResult.usage) {
+            const isRunware = genResult.modelId?.startsWith('runware:');
+            const isGrok = genResult.modelId?.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
+          }
+
+          // Save partial_page checkpoint for progressive display
+          if (genResult.imageData) {
+            await saveCheckpoint(jobId, 'partial_page', {
+              pageNumber: page.pageNumber,
+              text: page.text,
+              sceneDescription,
+              imageData: genResult.imageData,
+              modelId: genResult.modelId
+            }, page.pageNumber);
+          }
+
+          return {
+            pageNumber: page.pageNumber,
+            imageData: genResult.imageData,
+            modelId: genResult.modelId,
+            usage: genResult.usage,
+            prompt: imagePrompt,
+            characterPhotos: pagePhotos,
+            grokRefImages: genResult.grokRefImages || null,
+            sceneDescription,
+            text: page.text,
+            sceneCharacters,
+            perCharClothing,
+          };
+        } catch (err) {
+          log.warn(`⚠️ [TRIAL-STREAM] Page ${page.pageNumber} image gen failed: ${err.message}`);
+          return null;
+        }
+      })();
+
+      streamingTrialPageImagePromises.set(page.pageNumber, imagePromise);
     };
 
     // Helper: Start cover generation
@@ -3047,8 +3162,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         genLog.info('page_streamed', `Page ${page.pageNumber} parsed from stream`, null, { pageNumber: page.pageNumber, textLength: page.text?.length || 0 });
         // Store page data for scene expansion
         streamingExpandedPages.set(page.pageNumber, page);
-        // Only start scene expansion for non-trial (trial uses rich hints directly)
-        if (!inputData.trialMode) {
+        if (inputData.trialMode) {
+          // Trial mode: kick off page image generation immediately (parallel with rest of stream)
+          startTrialPageImageGeneration(page);
+        } else {
+          // Normal mode: scene expansion (image gen happens in Phase 5a)
           startSceneExpansion(page);
         }
       },
@@ -3936,6 +4054,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
             [progressPercent, `Generating illustration ${pageData.pageNumber}/${expandedScenes.length}...`, jobId]
           );
+
+          // Trial mode: reuse pre-generated streaming image if available
+          if (inputData.trialMode && streamingTrialPageImagePromises.has(pageData.pageNumber)) {
+            const streamResult = await streamingTrialPageImagePromises.get(pageData.pageNumber);
+            if (streamResult && streamResult.imageData) {
+              log.info(`♻️ [TRIAL-STREAM] Page ${pageData.pageNumber}: reusing pre-generated streaming image`);
+              return {
+                pageNumber: pageData.pageNumber,
+                imageData: streamResult.imageData,
+                modelId: streamResult.modelId,
+                thinkingText: null,
+                usage: streamResult.usage,
+                prompt: streamResult.prompt,
+                characterPhotos: streamResult.characterPhotos,
+                landmarkPhotos: pageData.landmarkPhotos,
+                visualBibleGrid: pageData.visualBibleGrid,
+                grokRefImages: streamResult.grokRefImages,
+                emptySceneImage: null,
+                emptyScenePrompt: null,
+                sceneDescription: pageData.scene.sceneDescription,
+                text: pageData.scene.text,
+                sceneCharacters: pageData.sceneCharacters,
+                sceneMetadata: pageData.sceneMetadata,
+                perCharClothing: pageData.perCharClothing,
+                scene: pageData.scene
+              };
+            }
+          }
 
           try {
             const genResult = await generateImageOnly(

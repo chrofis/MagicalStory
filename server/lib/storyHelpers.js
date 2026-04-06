@@ -317,6 +317,21 @@ function expandPositionAbbreviations(position) {
 }
 
 /**
+ * Strip Visual Bible entity IDs (e.g., "[LOC002]", "[ART001]", "[CHAR003]", "[CLO001]",
+ * "[LOC003.2]") from a string. These IDs are needed in scene metadata for landmark photo
+ * lookup, but they confuse image generators when they leak into rendered prompts.
+ * @param {string} str
+ * @returns {string}
+ */
+function stripEntityIds(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/\s*\[(?:LOC|ART|CHAR|CLO|OBJ)\d+(?:\.\d+)?\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Converts the structured JSON scene to concise prose for image generation prompt
  * @param {Object} scene - The scene section from JSON scene description
  * @returns {string} Formatted prose for image prompt
@@ -328,18 +343,18 @@ function buildTextFromJson(scene) {
 
   // Main description (imageSummary is the key description)
   if (scene.imageSummary) {
-    lines.push(scene.imageSummary);
+    lines.push(stripEntityIds(scene.imageSummary));
   }
 
   // Character positions and actions (concise bullet format)
   if (scene.characters && scene.characters.length > 0) {
     lines.push('');
     for (const char of scene.characters) {
-      const position = expandPositionAbbreviations(char.position) || '';
-      const parts = [char.name + ':'];
+      const position = stripEntityIds(expandPositionAbbreviations(char.position) || '');
+      const parts = [stripEntityIds(char.name || '') + ':'];
       if (position) parts.push(position);
-      if (char.action) parts.push(char.action);
-      if (char.expression) parts.push(char.expression);
+      if (char.action) parts.push(stripEntityIds(char.action));
+      if (char.expression) parts.push(stripEntityIds(char.expression));
       lines.push('- ' + parts.join(', '));
     }
   }
@@ -347,8 +362,8 @@ function buildTextFromJson(scene) {
   // Setting summary (one line)
   if (scene.setting) {
     const settingParts = [];
-    if (scene.setting.location) settingParts.push(scene.setting.location);
-    if (scene.setting.description) settingParts.push(scene.setting.description);
+    if (scene.setting.location) settingParts.push(stripEntityIds(scene.setting.location));
+    if (scene.setting.description) settingParts.push(stripEntityIds(scene.setting.description));
     if (settingParts.length > 0) {
       lines.push('');
       lines.push('Setting: ' + settingParts.join('. '));
@@ -366,12 +381,12 @@ function buildTextFromJson(scene) {
     }
   }
 
-  // Objects (if any have IDs from Visual Bible)
+  // Objects (Visual Bible IDs are stripped — they confuse image generators)
   if (scene.objects && scene.objects.length > 0) {
     const objectLines = scene.objects.map(obj => {
-      const idPart = obj.id ? ` [${obj.id}]` : '';
-      const expandedPos = expandPositionAbbreviations(obj.position) || '';
-      return `${obj.name}${idPart}${expandedPos ? ': ' + expandedPos : ''}`;
+      const cleanName = stripEntityIds(obj.name || '');
+      const expandedPos = stripEntityIds(expandPositionAbbreviations(obj.position) || '');
+      return `${cleanName}${expandedPos ? ': ' + expandedPos : ''}`;
     });
     if (objectLines.length > 0) {
       lines.push('');
@@ -457,6 +472,10 @@ function stripSceneMetadata(sceneDescription) {
     .replace(/^[\s\n]*\)*\*{1,2}\s*/g, '') // Remove leading )** or )* with whitespace
     .replace(/^[\s\n]*\*{1,2}\)*\s*/g, '') // Remove leading **) or *)
     .trim();
+
+  // Final pass: strip Visual Bible entity IDs (e.g., [LOC002], [ART001]) — these confuse
+  // image generators. Photo lookup uses parsed scene metadata, not this rendered text.
+  stripped = stripEntityIds(stripped);
 
   return stripped;
 }
@@ -3990,6 +4009,9 @@ module.exports = {
   expandPositionAbbreviations,
   normalizePositionToLCR,
   POSITION_ABBREVIATIONS,
+
+  // Entity ID stripping (for image prompts)
+  stripEntityIds,
 
   // Character parsing for bbox matching
   parseCharacterDescriptions,
