@@ -627,10 +627,11 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         total: 0
       },
       gemini_quality: {
-        // Gemini 2.5 Flash for quality eval (was 2.0 — pricing 3-6x higher)
-        input: (totals.gemini_quality.input_tokens / 1000000) * 0.30,
-        output: (totals.gemini_quality.output_tokens / 1000000) * 2.50,
-        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 2.50,
+        // Gemini 2.5 Flash Lite (default production model) — $0.10/$0.40/$0.40 per 1M
+        // NOTE: when dev overrides to Flash, actual cost is ~6× higher than what's shown.
+        input: (totals.gemini_quality.input_tokens / 1000000) * 0.10,
+        output: (totals.gemini_quality.output_tokens / 1000000) * 0.40,
+        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.40,
         total: 0
       },
       runware: {
@@ -701,10 +702,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
                             ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 2.50;
       // Gemini image gen: ~$0.04 per image (gemini-2.5-flash-image)
       const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.04;
-      // Gemini 2.5 Flash (quality): $0.30 input / $2.50 output per 1M tokens (was 2.0 Flash $0.10/$0.40)
-      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.30 +
-                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 2.50 +
-                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 2.50;
+      // Gemini 2.5 Flash Lite (production default): $0.10 input / $0.40 output / $0.40 thinking per 1M
+      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
+                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
       const runwareCost = entry.runware?.direct_cost || 0;
       const grokCost = entry.grok?.direct_cost || 0;
       return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost + grokCost;

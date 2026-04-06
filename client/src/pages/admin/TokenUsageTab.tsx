@@ -208,9 +208,10 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiTextCost = ((day.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
                                         ((day.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
                   const geminiImageCost = (day.gemini_image?.calls || 0) * 0.04;
-                  const geminiQualityCost = ((day.gemini_quality?.input_tokens || 0) / 1000000) * 0.30 +
-                                           ((day.gemini_quality?.output_tokens || 0) / 1000000) * 2.50 +
-                                           ((day.gemini_quality?.thinking_tokens || 0) / 1000000) * 2.50;
+                  // Gemini 2.5 Flash Lite (production default): $0.10/$0.40/$0.40
+                  const geminiQualityCost = ((day.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((day.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
+                                           ((day.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
                   const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
                   const grokCost = day.grok?.direct_cost || 0;
                   const runwareCost = day.runware?.direct_cost || 0;
@@ -272,9 +273,10 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiTextCost = ((month.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
                                         ((month.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
                   const geminiImageCost = (month.gemini_image?.calls || 0) * 0.04;
-                  const geminiQualityCost = ((month.gemini_quality?.input_tokens || 0) / 1000000) * 0.30 +
-                                           ((month.gemini_quality?.output_tokens || 0) / 1000000) * 2.50 +
-                                           ((month.gemini_quality?.thinking_tokens || 0) / 1000000) * 2.50;
+                  // Gemini 2.5 Flash Lite (production default): $0.10/$0.40/$0.40
+                  const geminiQualityCost = ((month.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((month.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
+                                           ((month.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
                   const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
                   const grokCost = month.grok?.direct_cost || 0;
                   const runwareCost = month.runware?.direct_cost || 0;
@@ -337,9 +339,10 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiTextCost = ((user.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
                                         ((user.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
                   const geminiImageCost = (user.gemini_image?.calls || 0) * 0.04;
-                  const geminiQualityCost = ((user.gemini_quality?.input_tokens || 0) / 1000000) * 0.30 +
-                                           ((user.gemini_quality?.output_tokens || 0) / 1000000) * 2.50 +
-                                           ((user.gemini_quality?.thinking_tokens || 0) / 1000000) * 2.50;
+                  // Gemini 2.5 Flash Lite (production default): $0.10/$0.40/$0.40
+                  const geminiQualityCost = ((user.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((user.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
+                                           ((user.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
                   // Calculate avatar cost per model
                   let avatarCost = 0;
                   if (user.avatarByModel) {

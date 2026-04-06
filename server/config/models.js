@@ -88,8 +88,8 @@ const MODEL_DEFAULTS = {
 
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
-  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation (2.5 for character identification)
-  bboxDetection: 'gemini-2.5-flash',   // Bounding box detection (needs 2.5 for spatial precision)
+  qualityEval: 'gemini-2.5-flash-lite',     // Image quality evaluation ($0.10/$0.40 — 6× cheaper than 2.5 Flash)
+  bboxDetection: 'gemini-2.5-flash-lite',   // Bounding box detection ($0.10/$0.40 — 6× cheaper than 2.5 Flash)
 
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.0-flash',         // Fast utility tasks
