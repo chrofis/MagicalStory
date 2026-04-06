@@ -198,35 +198,39 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    // Place images in the content areas defined by Gelato API
-    const backX = mmToPoints(contentBack.left);
-    const backY = mmToPoints(contentBack.top);
-    const backW = mmToPoints(contentBack.width);
-    const backH = mmToPoints(contentBack.height);
-    const frontX = mmToPoints(contentFront.left);
-    const frontY = mmToPoints(contentFront.top);
-    const frontW = mmToPoints(contentFront.width);
-    const frontH = mmToPoints(contentFront.height);
+    // Extend cover images into the bleed area (outer edge + top + bottom).
+    // Stop at the spine edge so back/front don't bleed into each other.
+    // Gelato content rectangles already exclude bleed; we add it back on the
+    // outer side and on top/bottom to fill the trim-safe margin.
+    const backLeft = 0;
+    const backRight = mmToPoints(contentBack.left + contentBack.width); // up to spine edge
+    const backImgX = backLeft;
+    const backImgY = 0;
+    const backImgW = backRight - backLeft;
+    const backImgH = coverSpreadHeight;
 
-    // Place back cover image centered in its content area
-    doc.image(backCoverBuffer, backX, backY, { fit: [backW, backH], align: 'center', valign: 'center' });
-    // Place front cover image centered in its content area
-    doc.image(frontCoverBuffer, frontX, frontY, { fit: [frontW, frontH], align: 'center', valign: 'center' });
+    const frontLeft = mmToPoints(contentFront.left); // start at spine edge
+    const frontRight = coverSpreadWidth;             // up to right page edge (incl. bleed)
+    const frontImgX = frontLeft;
+    const frontImgY = 0;
+    const frontImgW = frontRight - frontLeft;
+    const frontImgH = coverSpreadHeight;
+
+    doc.image(backCoverBuffer, backImgX, backImgY, { fit: [backImgW, backImgH], align: 'center', valign: 'center' });
+    doc.image(frontCoverBuffer, frontImgX, frontImgY, { fit: [frontImgW, frontImgH], align: 'center', valign: 'center' });
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
   doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-  // Page 3: Initial/dedication page (right side of first spread)
+  // Page 3: Initial/dedication page (right side of first spread).
+  // Image fills the entire page including bleed (outer 3mm gets trimmed off).
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   if (initialPageImageData) {
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    // Center image within content area (offset by bleed)
-    const initialImageHeight = pageWidth; // Square image height = content width
-    const initialYOffset = bleed + (pageHeight - initialImageHeight) / 2;
-    doc.image(initialPageBuffer, bleed, initialYOffset, { width: pageWidth });
+    doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
   }
 
   // Parse story pages
@@ -333,8 +337,10 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
     if (image && image.imageData) {
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, bleed, bleed, {
-          fit: [pageWidth, imageHeight],
+        // Image extends into LEFT, RIGHT, and TOP bleed (outer 3mm gets trimmed off).
+        // Bottom edge stays at imageHeight + bleed since text sits below.
+        doc.image(imageBuffer, 0, 0, {
+          fit: [interiorW, bleed + imageHeight],
           align: 'center',
           valign: 'center'
         });
@@ -343,7 +349,7 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
       }
     }
 
-    // Add text in bottom portion with consistent font size and vertical centering
+    // Text stays inside content area with current margins (readability)
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
     const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
     const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
@@ -387,13 +393,14 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
     const yPosition = bleed + marginY + (availableHeight - textHeight) / 2;
     doc.text(cleanText, bleed + marginOuter, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
-    // Add image page if available - image fills content area, centered within bleed
+    // Add image page if available - image fills the full page including bleed
+    // (outer 3mm gets trimmed off, eliminating white slivers at the edges)
     if (image && image.imageData) {
       doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, bleed, bleed, {
-          fit: [pageWidth, pageHeight],
+        doc.image(imageBuffer, 0, 0, {
+          fit: [interiorW, interiorH],
           align: 'center',
           valign: 'center'
         });
@@ -482,7 +489,8 @@ async function generateCombinedBookPdf(stories, options = {}) {
         if (image && image.imageData) {
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, bleed, bleed, { fit: [PAGE_SIZE, imageHeight], align: 'center', valign: 'center' });
+            // Image extends into LEFT, RIGHT, and TOP bleed (text sits below)
+            doc.image(imageBuffer, 0, 0, { fit: [interiorPageSize, bleed + imageHeight], align: 'center', valign: 'center' });
           } catch (err) {
             log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
@@ -535,7 +543,8 @@ async function generateCombinedBookPdf(stories, options = {}) {
           totalStoryPages++;
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, bleed, bleed, { fit: [PAGE_SIZE, PAGE_SIZE], align: 'center', valign: 'center' });
+            // Image fills full page including bleed on all sides
+            doc.image(imageBuffer, 0, 0, { fit: [interiorPageSize, interiorPageSize], align: 'center', valign: 'center' });
           } catch (err) {
             log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
@@ -570,29 +579,31 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-        // Place images in Gelato content areas
-        const backX = mmToPoints(contentBack.left);
-        const backY = mmToPoints(contentBack.top);
-        const backW = mmToPoints(contentBack.width);
-        const backH = mmToPoints(contentBack.height);
-        const frontX = mmToPoints(contentFront.left);
-        const frontY = mmToPoints(contentFront.top);
-        const frontW = mmToPoints(contentFront.width);
-        const frontH = mmToPoints(contentFront.height);
+        // Extend cover images into outer + top + bottom bleed; stop at the spine edge
+        const backImgX = 0;
+        const backImgY = 0;
+        const backImgW = mmToPoints(contentBack.left + contentBack.width); // up to spine edge
+        const backImgH = coverSpreadHeight;
 
-        doc.image(backCoverBuffer, backX, backY, { fit: [backW, backH], align: 'center', valign: 'center' });
-        doc.image(frontCoverBuffer, frontX, frontY, { fit: [frontW, frontH], align: 'center', valign: 'center' });
+        const frontImgX = mmToPoints(contentFront.left); // start at spine edge
+        const frontImgY = 0;
+        const frontImgW = coverSpreadWidth - frontImgX;  // up to right page edge incl. bleed
+        const frontImgH = coverSpreadHeight;
+
+        doc.image(backCoverBuffer, backImgX, backImgY, { fit: [backImgW, backImgH], align: 'center', valign: 'center' });
+        doc.image(frontCoverBuffer, frontImgX, frontImgY, { fit: [frontImgW, frontImgH], align: 'center', valign: 'center' });
       }
 
       // Blank left page (required by Gelato - left side of first spread)
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
       // Introduction/dedication page (right side of first spread) — blank if missing (e.g. trial)
+      // Image fills entire page including bleed
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
+        doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageSize, interiorPageSize], align: 'center', valign: 'center' });
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -603,13 +614,14 @@ async function generateCombinedBookPdf(stories, options = {}) {
       // so next page is LEFT — perfect for title.
       // Matches story 1 layout: blank (LEFT) + dedication (RIGHT)
 
-      // Title page (LEFT) — front cover image as internal title
+      // Title page (LEFT) — front cover image as internal title.
+      // Image fills entire page including bleed.
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(frontCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
+        doc.image(frontCoverBuffer, 0, 0, { fit: [interiorPageSize, interiorPageSize], align: 'center', valign: 'center' });
       }
 
       // Dedication/initial page (RIGHT) — same side as story 1's dedication
@@ -618,7 +630,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       if (initialPageImageData) {
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
+        doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageSize, interiorPageSize], align: 'center', valign: 'center' });
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -630,7 +642,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
         doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
+        doc.image(backCoverBuffer, 0, 0, { fit: [interiorPageSize, interiorPageSize], align: 'center', valign: 'center' });
 
         // Blank separator after back cover (if not last story)
         if (storyIndex < stories.length - 1) {
