@@ -722,6 +722,15 @@ function getMetaForRoute(routePath, lang) {
   lang = normalizeLang(lang);
   const cleanPath = routePath.replace(/\/+$/, '') || '/';
 
+  // Self-referencing canonical helper: each language variant must canonicalize to itself,
+  // not to the default-language version. Non-self-referencing canonicals are the #1 cause
+  // of "Crawled - currently not indexed" on multilingual sites with ?lang= query params.
+  // Root path: DE → "https://magicalstory.ch", non-DE → "https://magicalstory.ch/?lang=en".
+  const isRoot = cleanPath === '/';
+  const canonicalUrl = lang === 'de'
+    ? `${BASE_URL}${isRoot ? '' : cleanPath}`
+    : `${BASE_URL}${isRoot ? '/' : cleanPath}?lang=${lang}`;
+
   // Check noindex routes (prefix match for routes like /create/*)
   const isNoindex = NOINDEX_ROUTES.some(nr => cleanPath === nr || cleanPath.startsWith(nr + '/'));
 
@@ -731,7 +740,7 @@ function getMetaForRoute(routePath, lang) {
     const meta = {
       title: staticMeta.title[lang] || staticMeta.title.de,
       description: staticMeta.description[lang] || staticMeta.description.de,
-      canonical: `${BASE_URL}${cleanPath === '/' ? '' : cleanPath}`,
+      canonical: canonicalUrl,
       path: cleanPath,
       noindex: isNoindex,
       hreflang: buildHreflang(cleanPath),
@@ -792,7 +801,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: `${catName} – Magical Story`,
         description: buildCategoryDescription(catName, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -823,7 +832,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: titleTemplate,
         description: buildThemeDescription(themeName, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -850,7 +859,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: `${title} | MagicalStory`,
         description: buildTownDescription(town.name, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -875,7 +884,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: `${title} — Ehrlicher Vergleich | MagicalStory`,
         description: buildComparisonDescription(comp.name, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -900,7 +909,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: `${title} | MagicalStory`,
         description: buildOccasionDescription(occasionSlug, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -926,7 +935,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: `${title} | MagicalStory`,
         description: buildGiftDescription(giftSlug, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -958,7 +967,7 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: titleTpl,
         description: buildCityDescription(cityName, lang),
-        canonical: `${BASE_URL}${cleanPath}`,
+        canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
@@ -978,7 +987,7 @@ function getMetaForRoute(routePath, lang) {
     return {
       title: 'Magical Story',
       description: '',
-      canonical: `${BASE_URL}${cleanPath}`,
+      canonical: canonicalUrl,
       path: cleanPath,
       noindex: true,
       hreflang: [],
@@ -989,7 +998,7 @@ function getMetaForRoute(routePath, lang) {
   return {
     title: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
     description: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten.',
-    canonical: `${BASE_URL}${cleanPath === '/' ? '' : cleanPath}`,
+    canonical: canonicalUrl,
     path: cleanPath,
     noindex: false,
     hreflang: buildHreflang(cleanPath),

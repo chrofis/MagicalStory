@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useSwissStories } from '@/context/SEODataContext';
 import { Navigation, Footer } from '@/components/common';
 import { MapPin, ArrowRight, ChevronDown } from 'lucide-react';
 
@@ -9,11 +10,6 @@ interface City {
   name: { en: string; de: string; fr: string };
   canton: string;
   ideas: { id: string }[];
-}
-
-interface ApiResponse {
-  cantons: Record<string, { en: string; de: string; fr: string }>;
-  cities: City[];
 }
 
 const texts: Record<string, {
@@ -57,15 +53,8 @@ const texts: Record<string, {
 export default function CityListing() {
   const { language } = useLanguage();
   const t = texts[language] || texts.de;
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const { data } = useSwissStories();
   const [openCantons, setOpenCantons] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    fetch('/api/swiss-stories')
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => {});
-  }, []);
 
   // Group cities by canton, sorted by canton name
   const cantonGroups = useMemo(() => {

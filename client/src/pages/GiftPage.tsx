@@ -252,11 +252,10 @@ export default function GiftPage() {
                         className={`text-stone-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
-                    {isOpen && (
-                      <div className="px-5 pb-5 pt-0">
-                        <p className="text-stone-600 text-sm leading-relaxed">{answer}</p>
-                      </div>
-                    )}
+                    {/* Always rendered for SEO; CSS hides when collapsed */}
+                    <div className={`px-5 pb-5 pt-0 ${isOpen ? '' : 'hidden'}`}>
+                      <p className="text-stone-600 text-sm leading-relaxed">{answer}</p>
+                    </div>
                   </div>
                 );
               })}

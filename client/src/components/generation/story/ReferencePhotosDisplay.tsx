@@ -223,22 +223,29 @@ export function ReferencePhotosDisplay({
             </div>
           )}
 
-          {/* Pass 1 prompt */}
+          {/* Pass 1 prompt — always visible so it can be checked against the output */}
           {displayEmptyScenePrompt && (
-            <details>
-              <summary className="text-[10px] text-emerald-600 cursor-pointer">{language === 'de' ? 'Prompt' : 'Prompt'}</summary>
-              <pre className="mt-1 text-[10px] bg-emerald-100 p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap text-emerald-800">{displayEmptyScenePrompt}</pre>
-            </details>
+            <div>
+              <div className="text-[10px] text-emerald-600 font-medium mb-1">{language === 'de' ? 'Prompt ↓' : 'Prompt ↓'}</div>
+              <pre className="text-[10px] bg-emerald-100 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap text-emerald-800 border border-emerald-200">{displayEmptyScenePrompt}</pre>
+            </div>
           )}
 
-          {/* Pass 1 output: generated empty scene */}
+          {/* Pass 1 output: generated empty scene with prompt overlay */}
           <div className="text-[10px] text-emerald-600 font-medium">{language === 'de' ? 'Ausgabe ↓' : 'Output ↓'}</div>
-          <img
-            src={displayEmptySceneImage}
-            alt="Empty scene background"
-            className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setLightboxImage(displayEmptySceneImage)}
-          />
+          <div className="relative group">
+            <img
+              src={displayEmptySceneImage}
+              alt="Empty scene background"
+              className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setLightboxImage(displayEmptySceneImage)}
+            />
+            {displayEmptyScenePrompt && (
+              <div className="absolute inset-x-0 bottom-0 bg-black/70 text-white text-[9px] p-1.5 rounded-b max-h-20 overflow-auto whitespace-pre-wrap pointer-events-none">
+                {displayEmptyScenePrompt}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

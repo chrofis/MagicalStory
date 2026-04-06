@@ -1139,6 +1139,39 @@ function resolveArtStyle(artStyleId, backend) {
 }
 
 /**
+ * Resolve art style description for EMPTY SCENE generation (no characters present).
+ * Strips sentences that describe character anatomy (faces, eyes, skin, proportions),
+ * because image generators can't reliably negate "no people" — explicit eye/face
+ * details in the style prompt cause stray faces and eyes to appear in empty backgrounds.
+ *
+ * Keeps: rendering technique, color palette, lighting, texture, medium, composition.
+ * Removes: any sentence mentioning face/eyes/skin/character/proportions/nose/mouth/cheek.
+ *
+ * @param {string} artStyleId - Style key (e.g., 'anime')
+ * @param {string} [backend] - Image backend ('grok', 'gemini', 'runware')
+ * @returns {string|null} Cleaned style description or null if not found
+ */
+function resolveArtStyleForEmptyScene(artStyleId, backend) {
+  const full = resolveArtStyle(artStyleId, backend);
+  if (!full) return null;
+
+  // Pattern matches anatomy-related keywords (whole-word, case-insensitive).
+  // "features" only matches when it's clearly facial (paired with face/eye context),
+  // so we keep it broad and rely on the sentence containing other anatomy cues too.
+  const ANATOMY_RE = /\b(face|faces|facial|eye|eyes|skin|character|characters|proportion|proportions|proportioned|nose|mouth|jawline|cheek|cheeks|expression|expressions|expressive|brow|brows|eyebrow|eyebrows|lips|chin|iris|irises|pore|pores)\b/i;
+
+  // Split on sentence boundaries while preserving the punctuation.
+  // Handles ". ", "! ", "? " — em-dashes mid-sentence are not split.
+  const sentences = full.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [full];
+
+  const kept = sentences
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !ANATOMY_RE.test(s));
+
+  return kept.join(' ').trim() || null;
+}
+
+/**
  * Language level definitions - controls text length per page
  */
 const LANGUAGE_LEVELS = {
@@ -3945,6 +3978,7 @@ module.exports = {
   // Config
   ART_STYLES,
   resolveArtStyle,
+  resolveArtStyleForEmptyScene,
   LANGUAGE_LEVELS,
 
   // Level helpers

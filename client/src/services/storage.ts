@@ -13,15 +13,24 @@
 const memoryStorage: Record<string, string> = {};
 
 // Track which storage is available
-let storageType: 'localStorage' | 'sessionStorage' | 'memory' = 'localStorage';
+let storageType: 'localStorage' | 'sessionStorage' | 'memory' = 'memory';
 let storageChecked = false;
 
+const isBrowser = typeof window !== 'undefined';
+
 /**
- * Check if localStorage is available and working
+ * Check if localStorage is available and working.
+ * On the server (SSR / pre-rendering) this is a no-op — we stay on memory storage
+ * since there's no persistent storage available anyway.
  */
 function checkStorageAvailability(): void {
   if (storageChecked) return;
   storageChecked = true;
+
+  if (!isBrowser) {
+    storageType = 'memory';
+    return;
+  }
 
   const testKey = '__storage_test__';
 

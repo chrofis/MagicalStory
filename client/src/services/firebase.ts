@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -7,6 +7,7 @@ import {
   getRedirectResult,
   signOut,
   browserPopupRedirectResolver,
+  type Auth,
   type User as FirebaseUser
 } from 'firebase/auth';
 
@@ -20,20 +21,31 @@ const firebaseConfig = {
   measurementId: "G-TERDSLHHDG"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+// Lazy initialization — Firebase touches `window` and `indexedDB` at init time,
+// which crashes during SSR / pre-rendering. We defer init until first call so the
+// module can be safely imported in a Node environment.
+let _app: FirebaseApp | null = null;
+let _auth: Auth | null = null;
+let _googleProvider: GoogleAuthProvider | null = null;
 
-// Add prompt to force account selection
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+function ensureFirebase(): { auth: Auth; provider: GoogleAuthProvider } {
+  if (typeof window === 'undefined') {
+    throw new Error('Firebase is not available in server-side rendering');
+  }
+  if (!_app) {
+    _app = initializeApp(firebaseConfig);
+    _auth = getAuth(_app);
+    _googleProvider = new GoogleAuthProvider();
+    _googleProvider.setCustomParameters({ prompt: 'select_account' });
+  }
+  return { auth: _auth!, provider: _googleProvider! };
+}
 
 export async function signInWithGoogle(): Promise<FirebaseUser> {
+  const { auth, provider } = ensureFirebase();
   try {
     // Try popup first - works on most desktop browsers
-    const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return result.user;
   } catch (error: unknown) {
     const firebaseError = error as { code?: string; message?: string };
@@ -49,13 +61,14 @@ export async function signInWithGoogle(): Promise<FirebaseUser> {
     // All other popup failures → try redirect (covers popup-blocked, cancelled-popup-request,
     // operation-not-supported-in-this-environment, internal-error, etc.)
     console.log('Popup failed, trying redirect...');
-    await signInWithRedirect(auth, googleProvider);
+    await signInWithRedirect(auth, provider);
     throw new Error('Redirecting to Google...');
   }
 }
 
 // Handle redirect result when returning from Google auth
 export async function handleRedirectResult(): Promise<FirebaseUser | null> {
+  const { auth } = ensureFirebase();
   try {
     const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     if (result) {
@@ -74,8 +87,16 @@ export async function getIdToken(user: FirebaseUser): Promise<string> {
 }
 
 export async function firebaseSignOut(): Promise<void> {
+  const { auth } = ensureFirebase();
   await signOut(auth);
 }
 
-export { auth };
+/**
+ * Returns the Firebase Auth instance, lazily initializing if needed.
+ * Throws when called outside a browser environment.
+ */
+export function getFirebaseAuth(): Auth {
+  return ensureFirebase().auth;
+}
+
 export type { FirebaseUser };

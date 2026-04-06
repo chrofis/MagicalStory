@@ -2933,7 +2933,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               EMPTY_SCENE_DESCRIPTION: emptyDesc,
               REQUIRED_OBJECTS: ''
             });
+            // Use the same backend as the cover model itself (don't fall through to gemini default)
+            const coverModelForEmpty = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
+            const coverBackendForEmpty = IMAGE_MODELS[coverModelForEmpty]?.backend || null;
             const emptyResult = await generateImageOnly(emptyPrompt, [], {
+              imageModelOverride: coverModelForEmpty,
+              imageBackendOverride: coverBackendForEmpty,
               landmarkPhotos: coverLandmarkPhotos,
               skipCache: true
             });

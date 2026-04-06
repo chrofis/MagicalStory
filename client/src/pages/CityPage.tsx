@@ -1,41 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useSwissStories } from '@/context/SEODataContext';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, ChevronRight, ChevronDown, MapPin, BookOpen, Sparkles } from 'lucide-react';
 
 interface LocalizedString { en: string; de: string; fr: string }
-
-interface StoryIdea {
-  id: string;
-  title: LocalizedString;
-  description: LocalizedString;
-  context: LocalizedString;
-}
-
-interface City {
-  id: string;
-  name: LocalizedString;
-  canton: string;
-  lat: number;
-  lon: number;
-  ideas: StoryIdea[];
-}
-
-interface Sage {
-  id: string;
-  title: LocalizedString;
-  description: LocalizedString;
-  context: LocalizedString;
-  emoji: string;
-  age: string;
-}
-
-interface ApiResponse {
-  cantons: Record<string, LocalizedString>;
-  cities: City[];
-  sagen: Sage[];
-}
 
 // Map sage IDs to city IDs where they're most relevant
 const SAGE_CITY_MAP: Record<string, string[]> = {
@@ -152,15 +122,8 @@ export default function CityPage() {
   const { cityId } = useParams<{ cityId: string }>();
   const { language } = useLanguage();
   const t = pageTexts[language] || pageTexts.de;
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const { data } = useSwissStories();
   const [openContext, setOpenContext] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('/api/swiss-stories')
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => {});
-  }, []);
 
   const city = useMemo(() => {
     if (!data || !cityId) return null;
@@ -281,13 +244,12 @@ export default function CityPage() {
                         </Link>
                       </div>
                     </div>
-                    {isOpen && (
-                      <div className="px-5 pb-5 md:px-6 md:pb-6 pt-0">
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                          <p className="text-amber-900 text-sm leading-relaxed">{loc(idea.context)}</p>
-                        </div>
+                    {/* Always rendered (so it's in the DOM for SEO crawlers); CSS hides when collapsed */}
+                    <div className={`px-5 pb-5 md:px-6 md:pb-6 pt-0 ${isOpen ? '' : 'hidden'}`}>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <p className="text-amber-900 text-sm leading-relaxed">{loc(idea.context)}</p>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}

@@ -23,6 +23,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Vite SSR bundle (build-only intermediate, not deployed — only used by scripts/prerender.mjs)
+client/dist-ssr/
+
 # Test files
 test-simple.html
 
