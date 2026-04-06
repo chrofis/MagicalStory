@@ -149,7 +149,20 @@ for (const route of routes) {
     try {
       const swissStories = buildSwissStoriesForRoute(route);
       const seoData = swissStories ? { swissStories } : null;
-      const { html: bodyHtml } = render({ url: route, language, seoData });
+      const { html: rawBodyHtml } = render({ url: route, language, seoData });
+
+      // React 19's renderToString auto-emits <link rel="preload" as="image">
+      // (and similar resource hints) inline inside the rendered body for every
+      // <img> in the tree. On client hydration React expects those tags in
+      // <head> — leaving them inside <div id="root"> causes a hydration mismatch
+      // (React error #418). Extract them here and prepend to <head>.
+      const hoistedTagRegex = /<link\s+rel="(preload|modulepreload|stylesheet|preconnect|prefetch|dns-prefetch)"[^>]*\/?>/gi;
+      const hoistedTags = [];
+      const bodyHtml = rawBodyHtml.replace(hoistedTagRegex, (match) => {
+        hoistedTags.push(match);
+        return '';
+      });
+      const headInjection = hoistedTags.length > 0 ? hoistedTags.join('') : '';
 
       // Build the initial-data payload that the client hydrates from.
       // Only include seoData if it's non-null — keeps generic page payloads tiny.
@@ -162,6 +175,11 @@ for (const route of routes) {
       // using the same getMetaForRoute that powered the runtime injection.
       const meta = getMetaForRoute(route, language);
       let html = injectMeta(indexHtmlTemplate, meta, language);
+
+      // Inject hoisted resource hints into <head> (right before </head>)
+      if (headInjection) {
+        html = html.replace(/<\/head>/i, `${headInjection}</head>`);
+      }
 
       // Stitch the rendered React HTML into <div id="root"> and inject the
       // hydration data right after.
