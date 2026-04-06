@@ -3,45 +3,27 @@ import { useLanguage } from '@/context/LanguageContext';
 
 const footerTexts = {
   en: {
-    themes: 'Themes',
-    occasions: 'Gift Ideas',
-    giftHub: 'Gift Guide',
-    swissCities: 'Swiss Stories',
-    compare: 'Compare',
-    science: 'Science',
-    terms: 'Terms of Service',
-    privacy: 'Privacy Policy',
     faq: 'FAQ',
     about: 'About',
     contact: 'Contact',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
     copyright: 'Magical Story. All rights reserved.',
   },
   de: {
-    themes: 'Themen',
-    occasions: 'Geschenkideen',
-    giftHub: 'Geschenkratgeber',
-    swissCities: 'Schweizer Geschichten',
-    compare: 'Vergleich',
-    science: 'Forschung',
-    terms: 'Nutzungsbedingungen',
-    privacy: 'Datenschutz',
     faq: 'FAQ',
     about: 'Über uns',
     contact: 'Kontakt',
+    terms: 'Nutzungsbedingungen',
+    privacy: 'Datenschutz',
     copyright: 'Magical Story. Alle Rechte vorbehalten.',
   },
   fr: {
-    themes: 'Thèmes',
-    occasions: 'Idées cadeaux',
-    giftHub: 'Guide cadeaux',
-    swissCities: 'Histoires suisses',
-    compare: 'Comparaison',
-    science: 'Science',
-    terms: 'Conditions d\'Utilisation',
-    privacy: 'Confidentialité',
     faq: 'FAQ',
     about: 'À propos',
     contact: 'Contact',
+    terms: 'Conditions d\'Utilisation',
+    privacy: 'Confidentialité',
     copyright: 'Magical Story. Tous droits réservés.',
   },
 };
@@ -55,30 +37,6 @@ export function Footer() {
     <footer className="bg-stone-100 border-t border-stone-200 py-4 px-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-stone-600">
         <div className="flex items-center gap-4 flex-wrap">
-          <Link to="/themes" className="hover:text-indigo-500 hover:underline">
-            {texts.themes}
-          </Link>
-          <span className="text-stone-300">|</span>
-          <Link to="/anlass" className="hover:text-indigo-500 hover:underline">
-            {texts.occasions}
-          </Link>
-          <span className="text-stone-300">|</span>
-          <Link to="/geschenk" className="hover:text-indigo-500 hover:underline">
-            {texts.giftHub}
-          </Link>
-          <span className="text-stone-300">|</span>
-          <Link to="/stadt" className="hover:text-indigo-500 hover:underline">
-            {texts.swissCities}
-          </Link>
-          <span className="text-stone-300">|</span>
-          <Link to="/vergleich" className="hover:text-indigo-500 hover:underline">
-            {texts.compare}
-          </Link>
-          <span className="text-stone-300">|</span>
-          <Link to="/science" className="hover:text-indigo-500 hover:underline">
-            {texts.science}
-          </Link>
-          <span className="text-stone-300">|</span>
           <Link to="/faq" className="hover:text-indigo-500 hover:underline">
             {texts.faq}
           </Link>

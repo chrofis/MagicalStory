@@ -371,23 +371,25 @@ export function WizardStep3BookSettings({
                 </button>
               </div>
             ) : userLocation?.city ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-800">
                   {userLocation.city}{userLocation.country ? `, ${userLocation.country}` : ''}
                 </span>
                 <button
                   onClick={() => setIsEditingLocation(true)}
-                  className="p-0.5 text-gray-400 hover:text-indigo-500 transition-colors"
+                  className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200"
                   title={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
+                  aria-label={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
                 >
-                  <Pencil size={12} />
+                  <Pencil size={14} />
                 </button>
                 <button
                   onClick={handleClearLocation}
-                  className="p-0.5 text-gray-400 hover:text-red-500 transition-colors"
+                  className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200"
                   title={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : 'Remove location'}
+                  aria-label={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : 'Remove location'}
                 >
-                  <X size={12} />
+                  <X size={14} />
                 </button>
               </div>
             ) : (

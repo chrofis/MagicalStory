@@ -302,9 +302,9 @@ export default function StoryWizard() {
   const [pages, setPages] = useState(() => {
     try {
       const saved = localStorage.getItem('story_pages');
-      return saved ? parseInt(saved) : 30;
+      return saved ? parseInt(saved) : 15;
     } catch {
-      return 30;
+      return 15;
     }
   });
   const [dedication, setDedication] = useState(() => {
@@ -747,7 +747,7 @@ export default function StoryWizard() {
       setCustomThemeText('');
       setArtStyle('watercolor');
       setLanguageLevel('standard');
-      setPages(30);
+      setPages(15);
       setDedication('');
       setStoryDetails('');
       // NOTE: mainCharacters and excludedCharacters are USER data, not story data
@@ -4785,7 +4785,7 @@ export default function StoryWizard() {
                 setStoryTheme('');
                 setArtStyle('watercolor');
                 setLanguageLevel('standard');
-                setPages(30);
+                setPages(15);
                 setDedication('');
                 setStoryDetails('');
                 // Keep character configuration (mainCharacters, excludedCharacters) - user preference persists

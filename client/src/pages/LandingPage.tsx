@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown, Heart } from 'lucide-react';
+import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown, Heart, Gift, MapPin, Scale, GraduationCap } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer, Button } from '@/components/common';
 import { storyService } from '@/services';
@@ -18,7 +18,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Step 2',
     tellStory: 'Tell Your Story',
-    tellStoryDesc: "Choose from 170+ themes or describe your own adventure — from pirates to the first day of school. You're in full control: edit any text and shape every illustration exactly the way you want it.",
+    tellStoryDescBefore: 'Choose from ',
+    tellStoryDescLink: '170+ themes',
+    tellStoryDescAfter: " or describe your own adventure — from pirates to the first day of school. You're in full control: edit any text and shape every illustration exactly the way you want it.",
     selectThemes: 'Adventure, fantasy, birthday, bedtime stories, life challenges, and more',
     customElements: 'Edit text freely — every page, every word',
     readingLevel: 'Shape images to your vision — change scenes, adjust style, refine details',
@@ -44,6 +46,21 @@ const sectionTranslations = {
     // CTA
     readyToCreate: 'Ready to create your book?',
     ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in under 3 minutes.',
+    // Discover more (pre-footer grid)
+    discoverTitle: 'Discover more',
+    discoverDesc: 'Find inspiration, gift ideas and stories from your region.',
+    discoverThemes: '170+ Themes',
+    discoverThemesDesc: 'From pirates to first day of school — every adventure imaginable.',
+    discoverOccasions: 'Gift Ideas',
+    discoverOccasionsDesc: 'Birthday, baptism, school start — the perfect book for every occasion.',
+    discoverGiftHub: 'Gift Guide',
+    discoverGiftHubDesc: 'Help finding the right gift by age and interest.',
+    discoverSwiss: 'Swiss Stories',
+    discoverSwissDesc: 'Local legends and tales from your home town.',
+    discoverCompare: 'Compare',
+    discoverCompareDesc: 'See how MagicalStory compares to other personalized book providers.',
+    discoverScience: 'Why It Works',
+    discoverScienceDesc: 'The research behind personalized stories and child development.',
   },
   de: {
     // Section 1: Characters
@@ -56,7 +73,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Schritt 2',
     tellStory: 'Erzähle deine Geschichte',
-    tellStoryDesc: 'Wähle aus 170+ Themen oder beschreibe dein eigenes Abenteuer — von Piraten bis zum ersten Schultag. Du hast die volle Kontrolle: Passe jeden Text an und gestalte jedes Bild genau so, wie du es dir vorstellst.',
+    tellStoryDescBefore: 'Wähle aus ',
+    tellStoryDescLink: '170+ Themen',
+    tellStoryDescAfter: ' oder beschreibe dein eigenes Abenteuer — von Piraten bis zum ersten Schultag. Du hast die volle Kontrolle: Passe jeden Text an und gestalte jedes Bild genau so, wie du es dir vorstellst.',
     selectThemes: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten, Herausforderungen und mehr',
     customElements: 'Texte frei bearbeiten — jede Seite, jedes Wort',
     readingLevel: 'Bilder anpassen — Szene verändern, Stil wechseln, Details verfeinern',
@@ -82,6 +101,21 @@ const sectionTranslations = {
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
     ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in unter 3 Minuten fertig.',
+    // Discover more (pre-footer grid)
+    discoverTitle: 'Entdecke mehr',
+    discoverDesc: 'Finde Inspiration, Geschenkideen und Geschichten aus deiner Region.',
+    discoverThemes: '170+ Themen',
+    discoverThemesDesc: 'Von Piraten bis zum ersten Schultag — jedes Abenteuer, das du dir vorstellen kannst.',
+    discoverOccasions: 'Geschenkideen',
+    discoverOccasionsDesc: 'Geburtstag, Taufe, Schulanfang — das perfekte Buch für jeden Anlass.',
+    discoverGiftHub: 'Geschenkratgeber',
+    discoverGiftHubDesc: 'Hilfe beim richtigen Geschenk nach Alter und Interesse.',
+    discoverSwiss: 'Schweizer Sagen',
+    discoverSwissDesc: 'Lokale Sagen und Geschichten aus deinem Heimatort.',
+    discoverCompare: 'Vergleich',
+    discoverCompareDesc: 'Wie sich MagicalStory mit anderen Anbietern von personalisierten Büchern misst.',
+    discoverScience: 'Warum es wirkt',
+    discoverScienceDesc: 'Die Forschung hinter personalisierten Geschichten und Kindesentwicklung.',
   },
   fr: {
     // Section 1: Characters
@@ -94,7 +128,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Étape 2',
     tellStory: 'Racontez votre histoire',
-    tellStoryDesc: "Choisissez parmi 170+ thèmes ou décrivez votre propre aventure — des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
+    tellStoryDescBefore: 'Choisissez parmi ',
+    tellStoryDescLink: '170+ thèmes',
+    tellStoryDescAfter: " ou décrivez votre propre aventure — des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
     selectThemes: 'Aventure, fantasy, anniversaire, histoires du soir, défis de la vie, et plus',
     customElements: 'Modifiez les textes librement — chaque page, chaque mot',
     readingLevel: 'Façonnez les images — changez la scène, ajustez le style, affinez les détails',
@@ -120,6 +156,21 @@ const sectionTranslations = {
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
     ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
+    // Discover more (pre-footer grid)
+    discoverTitle: 'Découvrir plus',
+    discoverDesc: 'Trouvez de l\'inspiration, des idées cadeaux et des histoires de votre région.',
+    discoverThemes: '170+ thèmes',
+    discoverThemesDesc: 'Des pirates au premier jour d\'école — toutes les aventures imaginables.',
+    discoverOccasions: 'Idées cadeaux',
+    discoverOccasionsDesc: 'Anniversaire, baptême, rentrée — le livre parfait pour chaque occasion.',
+    discoverGiftHub: 'Guide cadeaux',
+    discoverGiftHubDesc: 'Aide pour trouver le bon cadeau selon l\'âge et les centres d\'intérêt.',
+    discoverSwiss: 'Histoires suisses',
+    discoverSwissDesc: 'Légendes locales et histoires de votre ville natale.',
+    discoverCompare: 'Comparer',
+    discoverCompareDesc: 'Comment MagicalStory se compare aux autres fournisseurs de livres personnalisés.',
+    discoverScience: 'Pourquoi ça marche',
+    discoverScienceDesc: 'La recherche derrière les histoires personnalisées et le développement de l\'enfant.',
   },
 };
 
@@ -428,7 +479,11 @@ export default function LandingPage() {
                 {st.tellStory}
               </h2>
               <p className="text-lg text-stone-600 mb-4">
-                {st.tellStoryDesc}
+                {st.tellStoryDescBefore}
+                <Link to="/themes" className="text-indigo-500 hover:text-indigo-700 font-semibold underline">
+                  {st.tellStoryDescLink}
+                </Link>
+                {st.tellStoryDescAfter}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
@@ -583,6 +638,50 @@ export default function LandingPage() {
             >
               {t.alreadyHaveAccount || 'Already have an account? Log in'}
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Discover More — pre-footer grid */}
+      <section className="py-16 lg:py-20 px-4 lg:px-8 bg-stone-50 border-t border-stone-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-3">
+              {st.discoverTitle}
+            </h2>
+            <p className="text-lg text-stone-600">
+              {st.discoverDesc}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              { to: '/themes',    icon: BookOpen,       title: st.discoverThemes,    desc: st.discoverThemesDesc },
+              { to: '/anlass',    icon: Gift,           title: st.discoverOccasions, desc: st.discoverOccasionsDesc },
+              { to: '/geschenk',  icon: Heart,          title: st.discoverGiftHub,   desc: st.discoverGiftHubDesc },
+              { to: '/stadt',     icon: MapPin,         title: st.discoverSwiss,     desc: st.discoverSwissDesc },
+              { to: '/vergleich', icon: Scale,          title: st.discoverCompare,   desc: st.discoverCompareDesc },
+              { to: '/science',   icon: GraduationCap,  title: st.discoverScience,   desc: st.discoverScienceDesc },
+            ].map(({ to, icon: Icon, title, desc }) => (
+              <Link
+                key={to}
+                to={to}
+                className="group bg-white rounded-2xl border-2 border-stone-200 p-6 hover:border-indigo-500 hover:shadow-lg transition-all flex flex-col"
+              >
+                <div className="bg-indigo-100 group-hover:bg-indigo-200 transition-colors w-14 h-14 rounded-full flex items-center justify-center mb-4">
+                  <Icon className="w-7 h-7 text-indigo-500" />
+                </div>
+                <h3 className="text-lg font-bold text-stone-900 mb-2 group-hover:text-indigo-500 transition-colors">
+                  {title}
+                </h3>
+                <p className="text-sm text-stone-600 flex-1">
+                  {desc}
+                </p>
+                <div className="mt-3 inline-flex items-center gap-1 text-indigo-500 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  {language === 'de' ? 'Entdecken' : language === 'fr' ? 'Découvrir' : 'Explore'}
+                  <ArrowRight size={14} />
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
