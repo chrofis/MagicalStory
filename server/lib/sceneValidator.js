@@ -18,7 +18,7 @@ const { generateWithRunware, RUNWARE_MODELS, isRunwareConfigured } = require('./
 const { callTextModel } = require('./textModels');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
-const { expandPositionAbbreviations } = require('./storyHelpers');
+const { expandPositionAbbreviations, stripEntityIds } = require('./storyHelpers');
 const { getPhysical } = require('./characterPhysical');
 
 // Initialize Gemini
@@ -752,10 +752,20 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     return null;
   }
 
+  // Strip Visual Bible entity IDs (ART###, LOC###, CLO###, CHAR###, OBJ###) from
+  // every text input. The outline-derived sceneHint, the story text, and the image
+  // prompt may all contain raw IDs from the outline writer — the vision model
+  // cannot "see" an ID and mis-reports the object as missing/unverifiable, wrecking
+  // semantic scores and triggering unnecessary repair rounds. The IDs are needed
+  // for backend lookups but never for vision comparison.
+  const cleanStoryText = stripEntityIds(storyText);
+  const cleanSceneHint = sceneHint ? stripEntityIds(sceneHint) : null;
+  const cleanImagePrompt = imagePrompt ? stripEntityIds(imagePrompt) : null;
+
   const prompt = fillTemplate(template, {
-    STORY_TEXT: storyText,
-    SCENE_HINT: sceneHint || 'Not provided',
-    IMAGE_PROMPT: imagePrompt || 'No prompt provided'
+    STORY_TEXT: cleanStoryText,
+    SCENE_HINT: cleanSceneHint || 'Not provided',
+    IMAGE_PROMPT: cleanImagePrompt || 'No prompt provided'
   });
 
   // Convert image to base64 if needed

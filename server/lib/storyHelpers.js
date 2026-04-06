@@ -317,16 +317,29 @@ function expandPositionAbbreviations(position) {
 }
 
 /**
- * Strip Visual Bible entity IDs (e.g., "[LOC002]", "[ART001]", "[CHAR003]", "[CLO001]",
- * "[LOC003.2]") from a string. These IDs are needed in scene metadata for landmark photo
- * lookup, but they confuse image generators when they leak into rendered prompts.
+ * Strip Visual Bible entity IDs from a string. Matches both bracketed form
+ * (`[LOC002]`, `[ART001.2]`) and bare form (`ART002`, `LOC003.1`). The bracketed
+ * form comes from scene metadata; the bare form shows up in outline scene hints
+ * where the writer references objects inline.
+ *
+ * These IDs are needed in scene metadata for landmark photo lookup, but they:
+ *   1. confuse image generators when they leak into rendered prompts, and
+ *   2. make the vision-based semantic eval report the object as "missing" or
+ *      "unverifiable" because the IDs are not visible in the image.
+ *
  * @param {string} str
  * @returns {string}
  */
 function stripEntityIds(str) {
   if (!str || typeof str !== 'string') return str;
   return str
-    .replace(/\s*\[(?:LOC|ART|CHAR|CLO|OBJ)\d+(?:\.\d+)?\]/gi, '')
+    // Bracketed: "Kurpark [LOC003.2]" → "Kurpark"
+    .replace(/\s*\[(?:LOC|ART|CHAR|CLO|OBJ|ANI|VEH|CHR)\d+(?:\.\d+)?\]/gi, '')
+    // Bare: "grab ART003 from" → "grab  from" (then collapsed by whitespace pass)
+    // Word-boundary anchored to avoid chopping off "LOCATION" or "CHARGE" etc.
+    .replace(/\b(?:LOC|ART|CHAR|CLO|OBJ|ANI|VEH|CHR)\d{3,}(?:\.\d+)?\b/g, '')
+    // Empty parens left behind: "( )", "(, , )", "(  , )" → ""
+    .replace(/\s*\([\s,]*\)/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
