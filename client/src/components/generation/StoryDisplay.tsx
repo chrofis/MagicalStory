@@ -3905,8 +3905,15 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
+            {/* During generation: show status banner only, no action buttons */}
+            {isGenerating && (
+              <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                <Loader size={12} className="animate-spin" />
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+              </div>
+            )}
+            {/* Cover action buttons - hidden during generation */}
+            {!isGenerating && (_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
@@ -4134,8 +4141,15 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
+            {/* During generation: show status banner only, no action buttons */}
+            {isGenerating && (
+              <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                <Loader size={12} className="animate-spin" />
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+              </div>
+            )}
+            {/* Cover action buttons - hidden during generation */}
+            {!isGenerating && (_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
@@ -5577,8 +5591,15 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Cover action buttons - visible to all users */}
-            {(_onRegenerateCover || onImproveImage || _onEditCover) && (
+            {/* During generation: show status banner only, no action buttons */}
+            {isGenerating && (
+              <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                <Loader size={12} className="animate-spin" />
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+              </div>
+            )}
+            {/* Cover action buttons - hidden during generation */}
+            {!isGenerating && (_onRegenerateCover || onImproveImage || _onEditCover) && (
               <div className="mt-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {_onEditCover && (
