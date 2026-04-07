@@ -2346,8 +2346,11 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     const result = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     if (result.length > 0) {
       const story = typeof result[0].data === 'string' ? JSON.parse(result[0].data) : result[0].data;
-      const coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-      if (coverImage) {
+      const fc = story.coverImages?.frontCover;
+      // coverImages.frontCover can be either a string (legacy) or an object
+      // {imageData, prompt, ...} (new format). Always return the string.
+      const coverImage = (typeof fc === 'string' ? fc : fc?.imageData) || story.thumbnail || null;
+      if (coverImage && typeof coverImage === 'string') {
         return res.json({ coverImage });
       }
     }

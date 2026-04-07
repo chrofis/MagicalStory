@@ -182,10 +182,16 @@ function BookOrderCard({
   // Load thumbnail on mount
   useEffect(() => {
     if (order.thumbnailUrl) {
-      api.get<{ coverImage: string }>(order.thumbnailUrl)
+      api.get<{ coverImage: string | { imageData?: string } }>(order.thumbnailUrl)
         .then(data => {
-          if (data.coverImage) {
-            setThumbnailData(data.coverImage);
+          // Backend /cover endpoint may return either a base64 string or a
+          // cover object {imageData, ...}. Normalize to a string here.
+          const raw = data.coverImage;
+          const str = typeof raw === 'string'
+            ? raw
+            : (raw && typeof raw === 'object' ? raw.imageData : null);
+          if (str && typeof str === 'string') {
+            setThumbnailData(str);
           }
         })
         .catch(() => {
