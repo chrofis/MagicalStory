@@ -361,9 +361,12 @@ Based on the story draft, determine which clothing variants each character needs
 - **Costumed**: Full outfit description. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
 - **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
-- **CRITICAL — Distinct Styles**: Each character needs a structurally DIFFERENT outfit — different roles, outfit types, and accessories. Not just color swaps.
-  - WRONG: Two characters both wearing "white dress with gold collar"
-  - RIGHT: One has "priestess robes with ceremonial sash", other has "explorer tunic with rope belt"
+- **Distinct Styles — two tests every costumed description must pass:**
+  1. **Different primary garment color**: No two characters may describe the same dominant color word (e.g., if one wears "dark blue cloak", no other character can wear "dark blue" anything — pick a different color for each).
+  2. **Different silhouette**: At least one of {garment type, length, cut} must differ. Not just different buttons, accessories, or trim.
+  - WRONG (all fail both tests): three characters each "dark blue cloak with silver stars" with different buckles/brooches
+  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe"
+  - RIGHT: one "dark blue knee-length cloak", another "crimson red short tunic with rope belt", another "emerald green long robe with wide sleeves"
 
 **Output format:**
 ```json
