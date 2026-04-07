@@ -428,6 +428,26 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           />
         </div>
       )}
+
+      {/* Face: anatomical shape (jawline, nose, cheeks, lips) — age-neutral. Full-width row. */}
+      <div className="col-span-2">
+        <InlineEditField
+          label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+          value={character.physical?.face || ''}
+          placeholder={
+            language === 'de'
+              ? 'z.B. eckiges Kinn, markante Nase, hohe Wangenknochen'
+              : language === 'fr'
+                ? 'ex. mâchoire carrée, nez proéminent, pommettes hautes'
+                : 'e.g. square jawline, prominent nose, high cheekbones'
+          }
+          onChange={(v) => updatePhysical('face', v)}
+          isAiExtracted={isAiExtracted}
+          isChanged={changedTraits?.face}
+          isUserEdited={isUserEdited('face')}
+          language={language}
+        />
+      </div>
     </div>
   );
 }
@@ -2182,8 +2202,26 @@ export function CharacterForm({
               <div>
                 <span className="text-gray-500 text-xs">Apparent Age:</span>
                 <div className="font-medium">{character.physical?.apparentAge || '—'}</div>
+                {character.physicalTraitsSource?.apparentAge && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.apparentAge}]</span>
+                )}
               </div>
             </div>
+
+            {/* Face: anatomical face shape — full width (often longer text) */}
+            {(character.physical?.face || character.physicalTraitsSource?.face) && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <span className="text-gray-500 text-xs block mb-1">
+                  Face:
+                  {character.physicalTraitsSource?.face && (
+                    <span className="ml-2 text-[10px] text-gray-400">[{character.physicalTraitsSource.face}]</span>
+                  )}
+                </span>
+                <p className="text-sm bg-white border border-gray-200 rounded p-2 text-gray-700">
+                  {character.physical?.face || '—'}
+                </p>
+              </div>
+            )}
 
             {/* Detailed Hair Analysis - Full width */}
             {character.physical?.detailedHairAnalysis && (

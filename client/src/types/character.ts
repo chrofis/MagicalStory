@@ -45,6 +45,7 @@ export interface ChangedTraits {
   hairStyle?: boolean;
   hair?: boolean;        // Legacy
   facialHair?: boolean;
+  face?: boolean;
   other?: boolean;
   gender?: boolean;
   age?: boolean;
