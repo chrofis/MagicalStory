@@ -1630,7 +1630,17 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
       log.warn(`Order not in database after ${maxRetries} attempts, checking Stripe directly`);
     }
 
-    // If not in database yet, check Stripe and return full session data
+    // If not in database yet, check Stripe and return full session data.
+    // Pick the client by session-ID prefix — `cs_test_*` → test, otherwise → live.
+    // Fall back to whichever client is configured if the preferred one is missing.
+    const isTestSession = sessionId.startsWith('cs_test_');
+    const stripe = isTestSession
+      ? (stripeTest || stripeLegacy || stripeLive)
+      : (stripeLive || stripeTest || stripeLegacy);
+    if (!stripe) {
+      log.error('❌ No Stripe client configured to retrieve session');
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['customer_details', 'shipping_details']
     });
