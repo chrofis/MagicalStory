@@ -117,6 +117,7 @@ const {
   convertClothingToCurrentFormat
 } = require('./storyHelpers');
 const { OutlineParser, ProgressiveUnifiedParser } = require('./outlineParser');
+const { createJobHeartbeat } = require('./jobHeartbeat');
 const { initializePool, saveStoryData, upsertStory, saveStoryImage, getPool } = require('../services/database');
 
 // --- Server.js-local dependencies received via init() ---
@@ -1119,10 +1120,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Use streaming API call with progressive parsers
       // Pass textModel override if provided (e.g., gemini-2.5-flash)
       const textModelOverride = modelOverrides.textModel || null;
+      // Heartbeat keeps story_jobs.updated_at fresh during the long Sonnet
+      // streaming phase. Without it, the status endpoint's 5-min stale check
+      // would mark the job as failed mid-stream when the frontend polls.
+      const heartbeat = createJobHeartbeat(jobId, dbPool);
       const streamResult = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
         // Process each chunk to detect complete scenes AND cover scenes
         coverParser.processChunk(chunk, fullText);
         sceneParser.processChunk(chunk, fullText);
+        heartbeat();  // throttled — fires at most every 30s
       }, textModelOverride);
       response = streamResult.text;
       streamingTextModelId = streamResult.modelId || (textModelOverride ? textModelOverride : getActiveTextModel().modelId);
@@ -2493,7 +2499,9 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
     const outlineModelConfig = outlineModelOverride ? TEXT_MODELS[outlineModelOverride] : getActiveTextModel();
     const outlineProvider = outlineModelConfig?.provider === 'google' ? 'gemini_text' : 'anthropic';
     log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING${outlineModelOverride ? ` [model: ${outlineModelOverride}]` : ''}`);
-    const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens, null, outlineModelOverride);
+    // Heartbeat keeps story_jobs.updated_at fresh during outline streaming.
+    const outlineHeartbeat = createJobHeartbeat(jobId, dbPool);
+    const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens, () => outlineHeartbeat(), outlineModelOverride);
     const outline = outlineResult.text;
     // Get the actual model used (override or default)
     const outlineModelUsed = outlineResult.modelId || outlineModelConfig?.modelId;
@@ -3239,6 +3247,8 @@ Output Format:
         });
 
         // Stream with progressive parsing
+        // Heartbeat keeps story_jobs.updated_at fresh during the long batch streaming.
+        const batchHeartbeat = createJobHeartbeat(jobId, dbPool);
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
           // Check for Visual Bible entries BEFORE pages start (only for first batch)
           if (!visualBibleParsedForBatch && batchNum === 0) {
@@ -3259,6 +3269,7 @@ Output Format:
             }
           }
           progressiveParser.processChunk(chunk, fullText);
+          batchHeartbeat();  // throttled — fires at most every 30s
         }, textModelOverride);
         batchText = batchResult.text;
         addUsage('anthropic', batchResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
@@ -3267,8 +3278,9 @@ Output Format:
         progressiveParser.finalize(batchText);
         log.debug(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
       } else {
-        // No progressive parsing - just stream text
-        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, null, textModelOverride);
+        // No progressive parsing — heartbeat the row directly while waiting for the response.
+        const noProgressHeartbeat = createJobHeartbeat(jobId, dbPool);
+        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, () => noProgressHeartbeat(), textModelOverride);
         batchText = batchResult.text;
         addUsage('anthropic', batchResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
 
@@ -3336,7 +3348,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 [Write the story text for page ${missingPageNum} here, following the outline and maintaining continuity with other pages]`;
 
           log.debug(` Generating missing page ${missingPageNum}...`);
-          const retryResult = await callTextModelStreaming(retryPrompt, 1500, null, textModelOverride);
+          const retryHeartbeat = createJobHeartbeat(jobId, dbPool);
+          const retryResult = await callTextModelStreaming(retryPrompt, 1500, () => retryHeartbeat(), textModelOverride);
           const retryText = retryResult.text;
           addUsage('anthropic', retryResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
 

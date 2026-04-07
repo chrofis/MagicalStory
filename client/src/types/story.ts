@@ -797,6 +797,9 @@ export interface CoverImageData {
   landmarkPhotos?: LandmarkPhoto[];
   // Visual Bible grid image (combines VB elements + secondary landmarks)
   visualBibleGrid?: string;  // Base64 data URL
+  hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
+  // Exact images packed and padded before sending to Grok edit API (dev mode)
+  grokRefImages?: string[] | null;
   // API model used (for dev mode)
   modelId?: string;
   // Bounding box detection for character identification (for dev mode)

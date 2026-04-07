@@ -4028,12 +4028,12 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || ((frontCoverObj as any)?.grokRefImages?.length ?? 0) > 0) && (
+                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverObj.grokRefImages?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={frontCoverObj.referencePhotos || []}
                     landmarkPhotos={frontCoverObj.landmarkPhotos}
                     visualBibleGrid={frontCoverObj.visualBibleGrid}
-                    grokRefImages={(frontCoverObj as any)?.grokRefImages}
+                    grokRefImages={frontCoverObj.grokRefImages}
                     language={language}
                   />
                 )}
@@ -4264,12 +4264,12 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || ((initialPageObj as any)?.grokRefImages?.length ?? 0) > 0) && (
+                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageObj.grokRefImages?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={initialPageObj.referencePhotos || []}
                     landmarkPhotos={initialPageObj.landmarkPhotos}
                     visualBibleGrid={initialPageObj.visualBibleGrid}
-                    grokRefImages={(initialPageObj as any)?.grokRefImages}
+                    grokRefImages={initialPageObj.grokRefImages}
                     language={language}
                   />
                 )}
@@ -5714,12 +5714,12 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || ((backCoverObj as any)?.grokRefImages?.length ?? 0) > 0) && (
+                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverObj.grokRefImages?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={backCoverObj.referencePhotos || []}
                     landmarkPhotos={backCoverObj.landmarkPhotos}
                     visualBibleGrid={backCoverObj.visualBibleGrid}
-                    grokRefImages={(backCoverObj as any)?.grokRefImages}
+                    grokRefImages={backCoverObj.grokRefImages}
                     language={language}
                   />
                 )}

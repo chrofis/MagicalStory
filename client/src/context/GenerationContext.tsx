@@ -7,6 +7,17 @@ import { useAuth } from '@/context/AuthContext';
 // Storage key for persisting active job
 const ACTIVE_JOB_KEY = 'active_story_job';
 
+// Sanity cap on how old a stored job can be before we discard it without
+// even asking the server. Long stories can take 30+ minutes (Sonnet streaming
+// + image generation), so the cap must be generous. The backend is the real
+// source of truth — we still call getJobStatus on whatever we restore.
+const MAX_RESTORE_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// If a job has been "processing" for more than this, treat it as orphaned —
+// the server probably restarted while it was running and the row will never
+// get marked completed. Silent cleanup, no error toast.
+const ORPHANED_JOB_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
+
 interface ActiveJob {
   jobId: string;
   startedAt: number;
@@ -42,18 +53,23 @@ const POLL_INTERVAL = 3000;
 
 export function GenerationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  // Load active job synchronously from localStorage so it's available on first render
+  // Load active job synchronously from localStorage so it's available on first render.
+  // We restore anything younger than MAX_RESTORE_AGE_MS — the polling effect below will
+  // immediately ask the server for the real status and react accordingly:
+  //   - completed → set completedStoryId, navigate
+  //   - failed    → clear state (silent if abandoned, error toast otherwise)
+  //   - processing & age > ORPHANED_JOB_THRESHOLD_MS → silent cleanup (server restart)
+  //   - processing & age < ORPHANED_JOB_THRESHOLD_MS → resume polling normally
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(() => {
     const stored = storage.getItem(ACTIVE_JOB_KEY);
     if (stored) {
       try {
         const job = JSON.parse(stored) as ActiveJob;
-        const maxAge = 30 * 60 * 1000;
-        if (Date.now() - job.startedAt < maxAge) {
+        if (Date.now() - job.startedAt < MAX_RESTORE_AGE_MS) {
           logger.info('[GenerationContext] Restoring active job from storage:', job.jobId);
           return job;
         }
-        logger.info('[GenerationContext] Stored job too old, clearing');
+        logger.info('[GenerationContext] Stored job exceeds 24h age cap, clearing');
         storage.removeItem(ACTIVE_JOB_KEY);
       } catch {
         storage.removeItem(ACTIVE_JOB_KEY);
@@ -124,8 +140,20 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id]);
 
-  // Poll job status when we have an active job
-  const pollJobStatus = useCallback(async (jobId: string) => {
+  // Helper: stop polling and clear local state. Used by every terminal-state branch.
+  const cleanupAfterTerminalState = useCallback(() => {
+    setActiveJob(null);
+    storage.removeItem(ACTIVE_JOB_KEY);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  // Poll job status when we have an active job. Caller passes the job's
+  // startedAt timestamp so we can detect orphaned jobs (server restart left
+  // a row in 'processing' that will never advance).
+  const pollJobStatus = useCallback(async (jobId: string, startedAt: number) => {
     if (isPollingRef.current) return;
     isPollingRef.current = true;
 
@@ -150,59 +178,69 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       // Check for completion
       if (status.status === 'completed' && status.result) {
         logger.success('[GenerationContext] Job completed:', jobId, 'storyId:', status.result.storyId);
-        logger.debug('[GenerationContext] Result object:', JSON.stringify(status.result).substring(0, 200));
+        // Order matters: set completion fields BEFORE clearing activeJob so StoryWizard's
+        // auto-nav effect sees both `generationComplete && completedStoryId` and the
+        // `step === 6` it inherited from the active job. After this re-render the
+        // polling effect's `!isComplete` guard prevents re-polling, and
+        // markCompletionViewed (which clears isComplete) won't restart polling
+        // because activeJob is now null.
         setIsComplete(true);
         setCompletedStoryId(status.result.storyId);
         setHasUnviewedCompletion(true);
         setProgress({ current: 100, total: 100, message: 'Complete!' });
-
-        // Clear from storage
-        storage.removeItem(ACTIVE_JOB_KEY);
-
-        // Stop polling
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
+        cleanupAfterTerminalState();
       } else if (status.status === 'failed') {
         const errorMsg = status.error || 'Generation failed';
 
-        // Check if this is an old abandoned job (silently clean up, don't show error)
-        const isAbandoned = errorMsg.toLowerCase().includes('abandoned');
+        // Server-side cleanup of abandoned jobs is silent (no error toast).
+        const isAbandoned = errorMsg.toLowerCase().includes('abandoned')
+          || errorMsg.toLowerCase().includes('stopped responding');
         if (isAbandoned) {
-          logger.info('[GenerationContext] Old job was cleaned up (abandoned):', status.error);
+          logger.info('[GenerationContext] Job cleaned up by server (abandoned/stale):', errorMsg);
         } else {
-          logger.error('[GenerationContext] Job failed:', status.error);
+          logger.error('[GenerationContext] Job failed:', errorMsg);
           setError(errorMsg);
         }
-
-        setActiveJob(null);
-        storage.removeItem(ACTIVE_JOB_KEY);
-
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
+        cleanupAfterTerminalState();
+      } else if (status.status === 'processing' || status.status === 'pending') {
+        // Orphan check: if a job has been processing for > ORPHANED_JOB_THRESHOLD_MS
+        // and is still not done, the worker probably died (server restart). Server
+        // will eventually mark it as failed, but we don't need to wait — silently
+        // clean up local state so the user isn't stuck on a stale spinner.
+        const jobAge = Date.now() - startedAt;
+        if (jobAge > ORPHANED_JOB_THRESHOLD_MS) {
+          logger.warn(`[GenerationContext] Job ${jobId} still ${status.status} after ${Math.round(jobAge / 60000)} min — treating as orphaned`);
+          cleanupAfterTerminalState();
         }
       }
     } catch (err) {
-      logger.error('[GenerationContext] Polling error:', err);
-      // Don't stop polling on transient errors
+      // 404 means the row was deleted server-side (e.g. by the cleanup job for
+      // very old abandoned jobs). Silent cleanup, no error toast.
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('HTTP 404') || errMsg.toLowerCase().includes('not found')) {
+        logger.info('[GenerationContext] Job no longer exists on server, cleaning up:', jobId);
+        cleanupAfterTerminalState();
+      } else {
+        // Transient error (network, 5xx) — keep polling, don't toast.
+        logger.warn('[GenerationContext] Transient polling error:', errMsg);
+      }
     } finally {
       isPollingRef.current = false;
     }
-  }, []);
+  }, [cleanupAfterTerminalState]);
 
   // Start/stop polling based on activeJob
   useEffect(() => {
     if (activeJob && !isComplete) {
       logger.info('[GenerationContext] Starting polling for job:', activeJob.jobId);
+      const { jobId, startedAt } = activeJob;
 
       // Poll immediately
-      pollJobStatus(activeJob.jobId);
+      pollJobStatus(jobId, startedAt);
 
       // Then poll at interval
       pollingRef.current = setInterval(() => {
-        pollJobStatus(activeJob.jobId);
+        pollJobStatus(jobId, startedAt);
       }, POLL_INTERVAL);
     }
 
@@ -221,7 +259,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && activeJob) {
         logger.info('[GenerationContext] App visible again, polling job immediately');
-        pollJobStatus(activeJob.jobId);
+        pollJobStatus(activeJob.jobId, activeJob.startedAt);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);

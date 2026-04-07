@@ -248,6 +248,7 @@ const {
   resolveArtStyle
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
+const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const legacyPipelines = require('./server/lib/legacyPipelines');
 const { GenerationLogger } = require('./server/lib/generationLogger');
@@ -2485,7 +2486,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           { maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3 }
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{' });
+        // Heartbeat keeps story_jobs.updated_at fresh during scene expansion streaming.
+        // 24 parallel scene expansions can each take 30-60s; without heartbeating,
+        // the row would only get updated when the first one finishes.
+        const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { prefill: '{' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -3215,8 +3220,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Use streaming with progressive parsing and parallel task initiation
     // Use 64000 tokens to match Claude Sonnet's max output capacity for longer stories
     timing.storyGenStart = Date.now();
+    // Heartbeat keeps story_jobs.updated_at fresh during the unified Sonnet
+    // streaming phase. Without it, the status endpoint's 5-min stale check
+    // would mark the job as failed mid-stream when the frontend polls — even
+    // though the backend is happily streaming text. Long stories can take
+    // 15+ minutes for the Sonnet response alone.
+    const unifiedHeartbeat = createJobHeartbeat(jobId, dbPool);
     const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
       progressiveParser.processChunk(chunk, fullText);
+      unifiedHeartbeat();  // throttled — fires at most every 30s
     }, modelOverrides.outlineModel);
     timing.storyGenEnd = Date.now();
     const unifiedResponse = unifiedResult.text;

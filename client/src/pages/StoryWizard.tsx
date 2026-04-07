@@ -22,6 +22,7 @@ const WizardStep6Summary = lazy(() => import('./wizard/WizardStep6Summary').then
 import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
+import { INITIAL_USER_CREDITS } from '@/constants/credits';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
@@ -29,6 +30,7 @@ import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UI
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
+import { reportError } from '@/services/errorReporter';
 import type { ExtractedTraits, ExtractedClothing } from '@/services/characterService';
 import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
@@ -172,21 +174,17 @@ export default function StoryWizard() {
     }
   };
 
-  // Wizard state - start at step 6 with loading if we have a storyId in URL
-  // Start at step 1 if ?new=true (creating new story)
-  // Otherwise restore from localStorage to preserve step when navigating away and back
+  // Wizard state - start at step 6 with loading if we have a storyId in URL.
+  // Start at step 1 if ?new=true (creating new story).
+  // If GenerationContext has an active job restored from storage, jump to step 6
+  // so the user lands on the generation view without a flash of step 1. The
+  // context already validated freshness/age — single source of truth.
+  // Otherwise restore from localStorage to preserve step when navigating away.
   const [step, setStep] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('storyId')) return 6;
     if (params.get('new') === 'true') return 1;  // New story starts at step 1
-    // If there's an active generation job, go straight to step 6 (avoid flash of wrong step)
-    try {
-      const stored = localStorage.getItem('active_story_job');
-      if (stored) {
-        const job = JSON.parse(stored);
-        if (Date.now() - job.startedAt < 30 * 60 * 1000) return 6;
-      }
-    } catch { /* ignore */ }
+    if (activeJob) return 6;  // GenerationContext has an active job → resume on the generation view
     const savedStep = localStorage.getItem('wizard_step');
     return savedStep ? parseInt(savedStep, 10) : 1;
   });
@@ -548,7 +546,15 @@ export default function StoryWizard() {
       }));
     }
 
-    // Merge dev metadata into coverImages
+    // Merge dev metadata into coverImages. Every dev-only field the server sends
+    // in GET /api/stories/:id/dev-metadata MUST be copied into state here —
+    // anything missing is silently dropped. Previously grokRefImages and
+    // totalAttempts were being dropped, hiding the "Sent to Grok API" debug
+    // panel and the retry count for covers. When adding new dev-only fields to
+    // the API response, update three places in lock-step:
+    //   1. server/routes/stories.js (the cover response builder)
+    //   2. CoverDevMeta in client/src/services/storyService.ts
+    //   3. this merge below (and CoverImageData in types/story.ts if rendered)
     if (devMetadata.coverImages) {
       setCoverImages(prev => {
         const updated = { ...prev };
@@ -562,8 +568,11 @@ export default function StoryWizard() {
               prompt: devCover.prompt ?? currentCover.prompt,
               qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
               retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
+              totalAttempts: devCover.totalAttempts ?? currentCover.totalAttempts,
               referencePhotos: devCover.referencePhotos ?? currentCover.referencePhotos,
               landmarkPhotos: devCover.landmarkPhotos ?? currentCover.landmarkPhotos,
+              grokRefImages: devCover.grokRefImages ?? currentCover.grokRefImages,
+              hasVisualBibleGrid: devCover.hasVisualBibleGrid ?? currentCover.hasVisualBibleGrid,
             };
           }
         }
@@ -4127,6 +4136,21 @@ export default function StoryWizard() {
         return;
       } else {
         setLastGenerationError(errorMessage);
+        // Report to server logs so future failures are visible alongside backend
+        // events. We don't have frontend logs in Railway today — without this,
+        // any "Generation failed" toast the user sees leaves no trace.
+        reportError({
+          errorType: 'GenerationFailure',
+          message: `Generation failed: ${errorMessage}`,
+          error,
+          context: {
+            jobId,
+            step,
+            language,
+            pages,
+            isGenerating,
+          },
+        });
         showError(language === 'de'
           ? `Generierung fehlgeschlagen: ${errorMessage}`
           : language === 'fr'
@@ -5341,7 +5365,7 @@ export default function StoryWizard() {
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
               <p className="text-amber-800 text-sm font-medium">
-                {language === 'de' ? '🎁 Du erhältst 300 Gratis-Credits!' : language === 'fr' ? '🎁 Vous recevrez 300 crédits gratuits !' : '🎁 You\'ll receive 300 free credits!'}
+                {language === 'de' ? `🎁 Du erhältst ${INITIAL_USER_CREDITS} Gratis-Credits!` : language === 'fr' ? `🎁 Vous recevrez ${INITIAL_USER_CREDITS} crédits gratuits !` : `🎁 You'll receive ${INITIAL_USER_CREDITS} free credits!`}
               </p>
               <ul className="text-amber-700 text-xs mt-1 space-y-0.5">
                 <li>{language === 'de' ? '• Längere Geschichten mit mehr Seiten' : language === 'fr' ? '• Des histoires plus longues avec plus de pages' : '• Longer stories with more pages'}</li>

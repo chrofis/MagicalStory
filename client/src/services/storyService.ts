@@ -28,6 +28,28 @@ function normalizeCoverImages(covers: { frontCover?: unknown; initialPage?: unkn
   };
 }
 
+/**
+ * Dev-metadata shape for a single cover image (front/initial/back).
+ * Returned by GET /api/stories/:id/dev-metadata. Must stay in sync with:
+ *   - server/routes/stories.js (the response builder around lines 758-871)
+ *   - client/src/pages/StoryWizard.tsx mergeDevMetadata (cover branch)
+ *
+ * Any new field added to the API response needs an entry here AND in the
+ * merge — otherwise it gets silently dropped between network and state.
+ */
+interface CoverDevMeta {
+  prompt: string | null;
+  qualityReasoning: string | null;
+  retryHistory: RetryAttempt[];
+  totalAttempts: number | null;
+  referencePhotos: ReferencePhoto[] | null;
+  landmarkPhotos?: LandmarkPhoto[] | null;
+  /** Exact images packed and padded before sending to Grok edit API */
+  grokRefImages?: string[] | null;
+  /** True if the server has a visual-bible grid image stashed for this cover (lazy-loaded) */
+  hasVisualBibleGrid?: boolean;
+}
+
 interface StoryDraft {
   storyType: string;
   artStyle: string;
@@ -448,10 +470,13 @@ export const storyService = {
         }>;
       } | null;
     }>;
+    // Must match the shape produced by GET /api/stories/:id/dev-metadata for covers.
+    // Adding a field here without updating the merge in StoryWizard.tsx (mergeDevMetadata)
+    // will silently drop it on the way to component state.
     coverImages: {
-      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
-      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
-      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
+      frontCover: CoverDevMeta | null;
+      initialPage: CoverDevMeta | null;
+      backCover: CoverDevMeta | null;
     } | null;
     generationLog?: GenerationLogEntry[];
     styledAvatarGeneration?: Array<{
