@@ -2326,13 +2326,18 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Verify user has access (fast query, no data loading)
+    // Verify user has access (fast query, no data loading).
+    // NOTE: return 200 with coverImage: null for access/not-found cases —
+    // this endpoint is used by the orders page to show book thumbnails, and
+    // orders can reference stories the user later deleted. Returning 404
+    // floods the console without offering any real security benefit (the
+    // endpoint leaks no data either way).
     const accessCheck = await dbQuery(
       'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
     if (accessCheck.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
+      return res.json({ coverImage: null });
     }
 
     // FAST PATH: Try to get cover from separate images table first (active version, not always 0)
@@ -2361,7 +2366,8 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
       return res.json({ coverImage: firstPageImage.imageData });
     }
 
-    return res.status(404).json({ error: 'Cover image not found' });
+    // No cover available — return null instead of 404 to avoid console noise
+    return res.json({ coverImage: null });
   } catch (err) {
     console.error('❌ Error fetching cover image:', err);
     res.status(500).json({ error: 'Failed to fetch cover image' });
