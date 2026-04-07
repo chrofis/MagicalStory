@@ -1,6 +1,6 @@
 # Pricing & Cost Structure
 
-**Last updated**: March 2026
+**Last updated**: April 2026
 
 ## Credit Packages
 
@@ -63,18 +63,25 @@ With repair workflow (optional, adds re-evaluations and redos): **~CHF 3-4**.
 
 ## Book Printing (Physical)
 
-Print orders go through Gelato. Prices charged to users:
+Print orders go through Gelato. Prices charged to users (April 2026):
 
-| Page Range | Softcover (CHF) | Hardcover (CHF) |
-|------------|-----------------|-----------------|
-| 1-30       | 38              | 53              |
-| 31-40      | 45              | 60              |
-| 41-50      | 51              | 66              |
-| 51-60      | 57              | 72              |
-| 61-70      | 63              | 78              |
-| 71-80      | 69              | 84              |
-| 81-90      | 75              | 90              |
-| 91-100     | 81              | 96              |
+| Seiten | Softcover<br>21 × 28 cm | Hardcover<br>21 × 28 cm |
+|--------|------------------------:|------------------------:|
+| 1-30   | CHF 29.- | CHF 37.- |
+| 31-40  | CHF 35.- | CHF 43.- |
+| 41-50  | CHF 41.- | CHF 49.- |
+| 51-60  | CHF 47.- | CHF 55.- |
+| 61-70  | CHF 52.- | CHF 60.- |
+| 71-80  | CHF 58.- | CHF 66.- |
+| 81-90  | CHF 64.- | CHF 72.- |
+| 91-100 | CHF 69.- | CHF 77.- |
+
+**Pricing model:**
+- Softcover anchored at CHF 29 for 30p, scaling linearly to CHF 69 at 100p
+- Hardcover = Softcover + flat CHF 8 across all tiers
+- Margin scales from CHF 12 (soft 30p) up to CHF 25 (soft/hard 100p)
+- Shipping: separate flat CHF 10 line at checkout
+- Promo budget: CHF 10 discount keeps every tier profitable
 
 Config: Pricing tiers stored in `pricing_tiers` DB table, seeded on first run. Endpoint: `GET /api/pricing`.
 
@@ -88,35 +95,38 @@ Credit value at best rate: CHF 50 / 4000 credits = **CHF 0.0125/credit**.
 
 | Pages | Credits Back (2x) | Credit Value (CHF) | Softcover Price | Net Effective Price |
 |-------|-------------------|-------------------|-----------------|---------------------|
-| 30    | 600               | 7.50              | 38              | 30.50               |
-| 40    | 800               | 10.00             | 45              | 35.00               |
-| 50    | 1000              | 12.50             | 51              | 38.50               |
-| 60    | 1200              | 15.00             | 57              | 42.00               |
-| 70    | 1400              | 17.50             | 63              | 45.50               |
-| 80    | 1600              | 20.00             | 69              | 49.00               |
-| 90    | 1800              | 22.50             | 75              | 52.50               |
-| 100   | 2000              | 25.00             | 81              | 56.00               |
+| 30    | 600               | 7.50              | 29              | 21.50               |
+| 40    | 800               | 10.00             | 35              | 25.00               |
+| 50    | 1000              | 12.50             | 41              | 28.50               |
+| 60    | 1200              | 15.00             | 47              | 32.00               |
+| 70    | 1400              | 17.50             | 52              | 34.50               |
+| 80    | 1600              | 20.00             | 58              | 38.00               |
+| 90    | 1800              | 22.50             | 64              | 41.50               |
+| 100   | 2000              | 25.00             | 69              | 44.00               |
 
-The credit reward effectively subsidizes the book price by ~CHF 7.50-25, encouraging repeat story generation.
+### Gelato Cost Breakdown (Switzerland, April 2026)
 
-### Gelato Cost Breakdown (Switzerland, March 2026)
+Gelato charges us per book (manufacturing only, CHF). Shipping is a separate
+CHF 10 line item charged to the customer at checkout. AI cost is assumed at
+CHF 0.20/page for the high-quality model with ~5 images per page.
 
-Our prices include Gelato manufacturing, ~CHF 10 shipping (Swiss Post Economy), and 8% Swiss VAT.
+| Pages | Gelato Soft | Gelato Hard | AI cost | Soft total | Hard total | Soft retail | Hard retail | Soft margin | Hard margin |
+|------:|------------:|------------:|--------:|-----------:|-----------:|------------:|------------:|------------:|------------:|
+| 30  | 11.08 | 14.44 | 6.00  | 17.08 | 20.44 | 29 | 37 | 11.92 | 16.56 |
+| 40  | 12.86 | 16.88 | 8.00  | 20.86 | 24.88 | 35 | 43 | 14.14 | 18.12 |
+| 50  | 14.63 | 19.32 | 10.00 | 24.63 | 29.32 | 41 | 49 | 16.37 | 19.68 |
+| 60  | 16.41 | 21.76 | 12.00 | 28.41 | 33.76 | 47 | 55 | 18.59 | 21.24 |
+| 70  | 18.18 | 24.21 | 14.00 | 32.18 | 38.21 | 52 | 60 | 19.82 | 21.79 |
+| 80  | 19.96 | 26.64 | 16.00 | 35.96 | 42.64 | 58 | 66 | 22.04 | 23.36 |
+| 90  | 21.73 | 29.10 | 18.00 | 39.73 | 47.10 | 64 | 72 | 24.27 | 24.90 |
+| 100 | 23.51 | 31.53 | 20.00 | 43.51 | 51.53 | 69 | 77 | 25.49 | 25.47 |
 
-| Pages | Gelato Soft | Gelato Hard | + Ship + Tax | Our Soft | Our Hard | Soft Margin | Hard Margin |
-|-------|------------|------------|--------------|----------|----------|-------------|-------------|
-| 30    | 10.86      | 14.32      | 22.53 / 26.27 | 38     | 53       | 41%         | 50%         |
-| 40    | 12.47      | 16.16      | 24.27 / 28.25 | 45     | 60       | 46%         | 53%         |
-| 50    | 14.07      | 17.98      | 26.00 / 30.22 | 51     | 66       | 49%         | 54%         |
-| 60    | 15.68      | 19.81      | 27.74 / 32.20 | 57     | 72       | 51%         | 55%         |
-| 70    | 17.30      | 21.65      | 29.48 / 34.18 | 63     | 78       | 53%         | 56%         |
-| 80    | 18.91      | 23.47      | 31.22 / 36.15 | 69     | 84       | 55%         | 57%         |
-| 90    | 20.51      | 25.31      | 32.95 / 38.13 | 75     | 90       | 56%         | 58%         |
-| 100   | 22.12      | 27.14      | 34.69 / 40.11 | 81     | 96       | 57%         | 58%         |
+**Margin model**: linear 12 → 25 (soft) and 16 → 25 (hard). Hardcover is a flat CHF 8 above softcover.
 
-**Margin range: 41-58%** before credit reward. After accounting for the credit reward value, the effective margin on softcovers drops to ~21-38%.
+**Promo budget**: A CHF 10 discount keeps even the smallest tier profitable —
+soft 30p still earns CHF 1.92, hard 30p still earns CHF 6.56.
 
-Source: Gelato Product Prices API (`/v3/products/{uid}/prices?country=CH&currency=CHF`), queried March 2026. Shipping ~CHF 8.50-10 (Swiss Post Economy, varies by weight).
+Source: Gelato CHF prices for `photobooks-softcover/hardcover_pf_210x280-mm-8x11-inch`, April 2026.
 
 ## Key Files
 

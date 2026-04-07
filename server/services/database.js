@@ -393,18 +393,19 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
 
     // Seed default pricing tiers if table is empty
-    // Hardcover = ceil(softcover × 1.35) — 35% premium over softcover
+    // Hardcover = Softcover + CHF 8 (flat premium)
+    // Soft margin scales 12 → 25 across tiers; Hard margin scales 16 → 25
     const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
     if (parseInt(pricingCheck[0].count) === 0) {
       const defaultTiers = [
-        { maxPages: 30, label: '1-30', softcover: 28, hardcover: 38 },
-        { maxPages: 40, label: '31-40', softcover: 35, hardcover: 48 },
-        { maxPages: 50, label: '41-50', softcover: 41, hardcover: 56 },
-        { maxPages: 60, label: '51-60', softcover: 47, hardcover: 64 },
-        { maxPages: 70, label: '61-70', softcover: 53, hardcover: 72 },
-        { maxPages: 80, label: '71-80', softcover: 59, hardcover: 80 },
-        { maxPages: 90, label: '81-90', softcover: 65, hardcover: 88 },
-        { maxPages: 100, label: '91-100', softcover: 71, hardcover: 96 },
+        { maxPages: 30,  label: '1-30',   softcover: 29, hardcover: 37 },
+        { maxPages: 40,  label: '31-40',  softcover: 35, hardcover: 43 },
+        { maxPages: 50,  label: '41-50',  softcover: 41, hardcover: 49 },
+        { maxPages: 60,  label: '51-60',  softcover: 47, hardcover: 55 },
+        { maxPages: 70,  label: '61-70',  softcover: 52, hardcover: 60 },
+        { maxPages: 80,  label: '71-80',  softcover: 58, hardcover: 66 },
+        { maxPages: 90,  label: '81-90',  softcover: 64, hardcover: 72 },
+        { maxPages: 100, label: '91-100', softcover: 69, hardcover: 77 },
       ];
       for (const tier of defaultTiers) {
         await dbPool.query(
@@ -421,15 +422,27 @@ async function initializeDatabase() {
         console.log('✓ Pricing tiers reduced by CHF 5');
       }
 
-      // Migration: hardcover = ceil(softcover × 1.35) instead of softcover + 15 (2026-04-07)
-      // Detect by checking if any row still has hardcover - softcover = 15 (the old flat +15 pattern).
-      const oldPattern = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers WHERE hardcover_price - softcover_price = 15');
-      if (parseInt(oldPattern[0].count) > 0) {
-        await dbPool.query(`
-          UPDATE pricing_tiers
-          SET hardcover_price = CEIL(softcover_price * 1.35)::int
-        `);
-        console.log('✓ Pricing tiers: hardcover migrated to ceil(softcover × 1.35)');
+      // Migration: new pricing model with CHF 25 max margin and +CHF 8 hard premium (2026-04-07)
+      // Detect by checking if 30p softcover is still at the old anchor (28).
+      const newPricingSentinel = await dbPool.query('SELECT softcover_price FROM pricing_tiers WHERE max_pages = 30');
+      if (newPricingSentinel.length > 0 && newPricingSentinel[0].softcover_price === 28) {
+        const newPrices = [
+          { maxPages: 30,  soft: 29, hard: 37 },
+          { maxPages: 40,  soft: 35, hard: 43 },
+          { maxPages: 50,  soft: 41, hard: 49 },
+          { maxPages: 60,  soft: 47, hard: 55 },
+          { maxPages: 70,  soft: 52, hard: 60 },
+          { maxPages: 80,  soft: 58, hard: 66 },
+          { maxPages: 90,  soft: 64, hard: 72 },
+          { maxPages: 100, soft: 69, hard: 77 },
+        ];
+        for (const p of newPrices) {
+          await dbPool.query(
+            'UPDATE pricing_tiers SET softcover_price = $1, hardcover_price = $2 WHERE max_pages = $3',
+            [p.soft, p.hard, p.maxPages]
+          );
+        }
+        console.log('✓ Pricing tiers: applied new model (soft 29-69, hard = soft+8, margin cap 25)');
       }
     }
 
