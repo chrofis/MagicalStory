@@ -69,11 +69,8 @@ or scene hints) MUST belong to one of these three groups:
 2. **Primary characters** — already provided to you
 3. **Secondary characters** — characters YOU invent and add to the Visual Bible's `secondaryCharacters` array
 
-If a name appears in your story but is in none of these, the illustration
-system has no description to draw from and will invent a different person
-for that name on every page. There are NO unlisted characters — even a child
-who appears once needs a Visual Bible entry with full description (build,
-hair, face, signature look, clothing).
+Ensure there are NO unlisted characters — even one who appears once needs a
+Visual Bible entry with full description (build, hair, face, signature look, clothing).
 
 # Story Category Guidelines
 
