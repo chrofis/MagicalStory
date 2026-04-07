@@ -862,6 +862,94 @@ function getAgeCategoryLabel(ageCategory) {
   return labels[ageCategory] || ageCategory;
 }
 
+// Canonical age category order — used by clampApparentAge() to compute distance
+// between categories. Must match getAgeCategory() / character-analysis.txt schema.
+const AGE_CATEGORY_ORDER = [
+  'infant',
+  'toddler',
+  'preschooler',
+  'kindergartner',
+  'young-school-age',
+  'school-age',
+  'preteen',
+  'young-teen',
+  'teenager',
+  'young-adult',
+  'adult',
+  'middle-aged',
+  'senior',
+  'elderly',
+];
+
+/**
+ * Get the index of an age category in the canonical order.
+ * @param {string} category - Age category name
+ * @returns {number} Index 0-13, or -1 if unknown
+ */
+function getAgeCategoryIndex(category) {
+  if (!category) return -1;
+  return AGE_CATEGORY_ORDER.indexOf(category);
+}
+
+/**
+ * Clamp an analyzed (visual) apparent-age category to within ±1 group of the
+ * stated numeric age. This is the safety net for the "trust visual age"
+ * strategy: a 12-year-old who looks 13 is fine (preteen → young-teen, off by
+ * 1, accept), but a 12-year-old who got mis-analyzed as "adult" gets clamped
+ * to young-teen (one group above preteen).
+ *
+ * Strategy:
+ *  - No stated age      → return analyzed (nothing to clamp against)
+ *  - No analyzed value  → return null (caller falls back to category from age)
+ *  - Low confidence     → return expected (the analysis isn't trustworthy)
+ *  - |analyzed - expected| ≤ 1 → return analyzed (visual age wins, normal variance)
+ *  - else               → clamp to expected ± 1 in the direction of analyzed
+ *
+ * @param {string} analyzedCategory - apparentAge from image analysis
+ * @param {string|number} statedAge - the user-entered numeric age
+ * @param {string} confidence - "high" | "medium" | "low" from analysis (optional)
+ * @returns {{category: string|null, clamped: boolean, reason: string}}
+ */
+function clampApparentAge(analyzedCategory, statedAge, confidence = null) {
+  const expected = getAgeCategory(statedAge);
+  if (!expected) {
+    return { category: analyzedCategory || null, clamped: false, reason: 'no stated age' };
+  }
+  if (!analyzedCategory) {
+    return { category: expected, clamped: false, reason: 'no analyzed category, using stated' };
+  }
+
+  const expectedIdx = getAgeCategoryIndex(expected);
+  const analyzedIdx = getAgeCategoryIndex(analyzedCategory);
+
+  // Unknown analyzed value → trust the stated category
+  if (analyzedIdx === -1) {
+    return { category: expected, clamped: true, reason: `unknown analyzed value "${analyzedCategory}"` };
+  }
+
+  // Low-confidence analysis → don't trust visual age, use stated
+  if (typeof confidence === 'string' && confidence.toLowerCase() === 'low') {
+    if (analyzedIdx !== expectedIdx) {
+      return { category: expected, clamped: true, reason: `low-confidence analysis (${analyzedCategory} → ${expected})` };
+    }
+    return { category: analyzedCategory, clamped: false, reason: 'low confidence but matches stated' };
+  }
+
+  const diff = analyzedIdx - expectedIdx;
+  if (Math.abs(diff) <= 1) {
+    return { category: analyzedCategory, clamped: false, reason: 'within ±1 group of stated age' };
+  }
+
+  // More than 1 group apart → clamp to expected ± 1 in the direction of analyzed
+  const clampedIdx = expectedIdx + (diff > 0 ? 1 : -1);
+  const clampedCategory = AGE_CATEGORY_ORDER[clampedIdx];
+  return {
+    category: clampedCategory,
+    clamped: true,
+    reason: `analyzed ${analyzedCategory} differs by ${Math.abs(diff)} groups from stated ${expected}, clamped to ${clampedCategory}`,
+  };
+}
+
 // ============================================================================
 // TEACHING GUIDES - Loaded from text files for easy editing
 // ============================================================================
@@ -4189,6 +4277,11 @@ module.exports = {
 
   // Age-word stripping for legacy face/distinguishing-mark text
   stripAgeWords,
+
+  // Apparent-age clamp + helpers
+  AGE_CATEGORY_ORDER,
+  getAgeCategoryIndex,
+  clampApparentAge,
 
   // Clothing format conversion
   convertClothingToCurrentFormat,

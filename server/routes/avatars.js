@@ -16,7 +16,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
-const { buildHairDescription, getAgeCategory } = require('../lib/storyHelpers');
+const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
 const { getFacePhoto } = require('../lib/characterPhotos');
 
 // ============================================================================
@@ -2637,6 +2637,22 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             photoTraitsResult?.traits?.detailedHairAnalysis ||
             evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
 
+          // Clamp the analyzed apparentAge to within ±1 group of the user-stated
+          // age. Trust the visual age normally (a 12yo who looks 13 stays as
+          // young-teen) but catch absurd mis-analyses (12yo analyzed as adult →
+          // clamped to young-teen, one group above preteen).
+          const photoConfidence = photoTraitsResult?.confidence?.overallConfidence
+            || photoTraitsResult?.traits?.confidence?.overallConfidence
+            || null;
+          const clampResult = clampApparentAge(consensusResult.apparentAge, age, photoConfidence);
+          if (clampResult.clamped) {
+            log.warn(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+            consensusResult.apparentAge = clampResult.category;
+            sources.apparentAge = `${sources.apparentAge || 'photo'} → clamped`;
+          } else {
+            log.debug(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+          }
+
           // Log consensus decisions where photo won (highlights "beautification" corrections)
           for (const [field, source] of Object.entries(sources)) {
             if (source.includes('photo')) {
@@ -3702,6 +3718,21 @@ These corrections OVERRIDE what is visible in the reference photo.
           photoTraitsResult?.detailedHairAnalysis ||
           photoTraitsResult?.traits?.detailedHairAnalysis ||
           evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
+
+        // Clamp analyzed apparentAge to ±1 group of stated age (see avatar job
+        // path for details). Trusts visual age normally but catches absurd
+        // mis-analyses where the photo got read as the wrong life stage.
+        const photoConfidence = photoTraitsResult?.confidence?.overallConfidence
+          || photoTraitsResult?.traits?.confidence?.overallConfidence
+          || null;
+        const clampResult = clampApparentAge(consensusResult.apparentAge, age, photoConfidence);
+        if (clampResult.clamped) {
+          log.warn(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+          consensusResult.apparentAge = clampResult.category;
+          sources.apparentAge = `${sources.apparentAge || 'photo'} → clamped`;
+        } else {
+          log.debug(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+        }
 
         for (const [field, source] of Object.entries(sources)) {
           if (source.includes('photo')) {
