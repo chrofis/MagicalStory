@@ -1918,22 +1918,99 @@ function buildCharacterPhysicalDescription(char) {
 }
 
 /**
+ * Estimate a character's height in cm from age + gender when no explicit
+ * height is set. Used purely for relative ordering — exact values don't
+ * matter, only the rank preservation.
+ *
+ * @param {Object} char - Character with optional age, apparentAge, gender
+ * @returns {number|null} Estimated height in cm, or null if no signal
+ */
+function estimateHeightFromAgeGender(char) {
+  const gender = char?.gender;
+  const isMale = gender === 'male';
+  const isFemale = gender === 'female';
+
+  // Prefer numeric age when present
+  let age = parseInt(char?.age);
+  if (isNaN(age)) {
+    // Fall back to apparent age category → approximate years
+    const physical = getPhysicalFromChar(char) || {};
+    const apparent = physical.apparentAge || char?.apparentAge || char?.ageCategory;
+    const APPARENT_AGE_YEARS = {
+      infant: 0.5,
+      toddler: 2,
+      preschooler: 4,
+      kindergartner: 5,
+      'young-school-age': 7,
+      'school-age': 9,
+      preteen: 11,
+      'young-teen': 13,
+      teenager: 16,
+      'young-adult': 25,
+      adult: 35,
+      'middle-aged': 50,
+      senior: 70,
+      elderly: 80,
+    };
+    age = APPARENT_AGE_YEARS[apparent];
+  }
+  if (age == null || isNaN(age)) return null;
+
+  // Growth curve in cm, averaged WHO/CDC references. Gender diverges from ~12.
+  // Values are order-preserving approximations — not medically precise.
+  if (age < 1) return 55;
+  if (age < 2) return 75;
+  if (age < 3) return 86;
+  if (age < 4) return 95;
+  if (age < 5) return 103;
+  if (age < 6) return 110;
+  if (age < 7) return 117;
+  if (age < 8) return 122;
+  if (age < 9) return 128;
+  if (age < 10) return 133;
+  if (age < 11) return 138;
+  if (age < 12) return 144;
+  if (age < 13) return isFemale ? 155 : 150;
+  if (age < 14) return isFemale ? 158 : 157;
+  if (age < 15) return isFemale ? 160 : 164;
+  if (age < 16) return isFemale ? 161 : 170;
+  if (age < 17) return isFemale ? 162 : 174;
+  if (age < 18) return isFemale ? 163 : 176;
+  // Adult ranges
+  const adultBase = isMale ? 178 : isFemale ? 165 : 172;
+  if (age < 60) return adultBase;
+  if (age < 75) return adultBase - 3; // mild shrink with age
+  return adultBase - 5;
+}
+
+/**
  * Build relative height description for characters
- * Instead of absolute cm values, describes relative heights which AI understands better
+ * Instead of absolute cm values, describes relative heights which AI understands better.
+ * Characters without explicit height fall back to age+gender estimation so they
+ * can still be placed in the ordering — the output is just a rank order, not
+ * absolute cm values, so approximate estimates are sufficient.
  * @param {Array} characters - Array of character objects with name and height properties
  * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
  */
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
-  // Filter characters that have height and sort by height
-  // Support both new structure (char.physical.height) and legacy (char.height)
+  // Resolve a height for every character: prefer explicit, fall back to estimate.
+  // Support both new structure (char.physical.height) and legacy (char.height).
   const withHeight = characters
     .map(c => {
-      const height = c.height || c.physical?.height;
-      return { name: c.name, height: height ? parseInt(height) : NaN };
+      const explicit = c.height || c.physical?.height;
+      const explicitNum = explicit ? parseInt(explicit) : NaN;
+      if (!isNaN(explicitNum)) {
+        return { name: c.name, height: explicitNum };
+      }
+      const estimate = estimateHeightFromAgeGender(c);
+      if (estimate != null) {
+        return { name: c.name, height: estimate };
+      }
+      return null;
     })
-    .filter(c => !isNaN(c.height))
+    .filter(Boolean)
     .sort((a, b) => a.height - b.height);
 
   if (withHeight.length < 2) return '';
