@@ -79,6 +79,51 @@ function formatClothingObject(clothingObj) {
 }
 
 /**
+ * Strip age-correlated words from freeform face/distinguishing-marks text.
+ *
+ * Belt-and-braces defense for legacy character data that was analyzed before
+ * the character-analysis prompt was tightened. The intended source of age info
+ * is the apparentAge field — face and distinguishing-marks lines should never
+ * carry an age signal that can contradict it.
+ *
+ * Strips qualifier phrases (e.g. "typical of a child", "youthful", "baby-faced",
+ * "mature", "weathered") and trims any leftover whitespace/dangling commas.
+ *
+ * @param {string} text - The text to clean
+ * @returns {string} Cleaned text, or the original if nothing matched
+ */
+function stripAgeWords(text) {
+  if (!text || typeof text !== 'string') return text;
+  let cleaned = text;
+
+  // Phrase-level: "typical of a/an X" where X is an age noun
+  cleaned = cleaned.replace(
+    /\s*[,;]?\s*(?:shape\s+)?typical\s+of\s+(?:a|an)\s+(?:young\s+)?(?:child|kid|baby|infant|toddler|teen|teenager|adult|senior|elderly)(?:'s|s)?\b/gi,
+    ''
+  );
+  // Phrase-level: "for a X-year-old" / "for a child" / etc.
+  cleaned = cleaned.replace(
+    /\s*[,;]?\s*for\s+(?:a|an)\s+(?:young\s+)?(?:child|kid|baby|teen|teenager|adult|senior|elderly)\b/gi,
+    ''
+  );
+  // Standalone age-correlated adjectives
+  const ageAdjectives = [
+    'youthful', 'young-looking', 'baby-faced', 'babyfaced', 'childlike', 'childish',
+    'mature(?:-looking)?', 'aged', 'elderly', 'weathered', 'wrinkled', 'fresh-faced',
+    'developing', 'adolescent', 'juvenile', 'infantile'
+  ];
+  cleaned = cleaned.replace(
+    new RegExp(`\\s*[,;]?\\s*\\b(?:${ageAdjectives.join('|')})\\b`, 'gi'),
+    ''
+  );
+  // "soft bone structure" alone is fine, but "soft features" + age word is the bad pattern
+  // (already covered by phrase-level above)
+  // Cleanup: collapse double spaces / commas, trim trailing punctuation
+  cleaned = cleaned.replace(/\s+/g, ' ').replace(/\s*,\s*,/g, ',').replace(/[,\s;]+$/, '').trim();
+  return cleaned;
+}
+
+/**
  * Build detailed hair description using both simple fields and detailedHairAnalysis
  * Uses detailed analysis when available for better consistency across scenes
  * User-edited values (from physicalTraitsSource) take priority over auto-extracted values
@@ -1904,11 +1949,11 @@ function buildCharacterPhysicalDescription(char) {
     }
   }
   if (face) {
-    description += `, ${face}`;
+    description += `, ${stripAgeWords(face)}`;
   }
   // Add other physical traits (glasses, birthmarks, always-present accessories)
   if (other && other !== 'none') {
-    description += `, ${other}`;
+    description += `, ${stripAgeWords(other)}`;
   }
   if (clothing) {
     description += `. Wearing: ${clothing}`;
@@ -2072,7 +2117,11 @@ function buildCharacterReferenceList(photos, characters = null) {
       case 'school-age':
         return isMale ? 'boy' : 'girl';
       case 'preteen':
+        // 11-12: still a child, NOT a teenager. Emitting "teenage girl" here
+        // used to contradict apparentAge="preteen" and confused image models.
+        return isMale ? 'boy' : 'girl';
       case 'young-teen':
+        return isMale ? 'young teen boy' : 'young teen girl';
       case 'teenager':
         return isMale ? 'teenage boy' : 'teenage girl';
       case 'young-adult':
@@ -2106,7 +2155,6 @@ function buildCharacterReferenceList(photos, characters = null) {
 
     const physicalParts = [
       physical.build ? `Build: ${physical.build}` : '',
-      // Face shape removed - let reference image handle facial geometry
       physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
       // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
@@ -2115,7 +2163,10 @@ function buildCharacterReferenceList(photos, characters = null) {
           ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
           : `Facial hair: ${physical.facialHair}`)
         : '',
-      physical.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
+      // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
+      physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
+      // Distinguishing marks only (freckles, scars, moles, glasses).
+      physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
       // Include clothing description from avatar if available
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
     ].filter(Boolean);
@@ -3105,7 +3156,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
           case 'school-age':
             return isMale ? 'boy' : 'girl';
           case 'preteen':
+            // 11-12: still a child, NOT a teenager.
+            return isMale ? 'boy' : 'girl';
           case 'young-teen':
+            return isMale ? 'young teen boy' : 'young teen girl';
           case 'teenager':
             return isMale ? 'teenage boy' : 'teenage girl';
           case 'young-adult':
@@ -3138,7 +3192,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       const physicalParts = [
         physical.build ? `Build: ${physical.build}` : '',
-        // Face shape removed - let reference image handle facial geometry
         physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
         // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
@@ -3147,7 +3200,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
             ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
             : `Facial hair: ${physical.facialHair}`)
           : '',
-        physical.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
+        // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
+        physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
+        // Distinguishing marks only (freckles, scars, moles, glasses).
+        physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
       ].filter(Boolean);
@@ -4130,6 +4186,9 @@ module.exports = {
 
   // Character parsing for bbox matching
   parseCharacterDescriptions,
+
+  // Age-word stripping for legacy face/distinguishing-mark text
+  stripAgeWords,
 
   // Clothing format conversion
   convertClothingToCurrentFormat,

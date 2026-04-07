@@ -15,8 +15,14 @@
  *   apparentAge: string,
  *   detailedHairAnalysis: string,
  *   build: string,
- *   other: string
+ *   face: string,    // Anatomical face shape (age-neutral: jawline, nose, cheeks, lips)
+ *   other: string    // Distinguishing marks only (freckles, scars, moles, glasses)
  * }
+ *
+ * Legacy note: `other_features` used to conflate face shape with distinguishing
+ * marks. It now maps to `face` (since historically that's where face data lived).
+ * Any character saved before this split gets its face-shape text back into the
+ * `face` slot via this mapping.
  */
 
 // Mapping from legacy snake_case fields to canonical camelCase
@@ -31,7 +37,11 @@ const FIELD_MAPPINGS = {
   apparent_age: 'apparentAge',
   detailed_hair_analysis: 'detailedHairAnalysis',
   build: 'build',
-  other_features: 'other'
+  face: 'face',
+  // Legacy: `other_features` historically stored face-shape descriptions.
+  // Route it to `face` so existing characters keep their data in the right slot.
+  other_features: 'face',
+  other: 'other'
 };
 
 // All legacy field names to strip
@@ -178,6 +188,7 @@ function buildPhysicalDescription(character) {
   if (physical.facialHair && physical.facialHair !== 'none') {
     parts.push(physical.facialHair);
   }
+  if (physical.face) parts.push(physical.face);
   if (physical.other) parts.push(physical.other);
 
   return parts.join(', ');

@@ -79,9 +79,10 @@ interface CharacterApiResponse {
   skinUndertone?: string;
   skin_tone_hex?: string;
   skinToneHex?: string;
-  other_features?: string;
+  face?: string;  // Anatomical face shape (jawline, nose, cheeks, lips)
+  other_features?: string;  // Legacy: historically held face description
   otherFeatures?: string;
-  other?: string;  // Birthmarks, always-present accessories
+  other?: string;  // Distinguishing marks (freckles, scars, moles, glasses)
   glasses?: string;  // Glasses description or 'none'
   detailed_hair_analysis?: string;
   detailedHairAnalysis?: string;
@@ -151,7 +152,9 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
   const physical = {
     height: p?.height || api.height,
     build: p?.build || api.build,
-    face: p?.face || api.other_features || api.otherFeatures,
+    // face = anatomical face shape (jawline, nose, cheeks, lips). Age-neutral.
+    // Legacy fallback: old characters stored face under other_features.
+    face: p?.face || api.face || api.other_features || api.otherFeatures,
     eyeColor: p?.eyeColor || api.eye_color || api.eyeColor,
     hairColor: p?.hairColor || api.hair_color || api.hairColor,
     hairLength: p?.hairLength || api.hair_length || api.hairLength,
@@ -236,8 +239,9 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     skin_tone: char.physical?.skinTone,
     skin_undertone: char.physical?.skinUndertone,
     skin_tone_hex: char.physical?.skinToneHex,
-    other_features: char.physical?.face,
-    other: char.physical?.other,  // Birthmarks, always-present accessories
+    // face = anatomical face shape, kept separate from distinguishing marks.
+    face: char.physical?.face,
+    other: char.physical?.other,  // Birthmarks, scars, freckles, glasses
     glasses: char.physical?.glasses,  // Glasses description or 'none'
     detailed_hair_analysis: char.physical?.detailedHairAnalysis,
     physical_traits_source: char.physicalTraitsSource,

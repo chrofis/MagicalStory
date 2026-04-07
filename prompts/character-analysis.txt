@@ -25,7 +25,7 @@ Return a JSON object with this EXACT structure:
     "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
     "skinUndertone": "<MUST be one of: warm | cool | neutral>",
     "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
-    "face": "<PERMANENT facial structure: bone structure, face shape - NO expressions>",
+    "face": "<PERMANENT anatomical facial features as a short comma-separated list. Use ONLY anatomical descriptors: jawline (sharp/angular/soft/rounded/square), chin (prominent/recessed/neutral/dimpled/pointed), nose (straight/aquiline/concave/curved bridge; pointed/bulbous/upturned/rounded tip), cheekbones (high/medium/low), lip fullness (thin/medium/full). Example: 'square jawline, prominent chin, aquiline nose with rounded tip, high cheekbones, full lips'. STRICTLY FORBIDDEN words and phrases: 'typical of', 'young', 'old', 'child', 'baby', 'baby-faced', 'youthful', 'mature', 'weathered', 'soft features typical', 'developing', 'adolescent', 'juvenile', 'aged', 'wrinkled', 'fresh-faced'. NO age cues whatsoever — only geometry. NO expressions.>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairDensity": "<MUST be one of: full | thinning | balding | bald> - full=normal coverage, thinning=visible scalp through hair, balding=significant hair loss with bald patches, bald=no hair",
