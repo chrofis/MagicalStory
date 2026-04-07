@@ -985,7 +985,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalScore: result.originalScore || null,
           originalReasoning: result.originalReasoning || null,
           referencePhotos: referencePhotos,
-          modelId: result.modelId || null
+          modelId: result.modelId || null,
+          // Dev panel: exact images packed and padded to 3:4 before sending to Grok
+          grokRefImages: result.grokRefImages || null
         };
 
         // Save partial cover checkpoint for progressive display
@@ -1707,7 +1709,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos: frontCoverPhotos,
             modelId: frontCoverResult.modelId || null,
             bboxDetection: frontCoverResult.bboxDetection || null,
-            bboxOverlayImage: frontCoverResult.bboxOverlayImage || null
+            bboxOverlayImage: frontCoverResult.bboxOverlayImage || null,
+            // Dev panel: exact images sent to Grok (max 3 slots, already packed + padded to 3:4)
+            grokRefImages: frontCoverResult.grokRefImages || null
           };
         } else {
           log.debug(`⚡ [STORYBOOK] Front cover already generated during streaming (skipping)`);
@@ -1765,7 +1769,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos: initialPagePhotos,
             modelId: initialResult.modelId || null,
             bboxDetection: initialResult.bboxDetection || null,
-            bboxOverlayImage: initialResult.bboxOverlayImage || null
+            bboxOverlayImage: initialResult.bboxOverlayImage || null,
+            grokRefImages: initialResult.grokRefImages || null
           };
         } else {
           log.debug(`⚡ [STORYBOOK] Initial page already generated during streaming (skipping)`);
@@ -1814,7 +1819,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos: backCoverPhotos,
             modelId: backCoverResult.modelId || null,
             bboxDetection: backCoverResult.bboxDetection || null,
-            bboxOverlayImage: backCoverResult.bboxOverlayImage || null
+            bboxOverlayImage: backCoverResult.bboxOverlayImage || null,
+            grokRefImages: backCoverResult.grokRefImages || null
           };
         }
 
@@ -3857,7 +3863,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             referencePhotos: frontCover.photos,
             modelId: frontCover.result.modelId || null,
             bboxDetection: frontCover.result.bboxDetection || null,
-            bboxOverlayImage: frontCover.result.bboxOverlayImage || null
+            bboxOverlayImage: frontCover.result.bboxOverlayImage || null,
+            grokRefImages: frontCover.result.grokRefImages || null
           },
           initialPage: {
             imageData: initialPage.result.imageData,
@@ -3876,7 +3883,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             referencePhotos: initialPage.photos,
             modelId: initialPage.result.modelId || null,
             bboxDetection: initialPage.result.bboxDetection || null,
-            bboxOverlayImage: initialPage.result.bboxOverlayImage || null
+            bboxOverlayImage: initialPage.result.bboxOverlayImage || null,
+            grokRefImages: initialPage.result.grokRefImages || null
           },
           backCover: {
             imageData: backCover.result.imageData,
@@ -3895,7 +3903,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             referencePhotos: backCover.photos,
             modelId: backCover.result.modelId || null,
             bboxDetection: backCover.result.bboxDetection || null,
-            bboxOverlayImage: backCover.result.bboxOverlayImage || null
+            bboxOverlayImage: backCover.result.bboxOverlayImage || null,
+            grokRefImages: backCover.result.grokRefImages || null
           }
         };
 

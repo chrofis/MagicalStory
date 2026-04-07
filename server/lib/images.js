@@ -2566,7 +2566,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
     const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-    const grokAspect = evaluationType === 'avatar' ? '9:16' : '1:1';
+    // Covers render to A4 portrait in the printed book — 3:4 is the closest
+    // standard ratio supported by both Gemini and Grok (A4 is 210:297 ≈ 0.707,
+    // 3:4 is 0.75). Pages stay square. Avatars stay 9:16 portrait.
+    const grokAspect = evaluationType === 'avatar' ? '9:16'
+      : evaluationType === 'cover' ? '3:4'
+      : '1:1';
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     try {
@@ -2914,6 +2919,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      // Covers → 3:4 (A4-like portrait), avatars → 9:16, scenes → 1:1 square.
+      // editWithGrok pads input refs to this aspect so the output matches.
+      const grokAspect = evaluationType === 'avatar' ? '9:16'
+        : evaluationType === 'cover' ? '3:4'
+        : '1:1';
 
       // For avatars: each reference image (face, body, style sample) gets its own slot
       // For scenes: use normal packing (VB grid + landmarks + characters)
@@ -2935,9 +2945,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: '1:1' });
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect });
       } else {
-        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: '1:1' });
+        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
       }
 
       if (onImageReady && result.imageData) {
@@ -2973,6 +2983,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   const systemInstruction = getImageSystemInstruction();
   const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
+  // Covers → 3:4 (A4-like portrait), avatars → 9:16, scenes → 1:1 square.
+  const geminiAspect = evaluationType === 'avatar' ? '9:16'
+    : evaluationType === 'cover' ? '3:4'
+    : '1:1';
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -2983,13 +2997,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       temperature: modelTemp,
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
-        aspectRatio: "1:1"
+        aspectRatio: geminiAspect
       }
     }
   };
 
   log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
-  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: ${geminiAspect}, Temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
@@ -3174,7 +3188,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     onImageReady = null,
     skipCache = false,
     artStyle = 'watercolor',
-    sceneBackground = null
+    sceneBackground = null,
+    // Output aspect ratio: '1:1' (default, pages), '3:4' (covers), '9:16' (avatars).
+    // Flows through to Grok and Gemini image configs.
+    aspectRatio = '1:1'
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
@@ -3257,9 +3274,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
+        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio });
       } else {
-        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
+        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio });
       }
 
       if (onImageReady && result.imageData) {
@@ -3487,9 +3504,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: '1:1' });
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio });
       } else {
-        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: '1:1' });
+        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio });
       }
 
       if (onImageReady && result.imageData) {
@@ -3525,12 +3542,12 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       temperature: modelTemp,
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
-        aspectRatio: "1:1"
+        aspectRatio
       }
     }
   };
 
-  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
 
   // Progressive retry with sanitization on safety blocks
   const sanitizationLevels = [

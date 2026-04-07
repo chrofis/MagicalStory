@@ -1967,13 +1967,17 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
         // (chars/animals/artifacts excluded — they belong on the populated page).
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
+        // Negative page numbers are covers (-1 front, -2 initial, -3 back) —
+        // they print to A4 portrait, so force 3:4 aspect. Regular pages stay 1:1.
+        const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           imageModelOverride,
           imageBackendOverride: iterBackend,
           landmarkPhotos: pageLandmarkPhotos,
           visualBibleGrid: emptySceneVbGrid,
           pageNumber,
-          skipCache: true
+          skipCache: true,
+          aspectRatio: isCoverPage ? '3:4' : '1:1'
         });
         if (emptyResult?.imageData) {
           sceneBackground = emptyResult.imageData;

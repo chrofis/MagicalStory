@@ -164,22 +164,37 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     images = [`data:image/jpeg;base64,${finalBuf.toString('base64')}`];
   }
 
-  // Grok edit output matches input aspect ratio (ignores aspect_ratio param).
-  // Pad all input images to square so output is always 1:1.
+  // Grok edit output matches the input image aspect ratio (ignores aspect_ratio
+  // param). To get a specific output aspect, pad every input image to that aspect
+  // with white letterbox bars. Parses aspectRatio strings like '3:4', '1:1', '9:16'.
+  const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
   for (let i = 0; i < images.length; i++) {
     try {
       const base64 = images[i].replace(/^data:image\/\w+;base64,/, '');
       const buf = Buffer.from(base64, 'base64');
       const meta = await sharp(buf).metadata();
-      if (meta.width && meta.height && meta.width !== meta.height) {
-        const size = Math.max(meta.width, meta.height);
-        const padded = await sharp(buf)
-          .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
-          .jpeg({ quality: 90 })
-          .toBuffer();
-        images[i] = `data:image/jpeg;base64,${padded.toString('base64')}`;
-        log.debug(`🎨 [GROK] Padded edit image ${i} from ${meta.width}x${meta.height} → ${size}x${size}`);
+      if (!meta.width || !meta.height) continue;
+      const currentRatio = meta.width / meta.height;
+      // Skip if already within 1% of target (avoid gratuitous re-encode)
+      if (Math.abs(currentRatio - targetRatio) / targetRatio < 0.01) continue;
+      // Compute the smallest box that contains the source and matches target aspect
+      let targetW, targetH;
+      if (currentRatio > targetRatio) {
+        // Source is wider — keep width, grow height
+        targetW = meta.width;
+        targetH = Math.round(meta.width / targetRatio);
+      } else {
+        // Source is taller — keep height, grow width
+        targetH = meta.height;
+        targetW = Math.round(meta.height * targetRatio);
       }
+      const padded = await sharp(buf)
+        .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      images[i] = `data:image/jpeg;base64,${padded.toString('base64')}`;
+      log.debug(`🎨 [GROK] Padded edit image ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
     } catch (padErr) {
       log.warn(`⚠️ [GROK] Failed to pad edit image ${i}: ${padErr.message}`);
     }

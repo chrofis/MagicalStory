@@ -275,7 +275,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     const emptyResult = await generateImageOnly(emptyPrompt, [], {
       landmarkPhotos: coverLandmarkPhotos,
       visualBibleGrid: emptySceneVbGrid,
-      skipCache: true
+      skipCache: true,
+      // Covers are printed on A4 portrait pages — the empty-scene style anchor
+      // must already be 3:4 so the final cover (which reuses it as a reference)
+      // ends up in the same ratio. A4 (0.707) is closest to 3:4 (0.75) among
+      // standard aspects supported by Gemini and Grok.
+      aspectRatio: '3:4'
     });
     if (emptyResult?.imageData) {
       coverSceneBackground = emptyResult.imageData;
