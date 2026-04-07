@@ -3279,6 +3279,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Filter main characters from Visual Bible (safety net)
     filterMainCharactersFromVisualBible(visualBible, inputData.characters);
 
+    // Phantom character detection: any name in scene hints that isn't in
+    // main characters or the Visual Bible. Without this, the image generator
+    // invents a different person for the same name on every page.
+    try {
+      const { detectAndPatchPhantomCharacters } = require('./server/lib/phantomCharacters');
+      const phantomUsage = await detectAndPatchPhantomCharacters({
+        storyPages,
+        visualBible,
+        inputCharacters: inputData.characters || [],
+        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
+      });
+      if (phantomUsage) {
+        addUsage('anthropic', phantomUsage, 'scene_expansion', phantomUsage.modelId || MODEL_DEFAULTS.sceneIteration);
+      }
+    } catch (err) {
+      log.warn(`👻 [PHANTOM] Detection/patch failed (continuing): ${err.message}`);
+    }
+
     // Initialize main characters from inputData.characters with their style analysis
     // This populates visualBible.mainCharacters for the dev panel display
     initializeVisualBibleMainCharacters(visualBible, inputData.characters);

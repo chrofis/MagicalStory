@@ -62,6 +62,19 @@ Minor characters you create to serve the story (shopkeepers, teachers, passersby
 - Define them in the Visual Bible for visual consistency
 - Keep them simple - one or two defining traits
 
+**RULE: Every named character must be declared in exactly one place.**
+Every character you mention by name anywhere in the story (text, dialogue,
+or scene hints) MUST belong to one of these three groups:
+1. **Main characters** — already provided to you
+2. **Primary characters** — already provided to you
+3. **Secondary characters** — characters YOU invent and add to the Visual Bible's `secondaryCharacters` array
+
+If a name appears in your story but is in none of these, the illustration
+system has no description to draw from and will invent a different person
+for that name on every page. There are NO unlisted characters — even a child
+who appears once needs a Visual Bible entry with full description (build,
+hair, face, signature look, clothing).
+
 # Story Category Guidelines
 
 {CATEGORY_GUIDELINES}
@@ -285,17 +298,43 @@ For EACH of the {PAGES} pages:
 ... continue for ALL {PAGES} pages ...
 
 
----QUICK CHECK---
-Scan the draft for these 5 issues ONLY. Be brief — one line per fix needed.
+---ANALYSIS---
+Analyze the draft above. Be honest and specific. Pretend you are editing
+someone else's work. Cover BOTH story quality AND scene hints.
 
-1. **Character count** - Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? → Remove the least important.
-2. **Scene plan compliance** - Does each page match the SCENE PLAN above? Same shot type, same character count? → Fix any that deviate.
-3. **Clothing** - Are costumed characters using `costumed:type` in ALL scenes (except scene 1)? → Fix any that say `standard` when costumed is available.
-4. **Banned patterns** - Any "hand on shoulder", "ruffled hair", "nodded wisely"? Any character "smiling" on more than 3 pages? → Replace.
-5. **Plot hole** - Any event that doesn't logically follow from the previous? Any character acting out of character? → Fix.
+**Story & narrative:**
+1. Plot holes — Logical gaps? Events that happen "just because"? Anything left unexplained?
+2. Cause and effect — Does each event follow naturally from the previous?
+3. Pacing — Setup too long? Climax rushed? Ending earned or abrupt?
+4. Stakes — Clear what characters stand to gain/lose? Does the reader care?
+5. Resolution — Does the ending feel satisfying and complete?
 
-Fixes (only if issues found):
+**Characters & dialogue (analyze EACH character by name):**
+For EACH character in the story, write one line:
+- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [...]
+
+6. Consistency — Acts according to their established traits? Out-of-character moments?
+7. Voice — Distinct way of speaking? Or do all characters sound the same?
+8. Show vs tell — Emotions SHOWN through actions/dialogue? Or just TOLD ("she was sad")?
+9. Motivation — Clear WHY each character does what they do?
+10. Growth — Main characters: do they learn or change? Believable arc?
+
+**Scene hints:**
+11. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
+12. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
+13. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
+14. **Banned patterns** — Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders"? Any character "smiling" on more than 2-3 pages?
+
+**Cliché check:**
+15. Repeated gestures — Same gesture (hug, smile, wink) used more than once? Vary them.
+16. Cliché phrases — Any "little did they know", "suddenly", "it was a dark and stormy night"? Remove.
+
+**Output:**
+List your character analysis lines (point 6-10, one per character), then list ALL fixes needed:
 - Page X: [issue] → [fix]
+- Page Y: [issue] → [fix]
+
+The ---STORY PAGES--- section below MUST apply ALL these fixes when rewriting the final clean version.
 
 
 ---TITLE---
@@ -352,8 +391,11 @@ Sophie ran to the window. Snow was falling!
 SCENE HINT:
 {"description":"Sophie presses both hands against the frosty window, breath fogging the glass.","characters":[{"name":"Sophie","position":"right","clothing":"standard"}],"setting":"indoor","time":"morning","weather":"snowy","shot":"close-up"}
 
----QUICK CHECK---
-1. Character count: ✓  2. Scene plan compliance: ✓  3. Clothing: ✓  4. No banned patterns  5. No plot holes
+---ANALYSIS---
+**Plot:** No plot holes, cause/effect clear, pacing fine, stakes clear, resolution satisfying.
+**Sophie**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓. Issues: none.
+**Scene hints:** All within character limit, match plan, clothing correct, no banned patterns.
+**Cliché:** No repeated gestures, no cliché phrases.
 Fixes: None needed
 
 ---TITLE---
@@ -518,7 +560,7 @@ Rules: no two consecutive pages with same shot + same character count. At least 
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
 
-Write the story following your SCENE PLAN above. No word counts - clean text only.
+Rewrite the story applying ALL fixes from your ANALYSIS section above. No word counts — clean text only. If your analysis found "Page X: issue → fix", the corresponding page below MUST contain the fix.
 
 **CRITICAL: Use EXACTLY `--- Page N ---` as page markers (in English, even for non-English stories). Do NOT translate to "Seite" or "Página".**
 
