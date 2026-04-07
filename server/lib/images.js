@@ -5586,14 +5586,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
           const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
+          // Collect both face AND body bboxes for every OTHER detected character.
+          //   - Face repair: we blur just other faces; protectedFaces drives the mask restore.
+          //   - Body repair: we blur other characters' FULL BODIES (not just faces) so Grok
+          //     can't trait-bleed their hair, clothing, skin tone, etc. into the target;
+          //     protectedBodies drives the mask restore.
           const protectedFaces = [];
+          const protectedBodies = [];
           const bboxFigures = bestEval?.bboxDetection?.figures || [];
+          const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
           for (const fig of bboxFigures) {
             if (!fig.name || fig.name === 'UNKNOWN') continue;
             if (fig.name.toLowerCase() === fix.charName.toLowerCase()) continue;
-            if (fig.faceBox) {
-              protectedFaces.push(Array.isArray(fig.faceBox) ? fig.faceBox : [fig.faceBox.y, fig.faceBox.x, fig.faceBox.y + fig.faceBox.height, fig.faceBox.x + fig.faceBox.width]);
-            }
+            if (fig.faceBox) protectedFaces.push(toRect(fig.faceBox));
+            if (fig.bodyBox) protectedBodies.push(toRect(fig.bodyBox));
           }
 
           const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
@@ -5609,6 +5615,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             sceneDescription: sceneDesc,
             faceBbox,
             protectedFaces,
+            protectedBodies,
             whiteoutTarget: useFaceOnly ? 'face' : 'body',
           });
 
@@ -6432,22 +6439,39 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     };
 
     const whiteoutTarget = options.whiteoutTarget || 'face';
+    const protectedFacesForGrok = options.protectedFaces || [];
+    const protectedBodiesForGrok = options.protectedBodies || [];
 
     if (whiteoutTarget === 'body') {
-      // Body repair: blur the full body region (face + body)
+      // Body repair: blur the full body region (face + body + clothing).
       const bodyBox = [ymin, xmin, ymax, xmax];
       await blurFace(bodyBox, `target body (${charName})`);
+
+      // Blur OTHER characters' FULL BODIES (not just faces). This prevents Grok
+      // from seeing their hair, skin tone, clothing, or build and trait-bleeding
+      // any of those into the target character's redraw. The blend mask then
+      // restores these regions from the original via protectedBodies.
+      // Fallback: if bodyBox wasn't detected for a figure, its faceBox is still
+      // blurred so hair/skin color near the face is hidden (partial protection).
+      if (protectedBodiesForGrok.length > 0) {
+        for (const pb of protectedBodiesForGrok) {
+          await blurFace(pb, 'other body');
+        }
+      } else {
+        // No body boxes available — fall back to blurring other faces only.
+        log.warn(`⚠️ [CHAR REPAIR GROK] Body repair: no protectedBodies available, falling back to face-only blur of other characters (trait bleed risk)`);
+        for (const pf of protectedFacesForGrok) {
+          await blurFace(pf, 'other face (fallback)');
+        }
+      }
     } else {
-      // Face repair: blur only the face
+      // Face repair: blur only the target face + other characters' faces.
       if (faceBbox) {
         await blurFace(faceBbox, `target face (${charName})`);
       }
-    }
-
-    // Blur other characters' faces (same blur — Grok redraws all, blend restores originals)
-    const protectedFacesForGrok = options.protectedFaces || [];
-    for (const pf of protectedFacesForGrok) {
-      await blurFace(pf, 'other face');
+      for (const pf of protectedFacesForGrok) {
+        await blurFace(pf, 'other face');
+      }
     }
 
     if (composites.length > 0) {
@@ -6542,9 +6566,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
     const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
 
-    // Pre-compute protected face rects in blend-region pixel coords (with 20% padding)
-    const protectedFaces = options.protectedFaces || [];
-    const protectedRects = protectedFaces.map(([fymin, fxmin, fymax, fxmax]) => {
+    // Pre-compute protected rects in blend-region pixel coords (with 20% padding).
+    // In body-repair mode we restore OTHER characters' FULL BODIES (because Grok
+    // painted them as the target charName and we need the originals back). In
+    // face-repair mode we restore just their faces.
+    const protectedSourceBoxes = whiteoutTarget === 'body'
+      ? (options.protectedBodies && options.protectedBodies.length > 0
+          ? options.protectedBodies
+          : (options.protectedFaces || []))  // fallback when bodyBox missing
+      : (options.protectedFaces || []);
+    const protectedRects = protectedSourceBoxes.map(([fymin, fxmin, fymax, fxmax]) => {
       const fw = fxmax - fxmin, fh = fymax - fymin;
       const pad = 0.2;
       const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
@@ -6557,7 +6588,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       };
     }).filter(r => r.right > 0 && r.bottom > 0 && r.left < blendWidth && r.top < blendHeight);
     if (protectedRects.length > 0) {
-      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} other face(s) from blend`);
+      const regionLabel = whiteoutTarget === 'body' ? 'other body/bodies' : 'other face(s)';
+      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} ${regionLabel} from blend`);
     }
 
     // F. Feathered blend: original outside, Grok inside, gradient at edges
