@@ -124,6 +124,50 @@ function stripAgeWords(text) {
 }
 
 /**
+ * Build physical age-marker cues from an apparentAge category.
+ *
+ * The analyzer emits apparentAge as a single category ("teenager", "school-age"),
+ * and the formatter used to render that as just `Looks: teenager` — a weak signal
+ * image models would ignore, rendering every character as generically young when
+ * the art style skewed that way. This returns a concrete physical description so
+ * mixed-age casts actually read at the right ages.
+ *
+ * @param {string} apparentAge - Age category from the analyzer
+ * @returns {string} Physical age markers (empty string if no category)
+ */
+function getAgeMarkers(apparentAge) {
+  if (!apparentAge) return '';
+  switch (apparentAge) {
+    case 'infant':
+    case 'toddler':
+      return 'baby proportions, large head relative to body, very short, rounded baby features';
+    case 'preschooler':
+    case 'kindergartner':
+      return 'very young child proportions, large head relative to body, soft rounded features, clearly shorter than school-age kids';
+    case 'young-school-age':
+    case 'school-age':
+      return 'grade-school child proportions, rounded child features, clearly shorter and smaller than a teenager';
+    case 'preteen':
+      return 'late-child proportions, starting to look slightly older than grade-schoolers, clearly not yet a teenager';
+    case 'young-teen':
+      return 'early adolescent proportions, longer face than a child, jaw edge starting to show, clearly taller and leaner than grade-schoolers';
+    case 'teenager':
+      return 'adolescent proportions, longer face than a child, defined jawline, clearly taller and leaner than grade-schoolers — visibly NOT a child';
+    case 'young-adult':
+      return 'young adult proportions, mature face with defined bone structure, full adult height';
+    case 'adult':
+      return 'adult proportions, mature bone structure, full adult height';
+    case 'middle-aged':
+      return 'adult proportions, mature bone structure with subtle signs of age, full adult height';
+    case 'senior':
+    case 'elderly':
+      return 'older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair';
+    default:
+      return '';
+  }
+}
+
+/**
  * Build detailed hair description using both simple fields and detailedHairAnalysis
  * Uses detailed analysis when available for better consistency across scenes
  * User-edited values (from physicalTraitsSource) take priority over auto-extracted values
@@ -1266,9 +1310,9 @@ const ART_STYLES = {
   comic: 'A classic American comic book illustration in the style of Jack Kirby and Jim Lee. Heavy black ink lines, dynamic composition, visible halftone dots, and vibrant CMYK colors. Not photorealistic. Faces: inked outlines, halftone-style shading, bold features, dramatic expressions. Classic Western comic book rendering.',
   manga: 'A traditional Japanese manga illustration with intricate detailed linework. Black and white monochrome with atmospheric screentones, dramatic lighting and composition. Not photorealistic. Faces: clean ink lines, screen tone shading, large but less extreme eyes than anime, defined noses, expressive mouths. Consistent manga rendering.',
   watercolor: {
-    default: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
-    grok: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
-    gemini: 'A traditional watercolor painting in the style of Beatrix Potter. Realistic human proportions, textured paper, delicate color washes with wet-on-wet technique, soft edges, visible artistic brushstrokes, and transparent flowing colors. Warm, inviting color palette with moderate vibrancy — not washed out or cool-toned. Visible watercolor texture in background elements. Faces: soft watercolor wash rendering, natural proportions, gentle features with visible brushstroke texture on skin. Eyes naturally sized. Warm rosy cheeks. Never sharp or digitally rendered.',
+    default: 'A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and transparent flowing colors. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.',
+    grok: 'A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and transparent flowing colors. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.',
+    gemini: 'A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and transparent flowing colors. Warm, inviting color palette with moderate vibrancy — not washed out or cool-toned. Visible watercolor texture in background elements. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.',
   },
   oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art. Faces: painterly realism with visible brushstrokes, natural proportions, defined bone structure, warm skin tones from impasto technique.',
   lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic. Faces: geometric faceted surfaces, minimal detail, flat-shaded polygonal features. No smooth skin — everything is angular.',
@@ -2251,6 +2295,10 @@ function buildCharacterReferenceList(photos, characters = null) {
     const effectiveAgeCategory = physical.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
     const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
     const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
+    // Concrete physical age markers (not just the category label) so mixed-age
+    // casts render at the right ages — the single "Looks: teenager" tag is too
+    // weak a signal for image models when the art style skews young.
+    const ageMarkersText = getAgeMarkers(effectiveAgeCategory);
 
     // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
     const hairDescText = buildHairDescription(physical, char?.physical_traits_source);
@@ -2258,6 +2306,7 @@ function buildCharacterReferenceList(photos, characters = null) {
 
     const physicalParts = [
       physical.build ? `Build: ${physical.build}` : '',
+      ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
       physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
       // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
@@ -3329,6 +3378,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       // Visual age category (how old they look) — skip numeric age, category is enough
       const visualAge = physical.apparentAge ? `Looks: ${physical.apparentAge.replace(/-/g, ' ')}` : '';
+      // Concrete physical age markers so teens don't render as children (and vice versa)
+      const ageMarkersText = getAgeMarkers(physical.apparentAge);
 
       // Age-specific gender term based on apparentAge
       const getGenderTerm = (gender, apparentAge) => {
@@ -3381,6 +3432,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       const physicalParts = [
         physical.build ? `Build: ${physical.build}` : '',
+        ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
         physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
         // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
