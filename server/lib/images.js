@@ -848,81 +848,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`📊 [EVAL] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
     }
 
-    // Fallback: If content was blocked and we're using 2.5, try sanitized prompt first
-    if (isBlockedResponse(data) && modelId.includes('2.5')) {
-      const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'UNKNOWN';
+    // If content was blocked, log full safety details and return null.
+    // The eval prompt is already neutral (no age/child/body language) so a block
+    // here is rare and means the IMAGE itself triggered the filter — a retry
+    // with a different prompt won't help. Surface it loudly so it can be
+    // investigated against the stored image in the DB.
+    if (isBlockedResponse(data)) {
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
-      log.warn(`🔄 [FALLBACK] ${pageLabel}Content blocked by ${modelId} (${blockReason}), retrying with sanitized prompt...`);
-
-      // Create a SANITIZED prompt that removes potentially triggering content:
-      // - No detailed physical descriptions (age, body type, etc.)
-      // Simplified prompt to avoid content filters
-      const sanitizedPrompt = `Illustration QA: Evaluate artwork against reference images.
-
-Check: rendering quality, character consistency, AI artifacts (hands, objects).
-
-Return JSON only:
-{
-  "figures": [{"id": 1, "position": "...", "hair": "...", "clothing": "..."}],
-  "matches": [{"figure": 1, "reference": "...", "confidence": 0.85, "face_bbox": [0.1,0.2,0.3,0.4], "issues": []}],
-  "rendering": {"hands": [{"figure": 1, "fingers": 5, "ok": true}], "issues": []},
-  "scene": {"all_present": true, "missing": []},
-  "score": 7,
-  "verdict": "PASS",
-  "issues_summary": "brief summary",
-  "fixable_issues": [{"description": "visual description", "severity": "MAJOR", "type": "hand", "fix": "what to render"}]
-}
-
-Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
-
-      // Rebuild parts with sanitized prompt (keep images, replace text)
-      const sanitizedParts = parts.slice(0, -1); // Remove original prompt
-      sanitizedParts.push({ text: sanitizedPrompt });
-
-      // Retry with 2.5 and sanitized prompt
-      const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-      const retryResponse = await fetch(retryUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: sanitizedParts }],
-          generationConfig: {
-            maxOutputTokens: 16000,
-            temperature: 0.3
-          },
-          safetySettings: GEMINI_SAFETY_SETTINGS
-        })
-      });
-
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json();
-        if (!isBlockedResponse(retryData)) {
-          log.info(`✅ [QUALITY] ${pageLabel}Sanitized prompt retry succeeded with ${modelId}`);
-          data = retryData;
-        } else {
-          // Still blocked, now fall back to 2.0
-          log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt still blocked, falling back to gemini-2.0-flash...`);
-          modelId = 'gemini-2.0-flash';
-          response = await callQualityAPI(modelId);
-          if (!response.ok) {
-            const error = await response.text();
-            log.error('❌ [QUALITY] Fallback model also failed:', error);
-            return null;
-          }
-          data = await response.json();
-        }
-      } else {
-        // HTTP error on retry, fall back to 2.0
-        log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt HTTP error, falling back to gemini-2.0-flash...`);
-        modelId = 'gemini-2.0-flash';
-        response = await callQualityAPI(modelId);
-        if (!response.ok) {
-          const error = await response.text();
-          log.error('❌ [QUALITY] Fallback model also failed:', error);
-          return null;
-        }
-        data = await response.json();
-      }
+      const promptBlockReason = data.promptFeedback?.blockReason || null;
+      const promptSafety = data.promptFeedback?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
+      const candFinish = data.candidates?.[0]?.finishReason || 'none';
+      const candSafety = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
+      const reason = promptBlockReason || candFinish;
+      log.error(`❌ [QUALITY] ${pageLabel}Image blocked by Gemini safety (${reason}) on ${modelId}`);
+      log.error(`❌ [QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
+      return null;
     }
 
     // Log finish reason to diagnose early stops
@@ -1291,7 +1231,8 @@ function parseVisualBibleObjects(prompt) {
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '' } = options;
+  const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1361,7 +1302,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     let outputTokens = 0;
     if (modelConfig?.provider === 'anthropic') {
       // Claude vision path — uses callTextModel with images option
-      log.info(`🔲 [BBOX-DETECT] Using Claude vision: ${modelId}`);
+      log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
       const { callTextModel } = require('./textModels');
       const imageDataUri = `data:${mimeType};base64,${base64Data}`;
       const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri] });
@@ -1377,7 +1318,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       inputTokens = claudeResult.usage?.input_tokens || 0;
       outputTokens = claudeResult.usage?.output_tokens || 0;
     } else if (modelConfig?.provider === 'xai') {
-      log.info(`🔲 [BBOX-DETECT] Using Grok vision: ${modelId}`);
+      log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Grok vision: ${modelId}`);
       const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, prompt);
       data = await grokResponse.json();
       if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -1449,18 +1390,22 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 
         // Log full response structure for debugging empty responses
         const candidateCount = data.candidates?.length || 0;
-        const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.blockReason || null;
-        const safetyRatings = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}`).join(', ') || 'none';
-        log.warn(`⚠️  [BBOX-DETECT] Empty response details: candidates=${candidateCount}, finishReason=${finishReason || 'none'}, blockReason=${blockReason || 'none'}, safety=[${safetyRatings}], model=${modelId}`);
+        const promptBlockReason = data.promptFeedback?.blockReason || null;
+        const promptSafety = data.promptFeedback?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
+        const candBlockReason = data.candidates?.[0]?.blockReason || null;
+        const candSafety = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
+        const blockReason = promptBlockReason || candBlockReason;
+        log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Empty response: candidates=${candidateCount}, finishReason=${finishReason || 'none'}, blockReason=${blockReason || 'none'}, model=${modelId}`);
+        log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
         // PROHIBITED_CONTENT is a system-level block — retrying won't help, go straight to fallback
         if (blockReason === 'PROHIBITED_CONTENT') {
-          log.warn(`⚠️  [BBOX-DETECT] Image blocked by Gemini safety (PROHIBITED_CONTENT), skipping retry`);
+          log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Image blocked by Gemini safety (PROHIBITED_CONTENT), skipping retry`);
           break;
         }
 
         if (bboxAttempt < 2) {
-          log.warn(`⚠️  [BBOX-DETECT] Empty response (0 output tokens), retrying in 2s...`);
+          log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Empty response (0 output tokens), retrying in 2s...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
           // Gemini failed — try Grok vision as fallback
@@ -1992,34 +1937,22 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     }
     let description;
     if (desc.richDescription) {
-      // Full physical description — sanitize specific age terms to reduce safety triggers
-      // Keep gender (male/female) but replace "X years old" with just age category
+      // Strip all age/gender language to neutralize for content-safety filters.
+      // The prompt only needs hair/clothing/build to identify figures by visual.
       const sanitized = desc.richDescription
-        .replace(/\b(\d+)\s*years?\s*old\b/gi, (_, age) => parseInt(age) < 13 ? 'young' : parseInt(age) < 18 ? 'teenage' : 'adult')
-        .replace(/\b(boy)\b/gi, 'male figure')
-        .replace(/\b(girl)\b/gi, 'female figure')
-        .replace(/\b(little boy)\b/gi, 'young male figure')
-        .replace(/\b(little girl)\b/gi, 'young female figure');
+        .replace(/\b\d+\s*years?\s*old\b/gi, '')
+        .replace(/\b(little|young|small|tiny)\s+(boy|girl|child|kid|man|woman)\b/gi, 'figure')
+        .replace(/\b(boy|girl|child|kid|man|woman|teenager|teen|adult|elderly|toddler|infant|baby)\b/gi, 'figure')
+        .replace(/\bmale\s+figure\b/gi, 'figure')
+        .replace(/\bfemale\s+figure\b/gi, 'figure')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
       description = clothing ? `${sanitized}. Wearing: ${clothing}` : sanitized;
     } else {
-      // Minimal description from prompt parsing
-      const descParts = [];
-      if (desc.genderTerm) {
-        // Replace child-specific terms but keep gender info
-        const sanitizedGender = desc.genderTerm
-          .replace(/\bboy\b/gi, 'male figure')
-          .replace(/\bgirl\b/gi, 'female figure')
-          .replace(/\blittle boy\b/gi, 'young male figure')
-          .replace(/\blittle girl\b/gi, 'young female figure')
-          .replace(/\bman\b/gi, 'male figure')
-          .replace(/\bwoman\b/gi, 'female figure');
-        descParts.push(sanitizedGender);
-      }
-      if (desc.age) descParts.push(`age ${desc.age}`);
-      else if (desc.isChild === true) descParts.push('young');
-      else if (desc.isChild === false) descParts.push('adult character');
+      // Minimal description from prompt parsing — drop age/gender entirely
+      const descParts = ['figure'];
       if (clothing) descParts.push(clothing);
-      description = descParts.join(', ') || 'character';
+      description = descParts.join(', ');
     }
     chars.push({
       name,
@@ -2166,18 +2099,20 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '') {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
-  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
+  const pageLabel = pageContext ? `[${pageContext}] ` : '';
+  log.info(`📦 [BBOX-ENRICH] ${pageLabel}Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
 
   // Call bbox detection WITH character/object context - AI identifies directly by name
   const allDetections = await detectAllBoundingBoxes(imageData, {
     expectedCharacters,
     expectedObjects,
     sceneContext,
-    bboxModelOverride
+    bboxModelOverride,
+    pageContext
   });
 
   if (!allDetections) {
@@ -3963,7 +3898,10 @@ async function evaluateImageBatch(images, options = {}) {
           expectedCharacterPositions,
           allExpectedObjects,
           characterDescriptions,
-          expectedCharacterClothing
+          expectedCharacterClothing,
+          null,
+          null,
+          `PAGE ${img.pageNumber}`
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
@@ -7685,7 +7623,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const bboxSceneContext = buildBboxSceneContext(sceneMetadata, sceneCharacters, expectedCharacterClothing);
 
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext, null, pageContext);
     bboxDetectionHistory = enrichResult.detectionHistory;
     // Track bbox detection tokens (Gemini quality-category)
     if (bboxDetectionHistory?.usage && usageTracker) {

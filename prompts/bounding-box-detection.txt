@@ -13,19 +13,19 @@ COORDINATE SYSTEM:
 
 FOR EACH FIGURE (include ALL figures, even partially visible ones at edges):
 - If you can identify it as an expected character, set "name" to the character name (EXACTLY as listed above)
-- Use CLOTHING + POSITION to distinguish characters (two boys of similar age are distinguished by what they wear and where they stand)
+- Use CLOTHING + POSITION to distinguish figures (two figures with similar build are distinguished by what they wear and where they stand)
 - If not identifiable as any expected character, set "name" to "UNKNOWN"
 - Include "confidence": "high", "medium", or "low" for identification certainty
-- face_box: bounding box around the COMPLETE FACE including all hair.
-  Must include: top of hair/forehead to bottom of chin, and full width from ear to ear including any hair that extends outward.
+- face_box: bounding box around the head region.
+  Include the top of the head and the bottom of the head outline, and the full width from side to side.
   Common mistakes to AVOID:
-  * Do NOT cut off the top of the head or hair — include ALL hair above the forehead
-  * Do NOT cut off the chin — extend below the jawline
-  * Do NOT make the box too narrow — include ears and hair width
+  * Do NOT cut off the top of the head — include the full head outline
+  * Do NOT cut off the bottom of the head outline
+  * Do NOT make the box too narrow — include the full head width
   * When in doubt, make the face_box LARGER rather than smaller
-  * The face_box should be roughly square for a front-facing character
-- body_box: bounding box around the FULL BODY (or as much as visible)
-- If face is not visible (back view, non-human creature), set face_box to null
+  * The face_box should be roughly square for a front-facing figure
+- body_box: bounding box around the FULL FIGURE (or as much as visible)
+- If the head is not visible (back view, non-human creature), set face_box to null
 
 FOR EXPECTED OBJECTS:
 - Report "found": true/false for each expected object
@@ -36,7 +36,7 @@ Return ONLY valid JSON:
   "figures": [
     {
       "name": "CharacterName or UNKNOWN",
-      "label": "visual description (e.g., 'boy in blue hoodie')",
+      "label": "visual description (e.g., 'figure in blue hoodie')",
       "position": "left|center|right",
       "face_box": [y_min, x_min, y_max, x_max] or null,
       "body_box": [y_min, x_min, y_max, x_max],
@@ -55,14 +55,14 @@ Return ONLY valid JSON:
 }
 
 EXAMPLE - Scene with two figures and a dog:
-Given expected characters: "Lukas (young male figure, blonde hair)" and "Mia (young female figure, brown curly hair)"
+Given expected characters: "Lukas (figure with blonde hair)" and "Mia (figure with brown curly hair)"
 Given expected objects: "golden crown", "brown teddy bear"
 
 {
   "figures": [
     {
       "name": "Lukas",
-      "label": "male figure with blonde hair in blue hoodie",
+      "label": "figure with blonde hair in blue hoodie",
       "position": "left",
       "face_box": [80, 100, 250, 280],
       "body_box": [70, 50, 650, 300],
@@ -70,7 +70,7 @@ Given expected objects: "golden crown", "brown teddy bear"
     },
     {
       "name": "Mia",
-      "label": "female figure with curly brown hair in pink dress",
+      "label": "figure with curly brown hair in pink dress",
       "position": "right",
       "face_box": [100, 680, 280, 830],
       "body_box": [90, 600, 680, 900],
@@ -105,7 +105,7 @@ Given expected objects: "golden crown", "brown teddy bear"
 
 IMPORTANT:
 - Detect ALL visible figures, even if partially visible or UNKNOWN
-- Be precise with bounding boxes - they will be used for inpainting
-- Match characters by approximate AGE and BUILD first (young vs adult, short vs tall), then use CLOTHING and POSITION to distinguish similar characters
-- Two characters of similar age are distinguished by their outfits and scene position
+- Be precise with bounding boxes — they will be used for inpainting
+- Match figures by approximate BUILD first (short vs tall, slim vs broad), then use CLOTHING and POSITION to distinguish similar figures
+- Two figures with similar build are distinguished by their outfits and scene position
 - For creatures/animals/non-humans that are not expected characters, use "UNKNOWN"
