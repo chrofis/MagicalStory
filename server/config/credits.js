@@ -13,19 +13,20 @@ const CREDIT_CONFIG = {
   },
 
   // Credit purchase pricing — fixed packages only
+  // 10 credits per page. Volume discount from 33¢/page (starter) to 25¢/page (pro).
   PRICING: {
     PACKAGES: [
-      { credits: 300,  amountCHF: 5,  amountCents: 500 },
-      { credits: 700,  amountCHF: 10, amountCents: 1000 },
-      { credits: 1500, amountCHF: 20, amountCents: 2000 },
-      { credits: 4000, amountCHF: 50, amountCents: 5000 },
+      { credits: 150,  amountCHF: 5,  amountCents: 500  }, // 33.3¢/page — 15 pages (1 default story)
+      { credits: 350,  amountCHF: 10, amountCents: 1000 }, // 28.6¢/page — 35 pages
+      { credits: 750,  amountCHF: 20, amountCents: 2000 }, // 26.7¢/page — 75 pages
+      { credits: 2000, amountCHF: 50, amountCents: 5000 }, // 25.0¢/page — 200 pages
     ],
   },
 
   // Credit limits
   LIMITS: {
-    MAX_PURCHASE: 4000,       // Maximum credits to purchase (largest package)
-    INITIAL_USER: 500,        // Credits for new users (all paths: direct signup, trial conversion, Google)
+    MAX_PURCHASE: 2000,       // Maximum credits to purchase (largest package)
+    INITIAL_USER: 200,        // Credits for new users (all paths: direct signup, trial conversion, Google)
     INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
   },
 

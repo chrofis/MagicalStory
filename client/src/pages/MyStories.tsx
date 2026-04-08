@@ -8,6 +8,7 @@ import { useGenerationOptional } from '@/context/GenerationContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { MAX_BOOK_PAGES } from './Pricing';
+import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyStories');
@@ -762,9 +763,9 @@ export default function MyStories() {
               <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold text-amber-800 text-sm mb-1">
-                  {language === 'de' ? 'Setze ein Passwort und erhalte 300 Credits für weitere Geschichten!'
-                    : language === 'fr' ? 'Définissez un mot de passe et recevez 300 crédits pour plus d\'histoires !'
-                    : 'Set a password and get 300 credits for more stories!'}
+                  {language === 'de' ? `Setze ein Passwort und erhalte ${INITIAL_USER_CREDITS} Credits für weitere Geschichten!`
+                    : language === 'fr' ? `Définissez un mot de passe et recevez ${INITIAL_USER_CREDITS} crédits pour plus d'histoires !`
+                    : `Set a password and get ${INITIAL_USER_CREDITS} credits for more stories!`}
                 </p>
                 <p className="text-amber-700 text-xs mb-2">
                   {language === 'de' ? 'Sichere deinen Zugang und schalte alle Funktionen frei.'

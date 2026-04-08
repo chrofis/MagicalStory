@@ -3,13 +3,7 @@ import { CreditCard, Loader2, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
 import { storyService } from '@/services';
-
-const CREDIT_PACKAGES = [
-  { credits: 300,  priceCHF: 5,  label: 'Starter' },
-  { credits: 700,  priceCHF: 10, label: 'Popular' },
-  { credits: 1500, priceCHF: 20, label: 'Best Value' },
-  { credits: 4000, priceCHF: 50, label: 'Pro' },
-] as const;
+import { CREDIT_PACKAGES } from '@/constants/credits';
 
 interface CreditsModalProps {
   isOpen: boolean;

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus, Baby, Book, BookText } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { CREDITS_PER_PAGE } from '@/constants/credits';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
 // Language family type
@@ -191,7 +192,7 @@ export function WizardStep3BookSettings({
   const minPages = developerMode ? 4 : 10;
   const absoluteMaxPages = 25;
   const pageStep = 1;
-  const creditsPerPage = 10;
+  const creditsPerPage = CREDITS_PER_PAGE;
 
   // Calculate max pages based on user credits (-1 = unlimited)
   const hasUnlimitedCredits = userCredits === -1;
@@ -248,7 +249,7 @@ export function WizardStep3BookSettings({
   // (image + text combined on the same page in picture-book layout).
   const getPageLabel = (pageCount: number, isTest = false) => {
     const testSuffix = isTest ? ' (Test)' : '';
-    const creditsCost = pageCount * 10;
+    const creditsCost = pageCount * CREDITS_PER_PAGE;
     const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits';
     const pagesLabel = language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages';
     return `${pageCount} ${pagesLabel} = ${creditsCost} ${creditsLabel}${testSuffix}`;

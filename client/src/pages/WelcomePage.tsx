@@ -3,6 +3,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
 import { Camera, Sparkles, BookOpen, ArrowRight, Gift, Coins } from 'lucide-react';
+import {
+  INITIAL_USER_CREDITS,
+  CREDITS_PER_PAGE,
+  EXAMPLE_STORY_PAGES,
+  EXAMPLE_STORY_CREDITS,
+} from '@/constants/credits';
 
 const translations = {
   en: {
@@ -19,9 +25,9 @@ const translations = {
     step3Desc: 'Download as PDF instantly or order a printed book.',
 
     creditsTitle: 'Your Starting Credits',
-    creditsAmount: '500',
+    creditsAmount: String(INITIAL_USER_CREDITS),
     creditsLabel: 'free credits',
-    creditsExplain: 'Each story page costs 10 credits. A 20-page story = 200 credits.',
+    creditsExplain: `Each story page costs ${CREDITS_PER_PAGE} credits. A ${EXAMPLE_STORY_PAGES}-page story = ${EXAMPLE_STORY_CREDITS} credits.`,
     creditsBonus: 'Order a printed book and get your credits back!',
 
     cta: 'Create Your First Story',
@@ -42,9 +48,9 @@ const translations = {
     step3Desc: 'Sofort als PDF herunterladen oder ein gedrucktes Buch bestellen.',
 
     creditsTitle: 'Deine Startguthaben',
-    creditsAmount: '500',
+    creditsAmount: String(INITIAL_USER_CREDITS),
     creditsLabel: 'Gratis-Credits',
-    creditsExplain: 'Jede Seite kostet 10 Credits. Eine 20-seitige Geschichte = 200 Credits.',
+    creditsExplain: `Jede Seite kostet ${CREDITS_PER_PAGE} Credits. Eine ${EXAMPLE_STORY_PAGES}-seitige Geschichte = ${EXAMPLE_STORY_CREDITS} Credits.`,
     creditsBonus: 'Bestelle ein gedrucktes Buch und erhalte deine Credits zurück!',
 
     cta: 'Erstelle deine erste Geschichte',
@@ -65,9 +71,9 @@ const translations = {
     step3Desc: 'Téléchargez en PDF instantanément ou commandez un livre imprimé.',
 
     creditsTitle: 'Vos crédits de départ',
-    creditsAmount: '500',
+    creditsAmount: String(INITIAL_USER_CREDITS),
     creditsLabel: 'crédits gratuits',
-    creditsExplain: 'Chaque page coûte 10 crédits. Une histoire de 20 pages = 200 crédits.',
+    creditsExplain: `Chaque page coûte ${CREDITS_PER_PAGE} crédits. Une histoire de ${EXAMPLE_STORY_PAGES} pages = ${EXAMPLE_STORY_CREDITS} crédits.`,
     creditsBonus: 'Commandez un livre imprimé et récupérez vos crédits!',
 
     cta: 'Créer votre première histoire',

@@ -524,7 +524,7 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     if (isTrial) {
       // Convert trial → full account with welcome credits
       const { CREDIT_CONFIG } = require('../config/credits');
-      const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 300
+      const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
       await pool.query(
         `UPDATE users SET password = $1, has_set_password = true, is_trial = FALSE, credits = $2 WHERE id = $3`,
         [hashedPassword, fullCredits, userId]

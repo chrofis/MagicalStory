@@ -1153,7 +1153,7 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
 
     // Upgrade trial to full account: link Google, give credits, mark verified
     const { CREDIT_CONFIG } = require('../config/credits');
-    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 300
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
     await pool.query(
       `UPDATE users SET
          email = $1,
@@ -2219,7 +2219,7 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
 
     // Convert trial account to full account with standard credits (500)
     const { CREDIT_CONFIG } = require('../config/credits');
-    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 300
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
     await pool.query(
       `UPDATE users SET
          password = $1,
@@ -2330,7 +2330,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
 
     // Link Google account and convert trial to full account with standard credits (500)
     const { CREDIT_CONFIG } = require('../config/credits');
-    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 300
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
     await pool.query(
       `UPDATE users SET
          firebase_uid = $1,

@@ -5,6 +5,7 @@ import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken, handleRedirectResult } from '@/services/firebase';
 import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
+import { INITIAL_USER_CREDITS } from '@/constants/credits';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -62,7 +63,7 @@ const translations = {
     failedDesc: 'Story generation failed. Please try again.',
     tryAgain: 'Try Again',
     accountReady: 'Account ready!',
-    creditsReceived: 'You received 300 free credits!',
+    creditsReceived: `You received ${INITIAL_USER_CREDITS} free credits!`,
     waitingForStory: 'Your story is almost done. You\'ll be redirected automatically.',
     verifiedWaiting: 'Email verified! Your story is still being created...',
     upsellTitle: 'This is a trial story. With a free account you can create full stories:',
@@ -102,7 +103,7 @@ const translations = {
     failedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
     tryAgain: 'Erneut versuchen',
     accountReady: 'Konto bereit!',
-    creditsReceived: 'Du hast 300 Gratis-Credits erhalten!',
+    creditsReceived: `Du hast ${INITIAL_USER_CREDITS} Gratis-Credits erhalten!`,
     waitingForStory: 'Deine Geschichte ist fast fertig. Du wirst automatisch weitergeleitet.',
     verifiedWaiting: 'E-Mail bestätigt! Deine Geschichte wird noch erstellt...',
     upsellTitle: 'Das ist eine Probegeschichte. Mit einem kostenlosen Konto kannst du vollständige Geschichten erstellen:',
@@ -142,7 +143,7 @@ const translations = {
     failedDesc: 'La création de l\'histoire a échoué. Veuillez réessayer.',
     tryAgain: 'Réessayer',
     accountReady: 'Compte prêt !',
-    creditsReceived: 'Vous avez reçu 300 crédits gratuits !',
+    creditsReceived: `Vous avez reçu ${INITIAL_USER_CREDITS} crédits gratuits !`,
     waitingForStory: 'Votre histoire est presque terminée. Vous serez redirigé automatiquement.',
     verifiedWaiting: 'E-mail vérifié ! Votre histoire est encore en cours de création...',
     upsellTitle: 'Ceci est une histoire d\'essai. Avec un compte gratuit, vous pouvez créer des histoires complètes :',

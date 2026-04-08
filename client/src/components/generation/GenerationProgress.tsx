@@ -5,6 +5,11 @@ import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
+import {
+  CREDITS_PER_PAGE,
+  EXAMPLE_STORY_PAGES,
+  EXAMPLE_STORY_CREDITS,
+} from '@/constants/credits';
 
 // Checkpoint → display % mapping (shared with Navigation bar)
 // Server sends checkpoint numbers: 1=start, 2=arcs, 3=title, 4=clothing, 5=plot,
@@ -446,7 +451,7 @@ export function GenerationProgress({
       tipSharing: 'Stories are private by default. Enable sharing to let grandparents and friends read along.',
       tipHistoric: 'Explore history! Your child can experience the moon landing, meet dinosaurs, or discover local Swiss legends.',
       tipLearning: 'Personalized stories inspire children to read — much better than screen time arguments!',
-      tipCredits: 'Each page costs 10 credits. A 20-page story uses 200 credits — you can create stories up to 25 pages, each with its own illustration!',
+      tipCredits: `Each page costs ${CREDITS_PER_PAGE} credits. A ${EXAMPLE_STORY_PAGES}-page story uses ${EXAMPLE_STORY_CREDITS} credits — you can create stories up to 25 pages, each with its own illustration!`,
       coversPreview: 'Cover Preview',
       frontCover: 'Front',
       initialPage: 'Inside',
@@ -471,7 +476,7 @@ export function GenerationProgress({
       tipSharing: 'Geschichten sind standardmässig privat. Aktiviere das Teilen, damit Grosseltern und Freunde mitlesen können.',
       tipHistoric: 'Entdecke Geschichte! Dein Kind kann die Mondlandung erleben, Dinosaurier treffen oder lokale Schweizer Sagen entdecken.',
       tipLearning: 'Personalisierte Geschichten motivieren Kinder zum Lesen — viel besser als Diskussionen über Bildschirmzeit!',
-      tipCredits: 'Jede Seite kostet 10 Credits. Eine 20-Seiten-Geschichte braucht 200 Credits — du kannst Geschichten bis zu 25 Seiten erstellen, jede mit eigener Illustration!',
+      tipCredits: `Jede Seite kostet ${CREDITS_PER_PAGE} Credits. Eine ${EXAMPLE_STORY_PAGES}-Seiten-Geschichte braucht ${EXAMPLE_STORY_CREDITS} Credits — du kannst Geschichten bis zu 25 Seiten erstellen, jede mit eigener Illustration!`,
       coversPreview: 'Cover-Vorschau',
       frontCover: 'Vorne',
       initialPage: 'Innen',
@@ -496,7 +501,7 @@ export function GenerationProgress({
       tipSharing: 'Les histoires sont privées par défaut. Activez le partage pour que les grands-parents et amis puissent lire.',
       tipHistoric: 'Explorez l\'histoire ! Votre enfant peut vivre l\'alunissage, rencontrer des dinosaures ou découvrir des légendes locales.',
       tipLearning: 'Les histoires personnalisées inspirent les enfants à lire — bien mieux que les disputes sur le temps d\'écran !',
-      tipCredits: 'Chaque page coûte 10 crédits. Une histoire de 20 pages utilise 200 crédits — vous pouvez créer des histoires jusqu\'à 25 pages, chacune avec sa propre illustration !',
+      tipCredits: `Chaque page coûte ${CREDITS_PER_PAGE} crédits. Une histoire de ${EXAMPLE_STORY_PAGES} pages utilise ${EXAMPLE_STORY_CREDITS} crédits — vous pouvez créer des histoires jusqu'à 25 pages, chacune avec sa propre illustration !`,
       coversPreview: 'Aperçu des couvertures',
       frontCover: 'Avant',
       initialPage: 'Intérieur',
