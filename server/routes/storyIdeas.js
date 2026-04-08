@@ -651,17 +651,24 @@ ${landmarkEntries}`;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
 
-    // Helper function to parse [FINAL] from streaming text
+    // Helper function to parse [FINAL] from streaming text.
+    //
+    // IMPORTANT: Uses the LAST [FINAL] marker, not the first. The LLM
+    // sometimes writes "[FINAL]" inside the [REVIEW] section (e.g. mentioning
+    // "the [FINAL] instructions" while explaining its own process), which
+    // used to make the parser grab from the first mention all the way to EOF
+    // — pulling in the tail of the review, a literal second [FINAL] header,
+    // and then the actual story. Taking the last marker gives us the real
+    // final section since the prompt structure is [DRAFT] → [REVIEW] → [FINAL].
     const parseFinal = (text) => {
-      const match = text.match(/\[FINAL\]\s*([\s\S]*?)$/i);
-      if (match) {
-        let result = match[1].trim();
-        // Strip Claude extended thinking artifacts that may leak into output
-        result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
-        result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
-        return result;
-      }
-      return null; // Return null if [FINAL] not yet reached
+      const matches = [...text.matchAll(/\[FINAL\]\s*/gi)];
+      if (matches.length === 0) return null;
+      const lastMatch = matches[matches.length - 1];
+      let result = text.slice(lastMatch.index + lastMatch[0].length).trim();
+      // Strip Claude extended thinking artifacts that may leak into output
+      result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
+      result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
+      return result;
     };
 
     // Build prompts for both stories using shared context
