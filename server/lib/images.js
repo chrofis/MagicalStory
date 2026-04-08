@@ -2527,18 +2527,21 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         storyText,
         sceneHint
       );
+      if (!qualityResult) {
+        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware) — returning image with score=null so pipeline can re-evaluate next round`);
+      }
 
       const finalResult = {
         imageData: result.imageData,
         modelId: result.modelId,
-        score: qualityResult.score,
-        reasoning: qualityResult.reasoning,
-        detectedProblems: qualityResult.detectedProblems || [],
-        figures: qualityResult.figures || [],
-        matches: qualityResult.matches || [],
-        objectMatches: qualityResult.object_matches || [],
-        fixTargets: qualityResult.fixTargets || [],
-        fixableIssues: qualityResult.fixableIssues || [],
+        score: qualityResult?.score ?? null,
+        reasoning: qualityResult?.reasoning ?? null,
+        detectedProblems: qualityResult?.detectedProblems || [],
+        figures: qualityResult?.figures || [],
+        matches: qualityResult?.matches || [],
+        objectMatches: qualityResult?.object_matches || [],
+        fixTargets: qualityResult?.fixTargets || [],
+        fixableIssues: qualityResult?.fixableIssues || [],
         semanticResult: qualityResult?.semanticResult || null,
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
@@ -2616,18 +2619,21 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         storyText,
         sceneHint
       );
+      if (!qualityResult) {
+        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok backend) — returning image with score=null so pipeline can re-evaluate next round`);
+      }
 
       const finalResult = {
         imageData: result.imageData,
         modelId: result.modelId,
-        score: qualityResult.score,
-        reasoning: qualityResult.reasoning,
-        detectedProblems: qualityResult.detectedProblems || [],
-        figures: qualityResult.figures || [],
-        matches: qualityResult.matches || [],
-        objectMatches: qualityResult.object_matches || [],
-        fixTargets: qualityResult.fixTargets || [],
-        fixableIssues: qualityResult.fixableIssues || [],
+        score: qualityResult?.score ?? null,
+        reasoning: qualityResult?.reasoning ?? null,
+        detectedProblems: qualityResult?.detectedProblems || [],
+        figures: qualityResult?.figures || [],
+        matches: qualityResult?.matches || [],
+        objectMatches: qualityResult?.object_matches || [],
+        fixTargets: qualityResult?.fixTargets || [],
+        fixableIssues: qualityResult?.fixableIssues || [],
         semanticResult: qualityResult?.semanticResult || null,
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
@@ -2885,22 +2891,25 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         storyText,
         sceneHint
       );
+      if (!qualityResult) {
+        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
+      }
 
       return {
         imageData: result.imageData,
         modelId: result.modelId,
-        score: qualityResult.score,
-        numericScore: qualityResult.numericScore,
-        reasoning: qualityResult.reasoning,
-        verdict: qualityResult.verdict,
-        fixTargets: qualityResult.fixTargets,
-        fixableIssues: qualityResult.fixableIssues || [],
+        score: qualityResult?.score ?? null,
+        numericScore: qualityResult?.numericScore ?? null,
+        reasoning: qualityResult?.reasoning ?? null,
+        verdict: qualityResult?.verdict ?? null,
+        fixTargets: qualityResult?.fixTargets ?? [],
+        fixableIssues: qualityResult?.fixableIssues || [],
         semanticResult: qualityResult?.semanticResult || null,
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
-        qualityModelId: qualityResult.qualityModelId,
+        qualityModelId: qualityResult?.qualityModelId ?? null,
         imageUsage: result.usage,
-        qualityUsage: qualityResult.usage
+        qualityUsage: qualityResult?.usage ?? null
       };
     } catch (runwareError) {
       log.error('❌ [IMAGE GEN] Runware generation failed:', runwareError.message);
@@ -2954,22 +2963,25 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         result.imageData, prompt, characterPhotos, evaluationType,
         qualityModelOverride, pageContext, storyText, sceneHint
       );
+      if (!qualityResult) {
+        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
+      }
 
       return {
         imageData: result.imageData,
         modelId: result.modelId,
-        score: qualityResult.score,
-        numericScore: qualityResult.numericScore,
-        reasoning: qualityResult.reasoning,
-        verdict: qualityResult.verdict,
-        fixTargets: qualityResult.fixTargets,
-        fixableIssues: qualityResult.fixableIssues || [],
+        score: qualityResult?.score ?? null,
+        numericScore: qualityResult?.numericScore ?? null,
+        reasoning: qualityResult?.reasoning ?? null,
+        verdict: qualityResult?.verdict ?? null,
+        fixTargets: qualityResult?.fixTargets ?? [],
+        fixableIssues: qualityResult?.fixableIssues || [],
         semanticResult: qualityResult?.semanticResult || null,
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
-        qualityModelId: qualityResult.qualityModelId,
+        qualityModelId: qualityResult?.qualityModelId ?? null,
         imageUsage: result.usage,
-        qualityUsage: qualityResult.usage
+        qualityUsage: qualityResult?.usage ?? null
       };
     } catch (grokError) {
       log.error('❌ [IMAGE GEN] Grok generation failed:', grokError.message);

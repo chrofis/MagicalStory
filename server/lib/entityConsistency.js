@@ -652,9 +652,17 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         const pageChars = getCharactersInScene(sceneDesc.description, storyCharacters);
         pageCharNames = pageChars.map(c => c.name);
       } else if (pageNumber < 0) {
-        // Covers: no scene description — expect all story characters
-        pageCharNames = storyCharacters.map(c => c.name);
-        log.debug(`[ENTITY-COLLECT] Page ${pageNumber} (cover): Using all ${pageCharNames.length} characters for fallback detection`);
+        // Covers: prefer per-cover character list from characterClothing (set from cover hint).
+        // Sending all 10 story characters to bbox detection produces 0 identifications because
+        // the prompt becomes too noisy. Fall back to all only if cover hint is missing.
+        const coverChars = Object.keys(characterClothing || {});
+        if (coverChars.length > 0) {
+          pageCharNames = coverChars;
+          log.debug(`[ENTITY-COLLECT] Page ${pageNumber} (cover): Using ${pageCharNames.length} characters from cover hint: ${pageCharNames.join(', ')}`);
+        } else {
+          pageCharNames = storyCharacters.map(c => c.name);
+          log.debug(`[ENTITY-COLLECT] Page ${pageNumber} (cover): No cover hint, falling back to all ${pageCharNames.length} story characters`);
+        }
       }
 
       if (pageCharNames.length > 0) {
