@@ -151,17 +151,11 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       return Buffer.from(base64, 'base64');
     });
     const stitched = await stitchImagesHorizontally(buffers, 768);
-    const squareSize = 768;
-    const meta = await sharp(stitched).metadata();
-    let finalBuf = stitched;
-    if (meta.width !== meta.height) {
-      const size = Math.max(meta.width, meta.height, squareSize);
-      finalBuf = await sharp(stitched)
-        .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
-        .jpeg({ quality: 90 })
-        .toBuffer();
-    }
-    images = [`data:image/jpeg;base64,${finalBuf.toString('base64')}`];
+    // Stitched composite is a wide rectangle — normalize it into an ASCII-clean
+    // JPEG and let the aspect-pad loop below snap it to the requested aspect
+    // ratio. Previously this was hardcoded to square, which silently broke
+    // non-1:1 outputs (e.g. covers).
+    images = [`data:image/jpeg;base64,${stitched.toString('base64')}`];
   }
 
   // Grok edit output matches the input image aspect ratio (ignores aspect_ratio
@@ -244,8 +238,42 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     }
 
     const imageBase64 = data.data[0].b64_json;
-    const imageData = `data:image/jpeg;base64,${imageBase64}`;
+    let imageData = `data:image/jpeg;base64,${imageBase64}`;
     const cost = model === GROK_MODELS.PRO ? 0.07 : 0.02;
+
+    // Verify output aspect ratio. Grok edit output is *supposed* to follow the
+    // aspect_ratio param, but empirically it sometimes returns a different
+    // aspect (usually its preferred 1024x1024). Detect drift and letterbox/pad
+    // back to the requested aspect so the caller gets what it asked for.
+    try {
+      const outBuf = Buffer.from(imageBase64, 'base64');
+      const outMeta = await sharp(outBuf).metadata();
+      if (outMeta.width && outMeta.height) {
+        const outRatio = outMeta.width / outMeta.height;
+        const drift = Math.abs(outRatio - targetRatio) / targetRatio;
+        if (drift >= 0.01) {
+          log.warn(`⚠️ [GROK] Output aspect drift: ${outMeta.width}x${outMeta.height} (ratio ${outRatio.toFixed(3)}) vs requested ${aspectRatio} (ratio ${targetRatio.toFixed(3)}) — letterbox padding to correct`);
+          let targetW, targetH;
+          if (outRatio > targetRatio) {
+            targetW = outMeta.width;
+            targetH = Math.round(outMeta.width / targetRatio);
+          } else {
+            targetH = outMeta.height;
+            targetW = Math.round(outMeta.height * targetRatio);
+          }
+          const padded = await sharp(outBuf)
+            .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          imageData = `data:image/jpeg;base64,${padded.toString('base64')}`;
+          log.info(`🎨 [GROK] Output corrected: ${outMeta.width}x${outMeta.height} → ${targetW}x${targetH}`);
+        } else {
+          log.debug(`🎨 [GROK] Output ${outMeta.width}x${outMeta.height} matches target ${aspectRatio}`);
+        }
+      }
+    } catch (verifyErr) {
+      log.warn(`⚠️ [GROK] Could not verify output dimensions: ${verifyErr.message}`);
+    }
 
     log.info(`✅ [GROK] Edit complete in ${elapsed}ms. Cost: $${cost}. Refs: ${images.length}`);
 
@@ -517,32 +545,85 @@ async function packReferences(refs = {}, options = {}) {
     }
   }
 
-  // Grok edit with single image: output matches input aspect ratio (ignores aspect_ratio param).
-  // Pad all reference images to square so output is always 1:1.
-  const squareSlots = [];
-  for (const slot of slots) {
+  // Grok edit output matches the input image aspect ratio (it mostly ignores the
+  // aspect_ratio API param for edits). Pad every slot to the requested aspect so
+  // the output matches. Never leave a non-matching slot in place — doing so would
+  // let the output inherit the wrong shape (e.g. square pages rendering as 3:4).
+  const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const TOLERANCE = 0.01; // within 1% of target → no-op
+  const FALLBACK_SIZE = 1024;
+
+  const paddedSlots = [];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const base64 = slot.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+
+    let meta;
     try {
-      const base64 = slot.replace(/^data:image\/\w+;base64,/, '');
-      const buf = Buffer.from(base64, 'base64');
-      const meta = await sharp(buf).metadata();
-      if (meta.width !== meta.height) {
-        const size = Math.max(meta.width, meta.height);
+      meta = await sharp(buf).metadata();
+    } catch (metaErr) {
+      log.warn(`⚠️ [GROK] Slot ${i + 1}: metadata read failed (${metaErr.message}) — forcing ${FALLBACK_SIZE}x${FALLBACK_SIZE} fallback`);
+      meta = null;
+    }
+
+    const w = meta?.width || 0;
+    const h = meta?.height || 0;
+
+    // Metadata invalid → force the slot into a fallback square and continue
+    if (!w || !h) {
+      try {
+        const fallbackRatio = targetRatio;
+        const fw = Math.round(FALLBACK_SIZE * (fallbackRatio >= 1 ? 1 : fallbackRatio));
+        const fh = Math.round(FALLBACK_SIZE / (fallbackRatio >= 1 ? fallbackRatio : 1));
         const padded = await sharp(buf)
-          .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+          .resize(fw, fh, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
           .jpeg({ quality: 90 })
           .toBuffer();
-        squareSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-        log.debug(`🎨 [GROK] Padded ref ${meta.width}x${meta.height} → ${size}x${size}`);
-      } else {
-        squareSlots.push(slot);
+        paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
+        log.debug(`🎨 [GROK] Slot ${i + 1}: fallback padded to ${fw}x${fh}`);
+      } catch (fallbackErr) {
+        log.error(`❌ [GROK] Slot ${i + 1}: fallback padding failed (${fallbackErr.message}) — dropping slot`);
       }
-    } catch {
-      squareSlots.push(slot);
+      continue;
+    }
+
+    const currentRatio = w / h;
+
+    // Already within tolerance → no-op (log the confirmed shape so we can verify)
+    if (Math.abs(currentRatio - targetRatio) / targetRatio < TOLERANCE) {
+      paddedSlots.push(slot);
+      log.debug(`🎨 [GROK] Slot ${i + 1}: ${w}x${h} already matches target ${aspectRatio}`);
+      continue;
+    }
+
+    // Compute the smallest box that contains the source and matches target aspect
+    let targetW, targetH;
+    if (currentRatio > targetRatio) {
+      // Source is wider than target → keep width, grow height with letterbox bars
+      targetW = w;
+      targetH = Math.round(w / targetRatio);
+    } else {
+      // Source is taller than target → keep height, grow width with letterbox bars
+      targetH = h;
+      targetW = Math.round(h * targetRatio);
+    }
+
+    try {
+      const padded = await sharp(buf)
+        .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
+      log.debug(`🎨 [GROK] Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
+    } catch (padErr) {
+      log.warn(`⚠️ [GROK] Slot ${i + 1}: pad failed (${padErr.message}) — dropping slot`);
     }
   }
 
-  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
-  return squareSlots;
+  log.info(`🎨 [GROK] Packed ${paddedSlots.length}/3 reference slots at ${aspectRatio} (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
+  return paddedSlots;
 }
 
 /**

@@ -3501,9 +3501,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
-      });
+      const refImages = await packReferences(
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+        { aspectRatio }
+      );
 
       let result;
       if (refImages.length > 0) {
