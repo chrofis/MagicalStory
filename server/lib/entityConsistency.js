@@ -28,21 +28,10 @@ const BODY_CROP_SIZE = 512;   // Size for body crops
 const MIN_APPEARANCES = 1;    // Minimum appearances to check consistency (1 = compare even single appearances against reference avatar)
 const MAX_GRID_CELLS = 9;     // Maximum cells per grid (3x3)
 
-/**
- * Normalize a clothing category string to a canonical form.
- * Strips bracket notation like [CLO001] and validates against known categories.
- * Valid categories: standard, winter, summer, costumed:<type>
- */
-function normalizeClothingCategory(category) {
-  if (!category) return 'standard';
-  const raw = category.replace(/\s*\[[A-Z]+\d+\]\s*/g, '').trim().toLowerCase();
-  if (!raw) return 'standard';
-  // One costume per story — no need for sub-type
-  if (raw.includes('costumed')) return 'costumed';
-  if (raw.includes('winter')) return 'winter';
-  if (raw.includes('summer')) return 'summer';
-  return 'standard';
-}
+// Canonical clothing category normalizer — single source of truth lives in
+// clothingCategories.js. Re-exported here for backwards compat with existing
+// callers in this module.
+const { normalizeClothingCategory } = require('./clothingCategories');
 
 /**
  * Group appearances by clothing category

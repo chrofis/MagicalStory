@@ -19,6 +19,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription } = require('./storyHelpers');
 const { generateStyledCostumedAvatar, evaluateAvatarFaceMatch } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
+const { normalizeClothingCategory } = require('./clothingCategories');
 
 // Quality gate constants for styled avatar evaluation
 const MAX_STYLED_AVATAR_RETRIES = 2;
@@ -212,7 +213,12 @@ function buildPhysicalTraitsString(character) {
  * @returns {string}
  */
 function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
-  return `${getCacheScope()}${characterName.trim().toLowerCase()}_${clothingCategory.trim().toLowerCase()}_${artStyle}`;
+  // Collapse clothing category to one of 4 canonical buckets BEFORE building
+  // the key. This guarantees write and read produce identical keys regardless
+  // of AI variability (case, language, costume subtype). See clothingCategories.js.
+  const canonical = normalizeClothingCategory(clothingCategory);
+  const name = String(characterName || '').trim().toLowerCase();
+  return `${getCacheScope()}${name}_${canonical}_${artStyle}`;
 }
 
 /**
@@ -884,23 +890,22 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
  */
 function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
-  let styledAvatar = styledAvatarCache.get(cacheKey);
-  if (!styledAvatar && (clothingCategory.startsWith('costumed:') || clothingCategory === 'costumed')) {
-    // Prefix match: find any costumed avatar for this character+style (within current scope)
-    const prefix = `${getCacheScope()}${characterName.trim().toLowerCase()}_costumed:`;
-    const suffix = `_${artStyle}`;
-    for (const [key, value] of styledAvatarCache.entries()) {
-      if (key.startsWith(prefix) && key.endsWith(suffix)) {
-        log.debug(`🔄 [STYLED AVATARS] Fuzzy match: wanted "${cacheKey}", found "${key}"`);
-        styledAvatar = value;
-        break;
-      }
-    }
+  const styledAvatar = styledAvatarCache.get(cacheKey);
+
+  // Safety: if we have no cache scope set, log a WARN — means a code path escaped
+  // runInCacheScope(). The write would have had a scope, the read wouldn't,
+  // prefixes would differ, and we'd get a spurious miss.
+  if (getCacheScope() === '') {
+    log.warn(`⚠️ [STYLED-AVATAR] No cache scope set for lookup "${cacheKey}" — code path escaped runInCacheScope()`);
   }
+
   if (!styledAvatar) {
-    log.info(`🔄 [FALLBACK] Styled avatar cache miss: ${cacheKey}`);
+    // Canonical keys on both sides mean any miss is a genuine cache-miss bug,
+    // NOT a naming variant. Log as ERROR so it surfaces loudly.
+    log.error(`❌ [STYLED-AVATAR] CACHE MISS — quality will degrade: ${cacheKey} (canonical: ${normalizeClothingCategory(clothingCategory)})`);
+    return null;
   }
-  return styledAvatar || null;
+  return styledAvatar;
 }
 
 /**
@@ -1090,7 +1095,10 @@ function applyStyledAvatars(characterPhotos, artStyle) {
     log.debug(`🎨 [STYLED AVATARS] Applied ${appliedCount}/${characterPhotos.length} styled avatars for ${artStyle}`);
   }
   if (missed.length > 0) {
-    log.warn(`🔄 [FALLBACK] Cache miss for ${artStyle}: ${missed.join(', ')} - using fallback avatars`);
+    // Cache miss means quality degradation — one or more characters will render
+    // from the raw face photo instead of the styled avatar. Log as ERROR so it
+    // surfaces in monitoring.
+    log.error(`❌ [STYLED-AVATAR] CACHE MISS batch for ${artStyle}: ${missed.join(', ')} — ${missed.length} character(s) falling back to raw photo`);
   }
 
   return result;
