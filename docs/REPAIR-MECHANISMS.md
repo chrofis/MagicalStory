@@ -139,8 +139,6 @@ executeRepairPlan() → Batch repair multiple pages
 | Physics violation | `rendering.physics_ok=false` | Regenerate |
 | Cross-eyes | `rendering.cross_eyes=true` | Regenerate |
 | Wrong pointing direction | `spatial.issues.length>0` | Regenerate |
-| Age mismatch | `match.age_match=false` | Targeted replace or regen |
-| Height order wrong | `match.height_order_ok=false` | Targeted replace or regen |
 | Hair mismatch | `match.hair_match=false` | Targeted replace or regen |
 | Clothing wrong | `match.clothing_match=false` | Grid inpaint |
 | Fixable clothing | `fixable_issues[].type=clothing` | Grid inpaint |
