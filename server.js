@@ -126,6 +126,7 @@ const {
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
+const { reconcileCoverClothingWithRequirements } = require('./server/lib/clothingCategories');
 const {
   getCostumedAvatarGenerationLog,
   clearCostumedAvatarGenerationLog
@@ -3260,7 +3261,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
     const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
     const coverHints = parser.extractCoverHints();
-    // Debug: log cover hints character clothing
+
+    // Reconcile cover hint clothing against the story's clothingRequirements.
+    // Claude can write a cover hint that asks for a clothing category that the
+    // character did NOT mark used (e.g. back cover wants Sophie:standard but
+    // Sophie's only used category is costumed:zauberlehrling). Generating a
+    // never-otherwise-needed avatar would be wasted work AND a silent fallback
+    // to the raw face photo would degrade quality. Override the cover hint to
+    // use what the character actually has — mutates coverHints in place.
+    const reconcileResult = reconcileCoverClothingWithRequirements(coverHints, clothingRequirements, log);
+    if (reconcileResult.overrides.length > 0) {
+      log.warn(`⚠️ [UNIFIED] Cover clothing reconciliation: ${reconcileResult.overrides.length} override(s) applied`);
+    }
+
+    // Debug: log cover hints character clothing (post-reconciliation)
     if (coverHints) {
       for (const [coverType, hint] of Object.entries(coverHints)) {
         if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {

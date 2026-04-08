@@ -73,7 +73,106 @@ function normalizeClothingCategory(category) {
   return 'standard';
 }
 
+/**
+ * Get the list of clothing categories a character has marked `used: true` in
+ * their clothingRequirements entry. Includes the costume name when present
+ * (e.g. "costumed:pirate"). Case-insensitive character name lookup.
+ *
+ * @param {Object|null} clothingRequirements - The full clothingRequirements object from outline
+ * @param {string} characterName - Character to look up
+ * @returns {string[]} List of used categories (raw, not canonicalized — first one wins for substitution)
+ */
+function getUsedClothingCategories(clothingRequirements, characterName) {
+  if (!clothingRequirements || !characterName) return [];
+  // Case-insensitive lookup — Claude is inconsistent about character name casing
+  const charNameLower = String(characterName).trim().toLowerCase();
+  const charReqs = Object.entries(clothingRequirements).find(
+    ([name]) => name.trim().toLowerCase() === charNameLower
+  )?.[1];
+  if (!charReqs || typeof charReqs !== 'object') return [];
+
+  const used = [];
+  for (const [category, config] of Object.entries(charReqs)) {
+    if (!config || !config.used) continue;
+    if (category === 'costumed' && config.costume) {
+      used.push(`costumed:${String(config.costume).toLowerCase()}`);
+    } else {
+      used.push(category);
+    }
+  }
+  return used;
+}
+
+/**
+ * Reconcile cover hint character clothing against the story's clothingRequirements.
+ *
+ * Claude generates `clothingRequirements` (per-character used categories) and
+ * `coverHints` (per-cover character clothing) independently, and the two can
+ * disagree — e.g. Claude marks Sophie's clothingRequirements as
+ * `{ costumed: { used: true, costume: 'zauberlehrling' } }` but writes the
+ * back cover hint as `{ Sophie: 'standard' }`. That contradiction would force
+ * us to either generate a never-otherwise-needed `standard` styled avatar for
+ * Sophie (wasted work) or fall back to a raw face photo at render time
+ * (ugly result).
+ *
+ * Resolution: when a cover hint requests a clothing category that the
+ * character did NOT mark used, override it with the FIRST category they DID
+ * mark used. This guarantees every cover-time avatar lookup hits a category
+ * that was already pre-generated.
+ *
+ * Mutates `coverHints` in place.
+ *
+ * @param {Object|null} coverHints - { titlePage: { characterClothing }, initialPage: ..., backCover: ... }
+ * @param {Object|null} clothingRequirements - From extractClothingRequirements()
+ * @param {Object} [logger] - Optional logger for warning messages
+ * @returns {{ overrides: Array<{cover, character, requested, replacedWith}> }}
+ */
+function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements, logger = null) {
+  const overrides = [];
+  if (!coverHints || !clothingRequirements) return { overrides };
+
+  for (const [coverType, hint] of Object.entries(coverHints)) {
+    if (!hint || !hint.characterClothing || typeof hint.characterClothing !== 'object') continue;
+
+    for (const [charName, requestedClothing] of Object.entries(hint.characterClothing)) {
+      const usedCategories = getUsedClothingCategories(clothingRequirements, charName);
+      if (usedCategories.length === 0) continue; // No requirements for this character — leave as-is
+
+      // Compare requested vs used using canonical buckets so 'costumed:pirate'
+      // and 'costumed' both count as a match.
+      const requestedCanonical = normalizeClothingCategory(requestedClothing);
+      const isUsed = usedCategories.some(
+        (cat) => normalizeClothingCategory(cat) === requestedCanonical
+      );
+
+      if (!isUsed) {
+        // Override with the first used category. We pick the first because
+        // when a character has multiple used variants we have no further
+        // signal — the cover hint clothing wasn't valid anyway.
+        const replacement = usedCategories[0];
+        hint.characterClothing[charName] = replacement;
+        overrides.push({
+          cover: coverType,
+          character: charName,
+          requested: requestedClothing,
+          replacedWith: replacement,
+        });
+        if (logger?.warn) {
+          logger.warn(
+            `⚠️ [COVER RECONCILE] ${coverType}: ${charName} requested "${requestedClothing}" ` +
+            `but only [${usedCategories.join(', ')}] are marked used — overriding to "${replacement}"`
+          );
+        }
+      }
+    }
+  }
+
+  return { overrides };
+}
+
 module.exports = {
   CANONICAL,
   normalizeClothingCategory,
+  getUsedClothingCategories,
+  reconcileCoverClothingWithRequirements,
 };
