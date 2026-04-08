@@ -440,6 +440,14 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const sceneImagesMap = new Map();
       const coverImages = { frontCover: null, initialPage: null, backCover: null };
 
+      // Pre-compute version counts per cover so we can pick the active version (not just the last row)
+      const coverVersionCounts = { frontCover: 0, initialPage: 0, backCover: 0 };
+      for (const row of imageInfoRows) {
+        if (row.image_type !== 'scene' && coverVersionCounts[row.image_type] !== undefined) {
+          coverVersionCounts[row.image_type]++;
+        }
+      }
+
       for (const row of imageInfoRows) {
         if (row.image_type === 'scene') {
           const activeVersion = activeVersions[row.page_number] ?? 0;
@@ -487,12 +495,22 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             }
           }
         } else {
-          // Cover image
-          coverImages[row.image_type] = {
-            hasImage: true,
-            qualityScore: row.quality_score,
-            generatedAt: row.generated_at
-          };
+          // Cover image — multiple version rows may exist; only keep the ACTIVE one
+          // (defaults to version 0 if no active version is set), and surface versionCount
+          // so the UI can show the version picker badge.
+          const coverType = row.image_type;
+          const activeCoverVersion = activeVersions[coverType] ?? 0;
+          const isActive = row.version_index === activeCoverVersion;
+          // Initialize on first row, or update if this row is the active one
+          if (!coverImages[coverType] || isActive) {
+            coverImages[coverType] = {
+              hasImage: true,
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              versionCount: coverVersionCounts[coverType] || 1,
+              activeVersion: activeCoverVersion
+            };
+          }
         }
       }
 

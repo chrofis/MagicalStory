@@ -48,13 +48,16 @@ const CLOTHING_CATEGORIES = ['winter', 'summer', 'costumed', 'standard'];
 
 /**
  * Parse per-character clothing block from page content
- * Format: Characters:\n- Name1: category\n- Name2: category
+ * Format: Characters:\n- Name1: category\n- Name2: category, depth: background, perspective: back view
  * Also supports legacy format: Characters: Name1, Name2 with separate Clothing: line
  * @param {string} content - Block content to parse
- * @returns {{characterClothing: Object, characters: string[]}}
+ * @returns {{characterClothing: Object, characterPerspectives: Object, characters: string[]}}
+ *   characterPerspectives: { Name: { depth?: string, perspective?: string } } — only includes
+ *   entries for characters that had explicit annotations after their clothing token.
  */
 function parseCharacterClothingBlock(content) {
   const characterClothing = {};
+  const characterPerspectives = {};
   const characters = [];
 
   // Debug: log content length and Characters section existence
@@ -70,7 +73,7 @@ function parseCharacterClothingBlock(content) {
   // Try new per-character format first:
   // Characters:
   // - Name1: standard
-  // - Name2 (alias): costumed:type
+  // - Name2 (alias): costumed:type, depth: background, perspective: back view
   // Also handles single-line comma-separated format:
   // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
   // Match "Characters:" with optional suffix like "(MAX 3)", "(MAX 5)", "(max 2-3)", etc.
@@ -81,18 +84,44 @@ function parseCharacterClothingBlock(content) {
     // Name pattern: plain name chars followed by optional parenthesized metadata (which may contain colons).
     // IMPORTANT: Uses possessive-safe pattern to avoid catastrophic backtracking (O(2^n) with nested quantifiers).
     // Clothing pattern handles costumed:{...} (braces with commas inside) and costumed:type (plain).
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))/gim;
+    // We capture an optional trailing annotations group (depth/perspective/position) up to end-of-line.
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)*)/gim;
+    // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side").
+    // We never want these mistaken for character names — they should be silently dropped.
+    const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action']);
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
       let clothing = lineMatch[2].trim().toLowerCase().replace(/\r$/, ''); // Strip trailing \r if present
+      const annotationsRaw = (lineMatch[3] || '').trim();
       // Strip curly brace wrapper from costumed descriptions: costumed:{desc} -> costumed:desc
       clothing = clothing.replace(/^(costumed:)\{([^}]*)\}$/, '$1$2');
       // Extract base name (remove alias in parentheses for lookup, keep for display)
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      // Skip annotation keys that snuck through as if they were names
+      if (ANNOTATION_KEYS.has(baseName.toLowerCase())) {
+        log.debug(`[PARSE-CLOTHING] Skipping annotation key "${baseName}" (not a character)`);
+        continue;
+      }
       characters.push(rawName);
       characterClothing[baseName] = clothing;
-      log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
+      // Parse trailing annotations like ", depth: background, perspective: back view"
+      if (annotationsRaw) {
+        const annotations = {};
+        const annotationPattern = /(depth|perspective|position)\s*:\s*([^,\r\n]+)/gi;
+        let annMatch;
+        while ((annMatch = annotationPattern.exec(annotationsRaw)) !== null) {
+          annotations[annMatch[1].toLowerCase()] = annMatch[2].trim().toLowerCase();
+        }
+        if (Object.keys(annotations).length > 0) {
+          characterPerspectives[baseName] = annotations;
+          log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}" + ${JSON.stringify(annotations)}`);
+        } else {
+          log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
+        }
+      } else {
+        log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
+      }
     }
     // Debug: log if Characters block found but no per-character clothing parsed
     if (characters.length === 0 && block.trim()) {
@@ -126,7 +155,7 @@ function parseCharacterClothingBlock(content) {
     }
   }
 
-  return { characterClothing, characters };
+  return { characterClothing, characterPerspectives, characters };
 }
 
 // ============================================================================
@@ -1359,10 +1388,10 @@ class UnifiedStoryParser {
         hint = lines[0] || '';
       }
 
-      // Extract per-character clothing
-      const { characterClothing, characters } = parseCharacterClothingBlock(block);
+      // Extract per-character clothing + optional perspective annotations
+      const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(block);
 
-      return { hint, characterClothing, characters };
+      return { hint, characterClothing, characterPerspectives, characters };
     };
 
     this._cache.coverHints = {
@@ -1424,14 +1453,14 @@ class UnifiedStoryParser {
         sceneHint = textHintMatch ? textHintMatch[1].trim() : '';
       }
 
-      // Extract per-character clothing from text-based format:
+      // Extract per-character clothing + perspective annotations from text-based format:
       // Characters:
       // - Name1: standard
-      // - Name2: costumed:superhero
-      let { characterClothing, characters } = parseCharacterClothingBlock(content);
+      // - Name2: costumed:superhero, depth: background, perspective: back view
+      let { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
 
-      // Fallback: extract clothing from JSON scene hint (trial prompt format)
-      // JSON hints have characters[].clothing inside the scene object
+      // Fallback: extract clothing + perspective from JSON scene hint (trial prompt format)
+      // JSON hints have characters[].clothing/depth/perspective inside the scene object
       if (Object.keys(characterClothing).length === 0 && sceneHint) {
         try {
           // Strip markdown code fences if present
@@ -1452,6 +1481,13 @@ class UnifiedStoryParser {
                 else if (raw.includes('summer')) clothing = 'summer';
                 characterClothing[baseName] = clothing;
                 characters.push(char.name);
+                // Capture optional depth/perspective from JSON char object
+                const annotations = {};
+                if (char.depth) annotations.depth = String(char.depth).toLowerCase();
+                if (char.perspective) annotations.perspective = String(char.perspective).toLowerCase();
+                if (Object.keys(annotations).length > 0) {
+                  characterPerspectives[baseName] = annotations;
+                }
               }
             }
           }
@@ -1465,6 +1501,7 @@ class UnifiedStoryParser {
         text,
         sceneHint,
         characterClothing,
+        characterPerspectives,
         characters
       });
 
@@ -1917,13 +1954,16 @@ class ProgressiveUnifiedParser {
         } else {
           log.debug(`[PAGE-CLOTHING] Page ${pageNum} NO Characters section found. Content snippet: "${content.substring(0, 200).replace(/\n/g, '\\n')}..."`);
         }
-        const { characterClothing, characters } = parseCharacterClothingBlock(content);
+        const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
 
         this.emitted.pages.add(pageNum);
         const clothingStr = Object.keys(characterClothing).length > 0
           ? Object.entries(characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')
           : 'none';
-        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete (clothing: ${clothingStr})`);
+        const perspectiveStr = Object.keys(characterPerspectives).length > 0
+          ? ` perspectives: ${Object.entries(characterPerspectives).map(([n, a]) => `${n}:${a.perspective || a.depth}`).join(', ')}`
+          : '';
+        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete (clothing: ${clothingStr}${perspectiveStr})`);
 
         if (this.callbacks.onPageComplete) {
           this.callbacks.onPageComplete({
@@ -1931,6 +1971,7 @@ class ProgressiveUnifiedParser {
             text,
             sceneHint,
             characterClothing,
+            characterPerspectives,
             characters
           });
         }

@@ -507,6 +507,7 @@ For famous buildings, monuments, or locations that exist in reality:
 - **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
 - **ALWAYS USE COSTUMED for covers** — if the story has costumed clothing, ALL cover characters MUST use their `costumed:type` variant, not `standard`. The book cover should showcase the story's theme.
 - **CLOTHING CONSISTENCY (HARD RULE)**: A character's clothing on ANY cover MUST be one of the categories you marked `used: true` in their `clothingRequirements`. Example: if Sophie's `clothingRequirements` only has `costumed: { used: true, costume: "wizard" }`, then EVERY cover that includes Sophie MUST list her as `costumed:wizard` — NEVER `standard` or any other category. If you need her in standard clothing on a cover, you MUST also mark `standard: { used: true }` for her in `clothingRequirements`.
+- **No `perspective` or `depth` on covers** — every cover character faces the viewer and is fully visible. If you can't fit everyone, drop them, don't hide them.
 
 **Title Page** (Front Cover)
 ONLY main characters: {MAIN_CHARACTER_NAMES}

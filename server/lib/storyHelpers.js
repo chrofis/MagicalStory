@@ -674,9 +674,10 @@ function extractSceneMetadata(sceneDescription) {
     parsedData = parsedData.scene;
   }
   if (parsed && parsedData && parsedData.characters) {
-    // Extract per-character clothing and positions
+    // Extract per-character clothing, positions, and perspective overrides
     const characterClothing = {};
     const characterPositions = {};
+    const characterPerspectives = {};
     const characterNames = [];
     for (const char of parsedData.characters) {
       if (char.name) {
@@ -693,6 +694,19 @@ function extractSceneMetadata(sceneDescription) {
         }
         if (char.position) {
           characterPositions[char.name] = char.position;
+        }
+        // Capture explicit perspective/depth overrides AND infer back view from pose text.
+        // Scene-iteration emits perspective inside the `pose` field as natural language
+        // (e.g. "Back view, seen from behind, gazing at the sea") rather than as a separate field.
+        const annotations = {};
+        if (char.perspective) annotations.perspective = String(char.perspective).toLowerCase();
+        if (char.depth) annotations.depth = String(char.depth).toLowerCase();
+        const poseLower = (char.pose || '').toLowerCase();
+        if (!annotations.perspective && /\b(back view|seen from behind|from behind)\b/.test(poseLower)) {
+          annotations.perspective = 'back view';
+        }
+        if (Object.keys(annotations).length > 0) {
+          characterPerspectives[char.name] = annotations;
         }
       }
     }
@@ -757,6 +771,7 @@ function extractSceneMetadata(sceneDescription) {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
       characterPositions: Object.keys(characterPositions).length > 0 ? characterPositions : null,
+      characterPerspectives: Object.keys(characterPerspectives).length > 0 ? characterPerspectives : null,
       clothing: null, // Per-character now, no single value
       objects: objectIds,
       // Store full parsed data for buildTextFromJson
@@ -2843,6 +2858,37 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     sceneSummary = rawOutlineContext.currentPage + '\n\n';
   }
 
+  // Mine LOCKED PERSPECTIVES from the raw outline current page (same logic as iteration)
+  let lockedPerspectivesText = '';
+  if (rawOutlineContext?.currentPage) {
+    const lockEntries = [];
+    const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed:[^,\r\n]+)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+    let lockMatch;
+    const seen = new Set();
+    while ((lockMatch = lineRegex.exec(rawOutlineContext.currentPage)) !== null) {
+      const baseName = lockMatch[1].replace(/\s*\([^)]*\)\s*$/, '').trim();
+      if (!baseName || seen.has(baseName.toLowerCase())) continue;
+      seen.add(baseName.toLowerCase());
+      const annotationsRaw = lockMatch[2];
+      const annPattern = /(depth|perspective|position)\s*:\s*([^,\r\n]+)/gi;
+      const ann = {};
+      let am;
+      while ((am = annPattern.exec(annotationsRaw)) !== null) {
+        ann[am[1].toLowerCase()] = am[2].trim().toLowerCase();
+      }
+      const parts = [];
+      if (ann.perspective) parts.push(`perspective: ${ann.perspective}`);
+      if (ann.depth) parts.push(`depth: ${ann.depth}`);
+      if (parts.length > 0) {
+        lockEntries.push(`- ${baseName}: ${parts.join(', ')}`);
+      }
+    }
+    if (lockEntries.length > 0) {
+      lockedPerspectivesText = `\n**Perspectives (from outline):**\n${lockEntries.join('\n')}\n`;
+      log.info(`[SCENE EXPANSION P${pageNumber}] Perspectives: ${lockEntries.length} character(s)`);
+    }
+  }
+
   if (!PROMPT_TEMPLATES.sceneExpansion) {
     log.warn('[SCENE EXPANSION] Template not loaded, falling back to iteration prompt');
     // Fall back to the iteration prompt (same as old behavior)
@@ -2862,6 +2908,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CHARACTERS: characterDetails,
     RECURRING_ELEMENTS: recurringElements,
     AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    LOCKED_PERSPECTIVES: lockedPerspectivesText,
     LANGUAGE_NAME: languageName,
     LANGUAGE_INSTRUCTION: languageInstruction,
     LANGUAGE_NOTE: getLanguageNote(language),
@@ -3118,6 +3165,41 @@ Compare this against the scene hint above. Your job is to:
       }
     }
 
+    // Build LOCKED PERSPECTIVES section by mining the raw outline (current page block).
+    // Pattern: "- Name (...): clothing, depth: X, perspective: Y" anywhere in the page block.
+    // This is the structured signal scene-iteration must honor — see CRITICAL RULE #15.
+    let lockedPerspectivesText = '';
+    const rawForLock = rawOutlineContext?.currentPage || '';
+    if (rawForLock) {
+      const lockEntries = [];
+      // Match each Characters: line that has perspective or depth annotations
+      const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed:[^,\r\n]+)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+      let lockMatch;
+      const seen = new Set();
+      while ((lockMatch = lineRegex.exec(rawForLock)) !== null) {
+        const baseName = lockMatch[1].replace(/\s*\([^)]*\)\s*$/, '').trim();
+        if (!baseName || seen.has(baseName.toLowerCase())) continue;
+        seen.add(baseName.toLowerCase());
+        const annotationsRaw = lockMatch[2];
+        const annPattern = /(depth|perspective|position)\s*:\s*([^,\r\n]+)/gi;
+        const ann = {};
+        let am;
+        while ((am = annPattern.exec(annotationsRaw)) !== null) {
+          ann[am[1].toLowerCase()] = am[2].trim().toLowerCase();
+        }
+        const parts = [];
+        if (ann.perspective) parts.push(`perspective: ${ann.perspective}`);
+        if (ann.depth) parts.push(`depth: ${ann.depth}`);
+        if (parts.length > 0) {
+          lockEntries.push(`- ${baseName}: ${parts.join(', ')}`);
+        }
+      }
+      if (lockEntries.length > 0) {
+        lockedPerspectivesText = `\n**Perspectives (from outline):**\n${lockEntries.join('\n')}\n`;
+        log.info(`[SCENE PROMPT P${pageNumber}] Perspectives: ${lockEntries.length} character(s)`);
+      }
+    }
+
     // Look up maxCharactersPerScene from the current image model config
     const iterImageModelKey = MODEL_DEFAULTS.pageImage;
     const iterImageModelConfig = IMAGE_MODELS[iterImageModelKey];
@@ -3134,6 +3216,7 @@ Compare this against the scene hint above. Your job is to:
       RECURRING_ELEMENTS: recurringElements,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       EXPECTED_CLOTHING: expectedClothingText,
+      LOCKED_PERSPECTIVES: lockedPerspectivesText,
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
@@ -3190,7 +3273,25 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   }
 
   // Strip JSON metadata block from scene description (not needed in image prompt)
-  const cleanSceneDescription = stripSceneMetadata(sceneDescription);
+  let cleanSceneDescription = stripSceneMetadata(sceneDescription);
+
+  // Append per-character perspective directives if scene-iteration assigned any.
+  if (metadata?.characterPerspectives) {
+    const lines = [];
+    for (const [name, ann] of Object.entries(metadata.characterPerspectives)) {
+      if (ann.perspective === 'back view' || ann.perspective === 'back-view') {
+        lines.push(`- ${name}: back view (face not visible)`);
+      } else if (ann.perspective === 'side' || ann.perspective === 'profile') {
+        lines.push(`- ${name}: side profile`);
+      } else if (ann.perspective === 'over-the-shoulder') {
+        lines.push(`- ${name}: over-the-shoulder (camera behind)`);
+      }
+    }
+    if (lines.length > 0) {
+      cleanSceneDescription += `\n\n**Perspective:**\n${lines.join('\n')}`;
+      log.info(`[IMAGE PROMPT] Page ${pageNumber}: Perspective directives for ${lines.length} character(s)`);
+    }
+  }
 
   const artStyleId = inputData.artStyle || 'pixar';
   // Resolve backend for per-model style variants: use explicit option, or infer from default image model

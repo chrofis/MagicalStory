@@ -68,7 +68,22 @@ async function iterateCover(coverKey, storyData, options = {}) {
     throw new Error(`No cover image found for ${coverKey}`);
   }
 
-  const sceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
+  // Strip any perspective/depth annotations from the cover description.
+  // Covers are group portraits — every character must face the viewer (see story-unified.txt
+  // COVER RULES). If Claude slipped a `, depth: background, perspective: back view` into a
+  // cover Characters line, drop it here so the cover prompt never sees it.
+  const stripCoverAnnotations = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    let stripped = text.replace(/(\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+/gi, '');
+    // Count how many lines we touched for logging
+    const stripCount = (text.match(/(?:depth|perspective|position)\s*:/gi) || []).length;
+    if (stripCount > 0) {
+      log.warn(`🔄 [COVER-ITERATE] ${coverKey}: Stripped ${stripCount} perspective/depth annotation(s) from cover description (covers must show all characters facing forward)`);
+    }
+    return stripped;
+  };
+  const rawSceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
+  const sceneDescription = stripCoverAnnotations(rawSceneDescription);
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Using stored description (${sceneDescription.length} chars)`);
 
   // --- Art style ---

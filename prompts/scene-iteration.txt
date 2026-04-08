@@ -19,6 +19,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 12. **NO POINTING** - Overused stereotype. ❌ "points at castle" ✅ "walks toward castle", "gazes up at castle", "reaches for door"
 13. **MAX {MAX_CHARACTERS_PER_SCENE} FACES** - The hard cap. If MORE than {MAX_CHARACTERS_PER_SCENE} characters need visible faces, you MUST reduce. For each extra character, pick the BEST option based on their role in this scene (see Check 17). Within the cap, use whatever count the page narratively needs.
 14. **NO CLOSED EYES** - Characters must have open eyes. ❌ "eyes closed in concentration" ✅ "focused gaze", "eyes narrowed", "looking intently"
+15. **HONOR PERSPECTIVES** - If the outline lists `perspective: back view` for a character, their `pose` starts with "Back view" and the `imageSummary` says "seen from behind". Same for `side` and `over-the-shoulder`. Don't override.
 
 ---
 
@@ -72,6 +73,7 @@ IMPORTANT CLOTHING RULES:
 - Never assign a costume that isn't in the character's available list
 - If in doubt, use "standard"
 {EXPECTED_CLOTHING}
+{LOCKED_PERSPECTIVES}
 
 **Main Characters:**
 {CHARACTERS}
