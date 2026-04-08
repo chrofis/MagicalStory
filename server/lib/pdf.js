@@ -33,8 +33,9 @@ const BOOK_FORMATS = {
   }
 };
 
-// Default to square format for backwards compatibility
-const DEFAULT_FORMAT = 'square';
+// Default to A4 (21×28cm portrait). 'square' (20×20cm) is legacy and only
+// used for orders that explicitly request it via bookFormat: 'square'.
+const DEFAULT_FORMAT = 'A4';
 
 // Legacy constants (for backwards compatibility)
 const COVER_WIDTH = BOOK_FORMATS.square.coverWidth;
@@ -48,6 +49,45 @@ const MIN_FONT_SIZE_WARNING = 10;
  * Extract image data from cover images (handles both string and object formats)
  */
 const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
+/**
+ * Render an image so it FILLS the entire box, cropping any overflow.
+ * This is the equivalent of CSS `object-fit: cover` for PDFKit.
+ *
+ * PDFKit's built-in `fit` option is `object-fit: contain` — it preserves
+ * aspect ratio and letterboxes any mismatch with white space. For cover
+ * images that should reach the page edges (no white borders), we want
+ * the opposite: scale up until both dimensions reach the box, accept
+ * that the long axis gets a small crop.
+ *
+ * Computes the larger of (boxWidth/imgWidth, boxHeight/imgHeight) so the
+ * smaller image axis exactly matches the box. Then offsets the image so
+ * the overflow on the long axis is split evenly (centered crop).
+ */
+async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight) {
+  // Read image dimensions via sharp (PDFKit doesn't expose them pre-render)
+  const sharp = require('sharp');
+  const meta = await sharp(imageBuffer).metadata();
+  const imgWidth = meta.width || boxWidth;
+  const imgHeight = meta.height || boxHeight;
+
+  // Scale-to-fill: pick the larger ratio so neither axis has a gap.
+  const scaleX = boxWidth / imgWidth;
+  const scaleY = boxHeight / imgHeight;
+  const scale = Math.max(scaleX, scaleY);
+  const drawnWidth = imgWidth * scale;
+  const drawnHeight = imgHeight * scale;
+
+  // Center the image inside the box; overflow is cropped equally on both sides.
+  const drawX = x - (drawnWidth - boxWidth) / 2;
+  const drawY = y - (drawnHeight - boxHeight) / 2;
+
+  // Clip to the box so the cropped overflow doesn't bleed onto neighboring content.
+  doc.save();
+  doc.rect(x, y, boxWidth, boxHeight).clip();
+  doc.image(imageBuffer, drawX, drawY, { width: drawnWidth, height: drawnHeight });
+  doc.restore();
+}
 
 /**
  * Parse story text into individual pages
@@ -216,8 +256,12 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const frontImgW = frontRight - frontLeft;
     const frontImgH = coverSpreadHeight;
 
-    doc.image(backCoverBuffer, backImgX, backImgY, { fit: [backImgW, backImgH], align: 'center', valign: 'center' });
-    doc.image(frontCoverBuffer, frontImgX, frontImgY, { fit: [frontImgW, frontImgH], align: 'center', valign: 'center' });
+    // Cover images use scale-to-fill — they're meant to reach the page edges,
+    // a small symmetric crop is acceptable. The previous `fit:` mode produced
+    // visible white bars whenever the image's aspect didn't exactly match the
+    // page area (always true after bleed math).
+    await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
+    await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
@@ -230,7 +274,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   if (initialPageImageData) {
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
+    await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
   }
 
   // Parse story pages
@@ -561,8 +605,10 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         const frontImgW = coverSpreadWidth - frontImgX;  // up to right page edge incl. bleed
         const frontImgH = coverSpreadHeight;
 
-        doc.image(backCoverBuffer, backImgX, backImgY, { fit: [backImgW, backImgH], align: 'center', valign: 'center' });
-        doc.image(frontCoverBuffer, frontImgX, frontImgY, { fit: [frontImgW, frontImgH], align: 'center', valign: 'center' });
+        // Scale-to-fill so covers reach the page edges (no white bars). The
+        // small symmetric crop on the long axis is acceptable for cover art.
+        await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
+        await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
       }
 
       // Blank left page (required by Gelato - left side of first spread)
@@ -574,7 +620,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
+        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -592,7 +638,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(frontCoverBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
+        await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
       // Dedication/initial page (RIGHT) — same side as story 1's dedication
@@ -601,7 +647,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       if (initialPageImageData) {
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
+        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -613,7 +659,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, 0, 0, { fit: [interiorPageWidth, interiorPageHeight], align: 'center', valign: 'center' });
+        await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
 
         // Blank separator after back cover (if not last story)
         if (storyIndex < stories.length - 1) {
@@ -684,7 +730,8 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(frontCoverBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
+      // Scale-to-fill so the cover reaches the page edges with no white bars.
+      await drawImageCovering(doc, frontCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding front cover:', err.message);
     }
@@ -696,7 +743,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(initialPageBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
+      await drawImageCovering(doc, initialPageBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding initial page:', err.message);
     }
@@ -738,7 +785,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(backCoverBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
+      await drawImageCovering(doc, backCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding back cover:', err.message);
     }

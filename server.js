@@ -2939,11 +2939,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Use the same backend as the cover model itself (don't fall through to gemini default)
             const coverModelForEmpty = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
             const coverBackendForEmpty = IMAGE_MODELS[coverModelForEmpty]?.backend || null;
+            // 3:4 portrait so the empty scene matches the cover's target aspect.
+            // Without this, the scene background reference would be square (1:1)
+            // and editWithGrok would have to letterbox-pad it to 3:4 — leaving
+            // visible white bars in the final cover that get printed as A4.
             const emptyResult = await generateImageOnly(emptyPrompt, [], {
               imageModelOverride: coverModelForEmpty,
               imageBackendOverride: coverBackendForEmpty,
               landmarkPhotos: coverLandmarkPhotos,
-              skipCache: true
+              skipCache: true,
+              aspectRatio: '3:4'
             });
             if (emptyResult?.imageData) {
               coverSceneBackground = emptyResult.imageData;

@@ -72,10 +72,10 @@ const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && process.env.DAT
 
 
 // Print Provider API - Create photobook order
-// Accepts bookFormat: 'square' (default) or 'A4'
+// Accepts bookFormat: 'A4' (default — 21×28cm portrait) or 'square' (legacy 20×20cm)
 router.post('/print-provider/order', authenticateToken, async (req, res) => {
   try {
-    let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount, bookFormat = 'square' } = req.body;
+    let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount, bookFormat = 'A4' } = req.body;
 
     // If storyId provided, look up story to get pdfUrl and pageCount
     if (storyId && !pdfUrl) {
@@ -644,7 +644,9 @@ router.get('/stories/:id/pdf', authenticateToken, async (req, res) => {
   try {
     const storyId = req.params.id;
     const userId = req.user.id;
-    const bookFormat = req.query.format === 'A4' ? 'A4' : 'square'; // Validate format
+    // Default to A4 (21×28cm portrait, the current production format).
+    // 'square' is only used for legacy orders that explicitly request it.
+    const bookFormat = req.query.format === 'square' ? 'square' : 'A4';
 
     log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}, format: ${bookFormat}`);
 
@@ -701,7 +703,7 @@ router.get('/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     }
 
     const storyId = req.params.id;
-    const bookFormat = req.query.format === 'A4' ? 'A4' : 'square'; // Validate format
+    const bookFormat = req.query.format === 'square' ? 'square' : 'A4';
     log.debug(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}, format: ${bookFormat}`);
     console.log(`🖨️ [ADMIN PRINT PDF] Storage mode: ${STORAGE_MODE}, getDbPool() exists: ${!!getDbPool()}`);
 
@@ -1094,7 +1096,7 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
 // as the Gelato order flow, ensuring test PDFs are identical to what Gelato receives
 router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
   try {
-    const { storyIds, bookFormat = 'square', coverType = 'softcover' } = req.body;
+    const { storyIds, bookFormat = 'A4', coverType = 'softcover' } = req.body;
     const userId = req.user.id;
 
     if (!storyIds || !Array.isArray(storyIds) || storyIds.length === 0) {
@@ -1426,7 +1428,7 @@ async function getPriceForPages(pageCount, isHardcover) {
 router.post('/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     // Support both single storyId and array of storyIds
-    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'square' } = req.body;
+    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
     const quantity = Math.max(1, Math.min(5, parseInt(req.body.quantity) || 1));
     const userId = req.user.id;
 
