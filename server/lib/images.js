@@ -2575,9 +2575,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     try {
-      const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
-      });
+      const refImages = await packReferences(
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+        { aspectRatio: grokAspect }
+      );
 
       let result;
       if (refImages.length > 0) {
@@ -2938,9 +2939,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
         log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
       } else {
-        refImages = await packReferences({
-          visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
-        });
+        refImages = await packReferences(
+          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage },
+          { aspectRatio: grokAspect }
+        );
       }
 
       let result;
@@ -3268,9 +3270,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend (model: ${GROK_MODELS.STANDARD})`);
 
     try {
-      const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground,
-      });
+      const refImages = await packReferences(
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+        { aspectRatio }
+      );
 
       let result;
       if (refImages.length > 0) {

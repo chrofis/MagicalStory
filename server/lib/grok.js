@@ -333,15 +333,21 @@ async function cropToFrontColumn(buffer) {
  *
  * If a category is empty, the slot is skipped (fewer images sent).
  *
+ * All slots are padded to the requested aspect ratio with white letterbox bars
+ * before being returned. Grok edit output matches the input aspect ratio, so
+ * mismatched-aspect inputs would otherwise produce mismatched-aspect outputs.
+ *
  * @param {Object} refs
  * @param {Buffer|null} refs.visualBibleGrid - VB grid buffer (JPEG)
  * @param {Array<{name: string, photoData: string}>} refs.landmarkPhotos - Landmark data URIs
  * @param {Array} refs.characterPhotos - Character photos (string data URIs or {name, photoUrl})
  * @param {string|null} refs.previousImage - Previous scene data URI
  * @param {string|null} refs.sceneBackground - Scene background data URI (style anchor)
- * @returns {Promise<string[]>} Array of data URIs (max 3)
+ * @param {Object} [options]
+ * @param {string} [options.aspectRatio='1:1'] - Target output aspect ratio (e.g. '1:1', '3:4', '9:16')
+ * @returns {Promise<string[]>} Array of data URIs (max 3), all padded to the target aspect
  */
-async function packReferences(refs = {}) {
+async function packReferences(refs = {}, options = {}) {
   const {
     visualBibleGrid = null,
     landmarkPhotos = [],
@@ -349,6 +355,7 @@ async function packReferences(refs = {}) {
     previousImage = null,
     sceneBackground = null,
   } = refs;
+  const { aspectRatio = '1:1' } = options;
 
   // Extract character photo buffers (handle same formats as Gemini path)
   const charBuffers = [];
