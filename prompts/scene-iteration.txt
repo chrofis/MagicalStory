@@ -255,7 +255,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
       {"id": "LOC001.1", "name": "Stadtturm", "position": "top-left background, ancient clock tower with blue face"}
     ],
     "reuseEmptyScene": true,
-    "emptyScenePrompt": "A snowy town plaza stretches out beneath a winter afternoon sky with golden hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly onto the cobblestone square. Medium wide shot, slightly low angle. The bottom-right and bottom-left foreground areas are open empty space where figures would stand, with the snowy plaza filling the midground gap between foreground and the distant tower.",
+    "emptyScenePrompt": "A snowy town plaza stretches out beneath a winter afternoon sky with golden hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly onto the cobblestone square. Medium wide shot, slightly low angle. The bottom-right and bottom-left foreground areas are open and uncluttered, with the snowy plaza filling the midground.",
     "translatedSummary": "Sophie steht im Vordergrund und zeigt nach oben links zum entfernten Turm, während Manuel neben ihr auf der linken Seite geht. Der verschneite Platz erstreckt sich zwischen ihnen und dem Turm. Hauptfiguren: Sophie, Manuel."
   }
 }
@@ -273,7 +273,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
 - `reuseEmptyScene`: `true` if the previously generated empty scene background can be reused as style anchor. `false` if the background/setting/location/camera/lighting changed significantly and a fresh empty scene should be generated. Rule of thumb: if only characters changed (pose, expression, position) → `true`. If setting, location, camera angle, or lighting changed → `false`.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location details, architecture, natural landscape, lighting, weather, camera angle, and depth layers. Describe where characters WOULD stand as "open area" or "empty space". This is used to generate a pure background image as a style anchor.
+- `emptyScenePrompt`: A 2-4 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location details, architecture, natural landscape, lighting, weather, camera angle, and depth layers. NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people. Use neutral phrases: "open foreground", "uncluttered center", "empty space".
 
 ---
 

@@ -96,7 +96,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
       {"id": "LOC001.1", "name": "Stadtturm", "position": "left, ancient clock tower with blue face"},
       {"id": "ANI001", "name": "Bello", "position": "at Sophie's feet"}
     ],
-    "emptyScenePrompt": "A snowy medieval town plaza with cobblestones stretching across the frame. An ancient clock tower with a blue face rises on the left side. Golden hour winter light casts long shadows across the square. Light snow drifts down. Medium wide shot. The foreground right and center areas are open, with footprint-free snow where figures would naturally walk.",
+    "emptyScenePrompt": "A snowy medieval town plaza with cobblestones stretching across the frame. An ancient clock tower with a blue face rises on the left side. Golden hour winter light casts long shadows across the square. Light snow drifts down. Medium wide shot. The foreground right and center areas are open and uncluttered.",
     "translatedSummary": "Sophie und Manuel gehen über den verschneiten Platz auf den Stadtturm zu."
   }
 }
@@ -133,7 +133,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
   - Default to `"simple"` unless depth separation is clearly needed by the story moment.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-3 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts. Just the location, architecture, lighting, weather, and camera angle. For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). This is used to generate a clean background image as a style anchor. Objects and characters are added separately.
+- `emptyScenePrompt`: A 2-3 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts. Just the location, architecture, lighting, weather, and camera angle. NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people. Use neutral phrases: "open foreground", "uncluttered center". For landmarks, use the physical details from the photo variant descriptions (e.g., "covered wooden bridge with intricate timber frame" not "wooden bridge with planks"). Objects and characters are added separately.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.

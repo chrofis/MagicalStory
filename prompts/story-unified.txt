@@ -117,7 +117,7 @@ SCENE HINT:
   "time": "morning|midday|afternoon|sunset|night",
   "weather": "sunny|cloudy|rainy|snowy|n/a",
   "shot": "close-up|medium|wide|ultra-wide",
-  "emptyScenePrompt": "2-4 sentences describing ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location, architecture, natural landscape, lighting, weather, camera angle. Leave open space where characters would stand."
+  "emptyScenePrompt": "2-4 sentences describing ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. NEVER write hypothetical references like 'where children would stand' or 'where figures would walk' — image models render those literally."
 }
 ```
 
@@ -130,8 +130,9 @@ SCENE HINT:
 **emptyScenePrompt** (required): Describe ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. This is used to generate a pure background image as a style anchor. Include ONLY:
 - Location, architecture, natural landscape details
 - Lighting, weather, camera angle from the scene
-- Open space where characters would naturally stand
+- Open and uncluttered foreground areas
 - Do NOT include any objects, animals, or artifacts — those are added separately via reference images
+- NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people
 
 **Rules:**
 - **CHARACTER COUNT** - Aim for 1-3 characters per scene. Use 4-5 only for gathering moments (reunion, group discovery, classroom). Never exceed {MAX_CHARACTERS_PER_SCENE}. Never pad.
