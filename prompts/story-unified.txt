@@ -134,13 +134,11 @@ SCENE HINT:
 - Do NOT include any objects, animals, or artifacts — those are added separately via reference images
 
 **Rules:**
-- **CHARACTER COUNT** - Aim for 1-3 characters per scene. Image models start swapping faces and producing low-quality output as character count grows, so use the MINIMUM needed for the moment. 4-5 characters is ONLY allowed for narratively essential gathering moments (family reunion, group discovery, classroom welcome) where the page's emotional payoff genuinely depends on showing everyone. NEVER exceed {MAX_CHARACTERS_PER_SCENE}. NEVER pad — if a character has no specific role on the page, leave them out.
-  - The description must ONLY mention characters from the characters array. If they're not listed, they don't exist in this illustration.
-  - BAD: page text describes a 5-person reunion but the characters array has 2 — image will miss the narrative beat
+- **CHARACTER COUNT** - Aim for 1-3 characters per scene. Use 4-5 only for gathering moments (reunion, group discovery, classroom). Never exceed {MAX_CHARACTERS_PER_SCENE}. Never pad.
+  - The description must ONLY mention characters from the characters array.
   - BAD: description mentions 7 characters but only 2 are in the array
-  - BAD: 5 characters listed for a quiet 1-on-1 moment — pad job, drop to 2
-  - GOOD: 5-person reunion that's the page's emotional payoff → list all 5 in array, description references each by name
-  - GOOD: solo moment → 1 character in array, no others mentioned
+  - GOOD: 5-person reunion → list all 5 in array, description references each by name
+  - GOOD: solo moment → 1 character in array
 - **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it!
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
