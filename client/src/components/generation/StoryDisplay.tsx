@@ -4028,15 +4028,24 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverObj.grokRefImages?.length ?? 0) > 0) && (
-                  <ReferencePhotosDisplay
-                    referencePhotos={frontCoverObj.referencePhotos || []}
-                    landmarkPhotos={frontCoverObj.landmarkPhotos}
-                    visualBibleGrid={frontCoverObj.visualBibleGrid}
-                    grokRefImages={frontCoverObj.grokRefImages}
-                    language={language}
-                  />
-                )}
+                {(() => {
+                  // Prefer the active version's grokRefImages over the root
+                  // cover object — iterated covers store the new refs inside
+                  // imageVersions[activeVersion], and the root stays stale.
+                  const activeIdx = frontCoverObj.activeVersion ?? (frontCoverObj.imageVersions?.length ? frontCoverObj.imageVersions.length - 1 : 0);
+                  const frontCoverGrokRefs = (frontCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? frontCoverObj.grokRefImages;
+                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverGrokRefs?.length ?? 0) > 0;
+                  if (!show) return null;
+                  return (
+                    <ReferencePhotosDisplay
+                      referencePhotos={frontCoverObj.referencePhotos || []}
+                      landmarkPhotos={frontCoverObj.landmarkPhotos}
+                      visualBibleGrid={frontCoverObj.visualBibleGrid}
+                      grokRefImages={frontCoverGrokRefs}
+                      language={language}
+                    />
+                  );
+                })()}
 
                 {/* Quality Score */}
                 {frontCoverObj.qualityScore !== undefined && (
@@ -4264,15 +4273,21 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageObj.grokRefImages?.length ?? 0) > 0) && (
-                  <ReferencePhotosDisplay
-                    referencePhotos={initialPageObj.referencePhotos || []}
-                    landmarkPhotos={initialPageObj.landmarkPhotos}
-                    visualBibleGrid={initialPageObj.visualBibleGrid}
-                    grokRefImages={initialPageObj.grokRefImages}
-                    language={language}
-                  />
-                )}
+                {(() => {
+                  const activeIdx = initialPageObj.activeVersion ?? (initialPageObj.imageVersions?.length ? initialPageObj.imageVersions.length - 1 : 0);
+                  const initialPageGrokRefs = (initialPageObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? initialPageObj.grokRefImages;
+                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageGrokRefs?.length ?? 0) > 0;
+                  if (!show) return null;
+                  return (
+                    <ReferencePhotosDisplay
+                      referencePhotos={initialPageObj.referencePhotos || []}
+                      landmarkPhotos={initialPageObj.landmarkPhotos}
+                      visualBibleGrid={initialPageObj.visualBibleGrid}
+                      grokRefImages={initialPageGrokRefs}
+                      language={language}
+                    />
+                  );
+                })()}
 
                 {/* Quality Score */}
                 {initialPageObj.qualityScore !== undefined && (
@@ -5714,15 +5729,21 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverObj.grokRefImages?.length ?? 0) > 0) && (
-                  <ReferencePhotosDisplay
-                    referencePhotos={backCoverObj.referencePhotos || []}
-                    landmarkPhotos={backCoverObj.landmarkPhotos}
-                    visualBibleGrid={backCoverObj.visualBibleGrid}
-                    grokRefImages={backCoverObj.grokRefImages}
-                    language={language}
-                  />
-                )}
+                {(() => {
+                  const activeIdx = backCoverObj.activeVersion ?? (backCoverObj.imageVersions?.length ? backCoverObj.imageVersions.length - 1 : 0);
+                  const backCoverGrokRefs = (backCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? backCoverObj.grokRefImages;
+                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverGrokRefs?.length ?? 0) > 0;
+                  if (!show) return null;
+                  return (
+                    <ReferencePhotosDisplay
+                      referencePhotos={backCoverObj.referencePhotos || []}
+                      landmarkPhotos={backCoverObj.landmarkPhotos}
+                      visualBibleGrid={backCoverObj.visualBibleGrid}
+                      grokRefImages={backCoverGrokRefs}
+                      language={language}
+                    />
+                  );
+                })()}
 
                 {/* Quality Score */}
                 {backCoverObj.qualityScore !== undefined && (

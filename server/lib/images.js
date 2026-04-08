@@ -2930,7 +2930,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         : '1:1';
 
       // For avatars: each reference image (face, body, style sample) gets its own slot
-      // For scenes: use normal packing (VB grid + landmarks + characters)
+      // For scenes: use normal packing (VB grid + landmarks + characters + scene background)
       let refImages;
       if (evaluationType === 'avatar' && characterPhotos?.length > 0) {
         refImages = [];
@@ -2943,7 +2943,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
       } else {
         refImages = await packReferences(
-          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage },
+          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
           { aspectRatio: grokAspect }
         );
       }
@@ -2981,7 +2981,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         issuesSummary: qualityResult?.issuesSummary || null,
         qualityModelId: qualityResult?.qualityModelId ?? null,
         imageUsage: result.usage,
-        qualityUsage: qualityResult?.usage ?? null
+        qualityUsage: qualityResult?.usage ?? null,
+        // Exact packed references sent to Grok (for dev-mode "Sent to Grok" display).
+        // The primary Grok branch at the top of this function already returns
+        // this field — the secondary "route to Grok if model config says so"
+        // branch used to forget it, so covers (which hit this path because
+        // CONFIG_DEFAULTS.imageBackend='gemini' but grok-imagine's modelConfig
+        // says backend='grok') always had grokRefImages=null in the DB.
+        grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
     } catch (grokError) {
       log.error('❌ [IMAGE GEN] Grok generation failed:', grokError.message);
