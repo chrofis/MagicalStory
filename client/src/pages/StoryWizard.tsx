@@ -878,13 +878,22 @@ export default function StoryWizard() {
         if (quickMeta.shareToken) setShareToken(quickMeta.shareToken);
         // Note: dedication and artStyle come from full metadata (not quick-metadata)
 
-        // Initialize empty scene images array with page count for lazy loading
-        // Images will show placeholders until loaded
-        setSceneImages(Array.from({ length: quickMeta.pageCount }, (_, i) => ({
-          pageNumber: i + 1,
-          imageData: undefined,  // Will be loaded lazily
-          hasImage: true,        // Assume images exist
-        })));
+        // Initialize scene images array with page count for lazy loading.
+        // Preserve any existing scenes that were populated by the just-finished
+        // generation (imageData, imageVersions, metadata) — they're the truth
+        // until Phase 2 refreshes them. Without this, loadSavedStory after
+        // generation wiped imageVersions and the user couldn't see them until
+        // they reloaded the page.
+        setSceneImages(prev => Array.from({ length: quickMeta.pageCount }, (_, i) => {
+          const pageNumber = i + 1;
+          const existing = prev.find(p => p.pageNumber === pageNumber);
+          if (existing) return existing;
+          return {
+            pageNumber,
+            imageData: undefined,  // Will be loaded lazily
+            hasImage: true,        // Assume images exist
+          };
+        }));
 
         // Set cover images placeholder (hasImage flag for lazy loading)
         setCoverImages(quickMeta.hasFrontCover ? {
@@ -4076,9 +4085,14 @@ export default function StoryWizard() {
             userLocation: userLocation || undefined,
           });
 
-          // Don't set justFinishedGenerating - let loadSavedStory handle image loading
-          // result_data doesn't include imageData (stripped for performance),
-          // so we need the two-phase loading to fetch images from story_images table
+          // Mark that we just finished generating so loadSavedStory takes the
+          // fast "versions only" path instead of wiping state and reloading
+          // everything. Progressive streaming already populated sceneImages
+          // with imageData — we only need Phase 2b to add imageVersions.
+          // Without this, versions didn't show until the user reloaded the page
+          // because loadSavedStory wiped the array and Phase 2b landed too late
+          // (or got clobbered by another state update in the interim).
+          justFinishedGenerating.current = true;
 
           // Stop tracking in global context
           stopTracking();
