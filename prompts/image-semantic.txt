@@ -18,33 +18,40 @@ List everything you see in the image:
 **STEP 2: COMPARE TO SCENE_HINT**
 
 Check if the image matches what was requested:
-- Are all mentioned characters present? (no extra, no missing main characters — background crowds are OK)
-- Are characters wearing the correct clothing/costume? (medieval costume should not appear as modern clothes — MAJOR if wrong)
+- Are all main characters present? Background crowds are fine.
+- Are characters wearing the correct clothing/costume? (medieval costume should not appear as modern clothes)
 - Are all mentioned objects present?
 - Is the setting/location correct?
-- Does the lighting/weather match? (night should be dark, snow scene should have snow, sunny should be bright — MAJOR if wrong)
-- Is the general action correct? (who's doing what to whom)
+- Are characters on the correct surface? (on the island, not in the water; on the path, not in the river) — MAJOR if wrong.
+- Does the lighting/weather match? (night dark, snow scene has snow, sunny bright)
+- Is the general action correct? (who is doing what to whom)
 
-**DO NOT penalize:**
-- Exact pose differences (sitting vs standing is fine if character is in the right place)
-- Facial expressions not matching (image models cannot render "thoughtful" vs "determined")
-- Specific gestures (thumbs up vs hands at sides — irrelevant unless the gesture IS the story moment)
-- Exact gaze direction (looking left vs looking at window — only flag if completely wrong direction)
-- Minor spatial differences (left midground vs center — only flag if completely wrong side)
-- Characters facing camera instead of an object — this is a generation limitation, not a semantic error
+**Do not flag, do not deduct for:**
+- Camera angle, framing, perspective (over-the-shoulder, low/high angle, profile vs front). Image models cannot reliably honor these and we want camera variety across pages.
+- Facial expressions and subtle moods (thoughtful, tired, determined, focused).
+- Gaze direction (looking left vs looking at object).
+- Exact pose or gesture (sitting vs standing, thumbs up vs hands down).
+- Minor spatial differences (left midground vs center).
+- Characters facing camera instead of an object.
 
-Image models produce illustrations, not movie stills. Judge WHO is WHERE doing roughly WHAT — not exact choreography.
+Do flag and deduct for:
+- A character who should be the focal/active one is shown as passive (or vice versa) — wrong narrative role.
+- Wrong major action (hugging instead of fighting, giving instead of receiving).
+
+Judge who is where doing roughly what. Skip choreography.
 
 ---
 
 **SCORING**
 
-Start at 10, subtract for issues:
-- Missing character: -3 (CRITICAL)
-- Missing key object: -2 (MAJOR)
-- Wrong/missing setting: -2 (MAJOR)
-- Key action completely wrong (hugging instead of fighting): -2 (MAJOR)
-- Missing background element: -1 (MINOR)
+Start at 10. Deduct only for items in this list — no other deductions:
+- Missing main character: -3
+- Missing key object: -2
+- Wrong setting/location: -2
+- Wrong major action: -2
+- Wrong narrative role (focal vs passive swapped): -2
+- Wrong clothing/costume on a named character: -1
+- Missing background element: -1
 
 VERDICT: PASS (7+), FAIL (0-6)
 
