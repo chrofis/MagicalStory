@@ -469,16 +469,21 @@ async function packReferences(refs = {}, options = {}) {
   // embedded in it, so we skip them below to free slots for character photos.
   // With a CLEAN scene background (0–1 chars), the VB grid gets its own slot.
   //
+  // Character takes priority over landmark in 0–1 char mode: when a scene
+  // background is present, the landmark is already baked into it (empty scenes
+  // are generated with the landmark photo as reference), so the dedicated
+  // landmark slot is redundant — the character slot matters more.
+  //
   // Bordered scene (slots used: 1 for bg with VB baked in):
   //   2 chars: Slot 2 = char 1, Slot 3 = char 2
   //   3+ chars: Slot 2 = chars first half, Slot 3 = chars second half
   //
   // Clean scene + 0–1 chars (slot 1 = scene, slots 2-3 free):
   //   0 chars: Slot 2 = VB grid, Slot 3 = landmark(s)
-  //   1 char:  Slot 2 = VB grid, Slot 3 = character
+  //   1 char:  Slot 2 = VB grid, Slot 3 = character (landmark dropped — already in scene)
   //
   // No scene background (all 3 slots free):
-  //   1 char:  Slot 1 = VB grid, Slot 2 = landmark(s), Slot 3 = character
+  //   1 char:  Slot 1 = VB grid, Slot 2 = character, Slot 3 = landmark(s)
   //   2 chars: Slot 1 = VB + landmarks stitched, Slot 2 = char 1, Slot 3 = char 2
   //   3+ chars: Slot 1 = VB + landmarks stitched, Slot 2 = chars first half, Slot 3 = chars second half
 
@@ -487,22 +492,26 @@ async function packReferences(refs = {}, options = {}) {
 
   if (charCount <= 1) {
     // ── 0-1 characters ──
+    // Character takes priority over landmark: when a scene background is present,
+    // the landmark is already baked into it (empty scenes are generated with the
+    // landmark photo as reference). The dedicated landmark slot is therefore
+    // redundant in that case, and the character slot matters more for consistency.
     if (!skipContext && visualBibleGrid) {
       const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       log.info(`🎨 [GROK] Slot ${slots.length}: VB grid`);
     }
 
-    if (!skipContext && landmarkBuffers.length > 0 && slots.length < 3) {
-      const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
-      slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
-    }
-
     if (charCount === 1 && slots.length < 3) {
       const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
+    }
+
+    if (!skipContext && landmarkBuffers.length > 0 && slots.length < 3) {
+      const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
+      slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
     }
   } else {
     // ── 2+ characters ──
