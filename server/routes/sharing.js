@@ -178,11 +178,15 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       }
     }
 
-    // Check which covers exist
+    // Check which covers exist. Use the ACTIVE version, not hardcoded 0 —
+    // a regenerated cover may live at version 1+ with no data at version 0,
+    // which would previously make the check falsely return "no cover" and
+    // cause the frontend to omit the cover from the page list entirely.
     const coverTypes = ['frontCover', 'initialPage', 'backCover'];
     const covers = {};
     for (const coverType of coverTypes) {
-      const img = await getStoryImage(story.id, coverType, null, 0);
+      const activeIdx = await getActiveVersion(story.id, coverType);
+      const img = await getStoryImage(story.id, coverType, null, activeIdx);
       if (img?.imageData) {
         covers[coverType] = true;
       } else {
