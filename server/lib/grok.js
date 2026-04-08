@@ -294,57 +294,72 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 }
 
 /**
- * Detect portrait 2x2 avatar grids (aspect ~1:1.75) and crop to left half (front-facing column).
+ * Extract the front-facing views from a 2x2 avatar grid and arrange them
+ * horizontally side-by-side, producing a near-square reference image.
  *
  * Avatar grids are arranged:
- *   Front-Left  |  Front-Right
- *   Back-Left   |  Back-Right
+ *   ┌──────────────┬──────────────┐
+ *   │ Face Front   │ Face 3/4     │   ← Top row
+ *   ├──────────────┼──────────────┤
+ *   │ Body Front   │ Body Profile │   ← Bottom row
+ *   └──────────────┴──────────────┘
  *
- * For Grok reference images, only the front-facing column is useful.
+ * The previous implementation cropped to the LEFT COLUMN (Face Front + Body Front
+ * stacked vertically), giving a 1:3.5 narrow strip. When that strip was padded to
+ * a square slot for Grok, the character filled only ~28% of the slot width and
+ * ended up rendered tiny in the output.
+ *
+ * This version extracts the same two cells (Face Front + Body Front) but lays
+ * them out HORIZONTALLY = ~9:8 aspect, very close to square. After padding to
+ * a square slot, the character fills ~89% of the slot — roughly 3× larger.
+ *
  * Non-grid images (aspect ratio far from 1:1.75) are returned unchanged.
  *
  * @param {Buffer} buffer - Image buffer
- * @returns {Promise<Buffer>} Cropped (or original) JPEG buffer
+ * @returns {Promise<Buffer>} Rearranged (or original) JPEG buffer
  */
 async function cropToFrontColumn(buffer) {
-  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-
-  // Try Python service first (detects actual separator line via variance analysis)
-  try {
-    const b64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
-    const response = await fetch(`${photoAnalyzerUrl}/crop-front-column`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: b64 }),
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      if (result.success && result.image) {
-        const croppedB64 = result.image.replace(/^data:image\/\w+;base64,/, '');
-        log.info(`🎨 [GROK] Cropped to front column via Python (separator at x=${result.separator_x})`);
-        return Buffer.from(croppedB64, 'base64');
-      }
-    }
-    log.debug(`[GROK] Python crop-front-column unavailable (${response.status}), using Sharp fallback`);
-  } catch (err) {
-    log.debug(`[GROK] Python crop-front-column failed: ${err.message}, using Sharp fallback`);
-  }
-
-  // Fallback: naive half-width crop with Sharp
   try {
     const meta = await sharp(buffer).metadata();
     if (!meta.width || !meta.height) return buffer;
 
-    const halfWidth = Math.floor(meta.width / 2);
-    const cropped = await sharp(buffer)
-      .extract({ left: 0, top: 0, width: halfWidth, height: meta.height })
+    // Only process portrait 2x2 grids (aspect ratio ~1.5-2.0).
+    const aspect = meta.height / meta.width;
+    if (aspect < 1.5 || aspect > 2.0) return buffer;
+
+    const halfW = Math.floor(meta.width / 2);
+    const halfH = Math.floor(meta.height / 2);
+
+    // Extract Face Front (top-left) and Body Front (bottom-left) quadrants.
+    const faceFront = await sharp(buffer)
+      .extract({ left: 0, top: 0, width: halfW, height: halfH })
+      .toBuffer();
+    const bodyFront = await sharp(buffer)
+      .extract({ left: 0, top: halfH, width: halfW, height: halfH })
+      .toBuffer();
+
+    // Compose them side-by-side on a white canvas. Body on the left (it's the
+    // bigger reference and tends to be what Grok needs most), face on the right.
+    const gap = 4;
+    const outW = halfW * 2 + gap;
+    const outH = halfH;
+    const composed = await sharp({
+      create: {
+        width: outW,
+        height: outH,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .composite([
+        { input: bodyFront, left: 0, top: 0 },
+        { input: faceFront, left: halfW + gap, top: 0 },
+      ])
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    log.info(`🎨 [GROK] Cropped to front column (Sharp fallback): ${meta.width}x${meta.height} → ${halfWidth}x${meta.height}`);
-    return cropped;
+    log.info(`🎨 [GROK] Rearranged front views horizontally: ${meta.width}x${meta.height} → ${outW}x${outH}`);
+    return composed;
   } catch (err) {
     log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
     return buffer;
@@ -503,7 +518,9 @@ async function packReferences(refs = {}, options = {}) {
     }
 
     if (charCount === 1 && slots.length < 3) {
-      const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      // Upscale to height 768 (no withoutEnlargement) so the rearranged
+      // front-views fill the slot at higher resolution for Grok.
+      const resized = await sharp(charBuffers[0]).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
     }
@@ -528,10 +545,10 @@ async function packReferences(refs = {}, options = {}) {
     }
 
     if (charCount === 2) {
-      // 2 characters: one per slot
+      // 2 characters: one per slot — upscale so each fills the slot
       for (const buf of charBuffers) {
         if (slots.length >= 3) break;
-        const resized = await sharp(buf).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        const resized = await sharp(buf).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
         slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       }
       if (charBuffers.length > 0) log.info(`🎨 [GROK] Slot ${slots.length - Math.min(charCount, 3 - (slots.length - charCount))}-${slots.length}: ${Math.min(charCount, 3 - slots.length + charCount)} character photos (separate)`);
@@ -542,12 +559,12 @@ async function packReferences(refs = {}, options = {}) {
       const group2 = charBuffers.slice(mid);
 
       if (group1.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group1, 768);
+        const stitched = await stitchImagesHorizontally(group1, 768, { allowEnlargement: true });
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
         log.info(`🎨 [GROK] Slot ${slots.length}: ${group1.length} characters stitched`);
       }
       if (group2.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group2, 768);
+        const stitched = await stitchImagesHorizontally(group2, 768, { allowEnlargement: true });
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
         log.info(`🎨 [GROK] Slot ${slots.length}: ${group2.length} characters stitched`);
       }
@@ -749,11 +766,16 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
  * @param {number} targetHeight - Height to normalize to
  * @returns {Promise<Buffer>} JPEG buffer of the stitched image
  */
-async function stitchImagesHorizontally(buffers, targetHeight = 768) {
+async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {}) {
+  const { allowEnlargement = false } = options;
+  const resizeOpts = allowEnlargement
+    ? { height: targetHeight }
+    : { height: targetHeight, withoutEnlargement: true };
+
   if (buffers.length === 1) {
     // Single image — just resize and return
     return sharp(buffers[0])
-      .resize({ height: targetHeight, withoutEnlargement: true })
+      .resize(resizeOpts)
       .jpeg({ quality: 85 })
       .toBuffer();
   }
@@ -761,7 +783,7 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768) {
   // Resize all to same height, get metadata
   const resized = [];
   for (const buf of buffers) {
-    const img = sharp(buf).resize({ height: targetHeight, withoutEnlargement: true });
+    const img = sharp(buf).resize(resizeOpts);
     const meta = await img.toBuffer({ resolveWithObject: true });
     resized.push({ buffer: meta.data, width: meta.info.width, height: meta.info.height });
   }
