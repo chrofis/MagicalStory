@@ -27,13 +27,8 @@ const {
   IMAGE_QUALITY_THRESHOLD,
   generateImageOnly,
   evaluateImageBatch,
-  buildRepairPlan,
-  executeRepairPlan,
-  mergeRepairResults,
   detectAllBoundingBoxes,
-  createBboxOverlayImage,
-  autoRepairImage,
-  autoRepairWithTargets
+  createBboxOverlayImage
 } = require('./images');
 const { runEntityConsistencyChecks } = require('./entityConsistency');
 const {

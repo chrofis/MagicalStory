@@ -12,9 +12,14 @@ const { REPAIR_DEFAULTS } = require('../config/models');
 /**
  * Identify pages that need redo based on score and issue count thresholds.
  *
- * @param {Object} evalPages - Map of pageNumber → { score?, qualityScore, fixableIssues? }
- *   Each value needs at least `qualityScore` (number) or `score` (number).
- *   `fixableIssues` is an optional array — its length is compared to issueThreshold.
+ * The score field read by this function (in priority order) is:
+ *   1. `finalScore` — entity-penalty-adjusted, set explicitly by the unified
+ *      pipeline round loop. PREFERRED — distinguishes itself from raw visual.
+ *   2. `score` / `qualityScore` — legacy fields, may be either raw visual or
+ *      adjusted depending on the call site. Used as fallback for endpoints
+ *      that haven't migrated to finalScore yet.
+ *
+ * @param {Object} evalPages - Map of pageNumber → { finalScore?, score?, qualityScore?, fixableIssues? }
  * @param {Object} [options]
  * @param {number} [options.scoreThreshold] - Pages scoring below this need redo
  * @param {number} [options.issueThreshold] - Pages with >= this many fixable issues need redo
@@ -29,7 +34,9 @@ function findBadPages(evalPages, options = {}) {
     const pageNum = parseInt(pageNumStr, 10);
     if (isNaN(pageNum)) continue;
 
-    const score = result.score ?? result.qualityScore ?? null;
+    // Prefer the explicit finalScore (set by unified pipeline round loop).
+    // Fall back to the ambiguous score/qualityScore fields for legacy callers.
+    const score = result.finalScore ?? result.score ?? result.qualityScore ?? null;
     const issueCount = result.fixableIssues?.length ?? 0;
 
     // Skip pages with no score data

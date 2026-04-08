@@ -91,8 +91,6 @@ const {
   clearImageCache,
   deleteFromImageCache,
   compressImageToJPEG,
-  autoRepairImage,
-  autoRepairWithTargets,
   runFinalConsistencyChecks,
   generateReferenceSheet,
   buildVisualBibleGrid,
@@ -101,9 +99,6 @@ const {
   // Separated evaluation pipeline functions
   generateImageOnly,
   evaluateImageBatch,
-  buildRepairPlan,
-  executeRepairPlan,
-  mergeRepairResults,
   // Unified repair pipeline
   runUnifiedRepairPipeline,
   // Bbox detection for covers

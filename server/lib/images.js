@@ -3838,11 +3838,11 @@ The added character must be:
 
 // =============================================================================
 // SEPARATED EVALUATION PIPELINE FUNCTIONS
-// These functions support the new architecture:
-// 1. Generate ALL images first (generateImageOnly or generateAllImages)
+// These functions support the unified pipeline architecture:
+// 1. Generate ALL images first (generateImageOnly)
 // 2. Evaluate ALL images in parallel (evaluateImageBatch)
-// 3. Build a repair plan based on all results (buildRepairPlan)
-// 4. Execute repairs/regenerations (executeRepairPlan)
+// 3. Run the unified repair loop (runUnifiedRepairPipeline) which iterates,
+//    inpaints, picks best versions, and runs character repair on entity issues
 // =============================================================================
 
 /**
@@ -4019,8 +4019,8 @@ async function evaluateImageBatch(images, options = {}) {
 }
 
 /**
- * Classify issues from an evaluation into repair categories
- * Used by buildRepairPlan to determine the best repair method for each page
+ * Classify issues from an evaluation into repair categories.
+ * Helper used by callers that want to inspect the issue mix on a page.
  *
  * @param {Object} evaluation - Single page evaluation from evaluateImageBatch
  * @returns {Object} Classified issues: { majorIssues, styleMismatch, characterMismatches, clothingIssues }
@@ -4169,613 +4169,6 @@ function classifyIssues(evaluation) {
   };
 }
 
-/**
- * Build a repair plan based on evaluation results
- * Analyzes all page evaluations and consistency reports to decide which pages need:
- * - Regeneration (score too low or generation failed)
- * - Repair (fixable issues detected)
- * - Keeping (score good enough)
- *
- * @param {Array<Object>} pageEvaluations - Evaluation results from evaluateImageBatch
- * @param {Object} options - Plan options
- * @param {Object|null} options.consistencyReport - Results from runFinalConsistencyChecks
- * @param {Object|null} options.entityReport - Results from runEntityConsistencyChecks
- * @param {number} options.regenerateThreshold - Score below which to regenerate (default: 30)
- * @param {number} options.repairThreshold - Score below which to repair if fixable (default: 70)
- * @param {number} options.keepThreshold - Score at or above which to keep (default: 50)
- * @param {boolean} options.useCategorizedRepairs - Use new categorized repair system (default: false)
- * @returns {Object} Repair plan with pagesToRegenerate, pagesToRepair, pagesToKeep
- */
-function buildRepairPlan(pageEvaluations, options = {}) {
-  const {
-    consistencyReport = null,
-    entityReport = null,
-    regenerateThreshold = 30,
-    repairThreshold = 70,
-    keepThreshold = 50,
-    useCategorizedRepairs = false
-  } = options;
-
-  // New categorized repair plan structure
-  if (useCategorizedRepairs) {
-    return buildCategorizedRepairPlan(pageEvaluations, options);
-  }
-
-  // Legacy plan structure (backwards compatible)
-  const plan = {
-    pagesToRegenerate: [],
-    pagesToRepair: [],
-    pagesToKeep: [],
-    reasoning: {},
-    stats: {
-      totalPages: pageEvaluations.length,
-      evaluated: 0,
-      avgScore: 0
-    }
-  };
-
-  // Build a map of consistency issues by page
-  const consistencyIssuesByPage = new Map();
-  if (consistencyReport?.issues) {
-    for (const issue of consistencyReport.issues) {
-      if (issue.pageNumber) {
-        if (!consistencyIssuesByPage.has(issue.pageNumber)) {
-          consistencyIssuesByPage.set(issue.pageNumber, []);
-        }
-        consistencyIssuesByPage.get(issue.pageNumber).push(issue);
-      }
-    }
-  }
-
-  // Build a map of entity issues by page
-  const entityIssuesByPage = new Map();
-  if (entityReport?.issues) {
-    for (const issue of entityReport.issues) {
-      if (issue.pageNumber) {
-        if (!entityIssuesByPage.has(issue.pageNumber)) {
-          entityIssuesByPage.set(issue.pageNumber, []);
-        }
-        entityIssuesByPage.get(issue.pageNumber).push(issue);
-      }
-    }
-  }
-
-  let totalScore = 0;
-  let scoredCount = 0;
-
-  for (const evaluation of pageEvaluations) {
-    const pageNum = evaluation.pageNumber;
-    // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
-    const score = evaluation.score ?? evaluation.qualityScore;
-    // Warn if fallback is used despite semantic evaluation running (indicates bug)
-    if (evaluation.score === null && evaluation.qualityScore !== null && evaluation.semanticScore !== null) {
-      log.warn(`⚠️ [REPAIR PLAN] Page ${pageNum}: Missing combined score despite semantic evaluation, using qualityScore fallback`);
-    }
-    const hasFixable = (evaluation.enrichedFixTargets?.length > 0) ||
-                       (evaluation.fixableIssues?.length > 0);
-    const evaluationFailed = !evaluation.evaluated;
-    const consistencyIssues = consistencyIssuesByPage.get(pageNum) || [];
-    const entityIssues = entityIssuesByPage.get(pageNum) || [];
-
-    // Track stats
-    if (score !== null && score !== undefined) {
-      totalScore += score;
-      scoredCount++;
-      plan.stats.evaluated++;
-    }
-
-    // Decision logic
-    if (evaluationFailed || score === null) {
-      // Evaluation failed - keep the image as-is (it was generated, just couldn't evaluate)
-      plan.pagesToKeep.push(pageNum);
-      plan.reasoning[pageNum] = `Evaluation failed: ${evaluation.error || 'unknown error'}`;
-    } else if (score < regenerateThreshold) {
-      // Score too low - regenerate
-      plan.pagesToRegenerate.push(pageNum);
-      plan.reasoning[pageNum] = `Score ${score}% < ${regenerateThreshold}% threshold`;
-    } else if (score < repairThreshold && hasFixable) {
-      // Below repair threshold with fixable issues
-      plan.pagesToRepair.push(pageNum);
-      const fixCount = (evaluation.enrichedFixTargets?.length || 0) +
-                       consistencyIssues.length + entityIssues.length;
-      plan.reasoning[pageNum] = `Score ${score}% < ${repairThreshold}% with ${fixCount} fixable issues`;
-    } else if (score < keepThreshold) {
-      // Between regenerate and keep threshold, no fixable issues - regenerate
-      plan.pagesToRegenerate.push(pageNum);
-      plan.reasoning[pageNum] = `Score ${score}% < ${keepThreshold}% without fixable issues`;
-    } else {
-      // Score good enough
-      plan.pagesToKeep.push(pageNum);
-      plan.reasoning[pageNum] = `Score ${score}% >= ${keepThreshold}% threshold`;
-    }
-  }
-
-  plan.stats.avgScore = scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0;
-
-  log.info(`📋 [REPAIR PLAN] Built plan: ${plan.pagesToRegenerate.length} regenerate, ${plan.pagesToRepair.length} repair, ${plan.pagesToKeep.length} keep (avg score: ${plan.stats.avgScore}%)`);
-
-  return plan;
-}
-
-/**
- * Build a categorized repair plan with different repair methods for different issue types
- *
- * Categories:
- * - iterate: Major issues → full regeneration via image analysis + 17-check scene
- * - styleRepair: Style mismatch → style transfer with good reference
- * - charRepair: Single character mismatch → targeted character replacement
- * - gridRepair: Clothing/artifacts → grid-based inpainting
- * - keep: Good enough pages
- *
- * @param {Array<Object>} pageEvaluations - Evaluation results from evaluateImageBatch
- * @param {Object} options - Plan options
- * @returns {Object} Categorized repair plan
- */
-function buildCategorizedRepairPlan(pageEvaluations, options = {}) {
-  const {
-    regenerateThreshold = 30,
-    keepThreshold = 70
-  } = options;
-
-  const plan = {
-    iterate: [],       // Major issues → full regeneration via iterate
-    styleRepair: [],   // Style mismatch → style transfer
-    charRepair: [],    // Character mismatch → character replacement
-    gridRepair: [],    // Clothing/artifacts → inpainting
-    keep: [],          // Good enough
-    reasoning: {},
-    stats: {
-      totalPages: pageEvaluations.length,
-      evaluated: 0,
-      avgScore: 0
-    },
-    // Flag to indicate this is a categorized plan
-    isCategorized: true
-  };
-
-  let totalScore = 0;
-  let scoredCount = 0;
-
-  for (const evaluation of pageEvaluations) {
-    const pageNum = evaluation.pageNumber;
-    // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
-    const score = evaluation.score ?? evaluation.qualityScore;
-    // Warn if fallback is used despite semantic evaluation running (indicates bug)
-    if (evaluation.score === null && evaluation.qualityScore !== null && evaluation.semanticScore !== null) {
-      log.warn(`⚠️ [CATEGORIZED REPAIR] Page ${pageNum}: Missing combined score despite semantic evaluation, using qualityScore fallback`);
-    }
-    const evaluationFailed = !evaluation.evaluated;
-
-    // Track stats
-    if (score !== null && score !== undefined) {
-      totalScore += score;
-      scoredCount++;
-      plan.stats.evaluated++;
-    }
-
-    // Skip failed evaluations
-    if (evaluationFailed || score === null) {
-      plan.keep.push({ pageNumber: pageNum, score: null });
-      plan.reasoning[pageNum] = `Evaluation failed: ${evaluation.error || 'unknown error'}`;
-      continue;
-    }
-
-    // Classify issues for this page
-    const issues = classifyIssues(evaluation);
-
-    // Decision priority: major > multiple character > style > single character > clothing
-    // Very low score always goes to iterate
-    if (score < regenerateThreshold || issues.majorIssues.length > 0) {
-      // Major issues or very low score → full iteration
-      const reasons = issues.majorIssues.map(i => i.reason);
-      if (score < regenerateThreshold) {
-        reasons.unshift(`Score ${score}% < ${regenerateThreshold}%`);
-      }
-      plan.iterate.push({
-        pageNumber: pageNum,
-        score,
-        reasons,
-        majorIssues: issues.majorIssues
-      });
-      plan.reasoning[pageNum] = `Iterate: ${reasons.join('; ')}`;
-    } else if (issues.characterMismatches.length > 1) {
-      // Multiple character mismatches → full iteration (too many to fix individually)
-      plan.iterate.push({
-        pageNumber: pageNum,
-        score,
-        reasons: [`${issues.characterMismatches.length} character mismatches`],
-        characterMismatches: issues.characterMismatches
-      });
-      plan.reasoning[pageNum] = `Iterate: ${issues.characterMismatches.length} character mismatches`;
-    } else if (issues.styleMismatch) {
-      // Style mismatch → style transfer
-      plan.styleRepair.push({
-        pageNumber: pageNum,
-        score,
-        reason: 'Style inconsistent with other pages'
-      });
-      plan.reasoning[pageNum] = 'Style repair: style_consistent=false';
-    } else if (issues.characterMismatches.length === 1) {
-      // Single character mismatch → targeted replacement
-      const charIssue = issues.characterMismatches[0];
-      plan.charRepair.push({
-        pageNumber: pageNum,
-        score,
-        character: charIssue.reference,
-        figure: charIssue.figure,
-        face_bbox: charIssue.face_bbox,
-        issues: charIssue.issues,
-        reason: charIssue.reason
-      });
-      plan.reasoning[pageNum] = `Character repair: ${charIssue.reason}`;
-    } else if (issues.clothingIssues.length > 0 && score < keepThreshold) {
-      // Clothing/artifact issues below keep threshold → grid inpainting
-      plan.gridRepair.push({
-        pageNumber: pageNum,
-        score,
-        issues: issues.clothingIssues,
-        reason: `${issues.clothingIssues.length} clothing/artifact issues`
-      });
-      plan.reasoning[pageNum] = `Grid repair: ${issues.clothingIssues.length} issues`;
-    } else {
-      // Score good enough or no actionable issues
-      plan.keep.push({ pageNumber: pageNum, score });
-      plan.reasoning[pageNum] = `Keep: score ${score}% >= ${keepThreshold}%`;
-    }
-  }
-
-  plan.stats.avgScore = scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0;
-
-  log.info(`📋 [REPAIR PLAN] Categorized: ${plan.iterate.length} iterate, ${plan.styleRepair.length} style, ${plan.charRepair.length} character, ${plan.gridRepair.length} grid, ${plan.keep.length} keep (avg: ${plan.stats.avgScore}%)`);
-
-  return plan;
-}
-
-/**
- * Execute a repair plan - regenerate or repair pages as specified
- *
- * @param {Object} plan - Repair plan from buildRepairPlan
- * @param {Map<number, Object>} pageData - Map of page number to page data (imageData, prompt, etc.)
- * @param {Map<number, Object>} evaluations - Map of page number to evaluation results
- * @param {Object} context - Generation context
- * @param {Object} context.modelOverrides - Model overrides for generation
- * @param {Function} context.usageTracker - Usage tracking callback
- * @param {Object} context.visualBible - Visual Bible data
- * @param {boolean} context.isAdmin - Whether user is admin (for debug output)
- * @param {Object} options - Execution options
- * @param {boolean} options.repairFirst - Run repairs before regenerations (default: true)
- * @param {boolean} options.useGridRepair - Use grid-based repair (default: true)
- * @returns {Promise<Object>} Results with updated images and repair history
- */
-async function executeRepairPlan(plan, pageData, evaluations, context, options = {}) {
-  const {
-    repairFirst = true,
-    useGridRepair = true
-  } = options;
-
-  const {
-    modelOverrides = {},
-    usageTracker = null,
-    visualBible = null,
-    isAdmin = false
-  } = context;
-
-  const results = {
-    repaired: new Map(),
-    regenerated: new Map(),
-    failed: new Map(),
-    history: []
-  };
-
-  const startTime = Date.now();
-
-  // Execute repairs first (faster, more likely to succeed)
-  if (repairFirst && plan.pagesToRepair.length > 0) {
-    log.info(`🔧 [REPAIR EXEC] Repairing ${plan.pagesToRepair.length} pages...`);
-
-    for (const pageNum of plan.pagesToRepair) {
-      const page = pageData.get(pageNum);
-      const evaluation = evaluations.get(pageNum);
-
-      if (!page || !page.imageData) {
-        log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: No image data, skipping repair`);
-        results.failed.set(pageNum, { error: 'No image data' });
-        continue;
-      }
-
-      try {
-        let repairResult;
-
-        if (useGridRepair) {
-          const { gridBasedRepair } = getGridBasedRepair();
-
-          const evalResults = {
-            quality: {
-              score: evaluation?.qualityScore,
-              fixTargets: evaluation?.enrichedFixTargets || evaluation?.fixTargets || [],
-              reasoning: evaluation?.reasoning,
-              matches: evaluation?.matches || []
-            },
-            incremental: null,
-            final: null
-          };
-
-          const gridRepairOutputDir = path.join(os.tmpdir(), 'grid-repair', `repair-${Date.now()}`);
-
-          const gridResult = await gridBasedRepair(
-            page.imageData,
-            pageNum,
-            evalResults,
-            {
-              outputDir: gridRepairOutputDir,
-              skipVerification: false,
-              saveIntermediates: isAdmin,
-              bboxDetection: evaluation?.bboxDetection,
-              onProgress: (step, msg) => log.debug(`  [GRID] Page ${pageNum} ${step}: ${msg}`)
-            }
-          );
-
-          if (gridResult.repaired && gridResult.imageData) {
-            // Re-evaluate repaired image to compare with original
-            const originalScore = evaluation?.qualityScore ?? 0;
-            const reEvalResult = await evaluateImageQuality(
-              gridResult.imageData,
-              page.prompt || '',
-              page.characterPhotos || [],
-              'scene',
-              modelOverrides?.qualityModel,
-              `PAGE ${pageNum} (post-repair)`,
-              page.text || null,
-              page.scene?.outlineExtract || page.scene?.sceneHint || null
-            );
-            const repairedScore = reEvalResult?.score ?? 0;
-
-            // Track quality eval usage
-            if (usageTracker && reEvalResult?.usage) {
-              usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-            }
-
-            // Use repaired only if score improved OR grid repair verified fixes
-            const hasVerifiedFixes = gridResult.fixedCount > 0;
-            const scoreImproved = repairedScore > originalScore;
-
-            if (scoreImproved || hasVerifiedFixes) {
-              repairResult = {
-                imageData: gridResult.imageData,
-                repaired: true,
-                method: 'grid',
-                fixedCount: gridResult.fixedCount,
-                totalIssues: gridResult.totalIssues,
-                originalScore,
-                repairedScore
-              };
-              results.repaired.set(pageNum, repairResult);
-              log.info(`✅ [REPAIR EXEC] Page ${pageNum}: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed (score: ${originalScore}% → ${repairedScore}%)`);
-            } else {
-              // Repair made it worse or no improvement - keep original
-              results.failed.set(pageNum, {
-                error: 'Repair did not improve score',
-                originalScore,
-                repairedScore,
-                keptOriginal: true
-              });
-              log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Repair rejected (score: ${originalScore}% → ${repairedScore}%), keeping original`);
-            }
-          } else {
-            results.failed.set(pageNum, { error: 'Grid repair failed', result: gridResult });
-            log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Grid repair failed`);
-          }
-        } else {
-          // Grok text edit repair (no bbox needed)
-          const qualityIssues = evaluation?.fixableIssues || [];
-          const semanticIssues = (evaluation?.semanticResult?.issues || evaluation?.semanticResult?.semanticIssues || [])
-            .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}` }));
-          const repairIssueTexts = [...qualityIssues, ...semanticIssues]
-            .map(i => i.description || i.issue || i.fix || '').filter(Boolean);
-          let inpaintResult = { repaired: false, imageData: null };
-          if (repairIssueTexts.length > 0) {
-            const editInstruction = repairIssueTexts.join('. ');
-            log.info(`🔧 [REPAIR EXEC] Page ${pageNum}: Grok text edit with ${repairIssueTexts.length} issues`);
-            const editResult = await editImageWithPrompt(page.imageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
-            if (editResult?.imageData) {
-              inpaintResult = { repaired: true, imageData: editResult.imageData, usage: editResult.usage };
-            }
-          }
-
-          if (inpaintResult.repaired && inpaintResult.imageData) {
-            // Re-evaluate repaired image to compare with original
-            const originalScore = evaluation?.qualityScore ?? 0;
-            const reEvalResult = await evaluateImageQuality(
-              inpaintResult.imageData,
-              page.prompt || '',
-              page.characterPhotos || [],
-              'scene',
-              modelOverrides?.qualityModel,
-              `PAGE ${pageNum} (post-repair)`,
-              page.text || null,
-              page.scene?.outlineExtract || page.scene?.sceneHint || null
-            );
-            const repairedScore = reEvalResult?.score ?? 0;
-
-            // Track quality eval usage
-            if (usageTracker && reEvalResult?.usage) {
-              usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-            }
-
-            if (repairedScore > originalScore) {
-              repairResult = {
-                imageData: inpaintResult.imageData,
-                repaired: true,
-                method: 'inpaint',
-                originalScore,
-                repairedScore
-              };
-              results.repaired.set(pageNum, repairResult);
-              log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Inpaint repair completed (score: ${originalScore}% → ${repairedScore}%)`);
-            } else {
-              // Repair made it worse - keep original
-              results.failed.set(pageNum, {
-                error: 'Repair did not improve score',
-                originalScore,
-                repairedScore,
-                keptOriginal: true
-              });
-              log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Inpaint rejected (score: ${originalScore}% → ${repairedScore}%), keeping original`);
-            }
-          } else {
-            results.failed.set(pageNum, { error: 'Inpaint repair failed' });
-          }
-        }
-
-        results.history.push({
-          pageNumber: pageNum,
-          action: 'repair',
-          success: results.repaired.has(pageNum),
-          method: useGridRepair ? 'grid' : 'inpaint'
-        });
-      } catch (error) {
-        log.error(`❌ [REPAIR EXEC] Page ${pageNum}: Repair error - ${error.message}`);
-        results.failed.set(pageNum, { error: error.message });
-        results.history.push({
-          pageNumber: pageNum,
-          action: 'repair',
-          success: false,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  // Execute regenerations
-  if (plan.pagesToRegenerate.length > 0) {
-    log.info(`🔄 [REPAIR EXEC] Regenerating ${plan.pagesToRegenerate.length} pages...`);
-
-    for (const pageNum of plan.pagesToRegenerate) {
-      const page = pageData.get(pageNum);
-
-      if (!page || !page.prompt) {
-        log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: No prompt data, skipping regeneration`);
-        results.failed.set(pageNum, { error: 'No prompt data' });
-        continue;
-      }
-
-      try {
-        // Use generateImageOnly to regenerate
-        const genResult = await generateImageOnly(
-          page.prompt,
-          page.characterPhotos || [],
-          {
-            imageModelOverride: modelOverrides?.imageModel,
-            imageBackendOverride: modelOverrides?.imageBackend,
-            landmarkPhotos: page.landmarkPhotos || [],
-            visualBibleGrid: page.visualBibleGrid,
-            pageNumber: pageNum
-          }
-        );
-
-        if (genResult.imageData) {
-          results.regenerated.set(pageNum, {
-            imageData: genResult.imageData,
-            modelId: genResult.modelId,
-            thinkingText: genResult.thinkingText || null,
-            usage: genResult.usage
-          });
-          log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Regenerated successfully`);
-
-          // Track usage
-          if (usageTracker && genResult.usage) {
-            usageTracker(genResult.usage, null, genResult.modelId, null, false);
-          }
-        } else {
-          results.failed.set(pageNum, { error: 'No image data returned' });
-        }
-
-        results.history.push({
-          pageNumber: pageNum,
-          action: 'regenerate',
-          success: results.regenerated.has(pageNum)
-        });
-      } catch (error) {
-        log.error(`❌ [REPAIR EXEC] Page ${pageNum}: Regeneration error - ${error.message}`);
-        results.failed.set(pageNum, { error: error.message });
-        results.history.push({
-          pageNumber: pageNum,
-          action: 'regenerate',
-          success: false,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  log.info(`✅ [REPAIR EXEC] Completed in ${elapsed}s: ${results.repaired.size} repaired, ${results.regenerated.size} regenerated, ${results.failed.size} failed`);
-
-  return results;
-}
-
-/**
- * Merge repair execution results back into the original image array
- *
- * @param {Array<Object>} originalImages - Original page images array
- * @param {Array<Object>} evaluations - Evaluation results from evaluateImageBatch
- * @param {Object} repairResults - Results from executeRepairPlan
- * @returns {Array<Object>} Merged array with updated images and evaluation data
- */
-function mergeRepairResults(originalImages, evaluations, repairResults) {
-  // Build lookup maps
-  const evalMap = new Map();
-  for (const evaluation of evaluations) {
-    evalMap.set(evaluation.pageNumber, evaluation);
-  }
-
-  return originalImages.map(img => {
-    const pageNum = img.pageNumber;
-    const evaluation = evalMap.get(pageNum);
-    const repaired = repairResults.repaired.get(pageNum);
-    const regenerated = repairResults.regenerated.get(pageNum);
-
-    // Start with original image data
-    let mergedImage = { ...img };
-
-    // Apply repair or regeneration if available
-    // Preserve original in imageData (version 0), push repair to imageVersions (version 1+)
-    if (repaired?.imageData) {
-      mergedImage.imageVersions = [{
-        imageData: repaired.imageData,
-        wasRepaired: true,
-        repairMethod: repaired.method,
-        generatedAt: new Date().toISOString(),
-        source: 'separated-eval-repair'
-      }];
-      mergedImage.wasRepaired = true;
-      mergedImage.repairMethod = repaired.method;
-    } else if (regenerated?.imageData) {
-      mergedImage.imageVersions = [{
-        imageData: regenerated.imageData,
-        wasRegenerated: true,
-        modelId: regenerated.modelId,
-        generatedAt: new Date().toISOString(),
-        source: 'separated-eval-regen'
-      }];
-      mergedImage.wasRegenerated = true;
-      mergedImage.modelId = regenerated.modelId;
-    }
-
-    // Add evaluation data
-    if (evaluation) {
-      mergedImage.qualityScore = evaluation.qualityScore;
-      mergedImage.qualityReasoning = evaluation.reasoning;
-      mergedImage.bboxDetection = evaluation.bboxDetection;
-      mergedImage.bboxOverlayImage = evaluation.bboxOverlayImage;
-      mergedImage.fixableIssues = evaluation.fixableIssues;
-      mergedImage.figures = evaluation.figures;
-      mergedImage.matches = evaluation.matches;
-    }
-
-    return mergedImage;
-  });
-}
 
 // ============================================================================
 // UNIFIED REPAIR PIPELINE
@@ -4818,12 +4211,16 @@ function buildRegenFeedback(evaluation) {
 /**
  * Choose whether to inpaint or iterate a bad page based on scores and round history.
  *
- * Decision logic:
- * - Round 3: always inpaint (last chance, cheapest)
- * - Semantic score < threshold OR quality score < threshold: iterate (fundamentally broken)
- * - Round 2: alternate strategy from round 1 if possible
- * - Has fixable issues with fix targets: inpaint
- * - Otherwise: iterate (bad score, no specific issues to fix)
+ * HARD RULE: never return 'inpaint' when there are no fix targets to act on.
+ * Inpaint without targets is a no-op that wastes a round and produces no upgrade.
+ *
+ * Decision logic (applies the same way in every round, including round 3):
+ *   1. Semantic score < threshold OR quality score < threshold → iterate
+ *      (the image itself is fundamentally broken — surgical fixes won't help)
+ *   2. Round 2 alternation: if round 1 was iterate AND there are fixable
+ *      issues, try inpaint; if round 1 was inpaint, try iterate
+ *   3. Has specific fixable issues / fix targets → inpaint (surgical fix)
+ *   4. No specific issues but bad score → iterate (general redo)
  *
  * @param {Object} evaluation - { qualityScore, semanticScore, fixableIssues, fixTargets, enrichedFixTargets }
  * @param {number} round - Current round (1-based)
@@ -4837,28 +4234,26 @@ function chooseRepairStrategy(evaluation, round, previousAction, options = {}) {
     qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate
   } = options;
 
-  // Round 3+: inpaint only (last chance, cheap)
-  if (round >= 3) return 'inpaint';
+  // Define fix targets up front — used in TWO places below, must stay consistent.
+  const hasFixableContent = (evaluation.fixableIssues?.length > 0) ||
+    (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
 
-  // Fundamentally broken: iterate
+  // Fundamentally broken: iterate (image itself is the problem, surgical fix won't help)
   if (evaluation.semanticScore != null && evaluation.semanticScore < semanticThresholdForIterate) return 'iterate';
   if ((evaluation.qualityScore ?? 100) < qualityThresholdForIterate) return 'iterate';
 
-  // Round 2: alternate strategy from round 1
+  // Round 2: alternate strategy from round 1 (variety helps escape local minima
+  // where the same approach keeps producing the same problem). Alternation only
+  // picks 'inpaint' when fixable content actually exists.
   if (round === 2 && previousAction) {
-    const hasFixableIssues = (evaluation.fixableIssues?.length > 0) ||
-      (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
-    if (previousAction === 'iterate' && hasFixableIssues) return 'inpaint';
+    if (previousAction === 'iterate' && hasFixableContent) return 'inpaint';
     if (previousAction === 'inpaint') return 'iterate';
   }
 
-  // Has specific fixable issues -> inpaint
-  const hasFixableContent = (evaluation.fixableIssues?.length > 0) ||
-    (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
-  if (hasFixableContent) return 'inpaint';
-
-  // No specific issues but bad score -> iterate
-  return 'iterate';
+  // Default: inpaint when targets exist (surgical fix is cheaper and preserves
+  // the rest of the image), otherwise iterate (general redo). NEVER inpaint
+  // without targets — the call would be a no-op that burns a round.
+  return hasFixableContent ? 'inpaint' : 'iterate';
 }
 
 /**
@@ -5234,28 +4629,90 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 2: Round loop (1 to maxPasses) — inpaint or iterate per bad page
   // =========================================================================
+  // Score terminology (THREE dimensions feed the round-loop decisions):
+  //   visual    = raw vision-model quality score (qualityScore in evaluation)
+  //               "is the image well rendered?"
+  //   semantic  = semantic fidelity penalty already folded into evaluation.score
+  //               BEFORE this loop runs. semanticPenalty = visual - evaluation.score
+  //               "does the image match what the scene description says?"
+  //   image     = visual - semantic = evaluation.score
+  //               combined "how good is the image itself" score (no entity yet)
+  //   entity    = entity consistency penalty (computed in this loop from entity report)
+  //               "do characters look consistent across pages?"
+  //   final     = image - entity
+  //               the score findBadPages compares to regenThreshold
+  //
+  // Page classification:
+  //   final >= regenThreshold                                  → ok                 (no action)
+  //   image < regenThreshold                                   → BAD-image          → iterate/inpaint (visual or semantic broken)
+  //   image in [regenThreshold, HIGH_IMAGE_FLOOR) AND final<thr → BAD-mixed         → iterate/inpaint
+  //   image >= HIGH_IMAGE_FLOOR AND final < regenThreshold     → ENTITY-ONLY        → defer to Step 5 (character repair)
+  //
+  // Rationale: a high-quality image with high semantic match but only entity drift
+  // should NOT be redone — Step 5 surgically repairs the character (~$0.02) instead of
+  // regenerating the whole image (~$0.05+) which produces a different image with
+  // different micro-issues (the convergence loop). But if visual OR semantic is low,
+  // the image itself is the problem and a full redo is justified.
+  const HIGH_IMAGE_FLOOR = 90;
+
   let currentEntityReport = entityReport;
   let upgradedCount = 0;
 
   for (let round = 1; round <= maxRegenAttempts; round++) {
-    // Build eval map for this round using best versions so far
+    // Build eval map for this round using best versions so far. Each entry now
+    // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
+    // finalScore so bad-page detection and strategy choice can read each dimension
+    // directly without mutating the existing qualityScore field (300+ call sites).
     const roundEvalPages = {};
+    const entityOnlyPages = [];
     for (const img of rawImages) {
       if (!img.imageData) continue;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       if (bestSoFar && bestSoFar.score != null) {
+        // bestSoFar.evaluation.qualityScore = raw visual (no penalties)
+        // bestSoFar.score                   = visual - semanticPenalty (image score)
+        const visualScore = bestSoFar.evaluation?.qualityScore ?? bestSoFar.score;
+        const imageScore = bestSoFar.score;
+        const semanticPenalty = Math.max(0, visualScore - imageScore);
         const entityPenalty = getEntityPenalty(img.pageNumber, currentEntityReport);
-        const adjustedScore = Math.max(0, bestSoFar.score - entityPenalty);
+        const finalScore = Math.max(0, imageScore - entityPenalty);
+
+        // Entity-only = image (visual+semantic combined) is good, only entity drags
+        const isEntityOnly =
+          imageScore >= HIGH_IMAGE_FLOOR &&
+          finalScore < regenThreshold;
+
+        const verdict =
+          finalScore >= regenThreshold ? 'ok'
+          : isEntityOnly ? 'ENTITY-ONLY → defer to Step 5'
+          : 'BAD → iterate/inpaint';
+
+        log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore} → ${verdict}`);
+
+        if (isEntityOnly) {
+          // Skip from this round's bad-page list — Step 5 character repair
+          // handles the character drift surgically. Don't iterate.
+          entityOnlyPages.push(img.pageNumber);
+          continue;
+        }
+
         roundEvalPages[img.pageNumber] = {
           ...bestSoFar.evaluation,
-          score: adjustedScore,
-          qualityScore: adjustedScore,
+          // Explicit score fields — readers should use these instead of
+          // the ambiguous qualityScore which we leave untouched at the raw
+          // visual value.
+          visualScore,
+          semanticPenalty,
+          imageScore,
+          entityPenalty,
+          finalScore,
         };
-        if (entityPenalty > 0) {
-          log.debug(`📊 [UNIFIED PIPELINE] Round ${round} Page ${img.pageNumber}: best=${bestSoFar.score}, entity penalty=${entityPenalty}, adjusted=${adjustedScore}`);
-        }
       }
+    }
+
+    if (entityOnlyPages.length > 0) {
+      log.info(`👤 [UNIFIED PIPELINE] Round ${round}: ${entityOnlyPages.length} entity-only page(s) deferred to Step 5: [${entityOnlyPages.join(', ')}]`);
     }
 
     const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
@@ -6065,7 +5522,9 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata }
   );
 
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
+  // visual = raw vision-model score; the pipeline round loop will subtract entity penalty
+  // before deciding whether the new image is good enough.
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (visual: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
   return {
     imageData: imageResult.imageData,
@@ -6084,115 +5543,6 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   };
 }
 
-/**
- * Repair style mismatch by transferring style from a good reference page
- *
- * @param {string} imageData - Current image data (base64) that needs style fix
- * @param {string} referenceImage - Good reference image data (base64) with correct style
- * @param {string} artStyle - Art style name (e.g., 'pixar', 'watercolor')
- * @param {Object} options - Options
- * @returns {Promise<Object>} { imageData, method: 'style_transfer' }
- */
-async function repairStyleMismatch(imageData, referenceImage, artStyle, options = {}) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  log.info(`🎨 [STYLE REPAIR] Starting style transfer to match ${artStyle} reference...`);
-
-  // Extract base64 from both images
-  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  const referenceBase64 = referenceImage.replace(/^data:image\/\w+;base64,/, '');
-
-  const prompt = `Convert this illustration to match the art style of the reference image.
-
-REFERENCE STYLE: ${artStyle} illustration style
-The reference image shows the CORRECT style including:
-- Color palette and saturation levels
-- Line weight and stroke style
-- Shading technique and lighting approach
-- Overall artistic rendering
-
-CURRENT IMAGE: Has correct composition but inconsistent style
-
-YOUR TASK: Redraw the current image (second image) in the EXACT style of the reference (first image).
-- Match the color palette and saturation
-- Match the line weight and stroke style
-- Match the shading and lighting technique
-- Keep the composition, characters, poses, and actions IDENTICAL to the current image
-- Only change the artistic rendering style to match the reference
-
-OUTPUT: A single image matching the reference style.`;
-
-  // Build parts: prompt, reference image (labeled), current image (labeled)
-  const parts = [
-    { text: prompt },
-    { text: 'REFERENCE (correct style):' },
-    { inline_data: { mime_type: 'image/jpeg', data: referenceBase64 } },
-    { text: 'CURRENT IMAGE (needs style fix):' },
-    { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
-  ];
-
-  // Style repair always uses a Gemini image model (pageImage may be Grok)
-  const defaultPageImage = MODEL_DEFAULTS.pageImage || '';
-  const modelId = defaultPageImage.startsWith('gemini') ? defaultPageImage : 'gemini-2.5-flash-image';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-  const systemInstruction = getImageSystemInstruction();
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(120000),
-    body: JSON.stringify({
-      ...(systemInstruction && { systemInstruction }),
-      contents: [{ parts }],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"],
-        temperature: 0.5,
-        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
-      }
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    log.error('❌ [STYLE REPAIR] Gemini API error:', error);
-    throw new Error(`Style repair failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  // Extract usage
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
-  log.debug(`📊 [STYLE REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}`);
-
-  // Extract thinking text
-  const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'STYLE REPAIR');
-
-  // Extract the generated image
-  if (data.candidates && data.candidates[0]?.content?.parts) {
-    for (const part of data.candidates[0].content.parts) {
-      const inlineData = part.inlineData || part.inline_data;
-      if (inlineData && inlineData.data) {
-        const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
-        const repairedImageData = `data:${respMimeType};base64,${inlineData.data}`;
-        log.info(`✅ [STYLE REPAIR] Style transfer completed successfully`);
-        return {
-          imageData: repairedImageData,
-          usage: { inputTokens, outputTokens, thinkingTokens, model: modelId },
-          thinkingText,
-          method: 'style_transfer'
-        };
-      }
-    }
-  }
-
-  log.warn('⚠️ [STYLE REPAIR] No image in response');
-  return { imageData: null, method: 'style_transfer' };
-}
 
 /**
  * Repair character mismatch by replacing a specific character with their avatar
@@ -6748,428 +6098,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   }
 }
 
-/**
- * Execute a categorized repair plan - uses different repair methods for different issues
- *
- * @param {Object} plan - Categorized repair plan from buildCategorizedRepairPlan
- * @param {Map<number, Object>} pageData - Map of page number to page data
- * @param {Map<number, Object>} evaluations - Map of page number to evaluation results
- * @param {Object} context - Generation context
- * @param {Object} context.storyData - Full story data object (required for iterate)
- * @param {Array} context.characters - Character array with avatarUrl
- * @param {Object} context.modelOverrides - Model overrides
- * @param {Function} context.usageTracker - Usage tracking callback
- * @param {Object} options - Execution options
- * @returns {Promise<Object>} Results with updated images and repair history
- */
-async function executeCategorizedRepairPlan(plan, pageData, evaluations, context, options = {}) {
-  const {
-    storyData = null,
-    characters = [],
-    modelOverrides = {},
-    usageTracker = null,
-    isAdmin = false
-  } = context;
-
-  const results = {
-    iterated: new Map(),
-    styleRepaired: new Map(),
-    charRepaired: new Map(),
-    gridRepaired: new Map(),
-    failed: new Map(),
-    history: []
-  };
-
-  const startTime = Date.now();
-
-  // 1. Execute iterations (major issues) - most expensive, highest priority
-  if (plan.iterate.length > 0 && storyData) {
-    log.info(`🔄 [REPAIR EXEC] Iterating ${plan.iterate.length} pages with major issues...`);
-
-    for (const item of plan.iterate) {
-      const page = pageData.get(item.pageNumber);
-      if (!page || !page.imageData) {
-        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No image data, skipping iterate`);
-        results.failed.set(item.pageNumber, { error: 'No image data' });
-        continue;
-      }
-
-      try {
-        log.info(`🔄 [REPAIR EXEC] Page ${item.pageNumber}: Full iteration (${item.reasons.join('; ')})`);
-
-        const iterResult = await iteratePage(
-          page.imageData,
-          item.pageNumber,
-          storyData,
-          { modelOverrides, usageTracker }
-        );
-
-        if (iterResult.imageData) {
-          // Re-evaluate to compare scores
-          const originalScore = item.score || 0;
-          const reEvalResult = await evaluateImageQuality(
-            iterResult.imageData,
-            page.prompt || '',
-            page.characterPhotos || [],
-            'scene',
-            modelOverrides?.qualityModel,
-            `PAGE ${item.pageNumber} (post-iterate)`
-          );
-          const newScore = reEvalResult?.score ?? 0;
-
-          if (usageTracker && reEvalResult?.usage) {
-            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-          }
-
-          // Accept if improved or at least as good (iteration addresses structural issues)
-          if (newScore >= originalScore) {
-            results.iterated.set(item.pageNumber, {
-              imageData: iterResult.imageData,
-              newScene: iterResult.newScene,
-              previewMismatches: iterResult.previewMismatches,
-              originalScore,
-              newScore,
-              method: 'iterate'
-            });
-            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Iteration accepted (score: ${originalScore}% → ${newScore}%)`);
-          } else {
-            results.failed.set(item.pageNumber, {
-              error: 'Iteration did not improve score',
-              originalScore,
-              newScore,
-              keptOriginal: true
-            });
-            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Iteration rejected (score: ${originalScore}% → ${newScore}%), keeping original`);
-          }
-        } else {
-          results.failed.set(item.pageNumber, { error: 'Iteration produced no image' });
-        }
-
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'iterate',
-          success: results.iterated.has(item.pageNumber),
-          reasons: item.reasons
-        });
-      } catch (error) {
-        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Iteration error - ${error.message}`);
-        results.failed.set(item.pageNumber, { error: error.message });
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'iterate',
-          success: false,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  // 2. Execute style repairs - if we have good reference pages
-  if (plan.styleRepair.length > 0) {
-    // Find a good reference page (score >= 70, not in any repair list)
-    const goodPages = plan.keep.filter(p => p.score >= 70);
-    if (goodPages.length > 0) {
-      const referencePageNum = goodPages[0].pageNumber;
-      const referencePage = pageData.get(referencePageNum);
-      const referenceImage = referencePage?.imageData;
-
-      if (referenceImage) {
-        log.info(`🎨 [REPAIR EXEC] Style repairing ${plan.styleRepair.length} pages using page ${referencePageNum} as reference...`);
-
-        for (const item of plan.styleRepair) {
-          const page = pageData.get(item.pageNumber);
-          if (!page || !page.imageData) {
-            results.failed.set(item.pageNumber, { error: 'No image data' });
-            continue;
-          }
-
-          try {
-            log.info(`🎨 [REPAIR EXEC] Page ${item.pageNumber}: Style transfer`);
-
-            const styleResult = await repairStyleMismatch(
-              page.imageData,
-              referenceImage,
-              storyData?.artStyle || 'pixar'
-            );
-
-            if (styleResult.imageData) {
-              // Re-evaluate
-              const originalScore = item.score || 0;
-              const reEvalResult = await evaluateImageQuality(
-                styleResult.imageData,
-                page.prompt || '',
-                page.characterPhotos || [],
-                'scene',
-                modelOverrides?.qualityModel,
-                `PAGE ${item.pageNumber} (post-style)`
-              );
-              const newScore = reEvalResult?.score ?? 0;
-
-              if (usageTracker && reEvalResult?.usage) {
-                usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-              }
-
-              results.styleRepaired.set(item.pageNumber, {
-                imageData: styleResult.imageData,
-                originalScore,
-                newScore,
-                method: 'style_transfer'
-              });
-              log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Style transfer completed (score: ${originalScore}% → ${newScore}%)`);
-            } else {
-              results.failed.set(item.pageNumber, { error: 'Style transfer produced no image' });
-            }
-
-            results.history.push({
-              pageNumber: item.pageNumber,
-              action: 'style_repair',
-              success: results.styleRepaired.has(item.pageNumber)
-            });
-          } catch (error) {
-            log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Style repair error - ${error.message}`);
-            results.failed.set(item.pageNumber, { error: error.message });
-            results.history.push({
-              pageNumber: item.pageNumber,
-              action: 'style_repair',
-              success: false,
-              error: error.message
-            });
-          }
-        }
-      } else {
-        log.warn(`⚠️ [REPAIR EXEC] No good reference image available for style repair`);
-        for (const item of plan.styleRepair) {
-          results.failed.set(item.pageNumber, { error: 'No reference image for style repair' });
-        }
-      }
-    } else {
-      log.warn(`⚠️ [REPAIR EXEC] No good reference pages (score >= 70) for style repair`);
-      for (const item of plan.styleRepair) {
-        // Fall back to iteration for style issues
-        plan.iterate.push({ ...item, reasons: ['Style mismatch (no reference available)'] });
-      }
-    }
-  }
-
-  // 3. Execute character replacements
-  if (plan.charRepair.length > 0) {
-    log.info(`👤 [REPAIR EXEC] Character replacing ${plan.charRepair.length} pages...`);
-
-    for (const item of plan.charRepair) {
-      const page = pageData.get(item.pageNumber);
-      if (!page || !page.imageData) {
-        results.failed.set(item.pageNumber, { error: 'No image data' });
-        continue;
-      }
-
-      // Find the character's avatar
-      const charName = item.character;
-      const charData = characters.find(c =>
-        c.name?.toLowerCase() === charName?.toLowerCase()
-      );
-
-      if (!charData?.avatarUrl && !charData?.data?.avatarUrl) {
-        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No avatar for ${charName}, falling back to grid repair`);
-        plan.gridRepair.push({
-          pageNumber: item.pageNumber,
-          score: item.score,
-          issues: [{ type: 'character', description: `${charName} mismatch`, severity: 'MODERATE' }]
-        });
-        continue;
-      }
-
-      const avatarUrl = charData.avatarUrl || charData.data?.avatarUrl;
-
-      // We need a face bbox - check if we have one from evaluation
-      const faceBbox = item.face_bbox;
-      if (!faceBbox || faceBbox.length !== 4) {
-        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No face bbox for ${charName}, falling back to grid repair`);
-        plan.gridRepair.push({
-          pageNumber: item.pageNumber,
-          score: item.score,
-          issues: [{ type: 'character', description: `${charName} mismatch (no bbox)`, severity: 'MODERATE' }]
-        });
-        continue;
-      }
-
-      try {
-        log.info(`👤 [REPAIR EXEC] Page ${item.pageNumber}: Character replacement (${charName})`);
-
-        const charResult = await repairCharacterMismatch(
-          page.imageData,
-          avatarUrl,
-          faceBbox,
-          charName
-        );
-
-        if (charResult.imageData) {
-          // Re-evaluate
-          const originalScore = item.score || 0;
-          const reEvalResult = await evaluateImageQuality(
-            charResult.imageData,
-            page.prompt || '',
-            page.characterPhotos || [],
-            'scene',
-            modelOverrides?.qualityModel,
-            `PAGE ${item.pageNumber} (post-char)`
-          );
-          const newScore = reEvalResult?.score ?? 0;
-
-          if (usageTracker && reEvalResult?.usage) {
-            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-          }
-
-          if (newScore >= originalScore) {
-            results.charRepaired.set(item.pageNumber, {
-              imageData: charResult.imageData,
-              character: charName,
-              originalScore,
-              newScore,
-              method: 'character_replacement'
-            });
-            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Character replacement accepted (score: ${originalScore}% → ${newScore}%)`);
-          } else {
-            results.failed.set(item.pageNumber, {
-              error: 'Character replacement did not improve score',
-              originalScore,
-              newScore,
-              keptOriginal: true
-            });
-            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Character replacement rejected (score: ${originalScore}% → ${newScore}%)`);
-          }
-        } else {
-          results.failed.set(item.pageNumber, { error: 'Character replacement produced no image' });
-        }
-
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'char_repair',
-          success: results.charRepaired.has(item.pageNumber),
-          character: charName
-        });
-      } catch (error) {
-        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Character repair error - ${error.message}`);
-        results.failed.set(item.pageNumber, { error: error.message });
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'char_repair',
-          success: false,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  // 4. Execute grid-based repairs (clothing/artifacts)
-  if (plan.gridRepair.length > 0) {
-    log.info(`🔧 [REPAIR EXEC] Grid repairing ${plan.gridRepair.length} pages...`);
-
-    const { gridBasedRepair } = getGridBasedRepair();
-
-    for (const item of plan.gridRepair) {
-      const page = pageData.get(item.pageNumber);
-      const evaluation = evaluations.get(item.pageNumber);
-
-      if (!page || !page.imageData) {
-        results.failed.set(item.pageNumber, { error: 'No image data' });
-        continue;
-      }
-
-      try {
-        log.info(`🔧 [REPAIR EXEC] Page ${item.pageNumber}: Grid inpainting (${item.issues.length} issues)`);
-
-        const evalResults = {
-          quality: {
-            score: evaluation?.qualityScore,
-            fixTargets: evaluation?.enrichedFixTargets || evaluation?.fixTargets || [],
-            reasoning: evaluation?.reasoning,
-            matches: evaluation?.matches || [],
-            fixable_issues: item.issues
-          },
-          incremental: null,
-          final: null
-        };
-
-        const gridRepairOutputDir = path.join(os.tmpdir(), 'grid-repair', `repair-${Date.now()}`);
-
-        const gridResult = await gridBasedRepair(
-          page.imageData,
-          item.pageNumber,
-          evalResults,
-          {
-            outputDir: gridRepairOutputDir,
-            skipVerification: false,
-            saveIntermediates: isAdmin,
-            bboxDetection: evaluation?.bboxDetection,
-            onProgress: (step, msg) => log.debug(`  [GRID] Page ${item.pageNumber} ${step}: ${msg}`)
-          }
-        );
-
-        if (gridResult.repaired && gridResult.imageData) {
-          // Re-evaluate
-          const originalScore = item.score || 0;
-          const reEvalResult = await evaluateImageQuality(
-            gridResult.imageData,
-            page.prompt || '',
-            page.characterPhotos || [],
-            'scene',
-            modelOverrides?.qualityModel,
-            `PAGE ${item.pageNumber} (post-grid)`
-          );
-          const newScore = reEvalResult?.score ?? 0;
-
-          if (usageTracker && reEvalResult?.usage) {
-            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
-          }
-
-          const hasVerifiedFixes = gridResult.fixedCount > 0;
-          if (newScore >= originalScore || hasVerifiedFixes) {
-            results.gridRepaired.set(item.pageNumber, {
-              imageData: gridResult.imageData,
-              fixedCount: gridResult.fixedCount,
-              totalIssues: gridResult.totalIssues,
-              originalScore,
-              newScore,
-              method: 'grid_inpaint'
-            });
-            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair completed (${gridResult.fixedCount}/${gridResult.totalIssues} fixed, score: ${originalScore}% → ${newScore}%)`);
-          } else {
-            results.failed.set(item.pageNumber, {
-              error: 'Grid repair did not improve score',
-              originalScore,
-              newScore,
-              keptOriginal: true
-            });
-            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair rejected (score: ${originalScore}% → ${newScore}%)`);
-          }
-        } else {
-          results.failed.set(item.pageNumber, { error: 'Grid repair failed', result: gridResult });
-        }
-
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'grid_repair',
-          success: results.gridRepaired.has(item.pageNumber),
-          issueCount: item.issues.length
-        });
-      } catch (error) {
-        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair error - ${error.message}`);
-        results.failed.set(item.pageNumber, { error: error.message });
-        results.history.push({
-          pageNumber: item.pageNumber,
-          action: 'grid_repair',
-          success: false,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  log.info(`✅ [REPAIR EXEC] Categorized repairs completed in ${elapsed}s: ${results.iterated.size} iterated, ${results.styleRepaired.size} style, ${results.charRepaired.size} character, ${results.gridRepaired.size} grid, ${results.failed.size} failed`);
-
-  return results;
-}
 
 /**
  * Edit an image based on a user-provided prompt using Gemini's image editing capabilities
@@ -7794,7 +6722,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             }
           );
 
-          // Convert grid result to match autoRepairWithTargets format
+          // Normalize grid repair result into the shared { imageData, repairHistory } shape
           repairResult = {
             imageData: gridResult.imageData,
             repaired: gridResult.repaired,
@@ -7899,7 +6827,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               // Two-stage bounding box detection results (new)
               bboxDetection: bboxDetectionHistory,
               bboxOverlayImage: bboxOverlayImage,  // Image with boxes drawn for dev mode
-              // Repair details from autoRepairWithTargets
+              // Repair details from inpaint / grid repair
               repairDetails: repairResult.repairHistory || [],
               // Grid repair data for UI display (only present for grid repairs)
               grids: repairResult.grids,
@@ -9267,351 +8195,6 @@ IMPORTANT INSTRUCTIONS:
   }
 }
 
-/**
- * Auto-repair using pre-computed fix targets from quality evaluation
- * Combines ALL fix targets into ONE mask and ONE API call for efficiency
- * Uses text-based coordinates instead of mask images for reliable region targeting.
- * @param {string} imageData - Base64 image data URL
- * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
- * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after combined fix (default 0)
- * @param {Object} options - Optional settings
- * @param {boolean} options.includeDebugImages - Include before/after images in repair history (for admin users)
- * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
- */
-async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0, options = {}) {
-  const { includeDebugImages = false } = options;
-  const repairHistory = [];
-  let currentImage = imageData;
-
-  if (!fixTargets || fixTargets.length === 0) {
-    log.info(`🔄 [AUTO-REPAIR] No fix targets provided, skipping repair`);
-    return {
-      imageData: currentImage,
-      repaired: false,
-      noErrorsFound: true,
-      repairHistory
-    };
-  }
-
-  // Group fix targets by issue type and apply adaptive padding
-  // Research: Combining unrelated regions (face vs objects) causes artifacts
-  const { faceTargets, anatomyTargets, objectTargets } = groupFixTargetsForInpainting(fixTargets);
-
-  // Collect all padded bounding boxes for coverage check
-  const allTargets = [...faceTargets, ...anatomyTargets, ...objectTargets];
-  const boundingBoxes = allTargets.map(t => t.boundingBox);
-
-  // Check mask coverage before attempting repair
-  const maskCoverage = calculateMaskCoverage(boundingBoxes);
-  log.info(`🔄 [AUTO-REPAIR] ${fixTargets.length} fix targets covering ${maskCoverage.toFixed(1)}% of image (with padding)`);
-
-  if (maskCoverage > MAX_MASK_COVERAGE_PERCENT) {
-    log.warn(`⚠️ [AUTO-REPAIR] Mask covers ${maskCoverage.toFixed(1)}% of image (>${MAX_MASK_COVERAGE_PERCENT}%) - too large for inpainting, skipping repair`);
-    log.warn(`   Inpainting works best for small fixes. For large areas, consider regenerating the entire image.`);
-    repairHistory.push({
-      attempt: 1,
-      errorType: 'mask_too_large',
-      description: `Mask coverage ${maskCoverage.toFixed(1)}% exceeds ${MAX_MASK_COVERAGE_PERCENT}% threshold`,
-      boundingBoxes: boundingBoxes,
-      targetCount: fixTargets.length,
-      coverage: maskCoverage,
-      success: false,
-      skipped: true,
-      reason: 'Inpainting is not effective for large masked areas. The image should be regenerated instead.',
-      timestamp: new Date().toISOString()
-    });
-    return {
-      imageData: currentImage,
-      repaired: false,
-      maskTooLarge: true,
-      coverage: maskCoverage,
-      repairHistory
-    };
-  }
-
-  // Helper function to repair a group of targets
-  const repairGroup = async (targets, groupName, modelId, passNumber) => {
-    if (targets.length === 0) return { success: true, skipped: true };
-
-    const groupBboxes = targets.map(t => t.boundingBox);
-    const groupPrompt = targets.length === 1
-      ? targets[0].fixPrompt
-      : `Fix the following issues:\n${targets.map((t, i) => `${i + 1}. ${t.fixPrompt}`).join('\n')}`;
-
-    log.info(`🔄 [AUTO-REPAIR] Pass ${passNumber}: ${groupName} (${targets.length} targets) using ${modelId}`);
-
-    try {
-      const dimensions = await getImageDimensions(currentImage);
-      const mask = await createCombinedMask(dimensions.width, dimensions.height, groupBboxes);
-
-      const repaired = await inpaintWithMask(
-        currentImage,
-        groupBboxes,
-        groupPrompt,
-        mask,
-        { runwareModel: modelId }
-      );
-
-      if (repaired?.imageData) {
-        const historyEntry = {
-          attempt: passNumber,
-          errorType: groupName,
-          description: targets.map(t => t.issue).join('; '),
-          boundingBoxes: groupBboxes,
-          fixPrompt: groupPrompt,
-          fullPrompt: repaired.fullPrompt || groupPrompt,  // Full inpainting prompt sent to API
-          success: true,
-          targetCount: targets.length,
-          modelId: repaired.modelId || modelId,
-          usage: repaired.usage,
-          timestamp: new Date().toISOString()
-        };
-
-        // Always run verification (LPIPS is fast, provides useful metrics)
-        try {
-          const verification = await verifyInpaintResult(currentImage, repaired.imageData, targets);
-          historyEntry.verification = verification;
-
-          if (verification.success) {
-            log.info(`🔍 [REPAIR VERIFY] Verification: repair successful`);
-          } else {
-            log.warn(`🔍 [REPAIR VERIFY] Verification: repair may not have fixed issue`);
-          }
-
-          if (verification.lpips) {
-            log.info(`🔍 [REPAIR VERIFY] LPIPS: ${verification.lpips.lpipsScore?.toFixed(4)} (${verification.lpips.changed ? 'changed' : 'unchanged'})`);
-          }
-          if (verification.llm) {
-            log.info(`🔍 [REPAIR VERIFY] LLM: ${verification.llm.fixed ? '✅ Fixed' : '❌ Not fixed'} (${(verification.llm.confidence * 100).toFixed(0)}% confidence)`);
-          }
-        } catch (verifyErr) {
-          log.debug(`[REPAIR VERIFY] Verification failed: ${verifyErr.message}`);
-          historyEntry.verification = { error: verifyErr.message };
-        }
-
-        // Only store images in debug mode (to save memory)
-        if (includeDebugImages) {
-          historyEntry.maskImage = mask;
-          historyEntry.beforeImage = currentImage;
-          historyEntry.afterImage = repaired.imageData;
-
-          // Generate diff image to highlight changes
-          try {
-            const beforeBuffer = Buffer.from(currentImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            const afterBuffer = Buffer.from(repaired.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            const diffBuffer = await createDiffImage(beforeBuffer, afterBuffer);
-            if (diffBuffer) {
-              historyEntry.diffImage = `data:image/jpeg;base64,${diffBuffer.toString('base64')}`;
-            }
-          } catch (diffErr) {
-            log.debug(`[AUTO-REPAIR] Failed to create diff image: ${diffErr.message}`);
-          }
-        }
-
-        repairHistory.push(historyEntry);
-        currentImage = repaired.imageData;
-        return { success: true };
-      }
-      return { success: false, error: 'No image returned' };
-    } catch (err) {
-      log.error(`❌ [AUTO-REPAIR] ${groupName} repair failed:`, err.message);
-      repairHistory.push({
-        attempt: passNumber,
-        errorType: groupName,
-        description: `Error: ${err.message}`,
-        success: false,
-        targetCount: targets.length,
-        timestamp: new Date().toISOString()
-      });
-      return { success: false, error: err.message };
-    }
-  };
-
-  try {
-    let passNumber = 1;
-    let anyRepaired = false;
-
-    // Pass 1: Face issues (highest priority, needs high-quality model)
-    // Use FLUX Fill for face repair - best quality for identity preservation
-    if (faceTargets.length > 0) {
-      const result = await repairGroup(faceTargets, 'face-repair', 'runware:102@1', passNumber++);
-      if (result.success && !result.skipped) anyRepaired = true;
-    }
-
-    // Pass 2: Anatomy issues (hands, limbs)
-    // Use SDXL - good quality, more affordable
-    if (anatomyTargets.length > 0) {
-      const result = await repairGroup(anatomyTargets, 'anatomy-repair', 'runware:101@1', passNumber++);
-      if (result.success && !result.skipped) anyRepaired = true;
-    }
-
-    // Pass 3: Object issues (props, items, backgrounds)
-    // Use SDXL - good enough for objects
-    if (objectTargets.length > 0) {
-      const result = await repairGroup(objectTargets, 'object-repair', 'runware:101@1', passNumber++);
-      if (result.success && !result.skipped) anyRepaired = true;
-    }
-
-    // Log summary
-    const totalPasses = passNumber - 1;
-    if (anyRepaired) {
-      log.info(`✅ [AUTO-REPAIR] Completed ${totalPasses} repair pass(es) for ${fixTargets.length} targets`);
-    }
-
-    // All repairs recorded in repairHistory by repairGroup
-    // No additional logging needed here
-  } catch (error) {
-    log.error(`❌ [AUTO-REPAIR] Grouped repair failed:`, error.message);
-    repairHistory.push({
-      attempt: 0,
-      errorType: 'grouped-repair-error',
-      description: `Error: ${error.message}`,
-      success: false,
-      targetCount: fixTargets.length,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  // Phase 2: Optional additional inspection-based repairs
-  if (maxAdditionalAttempts > 0) {
-    log.debug(`🔄 [AUTO-REPAIR] Running ${maxAdditionalAttempts} additional inspection-based attempts...`);
-    const additionalResult = await autoRepairImage(currentImage, maxAdditionalAttempts, { includeDebugImages });
-    if (additionalResult.repaired) {
-      currentImage = additionalResult.imageData;
-      repairHistory.push(...additionalResult.repairHistory);
-    }
-  }
-
-  const successCount = repairHistory.filter(r => r.success).length;
-  const skippedCount = repairHistory.filter(r => r.skipped && !r.success).length;
-  const failedCount = repairHistory.filter(r => !r.success && !r.skipped).length;
-
-  // Sum up total usage from all repair attempts (including verification LLM costs)
-  const totalUsage = repairHistory.reduce((acc, r) => {
-    if (r.usage) {
-      acc.input_tokens += r.usage.input_tokens || 0;
-      acc.output_tokens += r.usage.output_tokens || 0;
-      acc.thinking_tokens += r.usage.thinking_tokens || 0;
-    }
-    // Include verification LLM usage if present
-    if (r.verification?.llm?.usage) {
-      acc.input_tokens += r.verification.llm.usage.inputTokens || 0;
-      acc.output_tokens += r.verification.llm.usage.outputTokens || 0;
-    }
-    return acc;
-  }, { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 });
-
-  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount} successful, ${skippedCount} skipped, ${failedCount} failed (total tokens: ${totalUsage.input_tokens} in, ${totalUsage.output_tokens} out)`);
-
-  return {
-    imageData: currentImage,
-    repaired: successCount > 0,
-    noErrorsFound: false,
-    repairHistory,
-    usage: totalUsage,
-    modelId: repairHistory.find(r => r.modelId)?.modelId
-  };
-}
-
-/**
- * Auto-repair an image by detecting and fixing physics errors
- * Runs up to maxAttempts cycles of inspect → mask → fix
- * @param {string} imageData - Base64 image data URL
- * @param {number} maxAttempts - Maximum repair cycles (default 2)
- * @param {Object} options - Optional settings
- * @param {boolean} options.includeDebugImages - Include before/after images in repair history (for admin users)
- * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
- */
-async function autoRepairImage(imageData, maxAttempts = 2, options = {}) {
-  const { includeDebugImages = false } = options;
-  const repairHistory = [];
-  let currentImage = imageData;
-
-  log.info(`🔄 [AUTO-REPAIR] Starting auto-repair (max ${maxAttempts} attempts)...`);
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    log.debug(`🔄 [AUTO-REPAIR] Attempt ${attempt}/${maxAttempts}`);
-
-    // 1. Inspect the image for errors
-    const inspection = await inspectImageForErrors(currentImage);
-
-    if (!inspection.errorFound) {
-      log.info(`✅ [AUTO-REPAIR] No errors found after ${attempt - 1} repairs`);
-      return {
-        imageData: currentImage,
-        repaired: attempt > 1,
-        noErrorsFound: true,
-        repairHistory
-      };
-    }
-
-    // 2. Get image dimensions and create mask (for dev view only)
-    const dimensions = await getImageDimensions(currentImage);
-    const mask = await createMaskFromBoundingBox(
-      dimensions.width,
-      dimensions.height,
-      inspection.boundingBox
-    );
-
-    // 3. Inpaint using text-based coordinates
-    // Pass bounding box as array, mask is kept for dev view only
-    const repaired = await inpaintWithMask(
-      currentImage,
-      [inspection.boundingBox],  // Single bbox as array
-      inspection.fixPrompt,
-      mask  // Mask for dev view, not sent to API
-    );
-
-    if (!repaired || !repaired.imageData) {
-      log.warn(`⚠️ [AUTO-REPAIR] Inpainting failed at attempt ${attempt}`);
-      const historyEntry = {
-        attempt,
-        errorType: inspection.errorType,
-        description: inspection.description,
-        boundingBox: inspection.boundingBox,
-        fixPrompt: inspection.fixPrompt,
-        success: false,
-        timestamp: new Date().toISOString()
-      };
-      // Include debug images for admin users
-      if (includeDebugImages) {
-        historyEntry.maskImage = mask;
-        historyEntry.beforeImage = currentImage;
-      }
-      repairHistory.push(historyEntry);
-      break;
-    }
-
-    // Record the repair
-    const historyEntry = {
-      attempt,
-      errorType: inspection.errorType,
-      description: inspection.description,
-      boundingBox: inspection.boundingBox,
-      fixPrompt: inspection.fixPrompt,
-      fullPrompt: repaired.fullPrompt || inspection.fixPrompt,  // Full inpainting prompt sent to API
-      success: true,
-      timestamp: new Date().toISOString()
-    };
-    // Include debug images for admin users
-    if (includeDebugImages) {
-      historyEntry.maskImage = mask;
-      historyEntry.beforeImage = currentImage;
-      historyEntry.afterImage = repaired.imageData;
-    }
-    repairHistory.push(historyEntry);
-
-    currentImage = repaired.imageData;
-    log.info(`✅ [AUTO-REPAIR] Repair ${attempt} complete: fixed ${inspection.errorType}`);
-  }
-
-  return {
-    imageData: currentImage,
-    repaired: repairHistory.length > 0 && repairHistory.some(r => r.success),
-    noErrorsFound: false,
-    repairHistory
-  };
-}
 
 // =============================================================================
 // FINAL CONSISTENCY CHECKS
@@ -11193,23 +9776,17 @@ module.exports = {
   analyzeImageStyle,
   compareImageStyles,
   evaluateImageBatch,
-  buildRepairPlan,
-  executeRepairPlan,
-  mergeRepairResults,
 
-  // Unified repair pipeline
+  // Unified repair pipeline (the only active repair pipeline)
   selectBestVersion,
   runUnifiedRepairPipeline,
   chooseRepairStrategy,
   inpaintPage,
 
-  // Categorized repair system (new)
+  // Active repair primitives
   classifyIssues,
-  buildCategorizedRepairPlan,
   iteratePage,
-  repairStyleMismatch,
   repairCharacterMismatch,
-  executeCategorizedRepairPlan,
 
   // Cache management
   clearImageCache,
@@ -11219,15 +9796,10 @@ module.exports = {
   logCacheSummary,
   resetCacheStats,
 
-  // Auto-repair functions
-  inspectImageForErrors,
-  createMaskFromBoundingBox,
+  // Mask + region helpers (used by inpaint paths)
   createCombinedMask,
   blackoutIssueRegions,
   calculateMaskCoverage,
-  inpaintWithMask,
-  autoRepairImage,
-  autoRepairWithTargets,
   getGridBasedRepair,  // Lazy-loaded grid-based repair module
 
   // Two-stage bounding box detection

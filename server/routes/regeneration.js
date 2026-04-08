@@ -53,8 +53,6 @@ const {
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
-  autoRepairImage,
-  autoRepairWithTargets,
   deleteFromImageCache,
   generateImageCacheKey,
   buildVisualBibleGrid,
