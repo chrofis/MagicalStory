@@ -2736,6 +2736,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`📕 [COVER] ${coverType}: Using fallback scene description (hint was empty)`);
         }
 
+        // Inject explicit per-character holdings from the outline `holds` annotations.
+        // Outline parser captures `- Lukas (center): standard, holds: book + Eli` into
+        // hint.characterPerspectives[name].holds. Cap at 2 items per character (2 hands)
+        // and append a structured "Items per character" block to the cover scene description
+        // so the image model gets an unambiguous list (instead of relying on prose alone).
+        const perspectives = hint.characterPerspectives || {};
+        const itemLines = [];
+        for (const [charName, ann] of Object.entries(perspectives)) {
+          if (!ann.holds) continue;
+          const holdsRaw = String(ann.holds).trim();
+          if (!holdsRaw || holdsRaw.toLowerCase() === 'nothing' || holdsRaw.toLowerCase() === 'none' || holdsRaw === '-') continue;
+          // Split on " + " or "&" or " and " (lightweight, just to count)
+          const items = holdsRaw.split(/\s*\+\s*|\s*&\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+          if (items.length === 0) continue;
+          const capped = items.slice(0, 2);
+          if (items.length > 2) {
+            log.warn(`📕 [COVER] ${coverType}: ${charName} had ${items.length} items in 'holds', capped to 2: ${capped.join(' + ')} (dropped: ${items.slice(2).join(', ')})`);
+          }
+          itemLines.push(`- ${charName}: ${capped.join(' + ')}`);
+        }
+        if (itemLines.length > 0) {
+          sceneDescription += `\n\n**Items per character (max 2 per character — 2 hands):**\n${itemLines.join('\n')}`;
+          log.info(`📕 [COVER] ${coverType}: Injected items for ${itemLines.length} character(s)`);
+        }
+
         // Primary: use hint.characterClothing (authoritative — explicitly lists who should appear)
         // Fallback: match character names in scene text
         let coverCharacters = [];
@@ -3747,10 +3772,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Wait for reference sheet generation (for secondary element consistency)
+    let referenceSheetSourceGrids = null;
+    let referenceSheetBatchMeta = null;
     if (referenceSheetPromise) {
       const refResult = await referenceSheetPromise;
       if (refResult.generated > 0) {
         log.info(`🖼️ [UNIFIED] Reference images ready: ${refResult.generated} generated for secondary elements`);
+      }
+      // Capture source grids + batch metadata. The image bytes go to
+      // story_images (saved after upsert). The lightweight metadata
+      // (element names per batch) goes into storyData so the dev panel can
+      // label which cell corresponds to which element.
+      referenceSheetSourceGrids = refResult.sourceGrids || null;
+      if (referenceSheetSourceGrids) {
+        referenceSheetBatchMeta = referenceSheetSourceGrids.map(g => ({
+          batchIdx: g.batchIdx,
+          elementNames: g.elementNames,
+          elementIds: g.elementIds,
+        }));
       }
     }
 
@@ -4628,6 +4667,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       updatedAt: new Date().toISOString()
     };
 
+    // Attach reference sheet batch metadata so the dev panel can label cells.
+    // The actual source grid images live in story_images (saved after upsert);
+    // this is just the lightweight per-batch element list.
+    if (referenceSheetBatchMeta) {
+      storyData.referenceSheetBatches = referenceSheetBatchMeta;
+    }
+
     // Debug: Log what's being saved for storyCategory/storyTheme in unified mode
     log.debug(`📝 [UNIFIED SAVE] storyCategory: "${storyData.storyCategory}", storyTopic: "${storyData.storyTopic}", storyTheme: "${storyData.storyTheme}"`);
     log.debug(`📝 [UNIFIED SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
@@ -4635,6 +4681,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
+
+    // Persist reference sheet source grids for the dev panel. Each batch
+    // becomes a story_images row with image_type='ref_sheet_source' and
+    // page_number=batchIdx. Element names are encoded into the quality_score
+    // column as a JSON string... actually no — we use a separate metadata
+    // mechanism. For now we just save the image with the batch index.
+    if (referenceSheetSourceGrids && referenceSheetSourceGrids.length > 0) {
+      try {
+        for (const grid of referenceSheetSourceGrids) {
+          await saveStoryImage(storyId, 'ref_sheet_source', grid.batchIdx, grid.imageData, {
+            generatedAt: new Date().toISOString(),
+          });
+        }
+        log.info(`💾 [UNIFIED] Saved ${referenceSheetSourceGrids.length} reference sheet source grid(s) for dev inspection`);
+      } catch (refSheetSaveErr) {
+        log.warn(`⚠️ [UNIFIED] Failed to persist reference sheet source grids: ${refSheetSaveErr.message}`);
+      }
+    }
 
     // Initialize image_version_meta with active versions for all pages.
     // For scenes: if wasCharacterFixed, the last version is the charfix (active).

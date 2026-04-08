@@ -85,10 +85,10 @@ function parseCharacterClothingBlock(content) {
     // IMPORTANT: Uses possessive-safe pattern to avoid catastrophic backtracking (O(2^n) with nested quantifiers).
     // Clothing pattern handles costumed:{...} (braces with commas inside) and costumed:type (plain).
     // We capture an optional trailing annotations group (depth/perspective/position) up to end-of-line.
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)*)/gim;
-    // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side").
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))((?:\s*,\s*(?:depth|perspective|position|holds|holding)\s*:\s*[^,\r\n]+)*)/gim;
+    // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book").
     // We never want these mistaken for character names — they should be silently dropped.
-    const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action']);
+    const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding']);
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
@@ -105,13 +105,14 @@ function parseCharacterClothingBlock(content) {
       }
       characters.push(rawName);
       characterClothing[baseName] = clothing;
-      // Parse trailing annotations like ", depth: background, perspective: back view"
+      // Parse trailing annotations like ", depth: background, perspective: back view, holds: book + wand"
       if (annotationsRaw) {
         const annotations = {};
-        const annotationPattern = /(depth|perspective|position)\s*:\s*([^,\r\n]+)/gi;
+        const annotationPattern = /(depth|perspective|position|holds|holding)\s*:\s*([^,\r\n]+)/gi;
         let annMatch;
         while ((annMatch = annotationPattern.exec(annotationsRaw)) !== null) {
-          annotations[annMatch[1].toLowerCase()] = annMatch[2].trim().toLowerCase();
+          const key = annMatch[1].toLowerCase() === 'holding' ? 'holds' : annMatch[1].toLowerCase();
+          annotations[key] = annMatch[2].trim();
         }
         if (Object.keys(annotations).length > 0) {
           characterPerspectives[baseName] = annotations;

@@ -28,7 +28,7 @@ If ANY of these occur, the image MUST receive a score of 0:
 - Extra decorative text, watermarks, or incidental text in the background
 - Minor artistic text elements that don't interfere with the main title
 
-**THE 5 CRITERIA (in order of importance):**
+**THE 6 CRITERIA (in order of importance):**
 
 1. **TEXT ACCURACY (50 points)** - MOST IMPORTANT
    - Does the text match EXACTLY what was requested? (title, dedication, etc.)
@@ -53,6 +53,10 @@ If ANY of these occur, the image MUST receive a score of 0:
    - Does the scene match what was described?
    - Are the decorative elements appropriate?
 
+6. **ANATOMY**
+   - Each character has 2 arms / 2 hands. A character holding 3+ items = extra hand → flag.
+   - Extra arms/legs, fused/melted/6+ fingers, missing or detached limbs → flag.
+
 **SCORING:**
 
 IF text is wrong, misspelled, missing, or illegible: **Score = 0** (AUTOMATIC FAIL)
@@ -74,6 +78,10 @@ STYLE ISSUES:
 COMPOSITION ISSUES:
 - Poor text placement: -10 points
 - Cluttered or unbalanced: -5 points
+
+ANATOMY ISSUES:
+- Extra arm/hand (e.g. character holds 3 items): -30 points
+- Fused/melted fingers, 6+ fingers, missing/detached limb: -20 points
 
 EXTRA TEXT (not automatic fail):
 - Unwanted background text/watermarks: -5 to -15 points
@@ -113,4 +121,5 @@ Reasoning:
 - Style Consistency: [details]
 - Composition: [details]
 - Prompt Adherence: [details]
+- Anatomy: [PASS/FAIL] [count items each character holds, flag any with 3+ items or extra limbs]
 Final notes: [any other observations]]

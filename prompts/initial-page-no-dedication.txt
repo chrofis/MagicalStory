@@ -13,6 +13,7 @@ Create an introduction page illustration for a children's book.
 - Other characters should be arranged AROUND the main character
 - Everyone should be clearly visible and recognizable
 - Create a warm, inviting atmosphere that draws readers in
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **IMPORTANT:**
 - This image should contain NO TEXT at all

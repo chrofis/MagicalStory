@@ -12,6 +12,7 @@ Create a front cover illustration for a children's book.
 - Characters should be arranged in a balanced composition (side by side, or grouped naturally)
 - Keep the composition simple and uncluttered
 - Leave clear space at the TOP for the title text
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact title text: "{STORY_TITLE}"
