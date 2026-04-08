@@ -1665,6 +1665,196 @@ def split_grid():
         }), 500
 
 
+def _detect_separators(gray, axis, num_separators, search_range=(0.15, 0.85)):
+    """
+    Detect the N strongest separator lines along the given axis using variance.
+
+    A separator is a line of nearly-uniform color (low variance) that visually
+    divides the grid cells. We pick the N rows/columns with the LOWEST variance
+    inside the search range, then enforce a minimum spacing between them so we
+    don't return adjacent rows that are part of the same separator gap.
+
+    Args:
+        gray: Grayscale 2D numpy array
+        axis: 'horizontal' (find row separators) or 'vertical' (find column separators)
+        num_separators: How many separator lines to find
+        search_range: (start_frac, end_frac) of the dimension to search inside
+
+    Returns:
+        Sorted list of separator coordinates, length num_separators
+    """
+    if num_separators <= 0:
+        return []
+
+    if axis == 'horizontal':
+        # Find rows
+        dim = gray.shape[0]
+        start = int(dim * search_range[0])
+        end = int(dim * search_range[1])
+        variances = [(np.var(gray[y, :].astype(float)), y) for y in range(start, end)]
+    else:
+        # Find columns
+        dim = gray.shape[1]
+        start = int(dim * search_range[0])
+        end = int(dim * search_range[1])
+        variances = [(np.var(gray[:, x].astype(float)), x) for x in range(start, end)]
+
+    if not variances:
+        return [dim // (num_separators + 1) * (i + 1) for i in range(num_separators)]
+
+    # Sort by variance (ascending — lowest variance = most uniform = separator)
+    variances.sort()
+
+    # Greedy pick: take lowest-variance candidates that are at least
+    # min_spacing apart from each other.
+    min_spacing = int(dim * 0.15)  # at least 15% of dimension between separators
+    picked = []
+    for _, coord in variances:
+        if all(abs(coord - p) >= min_spacing for p in picked):
+            picked.append(coord)
+            if len(picked) >= num_separators:
+                break
+
+    # Fall back to even-split if we couldn't find enough good candidates
+    while len(picked) < num_separators:
+        even = dim // (num_separators + 1) * (len(picked) + 1)
+        picked.append(even)
+
+    return sorted(picked)
+
+
+@app.route('/split-reference-sheet', methods=['POST'])
+def split_reference_sheet():
+    """
+    Split an N-cell reference sheet image into individual cell images.
+
+    The image generator was asked to render N elements in a {cols}x{rows}
+    grid. Variance analysis finds the actual cell boundaries (rather than
+    blindly dividing the image into equal rectangles), so visible gaps,
+    title bars, and uneven cell sizes don't break the split.
+
+    Expected JSON:
+    {
+        "image": "data:image/...;base64,..." or raw base64,
+        "count": <number of cells, 1-6>,
+        "cols": <optional, hint about columns layout>,
+        "rows": <optional, hint about rows layout>
+    }
+
+    Returns:
+    {
+        "success": true,
+        "cells": ["base64...", "base64...", ...],   # row-major order
+        "layout": { "cols": N, "rows": M },
+        "separators": { "horizontal": [...], "vertical": [...] }
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data or 'count' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' or 'count' in request body"
+            }), 400
+
+        count = int(data['count'])
+        if count < 1 or count > 6:
+            return jsonify({
+                "success": False,
+                "error": f"count must be 1-6, got {count}"
+            }), 400
+
+        # Decode base64 image
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({
+                "success": False,
+                "error": "Failed to decode image"
+            }), 400
+
+        height, width = image.shape[:2]
+
+        # Determine grid layout
+        if 'cols' in data and 'rows' in data:
+            cols = int(data['cols'])
+            rows = int(data['rows'])
+        else:
+            # Default layouts matching the JS-side prompt builder
+            if count <= 2:
+                cols, rows = count, 1
+            elif count <= 4:
+                cols, rows = 2, 2
+            elif count <= 6:
+                cols, rows = 2, 3
+            else:
+                cols, rows = 2, (count + 1) // 2
+
+        if cols * rows < count:
+            return jsonify({
+                "success": False,
+                "error": f"layout {cols}x{rows} too small for count={count}"
+            }), 400
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Find (cols-1) vertical separators and (rows-1) horizontal separators
+        v_seps = _detect_separators(gray, 'vertical', cols - 1) if cols > 1 else []
+        h_seps = _detect_separators(gray, 'horizontal', rows - 1) if rows > 1 else []
+
+        # Build cell boundaries: start, separator1, separator2, ..., end
+        col_bounds = [0] + v_seps + [width]
+        row_bounds = [0] + h_seps + [height]
+
+        print(f"[SPLIT-REFSHEET] {width}x{height}, {cols}x{rows}, count={count}")
+        print(f"[SPLIT-REFSHEET]   v_seps={v_seps} → col_bounds={col_bounds}")
+        print(f"[SPLIT-REFSHEET]   h_seps={h_seps} → row_bounds={row_bounds}")
+
+        # Extract cells in row-major order, only as many as count
+        cells = []
+        for row in range(rows):
+            for col in range(cols):
+                if len(cells) >= count:
+                    break
+                y1, y2 = row_bounds[row], row_bounds[row + 1]
+                x1, x2 = col_bounds[col], col_bounds[col + 1]
+                cell = image[y1:y2, x1:x2]
+
+                # Encode cell as PNG base64 (PNG keeps the alpha-free crop pristine)
+                ok, encoded = cv2.imencode('.png', cell)
+                if not ok:
+                    print(f"[SPLIT-REFSHEET] Cell {len(cells)} encode failed")
+                    cells.append(None)
+                    continue
+                cells.append(base64.b64encode(encoded.tobytes()).decode('utf-8'))
+            if len(cells) >= count:
+                break
+
+        return jsonify({
+            "success": True,
+            "cells": cells,
+            "layout": {"cols": cols, "rows": rows},
+            "separators": {
+                "horizontal": h_seps,
+                "vertical": v_seps
+            },
+            "image_size": {"width": width, "height": height}
+        })
+
+    except Exception as e:
+        print(f"[SPLIT-REFSHEET] Error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @app.route('/crop-front-column', methods=['POST'])
 def crop_front_column():
     """

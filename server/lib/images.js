@@ -9124,23 +9124,60 @@ function logDryRunReport(pageContext, report) {
 // =============================================================================
 
 /**
- * Split a grid image into individual reference images
- * Used after generating reference sheets to extract individual element references
+ * Split a grid image into individual reference images.
+ *
+ * Tries the Python /split-reference-sheet endpoint first — it uses variance
+ * analysis to find the actual cell boundaries (handles visible gaps, title
+ * bars, uneven cell sizes). Falls back to blind sharp-based math if the
+ * Python service is unavailable.
  *
  * @param {Buffer|string} gridImage - Grid image as Buffer or base64 data URL
  * @param {number} count - Number of elements in the grid
  * @returns {Promise<string[]>} Array of base64 PNG images (without data URL prefix)
  */
 async function splitGridIntoReferences(gridImage, count) {
-  // Convert base64 data URL to buffer if needed
+  // Convert input to BOTH a Buffer (for sharp fallback) and a base64 string
+  // (for the Python call) so we don't pay the conversion twice.
   let buffer;
+  let base64;
   if (typeof gridImage === 'string') {
-    const base64Data = gridImage.replace(/^data:image\/\w+;base64,/, '');
-    buffer = Buffer.from(base64Data, 'base64');
+    base64 = gridImage.replace(/^data:image\/\w+;base64,/, '');
+    buffer = Buffer.from(base64, 'base64');
   } else {
     buffer = gridImage;
+    base64 = buffer.toString('base64');
   }
 
+  // Try Python service first — variance-based separator detection that
+  // finds the ACTUAL cell boundaries instead of blindly dividing pixels.
+  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  try {
+    const response = await fetch(`${photoAnalyzerUrl}/split-reference-sheet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: `data:image/png;base64,${base64}`,
+        count,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && Array.isArray(result.cells) && result.cells.length === count) {
+        log.info(`[REF-SHEET] Python split: ${result.layout.cols}x${result.layout.rows}, separators v=[${result.separators.vertical.join(',')}] h=[${result.separators.horizontal.join(',')}]`);
+        return result.cells;
+      }
+      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${count}) — falling back to sharp`);
+    } else {
+      log.debug(`[REF-SHEET] Python service unavailable (${response.status}) — using sharp fallback`);
+    }
+  } catch (err) {
+    log.debug(`[REF-SHEET] Python service unreachable (${err.message}) — using sharp fallback`);
+  }
+
+  // Fallback: blind equal-cell math via sharp. Works only when cells are
+  // really equal-sized with no padding/separator/title bar.
   const metadata = await sharp(buffer).metadata();
   const { width, height } = metadata;
 
@@ -9154,7 +9191,7 @@ async function splitGridIntoReferences(gridImage, count) {
   const cellWidth = Math.floor(width / cols);
   const cellHeight = Math.floor(height / rows);
 
-  log.debug(`[REF-SHEET] Splitting ${width}x${height} grid into ${cols}x${rows} cells (${cellWidth}x${cellHeight} each)`);
+  log.debug(`[REF-SHEET] Sharp fallback: ${width}x${height} → ${cols}x${rows} cells (${cellWidth}x${cellHeight} each)`);
 
   const references = [];
   for (let i = 0; i < count; i++) {
@@ -9169,14 +9206,13 @@ async function splitGridIntoReferences(gridImage, count) {
           width: cellWidth,
           height: cellHeight
         })
-        .resize(512, 512, { fit: 'cover' }) // Standardize size
         .png()
         .toBuffer();
 
       references.push(cropped.toString('base64'));
-      log.debug(`[REF-SHEET] Extracted cell ${i + 1}/${count} (col=${col}, row=${row})`);
+      log.debug(`[REF-SHEET] Sharp extracted cell ${i + 1}/${count} (col=${col}, row=${row})`);
     } catch (err) {
-      log.error(`[REF-SHEET] Failed to extract cell ${i}: ${err.message}`);
+      log.error(`[REF-SHEET] Sharp failed to extract cell ${i}: ${err.message}`);
       references.push(null);
     }
   }
@@ -9294,6 +9330,11 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
 
   log.info(`[REF-SHEET] Processing ${batches.length} batch(es)`);
 
+  // Capture source grids per batch so callers can persist them for debugging.
+  // The grid image is normally discarded after splitting — keep it for the
+  // dev panel so users can see what got cut and verify the splitter is right.
+  const sourceGrids = [];
+
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     log.info(`[REF-SHEET] Batch ${batchIdx + 1}/${batches.length}: ${batch.length} elements`);
@@ -9314,6 +9355,14 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       const gridImageData = result.imageData.replace(/^data:image\/\w+;base64,/, '');
 
       log.info(`[REF-SHEET] ✓ Generated ${batch.length}-element grid (${Math.round(gridImageData.length / 1024)}KB)`);
+
+      // Capture the source grid for debugging (caller persists it)
+      sourceGrids.push({
+        batchIdx,
+        imageData: result.imageData,
+        elementNames: batch.map(e => `${e.name} (${e.type})`),
+        elementIds: batch.map(e => e.id),
+      });
 
       // Split grid into individual references
       const references = await splitGridIntoReferences(gridImageData, batch.length);
@@ -9365,7 +9414,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   return {
     generated,
     failed,
-    elements: processedElements
+    elements: processedElements,
+    sourceGrids,  // Source grid images per batch — caller persists for debugging
   };
 }
 

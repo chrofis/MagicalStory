@@ -340,6 +340,38 @@ export function StoryDisplay({
   const [loadedRefImages, setLoadedRefImages] = useState<Record<string, string>>({});
   const [loadingRefImages, setLoadingRefImages] = useState<Set<string>>(new Set());
 
+  // Reference sheet source grids — the unsplit images that get cut into individual
+  // VB element references. Loaded on demand so dev can verify the splitter is right.
+  const [refSheetSources, setRefSheetSources] = useState<Array<{
+    batchIdx: number;
+    imageData: string;
+    elementNames: string[];
+    elementIds: string[];
+  }> | null>(null);
+  const [refSheetSourcesLoading, setRefSheetSourcesLoading] = useState(false);
+
+  const fetchReferenceSheetSources = async () => {
+    if (!storyId || refSheetSources !== null || refSheetSourcesLoading) return;
+    setRefSheetSourcesLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/reference-sheet-sources`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRefSheetSources(data.sources || []);
+      } else {
+        setRefSheetSources([]);
+      }
+    } catch (err) {
+      console.error('Failed to load reference sheet sources:', err);
+      setRefSheetSources([]);
+    } finally {
+      setRefSheetSourcesLoading(false);
+    }
+  };
+
   // Fetch a Visual Bible reference image on demand
   const fetchReferenceImage = async (elementId: string) => {
     if (!storyId || loadedRefImages[elementId] || loadingRefImages.has(elementId)) return;
@@ -1971,6 +2003,63 @@ export function StoryDisplay({
               </div>
             </details>
           )}
+
+          {/* Reference Sheet Source Grids — debug the splitter */}
+          <details
+            className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4"
+            onToggle={(e) => {
+              if ((e.target as HTMLDetailsElement).open) fetchReferenceSheetSources();
+            }}
+          >
+            <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
+              <Images size={20} />
+              {language === 'de' ? 'Visual Bible Quellraster' : language === 'fr' ? 'Grilles sources VB' : 'Reference Sheet Source Grids'}
+              {refSheetSources && (
+                <span className="ml-2 text-sm font-normal text-rose-500">({refSheetSources.length} batches)</span>
+              )}
+              {refSheetSourcesLoading && (
+                <span className="ml-2 text-xs text-rose-400 animate-pulse">Loading...</span>
+              )}
+            </summary>
+            <div className="mt-3 text-xs text-rose-700 mb-3">
+              {language === 'de'
+                ? 'Original-Rasterbilder die in einzelne VB-Element-Referenzen geschnitten wurden. Verwenden um zu prüfen ob der Splitter die Zellgrenzen korrekt findet.'
+                : language === 'fr'
+                ? "Images de grille originales découpées en références d'éléments VB. Utiliser pour vérifier que le découpeur trouve correctement les limites des cellules."
+                : 'Original grid images that were cut into individual VB element references. Use to verify the splitter finds cell boundaries correctly.'}
+            </div>
+            {refSheetSources && refSheetSources.length === 0 && (
+              <div className="text-sm text-rose-500 italic py-3 text-center bg-white rounded">
+                {language === 'de' ? 'Keine Quellraster gefunden' : 'No source grids found for this story'}
+              </div>
+            )}
+            {refSheetSources && refSheetSources.length > 0 && (
+              <div className="space-y-4">
+                {refSheetSources.map((src) => (
+                  <div key={src.batchIdx} className="bg-white rounded-lg p-3 border border-rose-200">
+                    <div className="text-sm font-semibold text-rose-700 mb-2">
+                      Batch {src.batchIdx} — {src.elementNames.length} element(s)
+                    </div>
+                    <img
+                      src={src.imageData}
+                      alt={`Reference sheet batch ${src.batchIdx}`}
+                      className="w-full max-h-96 object-contain rounded border border-rose-300 bg-gray-50 cursor-pointer hover:opacity-80"
+                      onClick={() => setEnlargedImage({ src: src.imageData, title: `Reference Sheet Batch ${src.batchIdx}` })}
+                      title="Click to enlarge"
+                    />
+                    <div className="mt-2 text-xs text-rose-600">
+                      <strong>Cells (row-major):</strong>
+                      <ol className="list-decimal list-inside mt-1 space-y-0.5">
+                        {src.elementNames.map((name, idx) => (
+                          <li key={idx}>{name}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </details>
 
           {/* Full Story Text Generation Output */}
           {story && storyTextPrompts.length > 0 && (

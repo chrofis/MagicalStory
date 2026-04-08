@@ -1639,6 +1639,55 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
   }
 });
 
+// GET /api/stories/:id/reference-sheet-sources - Dev-only: fetch reference sheet
+// source grids that were used to generate VB element images. Lets developers
+// inspect what got cut and verify the splitter is finding cell boundaries correctly.
+router.get('/:id/reference-sheet-sources', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access (or admin impersonating)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const batchMeta = story.referenceSheetBatches || [];
+
+    // Pull each source grid from story_images. The image_type is
+    // 'ref_sheet_source' and the page_number is the batch index.
+    const sources = [];
+    for (const meta of batchMeta) {
+      const img = await getStoryImage(id, 'ref_sheet_source', meta.batchIdx, 0);
+      if (img?.imageData) {
+        sources.push({
+          batchIdx: meta.batchIdx,
+          imageData: img.imageData,
+          elementNames: meta.elementNames || [],
+          elementIds: meta.elementIds || [],
+        });
+      }
+    }
+
+    console.log(`📷 [REF-SHEET-SOURCES] ${id} - ${sources.length} batch(es) loaded`);
+    res.json({ sources });
+  } catch (err) {
+    console.error('❌ Error fetching reference sheet sources:', err);
+    res.status(500).json({ error: 'Failed to fetch reference sheet sources', details: err.message });
+  }
+});
+
 // GET /api/stories/:id/images - Get images in one request (optimized batch load)
 // Use ?activeOnly=true for fast initial load (~3MB instead of ~53MB)
 // Without activeOnly, returns all versions for dev mode / version switching
