@@ -60,11 +60,18 @@ const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageDat
  * the opposite: scale up until both dimensions reach the box, accept
  * that the long axis gets a small crop.
  *
- * Computes the larger of (boxWidth/imgWidth, boxHeight/imgHeight) so the
- * smaller image axis exactly matches the box. Then offsets the image so
- * the overflow on the long axis is split evenly (centered crop).
+ * @param {Object} options
+ * @param {'top'|'center'|'bottom'} [options.valign='center'] - How to handle
+ *   vertical overflow when the scaled image is taller than the box. 'top'
+ *   pins the image's top edge to the box's top edge and crops the bottom
+ *   only — useful for page images where the character's head/face is at
+ *   the top of the frame and must not be cropped.
+ * @param {'left'|'center'|'right'} [options.halign='center'] - Same idea
+ *   for horizontal overflow.
  */
-async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight) {
+async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight, options = {}) {
+  const { valign = 'center', halign = 'center' } = options;
+
   // Read image dimensions via sharp (PDFKit doesn't expose them pre-render)
   const sharp = require('sharp');
   const meta = await sharp(imageBuffer).metadata();
@@ -78,9 +85,18 @@ async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight) {
   const drawnWidth = imgWidth * scale;
   const drawnHeight = imgHeight * scale;
 
-  // Center the image inside the box; overflow is cropped equally on both sides.
-  const drawX = x - (drawnWidth - boxWidth) / 2;
-  const drawY = y - (drawnHeight - boxHeight) / 2;
+  // Position the image inside the box. The overflow on each axis is
+  // distributed according to halign/valign.
+  const xOverflow = drawnWidth - boxWidth;
+  const yOverflow = drawnHeight - boxHeight;
+  let drawX;
+  if (halign === 'left')        drawX = x;
+  else if (halign === 'right')  drawX = x - xOverflow;
+  else                          drawX = x - xOverflow / 2;
+  let drawY;
+  if (valign === 'top')         drawY = y;
+  else if (valign === 'bottom') drawY = y - yOverflow;
+  else                          drawY = y - yOverflow / 2;
 
   // Clip to the box so the cropped overflow doesn't bleed onto neighboring content.
   doc.save();
@@ -313,7 +329,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 
-    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio);
+    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio);
   } else {
     // Standard 2-page layout (square format only). Text page on left, image on right.
     const marginOuter = 20;
@@ -384,7 +400,7 @@ function getPictureBookTextRatio(languageLevel) {
  * @param {number} bleed - Bleed area in points
  * @param {number} textRatio - Fraction of page height reserved for text (default 0.15)
  */
-function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14, bleed = 0, textRatio = 0.15) {
+async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14, bleed = 0, textRatio = 0.15) {
   const interiorW = pageWidth + 2 * bleed;
   const interiorH = pageHeight + 2 * bleed;
   const textAreaHeight = pageHeight * textRatio;
@@ -394,7 +410,8 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
   const availableTextHeight = textAreaHeight - textMargin;
   const lineGap = -2;
 
-  storyPages.forEach((pageText, index) => {
+  for (let index = 0; index < storyPages.length; index++) {
+    const pageText = storyPages[index];
     const pageNumber = index + 1;
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
@@ -404,13 +421,13 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
     if (image && image.imageData) {
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        // Image extends into LEFT, RIGHT, and TOP bleed (outer 3mm gets trimmed off).
-        // Bottom edge stays at imageHeight + bleed since text sits below.
-        doc.image(imageBuffer, 0, 0, {
-          fit: [interiorW, bleed + imageHeight],
-          align: 'center',
-          valign: 'center'
-        });
+        // Image fills the full image area (top edge of page through to top of text area).
+        // Scale-to-fill so it reaches the top edge edge-to-edge instead of having a small
+        // letterbox bar from `fit:` aspect-mismatch math. valign='top' pins the top of
+        // the image to y=0 and crops any vertical overflow off the BOTTOM only — this
+        // matters for advanced layouts where the text area is bigger and the image box
+        // is shorter than the source image, so we'd otherwise crop the character's head.
+        await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
       } catch (imgErr) {
         log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
       }
@@ -421,7 +438,7 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
     const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
     const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
     doc.text(cleanText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap });
-  });
+  }
 }
 
 /**
@@ -525,7 +542,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   let totalStoryPages = 0;
 
   // Helper: Add story content pages (picture-book layout, adaptive ratio per language level)
-  const addStoryContentPages = (storyData, storyPages) => {
+  const addStoryContentPages = async (storyData, storyPages) => {
     const textMarginMm = mmToPoints(3);
     const textRatio = getPictureBookTextRatio(storyData.languageLevel);
     const imageHeight = pageHeight * (1 - textRatio);
@@ -535,7 +552,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const lineGap = -2;
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
 
-    storyPages.forEach((pageText, index) => {
+    for (let index = 0; index < storyPages.length; index++) {
+      const pageText = storyPages[index];
       const pageNumber = index + 1;
       const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
       const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
@@ -546,8 +564,10 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (image && image.imageData) {
         try {
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          // Image extends into LEFT, RIGHT, and TOP bleed (text sits below)
-          doc.image(imageBuffer, 0, 0, { fit: [interiorPageWidth, bleed + imageHeight], align: 'center', valign: 'center' });
+          // Scale-to-fill, pinned to the top edge so the image reaches y=0 with
+          // no white bar above it. Vertical overflow (if the source aspect doesn't
+          // match the box) is cropped from the bottom only — keeps heads intact.
+          await drawImageCovering(doc, imageBuffer, 0, 0, interiorPageWidth, bleed + imageHeight, { valign: 'top' });
         } catch (err) {
           log.error(`Error adding image for page ${pageNumber}:`, err.message);
         }
@@ -565,7 +585,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
       doc.text(cleanText, bleed + textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
-    });
+    }
   };
 
   // Process each story
@@ -623,7 +643,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
-      addStoryContentPages(storyData, storyPages);
+      await addStoryContentPages(storyData, storyPages);
 
     } else {
       // STORY 2+: Title page (LEFT/even) + dedication page (RIGHT/odd)
@@ -650,7 +670,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
-      addStoryContentPages(storyData, storyPages);
+      await addStoryContentPages(storyData, storyPages);
 
       // Back cover (LEFT) + blank separator (RIGHT) — only if story has a back cover
       // If no back cover, skip both pages (reduces page count by 2, preserves alignment)
@@ -768,7 +788,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     const textAreaHeight = pageHeight * textRatio;
     const availableTextHeight = textAreaHeight - textMargin;
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, 'center');
-    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio);
+    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio);
   } else {
     const marginOuter = 20;
     const marginGutter = 30;
