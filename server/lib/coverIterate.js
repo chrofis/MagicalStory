@@ -252,21 +252,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
     previousImage = existingCover.imageData;
   }
 
-  // Landmark photos and VB grid
+  // Landmark photos (VB grid is built later, after the empty scene, so we can
+  // dedupe anything already painted into the empty scene plate).
   const coverSceneMetadata = extractSceneMetadata(sceneDescription);
   const coverLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, coverSceneMetadata) : [];
-  let coverVbGrid = null;
-  if (visualBible) {
-    const elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6);
-    const secondaryLandmarks = coverLandmarkPhotos.slice(1);
-    if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
-      coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
-    }
-  }
-
-  if (coverLandmarkPhotos.length > 0 || coverVbGrid) {
-    log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverLandmarkPhotos.length} landmark photos, VB grid: ${coverVbGrid ? 'yes' : 'no'}`);
-  }
 
   // --- Generate empty scene for style anchoring ---
   const { generateImageOnly } = require('./images');
@@ -305,12 +294,35 @@ async function iterateCover(coverKey, storyData, options = {}) {
     log.warn(`⚠️ [COVER-ITERATE] ${coverLabel}: empty scene failed: ${err.message}`);
   }
 
+  // Build VB grid + landmark refs for the FINAL composite call.
+  // If coverSceneBackground is set, vehicles, non-landmark locations, and ALL landmarks
+  // are already painted into the empty scene plate — drop them from the composite refs
+  // to avoid double-rendering. Characters/animals/artifacts stay in the grid.
+  let coverVbGrid = null;
+  let finalCoverLandmarkPhotos = coverLandmarkPhotos;
+  if (visualBible) {
+    let elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6);
+    let secondaryLandmarks = coverLandmarkPhotos.slice(1);
+    if (coverSceneBackground) {
+      elementRefs = elementRefs.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+      secondaryLandmarks = [];
+      finalCoverLandmarkPhotos = [];
+      log.debug(`🔲 [COVER-ITERATE] ${coverLabel}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs (already in empty scene plate)`);
+    }
+    if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
+      coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
+    }
+  }
+  if (coverLandmarkPhotos.length > 0 || coverVbGrid) {
+    log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverLandmarkPhotos.length} landmark photos, VB grid: ${coverVbGrid ? 'yes' : 'no'}`);
+  }
+
   // --- Generate image ---
   const imageResult = await generateImageWithQualityRetry(
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabel} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+    { landmarkPhotos: finalCoverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
   );
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);

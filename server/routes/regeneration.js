@@ -1814,17 +1814,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
 
-    // Build landmark photos and VB grid (newSceneMetadata already extracted above)
+    // Build landmark photos (newSceneMetadata already extracted above).
+    // VB grid is built later — after the empty scene decision — so we can dedupe
+    // anything already painted into the empty scene plate.
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
-
-    let visualBibleGrid = null;
-    if (visualBible) {
-      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-      const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-      }
-    }
 
     // Extract only the scene part for image generation (strip previewMismatches, checks, corrections)
     let cleanSceneForImage = newSceneDescription;
@@ -1988,6 +1981,27 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
+    // Build VB grid + landmark refs for the FINAL composite call.
+    // If sceneBackground is set, vehicles, non-landmark locations, and ALL landmarks
+    // are already painted into the empty scene plate — drop them from the composite refs
+    // to avoid double-rendering. Characters/animals/artifacts are not in the empty scene
+    // and stay in the grid.
+    let visualBibleGrid = null;
+    let finalLandmarkPhotos = pageLandmarkPhotos;
+    if (visualBible) {
+      let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+      let secondaryLandmarks = pageLandmarkPhotos.slice(1);
+      if (sceneBackground) {
+        elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+        secondaryLandmarks = [];
+        finalLandmarkPhotos = [];
+        log.debug(`🔲 [ITERATE] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs (already in empty scene plate)`);
+      }
+      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+      }
+    }
+
     let imageResult;
     if (iterativePlacement) {
       const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
@@ -1996,7 +2010,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
         imageModelOverride,
         imageBackendOverride: iterBackend,
-        landmarkPhotos: pageLandmarkPhotos,
+        landmarkPhotos: finalLandmarkPhotos,
         visualBibleGrid,
         pageNumber,
         artStyle: iterArtStyleDesc,
@@ -2007,7 +2021,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
         { imageModel: imageModelOverride },
         `PAGE ${pageNumber} ITERATE`,
-        { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, sceneBackground }
+        { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, sceneBackground }
       );
     }
 
@@ -4721,16 +4735,27 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
           log.info(`👤 [CHAR REPAIR] ${characterName} body:[${bbox.map(v => Math.round(v*100)+'%').join(', ')}] face:[${faceBbox ? faceBbox.map(v => Math.round(v*100)+'%').join(', ') : 'none'}]`);
 
-          // Collect face bboxes of OTHER characters from bbox detection (same source as repair target)
+          // Collect face AND body bboxes of OTHER characters from bbox detection.
+          // Body-mode repair needs protectedBodies to blur other characters' full
+          // figures (prevents Grok from bleeding their hair/clothing/skin into the
+          // target) and to restore them surgically in the blend mask. Face-mode
+          // only needs protectedFaces. The unified pipeline already passes both;
+          // the workflow endpoint used to only pass protectedFaces, which silently
+          // fell back to face-only protection in body mode.
           const protectedFaces = [];
+          const protectedBodies = [];
+          const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
           if (sceneBbox?.figures) {
             for (const fig of sceneBbox.figures) {
               if (!fig.name || fig.name === 'UNKNOWN') continue;
               if (fig.name.toLowerCase() === characterName.toLowerCase()) continue;
               if (fig.faceBox) {
-                const fb = Array.isArray(fig.faceBox) ? fig.faceBox : [fig.faceBox.y, fig.faceBox.x, fig.faceBox.y + fig.faceBox.height, fig.faceBox.x + fig.faceBox.width];
+                const fb = toRect(fig.faceBox);
                 protectedFaces.push(fb);
                 log.info(`🛡️ [CHAR REPAIR] Protecting ${fig.name}'s face at [${fb.map(v => Math.round(v*100)+'%').join(', ')}] (from bbox detection)`);
+              }
+              if (fig.bodyBox) {
+                protectedBodies.push(toRect(fig.bodyBox));
               }
             }
           }
@@ -4749,6 +4774,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               sceneDescription: sceneDesc,
               faceBbox,
               protectedFaces,
+              protectedBodies,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,
