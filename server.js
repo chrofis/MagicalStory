@@ -2779,6 +2779,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
+        // Back cover is a main-characters-only group portrait (same rule as title page).
+        // Drop any supporting characters Claude may have listed in the hint.
+        if (coverType === 'backCover' && coverCharacters.length > 0) {
+          const isMainChar = (c) =>
+            c.isMainCharacter === true ||
+            (inputData.mainCharacters?.length > 0 && inputData.mainCharacters.includes(c.id));
+          const mainOnly = coverCharacters.filter(isMainChar);
+          if (mainOnly.length !== coverCharacters.length) {
+            const dropped = coverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
+            log.info(`📕 [COVER] backCover: Dropping non-main characters: ${dropped}`);
+          }
+          coverCharacters = mainOnly;
+        }
+
         // Final fallback for title page: use main characters or all characters
         if (coverCharacters.length === 0 && coverType === 'titlePage') {
           // Try isMainCharacter property first

@@ -169,6 +169,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
     }
   }
 
+  // Back cover is a main-characters-only group portrait (same rule as front cover).
+  // Drop any supporting characters that slipped in through the hint or scene description.
+  if (normalizedCoverType === 'back' && selectedCoverCharacters.length > 0) {
+    const mainIds = Array.isArray(storyData.mainCharacters) ? storyData.mainCharacters : [];
+    const isMainChar = (c) =>
+      c.isMainCharacter === true || (mainIds.length > 0 && mainIds.includes(c.id));
+    const mainOnly = selectedCoverCharacters.filter(isMainChar);
+    if (mainOnly.length > 0 && mainOnly.length !== selectedCoverCharacters.length) {
+      const dropped = selectedCoverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
+      log.info(`🔄 [COVER-ITERATE] backCover: Dropping non-main characters: ${dropped}`);
+      selectedCoverCharacters = mainOnly;
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    }
+  }
+
   // Apply styled avatars (skip if photos already have styled data from story persistence)
   const allAlreadyStyled = coverCharacterPhotos.every(p =>
     p.photoType?.startsWith('styled-') || p.photoType?.startsWith('costumed-')

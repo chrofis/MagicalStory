@@ -534,14 +534,14 @@ Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
 
 **Back Cover**
-Pick **UP TO 5** of the most important characters — same rules as Initial Page.
-Do NOT try to include everyone. Characters not listed simply don't appear.
+ONLY main characters: {MAIN_CHARACTER_NAMES}
+NO primary characters on back cover - match the focus of the title page.
 
-Hint: [1-2 sentences - happy conclusion, characters together. Max 2 items per character if they carry anything.]
-Characters (MAX 5, each listed BY NAME):
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
+Hint: [1-2 sentences - happy conclusion, ONLY main character(s) together. Max 2 items per character if they carry anything.]
+Characters:
+- [MainChar1] (position): [clothing], holds: [item1 + item2 OR "nothing"]
+- [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]
+(List EVERY main character by name with position, clothing, and what they hold. Max 2 items per character — they have 2 hands.)
 
 ---SCENE PLAN---
 Plan the visual composition for each page BEFORE writing. One line per page:
