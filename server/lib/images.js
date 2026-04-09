@@ -4524,20 +4524,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     evalMap.set(ev.pageNumber, ev);
   }
 
-  // Track all versions per page: { pageNumber -> [{ imageData, score, source, evaluation }] }
-  const pageVersions = new Map();
-  for (const img of rawImages) {
-    const ev = evalMap.get(img.pageNumber);
-    pageVersions.set(img.pageNumber, [{
-      imageData: img.imageData,
-      score: ev?.score ?? ev?.qualityScore ?? null,
-      source: 'original',
-      evaluation: ev || null,
-      modelId: img.modelId,
-      grokRefImages: img.grokRefImages || null
-    }]);
-  }
-
   // =========================================================================
   // Shared helpers for the round loop
   // =========================================================================
@@ -4555,6 +4541,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     return penalty;
   };
+
+  // Track all versions per page: { pageNumber -> [{ imageData, score, source, evaluation, entityPenalty, evaluatedAt }] }
+  const pageVersions = new Map();
+  for (const img of rawImages) {
+    const ev = evalMap.get(img.pageNumber);
+    pageVersions.set(img.pageNumber, [{
+      imageData: img.imageData,
+      score: ev?.score ?? ev?.qualityScore ?? null,
+      source: 'original',
+      evaluation: ev || null,
+      modelId: img.modelId,
+      grokRefImages: img.grokRefImages || null,
+      entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
+      evaluatedAt: new Date().toISOString(),
+    }]);
+  }
 
   // Helper: execute an iterate action for a page
   const executeIterateAction = async (img, latestEval) => {
@@ -4826,6 +4828,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             modelId: repairResult.modelId,
             grokRefImages: repairResult.grokRefImages || null,
             inpaintInstruction: repairResult.inpaintInstruction || null,
+            entityPenalty: getEntityPenalty(ev.pageNumber, currentEntityReport),
+            evaluatedAt: new Date().toISOString(),
           });
         }
       }
@@ -5195,7 +5199,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const imageVersions = [];
     const buildVersionEntry = (v) => ({
       imageData: v.imageData,
-      qualityScore: v.score,
+      qualityScore: v.score,                                    // combined final (visual − semantic penalty)
+      rawQualityScore: v.evaluation?.qualityScore ?? null,      // raw visual eval
+      semanticScore: v.evaluation?.semanticScore ?? null,
+      semanticResult: v.evaluation?.semanticResult || null,
+      entityPenalty: v.entityPenalty ?? 0,
+      evaluatedAt: v.evaluatedAt || null,
+      issuesSummary: v.evaluation?.issuesSummary || null,
+      fixableIssues: v.evaluation?.fixableIssues || [],
       source: v.source,
       type: v.source === 'original' ? 'original' : (v.source === 'character-fix' ? 'entity-repair' : 'repair'),
       modelId: v.modelId,

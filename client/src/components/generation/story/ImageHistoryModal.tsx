@@ -358,6 +358,62 @@ export function ImageHistoryModal({
                           </div>
                         </div>
                       )}
+                      {/* Semantic fidelity details — visible vs expected + per-issue list */}
+                      {detailVersion.semanticResult && (
+                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200 space-y-2">
+                          <div className="text-xs font-medium text-indigo-700">Semantic details:</div>
+                          {detailVersion.semanticResult.visible && (
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-white p-2 rounded border border-indigo-200">
+                                <div className="font-medium text-indigo-800 mb-1">👁️ Visible</div>
+                                {(detailVersion.semanticResult.visible.characters?.length ?? 0) > 0 && (
+                                  <div><span className="text-gray-500">Characters:</span> {detailVersion.semanticResult.visible.characters?.join(', ')}</div>
+                                )}
+                                {(detailVersion.semanticResult.visible.objects?.length ?? 0) > 0 && (
+                                  <div><span className="text-gray-500">Objects:</span> {detailVersion.semanticResult.visible.objects?.join(', ')}</div>
+                                )}
+                                {detailVersion.semanticResult.visible.setting && (
+                                  <div><span className="text-gray-500">Setting:</span> {detailVersion.semanticResult.visible.setting}</div>
+                                )}
+                                {detailVersion.semanticResult.visible.action && (
+                                  <div><span className="text-gray-500">Action:</span> {detailVersion.semanticResult.visible.action}</div>
+                                )}
+                              </div>
+                              <div className="bg-white p-2 rounded border border-indigo-200">
+                                <div className="font-medium text-indigo-800 mb-1">🎯 Expected</div>
+                                {(detailVersion.semanticResult.expected?.characters?.length ?? 0) > 0 && (
+                                  <div><span className="text-gray-500">Characters:</span> {detailVersion.semanticResult.expected?.characters?.join(', ')}</div>
+                                )}
+                                {(detailVersion.semanticResult.expected?.objects?.length ?? 0) > 0 && (
+                                  <div><span className="text-gray-500">Objects:</span> {detailVersion.semanticResult.expected?.objects?.join(', ')}</div>
+                                )}
+                                {detailVersion.semanticResult.expected?.setting && (
+                                  <div><span className="text-gray-500">Setting:</span> {detailVersion.semanticResult.expected.setting}</div>
+                                )}
+                                {detailVersion.semanticResult.expected?.action && (
+                                  <div><span className="text-gray-500">Action:</span> {detailVersion.semanticResult.expected.action}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {(detailVersion.semanticResult.semanticIssues?.length ?? 0) > 0 && (
+                            <ul className="bg-white p-2 rounded border border-indigo-200 space-y-1 text-xs">
+                              {detailVersion.semanticResult.semanticIssues.map((issue, idx) => (
+                                <li key={idx} className="flex items-start gap-2">
+                                  <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${
+                                    issue.severity === 'CRITICAL' ? 'bg-red-200 text-red-800' :
+                                    issue.severity === 'MAJOR' ? 'bg-orange-200 text-orange-800' :
+                                    'bg-yellow-200 text-yellow-800'
+                                  }`}>
+                                    {issue.severity}
+                                  </span>
+                                  <span className="text-gray-700">{issue.problem}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   {detailVersion.issuesSummary && (

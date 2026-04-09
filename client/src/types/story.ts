@@ -665,6 +665,7 @@ export interface ImageVersion {
   qualityScore?: number;
   rawQualityScore?: number | null;
   semanticScore?: number | null;
+  semanticResult?: SemanticEvaluationResult | null;
   entityPenalty?: number;
   evaluatedAt?: string;
   issuesSummary?: string;
