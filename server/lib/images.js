@@ -4228,51 +4228,52 @@ function buildRegenFeedback(evaluation) {
 }
 
 /**
- * Choose whether to inpaint or iterate a bad page based on scores and round history.
+ * Choose whether to inpaint or iterate a bad page.
  *
- * HARD RULE: never return 'inpaint' when there are no fix targets to act on.
- * Inpaint without targets is a no-op that wastes a round and produces no upgrade.
+ * Philosophy: **default = repair** (inpaint). Iterate ONLY when the image is
+ * total crap (fundamentally broken visual/semantic) or when repair has nothing
+ * to act on. Repair is cheaper, preserves rendering, and is smarter for most
+ * issues (extra hand, wrong framing, character pose nudge, etc.).
  *
- * Decision logic (applies the same way in every round, including round 3):
- *   1. Semantic score < threshold OR quality score < threshold → iterate
- *      (the image itself is fundamentally broken — surgical fixes won't help)
- *   2. Round 2 alternation: if round 1 was iterate AND there are fixable
- *      issues, try inpaint; if round 1 was inpaint, try iterate
- *   3. Has specific fixable issues / fix targets → inpaint (surgical fix)
- *   4. No specific issues but bad score → iterate (general redo)
+ * Decision logic:
+ *   1. Visual score < VISUAL_BROKEN_FLOOR → iterate (image is visually broken)
+ *   2. Semantic score < SEMANTIC_BROKEN_FLOOR → iterate (image shows wrong scene)
+ *   3. No inpaintable content (no quality/semantic issues, no fix targets) → iterate
+ *   4. Otherwise → inpaint (default)
  *
- * @param {Object} evaluation - { qualityScore, semanticScore, fixableIssues, fixTargets, enrichedFixTargets }
- * @param {number} round - Current round (1-based)
- * @param {string|null} previousAction - What action was taken for this page in previous round ('inpaint'|'iterate'|null)
- * @param {Object} options - { semanticThresholdForIterate, qualityThresholdForIterate }
- * @returns {'inpaint'|'iterate'}
+ * @param {Object} evaluation - { qualityScore, semanticScore, fixableIssues, fixTargets, enrichedFixTargets, semanticResult }
+ * @returns {{ strategy: 'inpaint'|'iterate', reason: string }}
  */
-function chooseRepairStrategy(evaluation, round, previousAction, options = {}) {
-  const {
-    semanticThresholdForIterate = REPAIR_DEFAULTS.semanticThresholdForIterate,
-    qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate
-  } = options;
+function chooseRepairStrategy(evaluation) {
+  const VISUAL_BROKEN_FLOOR = 50;     // below this, the image is visually total crap
+  const SEMANTIC_BROKEN_FLOOR = 30;   // below this, the image shows the wrong scene
 
-  // Define fix targets up front — used in TWO places below, must stay consistent.
-  const hasFixableContent = (evaluation.fixableIssues?.length > 0) ||
-    (evaluation.enrichedFixTargets?.length > 0) || (evaluation.fixTargets?.length > 0);
+  const visualScore = evaluation.qualityScore ?? 100;
+  const semanticScore = evaluation.semanticScore ?? 100;
 
-  // Fundamentally broken: iterate (image itself is the problem, surgical fix won't help)
-  if (evaluation.semanticScore != null && evaluation.semanticScore < semanticThresholdForIterate) return 'iterate';
-  if ((evaluation.qualityScore ?? 100) < qualityThresholdForIterate) return 'iterate';
+  // Inpaint can act on quality fixableIssues, enriched/fix targets, OR semantic issues.
+  const fixableCount = evaluation.fixableIssues?.length || 0;
+  const enrichedCount = evaluation.enrichedFixTargets?.length || 0;
+  const fixTargetCount = evaluation.fixTargets?.length || 0;
+  const semanticIssueCount = (evaluation.semanticResult?.issues?.length
+    || evaluation.semanticResult?.semanticIssues?.length || 0);
+  const hasInpaintableContent = fixableCount + enrichedCount + fixTargetCount + semanticIssueCount > 0;
 
-  // Round 2: alternate strategy from round 1 (variety helps escape local minima
-  // where the same approach keeps producing the same problem). Alternation only
-  // picks 'inpaint' when fixable content actually exists.
-  if (round === 2 && previousAction) {
-    if (previousAction === 'iterate' && hasFixableContent) return 'inpaint';
-    if (previousAction === 'inpaint') return 'iterate';
+  if (visualScore < VISUAL_BROKEN_FLOOR) {
+    return { strategy: 'iterate', reason: `image visually broken (visual=${visualScore})` };
+  }
+  if (semanticScore < SEMANTIC_BROKEN_FLOOR) {
+    return { strategy: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
+  }
+  if (!hasInpaintableContent) {
+    return { strategy: 'iterate', reason: 'no inpaintable content' };
   }
 
-  // Default: inpaint when targets exist (surgical fix is cheaper and preserves
-  // the rest of the image), otherwise iterate (general redo). NEVER inpaint
-  // without targets — the call would be a no-op that burns a round.
-  return hasFixableContent ? 'inpaint' : 'iterate';
+  const parts = [];
+  if (fixableCount) parts.push(`${fixableCount} quality`);
+  if (semanticIssueCount) parts.push(`${semanticIssueCount} semantic`);
+  if (enrichedCount || fixTargetCount) parts.push(`${enrichedCount + fixTargetCount} targets`);
+  return { strategy: 'inpaint', reason: parts.join(', ') || 'default' };
 }
 
 /**
@@ -4371,8 +4372,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
  * @param {number} [options.evalConcurrency=100] - Concurrency for evaluations
  * @param {string} [options.qualityModelOverride] - Model override for quality evaluation
  * @param {boolean} [options.useIteratePage=false] - Use iteratePage (re-expansion) instead of generateImageOnly
- * @param {number} [options.semanticThresholdForIterate=30] - Below this → iterate
- * @param {number} [options.qualityThresholdForIterate=20] - Below this → iterate
  * @param {number} [options.inpaintMaxPasses=1] - Inpaint attempts per page per round
  * @returns {Promise<{results: Array<Object>, charFixDetails: Object}>}
  */
@@ -4394,8 +4393,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     evalConcurrency = 100,
     qualityModelOverride = null,
     useIteratePage = false,
-    semanticThresholdForIterate = REPAIR_DEFAULTS.semanticThresholdForIterate,
-    qualityThresholdForIterate = REPAIR_DEFAULTS.qualityThresholdForIterate,
     inpaintMaxPasses = REPAIR_DEFAULTS.inpaintMaxPasses,
   } = options;
 
@@ -4407,7 +4404,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   if (useIteratePage && !storyData) {
     log.warn('[UNIFIED PIPELINE] useIteratePage=true but storyData not provided; falling back to generateImageOnly');
   }
-  log.info(`🔧 [UNIFIED PIPELINE] Starting: ${imagesWithData.length} images, threshold=${regenThreshold}, maxPasses=${maxRegenAttempts}, mode=${effectiveUseIteratePage ? 'iteratePage' : 'generateImageOnly'}, semThresh=${semanticThresholdForIterate}, qualThresh=${qualityThresholdForIterate}`);
+  log.info(`🔧 [UNIFIED PIPELINE] Starting: ${imagesWithData.length} images, threshold=${regenThreshold}, maxPasses=${maxRegenAttempts}, mode=${effectiveUseIteratePage ? 'iteratePage' : 'generateImageOnly'}`);
 
   // Helper for progress updates
   const updateProgress = async (percent, message) => {
@@ -4558,9 +4555,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     return penalty;
   };
-
-  // Track which action was taken per page per round: Map<pageNumber, string[]>
-  const pageRoundActions = new Map();
 
   // Helper: execute an iterate action for a page
   const executeIterateAction = async (img, latestEval) => {
@@ -4751,13 +4745,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
-      const previousActions = pageRoundActions.get(img.pageNumber) || [];
-      const previousAction = previousActions.length > 0 ? previousActions[previousActions.length - 1] : null;
 
-      const strategy = chooseRepairStrategy(latestEval || {}, round, previousAction, {
-        semanticThresholdForIterate,
-        qualityThresholdForIterate,
-      });
+      const { strategy, reason } = chooseRepairStrategy(latestEval || {});
+      log.info(`  📋 [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: ${strategy} (${reason})`);
 
       return { img, strategy, latestEval };
     });
@@ -4776,9 +4766,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         try {
           if (strategy === 'inpaint') {
             const inpaintResult = await executeInpaintAction(img, latestEval);
-            if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
-            pageRoundActions.get(pageNumber).push('inpaint');
-
             if (inpaintResult.repaired && inpaintResult.imageData) {
               return {
                 pageNumber,
@@ -4793,9 +4780,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           } else {
             // iterate
             const result = await executeIterateAction(img, latestEval);
-            if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
-            pageRoundActions.get(pageNumber).push('iterate');
-
             if (result?.imageData) {
               return {
                 pageNumber,
@@ -4809,8 +4793,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           }
         } catch (err) {
           log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${strategy} failed for page ${pageNumber}: ${err.message}`);
-          if (!pageRoundActions.has(pageNumber)) pageRoundActions.set(pageNumber, []);
-          pageRoundActions.get(pageNumber).push(strategy);
           return { pageNumber, imageData: null, error: err.message };
         }
       }))
