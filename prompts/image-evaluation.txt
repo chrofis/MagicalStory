@@ -59,6 +59,11 @@ PHYSICS & GRAVITY:
 - Objects held properly (not phasing through hands)
 - Shadows and lighting consistent
 
+HELD & ATTACHED OBJECTS:
+- If a character bullet says `holding: X` OR the Objects line binds an item to a character (`in X's pocket`, `in X's arms`, `held by X`, `on X's back`, `around X's neck`, `carried by X`), that item must be physically in contact with the named character in the image.
+- An item that should be held/carried/worn but appears floating separately from its declared owner = MAJOR, set `physics_ok: false`.
+- List every such mismatch in `rendering.issues` as `"<item> should be <held/in pocket/etc> with <character> but is detached/floating"` and add a `fixable_issues` entry with `type: physics`.
+
 FACES:
 - CROSS-EYES: Eyes should look in same direction (not crossed) = MAJOR if crossed
 - Features properly placed (eyes, nose, mouth)
@@ -104,6 +109,7 @@ Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
   - Wrong clothing (completely different color/type than reference — e.g. blue shirt shown as red)
   - Wrong hair (completely different color than reference)
   - Unrecognizable character, limbs detached, impossible physics
+  - Held/carried object detached from its owner (e.g. toy that should be in pocket is floating beside the character)
 - MODERATE (-1): Minor clothing difference, character on wrong side of scene, key object missing
 - MINOR (-0.5): Small differences, minor finger issues
 
