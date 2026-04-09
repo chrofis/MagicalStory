@@ -54,6 +54,7 @@ ANATOMY (Critical):
 
 PHYSICS & GRAVITY:
 - People/objects grounded (not floating in air unless flying)
+- Characters stand on the surface the prompt specifies (on island, not in water; on ground, not in lava). Wrong substrate = MAJOR, set `physics_ok: false`.
 - Weight and balance look natural
 - Objects held properly (not phasing through hands)
 - Shadows and lighting consistent
