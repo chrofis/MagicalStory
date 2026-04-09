@@ -55,8 +55,10 @@ async function loadPromptTemplates() {
     // Auto-repair / Inpainting prompt
     PROMPT_TEMPLATES.imageInspection = await fs.readFile(path.join(promptsDir, 'image-inspection.txt'), 'utf-8');
     PROMPT_TEMPLATES.inpainting = await fs.readFile(path.join(promptsDir, 'inpainting.txt'), 'utf-8');
-    // Character repair (Grok blended mode)
+    // Character repair (Grok blended mode) — face-only template
     PROMPT_TEMPLATES.characterRepairBlended = await fs.readFile(path.join(promptsDir, 'character-repair-blended.txt'), 'utf-8');
+    // Character repair (Grok blended mode) — full-figure template used when whiteoutTarget='body'
+    PROMPT_TEMPLATES.characterRepairBodyBlended = await fs.readFile(path.join(promptsDir, 'character-repair-body-blended.txt'), 'utf-8');
     // Bbox refinement (iterate overlay with vision model)
     PROMPT_TEMPLATES.bboxRefine = await fs.readFile(path.join(promptsDir, 'bbox-refine.txt'), 'utf-8');
     // Scene expansion - UNUSED, moved to prompts/_unused/

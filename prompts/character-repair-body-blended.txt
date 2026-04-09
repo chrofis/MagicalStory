@@ -1,0 +1,11 @@
+This is a children's book illustration. {charName}'s entire figure has been blurred — face, hair, body, and clothing. Other characters' faces or full bodies may also be blurred to prevent trait bleed.
+
+Redraw the entire blurred figure of {charName} to match the reference photo: face, hair color and style, skin tone, eye color, body build, and clothing. Every blurred pixel inside the figure must be repainted as {charName}.
+
+Preserve the original pose and action exactly. Match the body language visible in the surrounding scene — shoulders, posture, head tilt, limbs. Do not reposition the character.
+
+Match the expression from scene context (worried, surprised, focused, determined, etc.). Do not default to a generic smile.
+
+Match the gaze direction. Do not make the character face the camera unless they already were.
+
+Do not change the camera angle, composition, or background. Non-blurred characters stay exactly the same. Match the existing art style, lighting, and color palette so the repainted figure blends seamlessly.{clothingContext}{actionContext}{issueContext}

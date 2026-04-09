@@ -5866,9 +5866,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    // Build prompt from template — tells Grok to redraw ALL whited-out faces
-    const prompt = PROMPT_TEMPLATES.characterRepairBlended
-      ? fillTemplate(PROMPT_TEMPLATES.characterRepairBlended, {
+    // Pick the template that matches the whiteout mode. Body-mode repair blurs
+    // the full figure, so the prompt must tell Grok to repaint the ENTIRE figure
+    // (face + hair + body + clothing). The face-only template says "preserve the
+    // body, only redo the face" — which left body repairs looking unchanged
+    // because Grok obediently preserved the blurry body and only touched the face.
+    const repairTemplate = whiteoutTarget === 'body' && PROMPT_TEMPLATES.characterRepairBodyBlended
+      ? PROMPT_TEMPLATES.characterRepairBodyBlended
+      : PROMPT_TEMPLATES.characterRepairBlended;
+    const prompt = repairTemplate
+      ? fillTemplate(repairTemplate, {
           charName,
           clothingContext,
           actionContext,
