@@ -2,6 +2,9 @@ Generate a SINGLE illustration. No split screen, no panels, no grid, no collage.
 
 **STYLE: {STYLE_DESCRIPTION}**
 
+**SCENE BACKGROUND:**
+When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment described in the SCENE section.
+
 ---
 
 {CHARACTER_REFERENCE_LIST}
