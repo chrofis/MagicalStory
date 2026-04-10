@@ -9191,9 +9191,9 @@ async function splitGridIntoReferences(gridImage, count) {
     throw new Error('Could not get grid image dimensions');
   }
 
-  // Calculate grid layout (always 2 columns for simplicity)
-  const cols = count <= 2 ? count : 2;
-  const rows = Math.ceil(count / cols);
+  // Calculate grid layout — match prompt logic: 2x2 only for exactly 4, otherwise single column
+  const cols = count === 4 ? 2 : 1;
+  const rows = count === 4 ? 2 : count;
   const cellWidth = Math.floor(width / cols);
   const cellHeight = Math.floor(height / rows);
 
@@ -9235,13 +9235,16 @@ async function splitGridIntoReferences(gridImage, count) {
  */
 function buildReferenceSheetPrompt(elements, styleDescription) {
   const count = elements.length;
-  const cols = count <= 2 ? count : 2;
-  const rows = Math.ceil(count / cols);
+  // Only use 2x2 for exactly 4 elements. Everything else uses a single column
+  // to avoid partial rows (e.g. 3 elements in a 2x2 leaves an empty cell that
+  // confuses image models and grid splitters).
+  const cols = count === 4 ? 2 : 1;
+  const rows = count === 4 ? 2 : count;
 
   // Build grid layout description
-  const positions = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
+  const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
   const gridLayoutLines = elements.map((el, i) => {
-    const pos = positions[i] || `Cell ${i + 1}`;
+    const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
     const desc = el.extractedDescription || el.description;
     return `${pos}: ${el.name} (${el.type}) - ${desc}`;
   });
