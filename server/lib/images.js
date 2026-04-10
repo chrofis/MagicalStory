@@ -2991,8 +2991,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
     } catch (grokError) {
-      log.error('❌ [IMAGE GEN] Grok generation failed:', grokError.message);
-      throw grokError;
+      log.error(`❌ [IMAGE GEN] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
+      // Fall through to Gemini below
     }
   }
 
@@ -3541,8 +3541,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
       return finalResult;
     } catch (grokError) {
-      log.error('❌ [IMAGE GEN-ONLY] Grok generation failed:', grokError.message);
-      throw grokError;
+      log.error(`❌ [IMAGE GEN-ONLY] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
+      // Fall through to Gemini below
     }
   }
 
@@ -6180,7 +6180,8 @@ async function editImageWithPrompt(imageData, editInstruction, model) {
         // Fall through to Gemini path below
         log.info(`🔄 [IMAGE EDIT] Falling back to Gemini for content-moderated edit`);
       } else {
-        throw grokErr; // Non-moderation error, rethrow
+        log.error(`❌ [IMAGE EDIT] Grok edit failed, falling back to Gemini: ${grokErr.message}`);
+        // Fall through to Gemini path below
       }
     }
   }

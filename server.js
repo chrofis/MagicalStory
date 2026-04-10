@@ -3041,11 +3041,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Get landmark photos for cover scene (same as regular pages)
         // Cover hints are plain text (no JSON), so extractSceneMetadata may return null.
         // Fallback: scan plain text for landmark names from the visual bible.
+        // Must await landmarkDescriptionsPromise first so photoVariants are populated
+        // (Swiss pre-indexed landmarks have no referencePhotoData until a variant is loaded).
+        if (landmarkDescriptionsPromise) {
+          await landmarkDescriptionsPromise;
+        }
         let coverSceneMetadata = extractSceneMetadata(sceneDescription);
         if (!coverSceneMetadata && streamingVisualBible?.locations) {
           const matchedObjects = [];
+          const sceneTextLower = sceneDescription.toLowerCase();
           for (const loc of streamingVisualBible.locations) {
-            if (loc.isRealLandmark && loc.name && sceneDescription.toLowerCase().includes(loc.name.toLowerCase())) {
+            if (!loc.isRealLandmark) continue;
+            // Match by loc.name (story-adapted name) OR landmarkQuery (real landmark name)
+            const nameMatch = loc.name && sceneTextLower.includes(loc.name.toLowerCase());
+            const queryMatch = loc.landmarkQuery && sceneTextLower.includes(loc.landmarkQuery.toLowerCase());
+            if (nameMatch || queryMatch) {
               matchedObjects.push(loc.id ? `${loc.name} [${loc.id}]` : loc.name);
             }
           }

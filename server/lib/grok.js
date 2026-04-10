@@ -69,7 +69,7 @@ async function generateWithGrok(prompt, options = {}) {
 
   const startTime = Date.now();
 
-  try {
+  const doFetch = async () => {
     const response = await fetch(`${XAI_API_URL}/images/generations`, {
       method: 'POST',
       headers: {
@@ -82,8 +82,27 @@ async function generateWithGrok(prompt, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const err = new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
+      err.statusCode = response.status;
       log.error(`❌ [GROK] API error ${response.status}: ${errorText.substring(0, 300)}`);
-      throw new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
+      throw err;
+    }
+    return response;
+  };
+
+  try {
+    let response;
+    try {
+      response = await doFetch();
+    } catch (firstError) {
+      // Retry once on 500 (Grok internal error) after a short delay
+      if (firstError.statusCode === 500) {
+        log.warn(`⚠️ [GROK] Got 500, retrying generation once after 2s delay...`);
+        await new Promise(r => setTimeout(r, 2000));
+        response = await doFetch();
+      } else {
+        throw firstError;
+      }
     }
 
     const data = await response.json();
@@ -213,7 +232,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
   const startTime = Date.now();
 
-  try {
+  const doFetch = async () => {
     const response = await fetch(`${XAI_API_URL}/images/edits`, {
       method: 'POST',
       headers: {
@@ -226,8 +245,27 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const err = new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
+      err.statusCode = response.status;
       log.error(`❌ [GROK] Edit API error ${response.status}: ${errorText.substring(0, 300)}`);
-      throw new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
+      throw err;
+    }
+    return response;
+  };
+
+  try {
+    let response;
+    try {
+      response = await doFetch();
+    } catch (firstError) {
+      // Retry once on 500 (Grok internal error) after a short delay
+      if (firstError.statusCode === 500) {
+        log.warn(`⚠️ [GROK] Got 500 on edit, retrying once after 2s delay...`);
+        await new Promise(r => setTimeout(r, 2000));
+        response = await doFetch();
+      } else {
+        throw firstError;
+      }
     }
 
     const data = await response.json();

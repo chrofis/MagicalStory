@@ -269,7 +269,24 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   // Landmark photos (VB grid is built later, after the empty scene, so we can
   // dedupe anything already painted into the empty scene plate).
-  const coverSceneMetadata = extractSceneMetadata(sceneDescription);
+  // Cover descriptions are plain text (no JSON metadata), so extractSceneMetadata
+  // returns null. Fall back to name-matching visual bible locations in the text.
+  let coverSceneMetadata = extractSceneMetadata(sceneDescription);
+  if (!coverSceneMetadata && visualBible?.locations) {
+    const matchedObjects = [];
+    const sceneTextLower = sceneDescription.toLowerCase();
+    for (const loc of visualBible.locations) {
+      if (!loc.isRealLandmark) continue;
+      const nameMatch = loc.name && sceneTextLower.includes(loc.name.toLowerCase());
+      const queryMatch = loc.landmarkQuery && sceneTextLower.includes(loc.landmarkQuery.toLowerCase());
+      if (nameMatch || queryMatch) {
+        matchedObjects.push(loc.id ? `${loc.name} [${loc.id}]` : loc.name);
+      }
+    }
+    if (matchedObjects.length > 0) {
+      coverSceneMetadata = { objects: matchedObjects };
+    }
+  }
   const coverLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, coverSceneMetadata) : [];
 
   // --- Generate empty scene for style anchoring ---
