@@ -512,8 +512,8 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
         hair: physical.hairColor || 'Not analyzed',
         other: physical.other || ''
       },
-      referenceOutfit: char.referenceOutfit || char.reference_outfit || null,
-      generatedOutfits: char.generatedOutfits || char.generated_outfits || {}
+      referenceOutfit: char.referenceOutfit || null,
+      generatedOutfits: char.generatedOutfits || {}
     };
 
     return mainChar;

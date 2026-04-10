@@ -131,8 +131,8 @@ Benefits:
 - [ ] **DEPRECATED:** `clothing.current` (free-text) - remove, use `clothing.structured` only
 
 **Snake_case vs camelCase (API compatibility):**
-- [ ] Consider standardizing to camelCase only: `apparent_age`→`apparentAge`, `photo_url`→`photoUrl`, `structured_clothing`→`structuredClothing`, etc.
-- Currently both formats supported in `characterService.ts` for backward compatibility
+- [x] Standardized to camelCase: `physicalTraitsSource`, `generatedOutfits`, `structuredClothing`, `ageCategory`
+- Physical trait fields still sent as snake_case by frontend but handled by server-side `normalizePhysical()` which migrates them to `physical.*` camelCase
 
 **Deprecated Type Aliases (TODO: Remove):**
 - [ ] `ClothingAvatars` → `CharacterAvatars`

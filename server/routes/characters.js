@@ -482,29 +482,29 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         }
 
-        // Preserve structured_clothing (new structured format with upperBody, lowerBody, shoes, fullBody)
-        const existingClothing = existingChar.structured_clothing;
-        const newClothing = newChar.structured_clothing;
+        // Preserve structuredClothing (structured format with upperBody, lowerBody, shoes, fullBody)
+        const existingClothing = existingChar.structuredClothing;
+        const newClothing = newChar.structuredClothing;
         const newClothingEmpty = !newClothing || (typeof newClothing === 'object' && Object.keys(newClothing).length === 0);
 
         if (existingClothing && newClothingEmpty) {
           // Frontend sent empty/no clothing - preserve from DB
-          mergedChar.structured_clothing = existingClothing;
-          preservedFields.push('structured_clothing');
+          mergedChar.structuredClothing = existingClothing;
+          preservedFields.push('structuredClothing');
           hasChanges = true;
         } else if (existingClothing && !newClothingEmpty) {
           // Frontend sent clothing - check if it has actual values or just nulls
           const hasRealValues = newClothing.upperBody || newClothing.lowerBody || newClothing.fullBody || newClothing.shoes;
           if (!hasRealValues) {
-            // Frontend sent structured_clothing but all fields are empty - preserve from DB
-            mergedChar.structured_clothing = existingClothing;
-            preservedFields.push('structured_clothing');
+            // Frontend sent structuredClothing but all fields are empty - preserve from DB
+            mergedChar.structuredClothing = existingClothing;
+            preservedFields.push('structuredClothing');
             hasChanges = true;
-            console.log(`[Characters] POST - Frontend sent empty structured_clothing for ${newChar.name}, preserving from DB`);
+            console.log(`[Characters] POST - Frontend sent empty structuredClothing for ${newChar.name}, preserving from DB`);
           } else {
             // Frontend sent real values - use those
-            mergedChar.structured_clothing = newClothing;
-            console.log(`[Characters] POST - Using frontend structured_clothing for ${newChar.name}`);
+            mergedChar.structuredClothing = newClothing;
+            console.log(`[Characters] POST - Using frontend structuredClothing for ${newChar.name}`);
           }
         }
 

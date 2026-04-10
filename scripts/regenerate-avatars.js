@@ -67,7 +67,7 @@ async function regenerateAvatars() {
         build: char.build,
         physicalTraits: char.physicalTraits || char.physical_traits,
         physicalDescription: char.physicalDescription,
-        clothing: char.structured_clothing
+        clothing: char.structuredClothing
       })
     });
 

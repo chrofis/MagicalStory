@@ -32,6 +32,7 @@ const FIELD_MAPPINGS = {
   hair_style: 'hairStyle',
   hair_length: 'hairLength',
   skin_tone: 'skinTone',
+  skin_undertone: 'skinUndertone',
   skin_tone_hex: 'skinToneHex',
   facial_hair: 'facialHair',
   apparent_age: 'apparentAge',
@@ -41,7 +42,8 @@ const FIELD_MAPPINGS = {
   // Legacy: `other_features` historically stored face-shape descriptions.
   // Route it to `face` so existing characters keep their data in the right slot.
   other_features: 'face',
-  other: 'other'
+  other: 'other',
+  glasses: 'glasses'
 };
 
 // All legacy field names to strip

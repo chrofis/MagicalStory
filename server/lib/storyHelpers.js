@@ -2116,7 +2116,7 @@ function buildCharacterPhysicalDescription(char) {
   }
 
   // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-  const hairDesc = buildHairDescription(physical, char.physical_traits_source);
+  const hairDesc = buildHairDescription(physical, char.physicalTraitsSource);
   if (hairDesc) {
     description += `. Hair: ${hairDesc}`;
   }
@@ -2335,7 +2335,7 @@ function buildCharacterReferenceList(photos, characters = null) {
     const ageMarkersText = getAgeMarkers(effectiveAgeCategory);
 
     // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-    const hairDescText = buildHairDescription(physical, char?.physical_traits_source);
+    const hairDescText = buildHairDescription(physical, char?.physicalTraitsSource);
     const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
     const physicalParts = [
@@ -3461,7 +3461,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
       // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-      const hairDescText = buildHairDescription(physical, char.physical_traits_source);
+      const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
       const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
       const physicalParts = [

@@ -3003,8 +3003,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Structured clothing
             if (results.structuredClothing?.standard) {
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(results.structuredClothing.standard));
               paramIndex += 1;
             }
@@ -4067,8 +4067,8 @@ These corrections OVERRIDE what is visible in the reference photo.
 
             // Structured clothing
             if (results.structuredClothing?.standard) {
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(results.structuredClothing.standard));
               paramIndex += 1;
               log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);

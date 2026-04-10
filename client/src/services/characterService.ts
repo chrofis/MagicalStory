@@ -38,7 +38,6 @@ interface CharacterApiResponse {
   name: string;
   gender: string;
   age: string;
-  age_category?: string;
   ageCategory?: string;
   apparent_age?: string;
   apparentAge?: string;
@@ -86,7 +85,6 @@ interface CharacterApiResponse {
   glasses?: string;  // Glasses description or 'none'
   detailed_hair_analysis?: string;
   detailedHairAnalysis?: string;
-  physical_traits_source?: PhysicalTraitsSource;
   physicalTraitsSource?: PhysicalTraitsSource;
   // Photos (canonical nested format)
   photos?: {
@@ -126,9 +124,8 @@ interface CharacterApiResponse {
   // Legacy fields
   weaknesses?: string[];
   fears?: string[];
-  // Clothing (snake_case + camelCase legacy)
+  // Clothing
   clothing?: string;
-  structured_clothing?: StructuredClothing;
   structuredClothing?: StructuredClothing;
   clothing_style?: string;
   clothingStyle?: string;
@@ -138,14 +135,13 @@ interface CharacterApiResponse {
   clothingAvatars?: CharacterAvatars;
   avatars?: CharacterAvatars;  // Direct avatars field (includes styledAvatars from story generation)
   // Generated outfits per page
-  generated_outfits?: Record<number, unknown>;
   generatedOutfits?: Record<number, unknown>;
   // Story role (persisted across sessions)
   storyRole?: 'main' | 'in' | 'out';
 }
 
 // Convert API response to frontend Character
-// Handles both snake_case (new format) and camelCase (legacy format) for backward compatibility
+// Handles legacy flat snake_case fields (normalized by server) alongside canonical camelCase
 function mapCharacterFromApi(api: CharacterApiResponse): Character {
   // Read from canonical nested physical object; flat fields only as legacy fallback
   const p = api.physical;
@@ -171,7 +167,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
   };
 
   // Compute ageCategory from API or derive from age
-  const ageCategory = (api.age_category || api.ageCategory || getAgeCategory(api.age)) as AgeCategory | undefined;
+  const ageCategory = (api.ageCategory || getAgeCategory(api.age)) as AgeCategory | undefined;
 
   return {
     id: api.id,
@@ -182,7 +178,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.glasses || physical.detailedHairAnalysis || physical.apparentAge) ? physical : undefined,
 
-    physicalTraitsSource: api.physical_traits_source || api.physicalTraitsSource,
+    physicalTraitsSource: api.physicalTraitsSource,
 
     traits: {
       strengths: api.traits?.strengths || api.strengths || [],
@@ -202,14 +198,14 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     avatars: api.avatars || api.clothing_avatars || api.clothingAvatars,
 
-    clothing: (api.clothing || api.structured_clothing || api.structuredClothing)
+    clothing: (api.clothing || api.structuredClothing)
       ? {
           current: api.clothing,
-          structured: api.structured_clothing || api.structuredClothing,
+          structured: api.structuredClothing,
         }
       : undefined,
 
-    generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
+    generatedOutfits: api.generatedOutfits as Record<number, GeneratedOutfit> | undefined,
 
     storyRole: api.storyRole,
   };
@@ -226,7 +222,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     name: char.name,
     gender: char.gender,
     age: char.age,
-    age_category: ageCategory,
+    ageCategory: ageCategory,
     apparent_age: char.physical?.apparentAge,
     // Physical traits
     height: char.physical?.height,
@@ -244,7 +240,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     other: char.physical?.other,  // Birthmarks, scars, freckles, glasses
     glasses: char.physical?.glasses,  // Glasses description or 'none'
     detailed_hair_analysis: char.physical?.detailedHairAnalysis,
-    physical_traits_source: char.physicalTraitsSource,
+    physicalTraitsSource: char.physicalTraitsSource,
     // Photos - NOT sent on regular saves (server preserves existing)
     // This reduces payload from 10-15MB to <1MB
     // Photos are sent via mapCharacterToApiWithPhotos when uploading new photos
@@ -260,10 +256,10 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     fears: char.traits?.challenges,
     // Clothing (text descriptions only - avatars managed by backend)
     clothing: char.clothing?.current,
-    structured_clothing: char.clothing?.structured,
+    structuredClothing: char.clothing?.structured,
     // NOTE: avatars/clothing_avatars NOT sent - backend is source of truth
     // Generated outfits per page
-    generated_outfits: char.generatedOutfits,
+    generatedOutfits: char.generatedOutfits,
     // Story role (main/in/out) - sent to avoid race conditions with PUT /roles
     storyRole: char.storyRole,
   };

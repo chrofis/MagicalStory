@@ -66,13 +66,13 @@ function mergeCharacter(newChar, existingChar) {
     }
   }
 
-  // Preserve structured_clothing (new structured format)
-  mergedChar.structured_clothing = mergeStructuredClothing(
-    existingChar.structured_clothing,
-    newChar.structured_clothing
+  // Preserve structuredClothing (structured format with upperBody, lowerBody, shoes, fullBody)
+  mergedChar.structuredClothing = mergeStructuredClothing(
+    existingChar.structuredClothing,
+    newChar.structuredClothing
   );
-  if (mergedChar.structured_clothing && !hasRealClothingValues(newChar.structured_clothing)) {
-    preservedFields.push('structured_clothing');
+  if (mergedChar.structuredClothing && !hasRealClothingValues(newChar.structuredClothing)) {
+    preservedFields.push('structuredClothing');
   }
 
   // Preserve physical traits object
