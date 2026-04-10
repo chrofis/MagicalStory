@@ -150,9 +150,9 @@ function getAgeMarkers(apparentAge) {
     case 'preteen':
       return 'late-child proportions, starting to look slightly older than grade-schoolers, clearly not yet a teenager';
     case 'young-teen':
-      return 'early adolescent proportions, longer face than a child, jaw edge starting to show, clearly taller and leaner than grade-schoolers';
+      return 'early adolescent body proportions, longer limbs than a child, clearly taller and leaner than grade-schoolers, face more elongated than a child';
     case 'teenager':
-      return 'adolescent proportions, longer face than a child, defined jawline, clearly taller and leaner than grade-schoolers — visibly NOT a child';
+      return 'teenage body proportions, long limbs, clearly taller and leaner than grade-schoolers — visibly NOT a child, render as a 15-16 year old';
     case 'young-adult':
       return 'young adult proportions, mature face with defined bone structure, full adult height';
     case 'adult':
@@ -2260,10 +2260,12 @@ function buildRelativeHeightDescription(characters) {
         descriptor = 'similar height';
       } else if (diff <= 10) {
         descriptor = 'slightly taller';
-      } else if (diff <= 25) {
+      } else if (diff <= 20) {
         descriptor = 'taller';
+      } else if (diff <= 35) {
+        descriptor = 'much taller';
       } else {
-        descriptor = 'noticeably taller';
+        descriptor = 'towering over the others';
       }
 
       descriptions.push(`${char.name} (${descriptor})`);
