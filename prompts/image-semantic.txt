@@ -1,59 +1,56 @@
 Check if this illustration matches what was requested.
 
-**SCENE_HINT (what image should show):** "{SCENE_HINT}"
+**SCENE_HINT (what the image should show):** "{SCENE_HINT}"
 **STORY_TEXT (narrative context):** "{STORY_TEXT}"
 
 ---
 
 **STEP 1: DESCRIBE WHAT'S VISIBLE**
 
-List everything you see in the image:
-- Characters (appearance, position, what they're doing — count them)
-- Objects (items being held, used, or prominent in scene)
-- Setting/background (location, landmarks)
+List what you see:
+- Characters (count, appearance, position, action)
+- Objects (held, used, or prominent)
+- Setting (location type, landmarks)
 - Action (what's happening)
 
 ---
 
 **STEP 2: COMPARE TO SCENE_HINT**
 
-Check if the image matches what was requested:
-- Are the correct NUMBER of characters present? (2 expected = 2 visible). Background crowds are fine.
-- Are characters wearing the correct clothing/costume? (medieval costume should not appear as modern clothes)
-- Are all mentioned objects present?
-- Is the setting/location correct?
-- Are characters on the correct surface? (on the island, not in the water; on the path, not in the river) — MAJOR if wrong.
-- Does the lighting/weather match? (night dark, snow scene has snow, sunny bright)
-- Is the general action correct? (who is doing what to whom)
+Only check these things:
+- Correct number of foreground characters? (2 expected = 2 visible)
+- Correct clothing type? (medieval ≠ modern, winter coat ≠ t-shirt)
+- Key objects present?
+- Correct setting/location?
+- Correct surface? (on island, not in water; on path, not in river)
+- Correct weather/lighting? (night = dark, snow = snow)
+- Correct main action? (giving ≠ receiving, hugging ≠ fighting)
+- Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
+- Gaze direction matches interaction? (two characters talking but facing away from each other = wrong)
 
-**Do not flag, do not deduct for:**
-- Character identity/names. You cannot tell WHO a character is by looking at an illustration. A separate system with reference photos handles identity matching. Never flag "character X is not identifiable" or "names are not represented."
-- Background characters mentioned in the BACKGROUND field of the scene hint. These are allowed extras.
-- Camera angle, framing, perspective (over-the-shoulder, low/high angle, profile vs front). Image models cannot reliably honor these and we want camera variety across pages.
-- Facial expressions and subtle moods (thoughtful, tired, determined, focused).
-- Gaze direction (looking left vs looking at object).
-- Exact pose or gesture (sitting vs standing, thumbs up vs hands down).
-- Minor spatial differences (left midground vs center).
-- Characters facing camera instead of an object.
-
-Do flag and deduct for:
-- A character who should be the focal/active one is shown as passive (or vice versa) — wrong narrative role.
-- Wrong major action (hugging instead of fighting, giving instead of receiving).
-
-Judge who is where doing roughly what. Skip choreography.
+Ignore everything else. Specifically ignore:
+- Character identity. You cannot tell WHO someone is without reference photos. A separate system handles that.
+- Background characters. Any people in the BACKGROUND field of the scene hint are optional extras.
+- Extra objects beyond what was requested.
+- Camera angle, shot type, framing, perspective.
+- Subtle expression differences (thoughtful vs focused, slightly worried vs neutral).
+- Exact pose, gesture, body language.
+- Left/right positioning, spatial arrangement.
 
 ---
 
 **SCORING**
 
-Start at 10. Deduct only for items in this list — no other deductions:
-- Missing main character: -3
-- Missing key object: -2
+Start at 10. Only these deductions exist:
+- Missing foreground character: -3
 - Wrong setting/location: -2
-- Wrong major action: -2
-- Wrong narrative role (focal vs passive swapped): -2
-- Wrong clothing/costume on a named character: -1
-- Missing background element: -1
+- Wrong main action: -2
+- Missing key object: -2
+- Wrong emotion (happy in danger, scared in calm scene): -1
+- Wrong gaze (characters interacting but facing away): -1
+- Wrong clothing type on a character: -1
+
+No other deductions. Extra objects, background people, spatial arrangement — all score 10.
 
 VERDICT: PASS (7+), FAIL (0-6)
 
@@ -61,58 +58,37 @@ VERDICT: PASS (7+), FAIL (0-6)
 
 **OUTPUT FORMAT**
 
-Return JSON only:
+Return JSON only. Use one issues list (not two).
 
 ```json
 {
   "visible": {
-    "characters": ["Emma (blonde girl, left side, waving)", "Lucas (boy, right side, holding sword)"],
+    "characters": ["blonde girl, left, waving", "boy, right, holding sword"],
     "objects": ["sword", "treasure chest"],
     "setting": "forest clearing",
-    "action": "Emma waving at Lucas who holds a sword"
+    "action": "girl waving at boy who holds sword"
   },
   "expected": {
-    "characters": ["Emma", "Lucas"],
+    "characters": ["girl", "boy"],
     "objects": ["sword", "map"],
     "setting": "forest",
-    "action": "Emma gives map to Lucas"
+    "action": "girl gives map to boy"
   },
   "issues": [
     {
       "type": "missing_object",
       "item": "map",
       "severity": "MAJOR",
-      "problem": "Map not visible - Emma should be giving it to Lucas"
-    },
-    {
-      "type": "wrong_action",
-      "severity": "MAJOR",
-      "problem": "Emma is waving, not giving map to Lucas"
+      "problem": "Map not visible — girl should be giving it to boy"
     }
   ],
-  "score": 6,
-  "verdict": "FAIL",
   "semantic_issues": [
     {
       "problem": "Map not visible in scene",
       "severity": "MAJOR"
-    },
-    {
-      "problem": "Wrong action - waving instead of giving map",
-      "severity": "MAJOR"
     }
-  ]
-}
-```
-
-If no issues:
-```json
-{
-  "visible": { ... },
-  "expected": { ... },
-  "issues": [],
-  "score": 10,
-  "verdict": "PASS",
-  "semantic_issues": []
+  ],
+  "score": 8,
+  "verdict": "PASS"
 }
 ```
