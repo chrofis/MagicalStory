@@ -2260,12 +2260,10 @@ function buildRelativeHeightDescription(characters) {
         descriptor = 'similar height';
       } else if (diff <= 10) {
         descriptor = 'slightly taller';
-      } else if (diff <= 20) {
+      } else if (diff <= 25) {
         descriptor = 'taller';
-      } else if (diff <= 35) {
-        descriptor = 'much taller';
       } else {
-        descriptor = 'towering over the others';
+        descriptor = 'noticeably taller';
       }
 
       descriptions.push(`${char.name} (${descriptor})`);
