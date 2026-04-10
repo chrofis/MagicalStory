@@ -1785,15 +1785,12 @@ def split_reference_sheet():
             cols = int(data['cols'])
             rows = int(data['rows'])
         else:
-            # Default layouts matching the JS-side prompt builder
-            if count <= 2:
-                cols, rows = count, 1
-            elif count <= 4:
+            # Default layouts matching the JS-side prompt builder:
+            # 2x2 only for exactly 4 elements, single column for everything else
+            if count == 4:
                 cols, rows = 2, 2
-            elif count <= 6:
-                cols, rows = 2, 3
             else:
-                cols, rows = 2, (count + 1) // 2
+                cols, rows = 1, count
 
         if cols * rows < count:
             return jsonify({
