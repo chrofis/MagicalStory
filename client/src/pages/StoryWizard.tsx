@@ -673,8 +673,11 @@ export default function StoryWizard() {
       restoredJobIdRef.current = null;
     }
 
-    // If there's an active job and we haven't restored it yet, restore progressive view
-    if (activeJob && !urlStoryId && restoredJobIdRef.current !== activeJob.jobId) {
+    // If there's an active job and we haven't restored it yet, restore progressive view.
+    // Skip if isGenerating is already true — that means generateStory() started this job
+    // in the current session and already set up step 6. Only restore for jobs from a
+    // previous session (user returning to page while generation is still running).
+    if (activeJob && !urlStoryId && !isGenerating && restoredJobIdRef.current !== activeJob.jobId) {
       log.info('Returning during active generation, restoring progress for job:', activeJob.jobId);
       restoredJobIdRef.current = activeJob.jobId;
       setStep(6);
