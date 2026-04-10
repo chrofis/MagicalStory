@@ -2574,7 +2574,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio: grokAspect }
+        { aspectRatio: grokAspect, pageLabel: pageNumber != null ? String(pageNumber) : pageContext }
       );
 
       let result;
@@ -2944,7 +2944,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       } else {
         refImages = await packReferences(
           { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-          { aspectRatio: grokAspect }
+          { aspectRatio: grokAspect, pageLabel: pageNumber != null ? String(pageNumber) : pageContext }
         );
       }
 
@@ -3285,7 +3285,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio }
+        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '' }
       );
 
       let result;
@@ -3516,7 +3516,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio }
+        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '' }
       );
 
       let result;

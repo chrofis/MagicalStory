@@ -493,7 +493,8 @@ async function packReferences(refs = {}, options = {}) {
     previousImage = null,
     sceneBackground = null,
   } = refs;
-  const { aspectRatio = '1:1' } = options;
+  const { aspectRatio = '1:1', pageLabel = '' } = options;
+  const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
 
   // Extract character photo buffers (handle same formats as Gemini path)
   const charBuffers = [];
@@ -521,7 +522,7 @@ async function packReferences(refs = {}, options = {}) {
       const croppedBuffer = isAvatarGrid ? await cropToFrontColumn(rawBuffer) : rawBuffer;
       charBuffers.push(croppedBuffer);
     } else if (charName) {
-      log.warn(`⚠️ [GROK] Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
+      log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
     }
   }
 
@@ -559,11 +560,11 @@ async function packReferences(refs = {}, options = {}) {
     if (useBorderedScene) {
       const bordered = await composeSceneWithVbBorder(buf, rawVbElements);
       slots.push(`data:image/jpeg;base64,${bordered.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: scene background + ${Math.min(rawVbElements.length, 9)} VB cells (bordered 1280x1280)`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: scene background + ${Math.min(rawVbElements.length, 9)} VB cells (bordered 1280x1280)`);
     } else {
       const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: scene background (clean style anchor)`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: scene background (clean style anchor)`);
     }
   }
 
@@ -574,7 +575,7 @@ async function packReferences(refs = {}, options = {}) {
     const buf = Buffer.from(base64, 'base64');
     const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 [GROK] Slot ${slots.length}: previous/source image`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
   }
 
   // Strategy: maximize character image quality by giving them separate slots.
@@ -612,7 +613,7 @@ async function packReferences(refs = {}, options = {}) {
     if (!skipContext && visualBibleGrid) {
       const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: VB grid`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
     }
 
     if (charCount === 1 && slots.length < 3) {
@@ -620,25 +621,22 @@ async function packReferences(refs = {}, options = {}) {
       // front-views fill the slot at higher resolution for Grok.
       const resized = await sharp(charBuffers[0]).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: 1 character photo`);
     }
 
-    if (!skipContext && landmarkBuffers.length > 0 && slots.length < 3) {
-      const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
-      slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-      log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
+    // Landmarks never get their own slot — they're already in the empty scene
+    // background or described in the prompt. Character slots are more valuable.
+    if (landmarkBuffers.length > 0) {
+      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — slots reserved for characters`);
     }
   } else {
     // ── 2+ characters ──
     if (!skipContext) {
-      const contextImages = [];
-      if (visualBibleGrid) contextImages.push(visualBibleGrid);
-      contextImages.push(...landmarkBuffers);
-
-      if (contextImages.length > 0) {
-        const stitched = await stitchImagesHorizontally(contextImages, 768);
-        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 [GROK] Slot ${slots.length}: VB grid + ${landmarkBuffers.length} landmark(s) stitched`);
+      // VB grid only — no landmarks (they waste a slot that characters need)
+      if (visualBibleGrid) {
+        const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+        log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
       }
     }
 
@@ -649,7 +647,7 @@ async function packReferences(refs = {}, options = {}) {
         const resized = await sharp(buf).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
         slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       }
-      if (charBuffers.length > 0) log.info(`🎨 [GROK] Slot ${slots.length - Math.min(charCount, 3 - (slots.length - charCount))}-${slots.length}: ${Math.min(charCount, 3 - slots.length + charCount)} character photos (separate)`);
+      if (charBuffers.length > 0) log.info(`🎨 ${tag} Slot ${slots.length - Math.min(charCount, 3 - (slots.length - charCount))}-${slots.length}: ${Math.min(charCount, 3 - slots.length + charCount)} character photos (separate)`);
     } else {
       // 3+ characters: split into two groups, stitch each
       const mid = Math.ceil(charCount / 2);
@@ -659,12 +657,12 @@ async function packReferences(refs = {}, options = {}) {
       if (group1.length > 0 && slots.length < 3) {
         const stitched = await stitchImagesHorizontally(group1, 768, { allowEnlargement: true });
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 [GROK] Slot ${slots.length}: ${group1.length} characters stitched`);
+        log.info(`🎨 ${tag} Slot ${slots.length}: ${group1.length} characters stitched`);
       }
       if (group2.length > 0 && slots.length < 3) {
         const stitched = await stitchImagesHorizontally(group2, 768, { allowEnlargement: true });
         slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 [GROK] Slot ${slots.length}: ${group2.length} characters stitched`);
+        log.info(`🎨 ${tag} Slot ${slots.length}: ${group2.length} characters stitched`);
       }
     }
   }
@@ -688,7 +686,7 @@ async function packReferences(refs = {}, options = {}) {
     try {
       meta = await sharp(buf).metadata();
     } catch (metaErr) {
-      log.warn(`⚠️ [GROK] Slot ${i + 1}: metadata read failed (${metaErr.message}) — forcing ${FALLBACK_SIZE}x${FALLBACK_SIZE} fallback`);
+      log.warn(`⚠️ ${tag} Slot ${i + 1}: metadata read failed (${metaErr.message}) — forcing ${FALLBACK_SIZE}x${FALLBACK_SIZE} fallback`);
       meta = null;
     }
 
@@ -706,7 +704,7 @@ async function packReferences(refs = {}, options = {}) {
           .jpeg({ quality: 90 })
           .toBuffer();
         paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-        log.debug(`🎨 [GROK] Slot ${i + 1}: fallback padded to ${fw}x${fh}`);
+        log.debug(`🎨 ${tag} Slot ${i + 1}: fallback padded to ${fw}x${fh}`);
       } catch (fallbackErr) {
         log.error(`❌ [GROK] Slot ${i + 1}: fallback padding failed (${fallbackErr.message}) — dropping slot`);
       }
@@ -718,7 +716,7 @@ async function packReferences(refs = {}, options = {}) {
     // Already within tolerance → no-op (log the confirmed shape so we can verify)
     if (Math.abs(currentRatio - targetRatio) / targetRatio < TOLERANCE) {
       paddedSlots.push(slot);
-      log.debug(`🎨 [GROK] Slot ${i + 1}: ${w}x${h} already matches target ${aspectRatio}`);
+      log.debug(`🎨 ${tag} Slot ${i + 1}: ${w}x${h} already matches target ${aspectRatio}`);
       continue;
     }
 
@@ -740,7 +738,7 @@ async function packReferences(refs = {}, options = {}) {
         .jpeg({ quality: 90 })
         .toBuffer();
       paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-      log.debug(`🎨 [GROK] Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
+      log.debug(`🎨 ${tag} Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
     } catch (padErr) {
       log.warn(`⚠️ [GROK] Slot ${i + 1}: pad failed (${padErr.message}) — dropping slot`);
     }

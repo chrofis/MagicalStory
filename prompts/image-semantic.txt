@@ -28,6 +28,9 @@ Only check these things:
 - Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
 - Gaze direction matches interaction? (two characters talking but facing away from each other = wrong)
 
+Also check:
+- Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
+
 Ignore everything else. Specifically ignore:
 - Character identity. You cannot tell WHO someone is without reference photos. A separate system handles that.
 - Background characters. Any people in the BACKGROUND field of the scene hint are optional extras.
@@ -43,6 +46,7 @@ Ignore everything else. Specifically ignore:
 
 Start at 10. Only these deductions exist:
 - Missing foreground character: -3
+- Character merged into or clipped through an object (AI compositing artifact): -3
 - Wrong setting/location: -2
 - Wrong main action: -2
 - Missing key object: -2
