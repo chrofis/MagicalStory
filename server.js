@@ -4158,6 +4158,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               if (fgCount > 0) parts.push(`${fgCount} character${fgCount > 1 ? 's' : ''} in the foreground`);
               if (bgCount > 0) parts.push(`${bgCount} tiny figure${bgCount > 1 ? 's' : ''} in the far background`);
               characterSpace = `Leave open, uncluttered space for ${parts.join(' and ')}. Don't fill those areas with detail.`;
+
+              // For close-up/medium shots, add explicit space guidance so the empty scene
+              // doesn't fill the frame with just furniture (e.g. table surface only)
+              const shotType = (sceneMetadata?.fullData?.shot || camera || '').toLowerCase();
+              if (shotType.includes('close') || shotType.includes('medium')) {
+                characterSpace += ` This is a ${shotType.includes('close') ? 'close-up' : 'medium'} shot — characters will be composited into this scene later. The frame must include enough space for character bodies to be placed naturally.`;
+              }
             }
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

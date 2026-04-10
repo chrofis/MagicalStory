@@ -1,6 +1,7 @@
 Check if this illustration matches what was requested.
 
-**SCENE_HINT (what the image should show):** "{SCENE_HINT}"
+**SCENE_DESCRIPTION (what the image should show):** "{IMAGE_PROMPT}"
+**SCENE_HINT (original outline, for context only):** "{SCENE_HINT}"
 **STORY_TEXT (narrative context):** "{STORY_TEXT}"
 
 ---
@@ -15,7 +16,9 @@ List what you see:
 
 ---
 
-**STEP 2: COMPARE TO SCENE_HINT**
+**STEP 2: COMPARE TO SCENE_DESCRIPTION**
+
+SCENE_DESCRIPTION is authoritative — it is the expanded, final version of what the image should show. Use SCENE_HINT only as supplementary context. If they conflict, trust SCENE_DESCRIPTION.
 
 Only check these things:
 - Correct number of foreground characters? (2 expected = 2 visible)
