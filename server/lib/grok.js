@@ -327,38 +327,95 @@ async function cropToFrontColumn(buffer) {
     const aspect = meta.height / meta.width;
     if (aspect < 1.5 || aspect > 2.0) return buffer;
 
-    const halfW = Math.floor(meta.width / 2);
-    const halfH = Math.floor(meta.height / 2);
+    // Detect actual grid separators via row/column variance (not blind 50/50).
+    // The divider line has uniform color → lowest variance among all rows/columns.
+    const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
 
-    // Extract Face Front (top-left) and Body Front (bottom-left) quadrants.
-    const faceFront = await sharp(buffer)
-      .extract({ left: 0, top: 0, width: halfW, height: halfH })
+    // Find horizontal separator (face row ↔ body row)
+    const hStart = Math.floor(height * 0.25);
+    const hEnd = Math.floor(height * 0.75);
+    let minHVar = Infinity, separatorY = Math.floor(height / 2);
+    for (let y = hStart; y < hEnd; y++) {
+      let sum = 0, sumSq = 0;
+      for (let x = 0; x < width; x++) {
+        const v = data[y * width + x];
+        sum += v; sumSq += v * v;
+      }
+      const mean = sum / width;
+      const variance = sumSq / width - mean * mean;
+      if (variance < minHVar) { minHVar = variance; separatorY = y; }
+    }
+
+    // Find vertical separator (front view ↔ profile view)
+    const vStart = Math.floor(width * 0.3);
+    const vEnd = Math.floor(width * 0.7);
+    let minVVar = Infinity, separatorX = Math.floor(width / 2);
+    for (let x = vStart; x < vEnd; x++) {
+      let sum = 0, sumSq = 0;
+      for (let y = 0; y < height; y++) {
+        const v = data[y * width + x];
+        sum += v; sumSq += v * v;
+      }
+      const mean = sum / height;
+      const variance = sumSq / height - mean * mean;
+      if (variance < minVVar) { minVVar = variance; separatorX = x; }
+    }
+
+    log.debug(`🎨 [GROK] Grid separators detected: x=${separatorX} (of ${width}), y=${separatorY} (of ${height})`);
+
+    // Extract Face Front (top-left) and Body Front (bottom-left) quadrants
+    let faceFront = await sharp(buffer)
+      .extract({ left: 0, top: 0, width: separatorX, height: separatorY })
       .toBuffer();
     const bodyFront = await sharp(buffer)
-      .extract({ left: 0, top: halfH, width: halfW, height: halfH })
+      .extract({ left: 0, top: separatorY, width: separatorX, height: height - separatorY })
       .toBuffer();
 
-    // Compose them side-by-side on a white canvas. Body on the left (it's the
-    // bigger reference and tends to be what Grok needs most), face on the right.
+    // Trim background from face — the face is a tight crop that only fills ~30-50%
+    // of the quadrant (rest is studio background). Trimming makes the face larger
+    // relative to the body when composed side-by-side.
+    const BG = { r: 220, g: 220, b: 220 };
+    const preTrimMeta = await sharp(faceFront).metadata();
+    try {
+      const trimmed = await sharp(faceFront).trim({ threshold: 25 }).toBuffer();
+      const trimMeta = await sharp(trimmed).metadata();
+      // Only use trimmed result if it kept at least 30% of original dimensions
+      // (avoids over-trimming when background color matches skin tone)
+      if (trimMeta.width >= preTrimMeta.width * 0.3 && trimMeta.height >= preTrimMeta.height * 0.3) {
+        faceFront = trimmed;
+      }
+    } catch { /* trim throws if entire image is uniform — keep original */ }
+
+    // Resize both to same height (body height drives, face scales to match)
+    const bodyMeta = await sharp(bodyFront).metadata();
+    const targetH = bodyMeta.height;
+    const faceResized = await sharp(faceFront)
+      .resize({ height: targetH, fit: 'inside' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const faceW = (await sharp(faceResized).metadata()).width;
+    const bodyW = bodyMeta.width;
+
+    // Compose side-by-side: body (left) + face (right) on light grey canvas
     const gap = 4;
-    const outW = halfW * 2 + gap;
-    const outH = halfH;
+    const outW = bodyW + faceW + gap;
     const composed = await sharp({
       create: {
         width: outW,
-        height: outH,
+        height: targetH,
         channels: 3,
-        background: { r: 255, g: 255, b: 255 },
+        background: BG,
       },
     })
       .composite([
         { input: bodyFront, left: 0, top: 0 },
-        { input: faceFront, left: halfW + gap, top: 0 },
+        { input: faceResized, left: bodyW + gap, top: 0 },
       ])
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    log.info(`🎨 [GROK] Rearranged front views horizontally: ${meta.width}x${meta.height} → ${outW}x${outH}`);
+    log.info(`🎨 [GROK] Rearranged front views: ${meta.width}x${meta.height} → ${outW}x${targetH} (sep: ${separatorX},${separatorY}, face trimmed to ${faceW}px)`);
     return composed;
   } catch (err) {
     log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
@@ -804,7 +861,7 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {
       width: totalWidth,
       height: targetHeight,
       channels: 3,
-      background: { r: 255, g: 255, b: 255 },
+      background: { r: 220, g: 220, b: 220 },
     },
   })
     .composite(composites)
