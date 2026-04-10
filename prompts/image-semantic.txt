@@ -8,7 +8,7 @@ Check if this illustration matches what was requested.
 **STEP 1: DESCRIBE WHAT'S VISIBLE**
 
 List everything you see in the image:
-- Characters (who, appearance, position, what they're doing)
+- Characters (appearance, position, what they're doing — count them)
 - Objects (items being held, used, or prominent in scene)
 - Setting/background (location, landmarks)
 - Action (what's happening)
@@ -18,7 +18,7 @@ List everything you see in the image:
 **STEP 2: COMPARE TO SCENE_HINT**
 
 Check if the image matches what was requested:
-- Are all main characters present? Background crowds are fine.
+- Are the correct NUMBER of characters present? (2 expected = 2 visible). Background crowds are fine.
 - Are characters wearing the correct clothing/costume? (medieval costume should not appear as modern clothes)
 - Are all mentioned objects present?
 - Is the setting/location correct?
@@ -27,6 +27,8 @@ Check if the image matches what was requested:
 - Is the general action correct? (who is doing what to whom)
 
 **Do not flag, do not deduct for:**
+- Character identity/names. You cannot tell WHO a character is by looking at an illustration. A separate system with reference photos handles identity matching. Never flag "character X is not identifiable" or "names are not represented."
+- Background characters mentioned in the BACKGROUND field of the scene hint. These are allowed extras.
 - Camera angle, framing, perspective (over-the-shoulder, low/high angle, profile vs front). Image models cannot reliably honor these and we want camera variety across pages.
 - Facial expressions and subtle moods (thoughtful, tired, determined, focused).
 - Gaze direction (looking left vs looking at object).
