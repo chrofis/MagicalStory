@@ -5557,6 +5557,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     referencePhotos,
     landmarkPhotos: pageLandmarkPhotos,
     visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
+    grokRefImages: imageResult.grokRefImages || null,
     method: 'iterate'
   };
 }
