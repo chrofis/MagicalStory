@@ -651,7 +651,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (sceneDesc?.description) {
         const pageChars = getCharactersInScene(sceneDesc.description, storyCharacters);
         pageCharNames = pageChars.map(c => c.name);
-      } else if (pageNumber < 0) {
+      }
+      if (pageCharNames.length === 0 && pageNumber < 0) {
         // Covers: prefer per-cover character list from characterClothing (set from cover hint).
         // Sending all 10 story characters to bbox detection produces 0 identifications because
         // the prompt becomes too noisy. Fall back to all only if cover hint is missing.
@@ -663,6 +664,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           pageCharNames = storyCharacters.map(c => c.name);
           log.debug(`[ENTITY-COLLECT] Page ${pageNumber} (cover): No cover hint, falling back to all ${pageCharNames.length} story characters`);
         }
+      }
+      // Fallback for regular pages: if scene description parsing found no characters,
+      // use all story characters so bbox detection still runs
+      if (pageCharNames.length === 0 && pageNumber > 0) {
+        pageCharNames = storyCharacters.map(c => c.name);
+        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Scene description yielded no characters, falling back to all ${pageCharNames.length} story characters`);
       }
 
       if (pageCharNames.length > 0) {
