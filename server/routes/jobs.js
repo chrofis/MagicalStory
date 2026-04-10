@@ -640,7 +640,20 @@ router.get('/my-jobs', authenticateToken, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
 
     if (STORAGE_MODE === 'database') {
-      const result = await getDbPool().query(
+      const pool = getDbPool();
+
+      // Mark stale processing/pending jobs as failed before returning.
+      // Without this, the client restores a stale job and shows a permanent spinner.
+      await pool.query(
+        `UPDATE story_jobs
+         SET status = 'failed', error_message = 'Job abandoned (server restart or timeout)', updated_at = NOW()
+         WHERE user_id = $1
+           AND status IN ('pending', 'processing')
+           AND created_at < NOW() - INTERVAL '2 hours'`,
+        [userId]
+      );
+
+      const result = await pool.query(
         `SELECT id, status, progress, progress_message, created_at, completed_at
          FROM story_jobs
          WHERE user_id = $1

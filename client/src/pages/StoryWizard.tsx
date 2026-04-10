@@ -740,7 +740,16 @@ export default function StoryWizard() {
       log.info('Generation completed, navigating to story:', completedStoryId);
       setSearchParams({ storyId: completedStoryId }, { replace: true });
     }
-  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages, step]);
+
+    // If activeJob was cleared (abandoned/failed/404) while we were showing generation view,
+    // reset back to step 1. Without this, the user gets stuck on a permanent spinner.
+    if (!activeJob && !generationComplete && isGenerating && step === 6 && !urlStoryId && restoredJobIdRef.current) {
+      log.info('Active job was cleared without completion, resetting to step 1');
+      restoredJobIdRef.current = null;
+      setIsGenerating(false);
+      setStep(1);
+    }
+  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages, step, isGenerating]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
