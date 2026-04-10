@@ -3744,7 +3744,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       timing.coversStart = timing.coversStart || Date.now(); // May have started during streaming
       log.debug(`⏳ [UNIFIED] Cover generations in progress (${streamingCoverPromises.size} covers, running parallel with page images)...`);
 
-      // Create promise but don't await yet - covers run parallel with page images
+      // Create promise but don't await yet - covers run parallel with page images.
+      // IMPORTANT: .catch() here prevents unhandled rejection crash if a cover fails
+      // before coverAwaitPromise is awaited at line ~4214. Without this, a Grok 500
+      // error between promise creation and await crashes the Node process.
       coverAwaitPromise = Promise.all(
         Array.from(streamingCoverPromises.values())
       ).then(coverResults => {
@@ -3773,6 +3776,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         log.debug(`✅ [UNIFIED] All ${Object.keys(coverImages).length} cover images complete`);
         log.debug(`⏱️ [UNIFIED] Cover images: ${((timing.coversEnd - (timing.coversStart || timing.storyGenEnd)) / 1000).toFixed(1)}s`);
+      }).catch(err => {
+        timing.coversEnd = Date.now();
+        log.error(`❌ [UNIFIED] Cover generation failed: ${err.message}`);
       });
     } else {
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
