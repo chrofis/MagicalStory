@@ -3743,6 +3743,7 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
   const backgroundPhotos = allCharacterPhotos.filter(p => backgroundNames.includes(p.name || p.characterName));
 
   // Extract scene info for prompt building
+  // Prose format: setting details are in imageSummary (the prose itself), no structured setting object
   const imageSummary = sceneMetadata?.fullData?.imageSummary || sceneMetadata?.imageSummary || '';
   const settingDesc = sceneMetadata?.fullData?.setting?.description || '';
   const camera = sceneMetadata?.fullData?.setting?.camera || 'wide shot';

@@ -2486,7 +2486,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 24 parallel scene expansions can each take 30-60s; without heartbeating,
         // the row would only get updated when the first one finishes.
         const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { prefill: '{' });
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel);
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
