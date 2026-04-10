@@ -505,8 +505,11 @@ async function packReferences(refs = {}, options = {}) {
   // no free slot for a standalone VB grid. With 0–1 characters we have a free
   // slot, so the scene stays clean and the VB grid gets its own slot at full size.
   const hasSceneBackground = sceneBackground && sceneBackground.startsWith('data:image');
+  // Filter out location elements when scene background exists — the location is
+  // already painted in the background, so a border cell showing the same thing
+  // wastes a reference slot.
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
-    ? visualBibleGrid.rawElements
+    ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
     : [];
   const useBorderedScene = hasSceneBackground && rawVbElements.length > 0 && charCount >= 2;
 

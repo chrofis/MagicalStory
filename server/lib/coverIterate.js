@@ -317,6 +317,28 @@ async function iterateCover(coverKey, storyData, options = {}) {
   let finalCoverLandmarkPhotos = coverLandmarkPhotos;
   if (visualBible) {
     let elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6);
+    // Covers represent the whole story — add key animals/artifacts that have
+    // reference images, matching the KEY STORY ELEMENTS listed in the prompt.
+    // Normal pages get these via appearsInPages, but covers aren't in that list.
+    const existingIds = new Set(elementRefs.map(r => r.id));
+    for (const [entries, type, priority] of [
+      [visualBible.animals, 'animal', 2],
+      [visualBible.artifacts, 'artifact', 3],
+    ]) {
+      for (const entry of entries || []) {
+        if (!entry.referenceImageData || existingIds.has(entry.id)) continue;
+        elementRefs.push({
+          id: entry.id, name: entry.name, type,
+          description: entry.extractedDescription || entry.description,
+          referenceImageData: entry.referenceImageData,
+          priority,
+        });
+        existingIds.add(entry.id);
+      }
+    }
+    elementRefs.sort((a, b) => (a.priority || 5) - (b.priority || 5));
+    elementRefs = elementRefs.slice(0, 6);
+
     let secondaryLandmarks = coverLandmarkPhotos.slice(1);
     if (coverSceneBackground) {
       elementRefs = elementRefs.filter(e => e.type !== 'vehicle' && e.type !== 'location');

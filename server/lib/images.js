@@ -4928,10 +4928,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageScores.set(pageNumber, best?.score ?? 100);
     }
 
-    const { tasks: fixTasks, dropped } = selectCharRepairTasks(finalEntityReport, { pageScores });
-    log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
+    const maxCharTasks = bestPerPage.size; // all story + cover pages
+    const { tasks: fixTasks, dropped } = selectCharRepairTasks(finalEntityReport, { pageScores, maxTasks: maxCharTasks });
+    log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages (cap ${maxCharTasks})`);
     if (dropped > 0) {
-      log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}).`);
+      log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${maxCharTasks}).`);
     }
 
     const fixesByPage = new Map();
@@ -5489,7 +5490,11 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   let visualBibleGrid = null;
   if (visualBible) {
-    const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+    let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+    // Drop location elements — the scene background already shows the location
+    if (useOriginalAsReference || pageLandmarkPhotos.length > 0) {
+      elementReferences = elementReferences.filter(e => e.type !== 'location');
+    }
     const secondaryLandmarks = pageLandmarkPhotos.slice(1);
     if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
       visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);

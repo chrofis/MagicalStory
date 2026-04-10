@@ -534,6 +534,46 @@ export function StoryDisplay({
     await Promise.all(indicesToLoad.map(idx => fetchEntityGridImage(idx)));
   };
 
+  // Helper: extract per-page entity issues from finalChecksReport (populated by "Run Consistency Check")
+  const getEntityIssuesForPage = (pageNum: number) => {
+    const entity = finalChecksReport?.entity as any;
+    if (!entity) return [];
+    const issues: Array<{ name: string; severity: string; description: string; source: string }> = [];
+    // Character issues
+    for (const [charName, cr] of Object.entries(entity.characters || {}) as any[]) {
+      const allIssues: any[] = [];
+      if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
+        for (const clothingResult of Object.values(cr.byClothing) as any[]) {
+          if (clothingResult.issues) allIssues.push(...clothingResult.issues);
+        }
+      } else if (cr.issues) {
+        allIssues.push(...cr.issues);
+      }
+      for (const iss of allIssues) {
+        if (iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
+          issues.push({ name: charName, severity: iss.severity, description: iss.description, source: 'character' });
+        }
+      }
+    }
+    // Object issues
+    for (const [objName, or] of Object.entries(entity.objects || {}) as any[]) {
+      const allIssues: any[] = [];
+      if (or.byClothing && Object.keys(or.byClothing).length > 0) {
+        for (const clothingResult of Object.values(or.byClothing) as any[]) {
+          if (clothingResult.issues) allIssues.push(...clothingResult.issues);
+        }
+      } else if (or.issues) {
+        allIssues.push(...or.issues);
+      }
+      for (const iss of allIssues) {
+        if (iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
+          issues.push({ name: objName, severity: iss.severity, description: iss.description, source: 'object' });
+        }
+      }
+    }
+    return issues;
+  };
+
   // Helper to crop a cell from an entity consistency grid image
   const cropGridCell = async (
     gridImage: string,
@@ -5026,6 +5066,41 @@ export function StoryDisplay({
                               </details>
                             )}
 
+                            {/* Entity Consistency (per-page issues from "Run Consistency Check") */}
+                            {finalChecksReport?.entity && (() => {
+                              const pageEntityIssues = getEntityIssuesForPage(pageNumber);
+                              return (
+                                <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+                                  <summary className="cursor-pointer text-sm font-semibold text-purple-700 hover:text-purple-900 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                      {language === 'de' ? 'Entitätskonsistenz' : language === 'fr' ? 'Cohérence des entités' : 'Entity Consistency'}
+                                    </span>
+                                    <span className={`text-lg font-bold ${
+                                      pageEntityIssues.length === 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {pageEntityIssues.length === 0 ? '✓' : `${pageEntityIssues.length} issues`}
+                                    </span>
+                                  </summary>
+                                  <div className="mt-2 text-xs">
+                                    {pageEntityIssues.length === 0 ? (
+                                      <span className="text-green-600">{language === 'de' ? 'Keine Konsistenzprobleme auf dieser Seite' : 'No entity issues on this page'}</span>
+                                    ) : (
+                                      <ul className="list-disc list-inside text-purple-700 bg-white p-2 rounded border border-purple-200">
+                                        {pageEntityIssues.map((issue, iIdx) => (
+                                          <li key={iIdx}>
+                                            <span className={`font-medium ${
+                                              issue.severity === 'critical' ? 'text-red-600' :
+                                              issue.severity === 'major' ? 'text-orange-600' : 'text-yellow-600'
+                                            }`}>[{issue.severity}]</span> <span className="font-medium">{issue.name}</span>: {issue.description}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                </details>
+                              );
+                            })()}
+
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image?.retryHistory}
@@ -5563,6 +5638,110 @@ export function StoryDisplay({
                                 )}
                               </details>
                             )}
+
+                            {/* Semantic Fidelity Score */}
+                            {image?.semanticResult && (
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                                  <span className="flex items-center gap-2">
+                                    {language === 'de' ? 'Semantische Treue' : language === 'fr' ? 'Fidélité sémantique' : 'Semantic Fidelity'}
+                                  </span>
+                                  <span className={`text-lg font-bold ${
+                                    (image.semanticScore ?? 0) >= 70 ? 'text-green-600' :
+                                    (image.semanticScore ?? 0) >= 50 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {image.semanticScore !== null && image.semanticScore !== undefined ? `${Math.round(image.semanticScore)}%` : 'N/A'}
+                                  </span>
+                                </summary>
+                                <div className="mt-2 text-xs">
+                                  {image.semanticResult.visible && (
+                                    <div className="grid grid-cols-2 gap-2 mb-2">
+                                      <div className="bg-white p-2 rounded border border-indigo-200">
+                                        <div className="font-medium text-indigo-800 mb-1">Visible:</div>
+                                        {(image.semanticResult.visible.characters?.length ?? 0) > 0 && (
+                                          <div><span className="text-gray-500">Characters:</span> {image.semanticResult.visible.characters?.join(', ')}</div>
+                                        )}
+                                        {(image.semanticResult.visible.objects?.length ?? 0) > 0 && (
+                                          <div><span className="text-gray-500">Objects:</span> {image.semanticResult.visible.objects?.join(', ')}</div>
+                                        )}
+                                        {image.semanticResult.visible.setting && (
+                                          <div><span className="text-gray-500">Setting:</span> {image.semanticResult.visible.setting}</div>
+                                        )}
+                                        {image.semanticResult.visible.action && (
+                                          <div><span className="text-gray-500">Action:</span> {image.semanticResult.visible.action}</div>
+                                        )}
+                                      </div>
+                                      <div className="bg-white p-2 rounded border border-indigo-200">
+                                        <div className="font-medium text-indigo-800 mb-1">Expected:</div>
+                                        {(image.semanticResult.expected?.characters?.length ?? 0) > 0 && (
+                                          <div><span className="text-gray-500">Characters:</span> {image.semanticResult.expected?.characters?.join(', ')}</div>
+                                        )}
+                                        {(image.semanticResult.expected?.objects?.length ?? 0) > 0 && (
+                                          <div><span className="text-gray-500">Objects:</span> {image.semanticResult.expected?.objects?.join(', ')}</div>
+                                        )}
+                                        {image.semanticResult.expected?.setting && (
+                                          <div><span className="text-gray-500">Setting:</span> {image.semanticResult.expected.setting}</div>
+                                        )}
+                                        {image.semanticResult.expected?.action && (
+                                          <div><span className="text-gray-500">Action:</span> {image.semanticResult.expected.action}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {image.semanticResult.semanticIssues?.length > 0 && (
+                                    <ul className="list-disc list-inside text-indigo-700 bg-white p-2 rounded border border-indigo-200">
+                                      {image.semanticResult.semanticIssues.map((issue: any, idx: number) => (
+                                        <li key={idx}>
+                                          <span className={`font-medium ${
+                                            issue.severity === 'CRITICAL' ? 'text-red-600' :
+                                            issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
+                                          }`}>[{issue.severity}]</span> {issue.problem}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  {(!image.semanticResult.semanticIssues || image.semanticResult.semanticIssues.length === 0) && !image.semanticResult.visible && (
+                                    <span className="text-green-600">No semantic issues</span>
+                                  )}
+                                </div>
+                              </details>
+                            )}
+
+                            {/* Entity Consistency (per-page issues from finalChecksReport) */}
+                            {(() => {
+                              const pageEntityIssues = getEntityIssuesForPage(image.pageNumber);
+                              return (
+                                <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+                                  <summary className="cursor-pointer text-sm font-semibold text-purple-700 hover:text-purple-900 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                      {language === 'de' ? 'Entitätskonsistenz' : language === 'fr' ? 'Cohérence des entités' : 'Entity Consistency'}
+                                    </span>
+                                    <span className={`text-lg font-bold ${
+                                      pageEntityIssues.length === 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {pageEntityIssues.length === 0 ? '✓' : `${pageEntityIssues.length} issues`}
+                                    </span>
+                                  </summary>
+                                  <div className="mt-2 text-xs">
+                                    {pageEntityIssues.length === 0 ? (
+                                      <span className="text-green-600">{language === 'de' ? 'Keine Konsistenzprobleme auf dieser Seite' : 'No entity issues on this page'}</span>
+                                    ) : (
+                                      <ul className="list-disc list-inside text-purple-700 bg-white p-2 rounded border border-purple-200">
+                                        {pageEntityIssues.map((issue, iIdx) => (
+                                          <li key={iIdx}>
+                                            <span className={`font-medium ${
+                                              issue.severity === 'critical' ? 'text-red-600' :
+                                              issue.severity === 'major' ? 'text-orange-600' : 'text-yellow-600'
+                                            }`}>[{issue.severity}]</span> <span className="font-medium">{issue.name}</span>: {issue.description}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                </details>
+                              );
+                            })()}
 
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay

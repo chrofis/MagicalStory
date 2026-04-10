@@ -530,6 +530,13 @@ export default function StoryWizard() {
               return {
                 ...v,
                 qualityScore: meta.qualityScore ?? v.qualityScore,
+                rawQualityScore: (meta as any).rawQualityScore ?? (v as any).rawQualityScore,
+                semanticScore: (meta as any).semanticScore ?? (v as any).semanticScore,
+                semanticResult: (meta as any).semanticResult ?? (v as any).semanticResult,
+                entityPenalty: (meta as any).entityPenalty ?? (v as any).entityPenalty,
+                evaluatedAt: (meta as any).evaluatedAt ?? (v as any).evaluatedAt,
+                issuesSummary: (meta as any).issuesSummary ?? (v as any).issuesSummary,
+                fixableIssues: (meta as any).fixableIssues?.length ? (meta as any).fixableIssues : v.fixableIssues,
                 qualityReasoning: meta.qualityReasoning ?? v.qualityReasoning,
                 fixTargets: meta.fixTargets?.length ? meta.fixTargets : v.fixTargets,
                 totalAttempts: meta.totalAttempts ?? v.totalAttempts,
@@ -538,6 +545,7 @@ export default function StoryWizard() {
                 description: meta.description ?? v.description,
                 type: (meta.type ?? v.type) as ImageVersion['type'],
                 grokRefImages: (meta as any).grokRefImages ?? (v as any).grokRefImages,
+                bboxDetection: (meta as any).bboxDetection ?? (v as any).bboxDetection,
               };
             }) ?? img.imageVersions,
           };

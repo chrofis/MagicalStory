@@ -364,6 +364,35 @@ function extractJsonFromText(text) {
 }
 
 /**
+ * Parse prose+metadata format: natural prose followed by ---METADATA--- JSON block.
+ * Returns { prose, metadata } if detected, null otherwise.
+ */
+function parseProseMetadataFormat(text) {
+  if (!text || typeof text !== 'string') return null;
+  const delimiter = '---METADATA---';
+  const idx = text.indexOf(delimiter);
+  if (idx === -1) return null;
+
+  const prose = text.substring(0, idx).trim();
+  const jsonPart = text.substring(idx + delimiter.length).trim();
+  if (!prose || !jsonPart) return null;
+
+  try {
+    // Try direct parse first, fall back to robust extraction
+    let metadata;
+    try {
+      metadata = JSON.parse(jsonPart);
+    } catch {
+      metadata = extractJsonFromText(jsonPart);
+    }
+    if (!metadata || !metadata.characters) return null;
+    return { prose, metadata };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 9-region position abbreviation mapping
  * Used to expand abbreviations from scene descriptions for image generation
  */
@@ -544,7 +573,13 @@ function buildTextFromJson(scene) {
 function stripSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return sceneDescription;
 
-  // Try NEW JSON format first using robust extraction
+  // Try prose+metadata format first (natural prose + ---METADATA--- JSON block)
+  const proseFormat = parseProseMetadataFormat(sceneDescription);
+  if (proseFormat) {
+    return stripEntityIds(proseFormat.prose);
+  }
+
+  // Try structured JSON format using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
   // Support all wrapper formats: "scene" (critique-only), "output" (old), "draft" (unified),
   // "previewMismatches" (iteration/consistency regen), or raw
@@ -737,7 +772,81 @@ function parseCharacterDescriptions(prompt) {
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
-  // Try NEW JSON format first using robust extraction
+  // Try prose+metadata format first (natural prose + ---METADATA--- JSON block)
+  const proseFormat = parseProseMetadataFormat(sceneDescription);
+  if (proseFormat) {
+    const { prose, metadata } = proseFormat;
+    const characterClothing = {};
+    const characterPositions = {};
+    const characterPerspectives = {};
+    const characterNames = [];
+
+    for (const char of metadata.characters || []) {
+      if (!char.name) continue;
+      characterNames.push(char.name);
+      // Clothing normalization (same logic as JSON format)
+      if (char.clothing) {
+        const raw = char.clothing.toLowerCase();
+        const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
+        if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
+        else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
+        else if (raw.includes('winter')) characterClothing[char.name] = 'winter';
+        else if (raw.includes('summer')) characterClothing[char.name] = 'summer';
+        else characterClothing[char.name] = 'standard';
+      }
+      // Perspective and depth from metadata
+      const annotations = {};
+      if (char.perspective) annotations.perspective = String(char.perspective).toLowerCase();
+      if (char.depth) annotations.depth = String(char.depth).toLowerCase();
+      if (Object.keys(annotations).length > 0) {
+        characterPerspectives[char.name] = annotations;
+      }
+    }
+
+    // Objects are string IDs in prose format (e.g., ["LOC001", "ART002"])
+    const objectIds = (metadata.objects || []).filter(o => typeof o === 'string');
+
+    // Extract landmark variants from object IDs (e.g., "LOC003.2")
+    const landmarkVariants = {};
+    for (const objStr of objectIds) {
+      const variantMatch = objStr.match(/LOC(\d+)\.(\d+)/i);
+      if (variantMatch) {
+        landmarkVariants[`LOC${variantMatch[1].padStart(3, '0')}`] = parseInt(variantMatch[2]);
+      }
+    }
+
+    // Scene complexity from character depth data
+    let sceneComplexity = 'simple';
+    if ((metadata.characters || []).some(c => (c.depth || '').toLowerCase() === 'background')) {
+      sceneComplexity = 'complex';
+    }
+
+    if (Object.keys(landmarkVariants).length > 0) {
+      log.info(`[SCENE META] Landmark variants (prose format): ${Object.entries(landmarkVariants).map(([id, v]) => `${id}.${v}`).join(', ')}`);
+    }
+
+    return {
+      characters: characterNames,
+      characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
+      characterPositions: Object.keys(characterPositions).length > 0 ? characterPositions : null,
+      characterPerspectives: Object.keys(characterPerspectives).length > 0 ? characterPerspectives : null,
+      clothing: null,
+      objects: objectIds,
+      fullData: { characters: metadata.characters, objects: metadata.objects, imageSummary: prose },
+      thinking: null,
+      translatedSummary: metadata.translatedSummary || null,
+      imageSummary: prose,
+      landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
+      setting: null, // Setting details are in the prose, not structured
+      sceneComplexity,
+      emptyScenePrompt: metadata.emptyScenePrompt || null,
+      reuseEmptyScene: metadata.reuseEmptyScene ?? null,
+      isJsonFormat: true,
+      isProseFormat: true
+    };
+  }
+
+  // Try structured JSON format using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
   // Support all wrapper formats: "scene" (critique-only mode), "output" (old format), "draft" (unified prompt format),
   // "previewMismatches" (iteration/consistency regen), or raw JSON

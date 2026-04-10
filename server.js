@@ -3892,6 +3892,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
         let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+        // Drop location elements when an empty scene background exists — the location
+        // is already painted into the background, so a VB grid cell showing the same
+        // location is redundant and wastes a reference slot.
+        if (sceneBackgrounds[pageNum]) {
+          elementReferences = elementReferences.filter(e => e.type !== 'location');
+        }
         // Fallback: also match by IDs found in scene hint (covers page mismatch between VB and scene)
         if (sceneMetadata?.fullData) {
           const sceneIds = [];
