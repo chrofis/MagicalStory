@@ -647,8 +647,9 @@ router.get('/stories/:id/pdf', authenticateToken, async (req, res) => {
     // Default to A4 (21×28cm portrait, the current production format).
     // 'square' is only used for legacy orders that explicitly request it.
     const bookFormat = req.query.format === 'square' ? 'square' : 'A4';
+    const textOverlay = req.query.textOverlay === '1';
 
-    log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}, format: ${bookFormat}`);
+    log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}, format: ${bookFormat}, textOverlay: ${textOverlay}`);
 
     // Fetch story from database
     const storyResult = await getDbPool().query(
@@ -670,7 +671,7 @@ router.get('/stories/:id/pdf', authenticateToken, async (req, res) => {
     storyData = await rehydrateStoryImages(storyId, storyData);
 
     // Generate PDF using shared library function
-    const pdfBuffer = await generateViewPdf(storyData, bookFormat);
+    const pdfBuffer = await generateViewPdf(storyData, bookFormat, { textOverlay });
 
     log.debug(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 

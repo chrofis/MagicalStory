@@ -108,7 +108,7 @@ interface StoryDisplayProps {
   languageLevel?: LanguageLevel;
   storyLanguage?: StoryLanguageCode;  // Language of the story content (for correct labels)
   isGenerating?: boolean;
-  onDownloadPdf?: (bookFormat: 'square' | 'A4') => void;
+  onDownloadPdf?: (bookFormat: 'square' | 'A4', textOverlay?: boolean) => void;
   onAddToBook?: () => void;
   onPrintBook?: () => void;
   onCreateAnother?: () => void;
@@ -337,6 +337,8 @@ export function StoryDisplay({
   // PDF format selection dropdown
   const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('square');
   const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
+  // Text overlay toggle — text on image (children's book style) vs text below image (classic)
+  const [textOverlay, setTextOverlay] = useState(true);
 
   // Visual Bible reference images (lazy-loaded)
   const [loadedRefImages, setLoadedRefImages] = useState<Record<string, string>>({});
@@ -1975,9 +1977,22 @@ export function StoryDisplay({
                     <span className="text-sm text-gray-700">A4 (21×28cm)</span>
                   </label>
                 </div>
+                <div className="border-t border-gray-100 px-2 py-2">
+                  <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={textOverlay}
+                      onChange={(e) => setTextOverlay(e.target.checked)}
+                      className="text-indigo-500 rounded"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+                    </span>
+                  </label>
+                </div>
                 <button
                   onClick={() => {
-                    onDownloadPdf(pdfFormat);
+                    onDownloadPdf(pdfFormat, textOverlay);
                     setShowPdfFormatDropdown(false);
                   }}
                   className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
@@ -4622,7 +4637,7 @@ export function StoryDisplay({
                           label={`Page ${pageNumber}`}
                         />
                         {/* Text overlay on image (children's book style) */}
-                        {!isEditMode && !isGenerating && pageText.trim() && (() => {
+                        {textOverlay && !isEditMode && !isGenerating && pageText.trim() && (() => {
                           const layout = getTextOverlayPosition(pageNumber, pageText);
                           const isFullWidth = layout.position.includes('full');
                           return (
@@ -5249,8 +5264,8 @@ export function StoryDisplay({
                       </div>
                     )}
 
-                    {/* Text below — shown in edit mode or when no image (overlay needs image) */}
-                    {(isEditMode || isGenerating || !hasPageImage) && (
+                    {/* Text below — shown when overlay is off, in edit mode, or when no image */}
+                    {(!textOverlay || isEditMode || isGenerating || !hasPageImage) && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea

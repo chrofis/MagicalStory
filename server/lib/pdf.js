@@ -399,16 +399,24 @@ function getPictureBookTextRatio(languageLevel) {
  * @param {number} fontSize - Consistent font size for all pages
  * @param {number} bleed - Bleed area in points
  * @param {number} textRatio - Fraction of page height reserved for text (default 0.15)
+ * @param {boolean} textOverlay - If true, image fills full page with text overlaid
  */
-async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14, bleed = 0, textRatio = 0.15) {
+async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14, bleed = 0, textRatio = 0.15, textOverlay = false) {
   const interiorW = pageWidth + 2 * bleed;
   const interiorH = pageHeight + 2 * bleed;
-  const textAreaHeight = pageHeight * textRatio;
-  const imageHeight = pageHeight - textAreaHeight;
   const textMargin = mmToPoints(3);
+  const lineGap = -2;
+
+  // Classic mode dimensions (text below image)
+  const textAreaHeight = pageHeight * textRatio;
+  const imageHeight = textOverlay ? pageHeight : (pageHeight - textAreaHeight);
   const textWidth = pageWidth - (textMargin * 2);
   const availableTextHeight = textAreaHeight - textMargin;
-  const lineGap = -2;
+
+  // Text overlay: 6-position cycle (same as browser)
+  const OVERLAY_POSITIONS = [
+    'top-left', 'bottom-full', 'top-right', 'bottom-left', 'top-full', 'bottom-right'
+  ];
 
   for (let index = 0; index < storyPages.length; index++) {
     const pageText = storyPages[index];
@@ -421,23 +429,59 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
     if (image && image.imageData) {
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        // Image fills the full image area (top edge of page through to top of text area).
-        // Scale-to-fill so it reaches the top edge edge-to-edge instead of having a small
-        // letterbox bar from `fit:` aspect-mismatch math. valign='top' pins the top of
-        // the image to y=0 and crops any vertical overflow off the BOTTOM only — this
-        // matters for advanced layouts where the text area is bigger and the image box
-        // is shorter than the source image, so we'd otherwise crop the character's head.
         await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
       } catch (imgErr) {
         log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
       }
     }
 
-    // Text stays inside content area with current margins (readability)
-    doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-    const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
-    doc.text(cleanText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap });
+    if (textOverlay && image?.imageData) {
+      // Text overlay mode: draw semi-transparent background + text on image
+      const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
+      const position = OVERLAY_POSITIONS[posIndex];
+      const wordCount = cleanText.split(/\s+/).length;
+      const isShort = wordCount < 20;
+      const isLong = wordCount >= 50;
+
+      // Calculate overlay box dimensions
+      const isFullWidth = position.includes('full');
+      const isTop = position.startsWith('top');
+      const isLeft = position.includes('left') || isFullWidth;
+
+      const overlayW = isFullWidth ? pageWidth : (pageWidth * (isShort ? 0.42 : isLong ? 0.62 : 0.52));
+      const overlayPad = mmToPoints(4);
+
+      // Measure text to fit the overlay
+      const overlayTextWidth = overlayW - overlayPad * 2;
+      doc.fontSize(fontSize).font('Helvetica');
+      const measuredHeight = doc.heightOfString(cleanText, { width: overlayTextWidth, align: isFullWidth ? 'center' : (isLeft ? 'left' : 'right'), lineGap });
+      const overlayH = Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.4);
+
+      // Position the overlay box
+      let overlayX = bleed;
+      let overlayY = bleed;
+      if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW;
+      if (!isTop) overlayY = bleed + pageHeight - overlayH;
+
+      // Draw semi-transparent white background
+      doc.save();
+      doc.fillOpacity(0.78);
+      doc.roundedRect(overlayX, overlayY, overlayW, overlayH, 8).fill('#FFFFFF');
+      doc.restore();
+
+      // Draw text
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#1a1a1a');
+      const textAlign = isFullWidth ? 'center' : (isLeft ? 'left' : 'right');
+      doc.text(cleanText, overlayX + overlayPad, overlayY + overlayPad, {
+        width: overlayTextWidth, align: textAlign, lineGap
+      });
+    } else {
+      // Classic mode: text in white area below image
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+      const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+      const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
+      doc.text(cleanText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap });
+    }
   }
 }
 
@@ -724,7 +768,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
  * @returns {Promise<Buffer>} PDF buffer
  */
-async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
+async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options = {}) {
+  const { textOverlay = false } = options;
   // Get dimensions for the selected format
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
   const { pageWidth, pageHeight } = format;
@@ -788,7 +833,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     const textAreaHeight = pageHeight * textRatio;
     const availableTextHeight = textAreaHeight - textMargin;
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, 'center');
-    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio);
+    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, textOverlay);
   } else {
     const marginOuter = 20;
     const marginGutter = 30;

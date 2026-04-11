@@ -2028,9 +2028,11 @@ export const storyService = {
   },
 
   // PDF generation
-  async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'square'): Promise<Blob> {
+  async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'square', textOverlay?: boolean): Promise<Blob> {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch(`/api/stories/${storyId}/pdf?format=${bookFormat}`, {
+    const params = new URLSearchParams({ format: bookFormat });
+    if (textOverlay !== undefined) params.set('textOverlay', textOverlay ? '1' : '0');
+    const response = await fetch(`/api/stories/${storyId}/pdf?${params}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) {
