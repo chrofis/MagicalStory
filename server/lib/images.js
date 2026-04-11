@@ -2455,7 +2455,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Buffer|null} visualBibleGrid - Combined grid image of VB elements and secondary landmarks
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null, aspectRatioOverride = null) {
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -2563,9 +2563,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
     const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-    // A4 portrait book format: 3:4 for covers and pages (better for text overlay).
-    // Avatars stay 9:16 portrait for character reference sheets.
-    const grokAspect = evaluationType === 'avatar' ? '9:16' : '3:4';
+    // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
+    // (pageAspect / coverAspect / avatarAspect — all configured in one place).
+    const grokAspect = aspectRatioOverride
+      || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
+          : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
+          : MODEL_DEFAULTS.pageAspect);
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     try {
@@ -2920,11 +2923,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      // Covers → 3:4 (A4-like portrait), avatars → 9:16, scenes → 1:1 square.
+      // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS.
       // editWithGrok pads input refs to this aspect so the output matches.
-      const grokAspect = evaluationType === 'avatar' ? '9:16'
-        : evaluationType === 'cover' ? '3:4'
-        : '1:1';
+      const grokAspect = aspectRatioOverride
+        || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
+            : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
+            : MODEL_DEFAULTS.pageAspect);
 
       // For avatars: each reference image (face, body, style sample) gets its own slot
       // For scenes: use normal packing (VB grid + landmarks + characters + scene background)
@@ -2995,10 +2999,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   const systemInstruction = getImageSystemInstruction();
   const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
-  // Covers → 3:4 (A4-like portrait), avatars → 9:16, scenes → 1:1 square.
-  const geminiAspect = evaluationType === 'avatar' ? '9:16'
-    : evaluationType === 'cover' ? '3:4'
-    : '1:1';
+  // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
+  // (pageAspect / coverAspect / avatarAspect — one source of truth).
+  const geminiAspect = aspectRatioOverride
+    || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
+        : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
+        : MODEL_DEFAULTS.pageAspect);
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -3201,9 +3207,11 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     skipCache = false,
     artStyle = 'watercolor',
     sceneBackground = null,
-    // Output aspect ratio: '3:4' (default, pages+covers), '9:16' (avatars).
+    // Output aspect ratio — defaults to MODEL_DEFAULTS.pageAspect (A4 portrait)
+    // so callers that forget to pass one still get the configured page aspect.
+    // Callers can override: avatars pass '9:16', covers pass MODEL_DEFAULTS.coverAspect.
     // Flows through to Grok and Gemini image configs.
-    aspectRatio = '3:4'
+    aspectRatio = CONFIG_DEFAULTS.pageAspect
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
@@ -5565,7 +5573,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
     { imageModel: imageModelId },
     `PAGE ${pageNumber} ITERATE`,
-    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata }
+    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect }
   );
 
   // visual = raw vision-model score; the pipeline round loop will subtract entity penalty
@@ -6512,7 +6520,7 @@ async function editImageWithPrompt(imageData, editInstruction, model) {
           temperature: 0.6,
           ...(modelSupportsThinking(geminiModelId) && { thinkingConfig: { includeThoughts: true } }),
           imageConfig: {
-            aspectRatio: "3:4"
+            aspectRatio: CONFIG_DEFAULTS.pageAspect
           }
         }
       })
@@ -6606,6 +6614,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     storyText = null,
     sceneHint = null,
     sceneBackground = null,
+    // Aspect ratio override — if set, wins over the MODEL_DEFAULTS.pageAspect /
+    // coverAspect / avatarAspect defaults inside callGeminiAPIForImage.
+    // Used by iteratePage to preserve the scene's configured aspect across repairs.
+    aspectRatio: aspectRatioOverride = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -6673,7 +6685,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground, aspectRatioOverride);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);

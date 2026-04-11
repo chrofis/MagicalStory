@@ -5,6 +5,16 @@
  * Change these values to update models across the entire pipeline.
  */
 
+// Image aspect presets — the exact strings Grok Imagine and Gemini
+// imageConfig.aspectRatio both accept. Use these everywhere instead of
+// scattering '1:1' / '3:4' literals through the code.
+const IMAGE_ASPECTS = {
+  SQUARE: '1:1',
+  A4: '3:4',          // portrait, matches A4 book format
+  LANDSCAPE: '4:3',
+  AVATAR: '9:16',     // tall portrait for character reference sheets
+};
+
 // Available text models
 const TEXT_MODELS = {
   'claude-sonnet': {
@@ -109,6 +119,14 @@ const MODEL_DEFAULTS = {
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
   generateEmptyScenes: true,           // Pre-generate empty scene backgrounds for style anchoring
+
+  // Output aspect ratios — one config per image type, read by every
+  // generation / iterate / repair path. Defaults: A4 portrait for pages
+  // and covers; 9:16 for avatars. Change the default here to reshape
+  // every generated image in the pipeline.
+  pageAspect: IMAGE_ASPECTS.A4,
+  coverAspect: IMAGE_ASPECTS.A4,
+  avatarAspect: IMAGE_ASPECTS.AVATAR,
 };
 
 // Available inpaint backends
@@ -368,6 +386,7 @@ module.exports = {
   MODEL_DEFAULTS,
   IMAGE_MODELS,
   IMAGE_BACKENDS,
+  IMAGE_ASPECTS,
   MODEL_PRICING,
   INPAINT_BACKENDS,
   REPAIR_DEFAULTS,

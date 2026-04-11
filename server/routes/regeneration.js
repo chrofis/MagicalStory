@@ -1961,7 +1961,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         // (chars/animals/artifacts excluded — they belong on the populated page).
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         // Negative page numbers are covers (-1 front, -2 initial, -3 back) —
-        // they print to A4 portrait, so force 3:4 aspect. Regular pages stay 1:1.
+        // use the configured cover aspect; regular pages use the configured page aspect.
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           imageModelOverride,
@@ -1970,7 +1970,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           visualBibleGrid: emptySceneVbGrid,
           pageNumber,
           skipCache: true,
-          aspectRatio: isCoverPage ? '3:4' : '1:1'
+          aspectRatio: isCoverPage ? MODEL_DEFAULTS.coverAspect : MODEL_DEFAULTS.pageAspect
         });
         if (emptyResult?.imageData) {
           sceneBackground = emptyResult.imageData;

@@ -3214,14 +3214,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
             // (chars/animals/artifacts excluded — they belong on the populated cover).
             const emptySceneVbGrid = await buildEmptySceneVbGrid(streamingVisualBible, 0, coverLandmarkPhotos);
-            // 3:4 portrait so the empty scene matches the cover's target aspect.
+            // Use the configured cover aspect so the empty scene matches the final cover shape.
             const emptyResult = await generateImageOnly(emptyPrompt, [], {
               imageModelOverride: coverImageModel,
               imageBackendOverride: coverImageBackend,
               landmarkPhotos: coverLandmarkPhotos,
               visualBibleGrid: emptySceneVbGrid,
               skipCache: true,
-              aspectRatio: '3:4'
+              aspectRatio: MODEL_DEFAULTS.coverAspect
             });
             if (emptyResult?.imageData) {
               coverSceneBackground = emptyResult.imageData;
