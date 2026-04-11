@@ -3842,7 +3842,15 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
         const refineModelConfig = TEXT_MODELS[refineModelId];
         let refineData;
 
-        if (refineModelConfig?.provider === 'xai') {
+        if (refineModelConfig?.provider === 'anthropic') {
+          // Claude vision — uses callTextModel with images option
+          const { callTextModel } = require('../lib/textModels');
+          const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
+          const claudeResult = await callTextModel(refinePrompt, 16000, refineModelId, { images: [imageDataUri] });
+          if (claudeResult?.text) {
+            refineData = { candidates: [{ content: { parts: [{ text: claudeResult.text }] } }] };
+          }
+        } else if (refineModelConfig?.provider === 'xai') {
           const grokResp = await callGrokVisionAPI(refineModelId, refineModelConfig.modelId || refineModelId, refineParts, refinePrompt);
           refineData = await grokResp.json();
         } else {
@@ -3985,7 +3993,17 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     const modelConfig = TEXT_MODELS[modelId];
     let data;
 
-    if (modelConfig?.provider === 'xai') {
+    if (modelConfig?.provider === 'anthropic') {
+      // Claude vision — uses callTextModel with images option
+      const { callTextModel } = require('../lib/textModels');
+      const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
+      const claudeResult = await callTextModel(iteratePrompt, 16000, modelId, { images: [imageDataUri] });
+      if (!claudeResult?.text) {
+        return res.status(500).json({ error: `${modelId} returned no response` });
+      }
+      // Wrap in Gemini-compatible format for downstream parsing
+      data = { candidates: [{ content: { parts: [{ text: claudeResult.text }] } }] };
+    } else if (modelConfig?.provider === 'xai') {
       const grokResponse = await callGrokVisionAPI(modelId, modelConfig.modelId || modelId, parts, iteratePrompt);
       data = await grokResponse.json();
     } else {
