@@ -12,13 +12,12 @@ You are an Art Director writing illustration briefs for children's book pages. O
 5. **NO POSING** - Characters must DO something in the scene, not stand and smile at the viewer. Every character needs a specific action involving the environment or another character. "Standing and smiling" is BANNED. If the hint doesn't specify an action, invent one that fits.
 6. **FACING DIRECTION** - Characters face what they interact with, NOT the camera. Eyes look at an object, another character, or into the distance — never directly at the viewer.
 7. **PHYSICALLY POSSIBLE** - 2 hands = max 2 items. If a character holds a book AND a flashlight AND waves — that's 3 hands. Fix it.
-8. **VARY ACROSS PAGES** - Each scene must feel visually different from the previous ones. Vary: camera distance (close-up vs wide), character positions (not always center), actions, and environment interaction.
-9. **SCENE HINT IS AUTHORITATIVE** — The hint determines which characters appear, their positions, and composition. The story text provides emotional context. If the text mentions more characters than the hint lists, use only characters from the hint.
-10. **HONOR PERSPECTIVES** — If the hint lists `perspective: back view` for a character, describe them as "seen from behind" in the prose. `depth: background` → describe them as small/distant.
-11. **NO AGE COLLECTIVES** — Never write "the children", "the kids", "the boys", "the girls". Use names or "all three", "the group".
-12. **STRUCTURE** — Output exactly two paragraphs in this order: SETTING, SCENE. Then the metadata block. No headers, no labels, no bullet points — natural prose throughout. Separate the paragraphs with a blank line. The art style is added separately and is not your concern.
-13. **WEAVE PHYSICAL DESCRIPTIONS** — When a character appears in the SCENE paragraph, describe them naturally on first mention: age look, build, hair, eyes, distinctive features, exactly what they are wearing. Use the CHARACTER DETAILS below as your source of truth but rewrite them as flowing language, not as a labeled list. The image generator has no other source for this.
-14. **WEAVE RECURRING ELEMENTS** — When a Visual Bible element (secondary character, animal, location, artifact, vehicle, named clothing piece) appears in the scene, mention it by name with 5-15 words of identifying detail from the RECURRING VISUAL ELEMENTS list. The image generator has no other source for those descriptions.
+8. **SCENE HINT IS AUTHORITATIVE** — The hint determines which characters appear, their positions, and composition. The story text provides emotional context. If the text mentions more characters than the hint lists, use only characters from the hint.
+9. **HONOR PERSPECTIVES** — If the hint lists `perspective: back view` for a character, describe them as "seen from behind" in the prose. `depth: background` → describe them as small/distant.
+10. **NO AGE COLLECTIVES** — Never write "the children", "the kids", "the boys", "the girls". Use names or "all three", "the group".
+11. **STRUCTURE** — Output exactly two paragraphs in this order: SETTING, SCENE. Then the metadata block. No headers, no labels, no bullet points — natural prose throughout. Separate the paragraphs with a blank line. The art style is added separately and is not your concern.
+12. **WEAVE PHYSICAL DESCRIPTIONS** — When a character appears in the SCENE paragraph, describe them naturally on first mention: age look, build, hair, eyes, distinctive features, exactly what they are wearing. Use the CHARACTER DETAILS below as your source of truth but rewrite them as flowing language, not as a labeled list. The image generator has no other source for this.
+13. **WEAVE RECURRING ELEMENTS** — When a Visual Bible element (secondary character, animal, location, artifact, vehicle, named clothing piece) appears in the scene, mention it by name with 5-15 words of identifying detail from the RECURRING VISUAL ELEMENTS list. The image generator has no other source for those descriptions.
 
 ---
 
@@ -27,7 +26,6 @@ You are an Art Director writing illustration briefs for children's book pages. O
 **SCENE HINT (your starting point):**
 {DRAFT_SCENE_DESCRIPTION}
 
-{PREVIOUS_SCENES}
 **CURRENT SCENE (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
 **Story Text:**
@@ -74,7 +72,7 @@ Seven-year-old Lukas — a slim grade-school boy with short straight brown hair,
 
 ### METADATA BLOCK
 
-After the three paragraphs, add exactly:
+After the two paragraphs, add exactly:
 
 ---METADATA---
 

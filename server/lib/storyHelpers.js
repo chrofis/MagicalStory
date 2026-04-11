@@ -3126,16 +3126,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     recurringElements = '(None available)';
   }
 
-  // Build previous scenes and scene context
-  let previousScenesText = '';
+  // Previous scenes are intentionally NOT passed — focus on this scene only.
   let sceneContextText = '';
-
-  if (rawOutlineContext) {
-    if (rawOutlineContext.previousPages) {
-      previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
-      previousScenesText += rawOutlineContext.previousPages + '\n\n';
-    }
-  }
 
   // Build draft scene description from scene hint
   let draftSceneDescription = '';
@@ -3200,7 +3192,6 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
 
   return fillTemplate(PROMPT_TEMPLATES.sceneExpansion, {
     DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
-    PREVIOUS_SCENES: previousScenesText,
     SCENE_SUMMARY: sceneSummary,
     SCENE_CONTEXT: sceneContextText,
     PAGE_NUMBER: pageNumber.toString(),
