@@ -3038,25 +3038,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
-        // Get landmark photos for cover scene (same as regular pages)
-        // Cover hints are plain text (no JSON), so extractSceneMetadata may return null.
-        // Fallback: scan plain text for landmark names from the visual bible.
+        // Get landmark photos for cover scene using LOC### IDs from parsed hint.objects.
         // Must await landmarkDescriptionsPromise first so photoVariants are populated
         // (Swiss pre-indexed landmarks have no referencePhotoData until a variant is loaded).
         if (landmarkDescriptionsPromise) {
           await landmarkDescriptionsPromise;
         }
+        // Use LOC### IDs from parsed cover hint objects (same system as page scene hints)
         let coverSceneMetadata = extractSceneMetadata(sceneDescription);
-        if (!coverSceneMetadata && streamingVisualBible?.locations) {
+        if (!coverSceneMetadata && hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
           const matchedObjects = [];
-          const sceneTextLower = sceneDescription.toLowerCase();
-          for (const loc of streamingVisualBible.locations) {
-            if (!loc.isRealLandmark) continue;
-            // Match by loc.name (story-adapted name) OR landmarkQuery (real landmark name)
-            const nameMatch = loc.name && sceneTextLower.includes(loc.name.toLowerCase());
-            const queryMatch = loc.landmarkQuery && sceneTextLower.includes(loc.landmarkQuery.toLowerCase());
-            if (nameMatch || queryMatch) {
-              matchedObjects.push(loc.id ? `${loc.name} [${loc.id}]` : loc.name);
+          for (const locId of hint.objects) {
+            const loc = streamingVisualBible.locations.find(l => l.id && l.id.toUpperCase() === locId.toUpperCase());
+            if (loc) {
+              matchedObjects.push(`${loc.name} [${loc.id}]`);
             }
           }
           if (matchedObjects.length > 0) {

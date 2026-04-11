@@ -517,6 +517,7 @@ ONLY main characters: {MAIN_CHARACTER_NAMES}
 NO primary characters on title page - keep focus on protagonist(s).
 
 Hint: [1-2 sentences - ONLY main character(s), generic setting, mood. If a character carries items, mention at most 2.]
+Objects: [LOC###]
 Characters:
 - [MainChar1] (position): [clothing], holds: [item1 + item2 OR "nothing"]
 - [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]
@@ -528,6 +529,7 @@ Always include main characters. If total characters exceed 5, DROP the least imp
 Place 2-3 characters in the foreground with positions, rest in background.
 
 Hint: [1-2 sentences - welcoming scene, characters, generic setting. Max 2 items per character if they carry anything.]
+Objects: [LOC###]
 Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
 - [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
@@ -538,6 +540,7 @@ ONLY main characters: {MAIN_CHARACTER_NAMES}
 NO primary characters on back cover - match the focus of the title page.
 
 Hint: [1-2 sentences - happy conclusion, ONLY main character(s) together. Max 2 items per character if they carry anything.]
+Objects: [LOC###]
 Characters:
 - [MainChar1] (position): [clothing], holds: [item1 + item2 OR "nothing"]
 - [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]

@@ -1353,9 +1353,9 @@ class UnifiedStoryParser {
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
     const defaults = {
-      titlePage: { hint: '', characterClothing: {}, characters: [] },
-      initialPage: { hint: '', characterClothing: {}, characters: [] },
-      backCover: { hint: '', characterClothing: {}, characters: [] }
+      titlePage: { hint: '', objects: [], characterClothing: {}, characters: [] },
+      initialPage: { hint: '', objects: [], characterClothing: {}, characters: [] },
+      backCover: { hint: '', objects: [], characterClothing: {}, characters: [] }
     };
 
     if (!sectionMatch) {
@@ -1372,7 +1372,7 @@ class UnifiedStoryParser {
       const blockMatch = section.match(blockPattern);
 
       if (!blockMatch) {
-        return { hint: '', characterClothing: {}, characters: [] };
+        return { hint: '', objects: [], characterClothing: {}, characters: [] };
       }
 
       const block = blockMatch[1];
@@ -1389,10 +1389,16 @@ class UnifiedStoryParser {
         hint = lines[0] || '';
       }
 
+      // Extract Objects: line (e.g. "Objects: LOC003, LOC004" or "Objects: [LOC003]")
+      const objectsMatch = block.match(/^Objects?:\s*(.+)$/im);
+      const objects = objectsMatch
+        ? objectsMatch[1].match(/LOC\d+/gi)?.map(id => id.toUpperCase()) || []
+        : [];
+
       // Extract per-character clothing + optional perspective annotations
       const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(block);
 
-      return { hint, characterClothing, characterPerspectives, characters };
+      return { hint, objects, characterClothing, characterPerspectives, characters };
     };
 
     this._cache.coverHints = {

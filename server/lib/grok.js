@@ -624,10 +624,13 @@ async function packReferences(refs = {}, options = {}) {
       log.info(`🎨 ${tag} Slot ${slots.length}: 1 character photo`);
     }
 
-    // Landmarks never get their own slot — they're already in the empty scene
-    // background or described in the prompt. Character slots are more valuable.
-    if (landmarkBuffers.length > 0) {
-      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — slots reserved for characters`);
+    // Add landmark photo if there's a free slot (max 3 total)
+    if (landmarkBuffers.length > 0 && slots.length < 3) {
+      const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
+    } else if (landmarkBuffers.length > 0) {
+      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — no free slots`);
     }
   } else {
     // ── 2+ characters ──
