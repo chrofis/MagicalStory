@@ -120,8 +120,8 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => Promise<{
-    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null } | null;
+  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body', repairMode?: 'auto' | 'blended' | 'cutout') => Promise<{
+    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null; cutoutSent?: string | null } | null;
     method?: string;
     beforeScore?: number | null;
     afterScore?: number | null;
@@ -282,10 +282,11 @@ export function StoryDisplay({
   const [charRepairPopover, setCharRepairPopover] = useState<{ pageNumber: number } | null>(null);
   const [charRepairSelected, setCharRepairSelected] = useState<string>('');
   const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
+  const [charRepairMode, setCharRepairMode] = useState<'auto' | 'blended' | 'cutout'>('auto');
   const [charRepairingPages, setCharRepairingPages] = useState<Set<number>>(new Set());
   const [charDetectingBbox, setCharDetectingBbox] = useState<Set<number>>(new Set());
   const [charRepairResults, setCharRepairResults] = useState<Record<number, {
-    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null } | null;
+    comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null; cutoutSent?: string | null } | null;
     method?: string; beforeScore?: number | null; afterScore?: number | null;
   }>>({});
 
@@ -1533,6 +1534,48 @@ export function StoryDisplay({
                     </button>
                   </div>
                 </div>
+                {developerMode && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">
+                      Method (admin)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCharRepairMode('auto')}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors ${
+                          charRepairMode === 'auto'
+                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        Auto
+                      </button>
+                      <button
+                        onClick={() => setCharRepairMode('blended')}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors ${
+                          charRepairMode === 'blended'
+                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        Blended
+                      </button>
+                      <button
+                        onClick={() => setCharRepairMode('cutout')}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors ${
+                          charRepairMode === 'cutout'
+                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        Cut-out
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Auto: face→blended, body→cutout. Blended blurs the region and regenerates; Cut-out extracts the figure, inpaints, composites back.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="px-5 pb-5 flex gap-3">
                 <button
@@ -1547,7 +1590,7 @@ export function StoryDisplay({
                     setCharRepairPopover(null);
                     setCharRepairingPages(prev => new Set([...prev, pageNumber]));
                     try {
-                      const repairResult = await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget);
+                      const repairResult = await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget, charRepairMode);
                       if (repairResult) {
                         setCharRepairResults(prev => ({ ...prev, [pageNumber]: repairResult }));
                       }
@@ -1598,6 +1641,12 @@ export function StoryDisplay({
             <div className="flex flex-col items-center">
               <img src={c.blackoutImage} alt="Whiteout" className="w-full aspect-square object-contain rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.blackoutImage!, title: 'Whiteout' })} />
               <span className="text-[10px] text-gray-500 mt-1">Whiteout</span>
+            </div>
+          )}
+          {c.cutoutSent && (
+            <div className="flex flex-col items-center">
+              <img src={c.cutoutSent} alt="Cutout sent" className="w-full aspect-square object-contain rounded border border-blue-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: c.cutoutSent!, title: 'Cutout sent to Grok' })} />
+              <span className="text-[10px] text-gray-500 mt-1">Cutout sent</span>
             </div>
           )}
           {c.grokRawResult && (

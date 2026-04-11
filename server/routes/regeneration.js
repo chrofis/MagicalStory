@@ -4818,8 +4818,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
                 croppedAvatar: grokResult.croppedAvatar || null,
                 blackoutImage: grokResult.blackoutImage || null,
-                grokRawResult: grokResult.grokRawResult || null,
+                grokRawResult: grokResult.grokRawResult || grokResult.comparison?.grokRawResult || null,
                 blendMask: grokResult.blendMask || null,
+                cutoutSent: grokResult.comparison?.cutoutSent || null,
               },
             };
           } else {

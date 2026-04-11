@@ -5751,6 +5751,30 @@ Output a single corrected image.`;
  * @param {Object} options
  * @returns {Promise<Object>} { imageData, character, method, usage }
  */
+// Grok image edits only support specific aspect ratios — pick the closest
+// preset for a given source (width, height). Used by character repair so we
+// don't send "1024:768" (which Grok may reject) and instead send "4:3".
+const GROK_ASPECT_PRESETS = [
+  { name: '1:1', value: 1.0 },
+  { name: '4:3', value: 4 / 3 },
+  { name: '3:4', value: 3 / 4 },
+  { name: '16:9', value: 16 / 9 },
+  { name: '9:16', value: 9 / 16 },
+  { name: '3:2', value: 3 / 2 },
+  { name: '2:3', value: 2 / 3 },
+];
+function closestGrokAspect(width, height) {
+  if (!width || !height) return '1:1';
+  const ratio = width / height;
+  let best = GROK_ASPECT_PRESETS[0];
+  let bestDist = Infinity;
+  for (const p of GROK_ASPECT_PRESETS) {
+    const d = Math.abs(p.value - ratio);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best.name;
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -5944,25 +5968,48 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. CRITICAL: preserve the original expression (look at body language and scene context — match the emotion, do not default to a smile) and gaze direction (do not make the character face the camera if they were not). Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, sending to Grok...`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
+    // Pick the closest Grok-supported preset to the scene's actual aspect so
+    // editWithGrok's internal pad loop doesn't letterbox the scene to 1:1
+    // (which then makes Grok return a square image, which our resize back to
+    // the non-square scene would stretch). Grok only accepts specific preset
+    // ratios for edits — can't pass raw "1024:768".
+    const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
+    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, scene=${sceneMeta.width}x${sceneMeta.height} (aspect preset=${sceneAspectStr}), sending to Grok...`);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri], { aspectRatio: sceneAspectStr });
 
     if (!grokResult.imageData) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
       return { imageData: null, character: charName, method };
     }
 
-    // C. Decode Grok result — resize only if dimensions differ (shouldn't happen normally)
+    // C. Decode Grok result. Resize to scene dimensions aspect-preserving
+    // (fit:'inside') and letterbox-crop if Grok returned a slightly
+    // different aspect. Never fit:'fill' — that stretches the image.
     const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     let grokBuffer = Buffer.from(grokBase64, 'base64');
     const grokMeta = await sharp(grokBuffer).metadata();
     if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height}, expected ${sceneMeta.width}x${sceneMeta.height} — resizing`);
-      grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+      const grokAspect = grokMeta.width / grokMeta.height;
+      const sceneAspect = sceneMeta.width / sceneMeta.height;
+      const aspectMatches = Math.abs(grokAspect - sceneAspect) / sceneAspect < 0.02;
+      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
+      if (aspectMatches) {
+        // Same aspect → simple proportional resize, no distortion
+        grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+      } else {
+        // Different aspect → center-crop to scene aspect (fit:'cover'), then resize
+        grokBuffer = await sharp(grokBuffer)
+          .resize(sceneMeta.width, sceneMeta.height, { fit: 'cover', position: 'center' })
+          .jpeg({ quality: 95 })
+          .toBuffer();
+      }
     }
 
-    // D. Calculate blend region: bbox + 50% padding
-    const BLEND_PADDING = 0.5;
+    // D. Calculate blend region: bbox + 10% padding (just enough for the edge feather).
+    // Was 50% previously — that caused the blend rectangle to cover a huge chunk of
+    // the scene, letting Grok's repaint overwrite background and other elements.
+    // Now only a thin ring outside the target bbox gets blended.
+    const BLEND_PADDING = 0.1;
     const FEATHER_PX = 30;
     const padX = (xmax - xmin) * BLEND_PADDING;
     const padY = (ymax - ymin) * BLEND_PADDING;
@@ -5980,18 +6027,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
     const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
 
-    // Pre-compute protected rects in blend-region pixel coords (with 20% padding).
-    // In body-repair mode we restore OTHER characters' FULL BODIES (because Grok
-    // painted them as the target charName and we need the originals back). In
-    // face-repair mode we restore just their faces.
-    const protectedSourceBoxes = whiteoutTarget === 'body'
-      ? (options.protectedBodies && options.protectedBodies.length > 0
-          ? options.protectedBodies
-          : (options.protectedFaces || []))  // fallback when bodyBox missing
-      : (options.protectedFaces || []);
+    // Pre-compute protected rects in blend-region pixel coords.
+    // Other characters must NEVER be changed regardless of whether we're fixing
+    // a face or a body — always restore BOTH their faces AND their bodies from
+    // the original where they overlap our blend region.
+    const protectedSourceBoxes = [
+      ...(options.protectedBodies || []),
+      ...(options.protectedFaces || []),
+    ];
     const protectedRects = protectedSourceBoxes.map(([fymin, fxmin, fymax, fxmax]) => {
       const fw = fxmax - fxmin, fh = fymax - fymin;
-      const pad = 0.2;
+      const pad = 0.1;
       const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
       const pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
       return {
@@ -6002,8 +6048,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       };
     }).filter(r => r.right > 0 && r.bottom > 0 && r.left < blendWidth && r.top < blendHeight);
     if (protectedRects.length > 0) {
-      const regionLabel = whiteoutTarget === 'body' ? 'other body/bodies' : 'other face(s)';
-      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} ${regionLabel} from blend`);
+      log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} other-character region(s) from blend`);
     }
 
     // F. Feathered blend: original outside, Grok inside, gradient at edges
@@ -6154,18 +6199,31 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}`;
 
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri]);
+    // Pick the closest Grok-supported preset to the cutout's native aspect so
+    // editWithGrok doesn't pad the cutout to 1:1.
+    const cutoutAspectStr = closestGrokAspect(extractWidth, extractHeight);
+    log.info(`👤 [CHAR REPAIR GROK] Cutout: ${extractWidth}x${extractHeight} (aspect preset=${cutoutAspectStr}), sending to Grok...`);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri], { aspectRatio: cutoutAspectStr });
 
     if (!grokResult.imageData) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
       return { imageData: null, character: charName, method };
     }
 
-    // Decode and resize Grok result to match the extraction dimensions
+    // Decode and resize Grok result to match the extraction dimensions.
+    // Use cover-crop when aspect drifts (Grok sometimes returns different
+    // dims) so we never distort the image with fit:'fill' stretching.
     const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+    const grokCutoutMeta = await sharp(repairedRegionBuffer).metadata();
+    const grokCutoutAspect = grokCutoutMeta.width / grokCutoutMeta.height;
+    const cutoutAspect = extractWidth / extractHeight;
+    const cutoutAspectMatches = Math.abs(grokCutoutAspect - cutoutAspect) / cutoutAspect < 0.02;
+    if (!cutoutAspectMatches) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok returned ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
+    }
     const resizedRegion = await sharp(repairedRegionBuffer)
-      .resize(extractWidth, extractHeight, { fit: 'fill' })
+      .resize(extractWidth, extractHeight, { fit: cutoutAspectMatches ? 'fill' : 'cover', position: 'center' })
       .raw()
       .toBuffer();
 
@@ -6176,9 +6234,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .toBuffer();
 
     // Feathered blend: full Grok content in the center (where the figure is),
-    // original pixels at the outer edges (the 20% padding zone). This hides
-    // any slight changes Grok may have made outside the figure.
-    const FEATHER_PX = Math.max(20, Math.round(Math.min(extractWidth, extractHeight) * 0.08));
+    // original pixels at the outer edges. The outer ~10% of the cutout ring
+    // is used for the feather, matching the padding we added around the bbox.
+    // This hides any slight changes Grok may have made outside the figure.
+    const FEATHER_PX = Math.max(20, Math.round(Math.min(extractWidth, extractHeight) * 0.10));
     const blended = Buffer.alloc(extractWidth * extractHeight * 3);
     for (let y = 0; y < extractHeight; y++) {
       for (let x = 0; x < extractWidth; x++) {
@@ -6203,9 +6262,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed (feather ${FEATHER_PX}px). Cost: $${grokResult.usage?.cost || 0.02}`);
 
+    // The cutout sent to Grok is always returned in the comparison payload
+    // so the UI can show exactly what was inpainted (alongside before/after).
     return {
       imageData: finalImageData,
-      comparison: { before: originalSceneDataUri, after: finalImageData },
+      comparison: {
+        before: originalSceneDataUri,
+        after: finalImageData,
+        cutoutSent: regionDataUri,
+        grokRawResult: grokResult.imageData,
+      },
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,

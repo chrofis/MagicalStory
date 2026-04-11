@@ -4997,13 +4997,14 @@ export default function StoryWizard() {
                 }
               } : undefined}
               // Character repair — available to all users.
-              // No explicit grokRepairMode — backend picks by whiteoutTarget
-              // (face → blended, body → cutout).
-              onRepairCharacter={storyId ? async (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => {
+              // repairMode='auto' leaves the default (face → blended, body → cutout).
+              // Explicit 'blended'/'cutout' are admin-only overrides from the popover.
+              onRepairCharacter={storyId ? async (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body', repairMode: 'auto' | 'blended' | 'cutout' = 'auto') => {
                 try {
-                  log.info(`Starting character repair: page ${pageNumber}, character ${characterName}, target ${whiteoutTarget}`);
+                  log.info(`Starting character repair: page ${pageNumber}, character ${characterName}, target ${whiteoutTarget}, mode ${repairMode}`);
                   const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages: [pageNumber] }], {
                     whiteoutTarget,
+                    ...(repairMode !== 'auto' ? { grokRepairMode: repairMode } : {}),
                   });
                   const repaired = result.results?.[0]?.pagesRepaired?.[0];
                   if (repaired?.imageData) {
