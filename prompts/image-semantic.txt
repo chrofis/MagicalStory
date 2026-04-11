@@ -1,28 +1,26 @@
-Check if this illustration matches what was requested.
+Check whether this illustration shows the right STORY BEAT. You are not grading the artist on how closely they copied the prompt — you are checking that the right scene is happening.
 
-**SCENE_DESCRIPTION (what the image should show):** "{IMAGE_PROMPT}"
-**SCENE_HINT (original outline, for context only):** "{SCENE_HINT}"
-**STORY_TEXT (narrative context):** "{STORY_TEXT}"
+**STORY_TEXT (the narrative beat this image must show):** "{STORY_TEXT}"
+**SCENE_HINT (intent from the outline):** "{SCENE_HINT}"
+**FULL PROMPT (background context — do NOT compare visual details against this):** "{IMAGE_PROMPT}"
 
 ---
 
 **STEP 1: DESCRIBE WHAT'S VISIBLE**
 
 List what you see:
-- Characters (count, appearance, position, action)
+- Characters (count, position, action)
 - Objects (held, used, or prominent)
-- Setting (location type, landmarks)
+- Setting (location type)
 - Action (what's happening)
 
 ---
 
-**STEP 2: COMPARE TO SCENE_DESCRIPTION**
-
-SCENE_DESCRIPTION is authoritative — it is the expanded, final version of what the image should show. Use SCENE_HINT only as supplementary context. If they conflict, trust SCENE_DESCRIPTION.
+**STEP 2: CHECK THE STORY BEAT**
 
 Only check these things:
 - Correct number of foreground characters? (2 expected = 2 visible)
-- Correct clothing type? (medieval ≠ modern, winter coat ≠ t-shirt)
+- Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual)
 - Key objects present?
 - Correct setting/location?
 - Correct surface? (on island, not in water; on path, not in river)
@@ -30,14 +28,15 @@ Only check these things:
 - Correct main action? (giving ≠ receiving, hugging ≠ fighting)
 - Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
 - Gaze direction matches interaction? (two characters talking but facing away from each other = wrong)
-
-Also check:
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
 
-Ignore everything else. Specifically ignore:
-- Character identity. You cannot tell WHO someone is without reference photos. A separate system handles that.
-- Background characters. Any people in the BACKGROUND field of the scene hint are optional extras.
-- Extra objects beyond what was requested.
+**Ignore everything else.** The full prompt contains detailed physical descriptions that come from reference photos — minor visual differences are expected and OK. Specifically ignore:
+- Character identity, names, recognizability. A separate system with reference photos handles identity.
+- Specific clothing details: exact colors, shades, patterns, fabric type, accessories (backpack present/absent), specific garment (hoodie vs sweatshirt). Only the broad category matters.
+- Hair details: exact length, exact shade, ponytail vs loose, style.
+- Face details: jaw shape, nose shape, exact features.
+- Background characters or extras.
+- Extra objects beyond what the story beat requires.
 - Camera angle, shot type, framing, perspective.
 - Subtle expression differences (thoughtful vs focused, slightly worried vs neutral).
 - Exact pose, gesture, body language.
