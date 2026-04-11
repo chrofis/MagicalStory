@@ -5777,12 +5777,37 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     throw new Error('XAI_API_KEY not configured for Grok repair');
   }
 
-  const [ymin, xmin, ymax, xmax] = bbox;
+  let [ymin, xmin, ymax, xmax] = bbox;
 
   // Validate bbox coordinates — NaN or out-of-range values crash Sharp
   if ([ymin, xmin, ymax, xmax].some(v => v == null || isNaN(v) || v < 0 || v > 1) || ymin >= ymax || xmin >= xmax) {
     log.warn(`⚠️ [CHAR REPAIR GROK] Invalid bbox for ${charName}: [${bbox.join(', ')}] — skipping`);
     return { imageData: null, character: charName, method: 'grok_blended', error: 'Invalid bounding box' };
+  }
+
+  // If a separate face bbox is provided and it pokes outside the body bbox
+  // (happens when the character detector gives a body box that cuts through
+  // the character — the face lands above / beside the body box), expand
+  // the body bbox to contain the face. Prevents the crosshatch / blur from
+  // missing half the face and leaving a sliver of the original figure that
+  // Grok then preserves alongside the repaint.
+  const faceBboxIn = options.faceBbox;
+  if (Array.isArray(faceBboxIn) && faceBboxIn.length === 4
+      && faceBboxIn.every(v => v != null && !isNaN(v) && v >= 0 && v <= 1)) {
+    const [fymin, fxmin, fymax, fxmax] = faceBboxIn;
+    const faceOutside = fymin < ymin || fxmin < xmin || fymax > ymax || fxmax > xmax;
+    if (faceOutside) {
+      const unionYmin = Math.min(ymin, fymin);
+      const unionXmin = Math.min(xmin, fxmin);
+      const unionYmax = Math.max(ymax, fymax);
+      const unionXmax = Math.max(xmax, fxmax);
+      log.info(`👤 [CHAR REPAIR GROK] Face bbox [${faceBboxIn.map(v => Math.round(v*100)+'%').join(', ')}] outside body bbox [${bbox.map(v => Math.round(v*100)+'%').join(', ')}] — expanding body bbox to union [${[unionYmin, unionXmin, unionYmax, unionXmax].map(v => Math.round(v*100)+'%').join(', ')}]`);
+      ymin = unionYmin;
+      xmin = unionXmin;
+      ymax = unionYmax;
+      xmax = unionXmax;
+      bbox = [ymin, xmin, ymax, xmax];
+    }
   }
 
   // Default repair mode depends on whiteoutTarget:
