@@ -4006,6 +4006,26 @@ export default function StoryWizard() {
             }
             return updated;
           });
+
+          // Also mirror imageData into sceneImages so the completion merge below
+          // (and the fast-path in loadSavedStory) have imageData to preserve.
+          // Without this, result_data arrives with imageData stripped, the merge
+          // finds nothing in prev to keep, and the user lands on a blank story
+          // until they refresh.
+          setSceneImages(prev => {
+            const updated = [...prev];
+            status.partialPages?.forEach(page => {
+              if (!page.imageData) return;
+              const idx = updated.findIndex(s => s.pageNumber === page.pageNumber);
+              if (idx >= 0) {
+                if (updated[idx].imageData) return;
+                updated[idx] = { ...updated[idx], imageData: page.imageData };
+              } else {
+                updated.push({ pageNumber: page.pageNumber, imageData: page.imageData });
+              }
+            });
+            return updated;
+          });
         }
 
         if (status.status === 'completed' && status.result) {
