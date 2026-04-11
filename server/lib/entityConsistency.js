@@ -129,39 +129,36 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
       matchedCascade.add(bestIdx);
       // Replace Gemini's faceBox with cascade's more accurate coordinates
       const oldFace = fig.faceBox;
-      fig.faceBox = [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height];
-      fig._cascadeFace = cf.source; // Track that this was cascade-improved
+      const newFace = [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height];
+      fig.faceBox = newFace;
+      fig._cascadeFace = cf.source;
+
+      // Expand bodyBox to include cascade face if it falls outside
+      // (same logic as char repair — prevents face being outside the figure region)
+      if (bb && Array.isArray(bb) && bb.length >= 4) {
+        const [bx1, by1, bx2, by2] = bb;
+        const [fx1, fy1, fx2, fy2] = newFace;
+        if (fx1 < bx1 || fy1 < by1 || fx2 > bx2 || fy2 > by2) {
+          fig.bodyBox = [
+            Math.min(bx1, fx1),
+            Math.min(by1, fy1),
+            Math.max(bx2, fx2),
+            Math.max(by2, fy2)
+          ];
+          log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: expanded bodyBox to include face`);
+        }
+      }
+
       log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: replaced faceBox [${oldFace?.map(v => v?.toFixed(3)).join(',')}] with cascade ${cf.source} [${fig.faceBox.map(v => v.toFixed(3)).join(',')}]`);
     }
   }
 
-  // Add cascade faces that didn't match any Gemini figure
-  for (let i = 0; i < cascadeFaces.length; i++) {
-    if (matchedCascade.has(i)) continue;
-    const cf = cascadeFaces[i];
-
-    // For haar-only detections, validate with Gemini before adding
-    if (cf.source === 'haar_only') {
-      const isRealFace = await validateFaceCropWithGemini(cf.cropData);
-      if (!isRealFace) {
-        log.debug(`[CASCADE-MERGE] Haar-only face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}] rejected by Gemini validation`);
-        continue;
-      }
-      log.debug(`[CASCADE-MERGE] Haar-only face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}] confirmed by Gemini validation`);
-    }
-
-    // Add as a new unidentified figure
-    geminiFigures.push({
-      name: 'UNKNOWN',
-      label: `cascade-detected face (${cf.source})`,
-      position: '',
-      faceBox: [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height],
-      bodyBox: null,
-      confidence: cf.source === 'both' ? 'high' : cf.source === 'anime' ? 'medium' : 'low',
-      _cascadeFace: cf.source,
-      _cascadeOnly: true
-    });
-    log.debug(`[CASCADE-MERGE] Added unmatched ${cf.source} face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}]`);
+  // Don't add unmatched cascade faces as new figures — they create noise.
+  // Cascade is only used to IMPROVE existing Gemini-detected figures, not to add new ones.
+  // Unmatched detections are likely false positives from haar or faces in the background.
+  const unmatchedCount = cascadeFaces.length - matchedCascade.size;
+  if (unmatchedCount > 0) {
+    log.debug(`[CASCADE-MERGE] ${unmatchedCount} unmatched cascade faces ignored (not adding as new figures)`);
   }
 
   return geminiFigures;

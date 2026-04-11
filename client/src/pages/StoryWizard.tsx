@@ -915,12 +915,26 @@ export default function StoryWizard() {
           };
         }));
 
-        // Set cover images placeholder (hasImage flag for lazy loading)
-        setCoverImages(quickMeta.hasFrontCover ? {
-          frontCover: { hasImage: true, imageData: undefined },
-          initialPage: null,
-          backCover: null,
-        } : { frontCover: null, initialPage: null, backCover: null });
+        // Set cover images placeholder. Preserve any existing covers that were
+        // populated by a prior load (or the just-finished generation) — they're
+        // the truth, including their imageVersions, until Phase 2 refreshes them.
+        // Without this, re-running loadSavedStory wiped initialPage/backCover
+        // state (including imageVersions) and the "Select Image" picker
+        // disappeared until a hard reload. Mirrors the scene preserve at line 907.
+        setCoverImages(prev => {
+          const preserve = <T extends { hasImage?: boolean; imageData?: string | null } | null>(
+            existing: T,
+            fallbackHasImage: boolean
+          ): T => {
+            if (existing && typeof existing === 'object') return existing;
+            return (fallbackHasImage ? { hasImage: true, imageData: undefined } : null) as T;
+          };
+          return {
+            frontCover: preserve(prev.frontCover, quickMeta.hasFrontCover),
+            initialPage: preserve(prev.initialPage, false),
+            backCover: preserve(prev.backCover, false),
+          };
+        });
 
         // Show the story view immediately - user sees title + cover NOW
         setStep(6);
