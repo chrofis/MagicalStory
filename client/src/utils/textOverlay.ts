@@ -7,6 +7,8 @@
  * Used by: StoryDisplay (browser CSS), pdf.js (PDFKit rendering)
  */
 
+import type { CSSProperties } from 'react';
+
 export type TextPosition = 'top-left' | 'bottom-full' | 'top-right' | 'bottom-left' | 'top-full' | 'bottom-right';
 
 // 6-position cycle
@@ -110,16 +112,27 @@ export function getOverlayClasses(layout: TextOverlayLayout): string {
 }
 
 /**
- * Get CSS classes for the gradient background
+ * Get inline style for the gradient background.
+ * Uses radial gradient from the corner for corners, linear for full-width.
+ * Fades gradually in ALL directions — no hard box edges.
  */
-export function getGradientClasses(layout: TextOverlayLayout): string {
+export function getGradientStyle(layout: TextOverlayLayout): CSSProperties {
   const isTop = layout.position.startsWith('top');
+  const isFullWidth = layout.position.includes('full');
+  const isLeft = layout.position.includes('left') || isFullWidth;
 
-  // Subtle feathered gradient — mostly transparent, just enough to read text
-  // Edge where text sits: ~50% white, feathers out to fully transparent
-  const vGradient = isTop
-    ? 'bg-gradient-to-b from-white/50 via-white/30 via-30% to-transparent'
-    : 'bg-gradient-to-t from-white/50 via-white/30 via-30% to-transparent';
+  if (isFullWidth) {
+    // Full-width: vertical gradient from edge
+    const dir = isTop ? 'to bottom' : 'to top';
+    return {
+      background: `linear-gradient(${dir}, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%)`,
+    };
+  }
 
-  return vGradient;
+  // Corner: radial gradient emanating from the corner
+  const originX = isLeft ? '0%' : '100%';
+  const originY = isTop ? '0%' : '100%';
+  return {
+    background: `radial-gradient(ellipse at ${originX} ${originY}, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0) 80%)`,
+  };
 }

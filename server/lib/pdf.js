@@ -465,10 +465,26 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW;
       if (!isTop) overlayY = bleed + pageHeight - overlayH;
 
-      // Draw subtle feathered background — soft enough to see image through
+      // Draw gradual feathered background — fades from text edge to transparent
+      // PDFKit linearGradient: from opaque white at text edge to transparent
       doc.save();
-      doc.fillOpacity(0.45);
-      doc.roundedRect(overlayX, overlayY, overlayW, overlayH, 12).fill('#FFFFFF');
+      if (isFullWidth) {
+        // Full-width: vertical gradient
+        const gradY1 = isTop ? overlayY : overlayY + overlayH;
+        const gradY2 = isTop ? overlayY + overlayH : overlayY;
+        const grad = doc.linearGradient(overlayX, gradY1, overlayX, gradY2);
+        grad.stop(0, '#FFFFFF', 0.55).stop(0.5, '#FFFFFF', 0.3).stop(1, '#FFFFFF', 0);
+        doc.rect(overlayX, overlayY, overlayW, overlayH).fill(grad);
+      } else {
+        // Corner: diagonal gradient from corner to opposite corner
+        const gradX1 = isLeft ? overlayX : overlayX + overlayW;
+        const gradY1 = isTop ? overlayY : overlayY + overlayH;
+        const gradX2 = isLeft ? overlayX + overlayW : overlayX;
+        const gradY2 = isTop ? overlayY + overlayH : overlayY;
+        const grad = doc.linearGradient(gradX1, gradY1, gradX2, gradY2);
+        grad.stop(0, '#FFFFFF', 0.55).stop(0.4, '#FFFFFF', 0.3).stop(1, '#FFFFFF', 0);
+        doc.rect(overlayX, overlayY, overlayW, overlayH).fill(grad);
+      }
       doc.restore();
 
       // Draw text with slight opacity for blend

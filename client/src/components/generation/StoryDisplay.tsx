@@ -9,7 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
-import { getTextOverlayPosition, getOverlayClasses, getGradientClasses } from '@/utils/textOverlay';
+import { getTextOverlayPosition, getOverlayClasses, getGradientStyle } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -335,7 +335,7 @@ export function StoryDisplay({
   } | null>(null);
 
   // PDF format selection dropdown
-  const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('square');
+  const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('A4');
   const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
   // Text overlay toggle — text on image (children's book style) vs text below image (classic)
   const [textOverlay, setTextOverlay] = useState(true);
@@ -4649,7 +4649,7 @@ export function StoryDisplay({
                                 overflow: 'hidden',
                               }}
                             >
-                              <div className={`${getGradientClasses(layout)} p-3 md:p-4 h-full`}>
+                              <div className="p-3 md:p-4 h-full" style={getGradientStyle(layout)}>
                                 <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
                                    style={{ fontSize: 'clamp(0.75rem, 1.8vw, 1.1rem)', textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)' }}>
                                   {pageText.trim()}
