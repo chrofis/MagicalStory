@@ -2838,6 +2838,144 @@ def detect_anime_faces():
         }), 500
 
 
+@app.route('/detect-illustration-faces', methods=['POST'])
+def detect_illustration_faces():
+    """
+    Combined face detection for illustrations using anime cascade + Haar cascade.
+    Returns merged results with confidence levels:
+    - "both": detected by both cascades (high confidence)
+    - "anime": detected by anime cascade only (good confidence for illustrations)
+    - "haar_only": detected by Haar only (needs validation — may be false positive)
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "pad_percent": 60  # Optional: padding around face crops as % (default 60)
+    }
+    """
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        pad_percent = data.get('pad_percent', 60)
+
+        if not image_data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        height, width = image.shape[:2]
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray_eq = cv2.equalizeHist(gray)
+
+        # Run anime cascade (best for illustrations)
+        anime_faces = []
+        if ANIME_CASCADE_AVAILABLE and anime_face_cascade is not None:
+            detections = anime_face_cascade.detectMultiScale(
+                gray_eq, scaleFactor=1.05, minNeighbors=2, minSize=(20, 20)
+            )
+            anime_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in detections]
+
+        # Run Haar cascade (catches some faces anime misses)
+        haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        haar_faces_raw = haar_cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
+        )
+        haar_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in haar_faces_raw]
+
+        # Compute IoU for matching
+        def iou(a, b):
+            ax1, ay1, ax2, ay2 = a[0], a[1], a[0]+a[2], a[1]+a[3]
+            bx1, by1, bx2, by2 = b[0], b[1], b[0]+b[2], b[1]+b[3]
+            ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+            ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+            if ix2 <= ix1 or iy2 <= iy1:
+                return 0
+            inter = (ix2-ix1) * (iy2-iy1)
+            union = a[2]*a[3] + b[2]*b[3] - inter
+            return inter / union if union > 0 else 0
+
+        # Merge: match anime to haar, find overlaps
+        matched_haar = set()
+        results = []
+
+        for af in anime_faces:
+            best_iou, best_j = 0, -1
+            for j, hf in enumerate(haar_faces):
+                s = iou(af, hf)
+                if s > best_iou:
+                    best_iou, best_j = s, j
+            if best_iou > 0.3 and best_j >= 0:
+                matched_haar.add(best_j)
+                results.append({"source": "both", "box_px": af, "confidence": 0.95})
+            else:
+                results.append({"source": "anime", "box_px": af, "confidence": 0.85})
+
+        for j, hf in enumerate(haar_faces):
+            if j not in matched_haar:
+                results.append({"source": "haar_only", "box_px": hf, "confidence": 0.5})
+
+        # Build response with normalized coordinates and padded crops
+        faces = []
+        for r in results:
+            x, y, fw, fh = r["box_px"]
+            # Apply padding
+            pad_w = int(fw * pad_percent / 100)
+            pad_h = int(fh * pad_percent / 100)
+            px = max(0, x - pad_w)
+            py = max(0, y - pad_h)
+            pw = min(width - px, fw + 2 * pad_w)
+            ph = min(height - py, fh + 2 * pad_h)
+
+            # Crop the padded face region
+            crop = image[py:py+ph, px:px+pw]
+            _, crop_jpg = cv2.imencode('.jpg', crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            crop_b64 = base64.b64encode(crop_jpg.tobytes()).decode('utf-8')
+
+            faces.append({
+                "source": r["source"],
+                "confidence": r["confidence"],
+                "faceBox": {
+                    "x": round(x / width, 4),
+                    "y": round(y / height, 4),
+                    "width": round(fw / width, 4),
+                    "height": round(fh / height, 4)
+                },
+                "paddedBox": {
+                    "x": round(px / width, 4),
+                    "y": round(py / height, 4),
+                    "width": round(pw / width, 4),
+                    "height": round(ph / height, 4)
+                },
+                "cropData": "data:image/jpeg;base64," + crop_b64,
+                "cropSize": {"width": pw, "height": ph}
+            })
+
+        print(f"[DETECT-ILLUSTRATION] {len(anime_faces)} anime + {len(haar_faces)} haar = {len(faces)} merged ({sum(1 for f in faces if f['source']=='both')} both, {sum(1 for f in faces if f['source']=='anime')} anime-only, {sum(1 for f in faces if f['source']=='haar_only')} haar-only)")
+
+        return jsonify({
+            "success": True,
+            "faces": faces,
+            "total_faces": len(faces),
+            "image_size": {"width": width, "height": height},
+            "detectors": {
+                "anime": len(anime_faces),
+                "haar": len(haar_faces)
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"[DETECT-ILLUSTRATION] Error: {e}")
+        import traceback
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")

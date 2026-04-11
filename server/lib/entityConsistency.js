@@ -21,6 +21,152 @@ const { detectAllBoundingBoxes } = require('./images');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+/**
+ * Detect faces in an illustration using anime + Haar cascades via Python service.
+ * Returns face locations with padded crops. Much more accurate than Gemini bbox for
+ * finding actual face positions in watercolor/cartoon illustrations.
+ * @param {string} imageData - base64 data URL of the illustration
+ * @param {number} padPercent - padding around face crops (default 60%)
+ * @returns {Array<{source, confidence, faceBox, paddedBox, cropData}>} or empty array on failure
+ */
+async function detectIllustrationFaces(imageData, padPercent = 60) {
+  try {
+    const response = await fetch(`${PHOTO_ANALYZER_URL}/detect-illustration-faces`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData, pad_percent: padPercent }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      log.warn(`[CASCADE-DETECT] Python service returned ${response.status}`);
+      return [];
+    }
+    const result = await response.json();
+    if (!result.success) {
+      log.warn(`[CASCADE-DETECT] Detection failed: ${result.error}`);
+      return [];
+    }
+    log.debug(`[CASCADE-DETECT] Found ${result.total_faces} faces (anime: ${result.detectors?.anime}, haar: ${result.detectors?.haar})`);
+    return result.faces || [];
+  } catch (err) {
+    log.warn(`[CASCADE-DETECT] Service unavailable: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Validate a face crop with Gemini — is this actually a face?
+ * Used for haar-only detections that might be false positives.
+ * @param {string} cropData - base64 data URL of the cropped region
+ * @returns {boolean} true if Gemini confirms this is a face
+ */
+async function validateFaceCropWithGemini(cropData) {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const base64 = cropData.replace(/^data:image\/\w+;base64,/, '');
+    const result = await model.generateContent([
+      { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+      'Does this image show a human or illustrated character face? Answer only "yes" or "no".'
+    ]);
+    const answer = result.response.text().trim().toLowerCase();
+    return answer.startsWith('yes');
+  } catch (err) {
+    log.warn(`[CASCADE-DETECT] Gemini face validation failed: ${err.message}`);
+    return false; // Assume not a face on error
+  }
+}
+
+/**
+ * Merge cascade-detected faces into Gemini bbox figures.
+ * Replaces Gemini's unreliable faceBox with cascade face locations.
+ * Adds new faces that Gemini missed entirely.
+ * @param {Array} geminiFigures - figures from detectAllBoundingBoxes
+ * @param {Array} cascadeFaces - faces from detectIllustrationFaces
+ * @param {number} imgWidth - image width for normalization
+ * @param {number} imgHeight - image height for normalization
+ * @returns {Array} merged figures with improved faceBox coordinates
+ */
+async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth, imgHeight) {
+  if (!cascadeFaces || cascadeFaces.length === 0) return geminiFigures;
+
+  const matchedCascade = new Set();
+
+  // For each Gemini figure, find the closest cascade face near its bodyBox
+  for (const fig of geminiFigures) {
+    const bb = fig.bodyBox; // [x1, y1, x2, y2] normalized
+    if (!bb || !Array.isArray(bb)) continue;
+
+    const bodyCenterX = (bb[0] + bb[2]) / 2;
+    const bodyCenterY = bb[1]; // top of body = near head
+    const bodyW = bb[2] - bb[0];
+
+    let bestDist = Infinity;
+    let bestIdx = -1;
+
+    for (let i = 0; i < cascadeFaces.length; i++) {
+      if (matchedCascade.has(i)) continue;
+      const cf = cascadeFaces[i];
+      const faceCenterX = cf.faceBox.x + cf.faceBox.width / 2;
+      const faceCenterY = cf.faceBox.y + cf.faceBox.height / 2;
+
+      // Face should be within ~1.5x body width horizontally and above body center
+      const dx = Math.abs(faceCenterX - bodyCenterX) / (bodyW || 0.1);
+      const dy = faceCenterY - bodyCenterY; // negative = face above body top (expected)
+
+      // Distance metric: horizontal offset + penalty for face below body top
+      const dist = dx + (dy > 0.1 ? dy * 5 : 0); // Penalize faces that are below body top
+
+      if (dist < bestDist && dx < 1.5) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      const cf = cascadeFaces[bestIdx];
+      matchedCascade.add(bestIdx);
+      // Replace Gemini's faceBox with cascade's more accurate coordinates
+      const oldFace = fig.faceBox;
+      fig.faceBox = [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height];
+      fig._cascadeFace = cf.source; // Track that this was cascade-improved
+      log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: replaced faceBox [${oldFace?.map(v => v?.toFixed(3)).join(',')}] with cascade ${cf.source} [${fig.faceBox.map(v => v.toFixed(3)).join(',')}]`);
+    }
+  }
+
+  // Add cascade faces that didn't match any Gemini figure
+  for (let i = 0; i < cascadeFaces.length; i++) {
+    if (matchedCascade.has(i)) continue;
+    const cf = cascadeFaces[i];
+
+    // For haar-only detections, validate with Gemini before adding
+    if (cf.source === 'haar_only') {
+      const isRealFace = await validateFaceCropWithGemini(cf.cropData);
+      if (!isRealFace) {
+        log.debug(`[CASCADE-MERGE] Haar-only face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}] rejected by Gemini validation`);
+        continue;
+      }
+      log.debug(`[CASCADE-MERGE] Haar-only face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}] confirmed by Gemini validation`);
+    }
+
+    // Add as a new unidentified figure
+    geminiFigures.push({
+      name: 'UNKNOWN',
+      label: `cascade-detected face (${cf.source})`,
+      position: '',
+      faceBox: [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height],
+      bodyBox: null,
+      confidence: cf.source === 'both' ? 'high' : cf.source === 'anime' ? 'medium' : 'low',
+      _cascadeFace: cf.source,
+      _cascadeOnly: true
+    });
+    log.debug(`[CASCADE-MERGE] Added unmatched ${cf.source} face at [${cf.faceBox.x.toFixed(3)},${cf.faceBox.y.toFixed(3)}]`);
+  }
+
+  return geminiFigures;
+}
+
 // Configuration
 const ENTITY_CHECK_MODEL = 'gemini-2.5-flash';  // Text model for evaluation
 const FACE_CROP_SIZE = 256;   // Size for face crops
@@ -729,6 +875,31 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         } catch (err) {
           log.warn(`⚠️  [ENTITY-COLLECT] Page ${pageNumber}: Fallback bbox detection failed: ${err.message}`);
         }
+      }
+    }
+
+    // Run cascade face detection to improve faceBox coordinates
+    // Anime + Haar cascades are much more accurate than Gemini for locating faces in illustrations
+    if (figures.length > 0) {
+      try {
+        const cascadeFaces = await detectIllustrationFaces(imageData, 60);
+        if (cascadeFaces.length > 0) {
+          // Get image dimensions for normalization (from sharp if available, else estimate)
+          let imgW = 1024, imgH = 1024;
+          try {
+            const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+            imgW = meta.width || 1024;
+            imgH = meta.height || 1024;
+          } catch { /* use defaults */ }
+
+          figures = await mergeCascadeFacesWithGemini(figures, cascadeFaces, imgW, imgH);
+          const cascadeImproved = figures.filter(f => f._cascadeFace).length;
+          if (cascadeImproved > 0) {
+            log.info(`🎯 [ENTITY-COLLECT] Page ${pageNumber}: Cascade improved ${cascadeImproved}/${figures.length} face boxes`);
+          }
+        }
+      } catch (err) {
+        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Cascade face detection skipped: ${err.message}`);
       }
     }
 
