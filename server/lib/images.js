@@ -5343,19 +5343,44 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 // ============================================================================
 
 /**
- * Iterate a page using image analysis and 17-check scene description prompt
- * This is the most comprehensive repair - analyzes what's wrong and regenerates with corrections
+ * Core iterate function — shared by the pipeline (executeIterateAction) and the
+ * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
+ * the scene description with Claude's 17-check prompt, then regenerates.
  *
  * @param {string} imageData - Current image data (base64)
  * @param {number} pageNumber - Page number being iterated
  * @param {Object} storyData - Full story data object
- * @param {Object} options - Options
- * @param {Object} options.modelOverrides - Model overrides for generation
- * @param {Function} options.usageTracker - Usage tracking callback
- * @returns {Promise<Object>} { imageData, newScene, previewMismatches, method: 'iterate' }
+ * @param {Object} options
+ * @param {Object}   options.modelOverrides       - { imageModel, sceneIterationModel, imageBackend }
+ * @param {Function} options.usageTracker          - Usage tracking callback
+ * @param {boolean}  options.useOriginalAsReference - Send current image as reference to generator
+ * @param {Object}   options.evaluationFeedback    - { score, reasoning, fixableIssues }
+ * @param {string}   options.sceneBackground       - Empty scene plate (base64) for composite
+ * @param {boolean}  options.iterativePlacement    - Use two-pass iterative placement
+ * @param {boolean}  options.blackoutIssues        - Black out fixTargets on input image
+ * @param {Array}    options.fixTargets            - Fix target bboxes (required when blackoutIssues=true)
+ * @param {boolean}  options.previewOnly           - Return prompt + mismatches without generating
+ * @param {string}   options.customImagePrompt     - Override the built image prompt
+ * @param {Object}   options.emptySceneCallbacks   - { load, save } for DB-backed empty scene handling
+ *   load(pageNumber): Promise<string|null>  — load existing empty scene from DB
+ *   save(pageNumber, imageData): Promise<void> — save generated empty scene to DB
+ *   When omitted, empty scene is only used if sceneBackground is pre-supplied.
+ * @returns {Promise<Object>} result object (see end of function)
  */
-async function iteratePage(imageData, pageNumber, storyData, options = {}) {
-  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false, evaluationFeedback = null, sceneBackground = null } = options;
+async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
+  const {
+    modelOverrides = {},
+    usageTracker = null,
+    useOriginalAsReference = false,
+    evaluationFeedback = null,
+    sceneBackground: sceneBackgroundIn = null,
+    iterativePlacement = false,
+    blackoutIssues = false,
+    fixTargets: optionFixTargets = null,
+    previewOnly = false,
+    customImagePrompt = null,
+    emptySceneCallbacks = null,
+  } = options;
 
   const {
     analyzeGeneratedImage
@@ -5370,11 +5395,13 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     buildAvailableAvatarsForPrompt,
     extractSceneMetadata,
     parseClothingCategory,
-    getLandmarkPhotosForScene
+    getLandmarkPhotosForScene,
+    convertClothingToCurrentFormat
   } = getStoryHelpers();
 
   const { callClaudeAPI } = require('./textModels');
   const { getElementReferenceImagesForPage } = require('./visualBible');
+  const { applyStyledAvatars } = require('./styledAvatars');
 
   // Extract story context
   const characters = storyData.characters || [];
@@ -5386,7 +5413,8 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const artStyle = storyData.artStyle || 'pixar';
 
   // Get page text
-  const pageText = getPageText(storyData.storyText, pageNumber);
+  const fullStoryText = storyData.storyText || storyData.story || '';
+  const pageText = getPageText(fullStoryText, pageNumber);
   if (!pageText) {
     throw new Error(`Page ${pageNumber} text not found`);
   }
@@ -5397,11 +5425,11 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`No scene description found for page ${pageNumber}`);
   }
 
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Analyzing current image with vision model...`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
-  // Step 1: Analyze the current image using analyzeGeneratedImage (composition analysis for regeneration)
+  // Step 1: Analyze the current image using analyzeGeneratedImage (composition analysis)
   const imageDescription = await analyzeGeneratedImage(imageData, characters, visualBible, clothingRequirements);
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
 
   // Step 2: Build previewFeedback from the image analysis
   const previewFeedback = {
@@ -5412,7 +5440,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const previousScenes = [];
   for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
     if (prevPage >= 1) {
-      const prevText = getPageText(storyData.storyText, prevPage);
+      const prevText = getPageText(fullStoryText, prevPage);
       if (prevText) {
         let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
         if (!prevClothing) {
@@ -5446,7 +5474,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     shortSceneDesc = sceneDescText.substring(0, 500);
   }
 
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
 
   // Step 3: Build the scene description prompt with preview feedback
   const scenePrompt = buildSceneDescriptionPrompt(
@@ -5465,121 +5493,309 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   );
 
   // Step 4: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 16000, modelOverrides?.sceneIterationModel || MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
+  const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || CONFIG_DEFAULTS.sceneIteration;
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with ${effectiveSceneModel}...`);
+  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
   const newSceneDescription = sceneResult.text;
 
   // Track usage (Claude Haiku scene re-expansion)
   if (usageTracker && sceneResult.usage) {
-    usageTracker('anthropic', sceneResult.usage, 'scene_expansion', sceneResult.modelId || MODEL_DEFAULTS.sceneIteration);
+    usageTracker('anthropic', sceneResult.usage, 'scene_expansion', sceneResult.modelId || effectiveSceneModel);
   }
 
-  // Parse the scene JSON to extract previewMismatches
+  // Parse the scene JSON to extract previewMismatches and checksRun
   let previewMismatches = [];
+  let checksRun = {};
   try {
     const cleanedScene = newSceneDescription.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '');
     const sceneJson = JSON.parse(cleanedScene);
     previewMismatches = sceneJson.previewMismatches || [];
-    log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
+    checksRun = sceneJson.selfCritique || {};
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
   } catch (parseErr) {
-    log.warn(`🔄 [ITERATE PAGE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
+    log.warn(`🔄 [ITERATE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
   }
 
   // Step 5: Prepare for image generation
   const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
-  // Build per-character clothing requirements from scene metadata (like main pipeline does)
-  const sceneMetadataForClothing = extractSceneMetadata(newSceneDescription) || {};
-  const sceneClothingReqs = { ...clothingRequirements };
+  // Extract metadata from the new scene description for per-character clothing
+  const newSceneMetadata = extractSceneMetadata(newSceneDescription);
 
-  if (sceneMetadataForClothing.characterClothing && Object.keys(sceneMetadataForClothing.characterClothing).length > 0) {
-    for (const [charName, clothing] of Object.entries(sceneMetadataForClothing.characterClothing)) {
-      if (!sceneClothingReqs[charName]) {
-        sceneClothingReqs[charName] = {};
-      }
-      sceneClothingReqs[charName]._currentClothing = clothing;
-    }
-    log.debug(`🔄 [ITERATE] Per-character clothing: ${Object.entries(sceneMetadataForClothing.characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')}`);
-  }
-
-  // Resolve clothingCategory — handle both string and object stored formats
-  const storedEntry = pageClothingData?.pageClothing?.[pageNumber];
+  // Resolve clothing — use per-character data from the new scene description (priority 1)
+  // or stored pageClothing (priority 2), falling back to parsed/primary clothing
   let clothingCategory;
-  if (typeof storedEntry === 'string') {
-    clothingCategory = storedEntry;
-  } else if (storedEntry && typeof storedEntry === 'object') {
-    const firstVal = Object.values(storedEntry)[0];
-    clothingCategory = firstVal || parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+  let effectiveClothingRequirements = clothingRequirements;
+
+  if (newSceneMetadata?.characterClothing && Object.keys(newSceneMetadata.characterClothing).length > 0) {
+    // Priority 1: Per-character clothing from newly generated scene description
+    const sceneClothing = newSceneMetadata.characterClothing;
+    const perCharClothing = convertClothingToCurrentFormat(sceneClothing);
+    effectiveClothingRequirements = { ...clothingRequirements };
+    for (const [charName, charClothing] of Object.entries(perCharClothing)) {
+      effectiveClothingRequirements[charName] = {
+        ...effectiveClothingRequirements[charName],
+        ...charClothing
+      };
+    }
+    const clothingValues = Object.values(sceneClothing);
+    const firstClothing = clothingValues[0];
+    clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+    log.debug(`🔄 [ITERATE] Using per-character clothing from scene description: ${JSON.stringify(sceneClothing)}`);
   } else {
-    clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+    // Priority 2: Per-character clothing from pageClothing (stored data)
+    const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+    if (typeof pageClothingEntry === 'string') {
+      clothingCategory = pageClothingEntry;
+    } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
+      const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
+      effectiveClothingRequirements = { ...clothingRequirements };
+      for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+        effectiveClothingRequirements[charName] = {
+          ...effectiveClothingRequirements[charName],
+          ...charClothing
+        };
+      }
+      const clothingValues = Object.values(pageClothingEntry);
+      const firstClothing = clothingValues[0];
+      clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+      log.debug(`🔄 [ITERATE] Using per-character clothing from pageClothing: ${JSON.stringify(pageClothingEntry)}`);
+    } else {
+      clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+    }
   }
 
-  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, sceneClothingReqs);
+  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, effectiveClothingRequirements);
 
-  // Apply styled avatars (handles non-costumed characters in mixed scenes)
-  const { applyStyledAvatars } = require('./styledAvatars');
-  if (!clothingCategory || !clothingCategory.startsWith('costumed')) {
+  // Apply styled avatars (skip when all already styled or costumed)
+  const allAlreadyStyled = referencePhotos.every(p =>
+    p.photoType?.startsWith('styled-') || p.photoType?.startsWith('costumed-')
+  );
+  if (!allAlreadyStyled && (!clothingCategory || !clothingCategory.startsWith('costumed'))) {
     referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
   }
 
-  // Build landmark photos and VB grid
-  const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+  // Build landmark photos
   const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
 
+  // Determine image model and backend (needed before empty scene generation)
+  let imageModelOverride = modelOverrides?.imageModel || null;
+  const iterateSceneMetadata = newSceneMetadata;
+
+  // Route by scene complexity when no explicit model override
+  if (!imageModelOverride) {
+    const sceneComplexity = iterateSceneMetadata?.sceneComplexity || 'simple';
+    if (sceneComplexity === 'complex') {
+      imageModelOverride = CONFIG_DEFAULTS.complexPageImage;
+      log.info(`🎯 [ITERATE] Page ${pageNumber}: complex scene → ${imageModelOverride}`);
+    }
+  }
+
+  const iterateImageBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+
+  // Resolve empty scene background.
+  // If sceneBackgroundIn was pre-supplied (pipeline), use it directly.
+  // If emptySceneCallbacks are provided (UI route), load/generate based on scene metadata.
+  let sceneBackground = sceneBackgroundIn;
+  if (!sceneBackground && emptySceneCallbacks) {
+    if (iterateSceneMetadata?.reuseEmptyScene) {
+      try {
+        const existing = await emptySceneCallbacks.load(pageNumber);
+        if (existing) {
+          sceneBackground = existing;
+          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
+        }
+      } catch (e) {
+        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
+      }
+    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
+      log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
+      try {
+        const { resolveArtStyleForEmptyScene, resolveArtStyle: resolveStyleForEmpty } = getStoryHelpers();
+        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
+          || resolveArtStyleForEmptyScene('pixar')
+          || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
+          || '';
+        const textPos = iterateSceneMetadata?.textPosition || null;
+        const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+          STYLE_DESCRIPTION: artStyleDesc,
+          EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
+          REQUIRED_OBJECTS: '',
+          TEXT_AREA_INSTRUCTION: textPos ? `Keep the ${textPos.replace('-', ' ')} area simple — story text will be placed there.` : ''
+        });
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
+        const isCoverPage = pageNumber < 0;
+        const emptyResult = await generateImageOnly(emptyPrompt, [], {
+          imageModelOverride,
+          imageBackendOverride: iterBackend,
+          landmarkPhotos: pageLandmarkPhotos,
+          visualBibleGrid: emptySceneVbGrid,
+          pageNumber,
+          skipCache: true,
+          aspectRatio: isCoverPage ? CONFIG_DEFAULTS.coverAspect : CONFIG_DEFAULTS.pageAspect
+        });
+        if (emptyResult?.imageData) {
+          sceneBackground = emptyResult.imageData;
+          if (emptySceneCallbacks.save) {
+            await emptySceneCallbacks.save(pageNumber, sceneBackground);
+          }
+          log.info(`🎬 [ITERATE] Page ${pageNumber}: fresh empty scene generated and saved`);
+        }
+      } catch (e) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: fresh empty scene failed: ${e.message}`);
+      }
+    }
+  }
+
+  // Build VB grid — when sceneBackground is set, vehicles/locations/landmarks are already
+  // painted into the empty scene plate, so drop them from the composite refs.
   let visualBibleGrid = null;
+  let finalLandmarkPhotos = pageLandmarkPhotos;
   if (visualBible) {
     let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-    // Drop location elements — the scene background already shows the location
-    if (useOriginalAsReference || pageLandmarkPhotos.length > 0) {
+    let secondaryLandmarks = pageLandmarkPhotos.slice(1);
+    if (sceneBackground) {
+      elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+      secondaryLandmarks = [];
+      finalLandmarkPhotos = [];
+      log.debug(`🔲 [ITERATE] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
+    } else if (useOriginalAsReference || pageLandmarkPhotos.length > 0) {
       elementReferences = elementReferences.filter(e => e.type !== 'location');
     }
-    const secondaryLandmarks = pageLandmarkPhotos.slice(1);
     if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
       visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
     }
   }
 
-  // Build image prompt
-  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+  // Extract clean scene for image generation (strip previewMismatches, checks, corrections)
+  let cleanSceneForImage = newSceneDescription;
+  try {
+    const parsed = JSON.parse(newSceneDescription);
+    const sceneObj = parsed?.previewMismatches?.[0]?.scene || parsed?.scene || parsed;
+    if (sceneObj?.imageSummary || sceneObj?.characters) {
+      cleanSceneForImage = JSON.stringify({ scene: sceneObj });
+    }
+  } catch {
+    const sceneMatch = newSceneDescription.match(/"scene"\s*:\s*\{[\s\S]*"imageSummary"/);
+    if (sceneMatch) {
+      const startIdx = newSceneDescription.indexOf(sceneMatch[0]);
+      let depth = 0;
+      let endIdx = startIdx;
+      for (let i = startIdx + '"scene":'.length; i < newSceneDescription.length; i++) {
+        if (newSceneDescription[i] === '{') depth++;
+        if (newSceneDescription[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+      }
+      if (endIdx > startIdx) {
+        cleanSceneForImage = newSceneDescription.substring(startIdx, endIdx);
+      }
+    }
+  }
 
-  // Append evaluation feedback if provided (tells the image model what to fix)
+  // Build image prompt
+  let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend });
+
+  // Append evaluation feedback if provided
   if (evaluationFeedback) {
-    const feedbackParts = [];
-    if (evaluationFeedback.reasoning) {
-      feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+    if (usageTracker) {
+      // Pipeline caller — append all feedback
+      const feedbackParts = [];
+      if (evaluationFeedback.reasoning) {
+        feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+      }
+      if (evaluationFeedback.fixableIssues?.length > 0) {
+        feedbackParts.push('Specific problems to avoid:\n' +
+          evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${i.description || i.issue || i}`).join('\n'));
+      }
+      if (feedbackParts.length > 0) {
+        imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'}, ${evaluationFeedback.fixableIssues?.length ?? 0} issues)`);
+      }
+    } else {
+      // UI route caller — only keep critical issues (missing/wrong elements)
+      const criticalIssues = (evaluationFeedback.fixableIssues || [])
+        .filter(i => {
+          const desc = (i.description || i.issue || '').toLowerCase();
+          return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
+            || desc.includes('wrong setting') || desc.includes('wrong location');
+        });
+      if (criticalIssues.length > 0) {
+        const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
+          criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
+        imagePrompt = `${imagePrompt}\n\n${feedbackText}`;
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${criticalIssues.length} critical issues as positive instructions (score: ${evaluationFeedback.score ?? 'N/A'})`);
+      }
     }
-    if (evaluationFeedback.fixableIssues?.length > 0) {
-      feedbackParts.push('Specific problems to avoid:\n' +
-        evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${i.description || i.issue || i}`).join('\n'));
-    }
-    if (feedbackParts.length > 0) {
-      imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
-      log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'}, ${evaluationFeedback.fixableIssues?.length ?? 0} issues)`);
-    }
+  }
+
+  // Preview mode: return prompt + mismatches without generating image
+  if (previewOnly) {
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Preview mode — returning prompt only (${imagePrompt.length} chars)`);
+    return {
+      previewOnly: true,
+      imagePrompt,
+      newScene: newSceneDescription,
+      newSceneMetadata,
+      compositionAnalysis: previewFeedback.composition,
+      previewMismatches,
+      checksRun,
+      method: 'iterate'
+    };
+  }
+
+  // Allow custom image prompt override (from preview → edit → generate flow)
+  if (customImagePrompt) {
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Using custom image prompt (${customImagePrompt.length} chars, was ${imagePrompt.length})`);
+    imagePrompt = customImagePrompt;
   }
 
   // Clear cache to force new generation
   const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
   deleteFromImageCache(cacheKey);
 
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Generating new image with corrected scene description...`);
-
-  // Step 6: Generate new image with corrected scene
-  const imageModelId = modelOverrides?.imageModel || 'gemini-3-pro-image-preview';
-  const previousImage = useOriginalAsReference ? imageData : null;
-  if (previousImage) {
-    log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Using original image as reference for generation`);
+  // Resolve previousImage based on blackout / useOriginalAsReference
+  let previousImage = null;
+  if (blackoutIssues) {
+    const targets = optionFixTargets || [];
+    if (targets.length > 0) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Blacking out ${targets.length} issue regions in current image`);
+      previousImage = await blackoutIssueRegions(imageData, targets);
+    } else {
+      log.warn(`🔄 [ITERATE] Page ${pageNumber}: No fix targets available for blackout, falling back to original as reference`);
+      previousImage = imageData;
+    }
+  } else if (useOriginalAsReference) {
+    previousImage = imageData;
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
   }
-  const imageResult = await generateImageWithQualityRetry(
-    imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
-    { imageModel: imageModelId },
-    `PAGE ${pageNumber} ITERATE`,
-    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground }
-  );
 
-  // visual = raw vision-model score; the pipeline round loop will subtract entity penalty
-  // before deciding whether the new image is good enough.
-  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (visual: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Generating new image with corrected scene description...`);
+
+  // Step 6: Generate image
+  let imageResult;
+  if (iterativePlacement) {
+    const { resolveArtStyle: resolveIterStyle } = getStoryHelpers();
+    const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+    const iterArtStyleDesc = resolveIterStyle(storyData.artStyle || 'pixar', iterBackend) || resolveIterStyle('pixar') || '';
+    imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
+      imageModelOverride,
+      imageBackendOverride: iterBackend,
+      landmarkPhotos: finalLandmarkPhotos,
+      visualBibleGrid,
+      pageNumber,
+      artStyle: iterArtStyleDesc,
+      sceneBackground,
+    });
+  } else {
+    imageResult = await generateImageWithQualityRetry(
+      imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
+      { imageModel: imageModelOverride },
+      `PAGE ${pageNumber} ITERATE`,
+      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground }
+    );
+  }
+
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
   return {
     imageData: imageResult.imageData,
@@ -5587,17 +5803,28 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     newScene: newSceneDescription,
     newSceneMetadata,
     previewMismatches,
+    checksRun,
     compositionAnalysis: previewFeedback.composition,
     score: imageResult.score,
     reasoning: imageResult.reasoning,
+    qualityModelId: imageResult.qualityModelId || null,
+    fixTargets: imageResult.fixTargets || [],
+    fixableIssues: imageResult.fixableIssues || [],
     totalAttempts: imageResult.totalAttempts,
     referencePhotos,
     landmarkPhotos: pageLandmarkPhotos,
     visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
     grokRefImages: imageResult.grokRefImages || null,
+    modelId: imageResult.modelId || null,
+    bboxDetection: imageResult.bboxDetection || null,
+    // The blackout image (when blackout mode was used and fixTargets were found)
+    blackoutImage: (blackoutIssues && previousImage && previousImage !== imageData) ? previousImage : null,
     method: 'iterate'
   };
 }
+
+// Backward-compatible alias
+const iteratePage = iteratePageCore;
 
 
 /**
@@ -5779,154 +6006,6 @@ function closestGrokAspect(width, height) {
     if (d < bestDist) { bestDist = d; best = p; }
   }
   return best.name;
-}
-
-/**
- * Scan a buffer for a uniform pale/light border. Used by `detectAddedBorder`
- * below to compare input and output — never called directly from production
- * code because it can false-positive on images with natural white frames
- * (e.g. Gemini-generated pages).
- *
- * @param {Buffer} buffer - PNG/JPEG buffer
- * @returns {Promise<{left:number,top:number,right:number,bottom:number,width:number,height:number}|null>}
- */
-async function detectGrokBorder(buffer) {
-  try {
-    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
-    const { width, height, channels } = info;
-    if (width < 100 || height < 100) return null;
-
-    // Sample all 4 corners and require they agree — prevents false positives
-    // when the image has a naturally dark corner (e.g. vignette).
-    const px = (x, y) => {
-      const i = (y * width + x) * channels;
-      return [data[i], data[i + 1], data[i + 2]];
-    };
-    const corners = [px(0, 0), px(width - 1, 0), px(0, height - 1), px(width - 1, height - 1)];
-    const baseline = [
-      Math.round((corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4),
-      Math.round((corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4),
-      Math.round((corners[0][2] + corners[1][2] + corners[2][2] + corners[3][2]) / 4),
-    ];
-    // Corners must agree within 20/channel; otherwise there's no uniform border
-    for (const c of corners) {
-      if (Math.abs(c[0] - baseline[0]) > 20 || Math.abs(c[1] - baseline[1]) > 20 || Math.abs(c[2] - baseline[2]) > 20) {
-        return null;
-      }
-    }
-
-    // Scan inward from each edge: stop when ANY pixel on that row/col differs
-    // from the baseline by > 40 in any channel.
-    const THRESH = 40;
-    const deviates = (r, g, b) =>
-      Math.abs(r - baseline[0]) > THRESH ||
-      Math.abs(g - baseline[1]) > THRESH ||
-      Math.abs(b - baseline[2]) > THRESH;
-
-    const maxInset = Math.floor(Math.min(width, height) * 0.4); // cap at 40%
-    let top = 0;
-    for (; top < maxInset; top++) {
-      let hit = false;
-      for (let x = 0; x < width; x++) {
-        const [r, g, b] = px(x, top);
-        if (deviates(r, g, b)) { hit = true; break; }
-      }
-      if (hit) break;
-    }
-    let bottom = height - 1;
-    for (; bottom > height - 1 - maxInset; bottom--) {
-      let hit = false;
-      for (let x = 0; x < width; x++) {
-        const [r, g, b] = px(x, bottom);
-        if (deviates(r, g, b)) { hit = true; break; }
-      }
-      if (hit) break;
-    }
-    let left = 0;
-    for (; left < maxInset; left++) {
-      let hit = false;
-      for (let y = 0; y < height; y++) {
-        const [r, g, b] = px(left, y);
-        if (deviates(r, g, b)) { hit = true; break; }
-      }
-      if (hit) break;
-    }
-    let right = width - 1;
-    for (; right > width - 1 - maxInset; right--) {
-      let hit = false;
-      for (let y = 0; y < height; y++) {
-        const [r, g, b] = px(right, y);
-        if (deviates(r, g, b)) { hit = true; break; }
-      }
-      if (hit) break;
-    }
-
-    const contentW = right - left + 1;
-    const contentH = bottom - top + 1;
-    const horizInset = (width - contentW) / width;
-    const vertInset = (height - contentH) / height;
-    const maxSideInset = Math.max(horizInset, vertInset);
-
-    // Cap at 45% (more than that is probably content not a border).
-    if (maxSideInset > 0.45) return null;
-
-    return { left, top, right, bottom, width: contentW, height: contentH, imgWidth: width, imgHeight: height };
-  } catch (err) {
-    log.warn(`⚠️ [GROK BORDER] Detection failed: ${err.message}`);
-    return null;
-  }
-}
-
-/**
- * Detect a border that Grok ADDED to its output that wasn't present in the
- * input we sent. Runs `detectGrokBorder` on both buffers and returns the
- * content box in Grok's output — but ONLY when the output border is
- * meaningfully larger than the input border (otherwise we'd trim legitimate
- * frames that existed in the original scene, like the natural white border
- * Gemini draws around pages).
- *
- * Tolerance: Grok's border must be at least 5 percentage points wider on
- * at least one side for us to treat it as a Grok addition.
- *
- * @param {Buffer} inputBuffer - what we sent to Grok
- * @param {Buffer} outputBuffer - what Grok returned
- * @returns {Promise<{left,top,right,bottom,width,height}|null>} content box in OUTPUT, or null if no added border
- */
-async function detectAddedBorder(inputBuffer, outputBuffer) {
-  const outputBorder = await detectGrokBorder(outputBuffer);
-  if (!outputBorder) return null;
-  const outputLeftFrac = outputBorder.left / outputBorder.imgWidth;
-  const outputRightFrac = (outputBorder.imgWidth - outputBorder.right - 1) / outputBorder.imgWidth;
-  const outputTopFrac = outputBorder.top / outputBorder.imgHeight;
-  const outputBottomFrac = (outputBorder.imgHeight - outputBorder.bottom - 1) / outputBorder.imgHeight;
-
-  const inputBorder = await detectGrokBorder(inputBuffer);
-  let inputLeftFrac = 0, inputRightFrac = 0, inputTopFrac = 0, inputBottomFrac = 0;
-  if (inputBorder) {
-    inputLeftFrac = inputBorder.left / inputBorder.imgWidth;
-    inputRightFrac = (inputBorder.imgWidth - inputBorder.right - 1) / inputBorder.imgWidth;
-    inputTopFrac = inputBorder.top / inputBorder.imgHeight;
-    inputBottomFrac = (inputBorder.imgHeight - inputBorder.bottom - 1) / inputBorder.imgHeight;
-  }
-
-  const TOLERANCE = 0.03; // 3 percentage points — tight enough to catch a 4% border addition
-  const leftAdded = outputLeftFrac > inputLeftFrac + TOLERANCE;
-  const rightAdded = outputRightFrac > inputRightFrac + TOLERANCE;
-  const topAdded = outputTopFrac > inputTopFrac + TOLERANCE;
-  const bottomAdded = outputBottomFrac > inputBottomFrac + TOLERANCE;
-
-  if (!leftAdded && !rightAdded && !topAdded && !bottomAdded) {
-    // Output's border is ≈ input's border → not a Grok addition, probably
-    // a preserved frame from the original scene. Leave it alone.
-    return null;
-  }
-
-  // Grok added border on at least one side. Return Grok's content box so
-  // callers can crop to it. We crop to the FULL Grok border (not just the
-  // added portion) because that's what visually matches a "normal" figure
-  // framing — the input border was typically scene edges that we want to
-  // restore from the original anyway via the feather blend downstream.
-  return outputBorder;
 }
 
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
@@ -6166,30 +6245,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // different aspect. Never fit:'fill' — that stretches the image.
     const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     let grokBuffer = Buffer.from(grokBase64, 'base64');
-
-    // Step 1: detect and trim any uniform pale border Grok ADDED to its
-    // output (from aspect mismatch letterbox, internal content-framing bias,
-    // or API-level padding). Compare Grok's output border against the
-    // input we sent so we don't trim legitimate frames that already existed.
-    const grokBorder = await detectAddedBorder(sceneForGrok, grokBuffer);
-    if (grokBorder) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Grok added a border: content ${grokBorder.width}x${grokBorder.height} at (${grokBorder.left},${grokBorder.top}) — trimming`);
-      grokBuffer = await sharp(grokBuffer)
-        .extract({ left: grokBorder.left, top: grokBorder.top, width: grokBorder.width, height: grokBorder.height })
-        .jpeg({ quality: 95 })
-        .toBuffer();
-    }
-
-    // Step 2: resize to scene dimensions (aspect-preserving if matching).
     const grokMeta = await sharp(grokBuffer).metadata();
     if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
       const grokAspect = grokMeta.width / grokMeta.height;
       const sceneAspect = sceneMeta.width / sceneMeta.height;
       const aspectMatches = Math.abs(grokAspect - sceneAspect) / sceneAspect < 0.02;
-      log.warn(`⚠️ [CHAR REPAIR GROK] Post-trim size ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
       if (aspectMatches) {
+        // Same aspect → simple proportional resize, no distortion
         grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
       } else {
+        // Different aspect → center-crop to scene aspect (fit:'cover'), then resize
         grokBuffer = await sharp(grokBuffer)
           .resize(sceneMeta.width, sceneMeta.height, { fit: 'cover', position: 'center' })
           .jpeg({ quality: 95 })
@@ -6477,33 +6543,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Decode Grok's output
+    // Decode and resize Grok result to match the extraction dimensions.
+    // Use cover-crop when aspect drifts (Grok sometimes returns different
+    // dims) so we never distort the image with fit:'fill' stretching.
     const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
-    let repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
-
-    // Step 1: detect and trim any uniform pale border Grok ADDED (internal
-    // framing bias, letterbox from aspect drift, API-level padding). This
-    // is what causes the "shorter and less wide" effect — Grok's actual
-    // content is inset inside a pale frame. Compare against the cutout we
-    // sent so we don't trim borders that were already in the scene.
-    const grokCutoutBorder = await detectAddedBorder(regionBuffer, repairedRegionBuffer);
-    if (grokCutoutBorder) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok added a border: content ${grokCutoutBorder.width}x${grokCutoutBorder.height} at (${grokCutoutBorder.left},${grokCutoutBorder.top}) — trimming`);
-      repairedRegionBuffer = await sharp(repairedRegionBuffer)
-        .extract({ left: grokCutoutBorder.left, top: grokCutoutBorder.top, width: grokCutoutBorder.width, height: grokCutoutBorder.height })
-        .jpeg({ quality: 95 })
-        .toBuffer();
-    }
-
-    // Step 2: resize to the extract dimensions. After the border trim,
-    // Grok's content should have the same aspect as our cutout — but we
-    // still cover-crop if something drifts, to avoid fit:'fill' stretching.
+    const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
     const grokCutoutMeta = await sharp(repairedRegionBuffer).metadata();
     const grokCutoutAspect = grokCutoutMeta.width / grokCutoutMeta.height;
     const cutoutAspect = extractWidth / extractHeight;
     const cutoutAspectMatches = Math.abs(grokCutoutAspect - cutoutAspect) / cutoutAspect < 0.02;
     if (!cutoutAspectMatches) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout post-trim ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok returned ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
     }
     const resizedRegion = await sharp(repairedRegionBuffer)
       .resize(extractWidth, extractHeight, { fit: cutoutAspectMatches ? 'fill' : 'cover', position: 'center' })
@@ -10341,6 +10391,7 @@ module.exports = {
 
   // Active repair primitives
   classifyIssues,
+  iteratePageCore,
   iteratePage,
   repairCharacterMismatch,
 

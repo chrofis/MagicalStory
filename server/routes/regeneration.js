@@ -58,6 +58,7 @@ const {
   buildVisualBibleGrid,
   buildEmptySceneVbGrid,
   blackoutIssueRegions,
+  iteratePageCore,
   enrichWithBoundingBoxes,
   collectAllIssuesForPage,
   repairCharacterMismatch,
@@ -1601,7 +1602,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     }
 
     // =========================================================================
-    // SCENE PAGE ITERATION BRANCH (existing flow, unchanged)
+    // SCENE PAGE ITERATION BRANCH — delegates to iteratePageCore()
     // =========================================================================
 
     // Get current image
@@ -1611,115 +1612,73 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       return res.status(400).json({ error: `No image found for page ${pageNumber}` });
     }
 
-    // Get current scene description
+    // Get current scene description (early validation)
     const sceneDescriptions = storyData.sceneDescriptions || [];
     const currentScene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
     if (!currentScene) {
       return res.status(400).json({ error: `No scene description found for page ${pageNumber}` });
     }
 
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
+    // Store previous image data (before iteratePageCore modifies anything)
+    const previousImageData = currentImage.imageData;
+    const previousScore = currentImage.qualityScore || null;
 
-    // Get context for image analysis
-    const characters = storyData.characters || [];
-    const visualBible = storyData.visualBible || null;
-    const clothingRequirements = storyData.clothingRequirements || null;
-
-    // Step 1: Analyze the current image using analyzeGeneratedImage (identifies characters by name)
-    const { analyzeGeneratedImage } = require('../lib/sceneValidator');
-    const imageDescription = await analyzeGeneratedImage(currentImage.imageData, characters, visualBible, clothingRequirements);
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
-    log.debug(`🔄 [ITERATE] Composition: ${imageDescription.description.substring(0, 200)}...`);
-
-    // Step 2: Build previewFeedback from the image analysis
-    const previewFeedback = {
-      composition: imageDescription.description
-    };
-
-    // Step 3: Gather context for scene description prompt
-    const fullStoryText = storyData.storyText || storyData.story || '';
-    const pageText = getPageText(fullStoryText, pageNumber);
-    if (!pageText) {
-      return res.status(404).json({ error: `Page ${pageNumber} text not found` });
+    if (imageModel) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModel}`);
     }
 
-    const language = storyData.language || 'en';
-    const pageClothingData = storyData.pageClothing || null;
+    // Call the shared core function
+    const iterResult = await iteratePageCore(currentImage.imageData, pageNumber, storyData, {
+      modelOverrides: {
+        imageModel: imageModel || null,
+        sceneModel: sceneModel || null,
+      },
+      useOriginalAsReference: !!useOriginalAsReference,
+      evaluationFeedback,
+      blackoutIssues: !!blackoutIssues,
+      fixTargets: currentImage.fixTargets || [],
+      iterativePlacement: !!iterativePlacement,
+      previewOnly: !!previewOnly,
+      customImagePrompt,
+      // Provide DB-backed empty scene callbacks
+      emptySceneCallbacks: {
+        load: async (pn) => {
+          const row = await getStoryImage(id, 'empty_scene', pn, 0);
+          return row?.imageData || null;
+        },
+        save: async (pn, imgData) => {
+          await saveStoryImage(id, 'empty_scene', pn, imgData);
+        },
+      },
+    });
 
-    // Build previous scenes context
-    const previousScenes = [];
-    for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
-      if (prevPage >= 1) {
-        const prevText = getPageText(fullStoryText, prevPage);
-        if (prevText) {
-          let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
-          if (!prevClothing) {
-            const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
-            prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
-          }
-          previousScenes.push({
-            pageNumber: prevPage,
-            text: prevText,
-            sceneHint: '',
-            clothing: prevClothing
-          });
-        }
-      }
+    // Preview mode: return prompt without generating image
+    if (iterResult.previewOnly) {
+      return res.json({
+        success: true,
+        previewOnly: true,
+        pageNumber,
+        imagePrompt: iterResult.imagePrompt,
+        sceneDescription: iterResult.newScene,
+        composition: iterResult.compositionAnalysis || null,
+        previewMismatches: iterResult.previewMismatches || [],
+        checksRun: iterResult.checksRun || {},
+      });
     }
 
-    // Get expected clothing for this page
-    const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
-    log.debug(`🔄 [ITERATE] Expected clothing: ${typeof expectedClothing === 'object' ? JSON.stringify(expectedClothing) : expectedClothing}`);
-
-    // Build available avatars
-    const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
-
-    // Extract short scene description from current scene (the "hint" that will be critiqued)
-    let shortSceneDesc = '';
-    const sceneMetadata = extractSceneMetadata(currentScene.description);
-    if (sceneMetadata?.imageSummary) {
-      shortSceneDesc = sceneMetadata.imageSummary;
-    } else {
-      // Fall back to first part of description
-      shortSceneDesc = currentScene.description.substring(0, 500);
-    }
-
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
-
-    // Step 4: Build the scene description prompt with preview feedback
-    const scenePrompt = buildSceneDescriptionPrompt(
-      pageNumber,
-      pageText,
-      characters,
-      shortSceneDesc,  // The current scene hint to critique
-      language,
-      visualBible,
-      previousScenes,
-      expectedClothing,
-      '',  // No correction notes for iteration
-      availableAvatars,
-      null,  // rawOutlineContext
-      previewFeedback  // The actual image analysis feedback!
-    );
-
-    // Step 5: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
-    const effectiveSceneModel = sceneModel || MODEL_DEFAULTS.sceneIteration;
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with ${effectiveSceneModel}...`);
-    const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
-    const newSceneDescription = sceneResult.text;
-
-    // Parse the scene JSON to extract previewMismatches
-    let previewMismatches = [];
-    let checksRun = {};
-    try {
-      const cleanedScene = newSceneDescription.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '');
-      const sceneJson = JSON.parse(cleanedScene);
-      previewMismatches = sceneJson.previewMismatches || [];
-      checksRun = sceneJson.selfCritique || {};
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
-    } catch (parseErr) {
-      log.warn(`🔄 [ITERATE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
-    }
+    // Destructure results from core
+    const {
+      imageData: newImageBase64,
+      imagePrompt,
+      newScene: newSceneDescription,
+      newSceneMetadata: iterateSceneMetadata,
+      previewMismatches,
+      checksRun,
+      compositionAnalysis,
+      referencePhotos,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid,
+    } = iterResult;
 
     // Update scene description in story data
     const existingSceneIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
@@ -1732,7 +1691,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       translatedSummary,
       imageSummary,
       iteratedAt: new Date().toISOString(),
-      iterationFeedback: previewFeedback.composition
+      iterationFeedback: compositionAnalysis
     };
 
     if (existingSceneIndex >= 0) {
@@ -1742,334 +1701,45 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Generating new image with corrected scene description...`);
-
-    // Step 6: Regenerate image with corrected scene
-    // Determine which characters appear in this scene
-    const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
-
-    // Extract metadata from the new scene description FIRST to get per-character clothing
-    const newSceneMetadata = extractSceneMetadata(newSceneDescription);
-
-    // Get clothing - PREFER per-character clothing from the new scene description
-    // This ensures we use the clothing the scene prompt just generated (e.g., "costumed:wizard")
-    // rather than stale pageClothing data
-    let clothingCategory;
-    let effectiveClothingRequirements = clothingRequirements;
-
-    // Priority 1: Per-character clothing from newly generated scene description
-    if (newSceneMetadata?.characterClothing && Object.keys(newSceneMetadata.characterClothing).length > 0) {
-      const sceneClothing = newSceneMetadata.characterClothing;
-      const perCharClothing = convertClothingToCurrentFormat(sceneClothing);
-      effectiveClothingRequirements = { ...clothingRequirements };
-      for (const [charName, charClothing] of Object.entries(perCharClothing)) {
-        effectiveClothingRequirements[charName] = {
-          ...effectiveClothingRequirements[charName],
-          ...charClothing
-        };
-      }
-      // Determine predominant clothing category from per-character data
-      const clothingValues = Object.values(sceneClothing);
-      const firstClothing = clothingValues[0];
-      if (firstClothing && firstClothing.startsWith('costumed:')) {
-        clothingCategory = firstClothing;
-      } else {
-        clothingCategory = firstClothing || 'standard';
-      }
-      log.debug(`🔄 [ITERATE] Using per-character clothing from scene description: ${JSON.stringify(sceneClothing)}`);
-    }
-    // Priority 2: Per-character clothing from pageClothing (stored data)
-    else {
-      const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
-      if (typeof pageClothingEntry === 'string') {
-        clothingCategory = pageClothingEntry;
-      } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
-        const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
-        effectiveClothingRequirements = { ...clothingRequirements };
-        for (const [charName, charClothing] of Object.entries(perPageClothing)) {
-          effectiveClothingRequirements[charName] = {
-            ...effectiveClothingRequirements[charName],
-            ...charClothing
-          };
-        }
-        const clothingValues = Object.values(pageClothingEntry);
-        const firstClothing = clothingValues[0];
-        if (firstClothing && firstClothing.startsWith('costumed:')) {
-          clothingCategory = firstClothing;
-        } else {
-          clothingCategory = firstClothing || 'standard';
-        }
-        log.debug(`🔄 [ITERATE] Using per-character clothing from pageClothing: ${JSON.stringify(pageClothingEntry)}`);
-      } else {
-        clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
-      }
-    }
-
-    const artStyle = storyData.artStyle || 'pixar';
-    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, artStyle, effectiveClothingRequirements);
-    const allAlreadyStyled = referencePhotos.every(p =>
-      p.photoType?.startsWith('styled-') || p.photoType?.startsWith('costumed-')
-    );
-    if (!allAlreadyStyled && (!clothingCategory || !clothingCategory.startsWith('costumed'))) {
-      referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
-    }
-
-    // Build landmark photos (newSceneMetadata already extracted above).
-    // VB grid is built later — after the empty scene decision — so we can dedupe
-    // anything already painted into the empty scene plate.
-    const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
-
-    // Extract only the scene part for image generation (strip previewMismatches, checks, corrections)
-    let cleanSceneForImage = newSceneDescription;
-    try {
-      const parsed = JSON.parse(newSceneDescription);
-      const sceneObj = parsed?.previewMismatches?.[0]?.scene || parsed?.scene || parsed;
-      if (sceneObj?.imageSummary || sceneObj?.characters) {
-        cleanSceneForImage = JSON.stringify({ scene: sceneObj });
-      }
-    } catch {
-      // If JSON parse fails, try extracting scene block with regex
-      const sceneMatch = newSceneDescription.match(/"scene"\s*:\s*\{[\s\S]*"imageSummary"/);
-      if (sceneMatch) {
-        // Find the matching closing brace for the scene object
-        const startIdx = newSceneDescription.indexOf(sceneMatch[0]);
-        let depth = 0;
-        let endIdx = startIdx;
-        for (let i = startIdx + '"scene":'.length; i < newSceneDescription.length; i++) {
-          if (newSceneDescription[i] === '{') depth++;
-          if (newSceneDescription[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
-        }
-        if (endIdx > startIdx) {
-          cleanSceneForImage = newSceneDescription.substring(startIdx, endIdx);
-        }
-      }
-    }
-
-    // Build image prompt (append evaluation feedback if provided)
-    // Only include critical issues (missing characters/objects/settings) — not pose/expression nitpicks
-    const iterateImageBackend = imageModel ? (IMAGE_MODELS[imageModel]?.backend || null) : null;
-    let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend });
-    if (evaluationFeedback) {
-      const criticalIssues = (evaluationFeedback.fixableIssues || [])
-        .filter(i => {
-          const desc = (i.description || i.issue || '').toLowerCase();
-          // Only keep issues about missing/wrong elements, not pose or expression differences
-          return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
-            || desc.includes('wrong setting') || desc.includes('wrong location');
-        });
-      if (criticalIssues.length > 0) {
-        const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
-          criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
-        imagePrompt = `${imagePrompt}\n\n${feedbackText}`;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${criticalIssues.length} critical issues as positive instructions (score: ${evaluationFeedback.score ?? 'N/A'})`);
-      }
-    }
-
-    // Preview mode: return prompt without generating image
-    if (previewOnly) {
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: Preview mode — returning prompt only (${imagePrompt.length} chars)`);
-      return res.json({
-        success: true,
-        previewOnly: true,
-        pageNumber,
-        imagePrompt,
-        sceneDescription: newSceneDescription,
-        composition: previewFeedback?.composition || null,
-        previewMismatches: previewFeedback?.previewMismatches || [],
-        checksRun: previewFeedback?.checksRun || {},
-      });
-    }
-
-    // Allow custom image prompt override (from preview → edit → generate flow)
-    if (customImagePrompt) {
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using custom image prompt (${customImagePrompt.length} chars, was ${imagePrompt.length})`);
-      imagePrompt = customImagePrompt;
-    }
-
-    // Clear cache to force new generation
-    const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
-    deleteFromImageCache(cacheKey);
-
-    // Store previous image data
-    const previousImageData = currentImage.imageData;
-    const previousScore = currentImage.qualityScore || null;
-
-    // Generate new image - use developer model override if provided, otherwise use default
-    let imageModelOverride = imageModel || null;  // null means use default (gemini-2.5-flash-image for scenes)
-    if (imageModelOverride) {
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModelOverride}`);
-    }
-    let previousImage = null;
-    if (blackoutIssues) {
-      // Blackout mode: black out issue regions in the current image to force regeneration
-      const fixTargets = currentImage.fixTargets || [];
-      if (fixTargets.length > 0) {
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Blacking out ${fixTargets.length} issue regions in current image`);
-        previousImage = await blackoutIssueRegions(currentImage.imageData, fixTargets);
-      } else {
-        log.warn(`🔄 [ITERATE] Page ${pageNumber}: No fix targets available for blackout, falling back to original as reference`);
-        previousImage = currentImage.imageData;
-      }
-    } else if (useOriginalAsReference) {
-      previousImage = currentImage.imageData;
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
-    }
-    const iterateSceneMetadata = extractSceneMetadata(newSceneDescription);
-
-    // Route by scene complexity when no explicit model override
-    if (!imageModelOverride) {
-      const sceneComplexity = iterateSceneMetadata?.sceneComplexity || 'simple';
-      if (sceneComplexity === 'complex') {
-        imageModelOverride = MODEL_DEFAULTS.complexPageImage;
-        log.info(`🎯 [ITERATE] Page ${pageNumber}: complex scene → ${imageModelOverride}`);
-      }
-    }
-
-    // Load or generate empty scene background based on prompt decision
-    let sceneBackground = null;
-    if (iterateSceneMetadata?.reuseEmptyScene) {
-      // Reuse existing empty scene — background didn't change
-      try {
-        const emptySceneRow = await getStoryImage(id, 'empty_scene', pageNumber, 0);
-        if (emptySceneRow?.imageData) {
-          sceneBackground = emptySceneRow.imageData;
-          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
-        }
-      } catch (e) {
-        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
-      }
-    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
-      // Generate fresh empty scene — background/setting changed
-      log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
-      try {
-        const { resolveArtStyleForEmptyScene, resolveArtStyle } = require('../lib/storyHelpers');
-        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-        // Use the anatomy-stripped style description — explicit eye/face details cause
-        // stray faces to appear in empty backgrounds.
-        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
-          || resolveArtStyleForEmptyScene('pixar')
-          || resolveArtStyle(storyData.artStyle || 'pixar', iterBackend)
-          || '';
-        const textPos = iterateSceneMetadata?.textPosition || null;
-        const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-          STYLE_DESCRIPTION: artStyleDesc,
-          EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
-          REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `Keep the ${textPos.replace('-', ' ')} area simple — story text will be placed there.` : ''
-        });
-        // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
-        // (chars/animals/artifacts excluded — they belong on the populated page).
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
-        // Negative page numbers are covers (-1 front, -2 initial, -3 back) —
-        // use the configured cover aspect; regular pages use the configured page aspect.
-        const isCoverPage = pageNumber < 0;
-        const emptyResult = await generateImageOnly(emptyPrompt, [], {
-          imageModelOverride,
-          imageBackendOverride: iterBackend,
-          landmarkPhotos: pageLandmarkPhotos,
-          visualBibleGrid: emptySceneVbGrid,
-          pageNumber,
-          skipCache: true,
-          aspectRatio: isCoverPage ? MODEL_DEFAULTS.coverAspect : MODEL_DEFAULTS.pageAspect
-        });
-        if (emptyResult?.imageData) {
-          sceneBackground = emptyResult.imageData;
-          // Save new empty scene to DB (replaces old one)
-          await saveStoryImage(id, 'empty_scene', pageNumber, sceneBackground);
-          log.info(`🎬 [ITERATE] Page ${pageNumber}: fresh empty scene generated and saved`);
-        }
-      } catch (e) {
-        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: fresh empty scene failed: ${e.message}`);
-      }
-    }
-
-    // Build VB grid + landmark refs for the FINAL composite call.
-    // If sceneBackground is set, vehicles, non-landmark locations, and ALL landmarks
-    // are already painted into the empty scene plate — drop them from the composite refs
-    // to avoid double-rendering. Characters/animals/artifacts are not in the empty scene
-    // and stay in the grid.
-    let visualBibleGrid = null;
-    let finalLandmarkPhotos = pageLandmarkPhotos;
-    if (visualBible) {
-      let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-      let secondaryLandmarks = pageLandmarkPhotos.slice(1);
-      if (sceneBackground) {
-        elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
-        secondaryLandmarks = [];
-        finalLandmarkPhotos = [];
-        log.debug(`🔲 [ITERATE] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs (already in empty scene plate)`);
-      }
-      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-      }
-    }
-
-    let imageResult;
-    if (iterativePlacement) {
-      const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-      const { resolveArtStyle: resolveIterStyle } = require('../lib/storyHelpers');
-      const iterArtStyleDesc = resolveIterStyle(storyData.artStyle || 'pixar', iterBackend) || resolveIterStyle('pixar') || '';
-      imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
-        imageModelOverride,
-        imageBackendOverride: iterBackend,
-        landmarkPhotos: finalLandmarkPhotos,
-        visualBibleGrid,
-        pageNumber,
-        artStyle: iterArtStyleDesc,
-        sceneBackground,
-      });
-    } else {
-      imageResult = await generateImageWithQualityRetry(
-        imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
-        { imageModel: imageModelOverride },
-        `PAGE ${pageNumber} ITERATE`,
-        { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, sceneBackground }
-      );
-    }
-
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
-
     // Step 7: Update the image in story data
     const existingImageIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
 
     const newImageData = {
       pageNumber,
-      imageData: imageResult.imageData,
+      imageData: newImageBase64,
       description: newSceneDescription,
       sceneDescription: newSceneDescription,  // alias for backward compat
       prompt: imagePrompt,
-      qualityScore: imageResult.score,
-      qualityReasoning: imageResult.reasoning || null,
-      qualityModelId: imageResult.qualityModelId || null,
-      fixTargets: imageResult.fixTargets || [],
+      qualityScore: iterResult.score,
+      qualityReasoning: iterResult.reasoning || null,
+      qualityModelId: iterResult.qualityModelId || null,
+      fixTargets: iterResult.fixTargets || [],
       wasIterated: true,
       iteratedAt: new Date().toISOString(),
-      iterationFeedback: previewFeedback.composition,
+      iterationFeedback: compositionAnalysis,
       previewMismatches,
-      totalAttempts: imageResult.totalAttempts || 1,
+      totalAttempts: iterResult.totalAttempts || 1,
       previousImage: previousImageData,
       previousScore: previousScore,
       originalImage: currentImage.originalImage || previousImageData,
       originalScore: currentImage.originalScore || previousScore,
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
-      modelId: imageResult.modelId || null,
+      visualBibleGrid: visualBibleGrid || null,
+      modelId: iterResult.modelId || null,
       iterationCount: (currentImage.iterationCount || 0) + 1,
       // Preserve clothing data from original image for entity consistency
       sceneCharacterClothing: currentImage.sceneCharacterClothing || currentImage.characterClothing || null,
       // Persist scene metadata for future bbox calls (re-evaluate, refresh-bbox, entity consistency)
       sceneMetadata: iterateSceneMetadata || currentImage.sceneMetadata || null,
       // Bbox detection from the new image (so scene-level bbox matches active image)
-      bboxDetection: imageResult.bboxDetection || null
+      bboxDetection: iterResult.bboxDetection || null
     };
 
     // Initialize imageVersions if needed
     if (currentImage && !currentImage.imageVersions) {
       currentImage.imageVersions = [{
         // Don't copy imageData — the original is already stored at DB version_index 0.
-        // Including it here would cause saveStoryData to re-save it at version_index 1,
-        // creating a duplicate row and an extra "attempt" in the UI.
         description: currentImage.description,
         prompt: currentImage.prompt,
         modelId: currentImage.modelId,
@@ -2090,26 +1760,26 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Create new version entry
     const timestamp = new Date().toISOString();
     const newVersion = {
-      imageData: imageResult.imageData,
+      imageData: newImageBase64,
       description: newSceneDescription,
       prompt: imagePrompt,
-      modelId: imageResult.modelId || null,
+      modelId: iterResult.modelId || null,
       createdAt: timestamp,
       generatedAt: timestamp,  // saveStoryData uses generatedAt for story_images.generated_at
       type: 'iteration',
-      iterationFeedback: previewFeedback.composition,
+      iterationFeedback: compositionAnalysis,
       previewMismatches,
-      qualityScore: imageResult.score ?? null,
-      qualityReasoning: imageResult.reasoning || null,
-      fixTargets: imageResult.fixTargets || [],
-      fixableIssues: imageResult.fixableIssues || [],
-      totalAttempts: imageResult.totalAttempts || null,
+      qualityScore: iterResult.score ?? null,
+      qualityReasoning: iterResult.reasoning || null,
+      fixTargets: iterResult.fixTargets || [],
+      fixableIssues: iterResult.fixableIssues || [],
+      totalAttempts: iterResult.totalAttempts || null,
       referencePhotoNames: (referencePhotos || []).map(p => ({
         name: p.name, photoType: p.photoType,
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
-      bboxDetection: imageResult.bboxDetection || null,
-      grokRefImages: imageResult.grokRefImages || null,
+      bboxDetection: iterResult.bboxDetection || null,
+      grokRefImages: iterResult.grokRefImages || null,
     };
 
     if (existingImageIndex >= 0) {
@@ -2119,7 +1789,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         sceneImages[existingImageIndex].imageVersions = [newVersion];
       }
       // Update main fields (but NOT imageData - that would cause duplicate image storage)
-      // The new image is stored in imageVersions and activeVersion meta points to it
       const { imageData: _unusedImg, ...metadataOnly } = newImageData;
       Object.assign(sceneImages[existingImageIndex], metadataOnly);
       // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
@@ -2140,7 +1809,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const updatedSceneData = sceneImages.find(s => s.pageNumber === pageNumber);
     const savedAtomically = updatedSceneData && await saveScenePageData(id, pageNumber, updatedSceneData);
     if (!savedAtomically) {
-      // Fallback: save full blob (scene not found in DB array — shouldn't happen normally)
       await saveStoryData(id, storyData);
     }
 
@@ -2163,10 +1831,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       );
     }
 
-    log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${imageResult.score})`);
+    log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${iterResult.score})`);
 
     // Get the updated image versions with imageData for all versions
-    // Version 0 (original) may not have imageData in the blob — load from DB
     const updatedScene = sceneImages.find(img => img.pageNumber === pageNumber);
     log.debug(`🔄 [ITERATE] Page ${pageNumber}: ${updatedScene?.imageVersions?.length || 0} versions after iterate`);
     const imageVersions = await Promise.all((updatedScene?.imageVersions || []).map(async (v, idx) => {
@@ -2179,7 +1846,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         } catch { /* ignore */ }
       }
       return {
-        versionIndex: idx,  // DB version_index (identity mapping)
+        versionIndex: idx,
         description: v.description,
         prompt: v.prompt,
         modelId: v.modelId,
@@ -2194,22 +1861,22 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       success: true,
       pageNumber,
       // What the vision model saw
-      composition: previewFeedback.composition,
+      composition: compositionAnalysis,
       // Claude's analysis
       previewMismatches,
       checksRun,
       // New content
       sceneDescription: newSceneDescription,
-      imageData: imageResult.imageData,
-      qualityScore: imageResult.score,
-      qualityReasoning: imageResult.reasoning,
-      modelId: imageResult.modelId,
-      totalAttempts: imageResult.totalAttempts,
+      imageData: newImageBase64,
+      qualityScore: iterResult.score,
+      qualityReasoning: iterResult.reasoning,
+      modelId: iterResult.modelId,
+      totalAttempts: iterResult.totalAttempts,
       // Previous version
       previousImage: previousImageData,
       previousScore: previousScore,
       // Blackout image (the masked image sent to the generator, only when blackout mode was used with fix targets)
-      blackoutImage: (blackoutIssues && previousImage !== currentImage.imageData) ? previousImage : null,
+      blackoutImage: iterResult.blackoutImage || null,
       // Image versions for history display
       imageVersions,
       // Credits
@@ -2218,19 +1885,19 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Reference info
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
-      visualBibleGrid: visualBibleGrid ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}` : null,
+      visualBibleGrid: visualBibleGrid || null,
       // Exact images sent to Grok API (max 3 packed/stitched slots)
-      grokRefImages: imageResult.grokRefImages || null,
+      grokRefImages: iterResult.grokRefImages || null,
       // Bbox detection for the new image (so frontend can display immediately)
-      bboxDetection: imageResult.bboxDetection || null,
+      bboxDetection: iterResult.bboxDetection || null,
       message: previewMismatches.length > 0
         ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
         : 'No mismatches found, regenerated with fresh analysis'
     });
 
     // Persist repair cost in background
-    const iterateImageModelId = imageModelOverride || MODEL_DEFAULTS.pageImage;
-    const iterateCost = calculateImageCost(iterateImageModelId, imageResult.totalAttempts || 1);
+    const iterateImageModelId = iterResult.modelId || imageModel || MODEL_DEFAULTS.pageImage;
+    const iterateCost = calculateImageCost(iterateImageModelId, iterResult.totalAttempts || 1);
     addRepairCost(id, iterateCost, `Iterate page ${pageNumber}`).catch(err => log.error('Failed to save iterate cost:', err.message));
 
   } catch (err) {

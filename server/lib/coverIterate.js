@@ -59,7 +59,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     buildEmptySceneVbGrid,
   } = require('./images');
 
-  const { getElementReferenceImagesForPage, buildFullVisualBiblePrompt } = require('./visualBible');
+  const { getElementReferenceImagesForPage, getElementReferenceImagesByIds, buildFullVisualBiblePrompt } = require('./visualBible');
 
   // Get existing cover data
   storyData.coverImages = storyData.coverImages || {};
@@ -289,6 +289,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
   }
   const coverLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, coverSceneMetadata) : [];
 
+  // Cover page numbers follow the convention used across entityConsistency, repair
+  // workflow, and the streaming generator: -1 frontCover, -2 initialPage, -3 backCover.
+  // Used for both the empty-scene VB lookup and the composite VB grid lookup.
+  const COVER_PAGE_NUMBERS = { frontCover: -1, initialPage: -2, backCover: -3 };
+  const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
+
   // --- Generate empty scene for style anchoring ---
   const { generateImageOnly } = require('./images');
   const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
@@ -308,7 +314,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     });
     // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
     // (chars/animals/artifacts excluded — they belong on the populated cover).
-    const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, 0, coverLandmarkPhotos);
+    const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, coverLandmarkPhotos);
     const emptyResult = await generateImageOnly(emptyPrompt, [], {
       landmarkPhotos: coverLandmarkPhotos,
       visualBibleGrid: emptySceneVbGrid,
@@ -325,43 +331,70 @@ async function iterateCover(coverKey, storyData, options = {}) {
     log.warn(`⚠️ [COVER-ITERATE] ${coverLabel}: empty scene failed: ${err.message}`);
   }
 
-  // Build VB grid + landmark refs for the FINAL composite call.
-  // If coverSceneBackground is set, vehicles, non-landmark locations, and ALL landmarks
-  // are already painted into the empty scene plate — drop them from the composite refs
-  // to avoid double-rendering. Characters/animals/artifacts stay in the grid.
+  // Build VB grid — aligned with regular page logic (preparePageData in server.js
+  // at line ~4153). Primary: getElementReferenceImagesForPage with the cover's page
+  // number. Fallback: scene-hint IDs from coverSceneMetadata. Same shape as pages so
+  // covers stay in sync if appearsInPages ever starts tracking -1/-2/-3.
   let coverVbGrid = null;
-  let finalCoverLandmarkPhotos = coverLandmarkPhotos;
   if (visualBible) {
-    let elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6);
-    // Covers represent the whole story — add key animals/artifacts that have
-    // reference images, matching the KEY STORY ELEMENTS listed in the prompt.
-    // Normal pages get these via appearsInPages, but covers aren't in that list.
-    const existingIds = new Set(elementRefs.map(r => r.id));
-    for (const [entries, type, priority] of [
-      [visualBible.animals, 'animal', 2],
-      [visualBible.artifacts, 'artifact', 3],
-    ]) {
-      for (const entry of entries || []) {
-        if (!entry.referenceImageData || existingIds.has(entry.id)) continue;
-        elementRefs.push({
-          id: entry.id, name: entry.name, type,
-          description: entry.extractedDescription || entry.description,
-          referenceImageData: entry.referenceImageData,
-          priority,
-        });
-        existingIds.add(entry.id);
+    let elementRefs = getElementReferenceImagesForPage(visualBible, coverPageNumber, 6);
+    // Drop location elements when an empty scene background exists — the location
+    // is already painted into the background.
+    if (coverSceneBackground) {
+      elementRefs = elementRefs.filter(e => e.type !== 'location');
+    }
+    // Fallback: also match by IDs found in the cover's expanded scene metadata
+    // (covers the case where appearsInPages doesn't include -1/-2/-3).
+    if (coverSceneMetadata?.fullData) {
+      const sceneIds = [];
+      for (const char of coverSceneMetadata.fullData.characters || []) {
+        if (char.id && char.id !== 'null') sceneIds.push(char.id);
+      }
+      for (const obj of coverSceneMetadata.fullData.objects || []) {
+        const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
+        if (id && !id.startsWith('LOC')) sceneIds.push(id);
+      }
+      if (sceneIds.length > 0) {
+        const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+        const existingIds = new Set(elementRefs.map(r => r.id));
+        const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+        if (newRefs.length > 0) {
+          log.info(`🔗 [VB-MATCH] Cover ${coverLabel}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
+          elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
+        }
       }
     }
-    elementRefs.sort((a, b) => (a.priority || 5) - (b.priority || 5));
-    elementRefs = elementRefs.slice(0, 6);
-
-    let secondaryLandmarks = coverLandmarkPhotos.slice(1);
-    if (coverSceneBackground) {
-      elementRefs = elementRefs.filter(e => e.type !== 'vehicle' && e.type !== 'location');
-      secondaryLandmarks = [];
-      finalCoverLandmarkPhotos = [];
-      log.debug(`🔲 [COVER-ITERATE] ${coverLabel}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs (already in empty scene plate)`);
+    // Safety net for the iterate path: cover descriptions are plain text, so
+    // extractSceneMetadata often returns null and the ID fallback above can't run.
+    // If we still have no refs, name-match VB entries against the description.
+    if (elementRefs.length === 0) {
+      const descLower = (sceneDescription || '').toLowerCase();
+      const nameMatched = [];
+      const checkEntries = (entries, type, priority) => {
+        for (const entry of entries || []) {
+          if (!entry.referenceImageData || !entry.name) continue;
+          if (!descLower.includes(entry.name.toLowerCase())) continue;
+          nameMatched.push({
+            id: entry.id,
+            name: entry.name,
+            type,
+            description: entry.extractedDescription || entry.description,
+            referenceImageData: entry.referenceImageData,
+            priority,
+          });
+        }
+      };
+      checkEntries(visualBible.secondaryCharacters, 'character', 1);
+      checkEntries(visualBible.animals, 'animal', 2);
+      checkEntries(visualBible.artifacts, 'artifact', 3);
+      checkEntries(visualBible.vehicles, 'vehicle', 4);
+      if (nameMatched.length > 0) {
+        nameMatched.sort((a, b) => a.priority - b.priority);
+        elementRefs = nameMatched.slice(0, 6);
+        log.info(`🔗 [VB-NAME-MATCH] Cover ${coverLabel}: Matched ${elementRefs.length} VB entries by name: ${elementRefs.map(r => r.id || r.name).join(', ')}`);
+      }
     }
+    const secondaryLandmarks = coverLandmarkPhotos.slice(1);
     if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
       coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
     }
@@ -375,7 +408,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabel} ITERATE`,
-    { landmarkPhotos: finalCoverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
   );
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);

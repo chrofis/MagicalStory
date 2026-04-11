@@ -3183,17 +3183,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
-        // Build VB grid for the cover from the Objects: line in the outline hint.
-        // The outline LLM lists 2-3 key elements per cover (LOC + ANI/ART/OBJ/VEH/CHR)
-        // that define the story's visual identity. Non-LOC IDs go into the grid.
-        let coverVbGrid = null;
-        let coverElementRefs = [];
-        if (streamingVisualBible && hint.objects && hint.objects.length > 0) {
-          const nonLocIds = hint.objects.filter(id => !id.startsWith('LOC'));
-          if (nonLocIds.length > 0) {
-            coverElementRefs = getElementReferenceImagesByIds(streamingVisualBible, nonLocIds);
-          }
-        }
+        // Page number convention for covers: -1 frontCover, -2 initialPage, -3 backCover.
+        // Used for both the empty scene VB lookup and the composite VB grid lookup,
+        // so covers align with the regular page flow (see preparePageData at ~line 4153).
+        const COVER_PAGE_NUMBERS = { titlePage: -1, frontCover: -1, initialPage: -2, backCover: -3 };
+        const coverPageNumber = COVER_PAGE_NUMBERS[coverType] ?? -1;
 
         // Generate empty scene background for style anchoring (same as regular pages)
         let coverSceneBackground = null;
@@ -3213,7 +3207,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             });
             // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
             // (chars/animals/artifacts excluded — they belong on the populated cover).
-            const emptySceneVbGrid = await buildEmptySceneVbGrid(streamingVisualBible, 0, coverLandmarkPhotos);
+            const emptySceneVbGrid = await buildEmptySceneVbGrid(streamingVisualBible, coverPageNumber, coverLandmarkPhotos);
             // Use the configured cover aspect so the empty scene matches the final cover shape.
             const emptyResult = await generateImageOnly(emptyPrompt, [], {
               imageModelOverride: coverImageModel,
@@ -3238,23 +3232,46 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
-        // Build final VB grid for the cover image call. When the empty scene is set,
-        // vehicles/locations/landmarks are already painted into it — drop them from
-        // the composite refs so they don't double-render. Characters/animals/artifacts stay.
-        let finalCoverLandmarkPhotos = coverLandmarkPhotos;
-        let finalCoverElementRefs = coverElementRefs;
-        let finalSecondaryLandmarks = coverLandmarkPhotos.slice(1);
+        // Build VB grid for the cover — aligned with regular page logic (preparePageData
+        // at line ~4153). Primary: getElementReferenceImagesForPage with the cover's
+        // page number (-1 / -2 / -3). Fallback: scene-hint IDs from coverExpandedMetadata.
+        let coverElementRefs = streamingVisualBible
+          ? getElementReferenceImagesForPage(streamingVisualBible, coverPageNumber, 6)
+          : [];
+        // Drop location elements when an empty scene background exists — the location
+        // is already painted into the background.
         if (coverSceneBackground) {
-          finalCoverElementRefs = coverElementRefs.filter(e => e.type !== 'vehicle' && e.type !== 'location');
-          finalSecondaryLandmarks = [];
-          finalCoverLandmarkPhotos = [];
+          coverElementRefs = coverElementRefs.filter(e => e.type !== 'location');
         }
-        if (finalCoverElementRefs.length > 0 || finalSecondaryLandmarks.length > 0) {
-          coverVbGrid = await buildVisualBibleGrid(finalCoverElementRefs, finalSecondaryLandmarks);
+        // Fallback: also match by IDs found in the cover's expanded scene metadata
+        // (covers the case where appearsInPages doesn't include -1/-2/-3).
+        if (streamingVisualBible && coverExpandedMetadata?.fullData) {
+          const sceneIds = [];
+          for (const char of coverExpandedMetadata.fullData.characters || []) {
+            if (char.id && char.id !== 'null') sceneIds.push(char.id);
+          }
+          for (const obj of coverExpandedMetadata.fullData.objects || []) {
+            const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
+            if (id && !id.startsWith('LOC')) sceneIds.push(id);
+          }
+          if (sceneIds.length > 0) {
+            const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds);
+            const existingIds = new Set(coverElementRefs.map(r => r.id));
+            const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+            if (newRefs.length > 0) {
+              log.info(`🔗 [VB-MATCH] Cover ${coverLabel}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
+              coverElementRefs = [...coverElementRefs, ...newRefs].slice(0, 6);
+            }
+          }
+        }
+        const coverSecondaryLandmarks = coverLandmarkPhotos.slice(1);
+        let coverVbGrid = null;
+        if (coverElementRefs.length > 0 || coverSecondaryLandmarks.length > 0) {
+          coverVbGrid = await buildVisualBibleGrid(coverElementRefs, coverSecondaryLandmarks);
         }
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: finalCoverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
