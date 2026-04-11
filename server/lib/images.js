@@ -6559,17 +6559,31 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Decode and resize Grok result to match the extraction dimensions.
-    // Use cover-crop when aspect drifts (Grok sometimes returns different
-    // dims) so we never distort the image with fit:'fill' stretching.
+    // Decode Grok's output
     const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
-    const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+    let repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+
+    // Step 1: detect and trim any uniform pale border Grok ADDED (letterbox
+    // from aspect drift, internal content-framing bias, API-level padding).
+    // Compare against the cutout we SENT (regionBuffer) so we don't trim
+    // borders that already existed in the scene.
+    const grokCutoutBorder = await detectAddedBorder(regionBuffer, repairedRegionBuffer);
+    if (grokCutoutBorder) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok added a border: content ${grokCutoutBorder.width}x${grokCutoutBorder.height} at (${grokCutoutBorder.left},${grokCutoutBorder.top}) — trimming`);
+      repairedRegionBuffer = await sharp(repairedRegionBuffer)
+        .extract({ left: grokCutoutBorder.left, top: grokCutoutBorder.top, width: grokCutoutBorder.width, height: grokCutoutBorder.height })
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    }
+
+    // Step 2: resize to extract dimensions. Cover-crop only if aspect drifts
+    // (shouldn't after the border trim) — never fit:'fill' stretching.
     const grokCutoutMeta = await sharp(repairedRegionBuffer).metadata();
     const grokCutoutAspect = grokCutoutMeta.width / grokCutoutMeta.height;
     const cutoutAspect = extractWidth / extractHeight;
     const cutoutAspectMatches = Math.abs(grokCutoutAspect - cutoutAspect) / cutoutAspect < 0.02;
     if (!cutoutAspectMatches) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok returned ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout post-trim ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
     }
     const resizedRegion = await sharp(repairedRegionBuffer)
       .resize(extractWidth, extractHeight, { fit: cutoutAspectMatches ? 'fill' : 'cover', position: 'center' })
