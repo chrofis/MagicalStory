@@ -1384,14 +1384,15 @@ export function RepairWorkflowPanel({
                         <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
                       </optgroup>
                       <optgroup label="Character Repair">
-                        <option value="grok-blended">Grok Blended — default ($0.02, feathered)</option>
-                        <option value="grok-cutout">Grok Cut-Out ($0.02/repair)</option>
-                        <option value="grok-blackout">Grok Blackout ($0.02/repair)</option>
+                        <option value="">Server Default — face→blended, body→cutout</option>
+                        <option value="grok-blended">Grok Blended (face blur, feather blend)</option>
+                        <option value="grok-cutout">Grok Cut-Out (extract figure, inpaint, composite)</option>
+                        <option value="grok-blackout">Grok Blackout (full scene + reference)</option>
                         <option value="gemini-repair">Gemini Repair (~$0.04/repair)</option>
                         <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
                       </optgroup>
                     </select>
-                    {(!grokRepairMode || grokRepairMode === 'blended') && !useMagicApiRepair && (
+                    {!useMagicApiRepair && overrideImageModel !== 'gemini-repair' && (
                       <div className="mt-2 space-y-2">
                         <label className="text-xs font-medium text-yellow-800 block">Whiteout target:</label>
                         <div className="flex gap-2">
@@ -1405,10 +1406,14 @@ export function RepairWorkflowPanel({
                                   : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
                               }`}
                             >
-                              {target === 'auto' ? 'Auto (by issue type)' : target === 'face' ? 'Face only (+50% pad)' : 'Full body (+20% pad)'}
+                              {target === 'auto' ? 'Auto (by issue type)' : target === 'face' ? 'Face only' : 'Full body'}
                             </button>
                           ))}
                         </div>
+                        <p className="text-[11px] text-yellow-700">
+                          With "Server Default" selected: face target → Grok Blended, body target → Grok Cut-Out.
+                          An explicit Grok mode overrides this.
+                        </p>
                       </div>
                     )}
                     {useMagicApiRepair && (
@@ -1416,9 +1421,14 @@ export function RepairWorkflowPanel({
                         Uses face swap + hair fix pipeline with iterative crop checking
                       </p>
                     )}
+                    {grokRepairMode === 'blended' && (
+                      <p className="text-xs text-yellow-600 mt-2">
+                        Blurs the target region + other characters, Grok repaints, feathered blend back onto the scene.
+                      </p>
+                    )}
                     {grokRepairMode === 'cutout' && (
                       <p className="text-xs text-yellow-600 mt-2">
-                        Extracts character region, sends to Grok with reference, composites back
+                        Extracts the figure's bbox + 20% padding, Grok replaces the figure using the avatar, feathered composite back.
                       </p>
                     )}
                     {grokRepairMode === 'blackout' && (

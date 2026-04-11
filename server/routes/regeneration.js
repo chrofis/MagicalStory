@@ -4604,8 +4604,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
         } else if (!useGeminiRepair && (grokRepairMode || isGrokConfigured())) {
-          // Grok repair: cutout (default), blended, or blackout
-          const effectiveMode = grokRepairMode || 'cutout';
+          // Grok repair modes: blended | cutout | blackout.
+          // Default is decided below once `useFaceOnly` is known:
+          //   - face repair → blended (tight blur on small region)
+          //   - body repair → cutout  (extract figure + inpaint + composite)
 
           const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {
@@ -4732,7 +4734,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             faceBbox = Array.isArray(faceData) ? faceData : [faceData.y, faceData.x, faceData.y + faceData.height, faceData.x + faceData.width];
           }
 
-          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
+          // Decide Grok mode: explicit grokRepairMode wins; otherwise default by target
+          // (face → blended for small tight blur, body → cutout for figure replacement)
+          const effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'cutout');
+
+          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair — mode=${effectiveMode} (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
           log.info(`👤 [CHAR REPAIR] ${characterName} body:[${bbox.map(v => Math.round(v*100)+'%').join(', ')}] face:[${faceBbox ? faceBbox.map(v => Math.round(v*100)+'%').join(', ') : 'none'}]`);
 
           // Collect face AND body bboxes of OTHER characters from bbox detection.
