@@ -3012,10 +3012,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
 
-        // Build cover prompt using proper templates (not generic buildImagePrompt)
-        const coverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
-        const coverBackend = IMAGE_MODELS[coverModel]?.backend || null;
-        const styleDescription = resolveArtStyle(artStyle, coverBackend) || resolveArtStyle('pixar');
+        // Cover prompt setup — routed model/backend determined after scene expansion.
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
         const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
 
@@ -3025,6 +3022,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (landmarkDescriptionsPromise) {
           await landmarkDescriptionsPromise;
         }
+        // Initial model guess for scene expansion's maxCharactersPerScene / backend hint.
+        // The actual image model is chosen after expansion (complexity-aware routing).
+        const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
+        const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
         let coverExpandedDescription = sceneDescription;
         let coverExpandedMetadata = null;
         try {
@@ -3053,9 +3054,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             coverAvailableAvatars,
             { previousPages: '', currentPage: syntheticPageBlock },
             {
-              maxCharactersPerScene: IMAGE_MODELS[coverModel]?.maxCharactersPerScene || 5,
+              maxCharactersPerScene: IMAGE_MODELS[initialCoverModel]?.maxCharactersPerScene || 5,
               artStyleId: inputData.artStyle,
-              imageBackend: coverBackend,
+              imageBackend: initialCoverBackend,
               referencePhotos: coverPhotos,
             }
           );
@@ -3075,6 +3076,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         // Use the expanded description (falls back to raw hint if expansion failed)
         sceneDescription = coverExpandedDescription;
+
+        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+
+        // Per-cover image model routing based on scene complexity (same as pages).
+        // sceneComplexity comes from scene expansion metadata (set to 'complex' when
+        // a character has depth:background, otherwise 'simple').
+        const coverSceneComplexity = coverExpandedMetadata?.sceneComplexity || 'simple';
+        const coverSceneRouting = modelOverrides.sceneRouting || 'auto';
+        let coverImageModel, coverImageBackend;
+        if (modelOverrides.coverImageModel) {
+          // Explicit cover model override always wins
+          coverImageModel = modelOverrides.coverImageModel;
+          coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || null;
+        } else if (coverSceneRouting === 'auto') {
+          coverImageModel = coverSceneComplexity === 'complex'
+            ? MODEL_DEFAULTS.complexPageImage
+            : MODEL_DEFAULTS.simplePageImage;
+          coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || 'gemini';
+          log.info(`🎯 [ROUTING] ${coverLabel}: ${coverSceneComplexity} → ${coverImageModel} (${coverImageBackend})`);
+        } else if (coverSceneRouting === 'grok') {
+          coverImageModel = MODEL_DEFAULTS.simplePageImage;
+          coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || 'grok';
+        } else if (coverSceneRouting === 'gemini') {
+          coverImageModel = MODEL_DEFAULTS.complexPageImage;
+          coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || 'gemini';
+        } else {
+          coverImageModel = MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
+          coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || null;
+        }
+        const coverModelOverrides = { imageModel: coverImageModel, qualityModel: modelOverrides.qualityModel };
+
+        // Build style description using the routed backend (same as pages at buildImagePrompt time)
+        const styleDescription = resolveArtStyle(artStyle, coverImageBackend) || resolveArtStyle('pixar');
 
         let coverPrompt;
         if (coverType === 'titlePage') {
@@ -3113,9 +3147,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           });
         }
 
-        const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-
         // Resolve landmark photos for the cover — same pipeline as pages.
         // Primary source: metadata from scene expansion (same JSON block pages produce).
         // Fallback: LOC### IDs parsed from the outline's Objects: line.
@@ -3149,11 +3180,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
+        // Build VB grid for the cover from the Objects: line in the outline hint.
+        // The outline LLM lists 2-3 key elements per cover (LOC + ANI/ART/OBJ/VEH/CHR)
+        // that define the story's visual identity. Non-LOC IDs go into the grid.
+        let coverVbGrid = null;
+        let coverElementRefs = [];
+        if (streamingVisualBible && hint.objects && hint.objects.length > 0) {
+          const nonLocIds = hint.objects.filter(id => !id.startsWith('LOC'));
+          if (nonLocIds.length > 0) {
+            coverElementRefs = getElementReferenceImagesByIds(streamingVisualBible, nonLocIds);
+          }
+        }
+
         // Generate empty scene background for style anchoring (same as regular pages)
         let coverSceneBackground = null;
         if (modelOverrides.generateEmptyScenes !== false) {
           try {
-            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar') || '';
+            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', coverImageBackend) || resolveArtStyle('pixar') || '';
             // Prefer the structured emptyScenePrompt from scene expansion (same as pages).
             // Falls back to the raw scene description if expansion didn't produce one.
             const expandedEmptyPrompt = coverExpandedMetadata?.emptyScenePrompt || '';
@@ -3164,17 +3207,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               EMPTY_SCENE_DESCRIPTION: emptyDesc,
               CHARACTER_SPACE: ''
             });
-            // Use the same backend as the cover model itself (don't fall through to gemini default)
-            const coverModelForEmpty = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
-            const coverBackendForEmpty = IMAGE_MODELS[coverModelForEmpty]?.backend || null;
+            // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
+            // (chars/animals/artifacts excluded — they belong on the populated cover).
+            const emptySceneVbGrid = await buildEmptySceneVbGrid(streamingVisualBible, 0, coverLandmarkPhotos);
             // 3:4 portrait so the empty scene matches the cover's target aspect.
-            // Without this, the scene background reference would be square (1:1)
-            // and editWithGrok would have to letterbox-pad it to 3:4 — leaving
-            // visible white bars in the final cover that get printed as A4.
             const emptyResult = await generateImageOnly(emptyPrompt, [], {
-              imageModelOverride: coverModelForEmpty,
-              imageBackendOverride: coverBackendForEmpty,
+              imageModelOverride: coverImageModel,
+              imageBackendOverride: coverImageBackend,
               landmarkPhotos: coverLandmarkPhotos,
+              visualBibleGrid: emptySceneVbGrid,
               skipCache: true,
               aspectRatio: '3:4'
             });
@@ -3193,8 +3234,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
+        // Build final VB grid for the cover image call. When the empty scene is set,
+        // vehicles/locations/landmarks are already painted into it — drop them from
+        // the composite refs so they don't double-render. Characters/animals/artifacts stay.
+        let finalCoverLandmarkPhotos = coverLandmarkPhotos;
+        let finalCoverElementRefs = coverElementRefs;
+        let finalSecondaryLandmarks = coverLandmarkPhotos.slice(1);
+        if (coverSceneBackground) {
+          finalCoverElementRefs = coverElementRefs.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+          finalSecondaryLandmarks = [];
+          finalCoverLandmarkPhotos = [];
+        }
+        if (finalCoverElementRefs.length > 0 || finalSecondaryLandmarks.length > 0) {
+          coverVbGrid = await buildVisualBibleGrid(finalCoverElementRefs, finalSecondaryLandmarks);
+        }
+
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: finalCoverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite

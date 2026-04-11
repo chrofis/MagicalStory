@@ -1389,10 +1389,10 @@ class UnifiedStoryParser {
         hint = lines[0] || '';
       }
 
-      // Extract Objects: line (e.g. "Objects: LOC003, LOC004" or "Objects: [LOC003]")
+      // Extract Objects: line — list of Visual Bible element IDs (LOC, ANI, ART, OBJ, VEH, CHR)
       const objectsMatch = block.match(/^Objects?:\s*(.+)$/im);
       const objects = objectsMatch
-        ? objectsMatch[1].match(/LOC\d+/gi)?.map(id => id.toUpperCase()) || []
+        ? objectsMatch[1].match(/(?:LOC|ANI|ART|OBJ|VEH|CHR)\d+/gi)?.map(id => id.toUpperCase()) || []
         : [];
 
       // Extract per-character clothing + optional perspective annotations
