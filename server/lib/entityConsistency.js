@@ -604,8 +604,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     // Process objects (after character loop)
     if (checkObjects) {
-      // Collect object appearances from bboxDetection.objects + objectMatches
-      const objectAppearances = collectObjectAppearances(sceneImages);
+      // Collect object appearances from bboxDetection.objects + objectMatches.
+      // Pass the Visual Bible so detector variant names collapse into canonical
+      // VB entries (e.g. "plush elephant toy with red scarf" → "Eli").
+      const objectAppearances = collectObjectAppearances(sceneImages, storyData.visualBible || null);
 
       for (const [objName, appearances] of objectAppearances) {
         if (appearances.length < minAppearances) continue;
@@ -983,8 +985,90 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
  * @param {Array<object>} sceneImages - Scene images with retryHistory
  * @returns {Map<string, Array>} Map of objectName -> appearances
  */
-function collectObjectAppearances(sceneImages) {
+/**
+ * Build a canonical-name lookup from the Visual Bible. For each animal,
+ * artifact, and vehicle entry, extract searchable keywords (from name +
+ * description). When the bbox detector returns variant labels like
+ * "stuffed elephant toy" / "plush elephant toy with red scarf", we match
+ * them against VB entries by keyword overlap and collapse them to the
+ * canonical VB name.
+ */
+function buildVisualBibleEntityIndex(visualBible) {
+  if (!visualBible) return [];
+  const index = [];
+  const STOP_WORDS = _expandedStopWords();
+  const extractKeywords = (text) => {
+    if (!text) return new Set();
+    return new Set(
+      String(text).toLowerCase().split(/[\s,.'"\-()/]+/)
+        .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
+    );
+  };
+  const addCategory = (arr, type) => {
+    for (const entry of (arr || [])) {
+      if (!entry || !entry.name) continue;
+      const keywords = new Set([
+        ...extractKeywords(entry.name),
+        ...extractKeywords(entry.extractedDescription || entry.description || ''),
+      ]);
+      if (keywords.size === 0) continue;
+      index.push({
+        id: entry.id || null,
+        name: entry.name,
+        type,
+        keywords,
+      });
+    }
+  };
+  addCategory(visualBible.animals, 'animal');
+  addCategory(visualBible.artifacts, 'artifact');
+  addCategory(visualBible.vehicles, 'vehicle');
+  // Also secondary characters — sometimes the detector labels them as "objects"
+  addCategory(visualBible.secondaryCharacters, 'secondary-character');
+  return index;
+}
+
+/**
+ * Match a detected object label against the Visual Bible index by
+ * keyword overlap. Returns the canonical VB entry (with .name, .id) if
+ * there's a meaningful match; otherwise null.
+ */
+function canonicalizeObjectName(label, vbIndex) {
+  if (!label || vbIndex.length === 0) return null;
+  const STOP_WORDS = new Set(['the', 'a', 'an', 'of', 'and', 'with', 'in', 'on', 'at', 'for', 'to', 'is', 'toy', 'small', 'large', 'red', 'blue', 'green', 'yellow', 'black', 'white', 'grey', 'gray', 'brown']);
+  const labelWords = new Set(
+    String(label).toLowerCase().split(/[\s,.'"\-()/]+/)
+      .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
+  );
+  if (labelWords.size === 0) return null;
+  let best = null;
+  let bestScore = 0;
+  for (const entry of vbIndex) {
+    let overlap = 0;
+    for (const w of labelWords) if (entry.keywords.has(w)) overlap++;
+    if (overlap > bestScore) {
+      bestScore = overlap;
+      best = entry;
+    }
+  }
+  // Require at least 2 overlapping non-color keywords to avoid matching
+  // on a single common adjective (e.g. "red and white checkered picnic
+  // blanket" shouldn't match "Eli — red scarf" just because both say red).
+  // Fall back to 1 for entries whose keyword set is small (e.g. very short
+  // VB entries with only 1-2 keywords) since the bar can't be higher than
+  // the entry's own keyword count.
+  const minNeeded = best && best.keywords.size >= 2 ? 2 : 1;
+  return bestScore >= minNeeded ? best : null;
+}
+
+// Also exclude color words from the VB keyword index to keep matching symmetric.
+function _expandedStopWords() {
+  return new Set(['the', 'a', 'an', 'of', 'and', 'with', 'in', 'on', 'at', 'for', 'to', 'is', 'toy', 'small', 'large', 'red', 'blue', 'green', 'yellow', 'black', 'white', 'grey', 'gray', 'brown']);
+}
+
+function collectObjectAppearances(sceneImages, visualBible = null) {
   const appearances = new Map();
+  const vbIndex = buildVisualBibleEntityIndex(visualBible);
 
   for (const img of sceneImages) {
     const pageNumber = img.pageNumber;
@@ -1003,13 +1087,19 @@ function collectObjectAppearances(sceneImages) {
       const match = bboxDetection.objectMatches?.find(m =>
         m.label === obj.label
       );
-      const name = match?.reference || obj.label || obj.name;
+      const rawName = match?.reference || obj.label || obj.name;
 
       // Skip objects without a valid name
-      if (!name) {
+      if (!rawName) {
         log.debug(`[ENTITY-COLLECT] Skipping object without name on page ${pageNumber}`);
         continue;
       }
+
+      // Canonicalize against the Visual Bible so detector variants like
+      // "plush elephant toy with red scarf" vs "stuffed elephant toy"
+      // collapse into the single VB entry (e.g. "Eli" / ANI001).
+      const canonical = canonicalizeObjectName(rawName, vbIndex);
+      const name = canonical?.name || rawName;
 
       if (!appearances.has(name)) {
         appearances.set(name, []);
@@ -1021,6 +1111,8 @@ function collectObjectAppearances(sceneImages) {
         bodyBox: obj.bodyBox,
         faceBox: null,  // Objects don't have faces
         label: obj.label,
+        rawLabel: rawName,
+        canonicalId: canonical?.id || null,
         confidence: match?.confidence || 0.7,
         isObject: true  // Mark as object for 15% padding in crop extraction
       });

@@ -762,10 +762,28 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   const cleanSceneHint = sceneHint ? stripEntityIds(sceneHint) : null;
   const cleanImagePrompt = imagePrompt ? stripEntityIds(imagePrompt) : null;
 
+  // Extract declared character interactions from the scene metadata in the
+  // expanded image prompt. Parse → formatted text block for the template.
+  // Declared interactions override the "ignore spatial arrangement" rule
+  // so the evaluator checks "Eli in pocket" etc. is actually rendered right.
+  let interactionsBlock = '(none declared)';
+  try {
+    const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
+    const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
+    const interactions = sceneMeta?.interactions
+      || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
+    if (interactions && interactions.length > 0) {
+      interactionsBlock = interactions
+        .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
+        .join('\n');
+    }
+  } catch { /* silent fallback */ }
+
   const prompt = fillTemplate(template, {
     STORY_TEXT: cleanStoryText,
     SCENE_HINT: cleanSceneHint || 'Not provided',
-    IMAGE_PROMPT: cleanImagePrompt || 'No prompt provided'
+    IMAGE_PROMPT: cleanImagePrompt || 'No prompt provided',
+    INTERACTIONS_BLOCK: interactionsBlock,
   });
 
   // Convert image to base64 if needed

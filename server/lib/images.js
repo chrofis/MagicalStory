@@ -768,8 +768,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     }
 
+    // Extract declared character interactions from the scene metadata so the
+    // evaluator can check each object is in the right place relative to its
+    // character (in pocket vs held vs floating, etc.). Parses from the
+    // metadata block embedded in `originalPrompt`.
+    let interactionsBlock = '(none declared)';
+    try {
+      const sceneMeta = getStoryHelpers().extractSceneMetadata(originalPrompt);
+      const interactions = sceneMeta?.interactions
+        || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
+      if (interactions && interactions.length > 0) {
+        interactionsBlock = interactions
+          .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
+          .join('\n');
+      }
+    } catch { /* silent — evaluator defaults to "(none declared)" */ }
+
     const evaluationPrompt = evaluationTemplate
-      ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: promptForEval })
+      ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: promptForEval, INTERACTIONS_BLOCK: interactionsBlock })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
     // Build content array for Gemini format

@@ -870,6 +870,18 @@ function extractSceneMetadata(sceneDescription) {
       log.info(`[SCENE META] Landmark variants (prose format): ${Object.entries(landmarkVariants).map(([id, v]) => `${id}.${v}`).join(', ')}`);
     }
 
+    // Character interactions: structured list of character-to-object contacts
+    // (held, worn, in pocket, climbed, stood on, passed through, etc).
+    // Normalize to { character, object, where } entries; skip malformed rows.
+    const rawInteractions = Array.isArray(metadata.interactions) ? metadata.interactions : [];
+    const interactions = rawInteractions
+      .filter(i => i && typeof i === 'object' && i.character && i.object)
+      .map(i => ({
+        character: String(i.character).trim(),
+        object: String(i.object).trim(),
+        where: String(i.where || '').trim(),
+      }));
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
@@ -877,7 +889,8 @@ function extractSceneMetadata(sceneDescription) {
       characterPerspectives: Object.keys(characterPerspectives).length > 0 ? characterPerspectives : null,
       clothing: null,
       objects: objectIds,
-      fullData: { characters: metadata.characters, objects: metadata.objects, imageSummary: prose },
+      interactions: interactions.length > 0 ? interactions : null,
+      fullData: { characters: metadata.characters, objects: metadata.objects, interactions: metadata.interactions, imageSummary: prose },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
       imageSummary: prose,
@@ -1000,6 +1013,17 @@ function extractSceneMetadata(sceneDescription) {
       if (hasBackgroundCharacter) sceneComplexity = 'complex';
     }
 
+    // Character interactions: structured list of character-to-object contacts
+    // (held, worn, in pocket, climbed, stood on, passed through, etc).
+    const rawInteractionsJson = Array.isArray(parsedData.interactions) ? parsedData.interactions : [];
+    const interactionsJson = rawInteractionsJson
+      .filter(i => i && typeof i === 'object' && i.character && i.object)
+      .map(i => ({
+        character: String(i.character).trim(),
+        object: String(i.object).trim(),
+        where: String(i.where || '').trim(),
+      }));
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
@@ -1007,6 +1031,7 @@ function extractSceneMetadata(sceneDescription) {
       characterPerspectives: Object.keys(characterPerspectives).length > 0 ? characterPerspectives : null,
       clothing: null, // Per-character now, no single value
       objects: objectIds,
+      interactions: interactionsJson.length > 0 ? interactionsJson : null,
       // Store full parsed data for buildTextFromJson
       fullData: parsedData,
       thinking: parsed.thinking || null,

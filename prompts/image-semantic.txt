@@ -3,6 +3,7 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 **STORY_TEXT (the narrative beat this image must show):** "{STORY_TEXT}"
 **SCENE_HINT (intent from the outline):** "{SCENE_HINT}"
 **FULL PROMPT (background context — do NOT compare visual details against this):** "{IMAGE_PROMPT}"
+**DECLARED INTERACTIONS (character-to-object placements the scene requires):** {INTERACTIONS_BLOCK}
 
 ---
 
@@ -29,6 +30,7 @@ Only check these things:
 - Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
 - Gaze direction matches interaction? (two characters talking but facing away from each other = wrong)
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
+- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope, not standing beside it. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in the wrong place, flag it as a `wrong_interaction` issue. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
 
 **Ignore everything else.** The full prompt contains detailed physical descriptions that come from reference photos — minor visual differences are expected and OK. Specifically ignore:
 - Character identity, names, recognizability. A separate system with reference photos handles identity.
@@ -49,6 +51,7 @@ Only check these things:
 Start at 10. Only these deductions exist:
 - Missing foreground character: -3
 - Character merged into or clipped through an object (AI compositing artifact): -3
+- Declared interaction missing or at completely wrong location (e.g. object in pocket drawn as large held plush): -3
 - Wrong setting/location: -2
 - Wrong main action: -2
 - Missing key object: -2
@@ -56,7 +59,7 @@ Start at 10. Only these deductions exist:
 - Wrong gaze (characters interacting but facing away): -1
 - Wrong clothing type on a character: -1
 
-No other deductions. Extra objects, background people, spatial arrangement — all score 10.
+No other deductions. Extra objects, background people, non-declared spatial arrangement — all score 10.
 
 VERDICT: PASS (7+), FAIL (0-6)
 

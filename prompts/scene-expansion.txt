@@ -83,6 +83,11 @@ Then a single-line JSON object with these fields only:
     {"name": "Manuel", "clothing": "costumed:wizard", "perspective": "back view", "depth": "background"}
   ],
   "objects": ["LOC001", "ART002"],
+  "interactions": [
+    {"character": "Lukas", "object": "Eli", "where": "in left jacket pocket, only tiny silhouette visible"},
+    {"character": "Manuel", "object": "wooden ladder", "where": "climbing, both hands gripping rungs, feet on third rung"},
+    {"character": "Sophie", "object": "stone stairs", "where": "standing on the top step, facing down"}
+  ],
   "textPosition": "top-left",
   "emptyScenePrompt": "A snowy medieval plaza with cobblestones. Clock tower with blue face on the left. Golden hour winter light, light snow. Medium wide shot. Open center foreground.",
   "translatedSummary": "Sophie und Manuel gehen über den verschneiten Platz."
@@ -92,6 +97,7 @@ Then a single-line JSON object with these fields only:
 **Metadata field rules:**
 - `characters[]`: One entry per character. Always include `name` and `clothing`. Only add `perspective` when back view or side profile is needed. Only add `depth` when the character is in the "background" (omit for foreground/midground — that's the default).
 - `objects[]`: String array of Visual Bible IDs only (e.g., `"LOC001"`, `"ART002.2"`). Include all recurring visual elements visible in this scene. For landmarks with photo variants, use `LOC003.2` format. Default to `.1` if unsure. Pick the variant matching the scene's perspective.
+- `interactions[]`: One entry per character-to-object contact visible in the scene. Use this for anything held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, or touched. Include the CHARACTER name, the OBJECT name (matching the recurring-element name or a plain noun like "rope", "ladder", "stairs", "doorway"), and a short WHERE string describing the exact placement ("in left jacket pocket", "right hand grip", "feet on third rung", "passing through the archway"). OMIT entries for characters who aren't touching anything in the scene. This is authoritative — evaluators will check that the image matches these interactions exactly.
 - `textPosition`: Where story text will be overlaid on the illustration. Pick the area with the LEAST action — sky, empty wall, floor, water, open background. One of: `"top-left"`, `"top-right"`, `"top-full"`, `"bottom-left"`, `"bottom-right"`, `"bottom-full"`. Avoid placing text where characters' faces or key actions are. Vary across pages — don't repeat the same position on consecutive pages.
 - `emptyScenePrompt`: 2-3 sentences describing ONLY the background — NO people, NO animals, NO artifacts. Just location, architecture, lighting, weather, camera angle. Never write "where children would stand" — image models render that literally. Use "open foreground", "uncluttered center". Characters will be composited onto this scene later, so the framing MUST leave enough physical space for them to be placed naturally into the scene.
 - `translatedSummary`: 1-2 sentence summary in the target language below.
