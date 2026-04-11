@@ -2584,13 +2584,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Resolve per-scene reference photos so the scene expansion prompt can include
         // the actual avatar clothing descriptions for each character. This pre-resolves
         // what would otherwise be built later in the pipeline at image-prompt time.
+        // Use per-page clothing from outline hint (page.characterClothing) to ensure
+        // costumed characters get costume descriptions, not standard clothing.
         let expansionPagePhotos = null;
         try {
+          // Merge per-page clothing into a copy of clothing requirements so
+          // getCharacterPhotoDetails picks the correct avatar (costumed vs standard)
+          const pageClothingReqs = { ...streamingClothingRequirements };
+          if (page.characterClothing) {
+            for (const [charName, clothingCat] of Object.entries(page.characterClothing)) {
+              if (!pageClothingReqs[charName]) pageClothingReqs[charName] = {};
+              pageClothingReqs[charName]._currentClothing = clothingCat;
+            }
+          }
           expansionPagePhotos = getCharacterPhotoDetails(
             sceneCharacters,
             'standard',
             inputData.artStyle,
-            streamingClothingRequirements
+            pageClothingReqs
           );
         } catch (photoErr) {
           log.debug(`[SCENE EXPANSION] Could not pre-resolve photos for page ${page.pageNumber}: ${photoErr.message}`);
