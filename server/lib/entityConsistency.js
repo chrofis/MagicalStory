@@ -2346,7 +2346,11 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       return { success: false, error: `No image data for page ${pageNumber}` };
     }
 
-    // Build bbox from the target appearance
+    // Build bbox from the target appearance. Prefer body (full figure repair)
+    // and fall back to face-only. The whiteoutTarget drives the default Grok
+    // mode: body → cutout (extract figure, inpaint, composite back), face →
+    // blended (tight blur, feathered blend).
+    const useBodyBox = !!targetAppearance.bodyBox;
     const bbox = targetAppearance.bodyBox || targetAppearance.faceBox;
     if (!bbox) {
       return { success: false, error: `No bbox found for ${charName} on page ${pageNumber}` };
@@ -2354,13 +2358,15 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
 
     const avatarDataUri = styledAvatar.startsWith('data:') ? styledAvatar : `data:image/jpeg;base64,${styledAvatar}`;
     const sceneDesc = storyData.sceneDescriptions?.find(s => s.pageNumber === pageNumber)?.description || '';
+    const whiteoutTarget = useBodyBox ? 'body' : 'face';
 
-    log.info(`🔧 [SINGLE-PAGE-REPAIR] Using Grok blended repair for ${charName} on page ${pageNumber}`);
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Grok repair for ${charName} on page ${pageNumber} (whiteoutTarget=${whiteoutTarget})`);
 
     const grokResult = await repairCharacterMismatch(
       pageImage, avatarDataUri, bbox, charName, {
         imageBackend: 'grok',
-        useBlended: true,
+        // Default mode is picked from whiteoutTarget: body → cutout, face → blended
+        whiteoutTarget,
         issueDescription: issuesFoundText || '',
         clothingDescription: clothingDescription || '',
         sceneDescription: sceneDesc,
