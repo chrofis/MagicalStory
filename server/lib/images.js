@@ -4483,6 +4483,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         retryHistory: []
       };
     }),
+    // Pass scene descriptions so entity-collect can determine per-page characters.
+    // Without this, runEntityConsistencyChecks falls back to sending ALL story
+    // characters to bbox detection — which causes false Werner/Uschi labels on
+    // pages where Werner/Uschi don't appear, then triggers bogus character fixes.
+    sceneDescriptions: imageEntries.map(entry => {
+      const orig = rawImages.find(r => r.pageNumber === entry.pageNumber) || entry;
+      return {
+        pageNumber: entry.pageNumber,
+        description: orig.sceneDescription || ''
+      };
+    }),
     artStyle: artStyle || 'pixar'
   });
 
