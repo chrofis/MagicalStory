@@ -303,7 +303,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
       STYLE_DESCRIPTION: artStyleDesc,
       EMPTY_SCENE_DESCRIPTION: emptyDesc,
-      REQUIRED_OBJECTS: ''
+      REQUIRED_OBJECTS: '',
+      TEXT_AREA_INSTRUCTION: ''
     });
     // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
     // (chars/animals/artifacts excluded — they belong on the populated cover).

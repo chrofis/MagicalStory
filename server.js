@@ -3208,7 +3208,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptyDesc,
-              CHARACTER_SPACE: ''
+              CHARACTER_SPACE: '',
+              TEXT_AREA_INSTRUCTION: ''
             });
             // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
             // (chars/animals/artifacts excluded — they belong on the populated cover).
@@ -3428,7 +3429,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
                     STYLE_DESCRIPTION: artStyleDesc,
                     EMPTY_SCENE_DESCRIPTION: bg.description,
-                    REQUIRED_OBJECTS: ''
+                    REQUIRED_OBJECTS: '',
+                    TEXT_AREA_INSTRUCTION: ''
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: [],
@@ -4300,10 +4302,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             }
 
+            // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
+            const textPos = sceneMetadata?.textPosition || null;
+            const emptyTextAreaInstr = textPos
+              ? `Keep the ${textPos.replace('-', ' ')} area simple and uncluttered — story text will be placed there.`
+              : '';
+
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
               CHARACTER_SPACE: characterSpace,
+              TEXT_AREA_INSTRUCTION: emptyTextAreaInstr,
             });
 
             try {

@@ -1950,10 +1950,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           || resolveArtStyleForEmptyScene('pixar')
           || resolveArtStyle(storyData.artStyle || 'pixar', iterBackend)
           || '';
+        const textPos = iterateSceneMetadata?.textPosition || null;
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
-          REQUIRED_OBJECTS: ''
+          REQUIRED_OBJECTS: '',
+          TEXT_AREA_INSTRUCTION: textPos ? `Keep the ${textPos.replace('-', ' ')} area simple — story text will be placed there.` : ''
         });
         // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
         // (chars/animals/artifacts excluded — they belong on the populated page).
