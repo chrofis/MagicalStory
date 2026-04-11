@@ -5781,6 +5781,154 @@ function closestGrokAspect(width, height) {
   return best.name;
 }
 
+/**
+ * Scan a buffer for a uniform pale/light border. Used by `detectAddedBorder`
+ * below to compare input and output — never called directly from production
+ * code because it can false-positive on images with natural white frames
+ * (e.g. Gemini-generated pages).
+ *
+ * @param {Buffer} buffer - PNG/JPEG buffer
+ * @returns {Promise<{left:number,top:number,right:number,bottom:number,width:number,height:number}|null>}
+ */
+async function detectGrokBorder(buffer) {
+  try {
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    const { width, height, channels } = info;
+    if (width < 100 || height < 100) return null;
+
+    // Sample all 4 corners and require they agree — prevents false positives
+    // when the image has a naturally dark corner (e.g. vignette).
+    const px = (x, y) => {
+      const i = (y * width + x) * channels;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    const corners = [px(0, 0), px(width - 1, 0), px(0, height - 1), px(width - 1, height - 1)];
+    const baseline = [
+      Math.round((corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4),
+      Math.round((corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4),
+      Math.round((corners[0][2] + corners[1][2] + corners[2][2] + corners[3][2]) / 4),
+    ];
+    // Corners must agree within 20/channel; otherwise there's no uniform border
+    for (const c of corners) {
+      if (Math.abs(c[0] - baseline[0]) > 20 || Math.abs(c[1] - baseline[1]) > 20 || Math.abs(c[2] - baseline[2]) > 20) {
+        return null;
+      }
+    }
+
+    // Scan inward from each edge: stop when ANY pixel on that row/col differs
+    // from the baseline by > 40 in any channel.
+    const THRESH = 40;
+    const deviates = (r, g, b) =>
+      Math.abs(r - baseline[0]) > THRESH ||
+      Math.abs(g - baseline[1]) > THRESH ||
+      Math.abs(b - baseline[2]) > THRESH;
+
+    const maxInset = Math.floor(Math.min(width, height) * 0.4); // cap at 40%
+    let top = 0;
+    for (; top < maxInset; top++) {
+      let hit = false;
+      for (let x = 0; x < width; x++) {
+        const [r, g, b] = px(x, top);
+        if (deviates(r, g, b)) { hit = true; break; }
+      }
+      if (hit) break;
+    }
+    let bottom = height - 1;
+    for (; bottom > height - 1 - maxInset; bottom--) {
+      let hit = false;
+      for (let x = 0; x < width; x++) {
+        const [r, g, b] = px(x, bottom);
+        if (deviates(r, g, b)) { hit = true; break; }
+      }
+      if (hit) break;
+    }
+    let left = 0;
+    for (; left < maxInset; left++) {
+      let hit = false;
+      for (let y = 0; y < height; y++) {
+        const [r, g, b] = px(left, y);
+        if (deviates(r, g, b)) { hit = true; break; }
+      }
+      if (hit) break;
+    }
+    let right = width - 1;
+    for (; right > width - 1 - maxInset; right--) {
+      let hit = false;
+      for (let y = 0; y < height; y++) {
+        const [r, g, b] = px(right, y);
+        if (deviates(r, g, b)) { hit = true; break; }
+      }
+      if (hit) break;
+    }
+
+    const contentW = right - left + 1;
+    const contentH = bottom - top + 1;
+    const horizInset = (width - contentW) / width;
+    const vertInset = (height - contentH) / height;
+    const maxSideInset = Math.max(horizInset, vertInset);
+
+    // Cap at 45% (more than that is probably content not a border).
+    if (maxSideInset > 0.45) return null;
+
+    return { left, top, right, bottom, width: contentW, height: contentH, imgWidth: width, imgHeight: height };
+  } catch (err) {
+    log.warn(`⚠️ [GROK BORDER] Detection failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Detect a border that Grok ADDED to its output that wasn't present in the
+ * input we sent. Runs `detectGrokBorder` on both buffers and returns the
+ * content box in Grok's output — but ONLY when the output border is
+ * meaningfully larger than the input border (otherwise we'd trim legitimate
+ * frames that existed in the original scene, like the natural white border
+ * Gemini draws around pages).
+ *
+ * Tolerance: Grok's border must be at least 5 percentage points wider on
+ * at least one side for us to treat it as a Grok addition.
+ *
+ * @param {Buffer} inputBuffer - what we sent to Grok
+ * @param {Buffer} outputBuffer - what Grok returned
+ * @returns {Promise<{left,top,right,bottom,width,height}|null>} content box in OUTPUT, or null if no added border
+ */
+async function detectAddedBorder(inputBuffer, outputBuffer) {
+  const outputBorder = await detectGrokBorder(outputBuffer);
+  if (!outputBorder) return null;
+  const outputLeftFrac = outputBorder.left / outputBorder.imgWidth;
+  const outputRightFrac = (outputBorder.imgWidth - outputBorder.right - 1) / outputBorder.imgWidth;
+  const outputTopFrac = outputBorder.top / outputBorder.imgHeight;
+  const outputBottomFrac = (outputBorder.imgHeight - outputBorder.bottom - 1) / outputBorder.imgHeight;
+
+  const inputBorder = await detectGrokBorder(inputBuffer);
+  let inputLeftFrac = 0, inputRightFrac = 0, inputTopFrac = 0, inputBottomFrac = 0;
+  if (inputBorder) {
+    inputLeftFrac = inputBorder.left / inputBorder.imgWidth;
+    inputRightFrac = (inputBorder.imgWidth - inputBorder.right - 1) / inputBorder.imgWidth;
+    inputTopFrac = inputBorder.top / inputBorder.imgHeight;
+    inputBottomFrac = (inputBorder.imgHeight - inputBorder.bottom - 1) / inputBorder.imgHeight;
+  }
+
+  const TOLERANCE = 0.03; // 3 percentage points — tight enough to catch a 4% border addition
+  const leftAdded = outputLeftFrac > inputLeftFrac + TOLERANCE;
+  const rightAdded = outputRightFrac > inputRightFrac + TOLERANCE;
+  const topAdded = outputTopFrac > inputTopFrac + TOLERANCE;
+  const bottomAdded = outputBottomFrac > inputBottomFrac + TOLERANCE;
+
+  if (!leftAdded && !rightAdded && !topAdded && !bottomAdded) {
+    // Output's border is ≈ input's border → not a Grok addition, probably
+    // a preserved frame from the original scene. Leave it alone.
+    return null;
+  }
+
+  // Grok added border on at least one side. Return Grok's content box so
+  // callers can crop to it. We crop to the FULL Grok border (not just the
+  // added portion) because that's what visually matches a "normal" figure
+  // framing — the input border was typically scene edges that we want to
+  // restore from the original anyway via the feather blend downstream.
+  return outputBorder;
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -6018,17 +6166,30 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // different aspect. Never fit:'fill' — that stretches the image.
     const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     let grokBuffer = Buffer.from(grokBase64, 'base64');
+
+    // Step 1: detect and trim any uniform pale border Grok ADDED to its
+    // output (from aspect mismatch letterbox, internal content-framing bias,
+    // or API-level padding). Compare Grok's output border against the
+    // input we sent so we don't trim legitimate frames that already existed.
+    const grokBorder = await detectAddedBorder(sceneForGrok, grokBuffer);
+    if (grokBorder) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Grok added a border: content ${grokBorder.width}x${grokBorder.height} at (${grokBorder.left},${grokBorder.top}) — trimming`);
+      grokBuffer = await sharp(grokBuffer)
+        .extract({ left: grokBorder.left, top: grokBorder.top, width: grokBorder.width, height: grokBorder.height })
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    }
+
+    // Step 2: resize to scene dimensions (aspect-preserving if matching).
     const grokMeta = await sharp(grokBuffer).metadata();
     if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
       const grokAspect = grokMeta.width / grokMeta.height;
       const sceneAspect = sceneMeta.width / sceneMeta.height;
       const aspectMatches = Math.abs(grokAspect - sceneAspect) / sceneAspect < 0.02;
-      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Post-trim size ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
       if (aspectMatches) {
-        // Same aspect → simple proportional resize, no distortion
         grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
       } else {
-        // Different aspect → center-crop to scene aspect (fit:'cover'), then resize
         grokBuffer = await sharp(grokBuffer)
           .resize(sceneMeta.width, sceneMeta.height, { fit: 'cover', position: 'center' })
           .jpeg({ quality: 95 })
@@ -6316,17 +6477,33 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Decode and resize Grok result to match the extraction dimensions.
-    // Use cover-crop when aspect drifts (Grok sometimes returns different
-    // dims) so we never distort the image with fit:'fill' stretching.
+    // Decode Grok's output
     const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
-    const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+    let repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+
+    // Step 1: detect and trim any uniform pale border Grok ADDED (internal
+    // framing bias, letterbox from aspect drift, API-level padding). This
+    // is what causes the "shorter and less wide" effect — Grok's actual
+    // content is inset inside a pale frame. Compare against the cutout we
+    // sent so we don't trim borders that were already in the scene.
+    const grokCutoutBorder = await detectAddedBorder(regionBuffer, repairedRegionBuffer);
+    if (grokCutoutBorder) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok added a border: content ${grokCutoutBorder.width}x${grokCutoutBorder.height} at (${grokCutoutBorder.left},${grokCutoutBorder.top}) — trimming`);
+      repairedRegionBuffer = await sharp(repairedRegionBuffer)
+        .extract({ left: grokCutoutBorder.left, top: grokCutoutBorder.top, width: grokCutoutBorder.width, height: grokCutoutBorder.height })
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    }
+
+    // Step 2: resize to the extract dimensions. After the border trim,
+    // Grok's content should have the same aspect as our cutout — but we
+    // still cover-crop if something drifts, to avoid fit:'fill' stretching.
     const grokCutoutMeta = await sharp(repairedRegionBuffer).metadata();
     const grokCutoutAspect = grokCutoutMeta.width / grokCutoutMeta.height;
     const cutoutAspect = extractWidth / extractHeight;
     const cutoutAspectMatches = Math.abs(grokCutoutAspect - cutoutAspect) / cutoutAspect < 0.02;
     if (!cutoutAspectMatches) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout Grok returned ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout post-trim ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
     }
     const resizedRegion = await sharp(repairedRegionBuffer)
       .resize(extractWidth, extractHeight, { fit: cutoutAspectMatches ? 'fill' : 'cover', position: 'center' })
