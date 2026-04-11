@@ -9,6 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
+import { getTextOverlayPosition, getOverlayClasses, getGradientClasses } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -4620,6 +4621,28 @@ export function StoryDisplay({
                           className={`w-full rounded-lg shadow-md object-cover ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
+                        {/* Text overlay on image (children's book style) */}
+                        {!isEditMode && !isGenerating && pageText.trim() && (() => {
+                          const layout = getTextOverlayPosition(pageNumber, pageText);
+                          const isFullWidth = layout.position.includes('full');
+                          return (
+                            <div
+                              className={getOverlayClasses(layout)}
+                              style={{
+                                width: `${layout.widthPercent}%`,
+                                maxHeight: `${layout.heightPercent}%`,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <div className={`${getGradientClasses(layout)} p-3 md:p-4 h-full`}>
+                                <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
+                                   style={{ fontSize: 'clamp(0.75rem, 1.8vw, 1.1rem)' }}>
+                                  {pageText.trim()}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         {/* Busy spinner overlay — any image operation */}
                         {isPageBusy(pageNumber) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
@@ -5226,7 +5249,8 @@ export function StoryDisplay({
                       </div>
                     )}
 
-                    {/* Text below */}
+                    {/* Text below — shown in edit mode or when no image (overlay needs image) */}
+                    {(isEditMode || isGenerating || !hasPageImage) && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea
@@ -5241,6 +5265,7 @@ export function StoryDisplay({
                         </p>
                       )}
                     </div>
+                    )}
                   </div>
                 ) : (
                   /* Standard Layout: Image on left, text on right (side-by-side) */
