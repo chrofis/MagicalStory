@@ -4996,12 +4996,13 @@ export default function StoryWizard() {
                   throw error;
                 }
               } : undefined}
-              // Character repair — available to all users
+              // Character repair — available to all users.
+              // No explicit grokRepairMode — backend picks by whiteoutTarget
+              // (face → blended, body → cutout).
               onRepairCharacter={storyId ? async (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body') => {
                 try {
                   log.info(`Starting character repair: page ${pageNumber}, character ${characterName}, target ${whiteoutTarget}`);
                   const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages: [pageNumber] }], {
-                    grokRepairMode: 'blended',
                     whiteoutTarget,
                   });
                   const repaired = result.results?.[0]?.pagesRepaired?.[0];
