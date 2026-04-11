@@ -6040,13 +6040,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const pad = 0.1;
       const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
       const pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
+      // Clamp coordinates to blend-region pixel space. Without clamping the
+      // coordinates can go negative (char straddles blend region boundary) or
+      // exceed blendWidth/blendHeight, which breaks the distance calculation
+      // below and causes protected characters to bleed traits into the repair.
       return {
-        left: Math.floor(pxmin * sceneMeta.width) - blendLeft,
-        top: Math.floor(pymin * sceneMeta.height) - blendTop,
-        right: Math.ceil(pxmax * sceneMeta.width) - blendLeft,
-        bottom: Math.ceil(pymax * sceneMeta.height) - blendTop,
+        left: Math.max(0, Math.floor(pxmin * sceneMeta.width) - blendLeft),
+        top: Math.max(0, Math.floor(pymin * sceneMeta.height) - blendTop),
+        right: Math.min(blendWidth, Math.ceil(pxmax * sceneMeta.width) - blendLeft),
+        bottom: Math.min(blendHeight, Math.ceil(pymax * sceneMeta.height) - blendTop),
       };
-    }).filter(r => r.right > 0 && r.bottom > 0 && r.left < blendWidth && r.top < blendHeight);
+    }).filter(r => r.right > r.left && r.bottom > r.top);
     if (protectedRects.length > 0) {
       log.info(`🛡️ [CHAR REPAIR GROK] Protecting ${protectedRects.length} other-character region(s) from blend`);
     }
@@ -6067,9 +6071,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           protectedAlpha = 0;
           break;
         }
-        // Euclidean distance to rect boundary — smooth circular feather at corners
-        const dx = Math.max(r.left - x, 0, x - r.right);
-        const dy = Math.max(r.top - y, 0, y - r.bottom);
+        // Euclidean distance to rect boundary — smooth circular feather at corners.
+        // Axis-aligned distance: 0 if x is within [r.left, r.right], else distance
+        // to the nearest edge. Same for y. Math.max was WRONG here — it returned
+        // the largest of (leftGap, 0, rightGap) which is not the distance-to-rect.
+        const dx = x < r.left ? r.left - x : (x > r.right ? x - r.right : 0);
+        const dy = y < r.top ? r.top - y : (y > r.bottom ? y - r.bottom : 0);
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < FEATHER_PX) {
           protectedAlpha = Math.min(protectedAlpha, dist / FEATHER_PX);
