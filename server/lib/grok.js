@@ -624,13 +624,16 @@ async function packReferences(refs = {}, options = {}) {
       log.info(`🎨 ${tag} Slot ${slots.length}: 1 character photo`);
     }
 
-    // Add landmark photo if there's a free slot (max 3 total)
-    if (landmarkBuffers.length > 0 && slots.length < 3) {
+    // Landmark photo: only gets a slot when there's NO scene background.
+    // When sceneBackground exists, the landmark is already baked into it (the
+    // empty scene was generated with the landmark photo as reference), so a
+    // dedicated slot here would be redundant.
+    if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
       const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
       log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
-    } else if (landmarkBuffers.length > 0) {
-      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — no free slots`);
+    } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
+      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
     }
   } else {
     // ── 2+ characters ──

@@ -3019,6 +3019,63 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
         const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
 
+        // Run the cover hint through scene expansion (same as pages) so covers get
+        // a structured description with emptyScenePrompt and objects metadata.
+        // Wait for landmark photo descriptions so variants are in the prompt.
+        if (landmarkDescriptionsPromise) {
+          await landmarkDescriptionsPromise;
+        }
+        let coverExpandedDescription = sceneDescription;
+        let coverExpandedMetadata = null;
+        try {
+          // Build a synthetic raw outline block for the cover so the scene expander
+          // has the same input shape as a page (TEXT + SCENE HINT).
+          const coverHintJson = {
+            description: hint.hint || '',
+            characters: Object.entries(hint.characterClothing || {}).map(([name, clothing]) => ({
+              name,
+              position: 'center',
+              clothing,
+            })),
+            objects: hint.objects || [],
+            background: 'landmark',
+            setting: 'outdoor',
+            shot: 'wide',
+          };
+          const syntheticPageBlock = `--- Cover: ${coverType} ---\nTEXT:\n${hint.hint || ''}\n\nSCENE HINT:\n${JSON.stringify(coverHintJson, null, 2)}\n`;
+          const coverAvailableAvatars = buildAvailableAvatarsForPrompt(charactersForCover, streamingClothingRequirements);
+          const coverExpansionPrompt = buildSceneExpansionPrompt(
+            0, // page number 0 = cover
+            hint.hint || '',
+            charactersForCover,
+            lang,
+            streamingVisualBible,
+            coverAvailableAvatars,
+            { previousPages: '', currentPage: syntheticPageBlock },
+            {
+              maxCharactersPerScene: IMAGE_MODELS[coverModel]?.maxCharactersPerScene || 5,
+              artStyleId: inputData.artStyle,
+              imageBackend: coverBackend,
+              referencePhotos: coverPhotos,
+            }
+          );
+          const coverExpansionResult = await callTextModelStreaming(
+            coverExpansionPrompt,
+            10000,
+            null,
+            modelOverrides.sceneDescriptionModel
+          );
+          const coverExpansionProvider = coverExpansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+          addUsage(coverExpansionProvider, coverExpansionResult.usage, 'scene_expansion', coverExpansionResult.modelId);
+          coverExpandedDescription = coverExpansionResult.text || sceneDescription;
+          coverExpandedMetadata = extractSceneMetadata(coverExpandedDescription);
+          log.debug(`✅ [STREAM-COVER] ${coverType} scene expanded`);
+        } catch (expansionErr) {
+          log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion failed: ${expansionErr.message} — using raw hint`);
+        }
+        // Use the expanded description (falls back to raw hint if expansion failed)
+        sceneDescription = coverExpandedDescription;
+
         let coverPrompt;
         if (coverType === 'titlePage') {
           // Front cover: include title for text rendering
@@ -3059,15 +3116,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
-        // Get landmark photos for cover scene using LOC### IDs from parsed hint.objects.
-        // Must await landmarkDescriptionsPromise first so photoVariants are populated
-        // (Swiss pre-indexed landmarks have no referencePhotoData until a variant is loaded).
-        if (landmarkDescriptionsPromise) {
-          await landmarkDescriptionsPromise;
-        }
-        // Use LOC### IDs from parsed cover hint objects (same system as page scene hints)
-        let coverSceneMetadata = extractSceneMetadata(sceneDescription);
-        if (!coverSceneMetadata && hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
+        // Resolve landmark photos for the cover — same pipeline as pages.
+        // Primary source: metadata from scene expansion (same JSON block pages produce).
+        // Fallback: LOC### IDs parsed from the outline's Objects: line.
+        let coverSceneMetadata = coverExpandedMetadata;
+        if ((!coverSceneMetadata || !coverSceneMetadata.objects?.length)
+            && hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
           const matchedObjects = [];
           for (const locId of hint.objects) {
             const loc = streamingVisualBible.locations.find(l => l.id && l.id.toUpperCase() === locId.toUpperCase());
@@ -3076,7 +3130,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
           if (matchedObjects.length > 0) {
-            coverSceneMetadata = { objects: matchedObjects };
+            coverSceneMetadata = { ...(coverSceneMetadata || {}), objects: matchedObjects };
           }
         }
         const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, coverSceneMetadata);
@@ -3100,11 +3154,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (modelOverrides.generateEmptyScenes !== false) {
           try {
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar') || '';
-            const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+            // Prefer the structured emptyScenePrompt from scene expansion (same as pages).
+            // Falls back to the raw scene description if expansion didn't produce one.
+            const expandedEmptyPrompt = coverExpandedMetadata?.emptyScenePrompt || '';
+            const emptyDesc = expandedEmptyPrompt
+              || `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptyDesc,
-              REQUIRED_OBJECTS: ''
+              CHARACTER_SPACE: ''
             });
             // Use the same backend as the cover model itself (don't fall through to gemini default)
             const coverModelForEmpty = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage;
