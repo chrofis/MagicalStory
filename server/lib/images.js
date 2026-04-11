@@ -4805,7 +4805,44 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
     log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
 
-    // Evaluate repaired pages
+    // Run fresh entity consistency FIRST (on the latest images including new repairs)
+    // so the new versions get their own entity penalty, not a stale one from the
+    // previous round. Runs every round (including the last) so final-round repairs
+    // also get proper per-version entity data.
+    if (roundSuccess.length > 0) {
+      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency on latest images...`);
+      // Build snapshot of latest images: repaired images from this round + original
+      // best-so-far for pages not touched this round.
+      const roundImageMap = new Map(roundSuccess.map(r => [r.pageNumber, r.imageData]));
+      const latestImages = rawImages.filter(img => img.imageData).map(img => {
+        if (roundImageMap.has(img.pageNumber)) {
+          return { imageData: roundImageMap.get(img.pageNumber), pageNumber: img.pageNumber };
+        }
+        const versions = pageVersions.get(img.pageNumber) || [];
+        const best = selectBestVersion(versions);
+        return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
+      });
+      const freshEntityCheckData = buildEntityCheckData(latestImages);
+      try {
+        const freshEntity = await runEntityConsistencyChecks(freshEntityCheckData, characters, {
+          checkCharacters: true,
+          checkObjects: true,
+          saveGrids: false
+        });
+        if (freshEntity?.tokenUsage && usageTracker) {
+          usageTracker('gemini_quality', {
+            input_tokens: freshEntity.tokenUsage.inputTokens || 0,
+            output_tokens: freshEntity.tokenUsage.outputTokens || 0
+          }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
+        }
+        currentEntityReport = freshEntity;
+        log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
+      } catch (entityErr) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${entityErr.message}`);
+      }
+    }
+
+    // Evaluate repaired pages using the FRESH entity report.
     if (roundSuccess.length > 0) {
       const evalProgressPct = progressBase + 8;
       await updateProgress(evalProgressPct, `Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
@@ -4833,34 +4870,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             evaluatedAt: new Date().toISOString(),
           });
         }
-      }
-    }
-
-    // On round 2+, run fresh entity consistency before next round's evaluation
-    if (round < maxRegenAttempts && roundSuccess.length > 0) {
-      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency on latest images...`);
-      const latestImages = rawImages.filter(img => img.imageData).map(img => {
-        const versions = pageVersions.get(img.pageNumber) || [];
-        const best = selectBestVersion(versions);
-        return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
-      });
-      const freshEntityCheckData = buildEntityCheckData(latestImages);
-      try {
-        const freshEntity = await runEntityConsistencyChecks(freshEntityCheckData, characters, {
-          checkCharacters: true,
-          checkObjects: true,
-          saveGrids: false
-        });
-        if (freshEntity?.tokenUsage && usageTracker) {
-          usageTracker('gemini_quality', {
-            input_tokens: freshEntity.tokenUsage.inputTokens || 0,
-            output_tokens: freshEntity.tokenUsage.outputTokens || 0
-          }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
-        }
-        currentEntityReport = freshEntity;
-        log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
-      } catch (entityErr) {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${entityErr.message}`);
       }
     }
   }
