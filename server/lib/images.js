@@ -6145,8 +6145,13 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const pixelWidth = Math.min(sceneMeta.width - pixelLeft, Math.ceil((xmax - xmin) * sceneMeta.width));
     const pixelHeight = Math.min(sceneMeta.height - pixelTop, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Add padding around bbox for context (20% each side)
-    const PAD_FACTOR = 0.2;
+    // Add padding around bbox for context (40% each side).
+    // The cutout sent to Grok is much bigger than the bbox so the crosshatch
+    // only fills the center ~60% — leaving a thick ring of sharp background
+    // for Grok to anchor to AND for the downstream feather-blend to use as
+    // the transition zone back into the scene. The previous 20% padding
+    // made the hatch dominate the cutout and left a visible seam at composite.
+    const PAD_FACTOR = 0.4;
     const padX = Math.floor(pixelWidth * PAD_FACTOR);
     const padY = Math.floor(pixelHeight * PAD_FACTOR);
     const extractLeft = Math.max(0, pixelLeft - padX);
@@ -6169,9 +6174,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // The hatch extends 12% beyond the bbox on each side to absorb
     // imperfect bboxes — any figure fragments that poke out past the bbox
     // get covered by the hatch and treated as part of the "remove" zone.
-    // The remaining ~8% of sharp padding on each side gives Grok clean
-    // background context and is also what the downstream feather blend
-    // uses to stitch the cutout back into the scene.
+    // With the now-larger 40% extract padding, the outer ~25% of the cutout
+    // stays sharp on every side — more than enough for Grok context and the
+    // downstream feather blend.
     const figureLeft = pixelLeft - extractLeft;
     const figureTop = pixelTop - extractTop;
     const figureWidth = pixelWidth;
@@ -6185,28 +6190,38 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const hatchBottom = Math.min(extractHeight, figureTop + figureHeight + hatchMarginY);
     const hatchWidth = hatchRight - hatchLeft;
     const hatchHeight = hatchBottom - hatchTop;
-    // Line spacing scales with hatch size: smaller cutouts get tighter
-    // spacing so the pattern stays dense enough to be unambiguous.
-    const hatchSpacing = Math.max(12, Math.round(Math.min(hatchWidth, hatchHeight) * 0.04));
-    const HATCH_STROKE = 3;
+    // Thin lines with wide spacing so the figure stays visible through the
+    // hatch — Grok still needs pose/silhouette cues. User feedback: previous
+    // 3px stroke at 4% spacing covered too much of the figure.
+    const hatchSpacing = Math.max(16, Math.round(Math.min(hatchWidth, hatchHeight) * 0.06));
+    const HATCH_STROKE = 2;
     const HATCH_COLOR = '#FF00FF'; // bright magenta — unambiguously foreign
     let regionBuffer = rawCutoutBuffer;
     try {
-      // Build an SVG crosshatch (two sets of diagonal lines forming an X
-      // grid) clipped to the hatch rectangle. SVG pattern fills only the
-      // <rect>, so everywhere outside stays transparent.
+      // Build an SVG crosshatch sized EXACTLY to the hatch region. Extract
+      // the hatch sub-region from the raw cutout, paint the SVG onto it,
+      // then composite the hatched sub-region back at (hatchLeft, hatchTop).
+      // This guarantees magenta pixels only exist inside the hatch rect —
+      // SVG stroke-width can't bleed outside a sub-buffer that's only
+      // `hatchWidth × hatchHeight` pixels wide.
       const hatchSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${extractWidth}" height="${extractHeight}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${hatchWidth}" height="${hatchHeight}">
   <defs>
     <pattern id="hatch" x="0" y="0" width="${hatchSpacing}" height="${hatchSpacing}" patternUnits="userSpaceOnUse">
       <line x1="0" y1="0" x2="${hatchSpacing}" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
       <line x1="${hatchSpacing}" y1="0" x2="0" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
     </pattern>
   </defs>
-  <rect x="${hatchLeft}" y="${hatchTop}" width="${hatchWidth}" height="${hatchHeight}" fill="url(#hatch)"/>
+  <rect x="0" y="0" width="${hatchWidth}" height="${hatchHeight}" fill="url(#hatch)"/>
 </svg>`;
-      regionBuffer = await sharp(rawCutoutBuffer)
+      // Extract hatch region, paint hatch onto it, composite back
+      const hatchRegionBuffer = await sharp(rawCutoutBuffer)
+        .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
         .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      regionBuffer = await sharp(rawCutoutBuffer)
+        .composite([{ input: hatchRegionBuffer, top: hatchTop, left: hatchLeft }])
         .jpeg({ quality: 95 })
         .toBuffer();
       log.info(`👤 [CHAR REPAIR GROK] Cut-out ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), hatch region ${hatchWidth}x${hatchHeight} @ stroke ${HATCH_STROKE}px spacing ${hatchSpacing}px`);
@@ -6293,11 +6308,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .raw()
       .toBuffer();
 
-    // Feathered blend: full Grok content in the center (where the figure is),
-    // original pixels at the outer edges. The outer ~10% of the cutout ring
-    // is used for the feather, matching the padding we added around the bbox.
-    // This hides any slight changes Grok may have made outside the figure.
-    const FEATHER_PX = Math.max(20, Math.round(Math.min(extractWidth, extractHeight) * 0.10));
+    // Feathered blend: full Grok content in the center, original pixels at
+    // the outer edges. With the now-larger 40% extract padding, the outer
+    // ring is thick enough that an 8% feather gives a smooth transition
+    // back to the scene without a visible seam.
+    const FEATHER_PX = Math.max(20, Math.round(Math.min(extractWidth, extractHeight) * 0.08));
     const blended = Buffer.alloc(extractWidth * extractHeight * 3);
     for (let y = 0; y < extractHeight; y++) {
       for (let x = 0; x < extractWidth; x++) {
