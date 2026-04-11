@@ -6003,14 +6003,25 @@ Output a single corrected image.`;
 // Grok image edits only support specific aspect ratios — pick the closest
 // preset for a given source (width, height). Used by character repair so we
 // don't send "1024:768" (which Grok may reject) and instead send "4:3".
+// Full set of aspect presets the Grok Imagine edit endpoint supports.
+// Source: https://docs.x.ai/developers/model-capabilities/images/generation
+// Previously we only listed 7 — the other 6 (2:1, 1:2, 19.5:9, 9:19.5, 20:9,
+// 9:20) give us tighter snaps for odd cutout shapes, so the scene extract
+// can naturally match a preset without any letterbox padding.
 const GROK_ASPECT_PRESETS = [
-  { name: '1:1', value: 1.0 },
-  { name: '4:3', value: 4 / 3 },
-  { name: '3:4', value: 3 / 4 },
-  { name: '16:9', value: 16 / 9 },
-  { name: '9:16', value: 9 / 16 },
-  { name: '3:2', value: 3 / 2 },
-  { name: '2:3', value: 2 / 3 },
+  { name: '1:1',    value: 1.0 },
+  { name: '4:3',    value: 4 / 3 },
+  { name: '3:4',    value: 3 / 4 },
+  { name: '16:9',   value: 16 / 9 },
+  { name: '9:16',   value: 9 / 16 },
+  { name: '3:2',    value: 3 / 2 },
+  { name: '2:3',    value: 2 / 3 },
+  { name: '2:1',    value: 2 / 1 },
+  { name: '1:2',    value: 1 / 2 },
+  { name: '19.5:9', value: 19.5 / 9 },
+  { name: '9:19.5', value: 9 / 19.5 },
+  { name: '20:9',   value: 20 / 9 },
+  { name: '9:20',   value: 9 / 20 },
 ];
 function closestGrokAspect(width, height) {
   if (!width || !height) return '1:1';
@@ -6022,6 +6033,82 @@ function closestGrokAspect(width, height) {
     if (d < bestDist) { bestDist = d; best = p; }
   }
   return best.name;
+}
+
+/**
+ * Pick an extract rectangle that naturally matches a Grok preset aspect.
+ *
+ * Given a character bbox in pixels and a desired padding factor, expand the
+ * extract on ONE axis so the final crop dimensions land exactly on a supported
+ * Grok aspect preset. No letterbox padding involved — we grab more scene pixels
+ * instead. The extract is centered on the bbox and clamped to scene bounds.
+ *
+ * @param {object} args
+ * @param {number} args.pixelLeft     - bbox left in scene pixels
+ * @param {number} args.pixelTop      - bbox top in scene pixels
+ * @param {number} args.pixelWidth    - bbox width in pixels
+ * @param {number} args.pixelHeight   - bbox height in pixels
+ * @param {number} args.padFactor     - minimum padding as fraction of bbox dim
+ * @param {number} args.sceneWidth    - scene canvas width
+ * @param {number} args.sceneHeight   - scene canvas height
+ * @returns {{left:number, top:number, width:number, height:number, preset:string}}
+ */
+function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHeight, padFactor, sceneWidth, sceneHeight }) {
+  // Start from the minimum-padded box
+  const minPadX = Math.floor(pixelWidth * padFactor);
+  const minPadY = Math.floor(pixelHeight * padFactor);
+  const baseLeft = Math.max(0, pixelLeft - minPadX);
+  const baseTop = Math.max(0, pixelTop - minPadY);
+  const baseRight = Math.min(sceneWidth, pixelLeft + pixelWidth + minPadX);
+  const baseBottom = Math.min(sceneHeight, pixelTop + pixelHeight + minPadY);
+  const baseW = baseRight - baseLeft;
+  const baseH = baseBottom - baseTop;
+
+  // Pick closest preset to the padded box aspect
+  const baseRatio = baseW / baseH;
+  let best = GROK_ASPECT_PRESETS[0];
+  let bestDist = Infinity;
+  for (const p of GROK_ASPECT_PRESETS) {
+    const d = Math.abs(p.value - baseRatio);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+
+  // Expand one axis to match preset exactly. Whichever axis grows, the other
+  // stays at baseW / baseH so we only ADD scene pixels, never subtract.
+  const targetRatio = best.value;
+  let targetW, targetH;
+  if (baseRatio < targetRatio) {
+    // Too tall — grow width
+    targetH = baseH;
+    targetW = Math.round(baseH * targetRatio);
+  } else {
+    // Too wide — grow height
+    targetW = baseW;
+    targetH = Math.round(baseW / targetRatio);
+  }
+
+  // If the preset-aligned target exceeds scene bounds on either axis, shrink
+  // both axes proportionally so the crop fits (keeps the preset ratio exact).
+  // This happens when the base box is already near a scene edge.
+  if (targetW > sceneWidth || targetH > sceneHeight) {
+    const scale = Math.min(sceneWidth / targetW, sceneHeight / targetH);
+    targetW = Math.floor(targetW * scale);
+    targetH = Math.floor(targetH * scale);
+  }
+
+  // Center the expanded box on the bbox center, then clamp left/top so the
+  // full box fits. Because targetW ≤ sceneWidth and targetH ≤ sceneHeight,
+  // clamping can never produce negative coordinates.
+  const cx = pixelLeft + pixelWidth / 2;
+  const cy = pixelTop + pixelHeight / 2;
+  let left = Math.round(cx - targetW / 2);
+  let top = Math.round(cy - targetH / 2);
+  if (left < 0) left = 0;
+  if (top < 0) top = 0;
+  if (left + targetW > sceneWidth) left = sceneWidth - targetW;
+  if (top + targetH > sceneHeight) top = sceneHeight - targetH;
+
+  return { left, top, width: targetW, height: targetH, preset: best.name };
 }
 
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
@@ -6419,19 +6506,31 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const pixelWidth = Math.min(sceneMeta.width - pixelLeft, Math.ceil((xmax - xmin) * sceneMeta.width));
     const pixelHeight = Math.min(sceneMeta.height - pixelTop, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Add padding around bbox for context (40% each side).
-    // The cutout sent to Grok is much bigger than the bbox so the crosshatch
-    // only fills the center ~60% — leaving a thick ring of sharp background
-    // for Grok to anchor to AND for the downstream feather-blend to use as
-    // the transition zone back into the scene. The previous 20% padding
-    // made the hatch dominate the cutout and left a visible seam at composite.
+    // Add padding around bbox for context (40% each side minimum), then
+    // expand ONE axis so the final crop lands exactly on a Grok-supported
+    // aspect preset. No letterbox padding inside editWithGrok — we extract
+    // more scene pixels instead of adding white bars, which was the root
+    // cause of the "shorter and less wide" seam at composite time.
+    //
+    // The 40% padding is the MINIMUM — the preset alignment may add more on
+    // one axis. That's fine: the extra padding pulls in sharp background,
+    // which gives Grok more context AND gives the feather-blend a wider
+    // transition zone. Worst case the hatch is off-center in a taller/wider
+    // cutout; the hatch coords below are computed from the actual pixelLeft/
+    // pixelTop relative to extractLeft/extractTop, so they stay correct.
     const PAD_FACTOR = 0.4;
-    const padX = Math.floor(pixelWidth * PAD_FACTOR);
-    const padY = Math.floor(pixelHeight * PAD_FACTOR);
-    const extractLeft = Math.max(0, pixelLeft - padX);
-    const extractTop = Math.max(0, pixelTop - padY);
-    const extractWidth = Math.min(sceneMeta.width - extractLeft, pixelWidth + 2 * padX);
-    const extractHeight = Math.min(sceneMeta.height - extractTop, pixelHeight + 2 * padY);
+    const aligned = computePresetAlignedExtract({
+      pixelLeft, pixelTop, pixelWidth, pixelHeight,
+      padFactor: PAD_FACTOR,
+      sceneWidth: sceneMeta.width,
+      sceneHeight: sceneMeta.height,
+    });
+    const extractLeft = aligned.left;
+    const extractTop = aligned.top;
+    const extractWidth = aligned.width;
+    const extractHeight = aligned.height;
+    const cutoutAspectStr = aligned.preset;
+    log.info(`👤 [CHAR REPAIR GROK] Preset-aligned extract: bbox ${pixelWidth}x${pixelHeight} at (${pixelLeft},${pixelTop}) → ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), aspect=${cutoutAspectStr}`);
 
     // Extract the raw cutout (we'll also keep this for the feather blend later)
     const rawCutoutBuffer = await sharp(sceneBuffer)
@@ -6548,10 +6647,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}`;
 
-    // Pick the closest Grok-supported preset to the cutout's native aspect so
-    // editWithGrok doesn't pad the cutout to 1:1.
-    const cutoutAspectStr = closestGrokAspect(extractWidth, extractHeight);
-    log.info(`👤 [CHAR REPAIR GROK] Cutout: ${extractWidth}x${extractHeight} (aspect preset=${cutoutAspectStr}), sending to Grok...`);
+    // The cutout dims were picked to land exactly on a Grok preset aspect,
+    // so editWithGrok's pad-loop will no-op (drift < 1%). No letterbox.
+    log.info(`👤 [CHAR REPAIR GROK] Sending cutout ${extractWidth}x${extractHeight} (preset ${cutoutAspectStr}) to Grok`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri], { aspectRatio: cutoutAspectStr });
 
     if (!grokResult.imageData) {
