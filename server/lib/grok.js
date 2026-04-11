@@ -331,9 +331,12 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   }
 }
 
+// Shared constants for character composition
+const CHAR_BG = { r: 220, g: 220, b: 220 };
+const CHAR_GAP = 4;
+
 /**
- * Extract the front-facing views from a 2x2 avatar grid and arrange them
- * horizontally side-by-side, producing a near-square reference image.
+ * Extract Face Front and Body Front quadrants from a 2x2 avatar grid.
  *
  * Avatar grids are arranged:
  *   ┌──────────────┬──────────────┐
@@ -342,118 +345,247 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
  *   │ Body Front   │ Body Profile │   ← Bottom row
  *   └──────────────┴──────────────┘
  *
- * The previous implementation cropped to the LEFT COLUMN (Face Front + Body Front
- * stacked vertically), giving a 1:3.5 narrow strip. When that strip was padded to
- * a square slot for Grok, the character filled only ~28% of the slot width and
- * ended up rendered tiny in the output.
+ * Grid separators are detected via row/column variance (divider lines have
+ * the lowest variance). The face is auto-trimmed to remove studio background
+ * (kept only if the trim retains ≥30% of original dimensions).
  *
- * This version extracts the same two cells (Face Front + Body Front) but lays
- * them out HORIZONTALLY = ~9:8 aspect, very close to square. After padding to
- * a square slot, the character fills ~89% of the slot — roughly 3× larger.
+ * @param {Buffer} buffer
+ * @returns {Promise<{face: Buffer, body: Buffer}|null>} null if the buffer
+ *   isn't a 2x2 grid (aspect ratio outside 1.5-2.0).
+ */
+async function extractFaceAndBody(buffer) {
+  const meta = await sharp(buffer).metadata();
+  if (!meta.width || !meta.height) return null;
+  const aspect = meta.height / meta.width;
+  if (aspect < 1.5 || aspect > 2.0) return null;
+
+  const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+
+  // Horizontal separator (face row ↔ body row)
+  const hStart = Math.floor(height * 0.25);
+  const hEnd = Math.floor(height * 0.75);
+  let minHVar = Infinity, separatorY = Math.floor(height / 2);
+  for (let y = hStart; y < hEnd; y++) {
+    let sum = 0, sumSq = 0;
+    for (let x = 0; x < width; x++) {
+      const v = data[y * width + x];
+      sum += v; sumSq += v * v;
+    }
+    const mean = sum / width;
+    const variance = sumSq / width - mean * mean;
+    if (variance < minHVar) { minHVar = variance; separatorY = y; }
+  }
+
+  // Vertical separator (front view ↔ profile view)
+  const vStart = Math.floor(width * 0.3);
+  const vEnd = Math.floor(width * 0.7);
+  let minVVar = Infinity, separatorX = Math.floor(width / 2);
+  for (let x = vStart; x < vEnd; x++) {
+    let sum = 0, sumSq = 0;
+    for (let y = 0; y < height; y++) {
+      const v = data[y * width + x];
+      sum += v; sumSq += v * v;
+    }
+    const mean = sum / height;
+    const variance = sumSq / height - mean * mean;
+    if (variance < minVVar) { minVVar = variance; separatorX = x; }
+  }
+
+  let faceFront = await sharp(buffer)
+    .extract({ left: 0, top: 0, width: separatorX, height: separatorY })
+    .toBuffer();
+  const bodyFront = await sharp(buffer)
+    .extract({ left: 0, top: separatorY, width: separatorX, height: height - separatorY })
+    .toBuffer();
+
+  // Trim face background; keep trimmed result only if ≥30% of original dims survive
+  const preTrimMeta = await sharp(faceFront).metadata();
+  try {
+    const trimmed = await sharp(faceFront).trim({ threshold: 25 }).toBuffer();
+    const trimMeta = await sharp(trimmed).metadata();
+    if (trimMeta.width >= preTrimMeta.width * 0.3 && trimMeta.height >= preTrimMeta.height * 0.3) {
+      faceFront = trimmed;
+    }
+  } catch { /* trim throws on uniform images — keep original */ }
+
+  return { face: faceFront, body: bodyFront };
+}
+
+/**
+ * Compose [body | face] horizontally. Body stays at native height; face is
+ * resized to match. Produces a near-square strip (~9:8).
+ */
+async function composeBodyFaceHorizontal(face, body) {
+  const bodyMeta = await sharp(body).metadata();
+  const targetH = bodyMeta.height;
+  const faceResized = await sharp(face)
+    .resize({ height: targetH, fit: 'inside' })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  const faceW = (await sharp(faceResized).metadata()).width;
+  const bodyW = bodyMeta.width;
+  const outW = bodyW + faceW + CHAR_GAP;
+  return sharp({
+    create: { width: outW, height: targetH, channels: 3, background: CHAR_BG },
+  })
+    .composite([
+      { input: body, left: 0, top: 0 },
+      { input: faceResized, left: bodyW + CHAR_GAP, top: 0 },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
+/**
+ * Compose [face / body] vertically. Body stays at native width; face is
+ * resized to match. Produces a tall portrait strip.
+ */
+async function composeFaceBodyVertical(face, body) {
+  const bodyMeta = await sharp(body).metadata();
+  const targetW = bodyMeta.width;
+  const faceResized = await sharp(face)
+    .resize({ width: targetW, fit: 'inside' })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  const faceH = (await sharp(faceResized).metadata()).height;
+  const bodyH = bodyMeta.height;
+  const outH = faceH + bodyH + CHAR_GAP;
+  return sharp({
+    create: { width: targetW, height: outH, channels: 3, background: CHAR_BG },
+  })
+    .composite([
+      { input: faceResized, left: 0, top: 0 },
+      { input: body, left: 0, top: faceH + CHAR_GAP },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
+/**
+ * Place image buffers horizontally in a row, all resized to max common height.
+ */
+async function composeRow(buffers) {
+  if (buffers.length === 0) return null;
+  if (buffers.length === 1) return buffers[0];
+  const metas = await Promise.all(buffers.map(b => sharp(b).metadata()));
+  const rowH = Math.max(...metas.map(m => m.height));
+  const resized = [];
+  let totalW = 0;
+  for (const buf of buffers) {
+    const r = await sharp(buf).resize({ height: rowH, fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+    const rm = await sharp(r).metadata();
+    resized.push({ buffer: r, width: rm.width });
+    totalW += rm.width;
+  }
+  const outW = totalW + CHAR_GAP * (resized.length - 1);
+  const composites = [];
+  let x = 0;
+  for (const r of resized) {
+    composites.push({ input: r.buffer, left: x, top: 0 });
+    x += r.width + CHAR_GAP;
+  }
+  return sharp({
+    create: { width: outW, height: rowH, channels: 3, background: CHAR_BG },
+  })
+    .composite(composites)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
+/**
+ * Stack two rows vertically. Both rows are centered horizontally; the wider
+ * row sets the composite width and the narrower row gets grey fill on the sides.
+ */
+async function composeStack(topRow, bottomRow) {
+  const tm = await sharp(topRow).metadata();
+  const bm = await sharp(bottomRow).metadata();
+  const outW = Math.max(tm.width, bm.width);
+  const outH = tm.height + bm.height + CHAR_GAP;
+  const topX = Math.floor((outW - tm.width) / 2);
+  const botX = Math.floor((outW - bm.width) / 2);
+  return sharp({
+    create: { width: outW, height: outH, channels: 3, background: CHAR_BG },
+  })
+    .composite([
+      { input: topRow, left: topX, top: 0 },
+      { input: bottomRow, left: botX, top: tm.height + CHAR_GAP },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
+/**
+ * Build a single slot image holding 1-3 characters with an aspect-aware layout.
  *
- * Non-grid images (aspect ratio far from 1:1.75) are returned unchanged.
+ *   n=1:        [body | face] horizontal           (~9:8, near square)
+ *   n=2:        2× [face / body] vertical stacks side-by-side  (~3:4 portrait)
+ *   n=3 square: 3× vertical stacks side-by-side    (~3:2, near square)
+ *   n=3 A4:     2 vertical stacks on top + 1 horizontal strip below
  *
- * @param {Buffer} buffer - Image buffer
- * @returns {Promise<Buffer>} Rearranged (or original) JPEG buffer
+ * Characters without an avatar-grid photoType (raw face/body/bodyNoBg) fall
+ * back to the raw buffer as-is.
+ *
+ * @param {Buffer[]} rawBuffers
+ * @param {(string|null)[]} photoTypes
+ * @param {string} aspectRatio - Target slot aspect (e.g. '1:1', '3:4')
+ * @returns {Promise<Buffer|null>} null if rawBuffers is empty or n > 3.
+ */
+async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio) {
+  const n = rawBuffers.length;
+  if (n === 0 || n > 3) return null;
+
+  // Extract face/body for each avatar-grid buffer; null for non-grid photos
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const photoType = photoTypes[i];
+    const isGrid = photoType && (photoType.startsWith('styled-') || photoType.startsWith('costumed-') || photoType.startsWith('clothing-'));
+    parts.push(isGrid ? await extractFaceAndBody(rawBuffers[i]) : null);
+  }
+
+  // Helper: vertical stack if grid, else use raw buffer as-is
+  const buildVertical = async (i) =>
+    parts[i] ? composeFaceBodyVertical(parts[i].face, parts[i].body) : rawBuffers[i];
+
+  // Helper: horizontal strip if grid, else raw
+  const buildHorizontal = async (i) =>
+    parts[i] ? composeBodyFaceHorizontal(parts[i].face, parts[i].body) : rawBuffers[i];
+
+  if (n === 1) {
+    return buildHorizontal(0);
+  }
+
+  if (n === 2) {
+    const stacks = [await buildVertical(0), await buildVertical(1)];
+    return composeRow(stacks);
+  }
+
+  // n === 3: aspect-aware
+  const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+
+  if (targetRatio >= 0.95) {
+    // Square-ish target: 3 vertical stacks side by side
+    const stacks = [await buildVertical(0), await buildVertical(1), await buildVertical(2)];
+    return composeRow(stacks);
+  }
+
+  // Portrait target: 2 vertical stacks on top, horizontal strip on bottom
+  const topRow = await composeRow([await buildVertical(0), await buildVertical(1)]);
+  const bottomRow = await buildHorizontal(2);
+  return composeStack(topRow, bottomRow);
+}
+
+/**
+ * Public helper retained for backwards compat: extract front views from a
+ * 2×2 avatar grid and rearrange them as a horizontal [body|face] strip.
+ * Non-grid images are returned unchanged.
  */
 async function cropToFrontColumn(buffer) {
   try {
-    const meta = await sharp(buffer).metadata();
-    if (!meta.width || !meta.height) return buffer;
-
-    // Only process portrait 2x2 grids (aspect ratio ~1.5-2.0).
-    const aspect = meta.height / meta.width;
-    if (aspect < 1.5 || aspect > 2.0) return buffer;
-
-    // Detect actual grid separators via row/column variance (not blind 50/50).
-    // The divider line has uniform color → lowest variance among all rows/columns.
-    const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
-    const { width, height } = info;
-
-    // Find horizontal separator (face row ↔ body row)
-    const hStart = Math.floor(height * 0.25);
-    const hEnd = Math.floor(height * 0.75);
-    let minHVar = Infinity, separatorY = Math.floor(height / 2);
-    for (let y = hStart; y < hEnd; y++) {
-      let sum = 0, sumSq = 0;
-      for (let x = 0; x < width; x++) {
-        const v = data[y * width + x];
-        sum += v; sumSq += v * v;
-      }
-      const mean = sum / width;
-      const variance = sumSq / width - mean * mean;
-      if (variance < minHVar) { minHVar = variance; separatorY = y; }
-    }
-
-    // Find vertical separator (front view ↔ profile view)
-    const vStart = Math.floor(width * 0.3);
-    const vEnd = Math.floor(width * 0.7);
-    let minVVar = Infinity, separatorX = Math.floor(width / 2);
-    for (let x = vStart; x < vEnd; x++) {
-      let sum = 0, sumSq = 0;
-      for (let y = 0; y < height; y++) {
-        const v = data[y * width + x];
-        sum += v; sumSq += v * v;
-      }
-      const mean = sum / height;
-      const variance = sumSq / height - mean * mean;
-      if (variance < minVVar) { minVVar = variance; separatorX = x; }
-    }
-
-    log.debug(`🎨 [GROK] Grid separators detected: x=${separatorX} (of ${width}), y=${separatorY} (of ${height})`);
-
-    // Extract Face Front (top-left) and Body Front (bottom-left) quadrants
-    let faceFront = await sharp(buffer)
-      .extract({ left: 0, top: 0, width: separatorX, height: separatorY })
-      .toBuffer();
-    const bodyFront = await sharp(buffer)
-      .extract({ left: 0, top: separatorY, width: separatorX, height: height - separatorY })
-      .toBuffer();
-
-    // Trim background from face — the face is a tight crop that only fills ~30-50%
-    // of the quadrant (rest is studio background). Trimming makes the face larger
-    // relative to the body when composed side-by-side.
-    const BG = { r: 220, g: 220, b: 220 };
-    const preTrimMeta = await sharp(faceFront).metadata();
-    try {
-      const trimmed = await sharp(faceFront).trim({ threshold: 25 }).toBuffer();
-      const trimMeta = await sharp(trimmed).metadata();
-      // Only use trimmed result if it kept at least 30% of original dimensions
-      // (avoids over-trimming when background color matches skin tone)
-      if (trimMeta.width >= preTrimMeta.width * 0.3 && trimMeta.height >= preTrimMeta.height * 0.3) {
-        faceFront = trimmed;
-      }
-    } catch { /* trim throws if entire image is uniform — keep original */ }
-
-    // Resize both to same height (body height drives, face scales to match)
-    const bodyMeta = await sharp(bodyFront).metadata();
-    const targetH = bodyMeta.height;
-    const faceResized = await sharp(faceFront)
-      .resize({ height: targetH, fit: 'inside' })
-      .jpeg({ quality: 90 })
-      .toBuffer();
-    const faceW = (await sharp(faceResized).metadata()).width;
-    const bodyW = bodyMeta.width;
-
-    // Compose side-by-side: body (left) + face (right) on light grey canvas
-    const gap = 4;
-    const outW = bodyW + faceW + gap;
-    const composed = await sharp({
-      create: {
-        width: outW,
-        height: targetH,
-        channels: 3,
-        background: BG,
-      },
-    })
-      .composite([
-        { input: bodyFront, left: 0, top: 0 },
-        { input: faceResized, left: bodyW + gap, top: 0 },
-      ])
-      .jpeg({ quality: 90 })
-      .toBuffer();
-
-    log.info(`🎨 [GROK] Rearranged front views: ${meta.width}x${meta.height} → ${outW}x${targetH} (sep: ${separatorX},${separatorY}, face trimmed to ${faceW}px)`);
+    const parts = await extractFaceAndBody(buffer);
+    if (!parts) return buffer;
+    const composed = await composeBodyFaceHorizontal(parts.face, parts.body);
     return composed;
   } catch (err) {
     log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
@@ -496,8 +628,9 @@ async function packReferences(refs = {}, options = {}) {
   const { aspectRatio = '1:1', pageLabel = '' } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
 
-  // Extract character photo buffers (handle same formats as Gemini path)
-  const charBuffers = [];
+  // Extract character photo buffers as raw data — the layout function decides
+  // how to crop/compose based on character count and aspect ratio.
+  const rawCharData = [];
   for (const photoData of characterPhotos) {
     let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
     const charName = typeof photoData === 'object' ? photoData?.name : null;
@@ -514,13 +647,8 @@ async function packReferences(refs = {}, options = {}) {
     if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
       const base64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
       const rawBuffer = Buffer.from(base64, 'base64');
-      // Crop to front column for avatar grids (2-column: front | side view)
-      // Avatar types (styled-*, costumed-*, clothing-*) are 2-column grids — crop to left half
-      // Raw photos (face, body, bodyNoBg, fallback) are single images — do NOT crop
       const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
-      const isAvatarGrid = photoType && (photoType.startsWith('styled-') || photoType.startsWith('costumed-') || photoType.startsWith('clothing-'));
-      const croppedBuffer = isAvatarGrid ? await cropToFrontColumn(rawBuffer) : rawBuffer;
-      charBuffers.push(croppedBuffer);
+      rawCharData.push({ rawBuffer, photoType, charName });
     } else if (charName) {
       log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
     }
@@ -536,13 +664,14 @@ async function packReferences(refs = {}, options = {}) {
   }
 
   // Count how many character slots we need (max 3 total reference slots for Grok)
-  const charCount = charBuffers.length;
+  const charCount = rawCharData.length;
   const slots = [];
 
   // Decide whether to bake VB elements into the scene background as a border.
-  // Border mode is ONLY used when 2+ characters need their own slots — there's
-  // no free slot for a standalone VB grid. With 0–1 characters we have a free
-  // slot, so the scene stays clean and the VB grid gets its own slot at full size.
+  // Border mode is ONLY used when 4+ characters need two character slots —
+  // only then is there no free slot for a standalone VB grid. With 1-3
+  // characters we have a free slot, so the scene stays clean and VB gets
+  // its own slot at full size.
   const hasSceneBackground = sceneBackground && sceneBackground.startsWith('data:image');
   // Filter out location elements when scene background exists — the location is
   // already painted in the background, so a border cell showing the same thing
@@ -550,7 +679,7 @@ async function packReferences(refs = {}, options = {}) {
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
     ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
     : [];
-  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0 && charCount >= 2;
+  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0 && charCount >= 4;
 
   // Scene background goes first — style anchor for visual consistency
   if (hasSceneBackground) {
@@ -578,99 +707,62 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
   }
 
-  // Strategy: maximize character image quality by giving them separate slots.
-  // When the scene background is BORDERED (2+ chars), VB+landmarks are already
-  // embedded in it, so we skip them below to free slots for character photos.
-  // With a CLEAN scene background (0–1 chars), the VB grid gets its own slot.
+  // Layout strategy (all char groups go through buildCharacterGroupSlot which
+  // picks the best shape based on count and aspect ratio):
   //
-  // Character takes priority over landmark in 0–1 char mode: when a scene
-  // background is present, the landmark is already baked into it (empty scenes
-  // are generated with the landmark photo as reference), so the dedicated
-  // landmark slot is redundant — the character slot matters more.
+  //   1 char:     [body | face] horizontal       (near square)
+  //   2 chars:    2× [face/body] vertical stacks (near 3:4 portrait)
+  //   3 chars 1:1: 3× vertical stacks side by side (near square)
+  //   3 chars 3:4: 2 vertical stacks on top + 1 horizontal strip below
+  //   4+ chars:   split at ceil(n/2), each group through the same function
   //
-  // Bordered scene (slots used: 1 for bg with VB baked in):
-  //   2 chars: Slot 2 = char 1, Slot 3 = char 2
-  //   3+ chars: Slot 2 = chars first half, Slot 3 = chars second half
+  // With 1–3 chars fitting in a single slot, we free up a slot compared to
+  // the old "one char per slot" approach — so 2 chars can have VB grid AND
+  // the char composite, and 3 chars get the same.
   //
-  // Clean scene + 0–1 chars (slot 1 = scene, slots 2-3 free):
-  //   0 chars: Slot 2 = VB grid, Slot 3 = landmark(s)
-  //   1 char:  Slot 2 = VB grid, Slot 3 = character (landmark dropped — already in scene)
-  //
-  // No scene background (all 3 slots free):
-  //   1 char:  Slot 1 = VB grid, Slot 2 = character, Slot 3 = landmark(s)
-  //   2 chars: Slot 1 = VB + landmarks stitched, Slot 2 = char 1, Slot 3 = char 2
-  //   3+ chars: Slot 1 = VB + landmarks stitched, Slot 2 = chars first half, Slot 3 = chars second half
-
-  // Skip VB grid and landmarks only when they are baked into the bordered scene
+  // Skip VB grid only when it's baked into a bordered scene.
   const skipContext = useBorderedScene;
 
-  if (charCount <= 1) {
-    // ── 0-1 characters ──
-    // Character takes priority over landmark: when a scene background is present,
-    // the landmark is already baked into it (empty scenes are generated with the
-    // landmark photo as reference). The dedicated landmark slot is therefore
-    // redundant in that case, and the character slot matters more for consistency.
-    if (!skipContext && visualBibleGrid) {
-      const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
-    }
+  // VB grid gets its own slot whenever we're not baking it into the scene border
+  if (!skipContext && visualBibleGrid && slots.length < 3) {
+    const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
+  }
 
-    if (charCount === 1 && slots.length < 3) {
-      // Upscale to height 768 (no withoutEnlargement) so the rearranged
-      // front-views fill the slot at higher resolution for Grok.
-      const resized = await sharp(charBuffers[0]).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: 1 character photo`);
-    }
+  // Pack character photos into 1 or 2 slots depending on count
+  const pushCharSlot = async (group) => {
+    if (slots.length >= 3 || group.length === 0) return;
+    const composed = await buildCharacterGroupSlot(
+      group.map(c => c.rawBuffer),
+      group.map(c => c.photoType),
+      aspectRatio
+    );
+    if (!composed) return;
+    const resized = await sharp(composed).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    const rm = await sharp(resized).metadata();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''} composed (${rm.width}x${rm.height})`);
+  };
 
-    // Landmark photo: only gets a slot when there's NO scene background.
-    // When sceneBackground exists, the landmark is already baked into it (the
-    // empty scene was generated with the landmark photo as reference), so a
-    // dedicated slot here would be redundant.
-    if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
-      const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
-    } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
-      log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
-    }
-  } else {
-    // ── 2+ characters ──
-    if (!skipContext) {
-      // VB grid only — no landmarks (they waste a slot that characters need)
-      if (visualBibleGrid) {
-        const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-        log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
-      }
-    }
+  if (charCount > 0 && charCount <= 3) {
+    // 1-3 chars fit in a single slot
+    await pushCharSlot(rawCharData);
+  } else if (charCount >= 4) {
+    // 4+ chars: split into two groups, each its own slot
+    const mid = Math.ceil(charCount / 2);
+    await pushCharSlot(rawCharData.slice(0, mid));
+    await pushCharSlot(rawCharData.slice(mid));
+  }
 
-    if (charCount === 2) {
-      // 2 characters: one per slot — upscale so each fills the slot
-      for (const buf of charBuffers) {
-        if (slots.length >= 3) break;
-        const resized = await sharp(buf).resize({ height: 768 }).jpeg({ quality: 85 }).toBuffer();
-        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      }
-      if (charBuffers.length > 0) log.info(`🎨 ${tag} Slot ${slots.length - Math.min(charCount, 3 - (slots.length - charCount))}-${slots.length}: ${Math.min(charCount, 3 - slots.length + charCount)} character photos (separate)`);
-    } else {
-      // 3+ characters: split into two groups, stitch each
-      const mid = Math.ceil(charCount / 2);
-      const group1 = charBuffers.slice(0, mid);
-      const group2 = charBuffers.slice(mid);
-
-      if (group1.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group1, 768, { allowEnlargement: true });
-        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 ${tag} Slot ${slots.length}: ${group1.length} characters stitched`);
-      }
-      if (group2.length > 0 && slots.length < 3) {
-        const stitched = await stitchImagesHorizontally(group2, 768, { allowEnlargement: true });
-        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-        log.info(`🎨 ${tag} Slot ${slots.length}: ${group2.length} characters stitched`);
-      }
-    }
+  // Landmark: only gets a slot when there's NO scene background (scene bg
+  // already has the landmark baked in from the empty-scene pass).
+  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
+    const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
+  } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
+    log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
   }
 
   // Grok edit output matches the input image aspect ratio (it mostly ignores the
@@ -920,5 +1012,6 @@ module.exports = {
   isGrokConfigured,
   packReferences,
   cropToFrontColumn,
+  buildCharacterGroupSlot,
   GROK_MODELS,
 };
