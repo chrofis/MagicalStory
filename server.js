@@ -4986,23 +4986,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Initialize image_version_meta with active versions for all pages.
-    // For scenes: if wasCharacterFixed, the last version is the charfix (active).
-    // Otherwise, pick the version with the highest qualityScore (best version).
+    // The pipeline's Step 7 (pick-best) already picked the winner and stamped it
+    // onto scene.bestSource. We honor that decision directly by finding the
+    // version whose `source` matches `bestSource`. This correctly handles cases
+    // where a character-fix version made things worse than the pre-fix best.
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          let activeIdx;
-          if (scene.wasCharacterFixed) {
-            activeIdx = scene.imageVersions.length - 1;
-          } else {
-            // Find version with highest qualityScore (best version from pipeline)
-            let bestIdx = -1, bestScore = -1;
+          let activeIdx = -1;
+          // Primary: match bestSource from Step 7 pick-best
+          if (scene.bestSource) {
+            activeIdx = scene.imageVersions.findIndex(v => v.source === scene.bestSource);
+          }
+          // Fallback: highest qualityScore
+          if (activeIdx < 0) {
+            let bestScore = -1;
             for (let i = 0; i < scene.imageVersions.length; i++) {
               const s = scene.imageVersions[i].qualityScore;
-              if (s != null && s > bestScore) { bestScore = s; bestIdx = i; }
+              if (s != null && s > bestScore) { bestScore = s; activeIdx = i; }
             }
-            activeIdx = bestIdx >= 0 ? bestIdx : scene.imageVersions.length - 1;
           }
+          if (activeIdx < 0) activeIdx = scene.imageVersions.length - 1;
           await setActiveVersion(storyId, scene.pageNumber, activeIdx);
         }
       }
