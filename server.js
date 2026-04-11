@@ -3150,14 +3150,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Resolve landmark photos for the cover — same pipeline as pages.
         // Primary source: metadata from scene expansion (same JSON block pages produce).
         // Fallback: LOC### IDs parsed from the outline's Objects: line.
+        // Only real landmarks have reference photos — filter to LOC IDs with isRealLandmark.
         let coverSceneMetadata = coverExpandedMetadata;
         if ((!coverSceneMetadata || !coverSceneMetadata.objects?.length)
             && hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
           const matchedObjects = [];
-          for (const locId of hint.objects) {
+          for (const locId of hint.objects.filter(id => id.startsWith('LOC'))) {
             const loc = streamingVisualBible.locations.find(l => l.id && l.id.toUpperCase() === locId.toUpperCase());
-            if (loc) {
+            if (loc && loc.isRealLandmark) {
               matchedObjects.push(`${loc.name} [${loc.id}]`);
+            } else if (loc) {
+              log.warn(`⚠️ [COVER] ${coverLabel}: outline picked ${loc.id} (${loc.name}) but it's not a real landmark — no photo available`);
             }
           }
           if (matchedObjects.length > 0) {

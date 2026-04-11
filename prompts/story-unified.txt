@@ -504,7 +504,7 @@ For famous buildings, monuments, or locations that exist in reality:
 ---COVER SCENE HINTS---
 
 **COVER RULES (CRITICAL):**
-- **USE LANDMARKS**: Each cover should feature a Visual Bible location with [LOC###] ID as the background. This makes covers look authentic and grounded. Pick the most iconic/recognizable landmark for the front cover. NEVER use the same landmark on two different covers — each cover gets a unique location.
+- **USE REAL LANDMARKS ONLY**: Each cover's background must be a Visual Bible location with `isRealLandmark: true` (one with photo references) — NEVER a story-local location. Covers reuse the same real landmark across front/initial/back when the story has only one real landmark. Pick the most iconic landmark for the front cover.
 - **LIST BY NAME**: NEVER write "the family", "everyone", "the group" - list each character by name
 - **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
 - **ALWAYS USE COSTUMED for covers** — if the story has costumed clothing, ALL cover characters MUST use their `costumed:type` variant, not `standard`. The book cover should showcase the story's theme.
