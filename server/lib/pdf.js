@@ -463,14 +463,14 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW;
       if (!isTop) overlayY = bleed + pageHeight - overlayH;
 
-      // Draw semi-transparent white background
+      // Draw subtle feathered background — soft enough to see image through
       doc.save();
-      doc.fillOpacity(0.78);
-      doc.roundedRect(overlayX, overlayY, overlayW, overlayH, 8).fill('#FFFFFF');
+      doc.fillOpacity(0.45);
+      doc.roundedRect(overlayX, overlayY, overlayW, overlayH, 12).fill('#FFFFFF');
       doc.restore();
 
-      // Draw text
-      doc.fontSize(fontSize).font('Helvetica').fillColor('#1a1a1a');
+      // Draw text with slight opacity for blend
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#222222');
       const textAlign = isFullWidth ? 'center' : (isLeft ? 'left' : 'right');
       doc.text(cleanText, overlayX + overlayPad, overlayY + overlayPad, {
         width: overlayTextWidth, align: textAlign, lineGap

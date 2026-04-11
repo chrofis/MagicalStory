@@ -4651,7 +4651,7 @@ export function StoryDisplay({
                             >
                               <div className={`${getGradientClasses(layout)} p-3 md:p-4 h-full`}>
                                 <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                                   style={{ fontSize: 'clamp(0.75rem, 1.8vw, 1.1rem)' }}>
+                                   style={{ fontSize: 'clamp(0.75rem, 1.8vw, 1.1rem)', textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)' }}>
                                   {pageText.trim()}
                                 </p>
                               </div>

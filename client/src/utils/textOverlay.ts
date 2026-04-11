@@ -114,18 +114,12 @@ export function getOverlayClasses(layout: TextOverlayLayout): string {
  */
 export function getGradientClasses(layout: TextOverlayLayout): string {
   const isTop = layout.position.startsWith('top');
-  const isCorner = !layout.position.includes('full');
 
-  // Gradient fades away from the edge where text sits
+  // Subtle feathered gradient — mostly transparent, just enough to read text
+  // Edge where text sits: ~50% white, feathers out to fully transparent
   const vGradient = isTop
-    ? 'bg-gradient-to-b from-white/[0.82] via-white/60 to-transparent'
-    : 'bg-gradient-to-t from-white/[0.82] via-white/60 to-transparent';
+    ? 'bg-gradient-to-b from-white/50 via-white/30 via-30% to-transparent'
+    : 'bg-gradient-to-t from-white/50 via-white/30 via-30% to-transparent';
 
-  const rounded = isCorner
-    ? (isTop
-        ? (layout.left !== 'auto' ? 'rounded-br-2xl' : 'rounded-bl-2xl')
-        : (layout.left !== 'auto' ? 'rounded-tr-2xl' : 'rounded-tl-2xl'))
-    : '';
-
-  return `${vGradient} ${rounded} backdrop-blur-[1px]`.trim();
+  return vGradient;
 }
