@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Images, X, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { ImageVersion } from '@/types/story';
 
 // Cover type names for display
@@ -34,6 +35,7 @@ export function ImageHistoryModal({
   const { language } = useLanguage();
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+  const [lightboxRef, setLightboxRef] = useState<string | null>(null);
 
   const getTitle = () => {
     if (coverType) {
@@ -481,7 +483,7 @@ export function ImageHistoryModal({
                         </div>
                         <div className="flex gap-1.5">
                           {refs.map((img, idx) => (
-                            <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-16 rounded border border-orange-200 cursor-pointer hover:opacity-80" title={`Slot ${idx + 1}`} />
+                            <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
                           ))}
                         </div>
                       </div>
@@ -493,6 +495,9 @@ export function ImageHistoryModal({
           </div>
         </div>
       </div>
+
+      {/* Lightbox for Grok reference images */}
+      <ImageLightbox src={lightboxRef} onClose={() => setLightboxRef(null)} />
     </>
   );
 }

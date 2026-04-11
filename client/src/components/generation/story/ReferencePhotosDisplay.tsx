@@ -423,9 +423,9 @@ export function ReferencePhotosDisplay({
                 <img
                   src={img}
                   alt={`Grok ref slot ${idx + 1}`}
-                  className="w-full max-h-40 object-contain rounded border border-orange-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setLightboxImage(img)}
-                  title="Click to enlarge — exact image sent to Grok API"
+                  className="w-full object-contain rounded border border-orange-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
+                  title="Click to enlarge"
                 />
               </div>
             ))}
