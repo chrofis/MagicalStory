@@ -4600,6 +4600,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         modelOverrides,
         usageTracker, // pass through so Haiku scene re-expansion + image gen are tracked
         evaluationFeedback: evalFeedback,
+        sceneBackground: img.emptySceneImage || null,
       });
       // iteratePage tracks its own usage internally; nothing to add here
     } else if (img.pageNumber < 0 && storyData) {
@@ -5354,7 +5355,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
  * @returns {Promise<Object>} { imageData, newScene, previewMismatches, method: 'iterate' }
  */
 async function iteratePage(imageData, pageNumber, storyData, options = {}) {
-  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false, evaluationFeedback = null } = options;
+  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false, evaluationFeedback = null, sceneBackground = null } = options;
 
   const {
     analyzeGeneratedImage
@@ -5573,7 +5574,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
     { imageModel: imageModelId },
     `PAGE ${pageNumber} ITERATE`,
-    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect }
+    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacters, sceneMetadata: newSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground }
   );
 
   // visual = raw vision-model score; the pipeline round loop will subtract entity penalty
