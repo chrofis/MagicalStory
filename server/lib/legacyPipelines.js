@@ -1990,6 +1990,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`📊 [STORYBOOK FINAL CHECKS] Added ${coverSceneImages.length} cover images to consistency check (pages ${coverSceneImages.map(c => c.pageNumber).join(', ')})`);
         }
 
+        // Pass per-page scene descriptions so entity-collect can determine per-page
+        // characters instead of falling back to ALL story characters (which causes
+        // bbox detection to falsely label figures as characters who aren't in the scene).
+        imageCheckData.sceneDescriptions = allImages.map(img => ({
+          pageNumber: img.pageNumber,
+          description: img.description || img.sceneDescription || ''
+        }));
+
         // LEGACY: Full-image consistency check
         const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true

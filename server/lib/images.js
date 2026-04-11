@@ -4459,7 +4459,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     sceneImages: imageEntries.map(entry => {
       const orig = rawImages.find(r => r.pageNumber === entry.pageNumber) || entry;
       const metadata = extractSceneMetadata(orig.sceneDescription) || {};
-      const perCharClothing = orig.perCharClothing || metadata.characterClothing || {};
+      // Build per-character clothing from multiple sources (covers don't have
+      // prose metadata, so we fall back to characterPhotos / referencePhotos).
+      const clothingFromPhotos = (orig.characterPhotos || []).reduce((acc, p) => {
+        if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
+        return acc;
+      }, {});
+      const perCharClothing = orig.perCharClothing
+        || metadata.characterClothing
+        || (Object.keys(clothingFromPhotos).length > 0 ? clothingFromPhotos : {});
       let sceneSummary = '';
       if (metadata.fullData?.imageSummary) {
         sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
@@ -5756,12 +5764,20 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     return { imageData: null, character: charName, method: 'grok_blended', error: 'Invalid bounding box' };
   }
 
-  // Default: cutout mode — extract the figure's bbox, send it to Grok as an
-  // inpaint-style replacement, composite back with feathered edges. This
-  // preserves the rest of the page (background, other characters, objects).
-  // Callers can opt into the older blended mode via `useBlended: true`.
-  const useBlended = options.useBlended === true;
-  const useCutout = !useBlended && options.useCutout !== false;
+  // Default repair mode depends on whiteoutTarget:
+  //   - face repair  → blended (small blur radius, good for face-only fixes)
+  //   - body repair  → cutout  (extract figure, inpaint replacement, composite back)
+  // Blended blurs a rectangle that can include background/objects for large
+  // bboxes, so it only makes sense for face-sized regions. Cutout keeps the
+  // rest of the page untouched and is better for full-figure repairs.
+  // Callers can force a specific mode via useBlended/useCutout flags.
+  const whiteoutTargetOpt = options.whiteoutTarget || 'body';
+  const defaultToBlended = whiteoutTargetOpt === 'face';
+  let useBlended, useCutout;
+  if (options.useBlended === true) { useBlended = true; useCutout = false; }
+  else if (options.useCutout === true) { useBlended = false; useCutout = true; }
+  else if (options.useBlended === false && options.useCutout === false) { useBlended = false; useCutout = false; }
+  else { useBlended = defaultToBlended; useCutout = !defaultToBlended; }
   const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : 'grok_blackout';
 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
