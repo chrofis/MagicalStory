@@ -3916,31 +3916,30 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
 
     // Storybook mode + prose format: scene description already has character
-    // descriptions and art style woven in by scene-expansion. Use the minimal
-    // template — no structured CHARACTER_REFERENCE_LIST or STYLE_DESCRIPTION needed.
+    // descriptions, art style, setting, and Visual Bible elements woven in by
+    // scene-expansion. Pass the prose through as-is — no structured blocks.
     if (isStorybook && isProseFormat) {
       return fillTemplate(template, {
         SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
-        REQUIRED_OBJECTS: requiredObjectsSection,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
     }
 
     // Storybook mode + legacy JSON format (iteratePage path): the scene description
-    // is JSON, so character descriptions and style are NOT in the prose. Prepend
-    // the structured blocks so the prompt still has everything the image model needs.
+    // is JSON, so character descriptions, style, and VB elements are NOT in the prose.
+    // Prepend the structured blocks so the prompt still has everything the image model needs.
     if (isStorybook && !isProseFormat) {
       const structuredScene = [
         styleDescription ? `**STYLE: ${styleDescription}**` : '',
         characterReferenceList,
-        cleanSceneDescription
+        cleanSceneDescription,
+        requiredObjectsSection
       ].filter(Boolean).join('\n\n');
       return fillTemplate(template, {
         SCENE_DESCRIPTION: structuredScene,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
-        REQUIRED_OBJECTS: requiredObjectsSection,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
