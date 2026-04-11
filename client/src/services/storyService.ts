@@ -2028,7 +2028,7 @@ export const storyService = {
   },
 
   // PDF generation
-  async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'square', textOverlay?: boolean): Promise<Blob> {
+  async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'A4', textOverlay?: boolean): Promise<Blob> {
     const token = localStorage.getItem('auth_token');
     const params = new URLSearchParams({ format: bookFormat });
     if (textOverlay !== undefined) params.set('textOverlay', textOverlay ? '1' : '0');
@@ -2047,7 +2047,7 @@ export const storyService = {
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
       storyIds: ids,
       coverType: coverType || 'softcover',
-      bookFormat: bookFormat || 'square',
+      bookFormat: bookFormat || 'A4',
       quantity: quantity || 1,
     });
     return response;
