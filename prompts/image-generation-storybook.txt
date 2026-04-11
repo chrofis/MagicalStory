@@ -1,17 +1,9 @@
-Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks to the image.
+Generate a SINGLE illustration. One continuous scene filling the entire image. No split screen, no panels, no grid, no collage. No text, letters, words, labels, signatures, or watermarks.
 
-**STYLE: {STYLE_DESCRIPTION}**
+When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment.
 
-**SCENE BACKGROUND:**
-When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment described in the SCENE section.
+EXACTLY {CHARACTER_COUNT} characters in this image, no more. Every person must match one of the reference photos provided. Do NOT add extra figures, background people, or supporting characters.
 
----
-
-{CHARACTER_REFERENCE_LIST}
-
-**SCENE:**
 {SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
-
-{VISUAL_BIBLE}

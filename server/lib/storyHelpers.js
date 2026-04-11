@@ -168,6 +168,45 @@ function getAgeMarkers(apparentAge) {
 }
 
 /**
+ * Resolve an age-appropriate gender noun (e.g. "boy", "young man", "elderly woman")
+ * @param {string} gender - 'male' | 'female' | 'other'
+ * @param {string} apparentAge - Age category from the analyzer
+ * @returns {string} Gender term, or empty string if unspecified
+ */
+function getGenderTerm(gender, apparentAge) {
+  if (!gender || gender === 'other') return '';
+  const isMale = gender === 'male';
+  switch (apparentAge) {
+    case 'infant':
+      return isMale ? 'baby boy' : 'baby girl';
+    case 'toddler':
+    case 'preschooler':
+    case 'kindergartner':
+      return isMale ? 'little boy' : 'little girl';
+    case 'young-school-age':
+    case 'school-age':
+      return isMale ? 'boy' : 'girl';
+    case 'preteen':
+      // 11-12: still a child, NOT a teenager.
+      return isMale ? 'boy' : 'girl';
+    case 'young-teen':
+      return isMale ? 'young teen boy' : 'young teen girl';
+    case 'teenager':
+      return isMale ? 'teenage boy' : 'teenage girl';
+    case 'young-adult':
+      return isMale ? 'young man' : 'young woman';
+    case 'adult':
+    case 'middle-aged':
+      return isMale ? 'man' : 'woman';
+    case 'senior':
+    case 'elderly':
+      return isMale ? 'elderly man' : 'elderly woman';
+    default:
+      return isMale ? 'boy/man' : 'girl/woman';
+  }
+}
+
+/**
  * Build detailed hair description using both simple fields and detailedHairAnalysis
  * Uses detailed analysis when available for better consistency across scenes
  * User-edited values (from physicalTraitsSource) take priority over auto-extracted values
@@ -2327,6 +2366,47 @@ function estimateHeightFromAgeGender(char) {
  * @param {Array} characters - Array of character objects with name and height properties
  * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
  */
+/**
+ * Build a single character's full physical + clothing description for scene expansion.
+ *
+ * Returns a numbered-list line in the same format buildImagePrompt currently uses for
+ * CHARACTER REFERENCE PHOTOS. Scene expansion (Claude) will read these and weave them
+ * naturally into the prose so the final image prompt is conversational language instead
+ * of a structured block.
+ *
+ * @param {Object} char - Character object (with physical traits + avatars)
+ * @param {string|null} clothingDescription - Pre-resolved avatar clothing description (from referencePhotos)
+ * @param {number} index - 1-based index for the numbered list
+ * @returns {string} Formatted line: "1. Lukas, Looks: school-age, boy, Build: slim. Age cues: ..."
+ */
+function buildCharacterDescriptionForExpansion(char, clothingDescription, index) {
+  const physical = getPhysicalFromChar(char);
+  const visualAge = physical.apparentAge ? `Looks: ${physical.apparentAge.replace(/-/g, ' ')}` : '';
+  const ageMarkersText = getAgeMarkers(physical.apparentAge);
+  const gender = getGenderTerm(char.gender, physical.apparentAge);
+  const clothingStyle = char.clothingStyle || char.clothing_style || char.clothing?.style || char.clothingColors || char.clothing_colors || char.clothing?.colors;
+  const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
+  const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
+
+  const physicalParts = [
+    physical.build ? `Build: ${physical.build}` : '',
+    ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
+    physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
+    hairDesc,
+    char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
+      ? (physical.facialHair.toLowerCase() === 'clean-shaven'
+        ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
+        : `Facial hair: ${physical.facialHair}`)
+      : '',
+    physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
+    physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
+    clothingDescription ? `Wearing: ${clothingDescription}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
+  ].filter(Boolean);
+  const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
+  const brief = [char.name, visualAge, gender, physicalDesc].filter(Boolean).join(', ');
+  return `${index}. ${brief}`;
+}
+
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
@@ -2958,8 +3038,49 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
  * @param {Object} rawOutlineContext - Raw outline blocks {previousPages: string, currentPage: string}
  */
 function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language = 'en', visualBible = null, availableAvatars = '', rawOutlineContext = null, options = {}) {
-  // Build character names list ONLY
+  // Build character names list ONLY (legacy placeholder for backwards-compat)
   const characterDetails = characters.map(c => `* **${c.name}**`).join('\n');
+
+  // Build clothing description map (per character) from referencePhotos.
+  // referencePhotos is the array returned by getCharacterPhotoDetails — it has the
+  // resolved clothingDescription matching whichever avatar photo will be sent to Grok.
+  // When not provided, we fall back to the character's avatar.clothing.standard map.
+  const clothingMap = {};
+  if (Array.isArray(options.referencePhotos)) {
+    for (const photo of options.referencePhotos) {
+      if (photo?.name && photo?.clothingDescription) {
+        clothingMap[photo.name.toLowerCase()] = photo.clothingDescription;
+      }
+    }
+  }
+
+  // Build full physical descriptions per character (numbered list, for the expansion
+  // prompt to weave into prose). Reuses buildCharacterDescriptionForExpansion which is
+  // the same logic the legacy buildImagePrompt uses for CHARACTER REFERENCE PHOTOS.
+  const characterDescriptions = characters
+    .map((char, idx) => {
+      const clothingDesc = clothingMap[char.name?.toLowerCase()] || null;
+      return buildCharacterDescriptionForExpansion(char, clothingDesc, idx + 1);
+    })
+    .join('\n');
+
+  // Resolve art style description (the same way buildImagePrompt does)
+  let resolvedArtStyle = '';
+  try {
+    const artStyleId = options.artStyleId || 'pixar';
+    let backend = options.imageBackend;
+    if (!backend) {
+      const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
+      const defaultModel = MODEL_DEFAULTS.pageImage || MODEL_DEFAULTS.image;
+      if (defaultModel && IMAGE_MODELS[defaultModel]) backend = IMAGE_MODELS[defaultModel].backend;
+    }
+    resolvedArtStyle = resolveArtStyle(artStyleId, backend) || resolveArtStyle('pixar') || '';
+  } catch (err) {
+    log.debug(`[SCENE EXPANSION] Could not resolve art style: ${err.message}`);
+  }
+
+  // Relative height ordering (e.g. "Lukas (shortest) -> Manuel (slightly taller)")
+  const heightOrder = buildRelativeHeightDescription(characters) || '';
 
   // Build Visual Bible recurring elements section (same logic as iteration prompt)
   // NOTE: Do NOT include element IDs (ART001, LOC001, etc.) — they leak into scene descriptions
@@ -3098,6 +3219,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     PAGE_NUMBER: pageNumber.toString(),
     PAGE_CONTENT: pageContent,
     CHARACTERS: characterDetails,
+    CHARACTER_DESCRIPTIONS: characterDescriptions,
+    CHARACTER_COUNT: characters.length.toString(),
+    HEIGHT_ORDER: heightOrder,
+    ART_STYLE: resolvedArtStyle,
     RECURRING_ELEMENTS: recurringElements,
     AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
     LOCKED_PERSPECTIVES: lockedPerspectivesText,
@@ -3464,6 +3589,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     log.debug(`[IMAGE PROMPT] Page ${pageNumber}: no metadata.objects (metadata=${metadata ? 'exists' : 'null'}, objects=${metadata?.objects?.length || 0})`);
   }
 
+  // Detect scene description format. Scenes from `scene-expansion.txt` use the new
+  // prose+metadata format and have character descriptions and art style already
+  // woven into the prose by Claude. Scenes from `scene-iteration.txt` (used by
+  // iteratePage repair) still output legacy JSON. For prose format we use the
+  // minimal storybook template; for JSON we keep the legacy structured wrapping.
+  const isProseFormat = parseProseMetadataFormat(sceneDescription) !== null;
+
   // Strip JSON metadata block from scene description (not needed in image prompt)
   let cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
@@ -3781,8 +3913,41 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
-    log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language}`);
-    // Fill all placeholders in template
+    log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
+
+    // Storybook mode + prose format: scene description already has character
+    // descriptions and art style woven in by scene-expansion. Use the minimal
+    // template — no structured CHARACTER_REFERENCE_LIST or STYLE_DESCRIPTION needed.
+    if (isStorybook && isProseFormat) {
+      return fillTemplate(template, {
+        SCENE_DESCRIPTION: cleanSceneDescription,
+        CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
+        REQUIRED_OBJECTS: requiredObjectsSection,
+        AGE_FROM: inputData.ageFrom || 3,
+        AGE_TO: inputData.ageTo || 8
+      });
+    }
+
+    // Storybook mode + legacy JSON format (iteratePage path): the scene description
+    // is JSON, so character descriptions and style are NOT in the prose. Prepend
+    // the structured blocks so the prompt still has everything the image model needs.
+    if (isStorybook && !isProseFormat) {
+      const structuredScene = [
+        styleDescription ? `**STYLE: ${styleDescription}**` : '',
+        characterReferenceList,
+        cleanSceneDescription
+      ].filter(Boolean).join('\n\n');
+      return fillTemplate(template, {
+        SCENE_DESCRIPTION: structuredScene,
+        CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
+        REQUIRED_OBJECTS: requiredObjectsSection,
+        AGE_FROM: inputData.ageFrom || 3,
+        AGE_TO: inputData.ageTo || 8
+      });
+    }
+
+    // Non-storybook modes (parallel, sequential): use the existing template
+    // structure with all placeholders.
     return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: cleanSceneDescription,

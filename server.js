@@ -2580,6 +2580,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Initial expansion: simplified prompt, no preview feedback (fast/cheap)
         const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel];
+
+        // Resolve per-scene reference photos so the scene expansion prompt can include
+        // the actual avatar clothing descriptions for each character. This pre-resolves
+        // what would otherwise be built later in the pipeline at image-prompt time.
+        let expansionPagePhotos = null;
+        try {
+          expansionPagePhotos = getCharacterPhotoDetails(
+            sceneCharacters,
+            'standard',
+            inputData.artStyle,
+            streamingClothingRequirements
+          );
+        } catch (photoErr) {
+          log.debug(`[SCENE EXPANSION] Could not pre-resolve photos for page ${page.pageNumber}: ${photoErr.message}`);
+        }
+
         const expansionPrompt = buildSceneExpansionPrompt(
           page.pageNumber,
           page.text,
@@ -2588,7 +2604,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           streamingVisualBible,
           availableAvatars,
           rawOutlineContext, // pass raw outline blocks directly
-          { maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3 }
+          {
+            maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+            artStyleId: inputData.artStyle,
+            imageBackend: imgModelConfig?.backend,
+            referencePhotos: expansionPagePhotos
+          }
         );
 
         // Heartbeat keeps story_jobs.updated_at fresh during scene expansion streaming.
