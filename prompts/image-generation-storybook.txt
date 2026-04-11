@@ -4,4 +4,6 @@ When a [Background] reference image is provided, copy its composition, layout, l
 
 EXACTLY {CHARACTER_COUNT} characters in this image, no more. Every person must match one of the reference photos provided. Do NOT add extra figures, background people, or supporting characters.
 
+{STYLE_DESCRIPTION}
+
 {SCENE_DESCRIPTION}

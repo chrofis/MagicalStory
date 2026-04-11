@@ -3064,22 +3064,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     })
     .join('\n');
 
-  // Resolve art style description (the same way buildImagePrompt does)
-  let resolvedArtStyle = '';
-  try {
-    const artStyleId = options.artStyleId || 'pixar';
-    let backend = options.imageBackend;
-    if (!backend) {
-      const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
-      const defaultModel = MODEL_DEFAULTS.pageImage || MODEL_DEFAULTS.image;
-      if (defaultModel && IMAGE_MODELS[defaultModel]) backend = IMAGE_MODELS[defaultModel].backend;
-    }
-    resolvedArtStyle = resolveArtStyle(artStyleId, backend) || resolveArtStyle('pixar') || '';
-  } catch (err) {
-    log.debug(`[SCENE EXPANSION] Could not resolve art style: ${err.message}`);
-  }
-
   // Relative height ordering (e.g. "Lukas (shortest) -> Manuel (slightly taller)")
+  // Art style is NOT built here — it's prepended to the final image prompt by
+  // buildImagePrompt directly, so Claude doesn't waste tokens copying it.
   const heightOrder = buildRelativeHeightDescription(characters) || '';
 
   // Build Visual Bible recurring elements section (same logic as iteration prompt)
@@ -3222,7 +3209,6 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CHARACTER_DESCRIPTIONS: characterDescriptions,
     CHARACTER_COUNT: characters.length.toString(),
     HEIGHT_ORDER: heightOrder,
-    ART_STYLE: resolvedArtStyle,
     RECURRING_ELEMENTS: recurringElements,
     AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
     LOCKED_PERSPECTIVES: lockedPerspectivesText,
@@ -3916,10 +3902,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
 
     // Storybook mode + prose format: scene description already has character
-    // descriptions, art style, setting, and Visual Bible elements woven in by
-    // scene-expansion. Pass the prose through as-is — no structured blocks.
+    // descriptions, setting, and Visual Bible elements woven in by scene-expansion.
+    // We prepend the art style verbatim (no point making Claude copy it).
     if (isStorybook && isProseFormat) {
       return fillTemplate(template, {
+        STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
         AGE_FROM: inputData.ageFrom || 3,
@@ -3928,16 +3915,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
 
     // Storybook mode + legacy JSON format (iteratePage path): the scene description
-    // is JSON, so character descriptions, style, and VB elements are NOT in the prose.
+    // is JSON, so character descriptions and VB elements are NOT in the prose.
     // Prepend the structured blocks so the prompt still has everything the image model needs.
     if (isStorybook && !isProseFormat) {
       const structuredScene = [
-        styleDescription ? `**STYLE: ${styleDescription}**` : '',
         characterReferenceList,
         cleanSceneDescription,
         requiredObjectsSection
       ].filter(Boolean).join('\n\n');
       return fillTemplate(template, {
+        STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: structuredScene,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
         AGE_FROM: inputData.ageFrom || 3,
