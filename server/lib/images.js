@@ -2563,12 +2563,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
     const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-    // Covers render to A4 portrait in the printed book — 3:4 is the closest
-    // standard ratio supported by both Gemini and Grok (A4 is 210:297 ≈ 0.707,
-    // 3:4 is 0.75). Pages stay square. Avatars stay 9:16 portrait.
-    const grokAspect = evaluationType === 'avatar' ? '9:16'
-      : evaluationType === 'cover' ? '3:4'
-      : '1:1';
+    // A4 portrait book format: 3:4 for covers and pages (better for text overlay).
+    // Avatars stay 9:16 portrait for character reference sheets.
+    const grokAspect = evaluationType === 'avatar' ? '9:16' : '3:4';
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     try {
@@ -3204,9 +3201,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     skipCache = false,
     artStyle = 'watercolor',
     sceneBackground = null,
-    // Output aspect ratio: '1:1' (default, pages), '3:4' (covers), '9:16' (avatars).
+    // Output aspect ratio: '3:4' (default, pages+covers), '9:16' (avatars).
     // Flows through to Grok and Gemini image configs.
-    aspectRatio = '1:1'
+    aspectRatio = '3:4'
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
@@ -6490,7 +6487,7 @@ async function editImageWithPrompt(imageData, editInstruction, model) {
           temperature: 0.6,
           ...(modelSupportsThinking(geminiModelId) && { thinkingConfig: { includeThoughts: true } }),
           imageConfig: {
-            aspectRatio: "1:1"
+            aspectRatio: "3:4"
           }
         }
       })

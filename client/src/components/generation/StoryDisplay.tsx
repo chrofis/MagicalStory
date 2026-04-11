@@ -4638,7 +4638,7 @@ export function StoryDisplay({
                         />
                         {/* Text overlay on image (children's book style) */}
                         {textOverlay && !isEditMode && !isGenerating && pageText.trim() && (() => {
-                          const layout = getTextOverlayPosition(pageNumber, pageText);
+                          const layout = getTextOverlayPosition(pageNumber, pageText, (image as any)?.textPosition);
                           const isFullWidth = layout.position.includes('full');
                           return (
                             <div

@@ -14,6 +14,8 @@ Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No border
 
 {REQUIRED_OBJECTS}
 
+{TEXT_AREA_INSTRUCTION}
+
 **ART STYLE:** {STYLE_DESCRIPTION}
 
 **REMINDER:** Absolutely NO text, letters, words, labels, or watermarks anywhere in the image.

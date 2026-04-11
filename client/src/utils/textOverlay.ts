@@ -41,10 +41,10 @@ function getTextSize(text: string): 'short' | 'medium' | 'long' {
   return 'long';
 }
 
-export function getTextOverlayPosition(pageNumber: number, text: string): TextOverlayLayout {
-  // Cycle through 6 positions (1-indexed page numbers)
+export function getTextOverlayPosition(pageNumber: number, text: string, explicitPosition?: TextPosition | null): TextOverlayLayout {
+  // Use explicit position from scene expansion if available, otherwise cycle
   const posIndex = ((pageNumber - 1) % POSITION_CYCLE.length + POSITION_CYCLE.length) % POSITION_CYCLE.length;
-  const position = POSITION_CYCLE[posIndex];
+  const position = (explicitPosition && POSITION_CYCLE.includes(explicitPosition)) ? explicitPosition : POSITION_CYCLE[posIndex];
   const size = getTextSize(text);
 
   // Width for corner positions (adapts to text length)

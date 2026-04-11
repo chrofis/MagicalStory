@@ -4541,6 +4541,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           emptyScenePrompt: img.emptyScenePrompt || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
+          textPosition: img.sceneMetadata?.textPosition || null,
           imageVersions: [],
         }));
       } else {
@@ -4635,7 +4636,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           verdict: img.verdict || null,
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
-          entityReport: img.entityReport || null
+          entityReport: img.entityReport || null,
+          textPosition: img.sceneMetadata?.textPosition || null
         }));
 
         // Extract covers from pipeline results back into coverImages (updated with eval data)

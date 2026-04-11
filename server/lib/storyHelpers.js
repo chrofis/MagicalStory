@@ -886,6 +886,7 @@ function extractSceneMetadata(sceneDescription) {
       sceneComplexity,
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
+      textPosition: metadata.textPosition || null,
       isJsonFormat: true,
       isProseFormat: true
     };
@@ -1023,6 +1024,8 @@ function extractSceneMetadata(sceneDescription) {
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
       // Whether the existing empty scene background can be reused (iteration only)
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
+      // Text overlay position (where to place story text on the illustration)
+      textPosition: parsedData.textPosition || null,
       isJsonFormat: true
     };
   }
@@ -3579,6 +3582,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // minimal storybook template; for JSON we keep the legacy structured wrapping.
   const isProseFormat = parseProseMetadataFormat(sceneDescription) !== null;
 
+  // Build text area instruction if textPosition is specified (keeps illustration uncluttered where text goes)
+  const textPosition = metadata?.textPosition || null;
+  const textAreaInstruction = textPosition
+    ? `**TEXT AREA:** The ${textPosition.replace('-', ' ')} area of this image will have story text overlaid. Keep that region simple and uncluttered — plain sky, soft background, empty ground, or muted colors. Do not place character faces or important details there.`
+    : '';
+
   // Strip JSON metadata block from scene description (not needed in image prompt)
   let cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
@@ -3906,6 +3915,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
+        TEXT_AREA_INSTRUCTION: textAreaInstruction,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
@@ -3924,6 +3934,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: structuredScene,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
+        TEXT_AREA_INSTRUCTION: textAreaInstruction,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
@@ -3937,6 +3948,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       CHARACTER_REFERENCE_LIST: characterReferenceList,
       VISUAL_BIBLE: visualBibleSection,
       REQUIRED_OBJECTS: requiredObjectsSection,
+      TEXT_AREA_INSTRUCTION: textAreaInstruction,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });

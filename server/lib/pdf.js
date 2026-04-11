@@ -438,7 +438,9 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
     if (textOverlay && image?.imageData) {
       // Text overlay mode: draw semi-transparent background + text on image
       const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
-      const position = OVERLAY_POSITIONS[posIndex];
+      // Use stored textPosition from scene expansion if available, otherwise cycle
+      const storedPos = image.textPosition;
+      const position = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
       const wordCount = cleanText.split(/\s+/).length;
       const isShort = wordCount < 20;
       const isLong = wordCount >= 50;
