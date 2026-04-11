@@ -1,7 +1,9 @@
-Inpaint task: repaint the main figure in this cutout as {charName} from the reference photo. The figure area has been blurred — restore it as {charName}.
+Inpaint task: repaint the area covered by the magenta crosshatch as {charName} from the reference photo. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
 
 Match {charName}'s face, hair, skin tone, build, and clothing from the reference.
 
-Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene context, not from a default smile.
+Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene and from the figure still faintly visible through the crosshatch. Do not default to a smile or make the character face the camera.
 
-The sharp pixels around the blurred area are the original background and must not change — they will be composited back into the scene.{clothingContext}{actionContext}{issueContext}
+Only ONE figure should appear in the result. If a partial figure is visible just outside the crosshatch, it is a leftover fragment of the same figure — absorb it into {charName}, do not paint a second character.
+
+The background outside the crosshatch area should stay the same.{clothingContext}{actionContext}{issueContext}

@@ -6160,30 +6160,58 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .jpeg({ quality: 95 })
       .toBuffer();
 
-    // Blur the figure's bbox area inside the cutout to force Grok to
-    // regenerate it. Without this, Grok often decides the image is already
-    // "correct" and returns the cutout unchanged. The blurred pixels give
-    // it nothing to anchor to, so it has to build the figure from the
-    // avatar reference. The outer ~10% padding stays sharp so the edges
-    // composite back seamlessly.
+    // Overlay a magenta crosshatch pattern on the figure area so Grok has
+    // a clear "replace this" signal. Diffusion edit models are trained on
+    // watermark / artifact removal, so an obvious foreign pattern is a
+    // much stronger disruption signal than a blur (which the model tends
+    // to "enhance" instead of replace).
+    //
+    // The hatch extends 12% beyond the bbox on each side to absorb
+    // imperfect bboxes — any figure fragments that poke out past the bbox
+    // get covered by the hatch and treated as part of the "remove" zone.
+    // The remaining ~8% of sharp padding on each side gives Grok clean
+    // background context and is also what the downstream feather blend
+    // uses to stitch the cutout back into the scene.
     const figureLeft = pixelLeft - extractLeft;
     const figureTop = pixelTop - extractTop;
     const figureWidth = pixelWidth;
     const figureHeight = pixelHeight;
-    const FIGURE_BLUR_RADIUS = Math.max(18, Math.round(Math.min(figureWidth, figureHeight) * 0.06));
+    const HATCH_SAFETY = 0.12;
+    const hatchMarginX = Math.round(figureWidth * HATCH_SAFETY);
+    const hatchMarginY = Math.round(figureHeight * HATCH_SAFETY);
+    const hatchLeft = Math.max(0, figureLeft - hatchMarginX);
+    const hatchTop = Math.max(0, figureTop - hatchMarginY);
+    const hatchRight = Math.min(extractWidth, figureLeft + figureWidth + hatchMarginX);
+    const hatchBottom = Math.min(extractHeight, figureTop + figureHeight + hatchMarginY);
+    const hatchWidth = hatchRight - hatchLeft;
+    const hatchHeight = hatchBottom - hatchTop;
+    // Line spacing scales with hatch size: smaller cutouts get tighter
+    // spacing so the pattern stays dense enough to be unambiguous.
+    const hatchSpacing = Math.max(12, Math.round(Math.min(hatchWidth, hatchHeight) * 0.04));
+    const HATCH_STROKE = 3;
+    const HATCH_COLOR = '#FF00FF'; // bright magenta — unambiguously foreign
     let regionBuffer = rawCutoutBuffer;
     try {
-      const blurredFigure = await sharp(rawCutoutBuffer)
-        .extract({ left: figureLeft, top: figureTop, width: figureWidth, height: figureHeight })
-        .blur(FIGURE_BLUR_RADIUS)
-        .toBuffer();
+      // Build an SVG crosshatch (two sets of diagonal lines forming an X
+      // grid) clipped to the hatch rectangle. SVG pattern fills only the
+      // <rect>, so everywhere outside stays transparent.
+      const hatchSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${extractWidth}" height="${extractHeight}">
+  <defs>
+    <pattern id="hatch" x="0" y="0" width="${hatchSpacing}" height="${hatchSpacing}" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="${hatchSpacing}" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
+      <line x1="${hatchSpacing}" y1="0" x2="0" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
+    </pattern>
+  </defs>
+  <rect x="${hatchLeft}" y="${hatchTop}" width="${hatchWidth}" height="${hatchHeight}" fill="url(#hatch)"/>
+</svg>`;
       regionBuffer = await sharp(rawCutoutBuffer)
-        .composite([{ input: blurredFigure, left: figureLeft, top: figureTop }])
+        .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
-      log.info(`👤 [CHAR REPAIR GROK] Cut-out ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), figure blurred ${figureWidth}x${figureHeight} @ radius ${FIGURE_BLUR_RADIUS}`);
+      log.info(`👤 [CHAR REPAIR GROK] Cut-out ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), hatch region ${hatchWidth}x${hatchHeight} @ stroke ${HATCH_STROKE}px spacing ${hatchSpacing}px`);
     } catch (err) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] Cut-out figure blur failed: ${err.message} — sending raw cutout`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cut-out hatch overlay failed: ${err.message} — sending raw cutout`);
     }
     const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
 
