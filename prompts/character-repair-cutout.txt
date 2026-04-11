@@ -1,7 +1,7 @@
-Inpaint task: replace the figure in this cutout with {charName} from the reference photo.
+Inpaint task: repaint the main figure in this cutout as {charName} from the reference photo. The figure area has been blurred — restore it as {charName}.
 
-The reference photo shows {charName}'s face, hair, skin tone, build, and clothing. Repaint the figure in the cutout to look exactly like the reference.
+Match {charName}'s face, hair, skin tone, build, and clothing from the reference.
 
-Repeat the original pose, body language, hand positions, and what the figure is holding. Repeat the original facial expression and gaze direction from scene context — do not default to a smile, do not make the character face the camera unless they already were.
+Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene context, not from a default smile.
 
-Do not change the background, lighting, camera angle, or anything outside the figure. This is a cutout from a larger illustration and will be composited back into it — the edges and surrounding pixels must stay the same so the seam is invisible.{clothingContext}{actionContext}{issueContext}
+The sharp pixels around the blurred area are the original background and must not change — they will be composited back into the scene.{clothingContext}{actionContext}{issueContext}

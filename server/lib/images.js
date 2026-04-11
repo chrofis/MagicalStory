@@ -6154,13 +6154,38 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const extractWidth = Math.min(sceneMeta.width - extractLeft, pixelWidth + 2 * padX);
     const extractHeight = Math.min(sceneMeta.height - extractTop, pixelHeight + 2 * padY);
 
-    const regionBuffer = await sharp(sceneBuffer)
+    // Extract the raw cutout (we'll also keep this for the feather blend later)
+    const rawCutoutBuffer = await sharp(sceneBuffer)
       .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
       .jpeg({ quality: 95 })
       .toBuffer();
-    const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Cut-out region: ${extractWidth}x${extractHeight} at (${extractLeft}, ${extractTop})`);
+    // Blur the figure's bbox area inside the cutout to force Grok to
+    // regenerate it. Without this, Grok often decides the image is already
+    // "correct" and returns the cutout unchanged. The blurred pixels give
+    // it nothing to anchor to, so it has to build the figure from the
+    // avatar reference. The outer ~10% padding stays sharp so the edges
+    // composite back seamlessly.
+    const figureLeft = pixelLeft - extractLeft;
+    const figureTop = pixelTop - extractTop;
+    const figureWidth = pixelWidth;
+    const figureHeight = pixelHeight;
+    const FIGURE_BLUR_RADIUS = Math.max(18, Math.round(Math.min(figureWidth, figureHeight) * 0.06));
+    let regionBuffer = rawCutoutBuffer;
+    try {
+      const blurredFigure = await sharp(rawCutoutBuffer)
+        .extract({ left: figureLeft, top: figureTop, width: figureWidth, height: figureHeight })
+        .blur(FIGURE_BLUR_RADIUS)
+        .toBuffer();
+      regionBuffer = await sharp(rawCutoutBuffer)
+        .composite([{ input: blurredFigure, left: figureLeft, top: figureTop }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      log.info(`👤 [CHAR REPAIR GROK] Cut-out ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), figure blurred ${figureWidth}x${figureHeight} @ radius ${FIGURE_BLUR_RADIUS}`);
+    } catch (err) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cut-out figure blur failed: ${err.message} — sending raw cutout`);
+    }
+    const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
 
     // Extract structured character data (expression, pose, gaze) so the
     // repaired figure matches the original emotion and body language.
