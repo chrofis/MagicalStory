@@ -231,9 +231,12 @@ User clicks "Run Full Workflow"
 - `maxCharRepairPages: 3` — max pages for character repair per run
 
 **Character repair methods** (in `server/lib/images.js` → `repairCharacterMismatchWithGrok()`):
-- **Grok Blended** (default): blackout character bbox → Grok regenerates → feathered blend
-  onto original scene (30px feather, bbox + 50% padding). Preserves background quality.
-- **Grok Cutout**: extract character region with 20% padding → Grok repairs → composite back
+- **Grok Cutout** (default): extract the figure's bbox + 20% padding → send cutout + avatar
+  to Grok as an inpaint-style replacement → composite back with a feathered edge (~8% of the
+  smaller dimension). Keeps background, other characters, and objects fully untouched.
+- **Grok Blended**: blur the character region → Grok regenerates → feathered blend onto the
+  original scene (30px feather, bbox + 50% padding). Good for face-only repairs but the blur
+  radius can include too much surrounding context on larger bboxes.
 - **Grok Blackout**: send full scene with blackout overlay → Grok regenerates entire scene
 
 **When images are REDONE (full regeneration):**

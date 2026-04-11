@@ -1,0 +1,7 @@
+Inpaint task: replace the figure in this cutout with {charName} from the reference photo.
+
+The reference photo shows {charName}'s face, hair, skin tone, build, and clothing. Repaint the figure in the cutout to look exactly like the reference.
+
+Repeat the original pose, body language, hand positions, and what the figure is holding. Repeat the original facial expression and gaze direction from scene context — do not default to a smile, do not make the character face the camera unless they already were.
+
+Do not change the background, lighting, camera angle, or anything outside the figure. This is a cutout from a larger illustration and will be composited back into it — the edges and surrounding pixels must stay the same so the seam is invisible.{clothingContext}{actionContext}{issueContext}

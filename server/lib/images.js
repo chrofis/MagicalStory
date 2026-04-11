@@ -5076,7 +5076,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} (bbox: [${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
           const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, fix.charName, {
             imageBackend: 'grok',
-            useBlended: true,
+            // Cutout mode (default): extracts the figure's bbox, repaints it,
+            // composites back with a feathered edge. Keeps background and
+            // other characters untouched — blended mode was blurring too much
+            // surrounding context and couldn't be repaired afterwards.
             issueDescription: fix.issueDescription,
             clothingDescription: clothingDesc,
             photoType: avatarPhotoType,
@@ -5742,8 +5745,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     return { imageData: null, character: charName, method: 'grok_blended', error: 'Invalid bounding box' };
   }
 
-  const useBlended = options.useBlended !== undefined ? options.useBlended : true; // default ON
-  const useCutout = !useBlended && (options.useCutout || false);
+  // Default: cutout mode — extract the figure's bbox, send it to Grok as an
+  // inpaint-style replacement, composite back with feathered edges. This
+  // preserves the rest of the page (background, other characters, objects).
+  // Callers can opt into the older blended mode via `useBlended: true`.
+  const useBlended = options.useBlended === true;
+  const useCutout = !useBlended && options.useCutout !== false;
   const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : 'grok_blackout';
 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
@@ -6048,7 +6055,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       } : null
     };
   } else if (useCutout) {
-    // ── Cut-out mode: extract bbox region, repair it, composite back ──
+    // ── Cut-out mode: extract the figure's bbox + 20% padding, send to Grok
+    // as an inpaint-style replacement, composite back with a feathered edge.
+    // The surrounding 20% padding gives Grok visual context but the prompt
+    // tells it not to change anything outside the figure. The feathered
+    // composite hides any small edge mismatches so the seam is invisible.
     const sceneMeta = await sharp(sceneBuffer).metadata();
     const pixelLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
     const pixelTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
@@ -6056,8 +6067,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const pixelHeight = Math.min(sceneMeta.height - pixelTop, Math.ceil((ymax - ymin) * sceneMeta.height));
 
     // Add padding around bbox for context (20% each side)
-    const padX = Math.floor(pixelWidth * 0.2);
-    const padY = Math.floor(pixelHeight * 0.2);
+    const PAD_FACTOR = 0.2;
+    const padX = Math.floor(pixelWidth * PAD_FACTOR);
+    const padY = Math.floor(pixelHeight * PAD_FACTOR);
     const extractLeft = Math.max(0, pixelLeft - padX);
     const extractTop = Math.max(0, pixelTop - padY);
     const extractWidth = Math.min(sceneMeta.width - extractLeft, pixelWidth + 2 * padX);
@@ -6065,13 +6077,55 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const regionBuffer = await sharp(sceneBuffer)
       .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
-      .jpeg({ quality: 90 })
+      .jpeg({ quality: 95 })
       .toBuffer();
     const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
 
     log.info(`👤 [CHAR REPAIR GROK] Cut-out region: ${extractWidth}x${extractHeight} at (${extractLeft}, ${extractTop})`);
 
-    const prompt = `Fix this character's appearance to match the reference photo of ${charName}. Replace the face, hair, and skin tone to match the reference exactly. Keep the pose, clothing style, and background unchanged.${issueContext}`;
+    // Extract structured character data (expression, pose, gaze) so the
+    // repaired figure matches the original emotion and body language.
+    let actionContext = '';
+    if (sceneDescription) {
+      try {
+        const sceneMetadata = getStoryHelpers().extractSceneMetadata(sceneDescription);
+        const charData = sceneMetadata?.fullData?.characters?.find(
+          c => c.name?.toLowerCase() === charName.toLowerCase()
+        );
+        if (charData) {
+          const parts = [];
+          if (charData.expression) parts.push(`Expression: ${charData.expression}`);
+          if (charData.pose) parts.push(`Pose: ${charData.pose}`);
+          if (charData.action) parts.push(`Action: ${charData.action}`);
+          if (charData.gaze) parts.push(`Gaze: ${charData.gaze}`);
+          if (charData.holding && typeof charData.holding === 'object') {
+            const holding = [];
+            if (charData.holding.leftHand && charData.holding.leftHand !== 'empty') holding.push(`left hand: ${charData.holding.leftHand}`);
+            if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') holding.push(`right hand: ${charData.holding.rightHand}`);
+            if (holding.length > 0) parts.push(`Holding: ${holding.join(', ')}`);
+          }
+          if (parts.length > 0) {
+            actionContext = `\n\n${charName}'s state in this scene (preserve in the repaint):\n- ${parts.join('\n- ')}`;
+          }
+        }
+      } catch { /* fall through to text fallback */ }
+      if (!actionContext) {
+        const charNameLower = charName.toLowerCase();
+        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
+        if (lines.length > 0) {
+          actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
+        }
+      }
+    }
+
+    const prompt = PROMPT_TEMPLATES.characterRepairCutout
+      ? fillTemplate(PROMPT_TEMPLATES.characterRepairCutout, {
+          charName,
+          clothingContext,
+          actionContext,
+          issueContext,
+        })
+      : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}`;
 
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri]);
 
@@ -6080,23 +6134,47 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Composite repaired region back into original scene
+    // Decode and resize Grok result to match the extraction dimensions
     const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
-
-    // Resize repaired region to match original extraction dimensions
     const resizedRegion = await sharp(repairedRegionBuffer)
       .resize(extractWidth, extractHeight, { fit: 'fill' })
+      .raw()
+      .toBuffer();
+
+    // Original region pixels for feathered blending
+    const origRegion = await sharp(sceneBuffer)
+      .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
+      .raw()
+      .toBuffer();
+
+    // Feathered blend: full Grok content in the center (where the figure is),
+    // original pixels at the outer edges (the 20% padding zone). This hides
+    // any slight changes Grok may have made outside the figure.
+    const FEATHER_PX = Math.max(20, Math.round(Math.min(extractWidth, extractHeight) * 0.08));
+    const blended = Buffer.alloc(extractWidth * extractHeight * 3);
+    for (let y = 0; y < extractHeight; y++) {
+      for (let x = 0; x < extractWidth; x++) {
+        const dMin = Math.min(x, extractWidth - 1 - x, y, extractHeight - 1 - y);
+        const alpha = dMin >= FEATHER_PX ? 1 : dMin / FEATHER_PX;
+        const idx = (y * extractWidth + x) * 3;
+        blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + resizedRegion[idx]     * alpha);
+        blended[idx + 1] = Math.round(origRegion[idx + 1] * (1 - alpha) + resizedRegion[idx + 1] * alpha);
+        blended[idx + 2] = Math.round(origRegion[idx + 2] * (1 - alpha) + resizedRegion[idx + 2] * alpha);
+      }
+    }
+    const blendedRegion = await sharp(blended, { raw: { width: extractWidth, height: extractHeight, channels: 3 } })
+      .jpeg({ quality: 95 })
       .toBuffer();
 
     const composited = await sharp(sceneBuffer)
-      .composite([{ input: resizedRegion, left: extractLeft, top: extractTop }])
-      .jpeg({ quality: 90 })
+      .composite([{ input: blendedRegion, left: extractLeft, top: extractTop }])
+      .jpeg({ quality: 92 })
       .toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
-    log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
+    log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed (feather ${FEATHER_PX}px). Cost: $${grokResult.usage?.cost || 0.02}`);
 
     return {
       imageData: finalImageData,
@@ -6104,7 +6182,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
-      method
+      method,
+      debug: options.includeDebug ? {
+        prompt,
+        sceneSent: regionDataUri,
+        avatarSent: croppedAvatarDataUri,
+        grokRawResult: grokResult.imageData,
+        bbox: [ymin, xmin, ymax, xmax],
+        extractRegion: { left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight },
+        featherPx: FEATHER_PX,
+      } : null,
     };
   } else {
     // ── Full-scene mode (blackout): send full scene + reference to Grok ──

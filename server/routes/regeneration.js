@@ -4604,8 +4604,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
         } else if (!useGeminiRepair && (grokRepairMode || isGrokConfigured())) {
-          // Grok repair: blended (default), cutout, or blackout
-          const effectiveMode = grokRepairMode || 'blended';
+          // Grok repair: cutout (default), blended, or blackout
+          const effectiveMode = grokRepairMode || 'cutout';
 
           const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {
