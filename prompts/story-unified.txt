@@ -146,6 +146,7 @@ SCENE HINT:
 - **INDOOR SCENES** - Use "n/a" for weather
 - **OBJECTS** - List Visual Bible IDs of any locations, animals, artifacts, or vehicles visible in this scene. Omit if none.
 - **NO POINTING** - BANNED: "points at", "points to". Use: gazes at, walks toward, reaches for, discovers.
+- **NO TRANSLUCENT CHARACTERS** - BANNED: "translucent", "transparent", "ghostly", "see-through", "ethereal", "spectral". Characters are always solid and opaque.
 - **NO AGE COLLECTIVES** - Never write "the children", "the kids", "the boys", "the girls", "both children" in `description`. Use names or group size ("all three", "the group").
 - **VISUAL ONLY** - Describe what the CAMERA sees. ❌ "excitedly runs" ✅ "runs with arms spread wide". No emotions, only body language.
 - **ONE MOMENT** - Description = one frozen instant. ❌ "opens door, walks in, sits" ✅ "steps through the doorway"

@@ -6111,6 +6111,103 @@ function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHei
   return { left, top, width: targetW, height: targetH, preset: best.name };
 }
 
+/**
+ * Detect uniform pale border in an image (from Grok aspect drift / letterboxing).
+ * Returns { left, top, width, height, imgWidth, imgHeight } of the content box, or null.
+ */
+async function detectGrokBorder(buffer) {
+  try {
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    const { width, height, channels } = info;
+    if (width < 100 || height < 100) return null;
+
+    const px = (x, y) => {
+      const i = (y * width + x) * channels;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    const corners = [px(0, 0), px(width - 1, 0), px(0, height - 1), px(width - 1, height - 1)];
+    const baseline = [
+      Math.round((corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4),
+      Math.round((corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4),
+      Math.round((corners[0][2] + corners[1][2] + corners[2][2] + corners[3][2]) / 4),
+    ];
+    for (const c of corners) {
+      if (Math.abs(c[0] - baseline[0]) > 20 || Math.abs(c[1] - baseline[1]) > 20 || Math.abs(c[2] - baseline[2]) > 20) {
+        return null;
+      }
+    }
+
+    const THRESH = 40;
+    const deviates = (r, g, b) =>
+      Math.abs(r - baseline[0]) > THRESH || Math.abs(g - baseline[1]) > THRESH || Math.abs(b - baseline[2]) > THRESH;
+
+    const maxInset = Math.floor(Math.min(width, height) * 0.4);
+    let top = 0;
+    for (; top < maxInset; top++) {
+      let hit = false;
+      for (let x = 0; x < width; x++) { const [r, g, b] = px(x, top); if (deviates(r, g, b)) { hit = true; break; } }
+      if (hit) break;
+    }
+    let bottom = height - 1;
+    for (; bottom > height - 1 - maxInset; bottom--) {
+      let hit = false;
+      for (let x = 0; x < width; x++) { const [r, g, b] = px(x, bottom); if (deviates(r, g, b)) { hit = true; break; } }
+      if (hit) break;
+    }
+    let left = 0;
+    for (; left < maxInset; left++) {
+      let hit = false;
+      for (let y = 0; y < height; y++) { const [r, g, b] = px(left, y); if (deviates(r, g, b)) { hit = true; break; } }
+      if (hit) break;
+    }
+    let right = width - 1;
+    for (; right > width - 1 - maxInset; right--) {
+      let hit = false;
+      for (let y = 0; y < height; y++) { const [r, g, b] = px(right, y); if (deviates(r, g, b)) { hit = true; break; } }
+      if (hit) break;
+    }
+
+    const contentW = right - left + 1;
+    const contentH = bottom - top + 1;
+    const maxSideInset = Math.max((width - contentW) / width, (height - contentH) / height);
+    if (maxSideInset > 0.45) return null;
+
+    return { left, top, right, bottom, width: contentW, height: contentH, imgWidth: width, imgHeight: height };
+  } catch { return null; }
+}
+
+/**
+ * Detect a border that Grok ADDED to its output that wasn't in the input.
+ * Compares border of both images — returns content box only when output has
+ * significantly more border than input.
+ */
+async function detectAddedBorder(inputBuffer, outputBuffer) {
+  const outputBorder = await detectGrokBorder(outputBuffer);
+  if (!outputBorder) return null;
+  const outputLeftFrac = outputBorder.left / outputBorder.imgWidth;
+  const outputRightFrac = (outputBorder.imgWidth - outputBorder.right - 1) / outputBorder.imgWidth;
+  const outputTopFrac = outputBorder.top / outputBorder.imgHeight;
+  const outputBottomFrac = (outputBorder.imgHeight - outputBorder.bottom - 1) / outputBorder.imgHeight;
+
+  const inputBorder = await detectGrokBorder(inputBuffer);
+  let inputLeftFrac = 0, inputRightFrac = 0, inputTopFrac = 0, inputBottomFrac = 0;
+  if (inputBorder) {
+    inputLeftFrac = inputBorder.left / inputBorder.imgWidth;
+    inputRightFrac = (inputBorder.imgWidth - inputBorder.right - 1) / inputBorder.imgWidth;
+    inputTopFrac = inputBorder.top / inputBorder.imgHeight;
+    inputBottomFrac = (inputBorder.imgHeight - inputBorder.bottom - 1) / inputBorder.imgHeight;
+  }
+
+  const TOLERANCE = 0.03;
+  const leftAdded = outputLeftFrac > inputLeftFrac + TOLERANCE;
+  const rightAdded = outputRightFrac > inputRightFrac + TOLERANCE;
+  const topAdded = outputTopFrac > inputTopFrac + TOLERANCE;
+  const bottomAdded = outputBottomFrac > inputBottomFrac + TOLERANCE;
+
+  if (!leftAdded && !rightAdded && !topAdded && !bottomAdded) return null;
+  return outputBorder;
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
