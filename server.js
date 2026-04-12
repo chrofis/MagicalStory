@@ -241,7 +241,8 @@ const {
   convertClothingToCurrentFormat,
   getPageText,
   updatePageText,
-  resolveArtStyle
+  resolveArtStyle,
+  enforceSpreadTextPosition
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
@@ -2582,9 +2583,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Need visual bible for scene expansion - queue if not available yet
       const expansionPromise = streamSceneLimit(async () => {
-        // Wait for visual bible if not yet available
-        while (!streamingVisualBible) {
+        // Wait for visual bible if not yet available (cap at 5 minutes)
+        let vbWait = 0;
+        while (!streamingVisualBible && vbWait < 3000) {
           await new Promise(r => setTimeout(r, 100));
+          vbWait++;
+        }
+        if (!streamingVisualBible) {
+          log.warn('[STREAM] Timed out waiting for Visual Bible in scene expansion — skipping');
+          return null;
         }
 
         // Wait for landmark photo descriptions to be loaded (so variants are in the prompt)
@@ -2782,9 +2789,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       const imagePromise = (async () => {
         try {
-          // Wait for prerequisites: visual bible + early avatar styling
-          while (!streamingVisualBible) {
+          // Wait for prerequisites: visual bible + early avatar styling (cap at 5 minutes)
+          let vbWait = 0;
+          while (!streamingVisualBible && vbWait < 3000) {
             await new Promise(r => setTimeout(r, 100));
+            vbWait++;
+          }
+          if (!streamingVisualBible) {
+            log.warn('[TRIAL-PAGE] Timed out waiting for Visual Bible — skipping page image');
+            return null;
           }
           if (streamingAvatarStylingPromise) {
             await streamingAvatarStylingPromise;
@@ -2923,9 +2936,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (skipCovers) return;
 
       const coverPromise = streamCoverLimit(async () => {
-        // Wait for visual bible if not yet available
-        while (!streamingVisualBible) {
+        // Wait for visual bible if not yet available (cap at 5 minutes)
+        let vbWait = 0;
+        while (!streamingVisualBible && vbWait < 3000) {
           await new Promise(r => setTimeout(r, 100));
+          vbWait++;
+        }
+        if (!streamingVisualBible) {
+          log.warn('[STREAM-COVER] Timed out waiting for Visual Bible — skipping cover');
+          return null;
         }
 
         // Build per-character clothing requirements from hint.characterClothing
@@ -3542,9 +3561,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const coverPromise = (async () => {
           try {
-            // Wait for prerequisites: visual bible + avatar styling
-            while (!streamingVisualBible) {
+            // Wait for prerequisites: visual bible + avatar styling (cap at 5 minutes)
+            let vbWait = 0;
+            while (!streamingVisualBible && vbWait < 3000) {
               await new Promise(r => setTimeout(r, 100));
+              vbWait++;
+            }
+            if (!streamingVisualBible) {
+              log.warn('[TRIAL-COVER] Timed out waiting for Visual Bible — skipping cover');
+              return null;
             }
             if (streamingAvatarStylingPromise) {
               log.debug(`[TRIAL-COVER] Waiting for avatar styling...`);
@@ -3745,7 +3770,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Ignore progress update errors
         }
       }
-    });
+    }, { isTrial: !!inputData.trialMode });
 
     // Use streaming with progressive parsing and parallel task initiation
     // Use 64000 tokens to match Claude Sonnet's max output capacity for longer stories
@@ -4800,7 +4825,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           emptyScenePrompt: img.emptyScenePrompt || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
-          textPosition: img.sceneMetadata?.textPosition || null,
+          textPosition: enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           outlineCharacters: img.scene?.outlineCharacters || null,
           imageVersions: [],
         }));
@@ -4897,7 +4922,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
-          textPosition: img.sceneMetadata?.textPosition || null,
+          textPosition: enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           outlineCharacters: img.scene?.outlineCharacters || null
         }));
 

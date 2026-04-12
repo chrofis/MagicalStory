@@ -1584,9 +1584,10 @@ class ProgressiveUnifiedParser {
    * @param {Function} callbacks.onPageComplete - Called when a story page is complete
    * @param {Function} callbacks.onProgress - Called with progress updates for UI
    */
-  constructor(callbacks = {}) {
+  constructor(callbacks = {}, options = {}) {
     this.callbacks = callbacks;
     this.fullText = '';
+    this._isTrial = options.isTrial || false;
 
     // Track which sections have been emitted
     this.emitted = {
@@ -1636,7 +1637,7 @@ class ProgressiveUnifiedParser {
     this._checkCharacterArcs();
     this._checkPlotStructure();
     this._checkVisualBible();
-    this._checkCoverScene();
+    if (this._isTrial) this._checkCoverScene();
     this._checkCoverHints();
     this._checkPages();
   }
@@ -2069,7 +2070,7 @@ class ProgressiveUnifiedParser {
     this._finalized = true;
 
     // Rescue truncated cover scene before final page check
-    this._checkCoverScene();
+    if (this._isTrial) this._checkCoverScene();
 
     // Re-check pages one more time to catch the last page
     this._checkPages();
@@ -2077,7 +2078,7 @@ class ProgressiveUnifiedParser {
     // Warn about required sections that weren't detected during streaming
     // Only warn about sections that actually exist in the response (trial mode skips clothing/covers)
     const hasClothingSection = this.fullText.includes('---') && this.fullText.includes('CLOTHING REQUIREMENTS');
-    const hasCoverHintsSection = this.fullText.includes('---') && this.fullText.includes('COVER SCENE HINTS');
+    const hasCoverHintsSection = this._hasMarker('COVER SCENE HINTS');
     const hasCoverSceneSection = this.fullText.includes('---') && /---\s*COVER\s+SCENE\s*---/.test(this.fullText);
     const missingSections = [];
     if (!this.emitted.title) missingSections.push('TITLE');
