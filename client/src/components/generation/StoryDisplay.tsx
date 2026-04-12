@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2 } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
@@ -2029,6 +2029,23 @@ export function StoryDisplay({
         )}
 
       </div>
+
+      {/* Text overlay toggle */}
+      {hasImages && (
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={() => setTextOverlay(!textOverlay)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              textOverlay
+                ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            <Eye size={14} />
+            {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+          </button>
+        </div>
+      )}
 
       {/* Developer Mode Buttons */}
       {developerMode && (
@@ -4637,7 +4654,7 @@ export function StoryDisplay({
                           label={`Page ${pageNumber}`}
                         />
                         {/* Text overlay on image (children's book style) */}
-                        {textOverlay && !isEditMode && !isGenerating && pageText.trim() && (() => {
+                        {textOverlay && !isGenerating && pageText.trim() && (() => {
                           const layout = getTextOverlayPosition(pageNumber, pageText, (image as any)?.textPosition);
                           const isFullWidth = layout.position.includes('full');
                           return (

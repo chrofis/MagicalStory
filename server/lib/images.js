@@ -663,21 +663,31 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * @returns {Promise<Object>} Quality result with score, reasoning, semantic issues, etc.
  */
 
-// Sanitize prompt for Gemini 2.5 to avoid content filter triggers
-// Remove age references and detailed physical descriptions while keeping scene context
-const sanitizePromptFor25 = (prompt) => {
-  if (!prompt) return prompt;
-  return prompt
-    // Remove age references like "8-year-old", "6 years old", "young child"
-    .replace(/\b\d{1,2}[-\s]?year[-\s]?old\b/gi, '')
-    .replace(/\b(young|little|small)\s+(child|boy|girl|kid)\b/gi, 'character')
+// Unified sanitizer for Gemini safety filters.
+// 'light' — strip age numbers, "young boy" → "character", body builds. Keeps standalone "boy"/"girl".
+// 'full'  — everything from light PLUS all standalone gender/age nouns → "figure".
+function sanitizeForGemini(text, level = 'light') {
+  if (!text || typeof text !== 'string') return text;
+  let result = text
+    // "8-year-old boy" → "character" (light) or "figure" (full) — catch compound first
+    .replace(/\b\d+[-\s]?years?[-\s]?old\s+(boy|girl|child|kid|man|woman)\b/gi, level === 'full' ? 'figure' : 'character')
+    // Standalone "7-year-old" → ""
+    .replace(/\b\d+[-\s]?years?[-\s]?old\b/gi, '')
+    // "young boy", "little girl" → "character"/"figure"
+    .replace(/\b(young|little|small|tiny)\s+(child|boy|girl|kid|man|woman)\b/gi, level === 'full' ? 'figure' : 'character')
+    // "aged 5" → ""
     .replace(/\bage[sd]?\s*\d+\b/gi, '')
-    // Remove body type descriptions
-    .replace(/\b(slim|thin|chubby|petite|small-framed|athletic)\s+(body|build|figure)\b/gi, '')
-    // Clean up extra whitespace
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-};
+    // "slim build" → ""
+    .replace(/\b(slim|thin|chubby|petite|small-framed|athletic)\s+(body|build|figure)\b/gi, '');
+
+  if (level === 'full') {
+    result = result
+      .replace(/\b(boy|girl|child|kid|man|woman|teenager|teen|adult|elderly|toddler|infant|baby)\b/gi, 'figure')
+      .replace(/\b(male|female)\s+figure\b/gi, 'figure');
+  }
+
+  return result.replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').trim();
+}
 
 // Helper function to check if a Gemini response indicates blocked content
 const isBlockedResponse = (responseData) => {
@@ -751,7 +761,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
 
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
-    let promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;
+    let promptForEval = modelId.includes('2.5') ? sanitizeForGemini(originalPrompt, 'light') : originalPrompt;
 
     // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
@@ -768,13 +778,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     }
 
-    // Extract declared character interactions from the scene metadata so the
-    // evaluator can check each object is in the right place relative to its
-    // character (in pocket vs held vs floating, etc.). Parses from the
-    // metadata block embedded in `originalPrompt`.
+    // Extract declared character interactions from the scene metadata.
+    // Use sceneHint (original scene description with metadata block) rather than
+    // originalPrompt (image prompt where metadata was already stripped).
     let interactionsBlock = '(none declared)';
     try {
-      const sceneMeta = getStoryHelpers().extractSceneMetadata(originalPrompt);
+      const interactionSource = sceneHint || originalPrompt;
+      const sceneMeta = getStoryHelpers().extractSceneMetadata(interactionSource);
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       if (interactions && interactions.length > 0) {
@@ -895,11 +905,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`📊 [EVAL] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
     }
 
-    // If content was blocked, log full safety details and try Grok vision as fallback.
-    // The eval prompt is already neutral (no age/child/body language) so a block
-    // here means the IMAGE itself triggered the filter — retrying Gemini won't help,
-    // but Grok vision (xAI) doesn't have the same safety filter and can usually
-    // analyze images that Gemini refuses.
+    // Blocked content: retry with full sanitization, then fall back to Grok vision.
     if (isBlockedResponse(data)) {
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
       const promptBlockReason = data.promptFeedback?.blockReason || null;
@@ -907,40 +913,63 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const candFinish = data.candidates?.[0]?.finishReason || 'none';
       const candSafety = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
       const reason = promptBlockReason || candFinish;
-      log.error(`❌ [QUALITY] ${pageLabel}Image blocked by Gemini safety (${reason}) on ${modelId}`);
-      log.error(`❌ [QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
+      log.warn(`⚠️ [QUALITY] ${pageLabel}Blocked by Gemini safety (${reason}), retrying with full sanitization...`);
+      log.debug(`⚠️ [QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
-      // Only fall back to Grok if we weren't already using an xAI model
-      const usedModelConfig = TEXT_MODELS[modelId];
-      if (usedModelConfig?.provider !== 'xai') {
-        const grokFallbackId = 'grok-4-fast';
-        const grokFallbackModel = TEXT_MODELS[grokFallbackId];
-        if (grokFallbackModel?.provider === 'xai') {
-          log.info(`🔄 [QUALITY] ${pageLabel}Falling back to Grok vision (${grokFallbackId})...`);
-          try {
-            const grokResponse = await callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, parts, evaluationPrompt);
-            if (grokResponse.ok) {
-              const grokData = await grokResponse.json();
-              if (grokData?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                log.info(`✅ [QUALITY] ${pageLabel}Grok fallback succeeded`);
-                data = grokData;
+      // Step 1: Retry with full sanitization (strips all gender/age nouns)
+      const fullSanitized = sanitizeForGemini(originalPrompt, 'full');
+      const fullEvalPrompt = evaluationTemplate
+        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: fullSanitized, INTERACTIONS_BLOCK: interactionsBlock })
+        : evaluationPrompt;
+      parts[parts.length - 1] = { text: fullEvalPrompt };
+      try {
+        const retryResponse = await callQualityAPI(modelId);
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          if (!isBlockedResponse(retryData)) {
+            log.info(`✅ [QUALITY] ${pageLabel}Full sanitization retry succeeded`);
+            data = retryData;
+          } else {
+            data = retryData; // still blocked — fall through to Grok
+          }
+        }
+      } catch (retryErr) {
+        log.warn(`⚠️ [QUALITY] ${pageLabel}Full sanitization retry failed: ${retryErr.message}`);
+      }
+
+      // Step 2: Grok vision fallback if still blocked
+      if (isBlockedResponse(data)) {
+        const usedModelConfig = TEXT_MODELS[modelId];
+        if (usedModelConfig?.provider !== 'xai') {
+          const grokFallbackId = 'grok-4-fast';
+          const grokFallbackModel = TEXT_MODELS[grokFallbackId];
+          if (grokFallbackModel?.provider === 'xai') {
+            log.info(`🔄 [QUALITY] ${pageLabel}Still blocked, falling back to Grok vision (${grokFallbackId})...`);
+            try {
+              const grokResponse = await callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, parts, fullEvalPrompt);
+              if (grokResponse.ok) {
+                const grokData = await grokResponse.json();
+                if (grokData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                  log.info(`✅ [QUALITY] ${pageLabel}Grok fallback succeeded`);
+                  data = grokData;
+                } else {
+                  log.error(`❌ [QUALITY] ${pageLabel}Grok fallback returned no text`);
+                  return null;
+                }
               } else {
-                log.error(`❌ [QUALITY] ${pageLabel}Grok fallback returned no text`);
+                log.error(`❌ [QUALITY] ${pageLabel}Grok fallback HTTP error`);
                 return null;
               }
-            } else {
-              log.error(`❌ [QUALITY] ${pageLabel}Grok fallback HTTP error`);
+            } catch (grokErr) {
+              log.error(`❌ [QUALITY] ${pageLabel}Grok fallback failed: ${grokErr.message}`);
               return null;
             }
-          } catch (grokErr) {
-            log.error(`❌ [QUALITY] ${pageLabel}Grok fallback failed: ${grokErr.message}`);
+          } else {
             return null;
           }
         } else {
           return null;
         }
-      } else {
-        return null;
       }
     }
 
@@ -2012,17 +2041,7 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     if (desc.richDescription) {
       // Strip all age/gender language to neutralize for content-safety filters.
       // The prompt only needs hair/clothing/build to identify figures by visual.
-      // Real input from buildCharacterPhysicalDescription uses hyphens ("8-year-old boy")
-      // so the regexes must match hyphen OR whitespace separators.
-      const sanitized = desc.richDescription
-        .replace(/\b\d+[-\s]?years?[-\s]?old\s+(boy|girl|child|kid|man|woman)\b/gi, 'figure')
-        .replace(/\b\d+[-\s]?years?[-\s]?old\b/gi, '')
-        .replace(/\b(little|young|small|tiny)\s+(boy|girl|child|kid|man|woman)\b/gi, 'figure')
-        .replace(/\b(boy|girl|child|kid|man|woman|teenager|teen|adult|elderly|toddler|infant|baby)\b/gi, 'figure')
-        .replace(/\b(male|female)\s+figure\b/gi, 'figure')
-        .replace(/\s{2,}/g, ' ')
-        .replace(/\s+,/g, ',')
-        .trim();
+      const sanitized = sanitizeForGemini(desc.richDescription, 'full');
       description = clothing ? `${sanitized}. Wearing: ${clothing}` : sanitized;
     } else {
       // Minimal description from prompt parsing — drop age/gender entirely
@@ -10777,7 +10796,7 @@ module.exports = {
   runVisualInventory,
 
   // Sanitization helpers
-  sanitizePromptFor25,
+  sanitizeForGemini,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,

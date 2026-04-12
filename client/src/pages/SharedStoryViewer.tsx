@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X, Eye, EyeOff } from 'lucide-react';
+import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle } from '@/utils/textOverlay';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -43,6 +44,7 @@ function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
 interface SharedStoryPage {
   pageNumber: number;
   text: string;
+  textPosition?: string | null;
 }
 
 interface SharedStoryData {
@@ -131,6 +133,7 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [showTextOverlay, setShowTextOverlay] = useState(true);
   const [pageTransition, setPageTransition] = useState<'none' | 'turning'>('none');
   const [turningOut, setTurningOut] = useState(false); // true = current page image is turning away
   const [newImageVisible, setNewImageVisible] = useState(true);
@@ -562,47 +565,108 @@ export default function SharedStoryViewer() {
             </div>
           )}
 
-          {/* Story Pages — text left, image right (desktop) / image top, text bottom (mobile) */}
+          {/* Story Pages — book spread: alternating image/text sides (desktop) */}
           {currentEntry && currentEntry.type === 'story' && (() => {
             const page = story.pages[currentEntry.storyPageIdx];
             if (!page) return null;
-            return (
-              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
-                {/* Text — left on desktop, bottom on mobile */}
-                <div
-                  className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2 md:order-1"
+            const isOddPage = page.pageNumber % 2 === 1;
+            // Odd pages: image LEFT, text RIGHT. Even pages: text LEFT, image RIGHT.
+            // Page turn always animates the RIGHT panel (hinge at spine = left edge).
+
+            const imagePanel = (
+              <div
+                className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 cursor-pointer relative overflow-hidden"
+                onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
+              >
+                <img
+                  src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
+                  alt={`Page ${currentEntry.storyPageIdx + 1}`}
+                  className="w-full h-full object-contain pointer-events-none"
+                  loading="eager"
                   style={{
                     transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
                     opacity: newImageVisible ? 1 : 0,
                   }}
-                >
-                  <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
-                    <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
-                      {page.text}
-                    </p>
-                  </div>
+                />
+                {/* Text overlay on image (matching print layout) */}
+                {showTextOverlay && page.text.trim() && (() => {
+                  const layout = getTextOverlayPosition(page.pageNumber, page.text, (page.textPosition || undefined) as import('@/utils/textOverlay').TextPosition | undefined);
+                  const isFullWidth = layout.position.includes('full');
+                  return (
+                    <div
+                      className={getOverlayClasses(layout)}
+                      style={{
+                        ...getOverlayPositionStyle(layout),
+                        width: `${layout.widthPercent}%`,
+                        maxHeight: `${layout.heightPercent}%`,
+                        overflow: 'hidden',
+                        transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
+                        opacity: newImageVisible ? 1 : 0,
+                      }}
+                    >
+                      <div className="p-3 md:p-4 h-full" style={getGradientStyle(layout)}>
+                        <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
+                           style={{ fontSize: 'clamp(0.65rem, 1.5vw, 0.95rem)', textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)' }}>
+                          {page.text.trim()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+
+            const textPanel = (
+              <div
+                className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2"
+                style={{
+                  transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
+                  opacity: newImageVisible ? 1 : 0,
+                }}
+              >
+                <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
+                  <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
+                    {page.text}
+                  </p>
                 </div>
-                {/* Image — right on desktop (page turn animation), top on mobile */}
+              </div>
+            );
+
+            // Desktop: odd = [image, text], even = [text, image]
+            // The RIGHT panel (second child on desktop) gets the page turn animation
+            const leftPanel = isOddPage ? imagePanel : textPanel;
+            const rightPanel = isOddPage ? textPanel : imagePanel;
+
+            return (
+              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
+                {/* Left panel on desktop */}
+                <div className="hidden md:block md:h-full">
+                  {leftPanel}
+                </div>
+                {/* Right panel on desktop — page turn animation applied here */}
                 <div
-                  className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden"
-                  style={{ perspective: '2000px' }}
-                  onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
+                  className="hidden md:flex md:h-full relative overflow-hidden"
+                  style={turningOut ? {
+                    perspective: '2000px',
+                    transformOrigin: 'left center',
+                    backfaceVisibility: 'hidden',
+                    animation: 'pageTurnLeft 1.6s ease-in-out forwards',
+                  } : { perspective: '2000px' }}
                 >
-                  {/* New page image — fades in while old page turns */}
+                  {rightPanel}
+                </div>
+                {/* Mobile: always image top, text bottom */}
+                <div className="md:hidden h-1/2 bg-white flex items-center justify-center relative overflow-hidden cursor-pointer"
+                     onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}>
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
-                    className="w-full h-full object-contain pointer-events-none"
+                    className="w-full h-full object-contain"
                     loading="eager"
-                    style={turningOut ? {
-                      transformOrigin: 'left center',
-                      backfaceVisibility: 'hidden',
-                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                    } : {
-                      transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
-                      opacity: newImageVisible ? 1 : 0,
-                    }}
                   />
+                </div>
+                <div className="md:hidden h-1/2 p-4 overflow-y-auto bg-white">
+                  <p className="text-base leading-relaxed text-gray-800 whitespace-pre-wrap">{page.text}</p>
                 </div>
               </div>
             );
@@ -687,6 +751,19 @@ export default function SharedStoryViewer() {
           <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
         </button>
       </main>
+
+      {/* Text overlay toggle — desktop */}
+      <div className="hidden md:flex justify-center mt-2">
+        <button
+          onClick={() => setShowTextOverlay(!showTextOverlay)}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+            showTextOverlay ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'
+          }`}
+        >
+          {showTextOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
+          {showTextOverlay ? 'Text on' : 'Text off'}
+        </button>
+      </div>
 
       {/* Mobile navigation - bottom */}
       <div className="md:hidden flex items-center justify-center gap-4 pb-4">

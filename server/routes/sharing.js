@@ -174,7 +174,12 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     for (let i = 1; i <= sceneCount; i++) {
       const text = getPageText(storyText, i);
       if (text) {
-        pages.push({ pageNumber: i, text });
+        const sceneImg = data.sceneImages?.find(s => Number(s.pageNumber) === i);
+        pages.push({
+          pageNumber: i,
+          text,
+          textPosition: sceneImg?.textPosition || null,
+        });
       }
     }
 

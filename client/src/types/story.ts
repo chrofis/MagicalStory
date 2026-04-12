@@ -773,6 +773,9 @@ export interface SceneImage {
   // Bounding box detection from latest evaluation (for dev mode)
   bboxDetection?: BboxSceneDetection | null;
   bboxOverlayImage?: string | null;
+  // Text overlay positioning (from scene expansion + post-gen region detection)
+  textPosition?: string;
+  textRect?: { x: number; y: number; w: number; h: number; imgWidth: number; imgHeight: number };
 }
 
 export interface CoverImageData {
