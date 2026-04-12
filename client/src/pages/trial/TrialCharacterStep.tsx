@@ -157,11 +157,12 @@ interface TrialCharacterStepProps {
   onAccountCreated?: (sessionToken: string, characterId: string) => void;
   sessionToken?: string | null;
   language: string;
+  adminToken?: string | null;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, onAccountCreated, sessionToken, language }: TrialCharacterStepProps) {
+export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, onAccountCreated, sessionToken, language, adminToken }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -304,6 +305,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           previewAvatar: previewAvatar || undefined, // Save to DB if already generated
           turnstileToken: token,
           fingerprint,
+          ...(adminToken ? { adminToken } : {}),
         }),
       });
 

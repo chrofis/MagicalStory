@@ -60,6 +60,19 @@ const titlePageLimiter = rateLimit({
 // the story job reads the character DB — avoiding duplicate avatar styling.
 const inFlightTitlePagePromises = new Map(); // userId -> Promise
 
+// ─── Admin bypass: admins can test the trial flow repeatedly ─────────────────
+// Checks for an adminToken in req.body — if it decodes to a valid admin JWT,
+// returns true so the caller can skip turnstile/fingerprint/quota checks.
+function isAdminRequest(req) {
+  const token = req.body?.adminToken;
+  if (!token) return false;
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded.role === 'admin';
+  } catch { return false; }
+}
+
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
 const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
@@ -552,15 +565,18 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     }
 
     const safeName = name.replace(/[\r\n]/g, '');
+    const adminBypass = isAdminRequest(req);
 
-    // Layer 1: Verify Turnstile
-    const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
-    if (!turnstileValid) {
-      return res.status(403).json({ error: 'Verification failed. Please try again.' });
+    // Layer 1: Verify Turnstile (skipped for admin testing)
+    if (!adminBypass) {
+      const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
+      if (!turnstileValid) {
+        return res.status(403).json({ error: 'Verification failed. Please try again.' });
+      }
     }
 
-    // Layer 2: Check fingerprint
-    if (!checkFingerprint(fingerprint)) {
+    // Layer 2: Check fingerprint (skipped for admin testing)
+    if (!adminBypass && !checkFingerprint(fingerprint)) {
       return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
     }
 

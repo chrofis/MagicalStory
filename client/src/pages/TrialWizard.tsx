@@ -157,9 +157,11 @@ export default function TrialWizard() {
     fetch(`${apiUrl}/api/user/location`).then(r => r.json()).then(setUserLocation).catch(() => {});
   }, []);
 
-  // Anonymous session state
+  const isAdmin = user?.role === 'admin';
+
+  // Anonymous session state — admins always start fresh (clear stale tokens)
   const [sessionToken, setSessionToken] = useState<string | null>(() =>
-    localStorage.getItem('trial_session_token')
+    isAdmin ? null : localStorage.getItem('trial_session_token')
   );
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
@@ -257,7 +259,7 @@ export default function TrialWizard() {
 
   const li = loggedInStrings[language] || loggedInStrings.en;
 
-  if (!authLoading && user) {
+  if (!authLoading && user && user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-black text-white px-3 py-3">
@@ -297,7 +299,7 @@ export default function TrialWizard() {
 
   const tu = trialUsedStrings[language] || trialUsedStrings.en;
 
-  if (trialUsed) {
+  if (trialUsed && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-black text-white px-3 py-3">
@@ -364,6 +366,7 @@ export default function TrialWizard() {
                 onAccountCreated={handleAccountCreated}
                 sessionToken={sessionToken}
                 language={language}
+                adminToken={isAdmin ? localStorage.getItem('auth_token') : null}
               />
             )}
             {currentStep === 'topic' && (
