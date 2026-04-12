@@ -290,22 +290,23 @@ async function initializeDatabase() {
     // Backfill referral codes for existing users who don't have one yet
     {
       const crypto = require('crypto');
-      // Generate code in format "MagicRoger42"
+      // Generate code in format "MagicRoger427"
       const genCode = (username) => {
-        const clean = (username || '').replace(/[^a-zA-Z]/g, '').slice(0, 12);
+        const clean = (username || '').replace(/[^a-zA-Z]/g, '').slice(0, 10);
         const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
-        const num = crypto.randomInt(10, 99);
+        const num = crypto.randomInt(100, 999);
         return `Magic${name}${num}`;
       };
       const missing = await dbPool.query('SELECT id, username FROM users WHERE referral_code IS NULL');
       for (const row of missing.rows) {
-        const code = genCode(row.username);
-        try {
-          await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
-        } catch (e) {
-          // Unique constraint collision — retry with a different number
-          const retry = genCode(row.username);
-          await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [retry, row.id]);
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const code = genCode(row.username);
+          try {
+            await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
+            break;
+          } catch (e) {
+            if (attempt === 9) console.error(`[DB] Failed to generate unique referral code for user ${row.id} after 10 attempts`);
+          }
         }
       }
       if (missing.rows.length > 0) {

@@ -1430,14 +1430,14 @@ async function getPriceForPages(pageCount, isHardcover) {
 const crypto = require('crypto');
 
 /**
- * Generate a referral code in the format "MagicRoger42".
+ * Generate a referral code in the format "MagicRoger427".
+ * 3-digit suffix → 900 slots per name. Caller retries on unique constraint violation.
  * @param {string} username - the user's display name (first name or username)
  */
 function generateReferralCode(username = '') {
-  // Clean the name: keep only letters, capitalize first letter
-  const clean = username.replace(/[^a-zA-Z]/g, '').slice(0, 12);
+  const clean = username.replace(/[^a-zA-Z]/g, '').slice(0, 10);
   const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
-  const num = crypto.randomInt(10, 99); // 2-digit random suffix
+  const num = crypto.randomInt(100, 999);
   return `Magic${name}${num}`;
 }
 
@@ -1487,13 +1487,15 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
 
     let code = userResult.rows[0].referral_code;
     if (!code) {
-      code = generateReferralCode(userResult.rows[0].username);
-      try {
-        await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
-      } catch (e) {
-        // Unique constraint collision — retry with different random number
-        code = generateReferralCode(userResult.rows[0].username);
-        await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
+      const uname = userResult.rows[0].username;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        code = generateReferralCode(uname);
+        try {
+          await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
+          break;
+        } catch (e) {
+          if (attempt === 9) throw e; // give up after 10 attempts
+        }
       }
     }
 
