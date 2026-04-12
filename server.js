@@ -2778,7 +2778,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneDescriptionPrompt: expansionPrompt,
           sceneDescriptionModelId: expansionResult.modelId,
           characterClothing: page.characterClothing,
-          characters: page.characters
+          characters: page.characters,
+          // Store outline's intended character list — eval uses this to distinguish
+          // "outline-required" (penalty if missing) vs "scene-expansion-added" (no penalty)
+          outlineCharacters: page.characters || []
         };
       });
 
@@ -4689,6 +4692,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           textPosition: img.sceneMetadata?.textPosition || null,
+          outlineCharacters: img.scene?.outlineCharacters || null,
           imageVersions: [],
         }));
       } else {
@@ -4784,7 +4788,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
-          textPosition: img.sceneMetadata?.textPosition || null
+          textPosition: img.sceneMetadata?.textPosition || null,
+          outlineCharacters: img.scene?.outlineCharacters || null
         }));
 
         // Extract covers from pipeline results back into coverImages (updated with eval data)
