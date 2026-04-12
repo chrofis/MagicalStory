@@ -35,9 +35,7 @@ You are an Art Director writing illustration briefs for children's book pages. O
 
 {HEIGHT_ORDER}
 
-**Available Clothing (use in metadata):**
 {AVAILABLE_AVATARS}
-PRESERVE clothing from the scene hint exactly. If hint says `costumed:wizard`, metadata MUST say `costumed:wizard`.
 {LOCKED_PERSPECTIVES}
 
 **RECURRING VISUAL ELEMENTS (when one appears in the scene, name it and weave its detail into the prose):**

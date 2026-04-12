@@ -3272,7 +3272,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CHARACTER_COUNT: characters.length.toString(),
     HEIGHT_ORDER: heightOrder,
     RECURRING_ELEMENTS: recurringElements,
-    AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    AVAILABLE_AVATARS: '', // Clothing comes from scene hint — no need to list all avatars
     LOCKED_PERSPECTIVES: lockedPerspectivesText,
     LANGUAGE_NAME: languageName,
     LANGUAGE_INSTRUCTION: languageInstruction,
@@ -3649,10 +3649,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
   const langLevel = inputData?.languageLevel || 'standard';
   const textSizeHint = langLevel === '1st-grade'
-    ? 'a narrow strip (about one tenth of the frame)'
+    ? 'a narrow strip (about one eighth of the frame)'
     : langLevel === 'advanced'
-      ? 'a large band (about one third of the frame)'
-      : 'a wide band (about one quarter of the frame)';
+      ? 'a large band (about two fifths of the frame)'
+      : 'a wide band (about one third of the frame)';
   const textAreaInstruction = textPosition
     ? `**TEXT AREA:** The ${textPosition.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box.`
     : '';
