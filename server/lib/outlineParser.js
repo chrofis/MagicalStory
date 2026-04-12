@@ -1579,6 +1579,7 @@ class ProgressiveUnifiedParser {
    * @param {Function} callbacks.onCharacterArcs - Called when character arcs section is complete
    * @param {Function} callbacks.onPlotStructure - Called when plot structure section is complete
    * @param {Function} callbacks.onVisualBible - Called when visual bible JSON is complete
+   * @param {Function} callbacks.onCoverScene - Called when cover scene JSON is complete (trial flow)
    * @param {Function} callbacks.onCoverHints - Called when cover hints section is complete
    * @param {Function} callbacks.onPageComplete - Called when a story page is complete
    * @param {Function} callbacks.onProgress - Called with progress updates for UI
@@ -1594,6 +1595,7 @@ class ProgressiveUnifiedParser {
       characterArcs: false,
       plotStructure: false,
       visualBible: false,
+      coverScene: false,
       coverHints: false,
       pages: new Set()
     };
@@ -1606,6 +1608,7 @@ class ProgressiveUnifiedParser {
       '---TITLE---',
       '---CLOTHING REQUIREMENTS---',
       '---VISUAL BIBLE---',
+      '---COVER SCENE---',
       '---COVER SCENE HINTS---',
       '---STORY PAGES---'
     ];
@@ -1633,6 +1636,7 @@ class ProgressiveUnifiedParser {
     this._checkCharacterArcs();
     this._checkPlotStructure();
     this._checkVisualBible();
+    this._checkCoverScene();
     this._checkCoverHints();
     this._checkPages();
   }
@@ -1752,11 +1756,11 @@ class ProgressiveUnifiedParser {
 
     // Visual Bible is complete when we see the next section marker
     // Full flow: VISUAL BIBLE → COVER SCENE HINTS
-    // Trial flow: VISUAL BIBLE → STORY PAGES
+    // Trial flow: VISUAL BIBLE → COVER SCENE → STORY PAGES
     if (!this._hasMarker('VISUAL BIBLE')) return;
-    if (!this._hasMarker('COVER SCENE HINTS') && !this._hasMarker('STORY PAGES')) return;
+    if (!this._hasMarker('COVER SCENE HINTS') && !this._hasMarker('COVER SCENE') && !this._hasMarker('STORY PAGES')) return;
 
-    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*(?:COVER\s+SCENE\s+HINTS|STORY\s+PAGES)\s*---)/i);
+    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*(?:COVER\s+SCENE(?:\s+HINTS)?|STORY\s+PAGES)\s*---)/i);
     if (!sectionMatch) return;
 
     const section = sectionMatch[1];
@@ -1870,6 +1874,40 @@ class ProgressiveUnifiedParser {
       } catch (e) {
         // JSON parse error - log it for debugging
         log.debug(`[STREAM-UNIFIED] Visual Bible JSON parse error (may be incomplete): ${e.message}`);
+      }
+    }
+  }
+
+  /**
+   * Check if cover scene JSON is complete (trial flow: COVER SCENE between VISUAL BIBLE and STORY PAGES)
+   */
+  _checkCoverScene() {
+    if (this.emitted.coverScene) return;
+
+    if (!this._hasMarker('COVER SCENE')) return;
+    if (!this._hasMarker('STORY PAGES')) return;
+
+    // Make sure we match the exact ---COVER SCENE--- marker and not ---COVER SCENE HINTS---
+    const sectionMatch = this.fullText.match(/---\s*COVER\s+SCENE\s*---\s*([\s\S]*?)(?=---\s*STORY\s+PAGES\s*---)/i);
+    if (!sectionMatch) return;
+
+    const section = sectionMatch[1];
+    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i);
+
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        this.emitted.coverScene = true;
+        log.debug(`[PARSER] Cover scene detected`);
+
+        if (this.callbacks.onCoverScene) {
+          this.callbacks.onCoverScene(parsed);
+        }
+        if (this.callbacks.onProgress) {
+          this.callbacks.onProgress('coverScene', 'Cover scene defined');
+        }
+      } catch (e) {
+        log.debug(`[STREAM-UNIFIED] Cover scene JSON parse error (may be incomplete): ${e.message}`);
       }
     }
   }
@@ -2036,12 +2074,14 @@ class ProgressiveUnifiedParser {
     // Warn about required sections that weren't detected during streaming
     // Only warn about sections that actually exist in the response (trial mode skips clothing/covers)
     const hasClothingSection = this.fullText.includes('---') && this.fullText.includes('CLOTHING REQUIREMENTS');
-    const hasCoverSection = this.fullText.includes('---') && this.fullText.includes('COVER SCENE HINTS');
+    const hasCoverHintsSection = this.fullText.includes('---') && this.fullText.includes('COVER SCENE HINTS');
+    const hasCoverSceneSection = this.fullText.includes('---') && /---\s*COVER\s+SCENE\s*---/.test(this.fullText);
     const missingSections = [];
     if (!this.emitted.title) missingSections.push('TITLE');
     if (!this.emitted.clothingRequirements && hasClothingSection) missingSections.push('CLOTHING REQUIREMENTS');
     if (!this.emitted.visualBible) missingSections.push('VISUAL BIBLE');
-    if (!this.emitted.coverHints && hasCoverSection) missingSections.push('COVER SCENE HINTS');
+    if (!this.emitted.coverScene && hasCoverSceneSection) missingSections.push('COVER SCENE');
+    if (!this.emitted.coverHints && hasCoverHintsSection) missingSections.push('COVER SCENE HINTS');
 
     if (missingSections.length > 0) {
       log.warn(`⚠️ [STREAM-UNIFIED] Missing sections not detected during streaming: ${missingSections.join(', ')}`);
@@ -2057,6 +2097,7 @@ class ProgressiveUnifiedParser {
       characterArcs: this.emitted.characterArcs,
       plotStructure: this.emitted.plotStructure,
       visualBible: this.emitted.visualBible,
+      coverScene: this.emitted.coverScene,
       coverHints: this.emitted.coverHints,
       pageCount: this.emitted.pages.size
     };
