@@ -3972,6 +3972,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     templateName = 'parallel';
   }
 
+  // Build interactions block from metadata (tells image model exactly what each character holds/touches)
+  let interactionsBlock = '';
+  const interactions = metadata?.interactions || metadata?.fullData?.interactions;
+  if (interactions && interactions.length > 0) {
+    const lines = interactions.map(i =>
+      `- ${i.character || '?'}: ${i.where || i.object || '(unspecified)'}`
+    );
+    interactionsBlock = `**CHARACTER INTERACTIONS (must match exactly):**\n${lines.join('\n')}`;
+  }
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
@@ -3985,6 +3995,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
+        INTERACTIONS_BLOCK: interactionsBlock,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
@@ -4004,6 +4015,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         SCENE_DESCRIPTION: structuredScene,
         CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
+        INTERACTIONS_BLOCK: interactionsBlock,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
@@ -4018,6 +4030,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       VISUAL_BIBLE: visualBibleSection,
       REQUIRED_OBJECTS: requiredObjectsSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
+      INTERACTIONS_BLOCK: interactionsBlock,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });

@@ -14,6 +14,8 @@ Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No border
 
 {REQUIRED_OBJECTS}
 
+{INTERACTIONS_BLOCK}
+
 {TEXT_AREA_INSTRUCTION}
 
 **ART STYLE:** {STYLE_DESCRIPTION}
