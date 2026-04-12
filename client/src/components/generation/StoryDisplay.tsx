@@ -6255,9 +6255,22 @@ export function StoryDisplay({
                         <span className="text-sm text-gray-700">A4 (21×28cm)</span>
                       </label>
                     </div>
+                    <div className="border-t border-gray-100 px-2 py-2">
+                      <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={textOverlay}
+                          onChange={(e) => setTextOverlay(e.target.checked)}
+                          className="text-indigo-500 rounded"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+                        </span>
+                      </label>
+                    </div>
                     <button
                       onClick={() => {
-                        onDownloadPdf(pdfFormat);
+                        onDownloadPdf(pdfFormat, textOverlay);
                         setShowPdfFormatDropdown(false);
                       }}
                       className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
