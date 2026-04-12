@@ -809,7 +809,7 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
 router.post('/create-story', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, preGeneratedTitlePage: clientTitlePage } = req.body;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation } = req.body;
 
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required' });
@@ -860,8 +860,6 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
 
     const mainChar = charData.characters[0];
-    // Prefer client-sent title page (always up-to-date), fall back to DB (may not be saved yet)
-    const preGeneratedTitlePage = clientTitlePage || mainChar.preGeneratedTitlePage || null;
     const characterData = {
       name: mainChar.name,
       age: mainChar.age,
@@ -911,7 +909,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       [JSON.stringify({ characterData, storyInput }), storyInput.language || 'en', userId]
     );
 
-    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage, resolvedLocation);
+    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, resolvedLocation);
 
     if (deps.processStoryJob) {
       deps.processStoryJob(jobId).catch(err => {
@@ -1911,7 +1909,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
  * @param {object} storyInput - { storyCategory, storyTopic, storyTheme, storyDetails, language }
  * @returns {string} jobId
  */
-async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage = null, userLocation = null) {
+async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput, userLocation = null) {
   // Check daily trial story cap (spending safety net)
   if (!checkAndIncrementTrialCap('story')) {
     const err = new Error('Daily trial story limit reached. Please try again tomorrow.');
@@ -1963,7 +1961,6 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
     trialMode: true, // Trial prompt with visual bible backgrounds for early empty scene streaming
-    preGeneratedTitlePage: preGeneratedTitlePage || null, // Pre-generated from prepare-title endpoint
     ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };
 

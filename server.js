@@ -2922,43 +2922,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (inputData.titlePageOnly && coverType !== 'titlePage') return;
       if (skipCovers) return;
 
-      // Skip if pre-generated title page exists (from prepare-title endpoint)
-      if (coverType === 'titlePage' && inputData.preGeneratedTitlePage) {
-        log.info(`⏭️ [COVER] Skipping titlePage generation — using pre-generated title page`);
-        streamingCoverPromises.set(coverType, Promise.resolve({
-          type: coverType,
-          imageData: inputData.preGeneratedTitlePage,
-          qualityScore: 80,
-          qualityReasoning: 'Pre-generated during trial step 3',
-        }));
-        return;
-      }
-
       const coverPromise = streamCoverLimit(async () => {
-        // TRIAL MODE: Re-check DB for pre-generated title page (may have been saved after job started)
-        if (coverType === 'titlePage' && inputData.trialMode && inputData.characterId) {
-          try {
-            const charResult = await dbPool.query(
-              'SELECT data FROM characters WHERE id = $1',
-              [inputData.characterId]
-            );
-            const charData = charResult.rows[0]?.data;
-            const parsed = typeof charData === 'string' ? JSON.parse(charData) : charData;
-            const titlePageImage = parsed?.characters?.[0]?.preGeneratedTitlePage;
-            if (titlePageImage) {
-              log.info(`⏭️ [COVER] Found pre-generated title page in DB (late arrival) — skipping generation`);
-              return {
-                type: coverType,
-                imageData: titlePageImage,
-                qualityScore: 80,
-                qualityReasoning: 'Pre-generated during trial step 3 (fetched from DB)',
-              };
-            }
-          } catch (e) {
-            log.debug(`[COVER] DB re-check for pre-generated title page failed: ${e.message}`);
-          }
-        }
-
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
           await new Promise(r => setTimeout(r, 100));
