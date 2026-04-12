@@ -26,8 +26,6 @@ interface LocationState {
   characterName: string;
   previewAvatar: string | null;
   titlePageData?: {
-    titlePageImage: string | null;
-    title: string | null;
     costumeType: string | null;
     avatarSlides?: string[];
   } | null;
@@ -204,13 +202,9 @@ export default function TrialGenerationPage() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartRef = useRef<number>(0);
 
-  // Title page image (may arrive late via polling if not ready at navigation time)
-  const [titlePageImage, setTitlePageImage] = useState<string | null>(
-    state?.titlePageData?.titlePageImage || null
-  );
-  const [titlePageTitle, setTitlePageTitle] = useState<string | null>(
-    state?.titlePageData?.title || null
-  );
+  // Title page image — always arrives via polling from the story generation pipeline
+  const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
+  const [titlePageTitle, setTitlePageTitle] = useState<string | null>(null);
 
   // Slideshow of page images as they arrive during generation
   const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
@@ -291,7 +285,6 @@ export default function TrialGenerationPage() {
           },
           body: JSON.stringify({
             ...state.storyInput,
-            ...(state.titlePageData?.titlePageImage ? { preGeneratedTitlePage: state.titlePageData.titlePageImage } : {}),
           }),
         });
 
@@ -372,7 +365,7 @@ export default function TrialGenerationPage() {
   }, []);
 
   // Track whether we still need to fetch the title page (ref so polling closure sees latest value)
-  const needTitlePageRef = useRef(!state?.titlePageData?.titlePageImage);
+  const needTitlePageRef = useRef(true);
 
   useEffect(() => {
     if (!jobId || !state?.sessionToken) return;

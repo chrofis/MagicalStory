@@ -142,11 +142,10 @@ export default function TrialWizard() {
   // Preview avatar (generated before topic selection, used by future "Meet [Name]!" screen)
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
 
-  // Pre-generated title page (generated during step 3 in background)
+  // Title preparation data (costume type + avatar slides from prepare-title)
   const [titlePageData, setTitlePageData] = useState<{
-    titlePageImage: string | null;
-    title: string | null;
     costumeType: string | null;
+    avatarSlides?: string[];
   } | null>(null);
 
   // User location (IP-based, for landmark personalization)

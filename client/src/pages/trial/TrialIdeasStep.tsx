@@ -14,7 +14,7 @@ interface Props {
   onBack: () => void;
   onCreate: () => void;
   sessionToken?: string | null;
-  onTitlePageReady?: (data: { titlePageImage: string | null; title: string | null; costumeType: string | null }) => void;
+  onTitlePageReady?: (data: { costumeType: string | null; avatarSlides?: string[] }) => void;
   userLocation?: { city: string | null; region: string | null; country: string | null } | null;
 }
 
@@ -275,7 +275,7 @@ export default function TrialIdeasStep({
     })
       .then(r => r.json())
       .then(data => {
-        if (data.titlePageImage) {
+        if (data.costumeType || data.avatarSlides?.length) {
           onTitlePageReady?.(data);
         }
       })
