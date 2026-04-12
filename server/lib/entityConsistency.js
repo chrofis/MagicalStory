@@ -385,7 +385,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
     const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
       storyCharacters: characters,
-      clothingRequirements: storyData.clothingRequirements || null
+      clothingRequirements: storyData.clothingRequirements || null,
+      visualBible: storyData.visualBible || null
     });
 
     // Extract and forward pages where fallback bbox detection was run
@@ -732,7 +733,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
 async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
-  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null } = options;
+  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null } = options;
   const pagesWithNewBbox = [];
   const appearances = new Map();
 
@@ -816,6 +817,23 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (sceneDesc?.description) {
         const pageChars = getCharactersInScene(sceneDesc.description, storyCharacters);
         pageCharNames = pageChars.map(c => c.name);
+
+        // Also check for VB animals and secondary characters mentioned in the scene
+        // (e.g., "Funke the dragon" — not a main character but should be detected)
+        const sceneText = sceneDesc.description.toLowerCase();
+        const vb = options.visualBible || storyData?.visualBible || null;
+        if (vb) {
+          for (const animal of (vb.animals || [])) {
+            if (animal.name && sceneText.includes(animal.name.toLowerCase()) && !pageCharNames.includes(animal.name)) {
+              pageCharNames.push(animal.name);
+            }
+          }
+          for (const sc of (vb.secondaryCharacters || [])) {
+            if (sc.name && sceneText.includes(sc.name.toLowerCase()) && !pageCharNames.includes(sc.name)) {
+              pageCharNames.push(sc.name);
+            }
+          }
+        }
       }
       if (pageCharNames.length === 0 && pageNumber < 0) {
         // Covers: prefer per-cover character list from characterClothing (set from cover hint).
@@ -843,8 +861,21 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
+        const vb = options.visualBible || storyData?.visualBible || null;
         const expectedChars = pageCharNames.map(name => {
           const fullChar = storyCharacters.find(c => c.name === name);
+
+          // Check VB for non-main characters (animals, secondary chars)
+          if (!fullChar && vb) {
+            const vbAnimal = vb.animals?.find(a => a.name === name);
+            const vbSecondary = vb.secondaryCharacters?.find(c => c.name === name);
+            const vbEntry = vbAnimal || vbSecondary;
+            if (vbEntry) {
+              const desc = vbEntry.extractedDescription || vbEntry.description || name;
+              return { name, description: sanitizeForGeminiSafety(desc), position: '' };
+            }
+          }
+
           const clothingCategory = charClothing[name] || 'standard';
           // Resolve category to actual clothing description
           let clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
