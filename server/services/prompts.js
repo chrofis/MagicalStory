@@ -26,7 +26,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.imageGenerationSequential = await fs.readFile(path.join(promptsDir, 'image-generation-sequential.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationStorybook = await fs.readFile(path.join(promptsDir, 'image-generation-storybook.txt'), 'utf-8');
+    // Storybook template was merged into image-generation.txt — alias for backward compat
+    PROMPT_TEMPLATES.imageGenerationStorybook = PROMPT_TEMPLATES.imageGeneration;
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageVisualInventory = await fs.readFile(path.join(promptsDir, 'image-visual-inventory.txt'), 'utf-8');
     PROMPT_TEMPLATES.imagePromptCompliance = await fs.readFile(path.join(promptsDir, 'image-prompt-compliance.txt'), 'utf-8');
