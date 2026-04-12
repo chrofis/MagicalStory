@@ -95,21 +95,19 @@ Note: Flag hands with 6+ fingers, fused/melted fingers, or missing hands as MAJO
 - Style consistent across figures?
 - Scene matches the prompt description?
 
-**STEP 5: SPATIAL VALIDATION (lenient)**
+**STEP 5: SPATIAL & COMPOSITION VALIDATION**
 
-Only check MAJOR spatial issues:
-- Is a character completely facing the wrong direction? (back to camera when should face forward)
-- Is a character on the wrong side of the scene? (prompt says left, rendered on right)
-- Is a key object/landmark entirely missing?
+Check these issues:
+- Is a character completely facing the wrong direction? (back to camera when should face forward, or vice versa) = MAJOR
+- Is a character on the wrong side of the scene? (prompt says left, rendered on right) = MODERATE
+- Is a key object/landmark entirely missing? = MAJOR
+- **CAMERA FACING**: If the prompt describes characters interacting with each other or with objects, but 3+ characters face the camera directly like a group photo instead = MAJOR (-2). Characters should face what they interact with, not the viewer.
+- **BACK VIEW IGNORED**: If the prompt says a character is "seen from behind" / "back view" but they face the camera = MAJOR (-2)
 
 DO NOT penalize:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
-- Exact actions not matching (e.g. "not turning from stove" — the character being NEAR the stove is enough)
 - Precise hand positions or gestures
-- Characters not interacting in the exact way described
-- "Static" vs "dynamic" — a group standing together is fine if all characters are present
-
-Image generators produce illustrations, not movie stills. Judge the SCENE COMPOSITION (who's there, where, what setting) not the ACTING.
+- Minor positional differences (doorway vs room entrance = same thing)
 
 ---
 
@@ -125,14 +123,15 @@ Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
   - Unrecognizable character, limbs detached, impossible physics
   - Held/carried object detached from its owner (e.g. toy that should be in pocket is floating beside the character)
   - Declared interaction object drawn at wrong size (e.g. "tiny silhouette" rendered as a large held plush)
+  - 3+ characters face the camera like a group photo when prompt describes them interacting with each other or the scene
+  - Character shown front-facing when prompt says "back view" or "seen from behind", or vice versa
 - MODERATE (-1): Minor clothing difference, character on wrong side of scene, key object missing
 - MINOR (-0.5): Small differences, minor finger issues
 
 DO NOT deduct for:
-- Actions/expressions not matching prompt (image generators cannot control this)
-- "Scene feels static" or "lacks dynamic interaction"
+- Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
+- Precise hand positions or gestures
 - Character not in exact position described (doorway vs room entrance = same thing)
-- Subjective composition preferences
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
 
