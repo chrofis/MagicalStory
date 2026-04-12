@@ -758,9 +758,13 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // cannot "see" an ID and mis-reports the object as missing/unverifiable, wrecking
   // semantic scores and triggering unnecessary repair rounds. The IDs are needed
   // for backend lookups but never for vision comparison.
-  const cleanStoryText = stripEntityIds(storyText);
-  const cleanSceneHint = sceneHint ? stripEntityIds(sceneHint) : null;
-  const cleanImagePrompt = imagePrompt ? stripEntityIds(imagePrompt) : null;
+  //
+  // Also sanitize age/gender terms ("7-year-old boy in pirate costume") that trigger
+  // Gemini PROHIBITED_CONTENT blocks when combined with costume/fantasy imagery.
+  const { sanitizePromptFor25 } = require('./images');
+  const cleanStoryText = sanitizePromptFor25(stripEntityIds(storyText));
+  const cleanSceneHint = sceneHint ? sanitizePromptFor25(stripEntityIds(sceneHint)) : null;
+  const cleanImagePrompt = imagePrompt ? sanitizePromptFor25(stripEntityIds(imagePrompt)) : null;
 
   // Extract declared character interactions from the scene metadata in the
   // expanded image prompt. Parse → formatted text block for the template.

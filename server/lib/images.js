@@ -10776,6 +10776,9 @@ module.exports = {
   // Standalone visual inventory (for evaluate-single endpoint)
   runVisualInventory,
 
+  // Sanitization helpers
+  sanitizePromptFor25,
+
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
   MAX_MASK_COVERAGE_PERCENT
