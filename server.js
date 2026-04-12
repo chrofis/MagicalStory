@@ -4409,7 +4409,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
 
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
-            const textPos = sceneMetadata?.textPosition || null;
+            // Enforce spread rule: odd pages = left side, even = right side
+            const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
+            const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
             const textSizeHint = langLevel === '1st-grade'
               ? 'a narrow strip (about one tenth of the frame)'
@@ -4417,7 +4419,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 ? 'a large band (about one third of the frame)'
                 : 'a wide band (about one quarter of the frame)';
             const emptyTextAreaInstr = textPos
-              ? `Reserve ${textSizeHint} along the ${textPos.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.`
+              ? `The ${textPos.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box — the area should look like a natural part of the scene, just quieter.`
               : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

@@ -3389,7 +3389,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   if (sceneBackground && sceneBackground.startsWith('data:image')) {
     const bgBase64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
     const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-    parts.push({ text: `[Background — copy composition, lighting, camera angle, colors, and depth. Add characters onto this background, do not redraw the environment]:` });
+    parts.push({ text: `[Background — copy composition, lighting, camera angle, colors, and depth. Add characters onto this background, do not redraw the environment. Preserve any calm, low-detail areas — they are reserved for text overlay]:` });
     parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
     currentImageIndex++;
     log.debug(`🖼️ [IMAGE GEN-ONLY] Added scene background reference`);
@@ -4416,13 +4416,14 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         imageData: editResult.imageData,
         repaired: true,
         instruction: editInstruction,
+        referenceImages, // VB/character refs sent to Grok
         usage: editResult.usage
       };
     }
-    return { imageData: null, repaired: false, instruction: editInstruction, usage: null };
+    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, usage: null };
   } catch (err) {
     log.error(`[INPAINT PAGE] Edit failed: ${err.message}`);
-    return { imageData: null, repaired: false, instruction: editInstruction, usage: null, error: err.message };
+    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, usage: null, error: err.message };
   }
 }
 
@@ -5708,7 +5709,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `Reserve ${iterTextSize} along the ${textPos.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area (${iterTextSize}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

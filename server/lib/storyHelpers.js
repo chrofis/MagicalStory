@@ -808,6 +808,24 @@ function parseCharacterDescriptions(prompt) {
   return characterInfo;
 }
 
+/**
+ * Enforce book-spread text position rule:
+ * Odd pages (left side of spread) → must use left or full, never right.
+ * Even pages (right side of spread) → must use right or full, never left.
+ * Flips wrong-side positions to the correct side.
+ */
+function enforceSpreadTextPosition(textPosition, pageNumber) {
+  if (!textPosition || !pageNumber || pageNumber < 1) return textPosition;
+  const isLeftPage = pageNumber % 2 === 1;  // odd = left in spread
+  if (isLeftPage && textPosition.includes('right')) {
+    return textPosition.replace('right', 'left');
+  }
+  if (!isLeftPage && textPosition.includes('left')) {
+    return textPosition.replace('left', 'right');
+  }
+  return textPosition;
+}
+
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -3608,7 +3626,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const isProseFormat = parseProseMetadataFormat(sceneDescription) !== null;
 
   // Build text area instruction if textPosition is specified (keeps illustration uncluttered where text goes)
-  const textPosition = metadata?.textPosition || null;
+  // Enforce spread rule: odd pages = left, even pages = right
+  const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
   const langLevel = inputData?.languageLevel || 'standard';
   const textSizeHint = langLevel === '1st-grade'
     ? 'a narrow strip (about one tenth of the frame)'
@@ -3616,7 +3635,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       ? 'a large band (about one third of the frame)'
       : 'a wide band (about one quarter of the frame)';
   const textAreaInstruction = textPosition
-    ? `**TEXT AREA:** Reserve ${textSizeHint} along the ${textPosition.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.`
+    ? `**TEXT AREA:** The ${textPosition.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)
@@ -4714,6 +4733,9 @@ module.exports = {
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
   buildHairDescription,
+
+  // Text position
+  enforceSpreadTextPosition,
 
   // Parsers
   parseStoryPages,
