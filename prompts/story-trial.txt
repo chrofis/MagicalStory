@@ -77,7 +77,10 @@ It must be detailed enough to illustrate without additional context.
 
 Output ALL sections in this EXACT order. Do not skip any.
 
-{TITLE_SECTION}---VISUAL BIBLE---
+---TITLE---
+TITLE: [A creative, specific title in {LANGUAGE}]
+
+---VISUAL BIBLE---
 ```json
 {
   "secondaryCharacters": [
@@ -111,6 +114,37 @@ Each background describes a scene with NO people, NO human figures. Include: loc
 - For outdoor scenes: describe landscape, sky, vegetation, architecture
 
 Keep it minimal: max 2-3 locations, 1-2 key objects, only secondary characters, 3-5 backgrounds.
+
+---COVER SCENE---
+Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Use a Visual Bible location (prefer real landmarks) as background. Characters in costumed clothing. Wide shot, balanced composition.
+
+```json
+{
+  "title": "[exact title from the TITLE section above]",
+  "scene": {
+    "imageSummary": "[2-3 sentences: main character in an iconic pose at the story's key location, mood and atmosphere]",
+    "setting": {
+      "location": "[Location Name [LOC001]]",
+      "indoorOutdoor": "[indoor/outdoor]",
+      "description": "[visual setting details]",
+      "lighting": "[time of day + light quality]",
+      "weather": "[weather]",
+      "camera": "wide",
+      "depthLayers": "[foreground, midground, background description]"
+    },
+    "characters": [
+      {
+        "name": "[MainCharName]",
+        "position": "center",
+        "action": "[heroic or characteristic pose/action]",
+        "expression": "[confident/happy/determined]",
+        "clothing": "costumed:[type]"
+      }
+    ],
+    "objects": ["[LOC###]", "[ART### if relevant]"]
+  }
+}
+```
 
 ---STORY PAGES---
 

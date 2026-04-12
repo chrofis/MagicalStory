@@ -4332,20 +4332,12 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
   if (PROMPT_TEMPLATES.storyTrial) {
     // Look up costume from config
     const { getTrialCostume } = require('../config/trialCostumes');
-    const { getTrialTitle } = require('../config/trialTitles');
     const mainChar = (inputData.characters || [])[0];
     const topic = inputData.storyTopic || inputData.storyTheme || '';
     const category = inputData.storyCategory || 'adventure';
     const gender = mainChar?.gender || '';
 
     const costume = getTrialCostume(topic, category, gender);
-
-    // Look up pre-defined title
-    const preDefinedTitle = getTrialTitle(topic, category, gender, language);
-    // If pre-defined title exists, skip the TITLE section entirely (saves tokens, title is set in server.js)
-    const titleSection = preDefinedTitle
-      ? ''
-      : `---TITLE---\nTITLE: [A creative, specific title in ${getLanguageNameEnglish(language)}]\n\n`;
 
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
@@ -4382,7 +4374,6 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       AVATAR_SELECTION: avatarSelection,
-      TITLE_SECTION: titleSection,
       LANDMARKS: landmarksInstruction,
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
     });
