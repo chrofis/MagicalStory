@@ -4084,6 +4084,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     });
 
+    // Batch-translate scene summaries to story language (separate from scene expansion)
+    // One cheap Haiku call with all summaries — ~1-2s, ~$0.001
+    if (lang !== 'en') {
+      try {
+        const summaries = allSceneDescriptions
+          .map(s => `Page ${s.pageNumber}: ${s.imageSummary || ''}`)
+          .filter(s => s.includes(': ') && s.split(': ')[1].trim())
+          .join('\n');
+        if (summaries) {
+          const { getLanguageInstruction } = require('./server/lib/storyHelpers');
+          const langInstruction = getLanguageInstruction(lang);
+          const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
+          const { callTextModelStreaming } = require('./server/lib/textModels');
+          const transResult = await callTextModelStreaming(translationPrompt, 2000, null, 'claude-haiku-4-5-20251001');
+          if (transResult?.text) {
+            const translations = transResult.text.trim().split('\n').filter(l => l.trim());
+            let tIdx = 0;
+            for (const scene of allSceneDescriptions) {
+              if (scene.imageSummary && tIdx < translations.length) {
+                // Strip "Page N: " prefix if the model echoed it
+                scene.translatedSummary = translations[tIdx].replace(/^Page\s+\d+:\s*/i, '').trim();
+                tIdx++;
+              }
+            }
+            addUsage('anthropic', transResult.usage, 'scene_translation', transResult.modelId);
+            log.info(`🌐 [TRANSLATION] Batch-translated ${tIdx} scene summaries to ${lang} ($${(transResult.usage?.cost || 0).toFixed(4)})`);
+          }
+        }
+      } catch (transErr) {
+        log.warn(`⚠️ [TRANSLATION] Batch translation failed: ${transErr.message}`);
+      }
+    }
+
     // Update pageClothing for storage compatibility (per-character format)
     storyPages.forEach((page, index) => {
       if (page.characterClothing && Object.keys(page.characterClothing).length > 0) {
