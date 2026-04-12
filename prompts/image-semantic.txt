@@ -1,9 +1,11 @@
 Check whether this illustration shows the right STORY BEAT. You are not grading the artist on how closely they copied the prompt — you are checking that the right scene is happening.
 
-**STORY_TEXT (the narrative beat this image must show):** "{STORY_TEXT}"
-**SCENE_HINT (intent from the outline):** "{SCENE_HINT}"
-**FULL PROMPT (background context — do NOT compare visual details against this):** "{IMAGE_PROMPT}"
+**SCENE_HINT (the authoritative source — this defines what MUST be in the image):** "{SCENE_HINT}"
+**IMAGE_PROMPT (the expanded scene sent to the image model — second authority):** "{IMAGE_PROMPT}"
+**STORY_TEXT (narrative context only — do NOT treat as a checklist):** "{STORY_TEXT}"
 **DECLARED INTERACTIONS (character-to-object placements the scene requires):** {INTERACTIONS_BLOCK}
+
+**CHARACTER AUTHORITY RULE:** The SCENE_HINT and IMAGE_PROMPT define which characters belong in the illustration. The STORY_TEXT is background narrative that often mentions characters who are NOT in this illustration — they may appear on other pages, or be referenced in dialogue without being physically present. A character mentioned in STORY_TEXT but absent from SCENE_HINT and IMAGE_PROMPT is NOT missing — do not penalize.
 
 ---
 
@@ -17,10 +19,16 @@ List what you see:
 
 ---
 
-**STEP 2: CHECK THE STORY BEAT**
+**STEP 2: DETERMINE EXPECTED CHARACTERS**
 
-Only check these things:
-- Correct number of foreground characters? (2 expected = 2 visible)
+Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are the ONLY characters expected in the illustration. Ignore any additional names from STORY_TEXT.
+
+---
+
+**STEP 3: CHECK THE STORY BEAT**
+
+Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth):
+- Correct number of foreground characters? (count from SCENE_HINT/IMAGE_PROMPT, not STORY_TEXT)
 - Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual)
 - Key objects present?
 - Correct setting/location?
@@ -32,7 +40,7 @@ Only check these things:
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
 - **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope, not standing beside it. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in the wrong place, flag it as a `wrong_interaction` issue. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
 
-**Ignore everything else.** The full prompt contains detailed physical descriptions that come from reference photos — minor visual differences are expected and OK. Specifically ignore:
+**Ignore everything else.** The image prompt contains detailed physical descriptions from reference photos — minor visual differences are expected. Specifically ignore:
 - Character identity, names, recognizability. A separate system with reference photos handles identity.
 - Specific clothing details: exact colors, shades, patterns, fabric type, accessories (backpack present/absent), specific garment (hoodie vs sweatshirt). Only the broad category matters.
 - Hair details: exact length, exact shade, ponytail vs loose, style.
@@ -43,13 +51,14 @@ Only check these things:
 - Subtle expression differences (thoughtful vs focused, slightly worried vs neutral).
 - Exact pose, gesture, body language.
 - Left/right positioning, spatial arrangement.
+- Characters mentioned in STORY_TEXT but not in SCENE_HINT/IMAGE_PROMPT.
 
 ---
 
 **SCORING**
 
 Start at 10. Only these deductions exist:
-- Missing foreground character: -3
+- Missing foreground character (listed in SCENE_HINT or IMAGE_PROMPT): -3
 - Character merged into or clipped through an object (AI compositing artifact): -3
 - Declared interaction missing or at completely wrong location (e.g. object in pocket drawn as large held plush): -3
 - Wrong setting/location: -2
@@ -59,7 +68,7 @@ Start at 10. Only these deductions exist:
 - Wrong gaze (characters interacting but facing away): -1
 - Wrong clothing type on a character: -1
 
-No other deductions. Extra objects, background people, non-declared spatial arrangement — all score 10.
+No other deductions. Extra objects, background people, non-declared spatial arrangement, characters from STORY_TEXT not in SCENE_HINT — all score 10.
 
 VERDICT: PASS (7+), FAIL (0-6)
 
@@ -78,6 +87,7 @@ Return JSON only. Use one issues list (not two).
     "action": "girl waving at boy who holds sword"
   },
   "expected": {
+    "source": "SCENE_HINT + IMAGE_PROMPT (not STORY_TEXT)",
     "characters": ["girl", "boy"],
     "objects": ["sword", "map"],
     "setting": "forest",
