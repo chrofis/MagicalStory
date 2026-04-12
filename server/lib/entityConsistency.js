@@ -832,7 +832,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         // Also check for VB animals and secondary characters mentioned in the scene
         // (e.g., "Funke the dragon" — not a main character but should be detected)
         const sceneText = sceneDesc.description.toLowerCase();
-        const vb = options.visualBible || storyData?.visualBible || null;
+        const vb = visualBible || null;
         if (vb) {
           for (const animal of (vb.animals || [])) {
             if (animal.name && sceneText.includes(animal.name.toLowerCase()) && !pageCharNames.includes(animal.name)) {
@@ -872,7 +872,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
-        const vb = options.visualBible || storyData?.visualBible || null;
+        const vb = visualBible || null;
         const expectedChars = pageCharNames.map(name => {
           const fullChar = storyCharacters.find(c => c.name === name);
 

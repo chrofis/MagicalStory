@@ -4200,7 +4200,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           .filter(s => s.includes(': ') && s.split(': ')[1].trim())
           .join('\n');
         if (summaries) {
-          const { getLanguageInstruction } = require('./server/lib/storyHelpers');
+          const { getLanguageInstruction } = require('./server/lib/languages');
           const langInstruction = getLanguageInstruction(lang);
           const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
           const { callTextModelStreaming } = require('./server/lib/textModels');
