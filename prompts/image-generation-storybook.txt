@@ -7,3 +7,5 @@ EXACTLY {CHARACTER_COUNT} characters in this image, no more. Every person must m
 {STYLE_DESCRIPTION}
 
 {SCENE_DESCRIPTION}
+
+{TEXT_AREA_INSTRUCTION}
