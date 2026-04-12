@@ -1282,13 +1282,21 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     // Calculate normalized padded box for later compositing
     const paddedBox = [y1 / height, x1 / width, y2 / height, x2 / width];
 
+    // Guard against degenerate bboxes (ymin >= ymax or xmin >= xmax)
+    const cropW = x2 - x1;
+    const cropH = y2 - y1;
+    if (cropW < 1 || cropH < 1) {
+      log.warn(`[ENTITY-CROP] Skipping degenerate bbox: ${cropW}x${cropH} (coords: x=${x1}-${x2}, y=${y1}-${y2})`);
+      return null;
+    }
+
     // Extract crop (no resize if targetSize is null)
     let sharpPipeline = sharp(imgBuffer)
       .extract({
         left: x1,
         top: y1,
-        width: x2 - x1,
-        height: y2 - y1
+        width: cropW,
+        height: cropH
       });
 
     // Only resize if targetSize is specified

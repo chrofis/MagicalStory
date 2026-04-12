@@ -3085,7 +3085,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
-        const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
+        let characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
 
         // Run the cover hint through scene expansion (same as pages) so covers get
         // a structured description with emptyScenePrompt and objects metadata.
