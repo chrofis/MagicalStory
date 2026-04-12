@@ -3453,36 +3453,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const progressiveParser = new ProgressiveUnifiedParser({
       onTitle: (title) => {
         streamingTitle = title;
-
-        // TRIAL MODE: Start title page generation as soon as title is known
-        // Must wait for avatar styling to complete first (started before streaming)
-        if (inputData.trialMode && inputData.titlePageOnly && !skipImages) {
-          const mainCharNames = (inputData.characters || [])
-            .filter(c => c.isMainCharacter)
-            .map(c => c.name)
-            .join(', ') || 'the main character';
-          const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
-          const titlePageHint = {
-            hint: `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
-            characterClothing: {}
-          };
-          // Use trial costume for title page character clothing
-          if (inputData._trialCostumeType) {
-            for (const char of (inputData.characters || [])) {
-              titlePageHint.characterClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
-            }
-          }
-          // Wait for avatar styling before starting cover (runs in background, doesn't block streaming)
-          (async () => {
-            if (streamingAvatarStylingPromise) {
-              log.debug(`🎨 [TRIAL] Waiting for avatar styling before title page...`);
-              await streamingAvatarStylingPromise;
-              log.debug(`🎨 [TRIAL] Avatars ready, starting title page generation`);
-            }
-            startCoverGeneration('titlePage', titlePageHint);
-            log.info(`🎨 [TRIAL] Started title page generation (title: "${title}")`);
-          })();
-        }
+        // Trial cover generation moved to onCoverScene (richer structured data from Claude)
       },
       onClothingRequirements: (requirements) => {
         streamingClothingRequirements = requirements;
@@ -3596,6 +3567,161 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             log.info(`🎬 [TRIAL] All ${Object.keys(sceneBackgrounds).length} empty scenes ready`);
           }).catch(() => {});
         }
+      },
+      onCoverScene: (coverData) => {
+        // TRIAL MODE: Generate title page from the structured cover scene JSON
+        if (!inputData.trialMode) return;
+        if (streamingCoverPromises.has('titlePage') || skipImages) return;
+
+        const coverTitle = coverData.title || streamingTitle || 'My Story';
+        const coverScene = coverData.scene || coverData;
+
+        const coverPromise = (async () => {
+          try {
+            // Wait for prerequisites: visual bible + avatar styling
+            while (!streamingVisualBible) {
+              await new Promise(r => setTimeout(r, 100));
+            }
+            if (streamingAvatarStylingPromise) {
+              log.debug(`[TRIAL-COVER] Waiting for avatar styling...`);
+              await streamingAvatarStylingPromise;
+            }
+
+            // Build scene description from the cover hint JSON
+            const sceneDescription = '```json\n' + JSON.stringify(coverScene, null, 2) + '\n```';
+
+            // Determine which characters appear in the cover scene
+            let coverCharacters = [];
+            if (coverScene.characters?.length > 0) {
+              const sceneCharNames = coverScene.characters.map(c => c.name?.toLowerCase());
+              coverCharacters = (inputData.characters || []).filter(c =>
+                sceneCharNames.includes(c.name?.toLowerCase())
+              );
+            }
+            if (coverCharacters.length === 0) {
+              coverCharacters = (inputData.characters || []).filter(c => c.isMainCharacter === true);
+            }
+            if (coverCharacters.length === 0) {
+              coverCharacters = (inputData.characters || []).slice(0, 3);
+            }
+
+            // Build per-character clothing requirements
+            const coverClothingReqs = { ...(inputData._trialClothingRequirements || {}) };
+            if (coverScene.characters?.length > 0) {
+              for (const sc of coverScene.characters) {
+                if (sc.name && sc.clothing) {
+                  coverClothingReqs[sc.name] = {
+                    ...(coverClothingReqs[sc.name] || {}),
+                    _currentClothing: sc.clothing
+                  };
+                }
+              }
+            }
+            // Fallback: apply trial costume type for characters without explicit clothing
+            if (inputData._trialCostumeType) {
+              for (const char of coverCharacters) {
+                if (!coverClothingReqs[char.name]?._currentClothing) {
+                  if (!coverClothingReqs[char.name]) coverClothingReqs[char.name] = {};
+                  coverClothingReqs[char.name]._currentClothing = `costumed:${inputData._trialCostumeType}`;
+                }
+              }
+            }
+
+            // Get character photos with styled avatars
+            let coverPhotos = getCharacterPhotoDetails(coverCharacters, 'standard', artStyle, coverClothingReqs);
+            coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
+
+            // Build prompt components
+            const pageImageModel = MODEL_DEFAULTS.simplePageImage;
+            const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
+            const styleDescription = resolveArtStyle(artStyle, pageImageBackend) || resolveArtStyle('pixar');
+            const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
+            const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true });
+
+            const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+              TITLE_PAGE_SCENE: sceneDescription,
+              STORY_TITLE: coverTitle,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_REFERENCE_LIST: characterRefList,
+              VISUAL_BIBLE: visualBibleText
+            });
+
+            // Resolve landmark photos from cover scene location
+            const sceneMetadata = extractSceneMetadata(sceneDescription);
+            const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
+
+            // Build VB grid (page number -1 = front cover convention)
+            let elementRefs = getElementReferenceImagesForPage(streamingVisualBible, -1, 6);
+            // Also match by IDs from cover scene objects
+            if (coverScene.objects?.length > 0) {
+              const sceneIds = coverScene.objects
+                .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH|LOC)\d+)/i)?.[1] : null)
+                .filter(Boolean);
+              if (sceneIds.length > 0) {
+                const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds.filter(id => !id.startsWith('LOC')));
+                const existingIds = new Set(elementRefs.map(r => r.id));
+                const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+                if (newRefs.length > 0) elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
+              }
+            }
+            const secondaryLandmarks = coverLandmarkPhotos.slice(1);
+            let coverVbGrid = null;
+            if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
+              coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
+            }
+
+            log.info(`[TRIAL-COVER] Starting title page generation (title: "${coverTitle}", ${coverCharacters.length} chars, ${coverLandmarkPhotos.length} landmarks${coverVbGrid ? ', VB grid' : ''})`);
+            const startTime = Date.now();
+
+            // Generate the image using simplePageImage model (same as trial pages)
+            const result = await generateImageOnly(coverPrompt, coverPhotos, {
+              imageModelOverride: pageImageModel,
+              imageBackendOverride: pageImageBackend,
+              landmarkPhotos: coverLandmarkPhotos,
+              visualBibleGrid: coverVbGrid,
+              aspectRatio: MODEL_DEFAULTS.coverAspect,
+              pageNumber: -1
+            });
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            log.info(`[TRIAL-COVER] Title page image ready in ${elapsed}s`);
+
+            // Track usage
+            if (result.usage) {
+              const isGrok = result.modelId?.startsWith('grok-imagine');
+              const provider = isGrok ? 'grok' : 'gemini_image';
+              addUsage(provider, result.usage, 'cover_images', result.modelId);
+            }
+
+            // Save checkpoint for progressive display
+            if (result.imageData) {
+              await saveCheckpoint(jobId, 'partial_cover', {
+                type: 'frontCover',
+                imageData: result.imageData,
+                storyTitle: coverTitle
+              }, 0);
+              log.debug(`[TRIAL-COVER] Saved partial_cover checkpoint`);
+            }
+
+            return {
+              type: 'titlePage',
+              imageData: result.imageData,
+              description: sceneDescription,
+              prompt: coverPrompt,
+              modelId: result.modelId,
+              referencePhotos: coverPhotos,
+              landmarkPhotos: coverLandmarkPhotos,
+              grokRefImages: result.grokRefImages || null
+            };
+          } catch (err) {
+            log.warn(`[TRIAL-COVER] Title page generation failed: ${err.message}`);
+            return null;
+          }
+        })();
+
+        coverPromise.catch(err => log.warn(`[TRIAL-COVER] Promise failed (will be handled when awaited): ${err.message}`));
+        streamingCoverPromises.set('titlePage', coverPromise);
+        log.info(`[TRIAL-COVER] Started cover generation from streaming cover scene`);
       },
       onCoverHints: () => {
         // Cover hints section complete - we'll start covers when we have individual hints
