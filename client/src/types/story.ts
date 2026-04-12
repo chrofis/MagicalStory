@@ -686,6 +686,9 @@ export interface ImageVersion {
   bboxOverlayImage?: string | null;
   // Grok reference images sent for this version
   grokRefImages?: string[] | null;
+  // Inpaint repair details
+  inpaintInstruction?: string | null;
+  inpaintReferenceImages?: string[] | null;
   // Entity repair specific
   entityRepairedFor?: string;
   clothingCategory?: string;

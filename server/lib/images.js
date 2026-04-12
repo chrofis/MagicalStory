@@ -4882,6 +4882,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 source: `inpaint-round-${round}`,
                 modelId: inpaintResult.usage?.model || 'grok-text-edit',
                 inpaintInstruction: inpaintResult.instruction,
+                inpaintReferenceImages: inpaintResult.referenceImages || null,
                 grokRefImages: null,
               };
             }
@@ -5338,6 +5339,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       prompt: img.prompt || null,
       grokRefImages: v.grokRefImages || null,
       inpaintInstruction: v.inpaintInstruction || null,
+      inpaintReferenceImages: v.inpaintReferenceImages || null,
     });
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));
