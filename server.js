@@ -4802,6 +4802,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
       const skipQualityEval = inputData.skipQualityEval === true;
 
+      // ── Text region detection: analyze each generated image to find the actual
+      // calmest/lightest region and override textPosition if significantly better.
+      // Runs in parallel across all pages — cheap (pure pixel math, no API call).
+      const { detectBestTextPosition } = require('./server/lib/textRegion');
+      const textRegionOverrides = {};
+      try {
+        const scenePages = rawImages.filter(img => img.pageNumber > 0 && img.imageData);
+        const detections = await Promise.all(scenePages.map(async (img) => {
+          const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);
+          if (!preferred) return null;
+          const result = await detectBestTextPosition(img.imageData, preferred, img.pageNumber);
+          if (result.overridden) {
+            textRegionOverrides[img.pageNumber] = result.position;
+          }
+          return { page: img.pageNumber, ...result };
+        }));
+        const overrideCount = Object.keys(textRegionOverrides).length;
+        if (overrideCount > 0) {
+          log.info(`📝 [TEXT-REGION] Overrode ${overrideCount} text positions: ${detections.filter(d => d?.overridden).map(d => `P${d.page}: ${d.preferredScore.toFixed(2)}→${d.score.toFixed(2)} (${d.position})`).join(', ')}`);
+        } else {
+          log.debug(`📝 [TEXT-REGION] All ${scenePages.length} pages: preferred positions are optimal`);
+        }
+      } catch (trErr) {
+        log.warn(`⚠️ [TEXT-REGION] Detection failed: ${trErr.message} — using preferred positions`);
+      }
+
       if (skipQualityEval) {
         // Trial/lightweight mode: skip evaluation and repair entirely
         log.info(`⏭️ [UNIFIED] Skipping quality evaluation and repair pipeline (skipQualityEval=true)`);
@@ -4825,7 +4851,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           emptyScenePrompt: img.emptyScenePrompt || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
-          textPosition: enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
+          textPosition: textRegionOverrides[img.pageNumber] || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           outlineCharacters: img.scene?.outlineCharacters || null,
           imageVersions: [],
         }));
@@ -4922,7 +4948,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
-          textPosition: enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
+          textPosition: textRegionOverrides[img.pageNumber] || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           outlineCharacters: img.scene?.outlineCharacters || null
         }));
 
