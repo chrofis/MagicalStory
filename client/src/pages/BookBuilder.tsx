@@ -50,6 +50,12 @@ export default function BookBuilder() {
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[] | undefined>(undefined);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoValid, setPromoValid] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoError, setPromoError] = useState('');
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [canUsePromo, setCanUsePromo] = useState<boolean | null>(null); // null = loading
 
   // Fetch pricing tiers on mount
   useEffect(() => {
@@ -64,6 +70,36 @@ export default function BookBuilder() {
     }
     fetchPricing();
   }, []);
+
+  // Check if user can use a referral code (referred_by must be null)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    storyService.getMyReferralCode()
+      .then(data => setCanUsePromo(data.referredBy === null))
+      .catch(() => setCanUsePromo(false));
+  }, [isAuthenticated]);
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoChecking(true);
+    setPromoError('');
+    try {
+      const result = await storyService.validateReferralCode(promoCode.trim());
+      if (result.valid) {
+        setPromoValid(true);
+        setPromoDiscount(result.discountChf || 10);
+        setPromoError('');
+      } else {
+        setPromoValid(false);
+        setPromoDiscount(0);
+        setPromoError(result.reason || 'Invalid code');
+      }
+    } catch {
+      setPromoError('Failed to validate code');
+    } finally {
+      setPromoChecking(false);
+    }
+  };
 
   const translations = {
     en: {
@@ -106,6 +142,10 @@ export default function BookBuilder() {
       shippingSavingHint: 'Save on shipping by ordering multiple books at once — shipping is paid only once.',
       totalPrice: 'Total',
       perBook: 'per book',
+      promoLabel: 'Have a referral code?',
+      promoApply: 'Apply',
+      promoApplied: 'CHF 10 discount applied',
+      promoDiscount: 'Referral discount',
     },
     de: {
       title: 'Erstelle dein Buch',
@@ -147,6 +187,10 @@ export default function BookBuilder() {
       shippingSavingHint: 'Spare Versandkosten, indem du mehrere Bücher auf einmal bestellst — Versand wird nur einmal berechnet.',
       totalPrice: 'Gesamt',
       perBook: 'pro Buch',
+      promoLabel: 'Hast du einen Empfehlungscode?',
+      promoApply: 'Einlösen',
+      promoApplied: 'CHF 10 Rabatt angewendet',
+      promoDiscount: 'Empfehlungsrabatt',
     },
     fr: {
       title: 'Créer votre livre',
@@ -188,6 +232,10 @@ export default function BookBuilder() {
       shippingSavingHint: 'Économisez sur la livraison en commandant plusieurs livres à la fois — la livraison n\'est facturée qu\'une seule fois.',
       totalPrice: 'Total',
       perBook: 'par livre',
+      promoLabel: 'Avez-vous un code de parrainage ?',
+      promoApply: 'Appliquer',
+      promoApplied: 'Réduction CHF 10 appliquée',
+      promoDiscount: 'Réduction parrainage',
     },
   };
 
@@ -244,7 +292,7 @@ export default function BookBuilder() {
       const storyIds = stories.map(s => s.id);
       log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages, quantity });
 
-      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity);
+      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity, promoValid ? promoCode.trim().toUpperCase() : undefined);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
@@ -552,12 +600,44 @@ export default function BookBuilder() {
               </div>
             )}
 
+            {/* Promo code input — only if user hasn't used a referral code before */}
+            {!isOverLimit && price && canUsePromo && (
+              <div className="mb-4">
+                <label className="text-sm text-gray-600 mb-1 block">{t.promoLabel}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                    disabled={promoValid}
+                    maxLength={12}
+                    placeholder="ABCD1234"
+                    className={`flex-1 px-3 py-2 border rounded-lg text-sm font-mono tracking-wider uppercase ${
+                      promoValid ? 'border-green-300 bg-green-50 text-green-700' : 'border-gray-300'
+                    } focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60`}
+                  />
+                  {!promoValid && (
+                    <button
+                      onClick={handleApplyPromo}
+                      disabled={!promoCode.trim() || promoChecking}
+                      className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50"
+                    >
+                      {promoChecking ? '...' : t.promoApply}
+                    </button>
+                  )}
+                </div>
+                {promoValid && <p className="text-sm text-green-600 mt-1 font-medium">✓ {t.promoApplied}</p>}
+                {promoError && <p className="text-sm text-red-500 mt-1">{promoError}</p>}
+              </div>
+            )}
+
             {/* Price summary */}
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
                   const booksSubtotal = price * quantity;
-                  const totalPrice = booksSubtotal + SHIPPING_COST_CHF;
+                  const discount = promoValid ? promoDiscount : 0;
+                  const totalPrice = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - discount);
                   return (
                     <>
                       <div className="flex items-center justify-between mb-1 text-sm text-gray-600">
@@ -570,6 +650,12 @@ export default function BookBuilder() {
                         <span>{t.shippingLabel}</span>
                         <span>CHF {SHIPPING_COST_CHF}.-</span>
                       </div>
+                      {discount > 0 && (
+                        <div className="flex items-center justify-between mb-2 text-sm text-green-600 font-medium">
+                          <span>{t.promoDiscount}</span>
+                          <span>-CHF {discount}.-</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-2 border-t border-indigo-200">
                         <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
                         <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice}.-</span>

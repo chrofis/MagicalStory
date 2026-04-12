@@ -30,6 +30,13 @@ const CREDIT_CONFIG = {
     INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
   },
 
+  // Referral / promo code rewards
+  REFERRAL: {
+    BUYER_DISCOUNT_CHF: 10,     // CHF 10 off the book price at checkout
+    REFERRER_CREDITS: 350,      // credits added to referrer's balance (= CHF 10 package value)
+    CODE_LENGTH: 8,             // 8-char uppercase alphanumeric, no ambiguous chars
+  },
+
   // Story page limits
   // 1 page = 1 scene = 1 illustration (picture-book layout for all reading levels)
   STORY_PAGES: {

@@ -49,6 +49,7 @@ const Comparisons = lazy(() => import('./pages/Comparisons'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
 const CityListing = lazy(() => import('./pages/CityListing'));
 const CityPage = lazy(() => import('./pages/CityPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
           <Route path="/create/*" element={<StoryWizard />} />
           <Route path="/stories" element={<MyStories />} />
           <Route path="/orders" element={<MyOrders />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/book-builder" element={<BookBuilder />} />
           <Route path="/admin" element={<AdminDashboard />} />

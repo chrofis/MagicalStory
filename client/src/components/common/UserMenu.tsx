@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles, Palette, HelpCircle, Info, Mail, Code } from 'lucide-react';
+import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles, Palette, HelpCircle, Info, Mail, Code, Gift } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Language } from '@/types/story';
@@ -47,7 +47,8 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
     contact: language === 'de' ? 'Kontakt' : language === 'fr' ? 'Contact' : 'Contact',
     legal: language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : 'Legal',
     terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : 'Terms',
-    privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : 'Privacy'
+    privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : 'Privacy',
+    myAccount: language === 'de' ? 'Mein Konto' : language === 'fr' ? 'Mon compte' : 'My Account'
   };
 
   return (
@@ -119,6 +120,15 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
           >
             <Package size={16} />
             <span>{texts.myOrders}</span>
+          </button>
+
+          {/* My Account (referral code + credits) */}
+          <button
+            onClick={() => handleNavigate('/account')}
+            className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+          >
+            <Gift size={16} />
+            <span>{texts.myAccount}</span>
           </button>
 
           {/* Buy Credits */}

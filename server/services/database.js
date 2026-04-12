@@ -265,6 +265,54 @@ async function initializeDatabase() {
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tokens_credited INT DEFAULT 0`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity INT DEFAULT 1`);
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS referral_code_used VARCHAR(20)`);
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_cents INT DEFAULT 0`);
+
+    // Referral system: each user gets a unique promo code; referrers earn credits
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20)`);
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(20)`);
+    // Unique constraint on referral_code (idempotent — does nothing if already exists)
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code) WHERE referral_code IS NOT NULL`);
+
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS referral_events (
+        id SERIAL PRIMARY KEY,
+        referrer_user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        buyer_user_id VARCHAR(255) NOT NULL,
+        order_stripe_session_id VARCHAR(255) NOT NULL UNIQUE,
+        discount_cents INT NOT NULL,
+        credits_granted INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_referral_events_referrer ON referral_events(referrer_user_id)`);
+
+    // Backfill referral codes for existing users who don't have one yet
+    {
+      const { CREDIT_CONFIG } = require('../config/credits');
+      const crypto = require('crypto');
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const genCode = (len) => {
+        let code = '';
+        const bytes = crypto.randomBytes(len);
+        for (let i = 0; i < len; i++) code += chars[bytes[i] % chars.length];
+        return code;
+      };
+      const missing = await dbPool.query('SELECT id FROM users WHERE referral_code IS NULL');
+      for (const row of missing.rows) {
+        const code = genCode(CREDIT_CONFIG.REFERRAL.CODE_LENGTH);
+        try {
+          await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
+        } catch (e) {
+          // Unique constraint collision — retry with a new code
+          const retry = genCode(CREDIT_CONFIG.REFERRAL.CODE_LENGTH);
+          await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [retry, row.id]);
+        }
+      }
+      if (missing.rows.length > 0) {
+        console.log(`[DB] Backfilled referral codes for ${missing.rows.length} users`);
+      }
+    }
 
     // Credit transactions table
     await dbPool.query(`

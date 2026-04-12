@@ -888,6 +888,66 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
           }
 
+          // ── Referral credit: if a valid referral code was used, reward the referrer
+          const refCode = fullSession.metadata?.referralCode;
+          const refReferrerId = fullSession.metadata?.referrerUserId;
+          const refDiscountCents = parseInt(fullSession.metadata?.discountCents) || 0;
+          if (refCode && refReferrerId) {
+            try {
+              // Idempotency: skip if this session was already processed
+              const existing = await dbPool.query(
+                'SELECT id FROM referral_events WHERE order_stripe_session_id = $1', [fullSession.id]
+              );
+              if (existing.rows.length === 0) {
+                const creditsToGrant = CREDIT_CONFIG.REFERRAL.REFERRER_CREDITS;
+
+                // 1. Record the referral event
+                await dbPool.query(`
+                  INSERT INTO referral_events (referrer_user_id, buyer_user_id, order_stripe_session_id, discount_cents, credits_granted)
+                  VALUES ($1, $2, $3, $4, $5)
+                `, [refReferrerId, userId, fullSession.id, refDiscountCents, creditsToGrant]);
+
+                // 2. Update the order with referral info
+                await dbPool.query(
+                  'UPDATE orders SET referral_code_used = $1, discount_cents = $2 WHERE stripe_session_id = $3',
+                  [refCode, refDiscountCents, fullSession.id]
+                );
+
+                // 3. Credit the referrer
+                await dbPool.query(
+                  'UPDATE users SET credits = CASE WHEN credits = -1 THEN -1 ELSE credits + $1 END WHERE id = $2',
+                  [creditsToGrant, refReferrerId]
+                );
+
+                // 4. Record credit transaction for referrer
+                const refBalanceResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [refReferrerId]);
+                await dbPool.query(`
+                  INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                  VALUES ($1, $2, $3, 'referral', $4, $5)
+                `, [
+                  refReferrerId,
+                  creditsToGrant,
+                  refBalanceResult.rows[0]?.credits || creditsToGrant,
+                  fullSession.id,
+                  `Referral reward: a friend used your code ${refCode}`
+                ]);
+
+                // 5. Mark the buyer as referred (permanent — one referral code per buyer, ever)
+                await dbPool.query(
+                  'UPDATE users SET referred_by = $1 WHERE id = $2 AND referred_by IS NULL',
+                  [refCode, userId]
+                );
+
+                log.info(`🎁 [STRIPE WEBHOOK] Referral reward: ${creditsToGrant} credits to ${refReferrerId} (code ${refCode}, buyer ${userId}, discount CHF ${refDiscountCents / 100})`);
+              } else {
+                log.warn('⚠️ [STRIPE WEBHOOK] Referral already processed for session:', fullSession.id);
+              }
+            } catch (refErr) {
+              log.error('❌ [STRIPE WEBHOOK] Referral credit failed:', refErr.message);
+              // Don't throw — the order itself is saved; referral credit is a bonus
+            }
+          }
+
           log.debug('💾 [STRIPE WEBHOOK] Order saved to database');
           log.debug('   User ID:', userId);
           log.debug('   Story IDs:', validatedStoryIds.join(', '));

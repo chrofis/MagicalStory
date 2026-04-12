@@ -2042,15 +2042,27 @@ export const storyService = {
   },
 
   // Stripe checkout for book purchase (supports single story or multiple stories)
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number): Promise<{ url: string }> {
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
-    const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
+    const body: Record<string, unknown> = {
       storyIds: ids,
       coverType: coverType || 'softcover',
       bookFormat: bookFormat || 'A4',
       quantity: quantity || 1,
-    });
+    };
+    if (referralCode) body.referralCode = referralCode;
+    const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', body);
     return response;
+  },
+
+  // Referral: get current user's referral code + stats
+  async getMyReferralCode(): Promise<{ code: string; credits: number; referredBy: string | null; referrals: number; creditsEarned: number }> {
+    return api.get('/api/referral/my-code');
+  },
+
+  // Referral: validate a promo code before checkout
+  async validateReferralCode(code: string): Promise<{ valid: boolean; discountChf?: number; reason?: string }> {
+    return api.post('/api/referral/validate', { code });
   },
 
   // Stripe checkout for credits purchase (server determines price from package)

@@ -1425,11 +1425,112 @@ async function getPriceForPages(pageCount, isHardcover) {
   return isHardcover ? tier.hardcover_price : tier.softcover_price;
 }
 
+// ── Referral / promo code helpers ───────────────────────────────────────────
+
+const crypto = require('crypto');
+
+function generateReferralCode(length = CREDIT_CONFIG.REFERRAL.CODE_LENGTH) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
+  let code = '';
+  const bytes = crypto.randomBytes(length);
+  for (let i = 0; i < length; i++) code += chars[bytes[i] % chars.length];
+  return code;
+}
+
+/**
+ * Validate a referral code for a given buyer. Returns { valid, referrerUserId, discountChf, reason }.
+ */
+async function validateReferralCodeForUser(code, buyerUserId) {
+  if (!code || typeof code !== 'string') return { valid: false, reason: 'No code provided' };
+  const trimmed = code.trim().toUpperCase();
+  if (!trimmed) return { valid: false, reason: 'No code provided' };
+
+  // Look up the code owner
+  const ownerResult = await getDbPool().query(
+    'SELECT id FROM users WHERE referral_code = $1', [trimmed]
+  );
+  if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found' };
+  const referrerUserId = ownerResult.rows[0].id;
+
+  // No self-referral
+  if (referrerUserId === buyerUserId) return { valid: false, reason: 'Cannot use your own code' };
+
+  // Buyer can only use ONE referral code ever
+  const buyerResult = await getDbPool().query(
+    'SELECT referred_by FROM users WHERE id = $1', [buyerUserId]
+  );
+  if (buyerResult.rows.length > 0 && buyerResult.rows[0].referred_by) {
+    return { valid: false, reason: 'You have already used a referral code' };
+  }
+
+  return {
+    valid: true,
+    referrerUserId,
+    discountChf: CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF,
+  };
+}
+
+// GET /api/referral/my-code — return current user's referral code + stats
+router.get('/referral/my-code', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userResult = await getDbPool().query(
+      'SELECT referral_code, credits, referred_by FROM users WHERE id = $1', [userId]
+    );
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    let code = userResult.rows[0].referral_code;
+    if (!code) {
+      code = generateReferralCode();
+      try {
+        await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
+      } catch (e) {
+        // Unique constraint collision — retry
+        code = generateReferralCode();
+        await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
+      }
+    }
+
+    const statsResult = await getDbPool().query(
+      'SELECT COUNT(*)::int as total, COALESCE(SUM(credits_granted), 0)::int as earned FROM referral_events WHERE referrer_user_id = $1',
+      [userId]
+    );
+    const stats = statsResult.rows[0] || { total: 0, earned: 0 };
+
+    res.json({
+      code,
+      credits: userResult.rows[0].credits,
+      referredBy: userResult.rows[0].referred_by || null,
+      referrals: stats.total,
+      creditsEarned: stats.earned,
+    });
+  } catch (err) {
+    log.error('❌ Error fetching referral code:', err);
+    res.status(500).json({ error: 'Failed to fetch referral code' });
+  }
+});
+
+// POST /api/referral/validate — buyer validates a code before checkout
+router.post('/referral/validate', authenticateToken, async (req, res) => {
+  try {
+    const { code } = req.body;
+    const result = await validateReferralCodeForUser(code, req.user.id);
+    if (result.valid) {
+      res.json({ valid: true, discountChf: result.discountChf });
+    } else {
+      res.json({ valid: false, reason: result.reason });
+    }
+  } catch (err) {
+    log.error('❌ Error validating referral code:', err);
+    res.status(500).json({ error: 'Failed to validate code' });
+  }
+});
+
 // Create Stripe checkout session for book purchase
 router.post('/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     // Support both single storyId and array of storyIds
-    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
+    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'A4', referralCode } = req.body;
     const quantity = Math.max(1, Math.min(5, parseInt(req.body.quantity) || 1));
     const userId = req.user.id;
 
@@ -1488,13 +1589,33 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     const SHIPPING_COST_CHF = 10; // Flat CHF 10 shipping per order (Switzerland)
     const booksSubtotal = priceInChf * quantity;
     const totalPriceChf = booksSubtotal + SHIPPING_COST_CHF;
-    const price = totalPriceChf * 100; // Convert CHF to cents for Stripe (total, not per-unit)
-    log.info(`💰 [CHECKOUT] ${quantity}× CHF ${priceInChf} (${booksSubtotal}) + CHF ${SHIPPING_COST_CHF} shipping = CHF ${totalPriceChf}`);
+
+    // Referral discount: validate code server-side (never trust client)
+    let discountCents = 0;
+    let referrerUserId = null;
+    let validatedReferralCode = null;
+    if (referralCode) {
+      const refResult = await validateReferralCodeForUser(referralCode, userId);
+      if (refResult.valid) {
+        discountCents = CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF * 100;
+        referrerUserId = refResult.referrerUserId;
+        validatedReferralCode = referralCode.trim().toUpperCase();
+        log.info(`🎁 [CHECKOUT] Referral code ${validatedReferralCode} applied: CHF ${CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF} off (referrer: ${referrerUserId})`);
+      } else {
+        log.info(`🎁 [CHECKOUT] Referral code rejected: ${refResult.reason}`);
+      }
+    }
+
+    const price = Math.max(0, totalPriceChf * 100 - discountCents);
+    log.info(`💰 [CHECKOUT] ${quantity}× CHF ${priceInChf} (${booksSubtotal}) + CHF ${SHIPPING_COST_CHF} shipping${discountCents ? ` - CHF ${discountCents / 100} referral` : ''} = CHF ${price / 100}`);
 
     const firstStory = stories[0].data;
     const bookTitle = stories.length === 1
       ? firstStory.title
       : `${firstStory.title} + ${stories.length - 1} more`;
+
+    const descParts = [`${quantity > 1 ? `${quantity} copies, ` : ''}${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType} — incl. CHF ${SHIPPING_COST_CHF} shipping`];
+    if (discountCents) descParts.push(`Referral discount: -CHF ${discountCents / 100}`);
 
     // Create checkout session with user-appropriate Stripe client
     const session = await userStripe.checkout.sessions.create({
@@ -1504,9 +1625,9 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
           currency: 'chf',
           product_data: {
             name: quantity > 1 ? `${quantity}x Personalized Storybook: ${bookTitle}` : `Personalized Storybook: ${bookTitle}`,
-            description: `${quantity > 1 ? `${quantity} copies, ` : ''}${stories.length} ${stories.length === 1 ? 'story' : 'stories'}, ${totalPages} pages, ${coverType} — incl. CHF ${SHIPPING_COST_CHF} shipping`,
+            description: descParts.join('. '),
           },
-          unit_amount: price,  // Total price for all copies (book × qty + shipping)
+          unit_amount: price,
         },
         quantity: 1,
       }],
@@ -1520,7 +1641,12 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         totalPages: totalPages.toString(),
         coverType: coverType,
         bookFormat: bookFormat,
-        quantity: quantity.toString()
+        quantity: quantity.toString(),
+        ...(validatedReferralCode && {
+          referralCode: validatedReferralCode,
+          referrerUserId: referrerUserId,
+          discountCents: discountCents.toString(),
+        }),
       },
       shipping_address_collection: {
         allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']
