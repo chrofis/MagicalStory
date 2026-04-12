@@ -1423,7 +1423,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 
         if (!response.ok) {
           const error = await response.text();
-          log.error(`❌ [BBOX-DETECT] API error (${modelId}): ${error.substring(0, 200)}`);
+          const errorOneLine = error.replace(/[\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').substring(0, 200);
+          log.warn(`⚠️ [BBOX-DETECT] API error ${response.status} (${modelId}): ${errorOneLine}`);
           // Try Grok fallback on API error
           const grokFallbackId = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : 'grok-4-fast';
           const grokModel = TEXT_MODELS[grokFallbackId];
@@ -1869,7 +1870,7 @@ async function detectSubRegion(characterCrop, targetElement) {
 
     if (!response.ok) {
       const error = await response.text();
-      log.error(`❌ [SUB-REGION] Gemini API error: ${error.substring(0, 200)}`);
+      log.error(`❌ [SUB-REGION] Gemini API error ${response.status}: ${error.replace(/[\n\r]+/g, ' ').substring(0, 200)}`);
       return null;
     }
 
