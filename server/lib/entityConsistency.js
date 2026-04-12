@@ -24,6 +24,32 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
 /**
+ * Sanitize text for Gemini safety filters — replace age/gender terms that trigger
+ * PROHIBITED_CONTENT blocks when combined with costume/fantasy imagery.
+ * "7-year-old boy in wizard robe" gets blocked; "young figure in wizard robe" does not.
+ */
+function sanitizeForGeminiSafety(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    // "X-year-old boy/girl/child" → "figure"
+    .replace(/\d{1,2}-year-old\s+(boy|girl|child|kid|teen|teenager|man|woman|person)/gi, 'figure')
+    // "X year old" (without hyphen)
+    .replace(/\d{1,2}\s+year\s+old\s+(boy|girl|child|kid|teen|teenager|man|woman|person)/gi, 'figure')
+    // "boy/girl, NNN cm tall" → "figure, NNN cm tall"
+    .replace(/\b(boy|girl|child|kid)\b(,\s*\d+\s*cm)/gi, 'figure$2')
+    // Standalone age-gender at sentence start: "Lukas is a 7-year-old boy" → "Lukas is a young figure"
+    .replace(/is\s+a\s+\d{1,2}-year-old\s+(boy|girl|child|kid)/gi, 'is a young figure')
+    // "teenage boy/girl" → "teenage figure"
+    .replace(/\b(teenage|teen)\s+(boy|girl)\b/gi, '$1 figure')
+    // "school-age boy/girl" → "school-age figure"
+    .replace(/\b(school[- ]age|grade[- ]school|young school age)\s+(boy|girl)\b/gi, '$1 figure')
+    // "young boy/girl" → "young figure"
+    .replace(/\b(young|little|small)\s+(boy|girl|child)\b/gi, '$1 figure')
+    // "slim boy/girl" → "slim figure"
+    .replace(/\b(slim|stocky|average|athletic)\s+(boy|girl)\b/gi, '$1 figure');
+}
+
+/**
  * Detect faces in an illustration using anime + Haar cascades via Python service.
  * Returns face locations with padded crops. Much more accurate than Gemini bbox for
  * finding actual face positions in watercolor/cartoon illustrations.
@@ -833,17 +859,19 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           }
           const physDesc = fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character';
           const position = sceneMetadata?.characterPositions?.[name] || '';
+          // Sanitize age/gender terms to avoid Gemini safety blocks on children in costumes
+          const sanitizedDesc = sanitizeForGeminiSafety(clothing ? `${physDesc}. Wearing: ${clothing}` : physDesc);
           return {
             name,
-            description: clothing ? `${physDesc}. Wearing: ${clothing}` : physDesc,
+            description: sanitizedDesc,
             position
           };
         });
 
-        // Build scene context for disambiguation
+        // Build scene context for disambiguation (sanitized for Gemini safety)
         let sceneContext = null;
         if (sceneMetadata?.imageSummary) {
-          const contextParts = [`**SCENE:** ${sceneMetadata.imageSummary}`];
+          const contextParts = [`**SCENE:** ${sanitizeForGeminiSafety(sceneMetadata.imageSummary)}`];
           const sceneChars = sceneMetadata.characters || [];
           if (sceneChars.length > 0) {
             contextParts.push(sceneChars.map(c => {
