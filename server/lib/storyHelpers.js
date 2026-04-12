@@ -2110,7 +2110,23 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
             }
           }
         }
-        // If not found, will fall through to standard avatar fallback below
+        // Styled costumed avatar not found (may still be generating).
+        // Still use the costumed clothing DESCRIPTION so scene expansion prose
+        // describes the costume, not standard clothes.
+        if (!photoUrl) {
+          if (avatars?.clothing?.costumed) {
+            const clothingDesc = Object.values(avatars.clothing.costumed)[0];
+            if (clothingDesc) {
+              clothingDescription = typeof clothingDesc === 'string' ? clothingDesc : formatClothingObject(clothingDesc);
+              log.debug(`[AVATAR LOOKUP] ${char.name}: costumed avatar not ready, using costumed clothing description`);
+            }
+          }
+          if (!clothingDescription && clothingRequirements?.[char.name]?.costumed?.description) {
+            clothingDescription = clothingRequirements[char.name].costumed.description;
+            log.debug(`[AVATAR LOOKUP] ${char.name}: costumed avatar not ready, using description from clothingRequirements`);
+          }
+        }
+        // Photo falls through to standard avatar below, but description is costumed
       }
       // Check styled avatars first (with signature items from this story)
       else if (resolvedClothing && resolvedClothing !== 'costumed' &&
