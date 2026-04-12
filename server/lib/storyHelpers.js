@@ -2076,6 +2076,8 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       if (clothingRequirements && clothingRequirements[char.name]?._currentClothing) {
         resolvedClothing = clothingRequirements[char.name]._currentClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
+      } else {
+        log.debug(`[AVATAR LOOKUP] ${char.name}: no per-scene clothing, defaulting to ${resolvedClothing || 'standard'}`);
       }
       // Normalize: costumed:anything → costumed (only one costume per story)
       if (resolvedClothing && resolvedClothing.startsWith('costumed')) {

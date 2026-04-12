@@ -2000,7 +2000,19 @@ class ProgressiveUnifiedParser {
         } else {
           log.debug(`[PAGE-CLOTHING] Page ${pageNum} NO Characters section found. Content snippet: "${content.substring(0, 200).replace(/\n/g, '\\n')}..."`);
         }
-        const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
+        let { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
+
+        // Fallback: if no Characters section found in content, extract clothing
+        // from the scene hint (which may use "- Name: costumed:X" format inline)
+        if (Object.keys(characterClothing).length === 0 && sceneHint) {
+          const hintParsed = parseCharacterClothingBlock(sceneHint);
+          if (Object.keys(hintParsed.characterClothing).length > 0) {
+            characterClothing = hintParsed.characterClothing;
+            characterPerspectives = hintParsed.characterPerspectives;
+            characters = hintParsed.characters;
+            log.debug(`[PAGE-CLOTHING] Page ${pageNum}: extracted from scene hint: ${Object.entries(characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')}`);
+          }
+        }
 
         this.emitted.pages.add(pageNum);
         const clothingStr = Object.keys(characterClothing).length > 0
