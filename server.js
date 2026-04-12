@@ -2475,9 +2475,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const artStyle = inputData.artStyle || 'pixar';
 
     // Track streaming progress and parallel tasks
-    // For trial mode with pre-defined title, set it immediately (prompt skips ---TITLE--- section)
-    let streamingTitle = (inputData.trialMode && inputData._trialPreDefinedTitle)
-      ? inputData._trialPreDefinedTitle : null;
+    let streamingTitle = null;
     let streamingClothingRequirements = null;
     let streamingVisualBible = null;
     let streamingCoverHints = null;
@@ -2529,20 +2527,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       inputData._trialCostumeType = costume?.costumeType || null;
       log.debug(`🎭 [TRIAL] _trialCostumeType set to: ${inputData._trialCostumeType} (costume: ${costume ? costume.costumeType : 'null'}, mainChar gender: ${mainChar?.gender})`);
       log.debug(`🎭 [TRIAL] Characters isMainCharacter: ${(inputData.characters || []).map(c => `${c.name}=${c.isMainCharacter}`).join(', ')}`);
-
-      // Look up pre-defined title for trial (uses same lookupTopic/lookupCategory as costume)
-      const { getTrialTitle } = require('./server/config/trialTitles');
-      const preDefinedTitle = getTrialTitle(
-        lookupTopic,
-        lookupCategory,
-        mainChar?.gender || '',
-        inputData.language || 'en'
-      );
-      if (preDefinedTitle) {
-        inputData._trialPreDefinedTitle = preDefinedTitle;
-        streamingTitle = preDefinedTitle; // Set immediately (line 2297 runs before this block)
-        log.debug(`📖 [TRIAL] Pre-defined title: "${preDefinedTitle}"`);
-      }
 
       const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
         const cats = ['standard'];
@@ -3468,16 +3452,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
     const progressiveParser = new ProgressiveUnifiedParser({
       onTitle: (title) => {
-        // TRIAL MODE: Use pre-defined title (Claude may output ---TITLE--- even when not asked)
-        streamingTitle = (inputData.trialMode && inputData._trialPreDefinedTitle)
-          ? inputData._trialPreDefinedTitle
-          : title;
+        streamingTitle = title;
 
         // TRIAL MODE: Start title page generation as soon as title is known
-        // Skip if pre-defined title exists — prepare-title endpoint is already generating the cover,
-        // and the DB re-check in startCoverGeneration will find it when the pipeline needs it.
         // Must wait for avatar styling to complete first (started before streaming)
-        if (inputData.trialMode && inputData.titlePageOnly && !skipImages && !inputData._trialPreDefinedTitle) {
+        if (inputData.trialMode && inputData.titlePageOnly && !skipImages) {
           const mainCharNames = (inputData.characters || [])
             .filter(c => c.isMainCharacter)
             .map(c => c.name)
@@ -3703,9 +3682,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Parse the unified response (full parse for complete data)
     const parser = new UnifiedStoryParser(unifiedResponse);
-    const title = (inputData.trialMode && inputData._trialPreDefinedTitle)
-      ? inputData._trialPreDefinedTitle
-      : (parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story');
+    const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
@@ -3979,31 +3956,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         : ['titlePage', 'initialPage', 'backCover'];
       for (const coverType of coverTypes) {
         if (streamingCoverPromises.has(coverType)) continue;
-        // Trial mode with pre-defined title: use prepare-title's image instead of generating a new one
-        if (coverType === 'titlePage' && inputData._trialPreDefinedTitle && inputData.characterId) {
-          // Poll DB for the pre-generated title page (prepare-title may still be running)
-          streamingCoverPromises.set(coverType, (async () => {
-            const maxWait = 90000; // 90s max wait
-            const pollInterval = 3000; // check every 3s
-            const start = Date.now();
-            while (Date.now() - start < maxWait) {
-              try {
-                const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [inputData.characterId]);
-                const charData = charResult.rows[0]?.data;
-                const parsed = typeof charData === 'string' ? JSON.parse(charData) : charData;
-                const titlePageImage = parsed?.characters?.[0]?.preGeneratedTitlePage;
-                if (titlePageImage) {
-                  log.info(`⏭️ [COVER] Using pre-generated title page from DB (waited ${Date.now() - start}ms)`);
-                  return { type: coverType, imageData: titlePageImage, qualityScore: 80, qualityReasoning: 'Pre-generated during trial step 3' };
-                }
-              } catch (e) { /* ignore DB errors, retry */ }
-              await new Promise(r => setTimeout(r, pollInterval));
-            }
-            log.warn(`[COVER] Pre-generated title page not found after ${maxWait}ms — generating fallback`);
-            return null; // will be filtered out
-          })());
-          continue;
-        }
         const hint = coverHints?.[coverType];
         if (hint) {
           startCoverGeneration(coverType, hint);
