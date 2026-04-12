@@ -2850,13 +2850,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             page.pageNumber, true, pagePhotos, { skipVisualBible: isGrokImage }
           );
 
-          log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)`);
+          // Resolve landmarks and VB grid for Grok reference slots
+          const sceneMetadata = extractSceneMetadata(sceneDescription);
+          const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
+          let elementRefs = getElementReferenceImagesForPage(streamingVisualBible, page.pageNumber, 6);
+          // Also match by IDs from scene hint (same as Phase 5a)
+          if (sceneMetadata?.fullData) {
+            const sceneIds = [];
+            for (const char of sceneMetadata.fullData.characters || []) {
+              if (char.id && char.id !== 'null') sceneIds.push(char.id);
+            }
+            for (const obj of sceneMetadata.fullData.objects || []) {
+              const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
+              if (id && !id.startsWith('LOC')) sceneIds.push(id);
+            }
+            if (sceneIds.length > 0) {
+              const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds);
+              const existingIds = new Set(elementRefs.map(r => r.id));
+              const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+              if (newRefs.length > 0) elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
+            }
+          }
+          const secondaryLandmarks = pageLandmarkPhotos.slice(1);
+          let trialVbGrid = null;
+          if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
+            trialVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
+          }
+
+          log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)${pageLandmarkPhotos.length ? ` [${pageLandmarkPhotos.length} landmark(s)]` : ''}${trialVbGrid ? ' [VB grid]' : ''}`);
           const startTime = Date.now();
 
           const genResult = await generateImageOnly(imagePrompt, pagePhotos, {
             imageModelOverride: pageImageModel,
             imageBackendOverride: pageImageBackend,
             pageNumber: page.pageNumber,
+            landmarkPhotos: pageLandmarkPhotos,
+            visualBibleGrid: trialVbGrid,
           });
 
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
