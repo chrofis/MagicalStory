@@ -150,29 +150,37 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 ## Architecture Overview
 
 ### Full-Stack Structure
-- **Frontend**: React 18 + Vite + TypeScript + Tailwind (`/client`)
+- **Frontend**: React 19 + Vite + TypeScript + Tailwind (`/client`)
 - **Backend**: Express.js monolith (`server.js` + `/server`)
 - **Database**: PostgreSQL on Railway
 - **Hosting**: Railway (auto-deploys from `master`)
+- **SSR**: Pre-rendered static HTML for all SEO routes (~999 files, build-time)
+- **Python**: Flask service for face detection + background removal (port 5000)
 
 ### AI Service Providers
 | Service | Provider | Purpose |
 |---------|----------|---------|
 | Text Generation | Claude (Anthropic) | Story outline, text, scene descriptions |
-| Image Generation | Gemini (Google) | Page illustrations, covers, avatars |
+| Image Generation | Gemini (Google) + Grok (xAI) | Page illustrations, covers, avatars |
+| Character Repair | Grok Imagine (xAI) | Cutout + blended character repair ($0.02/img) |
 | Cheap Images | Runware | Dev mode, inpainting (SDXL $0.002/img) |
 | Avatar Faces | Runware ACE++ | Face-consistent avatar generation |
+| Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
-### Story Generation Pipeline
+### Story Generation Pipeline (Unified Mode)
 ```
 POST /api/jobs/create-story → Background Job:
-  1. Generate Outline (Claude)
-  2. Extract Scene Hints
-  3. Generate Story Text (Claude, batched)
-  4. Generate Scene Descriptions (Claude, parallel)
-  5. Generate Images (Gemini, parallel/sequential)
-  6. Quality Evaluation + Auto-Repair (optional)
-  7. Generate Covers (front, back, dedication)
+  1. Generate full story in ONE Claude call (outline + visual bible + text + scene hints)
+  2. Parse scenes, expand each into Art Director prose (scene-expansion.txt)
+     → Each scene gets: character descriptions, interactions, textPosition, emptyScenePrompt
+  3. Generate empty scene backgrounds (style anchors for iterative placement)
+  4. Generate page images (Grok/Gemini, parallel) with VB grid references
+  5. Text region detection + white wash (calmness map → lighten calm area for text)
+  6. Quality eval + semantic eval + entity consistency (parallel)
+  7. Auto-repair: redo low-scoring pages (up to 3 passes)
+  8. Character repair: cutout/blended fix for mismatched characters (Grok)
+  9. Pick best versions per page
+  10. Generate covers (front, initial/dedication, back)
   → GET /api/jobs/:id/status (polling)
 ```
 
@@ -275,6 +283,92 @@ User clicks "Run Full Workflow"
 - `server/lib/images.js` → `repairCharacterMismatchWithGrok()` — Grok character repair
 - `server/lib/images.js` → `collectAllIssuesForPage()` — aggregates all issue sources
 
+### Text Overlay System (April 2026)
+
+Story text is overlaid directly on page images, matching the printed book layout.
+
+**Pipeline:**
+1. **Scene expansion** (Claude) picks `textPosition` per page (top-left, bottom-right, etc.)
+   - Spread rule: odd pages = left side, even pages = right side
+   - Claude writes the scene prose to keep the chosen area calm and light
+2. **Image prompt** includes a COPY SPACE instruction telling the model to keep the area light
+3. **Post-generation** text region detection (`server/lib/textRegion.js`):
+   - Computes per-block brightness + variance → calmness heatmap
+   - Builds a pixel-level alpha mask, constrains to correct spread side
+   - Composites a white wash (45% opacity) directly into the stored image
+   - Returns the detected rect for PDF text placement
+4. **enforceSpreadTextPosition** corrects Claude's mistakes (flips left↔right for wrong side)
+5. **PDF renderer** uses the detected rect coordinates for text placement, falls back to corners
+
+**Key files:**
+- `server/lib/textRegion.js` — calmness detection + white wash compositing
+- `client/src/utils/textOverlay.ts` — frontend text overlay positioning (6-position cycle + explicit override)
+- `server/lib/storyHelpers.js` → `buildImagePrompt()` — COPY SPACE instruction injection
+- `server/lib/pdf.js` — PDF text rendering with detected rect support
+
+**Frontend display:**
+- StoryDisplay (editor): text overlay on by default, Eye icon toggle button
+- SharedStoryViewer: text overlay on images + toggle, uses stored textPosition from API
+
+### Referral / Promo Code System (April 2026)
+
+Every user gets a unique referral code (format: `MagicRoger427`). When someone uses it at checkout:
+- Buyer gets CHF 10 off the book price
+- Referrer gets 350 story credits (= CHF 10 package value)
+
+**Rules:** No self-referral. Each buyer can use ONE referral code, ever (`users.referred_by` column).
+
+**Key files:**
+- `server/lib/referral.js` — code generation (3-digit suffix, 900 slots/name)
+- `server/routes/print.js` — `GET /api/referral/my-code`, `POST /api/referral/validate`, checkout discount logic
+- `server.js` — webhook credits referrer (transactional, atomic `referred_by` lock)
+- `server/config/credits.js` → `REFERRAL` config block
+- `client/src/pages/AccountPage.tsx` — referral code display, copy button, stats
+- `client/src/pages/BookBuilder.tsx` — promo code input + discount line in price summary
+
+### Shared Story Viewer — Book Spread (April 2026)
+
+Desktop: two-page book spread layout matching a real open book.
+- Odd pages: `[Image LEFT | Text RIGHT]`
+- Even pages: `[Text LEFT | Image RIGHT]`
+- Page turn animation always flips the RIGHT panel (spine hinge)
+- Text overlay on images with toggle button
+- Mobile: single column (image top, text bottom), unchanged
+
+**Key file:** `client/src/pages/SharedStoryViewer.tsx`
+
+### Preset-Aligned Cutout Extract (April 2026)
+
+Character repair cutout extraction now picks dimensions that naturally match a Grok aspect preset.
+No letterbox padding — extract more scene pixels instead of adding white bars.
+
+**Algorithm:** `computePresetAlignedExtract()` in `server/lib/images.js`:
+1. Start with bbox + 40% min padding
+2. Pick closest of Grok's 13 aspect presets
+3. Grow one axis to match the preset exactly
+4. Center on bbox, clamp to scene bounds
+
+### Entity Consistency Improvements (April 2026)
+
+- Cascade face detection (Python anime + Haar) merged with Gemini bboxes
+- Coordinates properly normalized from pixels to 0-1 `[ymin,xmin,ymax,xmax]`
+- Fallback detection triggers on empty `figures: []` (not just null)
+- Object name canonicalization to Visual Bible IDs
+- Structured `interactions` metadata for evaluator checks
+
+### Centralized Aspect Ratio (April 2026)
+
+All image generation reads aspect from `MODEL_DEFAULTS.pageAspect` / `coverAspect` / `avatarAspect`
+in `server/config/models.js`. No more hardcoded aspect in individual functions.
+Default: 3:4 (A4 portrait) for pages and covers, 9:16 for avatars.
+
+### Admin Trial Bypass (April 2026)
+
+Admins can test the trial flow (`/try`) repeatedly. Fresh anonymous account each time.
+Turnstile + fingerprint checks bypassed when valid admin JWT is provided.
+
+**Key files:** `server/routes/trial.js` → `isAdminRequest()`, `client/src/pages/TrialWizard.tsx`
+
 ### Test Models (Dev Mode)
 
 Allows admins to compare image generation across multiple AI models side-by-side for the same
@@ -311,23 +405,43 @@ iteration prompts across text AI models (not image models). Tests how different 
 scene descriptions. Usage: `node scripts/test-models.js <story-id> <page-number> [expansion|iterate|both]`
 
 ### Key Backend Files
-- `server.js` - Main Express app with all routes embedded
-- `server/config/models.js` - AI model configuration and defaults
-- `server/lib/images.js` - Image generation, quality eval, inpainting
+- `server.js` - Main Express app, unified pipeline, Stripe webhook
+- `server/config/models.js` - AI model configuration, aspect ratios, repair defaults
+- `server/config/credits.js` - Credit costs, packages, referral config
+- `server/lib/images.js` - Image generation, quality eval, cutout repair, VB grid
+- `server/lib/textRegion.js` - Text region detection + white wash compositing
+- `server/lib/entityConsistency.js` - Entity consistency, cascade face merge, object canonicalization
+- `server/lib/referral.js` - Referral code generation
+- `server/lib/storyHelpers.js` - Scene metadata extraction, image prompt building, text area instruction
 - `server/lib/runware.js` - Runware API (FLUX, ACE++, inpainting)
 - `server/lib/textModels.js` - Claude/Gemini text generation
-- `server/lib/visualBible.js` - Character consistency tracking
+- `server/lib/visualBible.js` - Visual Bible entity tracking
+- `server/lib/grok.js` - Grok Imagine API (edit, generate, pack references)
+- `server/lib/pdf.js` - PDF generation (A4/square, text overlay, print-ready)
+- `server/lib/coverIterate.js` - Cover generation and iteration
 - `server/routes/avatars.js` - Avatar generation endpoints
 - `server/routes/stories.js` - Story CRUD and regeneration
 - `server/routes/regeneration.js` - Repair workflow + image regeneration endpoints
+- `server/routes/print.js` - Stripe checkout, referral endpoints, pricing, Gelato orders
+- `server/routes/trial.js` - Trial story flow, admin bypass
+- `server/routes/sharing.js` - Share tokens, public viewer API
+- `server/services/prompts.js` - Prompt template loader
 - `prompts/` - All AI prompt templates (editable without code changes)
 
 ### Key Frontend Files
 - `client/src/pages/StoryWizard.tsx` - Main story creation wizard
+- `client/src/pages/TrialWizard.tsx` - Trial story wizard (anonymous users)
+- `client/src/pages/SharedStoryViewer.tsx` - Public story viewer (book spread)
+- `client/src/pages/AccountPage.tsx` - Account info, referral code, credits
+- `client/src/pages/BookBuilder.tsx` - Book checkout with promo code input
 - `client/src/hooks/useRepairWorkflow.ts` - Repair workflow orchestration hook
 - `client/src/hooks/useDeveloperMode.ts` - Dev mode model overrides
+- `client/src/utils/textOverlay.ts` - Text overlay positioning (6 positions + explicit override)
+- `client/src/types/story.ts` - Story/SceneImage types (includes textPosition, textRect)
 - `client/src/types/character.ts` - Character type definitions
+- `client/src/components/generation/StoryDisplay.tsx` - Story display with text overlay toggle
 - `client/src/components/generation/` - Story generation UI components
+- `client/src/components/common/UserMenu.tsx` - Nav dropdown (includes My Account link)
 
 ## Model Configuration
 
@@ -371,19 +485,37 @@ styles, any scene requiring consistent style across multiple pages.
 ## Prompt Templates
 
 All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`:
-- `avatar-main-prompt.txt` - Gemini avatar generation (4500+ chars)
-- `avatar-ace-prompt.txt` - Runware ACE++ avatars (2900 char limit)
-- `image-generation.txt` - Scene illustration prompts
-- `image-evaluation.txt` - Quality evaluation criteria
+- `scene-expansion.txt` - Art Director: expands outline hints into illustration briefs (includes interactions, textPosition, emptyScenePrompt)
+- `image-generation.txt` - Scene illustration prompt (unified template, includes COPY SPACE instruction)
+- `image-evaluation.txt` - Quality evaluation criteria (includes declared interactions check)
+- `image-semantic.txt` - Semantic fidelity evaluation (includes interactions placement check)
+- `empty-scene.txt` - Background-only scene generation (for iterative placement)
+- `avatar-main-prompt.txt` - Gemini avatar generation
+- `avatar-ace-prompt.txt` - Runware ACE++ avatars
+- `character-repair-cutout.txt` - Grok cutout repair prompt
+- `character-repair-blended.txt` - Grok blended repair prompt
+- `bbox-refine.txt` - Bounding box refinement (2-pass detection)
+- `front-cover.txt`, `back-cover.txt`, `initial-page-*.txt` - Cover generation
+
+**Note**: `image-generation-storybook.txt` was merged into `image-generation.txt`. The `imageGenerationStorybook` template key is aliased to `imageGeneration` in prompts.js.
 
 ## Database
 
-PostgreSQL with tables: `users`, `characters`, `stories`, `story_jobs`, `orders`, `config`
+PostgreSQL with tables: `users`, `characters`, `stories`, `story_jobs`, `orders`, `config`, `credit_transactions`, `referral_events`, `activity_log`, `pricing_tiers`, `gelato_products`, `story_images`
 
-Character data stored as JSONB in `characters.data` column containing:
-- `characters[]` - Array of character objects
-- `relationships` - Character relationship mappings
-- Physical traits, clothing, avatars per character
+**Key columns (recent additions):**
+- `users.referral_code` (VARCHAR 20 UNIQUE) - personal promo code (MagicName123 format)
+- `users.referred_by` (VARCHAR 20) - which code this user used (permanent, one per user ever)
+- `orders.referral_code_used`, `orders.discount_cents` - referral tracking on orders
+- `referral_events` table - referrer/buyer/session/credits log with unique constraint
+- `story_images` table - versioned image storage (pageNumber, version_index, image_data)
+
+**Story data** stored as JSONB in `stories.data`:
+- `sceneImages[]` — per-page: imageData, textPosition, textRect, sceneDescription, bboxDetection, retryHistory, imageVersions
+- `coverImages` — frontCover, initialPage, backCover (each with imageData, versions)
+- `characters[]`, `relationships`, physical traits, clothing, avatars
+
+Character data stored as JSONB in `characters.data` column.
 
 ## Log Analysis
 
