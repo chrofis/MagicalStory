@@ -2105,18 +2105,32 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
-      // Face box — same color as body so the pairing is obvious
+      // Original Gemini face box (dashed, dimmer) — shown when cascade improved the face
+      if (fig._geminiFaceBox && fig._cascadeFace) {
+        const [ymin, xmin, ymax, xmax] = fig._geminiFaceBox;
+        const x = Math.round(xmin * width);
+        const y = Math.round(ymin * height);
+        const w = Math.round((xmax - xmin) * width);
+        const h = Math.round((ymax - ymin) * height);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="2" stroke-dasharray="6,4" opacity="0.5"/>`);
+        svgParts.push(`<text x="${x + 2}" y="${y - 3}" font-family="Arial" font-size="9" fill="${figColor}" opacity="0.6">gemini</text>`);
+      }
+
+      // Final face box (solid = cascade-improved, or dashed = Gemini-only if no cascade)
       if (fig.faceBox) {
         const [ymin, xmin, ymax, xmax] = fig.faceBox;
         const x = Math.round(xmin * width);
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        // Dashed stroke to visually distinguish face from body
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="5" stroke-dasharray="8,4"/>`);
-        // Face label with figure index
-        const faceLabel = isIdentified ? `FACE ${fig.name}` : `FACE ${i + 1}`;
-        const faceLabelWidth = Math.min(faceLabel.length * 7 + 10, 160);
+        const isCascade = !!fig._cascadeFace;
+        const strokeStyle = isCascade ? '' : ' stroke-dasharray="8,4"'; // solid if cascade, dashed if gemini-only
+        const strokeWidth = isCascade ? 4 : 3;
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="${strokeWidth}"${strokeStyle}/>`);
+        // Face label
+        const sourceTag = isCascade ? ` [${fig._cascadeFace}]` : '';
+        const faceLabel = isIdentified ? `FACE ${fig.name}${sourceTag}` : `FACE ${i + 1}${sourceTag}`;
+        const faceLabelWidth = Math.min(faceLabel.length * 7 + 10, 200);
         svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${figColor}" opacity="0.9" rx="2"/>`);
         svgParts.push(`<text x="${x + 4}" y="${y + h + 12}" font-family="Arial" font-size="10" font-weight="bold" fill="white">${escapeXml(faceLabel)}</text>`);
       }

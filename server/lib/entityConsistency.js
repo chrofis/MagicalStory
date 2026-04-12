@@ -146,9 +146,11 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
       const cf = cascadeFaces[bestIdx];
       matchedCascade.add(bestIdx);
       // Replace Gemini's faceBox with cascade's more accurate coordinates
+      // Keep original for overlay display (dashed = Gemini, solid = cascade)
       const oldFace = fig.faceBox;
       const newFace = [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height];
-      fig.faceBox = newFace;
+      fig._geminiFaceBox = oldFace; // Original Gemini face box (for overlay)
+      fig.faceBox = newFace;        // Cascade-improved (used for face cropping)
       fig._cascadeFace = cf.source;
 
       // Expand bodyBox to include cascade face if it falls outside
