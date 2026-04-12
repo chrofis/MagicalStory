@@ -1494,7 +1494,11 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
           await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
           break;
         } catch (e) {
-          if (attempt === 9) throw e; // give up after 10 attempts
+          if (attempt === 9) {
+            log.error(`❌ [REFERRAL] Failed to generate unique code for user ${userId} (${uname}) after 10 attempts`);
+            logActivity(userId, uname, 'REFERRAL_CODE_GENERATION_FAILED', { attempts: 10, lastCode: code });
+            throw e;
+          }
         }
       }
     }

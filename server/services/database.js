@@ -305,7 +305,16 @@ async function initializeDatabase() {
             await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
             break;
           } catch (e) {
-            if (attempt === 9) console.error(`[DB] Failed to generate unique referral code for user ${row.id} after 10 attempts`);
+            if (attempt === 9) {
+              console.error(`❌ [DB] ADMIN ALERT: Failed to generate unique referral code for user ${row.id} (${row.username}) after 10 attempts — 900 slots exhausted for this name`);
+              // Log to activity table so it shows in admin dashboard
+              try {
+                await dbPool.query(
+                  `INSERT INTO activity_log (user_id, username, action, details) VALUES ($1, $2, $3, $4)`,
+                  [row.id, row.username || 'unknown', 'REFERRAL_CODE_GENERATION_FAILED', JSON.stringify({ attempts: 10, username: row.username })]
+                );
+              } catch { /* activity_log may not exist yet during init */ }
+            }
           }
         }
       }
