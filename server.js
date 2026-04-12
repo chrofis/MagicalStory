@@ -4580,7 +4580,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 ? 'a large band (about two fifths of the frame)'
                 : 'a wide band (about one third of the frame)';
             const emptyTextAreaInstr = textPos
-              ? `The ${textPos.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box — the area should look like a natural part of the scene, just quieter.`
+              ? `The ${textPos.replace('-', ' ')} area (${textSizeHint}) is reserved for dark text overlay. Paint this area in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water. No dark tones, no shadows, no building edges, no structural lines, no characters. Smooth, light, featureless wash that blends into the scene.`
               : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

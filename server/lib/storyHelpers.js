@@ -3654,7 +3654,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       ? 'a large band (about two fifths of the frame)'
       : 'a wide band (about one third of the frame)';
   const textAreaInstruction = textPosition
-    ? `**TEXT AREA:** The ${textPosition.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box.`
+    ? `**TEXT AREA (mandatory):** The ${textPosition.replace('-', ' ')} area (${textSizeHint}) is reserved for a dark text overlay. This area MUST be painted in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water, or washed-out ground. No dark tones, no shadows, no building edges, no window lines, no tree branches, no architectural structure, no characters. Keep it as a smooth, light-coloured, featureless wash that blends naturally into the scene. Dark text will be printed over this area — if it is dark or busy, the text becomes unreadable.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

@@ -439,7 +439,10 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       // Text overlay mode: draw semi-transparent background + text on image
       const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
       // Use stored textPosition from scene expansion if available, otherwise cycle
-      const storedPos = image.textPosition;
+      // Enforce spread rule: odd pages = left, even pages = right (Claude sometimes
+      // ignores this in later pages). enforceSpreadTextPosition flips left↔right.
+      const { enforceSpreadTextPosition } = require('./storyHelpers');
+      const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
       const position = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
       const wordCount = cleanText.split(/\s+/).length;
       const isShort = wordCount < 20;

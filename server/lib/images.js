@@ -5711,7 +5711,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area (${iterTextSize}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area (${iterTextSize}) is reserved for dark text overlay. Paint this area in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water. No dark tones, no shadows, no building edges, no structural lines, no characters. Smooth, light, featureless wash that blends into the scene.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;
@@ -10326,7 +10326,43 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
     const dropped = allElements.slice(9).map(e => `${e.name} (${e.type})`).join(', ');
     log.warn(`⚠️ [VB-GRID] Grid overflow: ${allElements.length} elements, keeping first 9, dropping: ${dropped}`);
   }
-  // Single column vertical stack — each element gets full width for maximum visibility
+
+  // Single element: return the image directly with a small label strip on top.
+  // No grid wrapper, no dark background, no wasted space.
+  if (gridElements.length === 1) {
+    try {
+      const el = gridElements[0];
+      const base64Data = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+      const resized = await sharp(imageBuffer)
+        .resize({ width: 512, withoutEnlargement: true })
+        .toBuffer({ resolveWithObject: true });
+      const labelHeight = 24;
+      const totalHeight = resized.info.height + labelHeight;
+      const labelText = `${el.name} (${el.type})`;
+      const displayText = labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText;
+      const labelSvg = `<svg width="512" height="${labelHeight}">
+        <rect width="512" height="${labelHeight}" fill="#555"/>
+        <text x="256" y="17" font-family="Arial, sans-serif" font-size="13" fill="white" text-anchor="middle">${displayText}</text>
+      </svg>`;
+      const gridBuffer = await sharp({
+        create: { width: 512, height: totalHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
+      })
+        .composite([
+          { input: Buffer.from(labelSvg), left: 0, top: 0 },
+          { input: resized.data, left: 0, top: labelHeight },
+        ])
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      log.info(`🔲 [VB-GRID] Single element: ${el.name} (${el.type}), ${512}x${totalHeight}px, ${Math.round(gridBuffer.length / 1024)}KB`);
+      gridBuffer.rawElements = gridElements;
+      return gridBuffer;
+    } catch (err) {
+      log.warn(`⚠️ [VB-GRID] Single element layout failed: ${err.message}, falling back to stack`);
+    }
+  }
+
+  // Multi-element: single column vertical stack — each element gets full width
   const cellWidth = 512;
   const labelHeight = 28;
   const gap = 4;
