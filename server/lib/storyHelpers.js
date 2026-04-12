@@ -4020,7 +4020,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       VISUAL_BIBLE: visualBibleSection,
       REQUIRED_OBJECTS: requiredObjectsSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
-      INTERACTIONS_BLOCK: interactionsBlock,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
