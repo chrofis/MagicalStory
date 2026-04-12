@@ -4325,6 +4325,8 @@ function chooseRepairStrategy(evaluation) {
  * @returns {Promise<{imageData: string|null, repaired: boolean, instruction: string|null, usage: Object|null}>}
  */
 async function inpaintPage(imageData, evaluation, options = {}) {
+  const { visualBible = null, characters = null } = options;
+
   // Collect quality issues
   const qualityIssues = (evaluation.fixableIssues || []).map(i => ({
     description: i.description || i.issue || i,
@@ -4335,7 +4337,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   const semanticIssues = (evaluation.semanticResult?.issues || evaluation.semanticResult?.semanticIssues || [])
     .map(si => ({
       description: si.problem || `${si.type}: ${si.item || ''}`,
-      source: 'semantic'
+      source: 'semantic',
+      type: si.type,
+      item: si.item
     }));
 
   // Combine and deduplicate
@@ -4350,16 +4354,58 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     return { imageData: null, repaired: false, instruction: null, usage: null };
   }
 
+  // Find reference images for missing characters/animals from Visual Bible or character data
+  const referenceImages = [];
+  const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
+  for (const missing of missingItems) {
+    const itemName = (missing.item || '').toLowerCase().trim();
+    if (!itemName) continue;
+
+    // Check VB animals (e.g., Funke the dragon)
+    const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
+    if (vbAnimal) {
+      referenceImages.push(vbAnimal.referenceImageData);
+      log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
+      continue;
+    }
+    // Check VB secondary characters
+    const vbChar = visualBible?.secondaryCharacters?.find(c => c.name?.toLowerCase() === itemName && c.referenceImageData);
+    if (vbChar) {
+      referenceImages.push(vbChar.referenceImageData);
+      log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item}"`);
+      continue;
+    }
+    // Check VB artifacts
+    const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
+    if (vbArtifact) {
+      referenceImages.push(vbArtifact.referenceImageData);
+      log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item}"`);
+      continue;
+    }
+    // Check main characters (by first name match)
+    if (characters) {
+      const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
+      if (mainChar) {
+        const avatar = mainChar.avatars?.standard || mainChar.avatars?.styledAvatars?.watercolor?.standard;
+        const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+          referenceImages.push(photoUrl);
+          log.info(`[INPAINT PAGE] Adding character avatar reference for missing "${missing.item}"`);
+        }
+      }
+    }
+  }
+
   const editInstruction = combinedIssues
     .map(i => i.description)
     .filter(Boolean)
     .join('. ');
 
   const fullInstruction = `Fix these issues in this children's book illustration: ${editInstruction}`;
-  log.info(`[INPAINT PAGE] Inpainting with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
+  log.info(`[INPAINT PAGE] Inpainting with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}, refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
-    const editResult = await editImageWithPrompt(imageData, fullInstruction);
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages);
     if (editResult?.imageData) {
       // Validate: reject too-small or identical results
       if (editResult.imageData.length < 1000) {
@@ -4681,7 +4727,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const versions = pageVersions.get(img.pageNumber) || [];
     const bestSoFar = selectBestVersion(versions);
     const inputImage = bestSoFar?.imageData || img.imageData;
-    const result = await inpaintPage(inputImage, latestEval || {});
+    const result = await inpaintPage(inputImage, latestEval || {}, {
+      visualBible: storyData?.visualBible || null,
+      characters: storyData?.characters || characters || null,
+    });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
       const inpaintModel = result.usage?.model || '';
@@ -6900,12 +6949,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, model) {
+async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = []) {
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
 
-  log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend})`);
+  log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length})`);
 
   // Build the editing prompt from template
   const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
@@ -6914,9 +6963,11 @@ async function editImageWithPrompt(imageData, editInstruction, model) {
   log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
   if (backend === 'grok') {
-    // Grok edit path — uses /images/edits endpoint with reference image
+    // Grok edit path — uses /images/edits endpoint with reference images
+    // Include the current image + any additional character/VB references
+    const allRefs = [imageData, ...referenceImages].slice(0, 3); // Grok max 3 refs
     try {
-      const grokResult = await editWithGrok(editPrompt, [imageData], { model: modelConfig.modelId });
+      const grokResult = await editWithGrok(editPrompt, allRefs, { model: modelConfig.modelId });
       log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
       return {
         imageData: grokResult.imageData,
