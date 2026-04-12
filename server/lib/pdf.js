@@ -438,9 +438,6 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
     if (textOverlay && image?.imageData) {
       // Text overlay mode: draw semi-transparent background + text on image
       const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
-      // Use stored textPosition from scene expansion if available, otherwise cycle
-      // Enforce spread rule: odd pages = left, even pages = right (Claude sometimes
-      // ignores this in later pages). enforceSpreadTextPosition flips left↔right.
       const { enforceSpreadTextPosition } = require('./storyHelpers');
       const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
       const position = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
@@ -448,27 +445,57 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       const isShort = wordCount < 20;
       const isLong = wordCount >= 50;
 
-      // Calculate overlay box dimensions
       const isFullWidth = position.includes('full');
       const isTop = position.startsWith('top');
       const isLeft = position.includes('left') || isFullWidth;
-
-      const overlayW = isFullWidth ? pageWidth : (pageWidth * (isShort ? 0.42 : isLong ? 0.62 : 0.52));
       const overlayPad = mmToPoints(4);
 
-      // Measure text to fit the overlay
+      // Use detected calm region rectangle if available (pixel coords from textRegion.js).
+      // Convert from image pixels to PDF points (image fills pageWidth × imageHeight).
+      const textRect = image.textRect;
+      let overlayX, overlayY, overlayW, overlayH;
+
+      if (textRect && textRect.w > 0 && textRect.h > 0 && textRect.imgWidth) {
+        // Scale from image pixels to PDF points
+        const scaleX = pageWidth / textRect.imgWidth;
+        const scaleY = imageHeight / textRect.imgHeight;
+        overlayX = bleed + textRect.x * scaleX;
+        overlayY = bleed + textRect.y * scaleY;
+        overlayW = textRect.w * scaleX;
+        overlayH = textRect.h * scaleY;
+
+        // Clamp to page bounds with a small inset
+        const borderInset = pageWidth * 0.015;
+        overlayX = Math.max(bleed + borderInset, overlayX);
+        overlayY = Math.max(bleed + borderInset, overlayY);
+        if (overlayX + overlayW > bleed + pageWidth - borderInset) {
+          overlayW = bleed + pageWidth - borderInset - overlayX;
+        }
+        if (overlayY + overlayH > bleed + pageHeight - borderInset) {
+          overlayH = bleed + pageHeight - borderInset - overlayY;
+        }
+      } else {
+        // Fallback: fixed corner position (no detected rect)
+        overlayW = isFullWidth ? pageWidth : (pageWidth * (isShort ? 0.42 : isLong ? 0.62 : 0.52));
+        const borderInset = pageWidth * 0.015;
+        overlayX = bleed + borderInset;
+        overlayY = bleed + borderInset;
+        if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW - borderInset;
+      }
+
+      // Measure text to fit the overlay width, then cap height
       const overlayTextWidth = overlayW - overlayPad * 2;
       doc.fontSize(fontSize).font('Helvetica');
       const measuredHeight = doc.heightOfString(cleanText, { width: overlayTextWidth, align: isFullWidth ? 'center' : (isLeft ? 'left' : 'right'), lineGap });
-      const overlayH = Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.4);
 
-      // Position the overlay box — inset 1.5% from image edges so text never
-      // sits on a Grok-added border or right at the image boundary.
-      const borderInset = pageWidth * 0.015;
-      let overlayX = bleed + borderInset;
-      let overlayY = bleed + borderInset;
-      if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW - borderInset;
-      if (!isTop) overlayY = bleed + pageHeight - overlayH - borderInset;
+      if (!textRect || !textRect.w) {
+        // Fallback path: compute height and vertical position from corner
+        overlayH = Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.4);
+        if (!isTop) overlayY = bleed + pageHeight - overlayH - pageWidth * 0.015;
+      } else {
+        // Detected rect path: ensure height is enough for the text
+        overlayH = Math.max(overlayH, Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.45));
+      }
 
       // Draw gradual feathered background — fades from text edge to transparent
       // PDFKit linearGradient: from opaque white at text edge to transparent

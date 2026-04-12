@@ -1,17 +1,18 @@
 /**
- * Text region detection — finds the best light/calm area in a generated
- * illustration for overlaying dark story text.
+ * Text region detection + lightening wash.
  *
- * Ported from tests/manual/test-text-region-detect.py to Node.js.
- * Uses sharp for pixel access — no OpenCV dependency.
+ * After image generation, finds the calmest/lightest region and bakes a
+ * semi-transparent white wash directly into the image. The washed area
+ * follows the organic contour of the calm region — not a fixed rectangle.
  *
  * Algorithm:
- * 1. Convert to grayscale, divide into blocks
- * 2. Compute per-block brightness (mean) and variance (std)
- * 3. Calmness = brightness^1.5 * (1 - normalized_variance)
- *    High score = bright + uniform = good for dark text
- * 4. Find the best rectangle anchored to each candidate position
- * 5. Return the position with the highest calmness score
+ * 1. Convert to greyscale, divide into blocks, compute brightness + variance
+ * 2. Calmness = brightness^1.5 × (1 - normalized_variance)
+ * 3. Build a per-pixel alpha mask: high calmness → strong white wash
+ * 4. Gaussian-blur the mask edges for organic feathering
+ * 5. Constrain to the correct side (odd=left, even=right) + target area
+ * 6. Composite the white wash onto the original image
+ * 7. Return the lightened image + bounding box for text placement
  */
 
 const sharp = require('sharp');
@@ -19,175 +20,199 @@ const { log } = require('../utils/logger');
 
 const BLOCK_SIZE = 16;
 
-// All valid text positions
-const ALL_POSITIONS = [
-  'top-left', 'top-right', 'top-full',
-  'bottom-left', 'bottom-right', 'bottom-full'
-];
-
 /**
- * Detect the best text overlay position in a generated image.
+ * Find the calm region, lighten it, and return the modified image + text rect.
  *
- * @param {string} imageData - base64 data URI of the page image
- * @param {string} preferredPosition - the position Claude chose (e.g. 'top-right')
- * @param {number} pageNumber - for spread enforcement (odd=left, even=right)
- * @returns {{ position: string, score: number, preferredScore: number, overridden: boolean }}
+ * @param {string} imageData - base64 data URI
+ * @param {string} preferredPosition - Claude's chosen position (e.g. 'top-right')
+ * @param {number} pageNumber - odd=left page, even=right page
+ * @param {object} [options]
+ * @param {number} [options.washOpacity=0.45] - max opacity of the white wash (0-1)
+ * @param {number} [options.calmThreshold=0.35] - blocks above this get the wash
+ * @returns {{ imageData: string, position: string, rect: {x,y,w,h}, score: number, overridden: boolean }}
  */
-async function detectBestTextPosition(imageData, preferredPosition, pageNumber) {
+async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
+  const { washOpacity = 0.45, calmThreshold = 0.35 } = options;
+
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
-    const { data: pixels, info } = await sharp(buf)
-      .greyscale()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    const meta = await sharp(buf).metadata();
+    const width = meta.width;
+    const height = meta.height;
 
-    const { width, height } = info;
+    const { data: grayPixels } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+
     const rows = Math.floor(height / BLOCK_SIZE);
     const cols = Math.floor(width / BLOCK_SIZE);
-
     if (rows < 4 || cols < 4) {
-      return { position: preferredPosition, score: 0, preferredScore: 0, overridden: false };
+      return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
     }
 
-    // Compute per-block brightness and variance
-    const brightness = new Float32Array(rows * cols);
-    const variance = new Float32Array(rows * cols);
+    // ── Step 1-2: Compute per-block calmness ──
+    const calmness = new Float32Array(rows * cols);
+    let vMax = 0;
+    const variances = new Float32Array(rows * cols);
+    const means = new Float32Array(rows * cols);
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        let sum = 0;
-        let sumSq = 0;
+        let sum = 0, sumSq = 0;
         const count = BLOCK_SIZE * BLOCK_SIZE;
         for (let by = 0; by < BLOCK_SIZE; by++) {
-          const rowOffset = (r * BLOCK_SIZE + by) * width;
+          const rowOff = (r * BLOCK_SIZE + by) * width;
           for (let bx = 0; bx < BLOCK_SIZE; bx++) {
-            const val = pixels[rowOffset + c * BLOCK_SIZE + bx];
+            const val = grayPixels[rowOff + c * BLOCK_SIZE + bx];
             sum += val;
             sumSq += val * val;
           }
         }
         const mean = sum / count;
         const std = Math.sqrt(Math.max(0, sumSq / count - mean * mean));
-        brightness[r * cols + c] = mean;
-        variance[r * cols + c] = std;
+        means[r * cols + c] = mean;
+        variances[r * cols + c] = std;
+        if (std > vMax) vMax = std;
       }
-    }
-
-    // Normalize and compute calmness
-    let vMax = 0;
-    for (let i = 0; i < variance.length; i++) {
-      if (variance[i] > vMax) vMax = variance[i];
     }
     if (vMax === 0) vMax = 1;
 
-    const calmness = new Float32Array(rows * cols);
     for (let i = 0; i < calmness.length; i++) {
-      const bNorm = brightness[i] / 255;
-      const vNorm = variance[i] / vMax;
+      const bNorm = means[i] / 255;
+      const vNorm = variances[i] / vMax;
       calmness[i] = Math.pow(bNorm, 1.5) * (1 - vNorm);
     }
 
-    // Build integral image
-    const integral = new Float64Array((rows + 1) * (cols + 1));
+    // ── Step 3: Build a per-pixel alpha mask from the calmness map ──
+    // Only include blocks on the correct side of the image (spread rule).
+    const isLeftPage = pageNumber % 2 === 1;
+    const isTop = preferredPosition?.startsWith('top') ?? true;
+
+    // Target zone: the half (top/bottom) × half (left/right) or full width
+    const isFull = preferredPosition?.includes('full');
+    const isLeft = preferredPosition?.includes('left') || isFull;
+
+    // Build block-level mask: 1.0 for calm blocks in target zone, 0 elsewhere
+    const blockMask = new Float32Array(rows * cols);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        integral[(r + 1) * (cols + 1) + (c + 1)] =
-          calmness[r * cols + c]
-          + integral[r * (cols + 1) + (c + 1)]
-          + integral[(r + 1) * (cols + 1) + c]
-          - integral[r * (cols + 1) + c];
-      }
-    }
+        const idx = r * cols + c;
+        // Side constraint: block must be on the correct side
+        const blockCenterX = (c + 0.5) / cols;
+        if (!isFull) {
+          if (isLeftPage && blockCenterX > 0.65) continue;  // left page: keep left 65%
+          if (!isLeftPage && blockCenterX < 0.35) continue;  // right page: keep right 65%
+        }
+        // Vertical preference: prefer the chosen half but allow spillover
+        const blockCenterY = (r + 0.5) / rows;
+        let verticalWeight = 1.0;
+        if (isTop && blockCenterY > 0.6) verticalWeight = 0.3;
+        if (!isTop && blockCenterY < 0.4) verticalWeight = 0.3;
 
-    const rectSum = (r1, c1, r2, c2) =>
-      integral[r2 * (cols + 1) + c2]
-      - integral[r1 * (cols + 1) + c2]
-      - integral[r2 * (cols + 1) + c1]
-      + integral[r1 * (cols + 1) + c1];
-
-    // Score each candidate position
-    const isLeftPage = pageNumber % 2 === 1;
-    const candidates = ALL_POSITIONS.filter(p => {
-      // Enforce spread: odd=left, even=right (skip wrong-side corners)
-      if (p.includes('left') && !isLeftPage) return false;
-      if (p.includes('right') && isLeftPage) return false;
-      return true;
-    });
-
-    const minHFrac = 0.15;
-    const maxHFrac = 0.40;
-    const minWFrac = 0.30;
-    const maxWFrac = 0.65;
-
-    const scorePosition = (position) => {
-      const isTop = position.startsWith('top');
-      const isLeft = position.includes('left') || position.includes('full');
-      const isFull = position.includes('full');
-
-      const minH = Math.max(2, Math.floor(rows * minHFrac));
-      const maxH = Math.floor(rows * maxHFrac);
-      const minW = Math.max(2, Math.floor(cols * minWFrac));
-      const maxW = Math.floor(cols * maxWFrac);
-
-      let bestScore = -1;
-      // Step by 2 to reduce computation (still fine-grained enough)
-      for (let h = minH; h <= maxH; h += 2) {
-        for (let w = minW; w <= maxW; w += 2) {
-          let r1, r2, c1, c2;
-          if (isFull) {
-            c1 = 0; c2 = cols;
-            r1 = isTop ? 0 : rows - h;
-            r2 = isTop ? h : rows;
-          } else {
-            r1 = isTop ? 0 : rows - h;
-            r2 = isTop ? h : rows;
-            c1 = isLeft ? 0 : cols - w;
-            c2 = isLeft ? w : cols;
-          }
-          if (r2 > rows || c2 > cols || r1 < 0 || c1 < 0) continue;
-
-          const area = (r2 - r1) * (c2 - c1);
-          const avg = rectSum(r1, c1, r2, c2) / area;
-          const sizeBonus = (area / (rows * cols)) * 0.3;
-          const score = avg + sizeBonus;
-
-          if (score > bestScore) bestScore = score;
+        if (calmness[idx] >= calmThreshold) {
+          blockMask[idx] = calmness[idx] * verticalWeight;
         }
       }
-      return bestScore;
-    };
-
-    const scores = {};
-    for (const pos of candidates) {
-      scores[pos] = scorePosition(pos);
     }
 
-    // Find best position
-    let bestPos = preferredPosition;
-    let bestScore = scores[preferredPosition] ?? -1;
-    for (const [pos, score] of Object.entries(scores)) {
-      if (score > bestScore) {
-        bestScore = score;
-        bestPos = pos;
+    // ── Step 4: Upscale block mask to pixel-level and blur for feathered edges ──
+    // Create a single-channel buffer at block resolution, then resize
+    const maskBlockBuf = Buffer.alloc(rows * cols);
+    for (let i = 0; i < blockMask.length; i++) {
+      maskBlockBuf[i] = Math.round(Math.min(1, blockMask[i] / 0.8) * washOpacity * 255);
+    }
+
+    // Upscale to full image size with bilinear interpolation (smooth edges)
+    const maskPixels = await sharp(maskBlockBuf, { raw: { width: cols, height: rows, channels: 1 } })
+      .resize(width, height, { kernel: 'cubic' })
+      .blur(Math.max(0.3, Math.round(Math.min(width, height) * 0.03)))
+      .toColourspace('b-w')  // force single channel output
+      .raw()
+      .toBuffer();
+
+    // ── Step 5: Check if there's enough calm area to place text ──
+    let washPixelCount = 0;
+    for (let i = 0; i < maskPixels.length; i++) {
+      if (maskPixels[i] > 30) washPixelCount++;
+    }
+    const washCoverage = washPixelCount / (width * height);
+
+    if (washCoverage < 0.05) {
+      // Less than 5% of image is calm enough — don't wash, just return original
+      log.info(`📝 [TEXT-REGION] P${pageNumber}: no calm region found (${(washCoverage * 100).toFixed(1)}% coverage) — using original`);
+      return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
+    }
+
+    // ── Step 6: Composite white wash onto original image ──
+    // Create a white image with the mask as alpha channel
+    const whitePlane = Buffer.alloc(width * height * 4);
+    for (let i = 0; i < width * height; i++) {
+      whitePlane[i * 4] = 255;      // R
+      whitePlane[i * 4 + 1] = 255;  // G
+      whitePlane[i * 4 + 2] = 255;  // B
+      whitePlane[i * 4 + 3] = maskPixels[i]; // A from calmness mask
+    }
+
+    const washOverlay = await sharp(whitePlane, { raw: { width, height, channels: 4 } })
+      .png()
+      .toBuffer();
+
+    const washedImage = await sharp(buf)
+      .composite([{ input: washOverlay, blend: 'over' }])
+      .jpeg({ quality: 92 })
+      .toBuffer();
+
+    const washedDataUri = `data:image/jpeg;base64,${washedImage.toString('base64')}`;
+
+    // ── Step 7: Compute bounding box of the washed region for text placement ──
+    let minX = width, minY = height, maxX = 0, maxY = 0;
+    const threshold = Math.round(washOpacity * 255 * 0.3); // ~30% of max wash
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (maskPixels[y * width + x] > threshold) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
       }
     }
 
-    const preferredScore = scores[preferredPosition] ?? -1;
-    const overridden = bestPos !== preferredPosition;
-    // Only override if the detected position is significantly better (>15% higher score)
-    const significantlyBetter = preferredScore > 0 && (bestScore - preferredScore) / preferredScore > 0.15;
+    const rect = {
+      x: minX,
+      y: minY,
+      w: maxX - minX,
+      h: maxY - minY,
+      imgWidth: width,
+      imgHeight: height,
+    };
 
-    if (overridden && significantlyBetter) {
-      log.info(`📝 [TEXT-REGION] Override: ${preferredPosition} (${preferredScore.toFixed(2)}) → ${bestPos} (${bestScore.toFixed(2)})`);
-      return { position: bestPos, score: bestScore, preferredScore, overridden: true };
+    // Determine position label from rect center
+    const centerX = rect.x + rect.w / 2;
+    const centerY = rect.y + rect.h / 2;
+    const detectedIsTop = centerY < height / 2;
+    const detectedIsLeft = centerX < width / 2;
+    const detectedIsFull = rect.w > width * 0.75;
+    let position;
+    if (detectedIsFull) {
+      position = detectedIsTop ? 'top-full' : 'bottom-full';
+    } else {
+      position = `${detectedIsTop ? 'top' : 'bottom'}-${detectedIsLeft ? 'left' : 'right'}`;
     }
 
-    return { position: preferredPosition, score: preferredScore, preferredScore, overridden: false };
+    const overridden = position !== preferredPosition;
+    log.info(`📝 [TEXT-REGION] P${pageNumber}: ${overridden ? preferredPosition + ' → ' : ''}${position}, wash ${(washCoverage * 100).toFixed(0)}% of image, rect ${rect.x},${rect.y} ${rect.w}×${rect.h}`);
+
+    return {
+      imageData: washedDataUri,
+      position,
+      rect,
+      score: washCoverage,
+      overridden,
+    };
   } catch (err) {
-    log.warn(`⚠️ [TEXT-REGION] Detection failed: ${err.message} — using preferred position`);
-    return { position: preferredPosition, score: 0, preferredScore: 0, overridden: false };
+    log.warn(`⚠️ [TEXT-REGION] P${pageNumber} failed: ${err.message}`);
+    return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
   }
 }
 
-module.exports = { detectBestTextPosition };
+module.exports = { detectAndLightenTextRegion };
