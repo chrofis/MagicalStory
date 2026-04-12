@@ -975,66 +975,48 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
       response.errorMessage = 'Story generation failed';
     }
 
-    // Include partial page images as they become available (small thumbnails for teaser)
+    // Fetch page images from checkpoints (progressive display during generation)
     if (job.status !== 'failed') {
       try {
-        const { getPool: getImgPool } = require('../services/database');
-        const imgPool = getImgPool();
-        // Get completed page images from story_images (saved progressively during generation)
-        const imgResult = await imgPool.query(
-          `SELECT si.page_number, encode(substring(si.image_data::bytea from 1 for 200000), 'escape') as thumb_prefix
-           FROM story_images si
-           JOIN stories s ON si.story_id = s.id
-           WHERE s.user_id = $1 AND si.image_data IS NOT NULL AND si.page_number >= 1 AND si.image_type = 'scene'
-           ORDER BY si.page_number`,
-          [userId]
+        const pageResult = await pool.query(
+          `SELECT step_index, step_data FROM story_job_checkpoints
+           WHERE job_id = $1 AND step_name = 'partial_page'
+           ORDER BY step_index ASC`,
+          [jobId]
         );
-        // Return tiny thumbnails (resize on client, or just use as-is since they're base64)
-        if (imgResult.rows.length > 0) {
-          const pageImages = [];
-          for (const row of imgResult.rows) {
-            // Get image_data directly — it's stored as base64 data URI
-            const fullResult = await imgPool.query(
-              `SELECT image_data FROM story_images si
-               JOIN stories s ON si.story_id = s.id
-               WHERE s.user_id = $1 AND si.page_number = $2 AND si.image_type = 'scene'
-               ORDER BY si.version_index DESC LIMIT 1`,
-              [userId, row.page_number]
-            );
-            if (fullResult.rows[0]?.image_data) {
-              pageImages.push({
-                pageNumber: row.page_number,
-                imageData: fullResult.rows[0].image_data
-              });
-            }
-          }
-          if (pageImages.length > 0) {
-            response.pageImages = pageImages;
-          }
+        if (pageResult.rows.length > 0) {
+          response.pageImages = pageResult.rows
+            .filter(row => row.step_data?.imageData)
+            .map(row => ({
+              pageNumber: row.step_index,
+              imageData: row.step_data.imageData
+            }));
         }
-      } catch (e) {
-        // Non-critical, ignore
+      } catch (err) {
+        log.debug(`[TRIAL] Page images checkpoint query failed: ${err.message}`);
       }
     }
 
-    // Include title page image if requested — now fetched from story_images (generated during streaming)
+    // Fetch title page from cover checkpoints
     if (req.query.needTitlePage === '1') {
-      // Title page is now generated during streaming — check story_images
       try {
-        const titleResult = await pool.query(
-          `SELECT si.image_data FROM story_images si
-           JOIN stories s ON si.story_id = s.id
-           WHERE s.user_id = $1 AND si.image_type = 'scene' AND si.page_number = -1
-           ORDER BY si.version_index DESC LIMIT 1`,
-          [userId]
+        const coverResult = await pool.query(
+          `SELECT step_data FROM story_job_checkpoints
+           WHERE job_id = $1 AND step_name = 'partial_cover' AND step_index = 0
+           LIMIT 1`,
+          [jobId]
         );
-        if (titleResult.rows.length > 0 && titleResult.rows[0].image_data) {
-          response.titlePageImage = titleResult.rows[0].image_data;
+        if (coverResult.rows.length > 0 && coverResult.rows[0].step_data?.imageData) {
+          response.titlePageImage = coverResult.rows[0].step_data.imageData;
+          if (coverResult.rows[0].step_data?.storyTitle) {
+            response.titlePageTitle = coverResult.rows[0].step_data.storyTitle;
+          }
         }
       } catch (err) {
-        log.debug(`[TRIAL] Title page query failed: ${err.message}`);
+        log.debug(`[TRIAL] Cover checkpoint query failed: ${err.message}`);
       }
-      // Also get avatar slides from character data (still stored there)
+
+      // Avatar slides from character data (independent of title page)
       try {
         const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [`characters_${userId}`]);
         if (charResult.rows.length > 0) {
