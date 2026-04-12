@@ -1427,19 +1427,7 @@ async function getPriceForPages(pageCount, isHardcover) {
 
 // ── Referral / promo code helpers ───────────────────────────────────────────
 
-const crypto = require('crypto');
-
-/**
- * Generate a referral code in the format "MagicRoger427".
- * 3-digit suffix → 900 slots per name. Caller retries on unique constraint violation.
- * @param {string} username - the user's display name (first name or username)
- */
-function generateReferralCode(username = '') {
-  const clean = username.replace(/[^a-zA-Z]/g, '').slice(0, 10);
-  const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
-  const num = crypto.randomInt(100, 999);
-  return `Magic${name}${num}`;
-}
+const { generateReferralCode } = require('../lib/referral');
 
 /**
  * Validate a referral code for a given buyer. Returns { valid, referrerUserId, discountChf, reason }.
@@ -1501,6 +1489,9 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
           }
         }
       }
+      // Re-read the stored code — a concurrent request may have won the race
+      const stored = await getDbPool().query('SELECT referral_code FROM users WHERE id = $1', [userId]);
+      code = stored.rows[0]?.referral_code || code;
     }
 
     const statsResult = await getDbPool().query(

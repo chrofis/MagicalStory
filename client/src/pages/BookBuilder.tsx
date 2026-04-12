@@ -76,11 +76,11 @@ export default function BookBuilder() {
     if (!isAuthenticated) return;
     storyService.getMyReferralCode()
       .then(data => setCanUsePromo(data.referredBy === null))
-      .catch(() => setCanUsePromo(false));
+      .catch(() => setCanUsePromo(true)); // default to showing field — server will reject if ineligible
   }, [isAuthenticated]);
 
   const handleApplyPromo = async () => {
-    if (!promoCode.trim()) return;
+    if (!promoCode.trim() || promoChecking || promoValid) return;
     setPromoChecking(true);
     setPromoError('');
     try {
@@ -608,7 +608,11 @@ export default function BookBuilder() {
                   <input
                     type="text"
                     value={promoCode}
-                    onChange={(e) => { setPromoCode(e.target.value); setPromoError(''); }}
+                    onChange={(e) => {
+                      setPromoCode(e.target.value);
+                      setPromoError('');
+                      if (promoValid) { setPromoValid(false); setPromoDiscount(0); }
+                    }}
                     disabled={promoValid}
                     maxLength={20}
                     placeholder="MagicRoger42"

@@ -273,6 +273,8 @@ async function initializeDatabase() {
     await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(20)`);
     // Unique constraint on referral_code (idempotent — does nothing if already exists)
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code) WHERE referral_code IS NOT NULL`);
+    // Functional index for case-insensitive lookup (LOWER()) used by validateReferralCodeForUser
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code_lower ON users(LOWER(referral_code)) WHERE referral_code IS NOT NULL`);
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS referral_events (
@@ -289,14 +291,7 @@ async function initializeDatabase() {
 
     // Backfill referral codes for existing users who don't have one yet
     {
-      const crypto = require('crypto');
-      // Generate code in format "MagicRoger427"
-      const genCode = (username) => {
-        const clean = (username || '').replace(/[^a-zA-Z]/g, '').slice(0, 10);
-        const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
-        const num = crypto.randomInt(100, 999);
-        return `Magic${name}${num}`;
-      };
+      const { generateReferralCode: genCode } = require('../lib/referral');
       const missing = await dbPool.query('SELECT id, username FROM users WHERE referral_code IS NULL');
       for (const row of missing.rows) {
         for (let attempt = 0; attempt < 10; attempt++) {

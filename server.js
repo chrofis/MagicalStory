@@ -888,40 +888,53 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
           }
 
-          // ── Referral credit: if a valid referral code was used, reward the referrer
+          // ── Referral credit: if a valid referral code was used, reward the referrer.
+          // Uses referred_by as the atomic idempotency lock: if the UPDATE touches 0
+          // rows the buyer was already referred (by this or another concurrent webhook),
+          // so we skip the credit grant entirely. All steps run in a transaction so
+          // they either all succeed or all roll back.
           const refCode = fullSession.metadata?.referralCode;
           const refReferrerId = fullSession.metadata?.referrerUserId;
           const refDiscountCents = parseInt(fullSession.metadata?.discountCents) || 0;
           if (refCode && refReferrerId) {
+            const client = await dbPool.connect();
             try {
-              // Idempotency: skip if this session was already processed
-              const existing = await dbPool.query(
-                'SELECT id FROM referral_events WHERE order_stripe_session_id = $1', [fullSession.id]
+              await client.query('BEGIN');
+
+              // Step 1: atomically mark the buyer as referred — this is the lock.
+              // If another webhook already set referred_by, rowCount = 0 and we skip.
+              const markResult = await client.query(
+                'UPDATE users SET referred_by = $1 WHERE id = $2 AND referred_by IS NULL',
+                [refCode, userId]
               );
-              if (existing.rows.length === 0) {
+              if (markResult.rowCount === 0) {
+                await client.query('ROLLBACK');
+                log.warn('⚠️ [STRIPE WEBHOOK] Buyer already referred, skipping referral credit for session:', fullSession.id);
+              } else {
                 const creditsToGrant = CREDIT_CONFIG.REFERRAL.REFERRER_CREDITS;
 
-                // 1. Record the referral event
-                await dbPool.query(`
+                // Step 2: record the referral event (unique constraint on stripe_session_id
+                // is a backstop — the referred_by lock above is the primary guard)
+                await client.query(`
                   INSERT INTO referral_events (referrer_user_id, buyer_user_id, order_stripe_session_id, discount_cents, credits_granted)
                   VALUES ($1, $2, $3, $4, $5)
                 `, [refReferrerId, userId, fullSession.id, refDiscountCents, creditsToGrant]);
 
-                // 2. Update the order with referral info
-                await dbPool.query(
+                // Step 3: update the order with referral info
+                await client.query(
                   'UPDATE orders SET referral_code_used = $1, discount_cents = $2 WHERE stripe_session_id = $3',
                   [refCode, refDiscountCents, fullSession.id]
                 );
 
-                // 3. Credit the referrer
-                await dbPool.query(
+                // Step 4: credit the referrer
+                await client.query(
                   'UPDATE users SET credits = CASE WHEN credits = -1 THEN -1 ELSE credits + $1 END WHERE id = $2',
                   [creditsToGrant, refReferrerId]
                 );
 
-                // 4. Record credit transaction for referrer
-                const refBalanceResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [refReferrerId]);
-                await dbPool.query(`
+                // Step 5: record credit transaction for referrer
+                const refBalanceResult = await client.query('SELECT credits FROM users WHERE id = $1', [refReferrerId]);
+                await client.query(`
                   INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
                   VALUES ($1, $2, $3, 'referral', $4, $5)
                 `, [
@@ -932,19 +945,15 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
                   `Referral reward: a friend used your code ${refCode}`
                 ]);
 
-                // 5. Mark the buyer as referred (permanent — one referral code per buyer, ever)
-                await dbPool.query(
-                  'UPDATE users SET referred_by = $1 WHERE id = $2 AND referred_by IS NULL',
-                  [refCode, userId]
-                );
-
+                await client.query('COMMIT');
                 log.info(`🎁 [STRIPE WEBHOOK] Referral reward: ${creditsToGrant} credits to ${refReferrerId} (code ${refCode}, buyer ${userId}, discount CHF ${refDiscountCents / 100})`);
-              } else {
-                log.warn('⚠️ [STRIPE WEBHOOK] Referral already processed for session:', fullSession.id);
               }
             } catch (refErr) {
-              log.error('❌ [STRIPE WEBHOOK] Referral credit failed:', refErr.message);
-              // Don't throw — the order itself is saved; referral credit is a bonus
+              await client.query('ROLLBACK').catch(() => {});
+              log.error('❌ [STRIPE WEBHOOK] Referral credit failed (rolled back):', refErr.message);
+              // Don't throw — the order itself is already saved outside this block
+            } finally {
+              client.release();
             }
           }
 
