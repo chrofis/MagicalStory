@@ -679,7 +679,10 @@ async function packReferences(refs = {}, options = {}) {
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
     ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
     : [];
-  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0 && charCount >= 4;
+  // Always bake VB elements into the scene background when both exist.
+  // This frees up a slot for characters — 3 chars can split across 2 slots
+  // instead of being crammed into 1.
+  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0;
 
   // Scene background goes first — style anchor for visual consistency
   if (hasSceneBackground) {
@@ -745,14 +748,18 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''} composed (${rm.width}x${rm.height})`);
   };
 
-  if (charCount > 0 && charCount <= 3) {
-    // 1-3 chars fit in a single slot
+  const availableCharSlots = 3 - slots.length;
+  if (charCount > 0 && charCount <= 2) {
+    // 1-2 chars: single slot is fine
     await pushCharSlot(rawCharData);
-  } else if (charCount >= 4) {
-    // 4+ chars: split into two groups, each its own slot
+  } else if (charCount >= 3 && availableCharSlots >= 2) {
+    // 3+ chars with 2 free slots: split into two groups for better detail
     const mid = Math.ceil(charCount / 2);
     await pushCharSlot(rawCharData.slice(0, mid));
     await pushCharSlot(rawCharData.slice(mid));
+  } else if (charCount >= 3) {
+    // 3+ chars but only 1 slot: cram all into one
+    await pushCharSlot(rawCharData);
   }
 
   // Landmark: only gets a slot when there's NO scene background (scene bg
