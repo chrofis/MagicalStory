@@ -2,9 +2,9 @@ Generate a SINGLE illustration. One continuous scene filling the entire image. N
 
 When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment.
 
-EXACTLY {CHARACTER_COUNT} characters in this image, no more. Every person must match one of the reference photos provided. Do NOT add extra figures, background people, or supporting characters.
-
 {STYLE_DESCRIPTION}
+
+Characters face TOWARD what they interact with — objects, landmarks, or each other. NOT at the camera. Each character must be DOING something, not standing and posing.
 
 {SCENE_DESCRIPTION}
 
