@@ -134,6 +134,7 @@ Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no seco
     },
     "characters": [
       {
+        "id": null,
         "name": "[MainCharName]",
         "position": "center",
         "action": "[heroic or characteristic pose/action]",
@@ -141,7 +142,9 @@ Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no seco
         "clothing": "costumed:[type]"
       }
     ],
-    "objects": ["[LOC###]", "[ART### if relevant]"]
+    "objects": [
+      {"id": "[LOC###]", "name": "[Location name]", "position": "background"}
+    ]
   }
 }
 ```

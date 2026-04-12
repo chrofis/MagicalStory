@@ -3535,7 +3535,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       onCoverScene: (coverData) => {
         // TRIAL MODE: Generate title page from the structured cover scene JSON
         if (!inputData.trialMode) return;
-        if (streamingCoverPromises.has('titlePage') || skipImages) return;
+        if (streamingCoverPromises.has('titlePage') || skipImages || skipCovers) return;
 
         const coverTitle = coverData.title || streamingTitle || 'My Story';
         const coverScene = coverData.scene || coverData;
@@ -3610,8 +3610,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               VISUAL_BIBLE: visualBibleText
             });
 
-            // Resolve landmark photos from cover scene location
-            const sceneMetadata = extractSceneMetadata(sceneDescription);
+            // Build metadata directly — extractSceneMetadata can't parse our code-fenced JSON
+            const sceneMetadata = {
+              objects: coverScene.objects || [],
+              fullData: coverScene,
+              characters: coverScene.characters || [],
+              setting: coverScene.setting || null,
+            };
             const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
 
             // Build VB grid (page number -1 = front cover convention)
@@ -4545,10 +4550,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
             const textSizeHint = langLevel === '1st-grade'
-              ? 'a narrow strip (about one tenth of the frame)'
+              ? 'a narrow strip (about one eighth of the frame)'
               : langLevel === 'advanced'
-                ? 'a large band (about one third of the frame)'
-                : 'a wide band (about one quarter of the frame)';
+                ? 'a large band (about two fifths of the frame)'
+                : 'a wide band (about one third of the frame)';
             const emptyTextAreaInstr = textPos
               ? `The ${textPos.replace('-', ' ')} area (${textSizeHint}) must stay calm for text overlay. Continue the scene naturally into that region — same sky, wall, ground, or water — but keep it simple, low-detail, and without important elements. Do not paint a blank patch or white box — the area should look like a natural part of the scene, just quieter.`
               : '';

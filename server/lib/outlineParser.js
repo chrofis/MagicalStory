@@ -2068,6 +2068,9 @@ class ProgressiveUnifiedParser {
     // (all content has been received, so TEXT + HINT is sufficient)
     this._finalized = true;
 
+    // Rescue truncated cover scene before final page check
+    this._checkCoverScene();
+
     // Re-check pages one more time to catch the last page
     this._checkPages();
 

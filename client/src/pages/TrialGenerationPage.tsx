@@ -204,7 +204,7 @@ export default function TrialGenerationPage() {
 
   // Title page image — always arrives via polling from the story generation pipeline
   const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
-  const [titlePageTitle, setTitlePageTitle] = useState<string | null>(null);
+
 
   // Slideshow of page images as they arrive during generation
   const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
@@ -337,7 +337,7 @@ export default function TrialGenerationPage() {
       if (data.titlePageImage) {
         setTitlePageImage(data.titlePageImage);
         needTitlePageRef.current = false;
-        if (data.titlePageTitle) setTitlePageTitle(data.titlePageTitle);
+
         if (data.avatarSlides?.length) setAvatarSlides(data.avatarSlides);
       }
 
@@ -549,10 +549,10 @@ export default function TrialGenerationPage() {
     for (let i = 0; i < avatarSlides.length; i++) {
       items.push({ type: 'avatar', src: avatarSlides[i], label: `${state?.characterName || 'Character'} - Style ${i + 1}` });
     }
-    if (titlePageImage) items.push({ type: 'title', src: titlePageImage, label: titlePageTitle || 'Cover' });
+    if (titlePageImage) items.push({ type: 'title', src: titlePageImage, label: 'Cover' });
     for (const img of pageImages) items.push({ type: 'page', src: img.imageData, label: `Page ${img.pageNumber}` });
     return items;
-  }, [state?.previewAvatar, state?.characterName, avatarSlides, titlePageImage, titlePageTitle, pageImages]);
+  }, [state?.previewAvatar, state?.characterName, avatarSlides, titlePageImage, pageImages]);
 
   // Funny messages (same as normal story generation)
   const funnyMessages = [
