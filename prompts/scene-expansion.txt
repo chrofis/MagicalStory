@@ -84,8 +84,7 @@ Then a single-line JSON object with these fields only:
     {"character": "Sophie", "object": "stone stairs", "where": "standing on the top step, facing down"}
   ],
   "textPosition": "top-left",
-  "emptyScenePrompt": "A snowy medieval plaza with cobblestones. Clock tower with blue face on the left. Golden hour winter light, light snow. Medium wide shot. Open center foreground.",
-  "translatedSummary": "Sophie und Manuel gehen über den verschneiten Platz."
+  "emptyScenePrompt": "A snowy medieval plaza with cobblestones. Clock tower with blue face on the left. Golden hour winter light, light snow. Medium wide shot. Open center foreground."
 }
 ```
 
@@ -95,21 +94,9 @@ Then a single-line JSON object with these fields only:
 - `interactions[]`: One entry per character-to-object contact visible in the scene. Use this for anything held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, or touched. Include the CHARACTER name, the OBJECT name (matching the recurring-element name or a plain noun like "rope", "ladder", "stairs", "doorway"), and a short WHERE string describing the exact placement ("in left jacket pocket", "right hand grip", "feet on third rung", "passing through the archway"). OMIT entries for characters who aren't touching anything in the scene. This is authoritative — evaluators will check that the image matches these interactions exactly.
 - `textPosition`: Where story text will be overlaid on the illustration. Pick the area with the LEAST action — sky, empty wall, floor, water, open background. Odd pages (1, 3, 5…) are printed on the LEFT side of a book spread — use `"top-left"`, `"bottom-left"`, or `"top-full"` / `"bottom-full"` only. Even pages (2, 4, 6…) are on the RIGHT — use `"top-right"`, `"bottom-right"`, or `"top-full"` / `"bottom-full"` only. Avoid placing text where characters' faces or key actions are. Vary between top and bottom across consecutive pages.
 - `emptyScenePrompt`: 2-3 sentences describing ONLY the background — NO people, NO animals, NO artifacts. Just location, architecture, lighting, weather, camera angle. Never write "where children would stand" — image models render that literally. Use "open foreground", "uncluttered center". Characters will be composited onto this scene later, so the framing MUST leave enough physical space for them to be placed naturally into the scene.
-- `translatedSummary`: 1-2 sentence summary in the target language below.
 
 **LANDMARK ACCURACY**: Read ALL photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
 
 ---
 
-## LANGUAGE RULES
-
-**ALL PROSE AND METADATA IN ENGLISH** — except `translatedSummary`:
-- Scene prose → ALWAYS ENGLISH
-- Metadata fields → ALWAYS ENGLISH
-- `translatedSummary` → translate to target language below
-
-**Target Language for translatedSummary:**
-{LANGUAGE_INSTRUCTION}
-{LANGUAGE_NOTE}
-
-The `translatedSummary` field MUST follow these language rules exactly.
+**ALL OUTPUT IN ENGLISH.** Prose and all metadata fields must be in English.
