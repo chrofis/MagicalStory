@@ -111,14 +111,17 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
 
   const matchedCascade = new Set();
 
-  // For each Gemini figure, find the closest cascade face near its bodyBox
+  // For each Gemini figure, find the closest cascade face near its bodyBox.
+  // Gemini bodyBox/faceBox are [ymin, xmin, ymax, xmax] normalized 0-1.
+  // Cascade faceBox/paddedBox are {x, y, width, height} in pixels.
+  // All comparisons normalize cascade coords to 0-1 first.
   for (const fig of geminiFigures) {
-    const bb = fig.bodyBox; // [x1, y1, x2, y2] normalized
+    const bb = fig.bodyBox; // [ymin, xmin, ymax, xmax] normalized 0-1
     if (!bb || !Array.isArray(bb)) continue;
 
-    const bodyCenterX = (bb[0] + bb[2]) / 2;
-    const bodyCenterY = bb[1]; // top of body = near head
-    const bodyW = bb[2] - bb[0];
+    const bodyCenterX = (bb[1] + bb[3]) / 2; // (xmin + xmax) / 2
+    const bodyCenterY = bb[0]; // ymin = top of body = near head
+    const bodyW = bb[3] - bb[1]; // xmax - xmin
 
     let bestDist = Infinity;
     let bestIdx = -1;
@@ -126,15 +129,16 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
     for (let i = 0; i < cascadeFaces.length; i++) {
       if (matchedCascade.has(i)) continue;
       const cf = cascadeFaces[i];
-      const faceCenterX = cf.faceBox.x + cf.faceBox.width / 2;
-      const faceCenterY = cf.faceBox.y + cf.faceBox.height / 2;
+      // Normalize cascade pixel coords to 0-1
+      const faceCenterX = (cf.faceBox.x + cf.faceBox.width / 2) / imgWidth;
+      const faceCenterY = (cf.faceBox.y + cf.faceBox.height / 2) / imgHeight;
 
       // Face should be within ~1.5x body width horizontally and above body center
       const dx = Math.abs(faceCenterX - bodyCenterX) / (bodyW || 0.1);
       const dy = faceCenterY - bodyCenterY; // negative = face above body top (expected)
 
       // Distance metric: horizontal offset + penalty for face below body top
-      const dist = dx + (dy > 0.1 ? dy * 5 : 0); // Penalize faces that are below body top
+      const dist = dx + (dy > 0.1 ? dy * 5 : 0);
 
       if (dist < bestDist && dx < 1.5) {
         bestDist = dist;
@@ -145,25 +149,30 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
     if (bestIdx >= 0) {
       const cf = cascadeFaces[bestIdx];
       matchedCascade.add(bestIdx);
-      // Replace Gemini's faceBox with cascade's more accurate coordinates
-      // Keep original for overlay display (dashed = Gemini, solid = cascade)
+      // Replace Gemini's faceBox with cascade's more accurate coordinates.
+      // Normalize cascade paddedBox from pixels to [ymin, xmin, ymax, xmax] 0-1
+      // to match the Gemini coordinate format used everywhere.
       const oldFace = fig.faceBox;
-      const newFace = [cf.paddedBox.x, cf.paddedBox.y, cf.paddedBox.x + cf.paddedBox.width, cf.paddedBox.y + cf.paddedBox.height];
-      fig._geminiFaceBox = oldFace; // Original Gemini face box (for overlay)
-      fig.faceBox = newFace;        // Cascade-improved (used for face cropping)
+      const newFace = [
+        cf.paddedBox.y / imgHeight,                          // ymin
+        cf.paddedBox.x / imgWidth,                           // xmin
+        (cf.paddedBox.y + cf.paddedBox.height) / imgHeight,  // ymax
+        (cf.paddedBox.x + cf.paddedBox.width) / imgWidth,    // xmax
+      ];
+      fig._geminiFaceBox = oldFace;
+      fig.faceBox = newFace;
       fig._cascadeFace = cf.source;
 
       // Expand bodyBox to include cascade face if it falls outside
-      // (same logic as char repair — prevents face being outside the figure region)
-      if (bb && Array.isArray(bb) && bb.length >= 4) {
-        const [bx1, by1, bx2, by2] = bb;
-        const [fx1, fy1, fx2, fy2] = newFace;
-        if (fx1 < bx1 || fy1 < by1 || fx2 > bx2 || fy2 > by2) {
+      if (bb.length >= 4) {
+        const [bymin, bxmin, bymax, bxmax] = bb;
+        const [fymin, fxmin, fymax, fxmax] = newFace;
+        if (fxmin < bxmin || fymin < bymin || fxmax > bxmax || fymax > bymax) {
           fig.bodyBox = [
-            Math.min(bx1, fx1),
-            Math.min(by1, fy1),
-            Math.max(bx2, fx2),
-            Math.max(by2, fy2)
+            Math.min(bymin, fymin),
+            Math.min(bxmin, fxmin),
+            Math.max(bymax, fymax),
+            Math.max(bxmax, fxmax)
           ];
           log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: expanded bodyBox to include face`);
         }
@@ -806,9 +815,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: ${figures.length} figures, ${identifiedFigures.length} identified: ${identifiedFigures.map(f => f.name).join(', ')}`);
     }
 
-    // Fallback: run on-the-fly bbox detection for pages with missing or unusable data
+    // Fallback: run on-the-fly bbox detection for pages with missing or unusable data.
+    // Triggers when: no detection at all, empty figures array, or all figures are UNKNOWN.
     const identifiedCount = figures.filter(f => f.name && f.name !== 'UNKNOWN').length;
-    const needsFallbackDetection = !bboxDetection || (figures.length > 0 && identifiedCount === 0);
+    const needsFallbackDetection = !bboxDetection || figures.length === 0 || identifiedCount === 0;
 
     if (needsFallbackDetection && storyCharacters) {
       // Determine which characters are expected on this page
