@@ -4574,13 +4574,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
             const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
-            const textSizeHint = langLevel === '1st-grade'
-              ? 'a narrow strip (about one eighth of the frame)'
-              : langLevel === 'advanced'
-                ? 'a large band (about two fifths of the frame)'
-                : 'a wide band (about one third of the frame)';
             const emptyTextAreaInstr = textPos
-              ? `The ${textPos.replace('-', ' ')} area (${textSizeHint}) is reserved for dark text overlay. Paint this area in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water. No dark tones, no shadows, no building edges, no structural lines, no characters. Smooth, light, featureless wash that blends into the scene.`
+              ? `The ${textPos.replace('-', ' ')} area must be open, light-coloured negative space for text overlay. Soft pale background — open sky, light fog, pale wall, calm water. No dark tones, no shadows, no structural lines. Lots of breathing room.`
               : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

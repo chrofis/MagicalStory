@@ -3650,13 +3650,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Enforce spread rule: odd pages = left, even pages = right
   const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
   const langLevel = inputData?.languageLevel || 'standard';
-  const textSizeHint = langLevel === '1st-grade'
-    ? 'a narrow strip (about one eighth of the frame)'
-    : langLevel === 'advanced'
-      ? 'a large band (about two fifths of the frame)'
-      : 'a wide band (about one third of the frame)';
+  // Describe the text area using compositional framing language + percentage as anchor.
+  const areaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '30%';
+  const areaSize = langLevel === '1st-grade' ? 'a small corner' : langLevel === 'advanced' ? 'the full upper/lower third' : 'a generous corner area';
+  const areaMap = {
+    'top-left': `The upper left corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
+    'top-right': `The upper right corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
+    'bottom-left': `The lower left corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
+    'bottom-right': `The lower right corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
+    'top-full': `The entire upper third of the frame (roughly ${areaPct} of the image) must be open, light-coloured negative space`,
+    'bottom-full': `The entire lower third of the frame (roughly ${areaPct} of the image) must be open, light-coloured negative space`,
+  };
   const textAreaInstruction = textPosition
-    ? `**TEXT AREA (mandatory):** The ${textPosition.replace('-', ' ')} area (${textSizeHint}) is reserved for a dark text overlay. This area MUST be painted in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water, or washed-out ground. No dark tones, no shadows, no building edges, no window lines, no tree branches, no architectural structure, no characters. Keep it as a smooth, light-coloured, featureless wash that blends naturally into the scene. Dark text will be printed over this area — if it is dark or busy, the text becomes unreadable.`
+    ? `**COPY SPACE (mandatory):** ${areaMap[textPosition] || `The ${textPosition.replace('-', ' ')} area must be open, light-coloured negative space`}. This is where dark story text will be printed. Paint this region as soft, pale, featureless background — open sky, light fog, pale wall, calm water, sunlit ground. Lots of breathing room, no detail. No dark tones, no shadows, no structural lines, no characters, no objects in this zone. The rest of the illustration can be rich and detailed — just keep this corner/edge light and empty.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

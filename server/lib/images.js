@@ -5720,17 +5720,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
           || '';
         const textPos = iterateSceneMetadata?.textPosition || null;
-        const iterLangLevel = storyData.languageLevel || 'standard';
-        const iterTextSize = iterLangLevel === '1st-grade'
-          ? 'a narrow strip (about one eighth of the frame)'
-          : iterLangLevel === 'advanced'
-            ? 'a large band (about two fifths of the frame)'
-            : 'a wide band (about one third of the frame)';
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area (${iterTextSize}) is reserved for dark text overlay. Paint this area in LIGHT, PALE colours only — soft sky, pale clouds, light fog, sunlit wall, calm water. No dark tones, no shadows, no building edges, no structural lines, no characters. Smooth, light, featureless wash that blends into the scene.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area must be open, light-coloured negative space for text overlay. Soft pale background — open sky, light fog, pale wall, calm water. No dark tones, no shadows, no structural lines. Lots of breathing room.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;
