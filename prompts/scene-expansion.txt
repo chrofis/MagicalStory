@@ -24,12 +24,10 @@ You are an Art Director writing illustration briefs for children's book pages. O
 
 ## INPUT
 
-**SCENE HINT (your starting point):**
+**SCENE HINT (Page {PAGE_NUMBER} — your starting point):**
 {DRAFT_SCENE_DESCRIPTION}
 
-**CURRENT SCENE (Page {PAGE_NUMBER}):**
-{SCENE_SUMMARY}
-**Story Text:**
+**Story Text (for emotional context — do NOT add characters from here that are not in the hint):**
 {PAGE_CONTENT}
 
 **CHARACTER DETAILS (EXACTLY {CHARACTER_COUNT} characters — weave each one's appearance into the prose):**
@@ -37,10 +35,9 @@ You are an Art Director writing illustration briefs for children's book pages. O
 
 {HEIGHT_ORDER}
 
-**Available Avatars (select clothing from these):**
+**Available Clothing (use in metadata):**
 {AVAILABLE_AVATARS}
-
-IMPORTANT: PRESERVE the clothing value from the scene hint EXACTLY. If the hint says `costumed:mittelalterlich`, your metadata MUST say `costumed:mittelalterlich`. Do NOT change clothing to "standard".
+PRESERVE clothing from the scene hint exactly. If hint says `costumed:wizard`, metadata MUST say `costumed:wizard`.
 {LOCKED_PERSPECTIVES}
 
 **RECURRING VISUAL ELEMENTS (when one appears in the scene, name it and weave its detail into the prose):**

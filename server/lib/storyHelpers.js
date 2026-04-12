@@ -3121,19 +3121,36 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   // buildImagePrompt directly, so Claude doesn't waste tokens copying it.
   const heightOrder = buildRelativeHeightDescription(characters) || '';
 
-  // Build Visual Bible recurring elements section (same logic as iteration prompt)
-  // NOTE: Do NOT include element IDs (ART001, LOC001, etc.) — they leak into scene descriptions
-  // and then into image prompts where they confuse image generators.
+  // Extract object IDs from the scene hint (e.g., ["LOC003", "ANI002"]) to filter
+  // recurring elements — only pass elements referenced by THIS scene, not the entire VB.
+  let hintObjectIds = new Set();
+  try {
+    const hintJson = draftSceneDescription || rawOutlineContext?.currentPage || '';
+    const objMatch = hintJson.match(/"objects"\s*:\s*\[(.*?)\]/s);
+    if (objMatch) {
+      const ids = objMatch[1].match(/"([^"]+)"/g);
+      if (ids) ids.forEach(id => hintObjectIds.add(id.replace(/"/g, '').replace(/\.\d+$/, '').toUpperCase()));
+    }
+  } catch { /* ignore parse errors */ }
+
+  // Build Visual Bible recurring elements — ONLY those referenced by this scene's objects[].
+  // This avoids passing 12 elements when only 2 are relevant, saving ~500 tokens.
   let recurringElements = '';
+  const isRelevant = (entry) => {
+    if (hintObjectIds.size === 0) return true; // No filter available — pass everything
+    return entry.id && hintObjectIds.has(entry.id.toUpperCase());
+  };
   if (visualBible) {
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       for (const sc of visualBible.secondaryCharacters) {
+        if (!isRelevant(sc)) continue;
         const description = sc.extractedDescription || sc.description;
         recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
       }
     }
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
+        if (!isRelevant(loc)) continue;
         const description = loc.extractedDescription || loc.description;
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
           recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
@@ -3150,24 +3167,28 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     }
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
       for (const veh of visualBible.vehicles) {
+        if (!isRelevant(veh)) continue;
         const description = veh.extractedDescription || veh.description;
         recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
       }
     }
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
+        if (!isRelevant(animal)) continue;
         const description = animal.extractedDescription || animal.description;
         recurringElements += `* **${animal.name}** (animal): ${description}\n`;
       }
     }
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
+        if (!isRelevant(artifact)) continue;
         const description = artifact.extractedDescription || artifact.description;
         recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
     if (visualBible.clothing && visualBible.clothing.length > 0) {
       for (const item of visualBible.clothing) {
+        if (!isRelevant(item)) continue;
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
         recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
@@ -3196,11 +3217,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     }
   }
 
-  // Build scene summary
+  // Scene summary: just the page label. The scene hint is in DRAFT_SCENE_DESCRIPTION
+  // and story text in PAGE_CONTENT — don't duplicate by passing the raw outline block.
   let sceneSummary = '';
-  if (rawOutlineContext?.currentPage) {
-    sceneSummary = rawOutlineContext.currentPage + '\n\n';
-  }
 
   // Mine LOCKED PERSPECTIVES from the raw outline current page (same logic as iteration)
   let lockedPerspectivesText = '';
