@@ -3650,19 +3650,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Enforce spread rule: odd pages = left, even pages = right
   const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
   const langLevel = inputData?.languageLevel || 'standard';
-  // Describe the text area using compositional framing language + percentage as anchor.
+  // Text area instruction: tell the model to keep an area calm for text overlay.
+  // Critical: do NOT say "white", "blank", "empty", or "negative space" — the model
+  // will paint a literal white box. Instead say "continue the scene but keep it simple".
   const areaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '30%';
-  const areaSize = langLevel === '1st-grade' ? 'a small corner' : langLevel === 'advanced' ? 'the full upper/lower third' : 'a generous corner area';
-  const areaMap = {
-    'top-left': `The upper left corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
-    'top-right': `The upper right corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
-    'bottom-left': `The lower left corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
-    'bottom-right': `The lower right corner — ${areaSize}, roughly ${areaPct} of the image — must be open, light-coloured negative space`,
-    'top-full': `The entire upper third of the frame (roughly ${areaPct} of the image) must be open, light-coloured negative space`,
-    'bottom-full': `The entire lower third of the frame (roughly ${areaPct} of the image) must be open, light-coloured negative space`,
+  const cornerDesc = {
+    'top-left': 'upper left corner',
+    'top-right': 'upper right corner',
+    'bottom-left': 'lower left corner',
+    'bottom-right': 'lower right corner',
+    'top-full': 'upper third',
+    'bottom-full': 'lower third',
   };
   const textAreaInstruction = textPosition
-    ? `**COPY SPACE (mandatory):** ${areaMap[textPosition] || `The ${textPosition.replace('-', ' ')} area must be open, light-coloured negative space`}. This is where dark story text will be printed. Paint this region as soft, pale, featureless background — open sky, light fog, pale wall, calm water, sunlit ground. Lots of breathing room, no detail. No dark tones, no shadows, no structural lines, no characters, no objects in this zone. The rest of the illustration can be rich and detailed — just keep this corner/edge light and empty.`
+    ? `**COPY SPACE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) will have dark text printed over it. Continue the scene naturally into this area — same sky, same wall, same ground — but keep it SOFT and SIMPLE there. Use lighter tones of the same colours already in the scene, with gentle gradients and minimal detail. DO NOT paint a white box, a blank patch, or a sharp colour change. The area should look like a natural, calm continuation of the illustration — just quieter and lighter than the rest, so dark text is readable over it. No characters, no sharp lines, no high-contrast detail in this zone.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

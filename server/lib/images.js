@@ -5724,7 +5724,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area must be open, light-coloured negative space for text overlay. Soft pale background — open sky, light fog, pale wall, calm water. No dark tones, no shadows, no structural lines. Lots of breathing room.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

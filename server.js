@@ -4575,7 +4575,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
             const emptyTextAreaInstr = textPos
-              ? `The ${textPos.replace('-', ' ')} area must be open, light-coloured negative space for text overlay. Soft pale background — open sky, light fog, pale wall, calm water. No dark tones, no shadows, no structural lines. Lots of breathing room.`
+              ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.`
               : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
