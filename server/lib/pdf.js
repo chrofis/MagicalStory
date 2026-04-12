@@ -459,11 +459,13 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       const measuredHeight = doc.heightOfString(cleanText, { width: overlayTextWidth, align: isFullWidth ? 'center' : (isLeft ? 'left' : 'right'), lineGap });
       const overlayH = Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.4);
 
-      // Position the overlay box
-      let overlayX = bleed;
-      let overlayY = bleed;
-      if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW;
-      if (!isTop) overlayY = bleed + pageHeight - overlayH;
+      // Position the overlay box — inset 1.5% from image edges so text never
+      // sits on a Grok-added border or right at the image boundary.
+      const borderInset = pageWidth * 0.015;
+      let overlayX = bleed + borderInset;
+      let overlayY = bleed + borderInset;
+      if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW - borderInset;
+      if (!isTop) overlayY = bleed + pageHeight - overlayH - borderInset;
 
       // Draw gradual feathered background — fades from text edge to transparent
       // PDFKit linearGradient: from opaque white at text edge to transparent

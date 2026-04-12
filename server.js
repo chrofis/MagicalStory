@@ -4341,8 +4341,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
             const textPos = sceneMetadata?.textPosition || null;
+            const langLevel = inputData.languageLevel || 'standard';
+            const textSizeHint = langLevel === '1st-grade'
+              ? 'a narrow strip (about one tenth of the frame)'
+              : langLevel === 'advanced'
+                ? 'a large band (about one third of the frame)'
+                : 'a wide band (about one quarter of the frame)';
             const emptyTextAreaInstr = textPos
-              ? `Keep the ${textPos.replace('-', ' ')} area simple and uncluttered — story text will be placed there.`
+              ? `Reserve ${textSizeHint} along the ${textPos.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.`
               : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

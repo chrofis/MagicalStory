@@ -5634,11 +5634,17 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
           || '';
         const textPos = iterateSceneMetadata?.textPosition || null;
+        const iterLangLevel = storyData.languageLevel || 'standard';
+        const iterTextSize = iterLangLevel === '1st-grade'
+          ? 'a narrow strip (about one tenth of the frame)'
+          : iterLangLevel === 'advanced'
+            ? 'a large band (about one third of the frame)'
+            : 'a wide band (about one quarter of the frame)';
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `Keep the ${textPos.replace('-', ' ')} area simple — story text will be placed there.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `Reserve ${iterTextSize} along the ${textPos.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

@@ -3609,8 +3609,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Build text area instruction if textPosition is specified (keeps illustration uncluttered where text goes)
   const textPosition = metadata?.textPosition || null;
+  const langLevel = inputData?.languageLevel || 'standard';
+  const textSizeHint = langLevel === '1st-grade'
+    ? 'a narrow strip (about one tenth of the frame)'
+    : langLevel === 'advanced'
+      ? 'a large band (about one third of the frame)'
+      : 'a wide band (about one quarter of the frame)';
   const textAreaInstruction = textPosition
-    ? `**TEXT AREA:** The ${textPosition.replace('-', ' ')} area of this image will have story text overlaid. Keep that region simple and uncluttered — plain sky, soft background, empty ground, or muted colors. Do not place character faces or important details there.`
+    ? `**TEXT AREA:** Reserve ${textSizeHint} along the ${textPosition.replace('-', ' ')} for story text. Keep that region light-coloured and uncluttered — plain sky, soft pastel background, empty ground, or pale muted colors. Do not place character faces or important details there.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

@@ -97,24 +97,37 @@ export function getTextOverlayPosition(pageNumber: number, text: string, explici
 }
 
 /**
- * Get CSS classes for the text overlay container
+ * Get CSS classes for the text overlay container.
+ * Uses a small inset (1.5%) so the overlay never lands on a Grok-added border
+ * or gets clipped by the image's rounded corners.
  */
-export function getOverlayClasses(layout: TextOverlayLayout): string {
-  const posClasses: string[] = ['absolute', 'p-3', 'md:p-5'];
+export function getOverlayClasses(_layout: TextOverlayLayout): string {
+  return 'absolute';
+}
 
-  // Position
-  if (layout.top !== 'auto') posClasses.push(`top-0`);
-  if (layout.bottom !== 'auto') posClasses.push(`bottom-0`);
-  if (layout.left !== 'auto') posClasses.push(`left-0`);
-  if (layout.right !== 'auto') posClasses.push(`right-0`);
-
-  return posClasses.join(' ');
+/**
+ * Inline positioning style for the overlay container.
+ * Adds a 1.5% inset from image edges so text never sits on Grok borders
+ * or gets clipped by rounded corners.
+ */
+export function getOverlayPositionStyle(layout: TextOverlayLayout): CSSProperties {
+  const inset = '1.5%';
+  const style: CSSProperties = {};
+  if (layout.top !== 'auto') style.top = inset;
+  else style.bottom = inset;
+  if (layout.left !== 'auto') style.left = inset;
+  if (layout.right !== 'auto') style.right = inset;
+  return style;
 }
 
 /**
  * Get inline style for the gradient background.
  * Uses radial gradient from the corner for corners, linear for full-width.
  * Fades gradually in ALL directions — no hard box edges.
+ *
+ * Corner positions also get a CSS mask that feathers the two non-corner edges
+ * (e.g. bottom + right for top-left) so `overflow:hidden` on the container
+ * never creates a visible hard line.
  */
 export function getGradientStyle(layout: TextOverlayLayout): CSSProperties {
   const isTop = layout.position.startsWith('top');
@@ -132,7 +145,20 @@ export function getGradientStyle(layout: TextOverlayLayout): CSSProperties {
   // Corner: radial gradient emanating from the corner
   const originX = isLeft ? '0%' : '100%';
   const originY = isTop ? '0%' : '100%';
+
+  // Feather mask: fade the two non-corner edges to transparent so the container
+  // clip (`overflow:hidden`) never shows a hard line.
+  // E.g. top-left → fade bottom edge (to top) + fade right edge (to left)
+  const vertDir = isTop ? 'to top' : 'to bottom';   // toward the anchored edge
+  const horizDir = isLeft ? 'to left' : 'to right';  // toward the anchored edge
+  const maskEdgeV = `linear-gradient(${vertDir}, transparent 0%, black 25%)`;
+  const maskEdgeH = `linear-gradient(${horizDir}, transparent 0%, black 25%)`;
+
   return {
     background: `radial-gradient(ellipse at ${originX} ${originY}, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0) 80%)`,
+    WebkitMaskImage: `${maskEdgeV}, ${maskEdgeH}`,
+    WebkitMaskComposite: 'destination-in' as any,
+    maskImage: `${maskEdgeV}, ${maskEdgeH}`,
+    maskComposite: 'intersect',
   };
 }

@@ -9,7 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
-import { getTextOverlayPosition, getOverlayClasses, getGradientStyle } from '@/utils/textOverlay';
+import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -4644,6 +4644,7 @@ export function StoryDisplay({
                             <div
                               className={getOverlayClasses(layout)}
                               style={{
+                                ...getOverlayPositionStyle(layout),
                                 width: `${layout.widthPercent}%`,
                                 maxHeight: `${layout.heightPercent}%`,
                                 overflow: 'hidden',
