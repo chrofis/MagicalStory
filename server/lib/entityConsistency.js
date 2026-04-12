@@ -17,29 +17,11 @@ const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene } = require('./storyHelpers');
 const { getFacePhoto } = require('./characterPhotos');
-const { detectAllBoundingBoxes } = require('./images');
+const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-
-/**
- * Sanitize text for Gemini safety filters — replace age/gender terms that trigger
- * PROHIBITED_CONTENT blocks when combined with costume/fantasy imagery.
- * Same regexes used in images.js buildExpectedCharactersForBbox().
- */
-function sanitizeForGeminiSafety(text) {
-  if (!text || typeof text !== 'string') return text;
-  return text
-    .replace(/\b\d+[-\s]?years?[-\s]?old\s+(boy|girl|child|kid|man|woman)\b/gi, 'figure')
-    .replace(/\b\d+[-\s]?years?[-\s]?old\b/gi, '')
-    .replace(/\b(little|young|small|tiny)\s+(boy|girl|child|kid|man|woman)\b/gi, 'figure')
-    .replace(/\b(boy|girl|child|kid|man|woman|teenager|teen|adult|elderly|toddler|infant|baby)\b/gi, 'figure')
-    .replace(/\b(male|female)\s+figure\b/gi, 'figure')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s+,/g, ',')
-    .trim();
-}
 
 /**
  * Detect faces in an illustration using anime + Haar cascades via Python service.
@@ -883,7 +865,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             const vbEntry = vbAnimal || vbSecondary;
             if (vbEntry) {
               const desc = vbEntry.extractedDescription || vbEntry.description || name;
-              return { name, description: sanitizeForGeminiSafety(desc), position: '' };
+              return { name, description: sanitizeForGemini(desc, 'full'), position: '' };
             }
           }
 
@@ -896,7 +878,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           const physDesc = fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character';
           const position = sceneMetadata?.characterPositions?.[name] || '';
           // Sanitize age/gender terms to avoid Gemini safety blocks on children in costumes
-          const sanitizedDesc = sanitizeForGeminiSafety(clothing ? `${physDesc}. Wearing: ${clothing}` : physDesc);
+          const sanitizedDesc = sanitizeForGemini(clothing ? `${physDesc}. Wearing: ${clothing}` : physDesc, 'full');
           return {
             name,
             description: sanitizedDesc,
@@ -907,7 +889,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         // Build scene context for disambiguation (sanitized for Gemini safety)
         let sceneContext = null;
         if (sceneMetadata?.imageSummary) {
-          const contextParts = [`**SCENE:** ${sanitizeForGeminiSafety(sceneMetadata.imageSummary)}`];
+          const contextParts = [`**SCENE:** ${sanitizeForGemini(sceneMetadata.imageSummary, 'full')}`];
           const sceneChars = sceneMetadata.characters || [];
           if (sceneChars.length > 0) {
             contextParts.push(sceneChars.map(c => {

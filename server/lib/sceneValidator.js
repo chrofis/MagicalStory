@@ -742,7 +742,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
   log.verbose('[SEMANTIC] Evaluating semantic fidelity against story text...');
 
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL });
+  const { sanitizeForGemini, callGrokVisionAPI, GEMINI_SAFETY_SETTINGS } = require('./images');
+  const { TEXT_MODELS } = require('../config/models');
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL, safetySettings: GEMINI_SAFETY_SETTINGS });
   const startTime = Date.now();
 
   // Load semantic evaluation template
@@ -752,24 +754,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     return null;
   }
 
-  // Strip Visual Bible entity IDs (ART###, LOC###, CLO###, CHAR###, OBJ###) from
-  // every text input. The outline-derived sceneHint, the story text, and the image
-  // prompt may all contain raw IDs from the outline writer — the vision model
-  // cannot "see" an ID and mis-reports the object as missing/unverifiable, wrecking
-  // semantic scores and triggering unnecessary repair rounds. The IDs are needed
-  // for backend lookups but never for vision comparison.
-  //
-  // Also sanitize age/gender terms ("7-year-old boy in pirate costume") that trigger
-  // Gemini PROHIBITED_CONTENT blocks when combined with costume/fantasy imagery.
-  const { sanitizePromptFor25 } = require('./images');
-  const cleanStoryText = sanitizePromptFor25(stripEntityIds(storyText));
-  const cleanSceneHint = sceneHint ? sanitizePromptFor25(stripEntityIds(sceneHint)) : null;
-  const cleanImagePrompt = imagePrompt ? sanitizePromptFor25(stripEntityIds(imagePrompt)) : null;
-
-  // Extract declared character interactions from the scene metadata in the
-  // expanded image prompt. Parse → formatted text block for the template.
-  // Declared interactions override the "ignore spatial arrangement" rule
-  // so the evaluator checks "Eli in pocket" etc. is actually rendered right.
+  // Extract declared interactions (before sanitization — no age/gender terms here)
   let interactionsBlock = '(none declared)';
   try {
     const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
@@ -783,43 +768,32 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     }
   } catch { /* silent fallback */ }
 
-  const prompt = fillTemplate(template, {
-    STORY_TEXT: cleanStoryText,
-    SCENE_HINT: cleanSceneHint || 'Not provided',
-    IMAGE_PROMPT: cleanImagePrompt || 'No prompt provided',
-    INTERACTIONS_BLOCK: interactionsBlock,
-  });
-
   // Convert image to base64 if needed
   let imageBase64 = imageData;
   if (imageData.startsWith('data:')) {
     imageBase64 = imageData.split(',')[1];
   }
 
-  try {
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: 'image/png', data: imageBase64 } }
-    ]);
+  // Build prompt at a given sanitization level
+  const buildPrompt = (level) => {
+    const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
+    return fillTemplate(template, {
+      STORY_TEXT: clean(storyText),
+      SCENE_HINT: clean(sceneHint) || 'Not provided',
+      IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
+      INTERACTIONS_BLOCK: interactionsBlock,
+    });
+  };
 
-    const elapsed = Date.now() - startTime;
-    const text = result.response.text();
+  // Parse the Gemini/Grok response text into a result object
+  const parseResponse = (text, usageMeta, elapsed) => {
+    const tokens = (usageMeta?.promptTokenCount || 0) + (usageMeta?.candidatesTokenCount || 0);
+    const estimatedCost = ((usageMeta?.promptTokenCount || 0) * 0.15 + (usageMeta?.candidatesTokenCount || 0) * 0.60) / 1000000;
 
-    const usage = result.response.usageMetadata;
-    const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
-    const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
-
-    // Parse JSON response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       log.warn(`[SEMANTIC] Failed to parse response: ${text.substring(0, 200)}`);
-      return {
-        score: null,
-        verdict: 'UNKNOWN',
-        semanticIssues: [],
-        usage: { tokens, estimatedCost, elapsed },
-        error: 'Failed to parse response'
-      };
+      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage: { tokens, estimatedCost, elapsed }, error: 'Failed to parse response' };
     }
 
     let analysis;
@@ -827,22 +801,13 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       analysis = JSON.parse(jsonMatch[0]);
     } catch (err) {
       log.warn(`[SEMANTIC] JSON parse error: ${err.message}`);
-      return {
-        score: null,
-        verdict: 'UNKNOWN',
-        semanticIssues: [],
-        usage: { tokens, estimatedCost, elapsed },
-        error: err.message
-      };
+      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage: { tokens, estimatedCost, elapsed }, error: err.message };
     }
 
     const score = analysis.score ?? null;
-    const verdict = analysis.verdict || 'UNKNOWN';
     const semanticIssues = analysis.semantic_issues || [];
 
-    // Log token usage
-    log.info(`🔍 [SEMANTIC] Token usage - input: ${usage?.promptTokenCount?.toLocaleString() || 0}, output: ${usage?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
-
+    log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
       log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
     } else {
@@ -850,34 +815,74 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     }
 
     return {
-      score: score !== null ? score * 10 : null, // Convert 0-10 to 0-100
+      score: score !== null ? score * 10 : null,
       rawScore: score,
-      verdict,
+      verdict: analysis.verdict || 'UNKNOWN',
       semanticIssues,
-      // Full analysis for UI display
       visible: analysis.visible || null,
       expected: analysis.expected || null,
       issues: analysis.issues || [],
-      // Legacy fields (old prompt format)
       storyActions: analysis.story_actions || [],
       semanticChecks: analysis.semantic_checks || [],
-      usage: {
-        tokens,
-        input_tokens: usage?.promptTokenCount || 0,
-        output_tokens: usage?.candidatesTokenCount || 0,
-        estimatedCost,
-        elapsed
+      usage: { tokens, input_tokens: usageMeta?.promptTokenCount || 0, output_tokens: usageMeta?.candidatesTokenCount || 0, estimatedCost, elapsed }
+    };
+  };
+
+  // Retry chain: light sanitization → full sanitization → Grok fallback
+  const levels = ['light', 'full'];
+  for (let i = 0; i < levels.length; i++) {
+    const prompt = buildPrompt(levels[i]);
+    try {
+      const result = await model.generateContent([
+        prompt,
+        { inlineData: { mimeType: 'image/png', data: imageBase64 } }
+      ]);
+      const text = result.response.text(); // throws on block
+      return parseResponse(text, result.response.usageMetadata, Date.now() - startTime);
+    } catch (err) {
+      const isBlock = err.message?.includes('PROHIBITED_CONTENT') || err.message?.includes('blocked') || err.message?.includes('SAFETY');
+      if (isBlock && i < levels.length - 1) {
+        log.warn(`⚠️ [SEMANTIC] Blocked with ${levels[i]} sanitization, retrying with ${levels[i + 1]}...`);
+        continue;
       }
-    };
-  } catch (err) {
-    log.error(`[SEMANTIC] Evaluation failed: ${err.message}`);
-    return {
-      score: null,
-      verdict: 'ERROR',
-      semanticIssues: [],
-      usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime },
-      error: err.message
-    };
+      if (isBlock) {
+        log.warn(`⚠️ [SEMANTIC] Blocked with full sanitization, falling back to Grok...`);
+        break; // fall through to Grok
+      }
+      // Non-safety error — no retry
+      log.error(`[SEMANTIC] Evaluation failed: ${err.message}`);
+      return { score: null, verdict: 'ERROR', semanticIssues: [], usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime }, error: err.message };
+    }
+  }
+
+  // Grok vision fallback
+  try {
+    const grokModelId = 'grok-4-fast';
+    const grokModel = TEXT_MODELS[grokModelId];
+    if (!grokModel || grokModel.provider !== 'xai') {
+      log.warn('[SEMANTIC] No Grok model available for fallback');
+      return { score: null, verdict: 'ERROR', semanticIssues: [], usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime }, error: 'Blocked by Gemini, no Grok fallback' };
+    }
+    log.info(`🔄 [SEMANTIC] Falling back to Grok vision (${grokModelId})...`);
+    const fullPrompt = buildPrompt('full');
+    const parts = [
+      { inline_data: { mime_type: 'image/png', data: imageBase64 } },
+      { text: fullPrompt }
+    ];
+    const grokResponse = await callGrokVisionAPI(grokModelId, grokModel.modelId || grokModelId, parts, fullPrompt);
+    if (grokResponse.ok) {
+      const grokData = await grokResponse.json();
+      const text = grokData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        log.info('✅ [SEMANTIC] Grok fallback succeeded');
+        return parseResponse(text, grokData.usageMetadata, Date.now() - startTime);
+      }
+    }
+    log.error('[SEMANTIC] Grok fallback returned no text');
+    return { score: null, verdict: 'ERROR', semanticIssues: [], usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime }, error: 'Grok fallback failed' };
+  } catch (grokErr) {
+    log.error(`[SEMANTIC] Grok fallback failed: ${grokErr.message}`);
+    return { score: null, verdict: 'ERROR', semanticIssues: [], usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime }, error: grokErr.message };
   }
 }
 
