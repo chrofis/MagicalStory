@@ -3086,7 +3086,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion failed: ${expansionErr.message} — using raw hint`);
         }
         // Use the expanded description (falls back to raw hint if expansion failed)
-        sceneDescription = coverExpandedDescription;
+        // Strip metadata block before using as image prompt — the ---METADATA--- JSON
+        // is for code consumption, not for the image model
+        sceneDescription = stripSceneMetadata(coverExpandedDescription) || coverExpandedDescription;
+
+        // If scene expansion produced prose (already contains character descriptions),
+        // don't duplicate with the structured CHARACTER_REFERENCE_LIST
+        const isProseScene = coverExpandedDescription.includes('---METADATA---');
+        if (isProseScene) {
+          characterRefList = ''; // Prose already describes characters
+        }
 
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
