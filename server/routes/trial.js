@@ -987,7 +987,7 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
           `SELECT si.page_number, encode(substring(si.image_data::bytea from 1 for 200000), 'escape') as thumb_prefix
            FROM story_images si
            JOIN stories s ON si.story_id = s.id
-           WHERE s.user_id = $1 AND si.image_data IS NOT NULL AND si.page_number >= -3
+           WHERE s.user_id = $1 AND si.image_data IS NOT NULL AND si.page_number >= 1 AND si.image_type = 'scene'
            ORDER BY si.page_number`,
           [userId]
         );
@@ -999,7 +999,7 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
             const fullResult = await imgPool.query(
               `SELECT image_data FROM story_images si
                JOIN stories s ON si.story_id = s.id
-               WHERE s.user_id = $1 AND si.page_number = $2
+               WHERE s.user_id = $1 AND si.page_number = $2 AND si.image_type = 'scene'
                ORDER BY si.version_index DESC LIMIT 1`,
               [userId, row.page_number]
             );
@@ -1019,25 +1019,34 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
       }
     }
 
-    // Include pre-generated title page image if requested and available
+    // Include title page image if requested — now fetched from story_images (generated during streaming)
     if (req.query.needTitlePage === '1') {
+      // Title page is now generated during streaming — check story_images
       try {
-        const charResult = await pool.query(
-          'SELECT data FROM characters WHERE id = $1',
-          [`characters_${userId}`]
+        const titleResult = await pool.query(
+          `SELECT si.image_data FROM story_images si
+           JOIN stories s ON si.story_id = s.id
+           WHERE s.user_id = $1 AND si.image_type = 'scene' AND si.page_number = -1
+           ORDER BY si.version_index DESC LIMIT 1`,
+          [userId]
         );
-        const rawData = charResult.rows[0]?.data;
-        const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-        const titlePageImage = charData?.characters?.[0]?.preGeneratedTitlePage;
-        const titleText = charData?.characters?.[0]?.preGeneratedTitle;
-        if (titlePageImage) {
-          response.titlePageImage = titlePageImage;
-          response.titlePageTitle = titleText || null;
+        if (titleResult.rows.length > 0 && titleResult.rows[0].image_data) {
+          response.titlePageImage = titleResult.rows[0].image_data;
+        }
+      } catch (err) {
+        log.debug(`[TRIAL] Title page query failed: ${err.message}`);
+      }
+      // Also get avatar slides from character data (still stored there)
+      try {
+        const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [`characters_${userId}`]);
+        if (charResult.rows.length > 0) {
+          const rawData = charResult.rows[0].data;
+          const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
           const slides = charData?.characters?.[0]?.preGeneratedAvatarSlides;
           if (slides?.length) response.avatarSlides = slides;
         }
-      } catch (e) {
-        // Non-critical, ignore
+      } catch (err) {
+        log.debug(`[TRIAL] Avatar slides query failed: ${err.message}`);
       }
     }
 
