@@ -5703,10 +5703,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const textPos = iterateSceneMetadata?.textPosition || null;
         const iterLangLevel = storyData.languageLevel || 'standard';
         const iterTextSize = iterLangLevel === '1st-grade'
-          ? 'a narrow strip (about one tenth of the frame)'
+          ? 'a narrow strip (about one eighth of the frame)'
           : iterLangLevel === 'advanced'
-            ? 'a large band (about one third of the frame)'
-            : 'a wide band (about one quarter of the frame)';
+            ? 'a large band (about two fifths of the frame)'
+            : 'a wide band (about one third of the frame)';
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
