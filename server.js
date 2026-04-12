@@ -5210,9 +5210,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
     }
 
+    // Fetch shareToken so the client can show "View Story" button immediately
+    let shareToken = null;
+    try {
+      const stResult = await dbPool.query('SELECT share_token FROM stories WHERE id = $1', [storyId]);
+      shareToken = stResult.rows[0]?.share_token || null;
+    } catch { /* non-critical */ }
+
     // Build final result
     const resultData = {
       storyId,
+      shareToken,
       title,
       outline: unifiedResult.text,
       outlinePrompt: unifiedPrompt,

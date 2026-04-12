@@ -1743,6 +1743,7 @@ export const storyService = {
     progress?: { current: number; total: number; message: string };
     result?: {
       storyId: string;
+      shareToken?: string;
       title: string;
       outline: string;
       outlinePrompt?: string;
@@ -1823,6 +1824,7 @@ export const storyService = {
       progressMessage: string;
       resultData?: {
         storyId?: string;
+        shareToken?: string;
         title?: string;
         outline?: string;
         outlinePrompt?: string;
@@ -1898,6 +1900,7 @@ export const storyService = {
       currentCredits?: number | null;  // User's updated credits after job completion
       result?: {  // Backend sends 'result' not 'resultData'
         storyId?: string;
+        shareToken?: string;
         title?: string;
         outline?: string;
         outlinePrompt?: string;
@@ -1974,6 +1977,7 @@ export const storyService = {
       },
       result: resultData ? {
         storyId: resultData.storyId || '',
+        shareToken: resultData.shareToken,
         title: resultData.title || '',
         outline: resultData.outline || '',
         outlinePrompt: resultData.outlinePrompt,

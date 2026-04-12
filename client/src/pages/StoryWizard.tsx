@@ -4045,6 +4045,7 @@ export default function StoryWizard() {
         if (status.status === 'completed' && status.result) {
           // Job completed successfully
           setStoryId(status.result.storyId);
+          if (status.result.shareToken) setShareToken(status.result.shareToken);
           setStoryTitle(status.result.title);
           setStoryOutline(status.result.outline);
           setOutlinePrompt(status.result.outlinePrompt || '');
