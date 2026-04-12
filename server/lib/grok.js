@@ -726,11 +726,19 @@ async function packReferences(refs = {}, options = {}) {
   // Skip VB grid only when it's baked into a bordered scene.
   const skipContext = useBorderedScene;
 
-  // VB grid gets its own slot whenever we're not baking it into the scene border
+  // VB grid gets its own slot only when NOT baked into the scene border
+  // AND there are non-location elements to show (locations are in the empty scene already)
   if (!skipContext && visualBibleGrid && slots.length < 3) {
-    const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
+    // Check if there are any non-location elements worth showing
+    const hasNonLocationElements = !hasSceneBackground || !Array.isArray(visualBibleGrid.rawElements) ||
+      visualBibleGrid.rawElements.some(e => e.type !== 'location');
+    if (hasNonLocationElements) {
+      const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
+    } else {
+      log.debug(`🎨 ${tag} Skipping VB grid — all elements are locations already in scene background`);
+    }
   }
 
   // Pack character photos into 1 or 2 slots depending on count
