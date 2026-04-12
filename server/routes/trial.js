@@ -437,42 +437,80 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
       ]
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
-    );
+    // Try Gemini with one retry on 503, then fall back to Grok
+    let avatarImage = null;
+    let safetyBlocked = false;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`[TRIAL AVATAR] Gemini API error ${response.status}: ${errorText.substring(0, 200)}`);
-      return res.status(502).json({ error: 'Avatar generation failed. Please try again.' });
+    for (let attempt = 0; attempt < 2 && !avatarImage; attempt++) {
+      try {
+        if (attempt > 0) {
+          log.info(`[TRIAL AVATAR] Retry ${attempt} after 5s delay...`);
+          await new Promise(r => setTimeout(r, 5000));
+        }
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          log.error(`[TRIAL AVATAR] Gemini API error ${response.status} (attempt ${attempt + 1}): ${errorText.substring(0, 200)}`);
+          if (response.status !== 503 && response.status !== 429) break; // Only retry on transient errors
+          continue;
+        }
+
+        const data = await response.json();
+        if (data.promptFeedback?.blockReason) {
+          log.warn(`[TRIAL AVATAR] Blocked by safety: ${data.promptFeedback.blockReason}`);
+          safetyBlocked = true;
+          break;
+        }
+
+        if (data.candidates?.[0]?.content?.parts) {
+          for (const part of data.candidates[0].content.parts) {
+            if (part.inlineData?.mimeType?.startsWith('image/')) {
+              avatarImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+        }
+      } catch (fetchErr) {
+        log.error(`[TRIAL AVATAR] Gemini fetch error (attempt ${attempt + 1}): ${fetchErr.message}`);
+      }
     }
 
-    const data = await response.json();
-
-    // Check for safety blocks
-    if (data.promptFeedback?.blockReason) {
-      log.warn(`[TRIAL AVATAR] Blocked by safety: ${data.promptFeedback.blockReason}`);
+    if (safetyBlocked) {
       return res.status(422).json({ error: 'Photo could not be processed. Please try a different photo.' });
     }
 
-    // Extract image
-    let avatarImage = null;
-    if (data.candidates && data.candidates[0]?.content?.parts) {
-      for (const part of data.candidates[0].content.parts) {
-        if (part.inlineData?.mimeType?.startsWith('image/')) {
-          avatarImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          break;
+    // Fallback to Grok if Gemini failed
+    if (!avatarImage) {
+      try {
+        const { generateImageOnly } = require('../lib/images');
+        const { isGrokConfigured } = require('../lib/grok');
+        if (isGrokConfigured()) {
+          log.info('[TRIAL AVATAR] Gemini failed — falling back to Grok');
+          const faceDataUri = `data:image/jpeg;base64,${resizedBase64}`;
+          const grokResult = await generateImageOnly(prompt, [{ name: `${safeName}_face`, data: faceDataUri }], {
+            imageModelOverride: 'grok-imagine',
+            imageBackendOverride: 'grok',
+            aspectRatio: '9:16',
+            skipCache: true
+          });
+          if (grokResult?.imageData) {
+            avatarImage = grokResult.imageData;
+            log.info('[TRIAL AVATAR] Grok fallback succeeded');
+          }
         }
+      } catch (grokErr) {
+        log.error(`[TRIAL AVATAR] Grok fallback failed: ${grokErr.message}`);
       }
     }
 
     if (!avatarImage) {
-      log.error('[TRIAL AVATAR] No image in Gemini response');
+      log.error('[TRIAL AVATAR] All avatar generation attempts failed');
       return res.status(502).json({ error: 'Avatar generation failed. Please try again.' });
     }
 

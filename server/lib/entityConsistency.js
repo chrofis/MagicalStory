@@ -727,6 +727,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
   } catch (error) {
     log.error(`❌ [ENTITY-CHECK] Error running checks: ${error.message}`);
+    if (error.stack) log.error(`[ENTITY-CHECK] Stack: ${error.stack.split('\n').slice(0, 5).join(' | ')}`);
     report.error = error.message;
   }
 
