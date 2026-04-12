@@ -2608,14 +2608,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await landmarkDescriptionsPromise;
         }
 
-        // Always detect characters from scene text (reliable, not dependent on streaming completeness)
-        let sceneCharacters = getCharactersInScene(
-          (page.sceneHint || '') + '\n' + (page.text || ''),
-          inputData.characters
-        );
-        // Also include any characters from clothing parsing that text matching might have missed
+        // Build character list from OUTLINE HINT only (not page text).
+        // The outline's characters[] array is authoritative — it specifies who is
+        // VISIBLE in the illustration. The page text may mention other characters
+        // (narration, dialogue) who should NOT be drawn.
+        // Also scan the outline's background field for secondary characters.
+        let sceneCharacters = [];
+        const allChars = inputData.characters || [];
+
+        // 1. Characters from outline's characters[] array (primary — foreground/center)
         if (page.characters && page.characters.length > 0) {
-          const allChars = inputData.characters || [];
           for (const parsed of page.characters) {
             const parsedLower = parsed.toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
             const match = allChars.find(char => {
@@ -2628,6 +2630,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneCharacters.push(match);
             }
           }
+        }
+
+        // 2. Characters mentioned in outline's background text (secondary — visible but background)
+        const hintJson = page.sceneHint || '';
+        try {
+          const hintParsed = JSON.parse(hintJson.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim());
+          const bgText = (hintParsed.background || '').toLowerCase();
+          if (bgText) {
+            for (const char of allChars) {
+              if (char.name && bgText.includes(char.name.toLowerCase()) && !sceneCharacters.some(sc => sc.name === char.name)) {
+                sceneCharacters.push(char);
+              }
+            }
+          }
+        } catch { /* not valid JSON — skip background parsing */ }
+
+        // 3. Fallback: if outline parsing found nothing, scan scene hint text only (not page text)
+        if (sceneCharacters.length === 0) {
+          sceneCharacters = getCharactersInScene(
+            page.sceneHint || '',
+            allChars
+          );
         }
 
         // SIMPLE: Get raw outline blocks directly from parser (no parsing/reconstruction needed)
