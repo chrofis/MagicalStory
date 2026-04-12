@@ -1,8 +1,9 @@
 Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. Do NOT add any text, letters, words, labels, signatures, or watermarks.
 
+When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment. Preserve any calm, low-detail areas — they are reserved for text overlay.
+
 {CHARACTER_REFERENCE_LIST}
 
-**SCENE:**
 {SCENE_DESCRIPTION}
 
 **COMPOSITION:**
@@ -17,5 +18,3 @@ Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No border
 {TEXT_AREA_INSTRUCTION}
 
 **ART STYLE:** {STYLE_DESCRIPTION}
-
-**REMINDER:** Absolutely NO text, letters, words, labels, or watermarks anywhere in the image.

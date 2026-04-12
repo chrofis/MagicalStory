@@ -3948,9 +3948,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Select the correct template based on mode and language
   let template = null;
   let templateName = '';
-  if (isStorybook && PROMPT_TEMPLATES.imageGenerationStorybook) {
-    // Storybook mode template (includes Visual Bible section)
-    template = PROMPT_TEMPLATES.imageGenerationStorybook;
+  if (isStorybook && PROMPT_TEMPLATES.imageGeneration) {
+    // Unified template for all modes
+    template = PROMPT_TEMPLATES.imageGeneration;
     templateName = 'storybook';
   } else if (isSequential) {
     // Sequential mode templates (with visual continuity instructions)
@@ -3985,9 +3985,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       return fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
-        CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
-
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
@@ -4005,9 +4003,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       return fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: structuredScene,
-        CHARACTER_COUNT: sceneCharacters ? sceneCharacters.length.toString() : '0',
+        CHARACTER_REFERENCE_LIST: characterReferenceList,
+        REQUIRED_OBJECTS: requiredObjectsSection,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
-
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       });
