@@ -1652,17 +1652,18 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
   }
 });
 
-// ─── Pre-generate Title Page ─────────────────────────────────────────────────
+// ─── Pre-generate Styled Avatars ────────────────────────────────────────────
 
 /**
  * POST /api/trial/prepare-title
  *
- * Pre-generate the title page image while the user is picking a story idea.
+ * Pre-generate costumed styled avatars while the user is picking a story idea.
+ * Title page image generation has moved into the streaming story pipeline.
  * This is a non-critical optimization — failures return nulls gracefully.
  * Protected by: session token + rate limit.
  */
 router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, res) => {
-  // Register an in-flight promise so /start can await title-page completion
+  // Register an in-flight promise so /start can await avatar completion
   // (which persists preGeneratedStyledAvatars to DB) before reading character data.
   // Resolves when this handler returns — successfully or with error — guaranteeing
   // any DB writes have happened before /start reads the character row.
@@ -1672,20 +1673,20 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
   inFlightTitlePagePromises.set(userId, inFlightPromise);
 
   try {
-    const { storyTopic, storyCategory, storyTheme, language } = req.body;
+    const { storyTopic, storyCategory, storyTheme } = req.body;
 
     if (!storyCategory || (!storyTopic && !storyTheme)) {
       return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
 
-    // Resolve which topic/category to look up titles and costumes from:
+    // Resolve which topic/category to look up costumes from:
     // - adventure: storyTheme has the theme (pirate, knight, etc.), storyTopic is empty
     // - life-challenge: storyTopic has the challenge, storyTheme has the adventure theme → use storyTheme
     // - historical: storyTopic has the event ID → use storyTopic
     const lookupTopic = storyCategory === 'historical' ? storyTopic : (storyTheme || storyTopic);
     const lookupCategory = storyCategory === 'historical' ? 'historical' : 'adventure';
 
-    log.info(`[TRIAL TITLE] Preparing title page for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
+    log.info(`[TRIAL AVATARS] Preparing styled avatars for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
 
     // Load character from DB
     const { getPool } = require('../services/database');
@@ -1694,31 +1695,23 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
     if (charResult.rows.length === 0) {
-      log.warn(`[TRIAL TITLE] No character found for user ${userId}`);
-      return res.json({ titlePageImage: null, title: null, costumeType: null });
+      log.warn(`[TRIAL AVATARS] No character found for user ${userId}`);
+      return res.json({ costumeType: null, avatarSlides: [] });
     }
 
     const charData = typeof charResult.rows[0].data === 'string'
       ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
     const mainChar = charData.characters?.[0];
     if (!mainChar) {
-      log.warn(`[TRIAL TITLE] No main character in data for user ${userId}`);
-      return res.json({ titlePageImage: null, title: null, costumeType: null });
+      log.warn(`[TRIAL AVATARS] No main character in data for user ${userId}`);
+      return res.json({ costumeType: null, avatarSlides: [] });
     }
 
     const gender = mainChar.gender || 'male';
-    const lang = language || 'en';
 
-    // Look up costume and title using the resolved lookup topic/category
+    // Look up costume using the resolved lookup topic/category
     const { getTrialCostume } = require('../config/trialCostumes');
-    const { getTrialTitle } = require('../config/trialTitles');
     const costume = getTrialCostume(lookupTopic, lookupCategory, gender);
-    const title = getTrialTitle(lookupTopic, lookupCategory, gender, lang);
-
-    if (!title) {
-      log.warn(`[TRIAL TITLE] No pre-defined title found for topic=${storyTopic}, category=${storyCategory}, gender=${gender}, lang=${lang}`);
-      return res.json({ titlePageImage: null, title: null, costumeType: null });
-    }
 
     // Build character object for styled avatar pipeline
     const character = {
@@ -1732,9 +1725,8 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     };
     const characters = [character];
 
-    // Determine clothing requirements (two formats needed)
+    // Determine clothing requirements
     const costumeType = costume ? costume.costumeType : null;
-    const clothingKey = costume ? `costumed:${costume.costumeType}` : 'standard';
 
     // Format for prepareStyledAvatars (needs standard/costumed config for on-demand generation)
     const avatarClothingRequirements = {
@@ -1744,11 +1736,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
           ? { used: true, costume: costume.costumeType, description: costume.description }
           : { used: false },
       },
-    };
-
-    // Format for getCharacterPhotoDetails (needs _currentClothing)
-    const coverClothingRequirements = {
-      [character.name]: { _currentClothing: clothingKey },
     };
 
     // Build avatar requirements for prepareStyledAvatars
@@ -1763,94 +1750,14 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       });
     }
 
-    // Lazy require the styled avatar and story helper modules
-    const { runInCacheScope, prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence } = require('../lib/styledAvatars');
-    const { resolveArtStyle, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
-    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-    const { generateImageOnly } = require('../lib/images');
+    // Lazy require the styled avatar module
+    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence } = require('../lib/styledAvatars');
 
     // Run avatar styling inside a cache scope to prevent cross-user collisions
     await runInCacheScope(`title-${userId}`, async () => {
       // Prepare styled avatars (standard + costumed)
       await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
-      log.info(`[TRIAL TITLE] Avatar styling complete for "${character.name}"`);
-
-      // Get character photo details with clothing
-      let coverPhotos = getCharacterPhotoDetails(
-        characters,
-        costume ? 'costumed' : 'standard',
-        'watercolor',
-        coverClothingRequirements
-      );
-
-      // Apply styled avatars
-      coverPhotos = applyStyledAvatars(coverPhotos, 'watercolor');
-
-      // Build the cover scene description
-      const sceneDescription = `A magical, eye-catching front cover scene featuring ${character.name} in a ${storyTopic}-themed setting. The main character is prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
-
-      // Fill the front cover template
-      const styleDescription = resolveArtStyle('watercolor');
-      const characterRefList = buildCharacterReferenceList(coverPhotos, characters);
-      const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-        TITLE_PAGE_SCENE: sceneDescription,
-        STYLE_DESCRIPTION: styleDescription,
-        STORY_TITLE: title,
-        CHARACTER_REFERENCE_LIST: characterRefList,
-        VISUAL_BIBLE: '',
-      });
-
-      // Generate the cover image (use cover model, not page model)
-      const { MODEL_DEFAULTS } = require('../config/models');
-      const { evaluateImageQuality } = require('../lib/images');
-      log.info(`[TRIAL TITLE] Generating title page image for "${title}" (model: ${MODEL_DEFAULTS.coverImage})`);
-
-      // Generate + verify text up to 2 attempts
-      const MAX_TITLE_ATTEMPTS = 2;
-      let result = null;
-      let titlePageImage = null;
-      for (let attempt = 1; attempt <= MAX_TITLE_ATTEMPTS; attempt++) {
-        result = await generateImageOnly(coverPrompt, coverPhotos, {
-          imageModelOverride: MODEL_DEFAULTS.coverImage,
-        });
-        if (!result || !result.imageData) {
-          log.warn(`[TRIAL TITLE] Image generation returned no image (attempt ${attempt})`);
-          break;
-        }
-        titlePageImage = result.imageData;
-
-        // Verify the title text on the image (cover-mode quality eval checks text)
-        try {
-          const evalResult = await evaluateImageQuality(
-            titlePageImage,
-            coverPrompt,
-            [],
-            'cover'
-          );
-          if (!evalResult) {
-            log.info(`[TRIAL TITLE] Eval skipped (attempt ${attempt}) — accepting image`);
-            break;
-          }
-          const textIssue = evalResult.textIssue;
-          const textOk = !textIssue || textIssue === 'NONE';
-          if (textOk) {
-            log.info(`[TRIAL TITLE] Title text verified on attempt ${attempt} (score: ${evalResult.score})`);
-            break;
-          }
-          log.warn(`[TRIAL TITLE] Title text issue on attempt ${attempt}: ${textIssue} — expected: "${evalResult.expectedText}", actual: "${evalResult.actualText}"`);
-          if (attempt < MAX_TITLE_ATTEMPTS) {
-            log.info(`[TRIAL TITLE] Regenerating title page...`);
-          }
-        } catch (evalErr) {
-          log.warn(`[TRIAL TITLE] Eval failed (attempt ${attempt}): ${evalErr.message} — accepting image`);
-          break;
-        }
-      }
-
-      if (!titlePageImage) {
-        res.json({ titlePageImage: null, title: null, costumeType: null });
-        return;
-      }
+      log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)
       const styledAvatarExport = exportStyledAvatarsForPersistence(characters, 'watercolor');
@@ -1859,7 +1766,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         styledAvatarsData[charName] = avatars;
       }
 
-      // Clear this title-page's scoped cache to free memory
+      // Clear this scoped cache to free memory
       clearStyledAvatarCache();
 
       // Split styled avatars into individual front-view images for the generation slideshow
@@ -1876,16 +1783,14 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
           avatarSlides.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
         }
         if (avatarSlides.length > 0) {
-          log.info(`[TRIAL TITLE] Split ${avatarSlides.length} styled avatars for slideshow`);
+          log.info(`[TRIAL AVATARS] Split ${avatarSlides.length} styled avatars for slideshow`);
         }
       } catch (splitErr) {
-        log.debug(`[TRIAL TITLE] Avatar split failed (non-critical): ${splitErr.message}`);
+        log.debug(`[TRIAL AVATARS] Avatar split failed (non-critical): ${splitErr.message}`);
       }
 
-      // Store result on character data in DB (title page MUST save even if avatar slides fail)
+      // Store avatar data on character in DB
       try {
-        charData.characters[0].preGeneratedTitlePage = titlePageImage;
-        charData.characters[0].preGeneratedTitle = title;
         charData.characters[0].preGeneratedCostumeType = costumeType;
         charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
         if (avatarSlides.length > 0) charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
@@ -1893,19 +1798,19 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
           'UPDATE characters SET data = $1 WHERE id = $2',
           [JSON.stringify(charData), characterId]
         );
-        log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
+        log.debug(`[TRIAL AVATARS] Saved styled avatars to character ${characterId}`);
       } catch (dbErr) {
-        log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
+        log.warn(`[TRIAL AVATARS] Failed to save avatars to DB: ${dbErr.message}`);
       }
 
-      log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType}, avatarSlides: ${avatarSlides.length})`);
-      res.json({ titlePageImage, title, costumeType, avatarSlides });
+      log.info(`[TRIAL AVATARS] Avatars ready for "${character.name}" (costumeType: ${costumeType}, avatarSlides: ${avatarSlides.length})`);
+      res.json({ costumeType, avatarSlides });
     });
 
   } catch (err) {
-    log.error(`[TRIAL TITLE] Error generating title page: ${err.message}`);
+    log.error(`[TRIAL AVATARS] Error generating styled avatars: ${err.message}`);
     // Non-critical optimization — return nulls gracefully
-    res.json({ titlePageImage: null, title: null, costumeType: null });
+    res.json({ costumeType: null, avatarSlides: [] });
   } finally {
     // Always resolve and clean up the in-flight registry, regardless of outcome.
     if (inFlightTitlePagePromises.get(userId) === inFlightPromise) {
