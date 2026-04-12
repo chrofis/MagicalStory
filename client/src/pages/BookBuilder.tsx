@@ -292,7 +292,7 @@ export default function BookBuilder() {
       const storyIds = stories.map(s => s.id);
       log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages, quantity });
 
-      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity, promoValid ? promoCode.trim().toUpperCase() : undefined);
+      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity, promoValid ? promoCode.trim() : undefined);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
@@ -608,11 +608,11 @@ export default function BookBuilder() {
                   <input
                     type="text"
                     value={promoCode}
-                    onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                    onChange={(e) => { setPromoCode(e.target.value); setPromoError(''); }}
                     disabled={promoValid}
-                    maxLength={12}
-                    placeholder="ABCD1234"
-                    className={`flex-1 px-3 py-2 border rounded-lg text-sm font-mono tracking-wider uppercase ${
+                    maxLength={20}
+                    placeholder="MagicRoger42"
+                    className={`flex-1 px-3 py-2 border rounded-lg text-sm font-mono tracking-wider ${
                       promoValid ? 'border-green-300 bg-green-50 text-green-700' : 'border-gray-300'
                     } focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60`}
                   />

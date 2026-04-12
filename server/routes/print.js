@@ -1429,12 +1429,16 @@ async function getPriceForPages(pageCount, isHardcover) {
 
 const crypto = require('crypto');
 
-function generateReferralCode(length = CREDIT_CONFIG.REFERRAL.CODE_LENGTH) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
-  let code = '';
-  const bytes = crypto.randomBytes(length);
-  for (let i = 0; i < length; i++) code += chars[bytes[i] % chars.length];
-  return code;
+/**
+ * Generate a referral code in the format "MagicRoger42".
+ * @param {string} username - the user's display name (first name or username)
+ */
+function generateReferralCode(username = '') {
+  // Clean the name: keep only letters, capitalize first letter
+  const clean = username.replace(/[^a-zA-Z]/g, '').slice(0, 12);
+  const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
+  const num = crypto.randomInt(10, 99); // 2-digit random suffix
+  return `Magic${name}${num}`;
 }
 
 /**
@@ -1442,15 +1446,16 @@ function generateReferralCode(length = CREDIT_CONFIG.REFERRAL.CODE_LENGTH) {
  */
 async function validateReferralCodeForUser(code, buyerUserId) {
   if (!code || typeof code !== 'string') return { valid: false, reason: 'No code provided' };
-  const trimmed = code.trim().toUpperCase();
+  const trimmed = code.trim();
   if (!trimmed) return { valid: false, reason: 'No code provided' };
 
-  // Look up the code owner
+  // Look up the code owner (case-insensitive — codes are mixed case like MagicRoger42)
   const ownerResult = await getDbPool().query(
-    'SELECT id FROM users WHERE referral_code = $1', [trimmed]
+    'SELECT id, referral_code FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
   );
   if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found' };
   const referrerUserId = ownerResult.rows[0].id;
+  const storedCode = ownerResult.rows[0].referral_code; // exact stored casing
 
   // No self-referral
   if (referrerUserId === buyerUserId) return { valid: false, reason: 'Cannot use your own code' };
@@ -1466,6 +1471,7 @@ async function validateReferralCodeForUser(code, buyerUserId) {
   return {
     valid: true,
     referrerUserId,
+    storedCode,
     discountChf: CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF,
   };
 }
@@ -1475,18 +1481,18 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userResult = await getDbPool().query(
-      'SELECT referral_code, credits, referred_by FROM users WHERE id = $1', [userId]
+      'SELECT referral_code, credits, referred_by, username FROM users WHERE id = $1', [userId]
     );
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     let code = userResult.rows[0].referral_code;
     if (!code) {
-      code = generateReferralCode();
+      code = generateReferralCode(userResult.rows[0].username);
       try {
         await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
       } catch (e) {
-        // Unique constraint collision — retry
-        code = generateReferralCode();
+        // Unique constraint collision — retry with different random number
+        code = generateReferralCode(userResult.rows[0].username);
         await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
       }
     }
@@ -1599,7 +1605,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
       if (refResult.valid) {
         discountCents = CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF * 100;
         referrerUserId = refResult.referrerUserId;
-        validatedReferralCode = referralCode.trim().toUpperCase();
+        validatedReferralCode = refResult.storedCode;
         log.info(`🎁 [CHECKOUT] Referral code ${validatedReferralCode} applied: CHF ${CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF} off (referrer: ${referrerUserId})`);
       } else {
         log.info(`🎁 [CHECKOUT] Referral code rejected: ${refResult.reason}`);

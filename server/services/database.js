@@ -289,23 +289,22 @@ async function initializeDatabase() {
 
     // Backfill referral codes for existing users who don't have one yet
     {
-      const { CREDIT_CONFIG } = require('../config/credits');
       const crypto = require('crypto');
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const genCode = (len) => {
-        let code = '';
-        const bytes = crypto.randomBytes(len);
-        for (let i = 0; i < len; i++) code += chars[bytes[i] % chars.length];
-        return code;
+      // Generate code in format "MagicRoger42"
+      const genCode = (username) => {
+        const clean = (username || '').replace(/[^a-zA-Z]/g, '').slice(0, 12);
+        const name = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'User';
+        const num = crypto.randomInt(10, 99);
+        return `Magic${name}${num}`;
       };
-      const missing = await dbPool.query('SELECT id FROM users WHERE referral_code IS NULL');
+      const missing = await dbPool.query('SELECT id, username FROM users WHERE referral_code IS NULL');
       for (const row of missing.rows) {
-        const code = genCode(CREDIT_CONFIG.REFERRAL.CODE_LENGTH);
+        const code = genCode(row.username);
         try {
           await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
         } catch (e) {
-          // Unique constraint collision — retry with a new code
-          const retry = genCode(CREDIT_CONFIG.REFERRAL.CODE_LENGTH);
+          // Unique constraint collision — retry with a different number
+          const retry = genCode(row.username);
           await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [retry, row.id]);
         }
       }
