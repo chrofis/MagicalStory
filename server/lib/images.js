@@ -650,18 +650,21 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
 }
 
 /**
- * Validate an empty scene (background-only) image using the calmness heatmap.
- * No API call — pure pixel analysis via sharp. Checks for:
- * - White box artifacts (large uniform bright patches with sharp edges)
- * - Overall brightness distribution (too dark or too bright = problem)
- * - Text area readiness (is there enough calm area at the textPosition?)
+ * Validate an empty scene (background-only) image.
+ * Two-phase check:
+ * Phase 1 (pixel): calmness heatmap — white boxes, too dark, text area readiness (<50ms, free)
+ * Phase 2 (vision): Gemini Flash-lite — people/figures, landmark accuracy, content issues (~2s, cheap)
  *
  * @param {string} imageData - base64 data URI
  * @param {string} textPosition - e.g. 'top-right'
  * @param {string} pageContext - logging context
- * @returns {{ pass: boolean, issues: string[], calmnessScore: number }}
+ * @param {object} [options]
+ * @param {string} [options.sceneDescription] - expected scene description (for landmark check)
+ * @param {boolean} [options.skipVision=false] - skip the Gemini vision check (pixel only)
+ * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
-async function validateEmptyScene(imageData, textPosition, pageContext = '') {
+async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
+  const { sceneDescription = null, skipVision = false } = options;
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
@@ -746,6 +749,68 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '') {
       issues.push(`text area too busy/dark: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
     }
 
+    // ── Phase 2: Gemini Flash-lite vision check ──
+    // Catches things pixels can't: people/figures, wrong landmark, content errors.
+    let visionFeedback = null;
+    if (!skipVision && issues.length === 0) {
+      try {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (apiKey) {
+          const base64ForVision = imageData.replace(/^data:image\/\w+;base64,/, '');
+          const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
+
+          const sceneCtx = sceneDescription
+            ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
+            : '';
+
+          const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+          const visionResp = await fetch(visionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [
+                { inline_data: { mime_type: mimeType, data: base64ForVision } },
+                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}
+
+Check:
+1. Does the setting/location roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
+2. Are there large artificial-looking patches — white rectangles, solid color blocks, or obvious AI glitches? (FAIL)
+3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
+
+Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence describing what to fix if failed, or empty if passed"}` }
+              ]}],
+              generationConfig: { maxOutputTokens: 200, temperature: 0.1, responseMimeType: 'application/json' },
+              safetySettings: GEMINI_SAFETY_SETTINGS
+            }),
+            signal: AbortSignal.timeout(15000),
+          });
+
+          if (visionResp.ok) {
+            const visionData = await visionResp.json();
+            const visionText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            try {
+              const visionResult = JSON.parse(visionText);
+              if (visionResult.pass === false) {
+                issues.push(...(visionResult.issues || ['vision check failed']));
+                visionFeedback = visionResult.feedback || null;
+                log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} Vision FAILED: ${(visionResult.issues || []).join(', ')}${visionFeedback ? ` — fix: ${visionFeedback}` : ''}`);
+              } else {
+                log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} Vision passed`);
+              }
+            } catch {
+              // Unparseable — check for keywords
+              if (visionText.toLowerCase().includes('"pass": false') || visionText.toLowerCase().includes('"pass":false')) {
+                issues.push('vision check failed (unparseable)');
+                visionFeedback = visionText.substring(0, 200);
+              }
+            }
+          }
+        }
+      } catch (visionErr) {
+        log.debug(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Vision check skipped: ${visionErr.message}`);
+      }
+    }
+
     const pass = issues.length === 0;
     if (!pass) {
       log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} FAILED (calmness ${(calmnessScore * 100).toFixed(0)}%): ${issues.join(', ')}`);
@@ -753,10 +818,10 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '') {
       log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%)`);
     }
 
-    return { pass, issues, calmnessScore };
+    return { pass, issues, calmnessScore, visionFeedback };
   } catch (err) {
     log.warn(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Error: ${err.message} — skipping check`);
-    return { pass: true, issues: [], calmnessScore: 0.5 };
+    return { pass: true, issues: [], calmnessScore: 0.5, visionFeedback: null };
   }
 }
 

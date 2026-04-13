@@ -4621,37 +4621,51 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
 
               // Validate the empty scene before using it as a background.
-              // Catches white box artifacts, too-dark images, and busy text areas.
-              // No API call — pure pixel analysis, <50ms per image.
+              // Phase 1: pixel analysis (white boxes, too dark, text area calmness) — <50ms, free
+              // Phase 2: Gemini Flash-lite vision (people, landmark, artifacts) — ~2s, cheap
               if (result?.imageData) {
                 const { validateEmptyScene } = require('./server/lib/images');
                 const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
-                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`);
+                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
+                  sceneDescription: emptySceneDesc,
+                });
                 if (!qc.pass) {
-                  // Retry once with a simpler prompt (drop text area instruction to avoid white boxes)
-                  log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying without text area instruction...`);
+                  // Retry with a modified prompt that incorporates Gemini's feedback.
+                  // Don't just drop the text area instruction — soften it and add the fix hint.
+                  const fixHint = qc.visionFeedback
+                    ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
+                    : '';
+                  // Soften the text area instruction instead of removing it entirely
+                  const softerTextInstr = textPos
+                    ? `Keep the ${textPos.replace('-', ' ')} area slightly calmer than the rest of the scene — lighter tones, less detail. But do NOT paint a white box or blank patch there.`
+                    : '';
+                  log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
                   const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
                     STYLE_DESCRIPTION: artStyleDesc,
-                    EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
+                    EMPTY_SCENE_DESCRIPTION: emptySceneDesc + fixHint,
                     CHARACTER_SPACE: characterSpace,
-                    TEXT_AREA_INSTRUCTION: '', // drop the text area instruction that may cause white boxes
+                    TEXT_AREA_INSTRUCTION: softerTextInstr,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: CONFIG_DEFAULTS.pageAspect,
-                    imageModelOverride: modelOverrides.imageModel || null,
+                    imageModelOverride: pageData.pageImageModel,
+                    imageBackendOverride: pageData.pageImageBackend,
                     visualBibleGrid: emptySceneVbGrid,
                     landmarkPhotos: emptySceneLandmarks,
                     pageContext: `empty-P${pageData.pageNumber}-retry`,
                   });
                   if (retryResult?.imageData) {
-                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`);
+                    // Validate retry (pixel only — skip vision to avoid double API cost)
+                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, { skipVision: true });
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt };
+                      // Return both versions so they can be compared in dev mode
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues };
                     }
-                    // Use retry result even if it still fails — it's likely better than the original
-                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed QC, using retry result anyway`);
-                    return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt };
+                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
+                    // Pick whichever version has fewer issues
+                    const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues };
                   }
                 }
               }
@@ -4665,7 +4679,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         for (const bg of emptyScenes) {
-          if (bg?.imageData) sceneBackgrounds[bg.pageNumber] = { imageData: bg.imageData, prompt: bg.prompt };
+          if (bg?.imageData) {
+            sceneBackgrounds[bg.pageNumber] = {
+              imageData: bg.imageData,
+              prompt: bg.prompt,
+              // Store v1 (failed QC) alongside v2 (retry) for dev mode comparison
+              ...(bg.v1ImageData ? { v1ImageData: bg.v1ImageData, v1Issues: bg.v1Issues } : {}),
+            };
+          }
         }
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
