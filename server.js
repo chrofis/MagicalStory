@@ -4609,9 +4609,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 addUsage(provider, result.usage, 'page_images', result.modelId);
               }
 
-              // Empty scene is saved CLEAN (no manual stitching). At page-generation time,
-              // packReferences (grok.js) decides whether to bake the full VB grid into a
-              // bordered scene composite or pass it as a separate reference slot.
+              // Validate the empty scene before using it as a background.
+              // Catches white box artifacts, too-dark images, and busy text areas.
+              // No API call — pure pixel analysis, <50ms per image.
+              if (result?.imageData) {
+                const { validateEmptyScene } = require('./server/lib/images');
+                const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
+                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`);
+                if (!qc.pass) {
+                  // Retry once with a simpler prompt (drop text area instruction to avoid white boxes)
+                  log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying without text area instruction...`);
+                  const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+                    STYLE_DESCRIPTION: artStyleDesc,
+                    EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
+                    CHARACTER_SPACE: characterSpace,
+                    TEXT_AREA_INSTRUCTION: '', // drop the text area instruction that may cause white boxes
+                  });
+                  const retryResult = await generateImageOnly(retryPrompt, [], {
+                    aspectRatio: CONFIG_DEFAULTS.pageAspect,
+                    imageModelOverride: modelOverrides.imageModel || null,
+                    visualBibleGrid: emptySceneVbGrid,
+                    landmarkPhotos: emptySceneLandmarks,
+                    pageContext: `empty-P${pageData.pageNumber}-retry`,
+                  });
+                  if (retryResult?.imageData) {
+                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`);
+                    if (retryQc.pass) {
+                      log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt };
+                    }
+                    // Use retry result even if it still fails — it's likely better than the original
+                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed QC, using retry result anyway`);
+                    return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt };
+                  }
+                }
+              }
+
               return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);

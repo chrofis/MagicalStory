@@ -650,6 +650,117 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
 }
 
 /**
+ * Validate an empty scene (background-only) image using the calmness heatmap.
+ * No API call — pure pixel analysis via sharp. Checks for:
+ * - White box artifacts (large uniform bright patches with sharp edges)
+ * - Overall brightness distribution (too dark or too bright = problem)
+ * - Text area readiness (is there enough calm area at the textPosition?)
+ *
+ * @param {string} imageData - base64 data URI
+ * @param {string} textPosition - e.g. 'top-right'
+ * @param {string} pageContext - logging context
+ * @returns {{ pass: boolean, issues: string[], calmnessScore: number }}
+ */
+async function validateEmptyScene(imageData, textPosition, pageContext = '') {
+  try {
+    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+    const { data: pixels, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+
+    const BLOCK = 16;
+    const rows = Math.floor(height / BLOCK);
+    const cols = Math.floor(width / BLOCK);
+    if (rows < 4 || cols < 4) return { pass: true, issues: [], calmnessScore: 0.5 };
+
+    // Compute per-block brightness and variance
+    const blockBrightness = new Float32Array(rows * cols);
+    const blockVariance = new Float32Array(rows * cols);
+    let totalBrightness = 0;
+    let vMax = 0;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let sum = 0, sumSq = 0;
+        const count = BLOCK * BLOCK;
+        for (let by = 0; by < BLOCK; by++) {
+          const off = (r * BLOCK + by) * width;
+          for (let bx = 0; bx < BLOCK; bx++) {
+            const val = pixels[off + c * BLOCK + bx];
+            sum += val;
+            sumSq += val * val;
+          }
+        }
+        const mean = sum / count;
+        const std = Math.sqrt(Math.max(0, sumSq / count - mean * mean));
+        blockBrightness[r * cols + c] = mean;
+        blockVariance[r * cols + c] = std;
+        totalBrightness += mean;
+        if (std > vMax) vMax = std;
+      }
+    }
+
+    const avgBrightness = totalBrightness / (rows * cols) / 255;
+    if (vMax === 0) vMax = 1;
+
+    const issues = [];
+
+    // Check 1: white box detection — blocks with brightness > 240 AND variance < 5
+    // (artificial white patches have near-zero variance)
+    let whiteBoxBlocks = 0;
+    for (let i = 0; i < rows * cols; i++) {
+      if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteBoxBlocks++;
+    }
+    const whiteBoxPct = whiteBoxBlocks / (rows * cols);
+    if (whiteBoxPct > 0.08) {
+      issues.push(`white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
+    }
+
+    // Check 2: overall too dark (average < 15% brightness) — scene may be black/failed
+    if (avgBrightness < 0.15) {
+      issues.push(`too dark: average brightness ${(avgBrightness * 100).toFixed(0)}%`);
+    }
+
+    // Check 3: text area calmness — compute calmness at the textPosition region
+    let textAreaCalm = 0;
+    let textAreaCount = 0;
+    const isTop = textPosition?.startsWith('top');
+    const isLeft = textPosition?.includes('left') || textPosition?.includes('full');
+    const isFull = textPosition?.includes('full');
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const inVertical = isTop ? r < rows * 0.4 : r > rows * 0.6;
+        const inHorizontal = isFull || (isLeft ? c < cols * 0.6 : c > cols * 0.4);
+        if (inVertical && inHorizontal) {
+          const bNorm = blockBrightness[r * cols + c] / 255;
+          const vNorm = blockVariance[r * cols + c] / vMax;
+          textAreaCalm += Math.pow(bNorm, 1.5) * (1 - vNorm);
+          textAreaCount++;
+        }
+      }
+    }
+    const calmnessScore = textAreaCount > 0 ? textAreaCalm / textAreaCount : 0;
+
+    if (calmnessScore < 0.15 && textPosition) {
+      issues.push(`text area too busy/dark: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
+    }
+
+    const pass = issues.length === 0;
+    if (!pass) {
+      log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} FAILED (calmness ${(calmnessScore * 100).toFixed(0)}%): ${issues.join(', ')}`);
+    } else {
+      log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%)`);
+    }
+
+    return { pass, issues, calmnessScore };
+  } catch (err) {
+    log.warn(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Error: ${err.message} — skipping check`);
+    return { pass: true, issues: [], calmnessScore: 0.5 };
+  }
+}
+
+/**
  * Three-stage image evaluation: vision inventory (flash-lite) + prompt compliance (Haiku).
  * Stage 1 describes the image without seeing the prompt (unbiased).
  * Stage 2 compares the vision inventory against the original prompt (text-only, no image).
@@ -10960,6 +11071,7 @@ module.exports = {
   compressImageToJPEG,
 
   // Core image functions
+  validateEmptyScene,
   evaluateImageQuality,
   callGeminiAPIForImage,
   editImageWithPrompt,
