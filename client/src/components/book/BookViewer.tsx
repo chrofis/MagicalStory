@@ -3,6 +3,7 @@ import HTMLFlipBook from 'react-pageflip';
 import BookCoverPage from './BookCoverPage';
 import BookStoryPage from './BookStoryPage';
 import BookEndPage from './BookEndPage';
+import storyService from '@/services/storyService';
 
 interface SharedStoryPage {
   pageNumber: number;
@@ -102,6 +103,24 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       return () => window.removeEventListener('resize', updateDimensions);
     }, [updateDimensions]);
 
+    // Server-rendered text overlay images
+    const [overlayImages, setOverlayImages] = useState<Record<number, string>>({});
+
+    useEffect(() => {
+      if (!showTextOverlay || !story.pages?.length) return;
+      let cancelled = false;
+      story.pages.forEach(page => {
+        if (!page.text?.trim() || overlayImages[page.pageNumber]) return;
+        storyService.getSharedTextOverlay(shareToken, page.pageNumber).then(result => {
+          if (!cancelled) {
+            setOverlayImages(prev => ({ ...prev, [page.pageNumber]: result.overlayImage }));
+          }
+        }).catch(() => { /* overlay fetch is best-effort */ });
+      });
+      return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showTextOverlay, shareToken, story.pages?.length]);
+
     // Build image URL helpers
     const coverImageUrl = (type: string) =>
       `/api/shared/${shareToken}/cover-image/${type}`;
@@ -146,6 +165,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 pageNumber={storyPage.pageNumber}
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay}
+                overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
             );

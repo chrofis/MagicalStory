@@ -339,6 +339,9 @@ export function StoryDisplay({
   const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
   // Text overlay toggle — text on image (children's book style) vs text below image (classic)
   const [textOverlay, setTextOverlay] = useState(true);
+  // Server-rendered text overlay images, keyed by pageNumber
+  const [overlayImages, setOverlayImages] = useState<Record<number, string>>({});
+  const [overlayLoading, setOverlayLoading] = useState<Set<number>>(new Set());
 
   // Visual Bible reference images (lazy-loaded)
   const [loadedRefImages, setLoadedRefImages] = useState<Record<string, string>>({});
@@ -897,6 +900,9 @@ export function StoryDisplay({
     }
 
     setEditedStory(sections.join(''));
+    // Clear cached overlay for this page so it gets re-fetched with new text
+    const pageNum = pageIndex + 1;
+    setOverlayImages(prev => { const next = { ...prev }; delete next[pageNum]; return next; });
   };
 
   // Get image versions for a page
@@ -1269,6 +1275,32 @@ export function StoryDisplay({
   const displayStory = isEditMode ? editedStory : story;
   const storyPages = parseStoryPages(displayStory);
   const hasImages = sceneImages.length > 0;
+
+  // Fetch server-rendered text overlay images when textOverlay is enabled
+  useEffect(() => {
+    if (!textOverlay || !storyId || isGenerating) return;
+    const pages = storyPages.map((_: string, i: number) => i + 1);
+    let cancelled = false;
+    pages.forEach((pageNum: number) => {
+      const pageText = storyPages[pageNum - 1]?.trim();
+      const hasImage = sceneImages.some(img => img.pageNumber === pageNum && img.imageData);
+      if (!pageText || !hasImage || overlayImages[pageNum] || overlayLoading.has(pageNum)) return;
+      setOverlayLoading(prev => new Set(prev).add(pageNum));
+      storyService.getTextOverlay(storyId, pageNum).then(result => {
+        if (!cancelled) {
+          setOverlayImages(prev => ({ ...prev, [pageNum]: result.overlayImage }));
+        }
+      }).catch((err: Error) => {
+        console.warn(`[TEXT-OVERLAY] Failed to fetch overlay for page ${pageNum}:`, err.message);
+      }).finally(() => {
+        if (!cancelled) {
+          setOverlayLoading(prev => { const s = new Set(prev); s.delete(pageNum); return s; });
+        }
+      });
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textOverlay, storyId, isGenerating, storyPages.length]);
 
   // Determine layout from languageLevel:
   // - Picture Book (1st-grade): 1 image + text combined on each page
@@ -4653,27 +4685,37 @@ export function StoryDisplay({
                           className={`w-full rounded-lg shadow-md object-contain ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
-                        {/* Text overlay on image (children's book style) */}
-                        {textOverlay && !isGenerating && pageText.trim() && (() => {
-                          const layout = getTextOverlayPosition(pageNumber, pageText, (image as any)?.textPosition);
-                          const isFullWidth = layout.position.includes('full');
-                          return (
-                            <div
-                              className={getOverlayClasses(layout)}
-                              style={{
-                                ...getOverlayPositionStyle(layout),
-                                ...getGradientStyle(layout),
-                              }}
-                            >
-                              <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
-                                <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                                   style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}>
-                                  {pageText.trim()}
-                                </p>
+                        {/* Text overlay on image — server-rendered with calm region detection */}
+                        {textOverlay && !isGenerating && pageText.trim() && (
+                          overlayImages[pageNumber] ? (
+                            <img
+                              src={overlayImages[pageNumber]}
+                              alt=""
+                              className="absolute inset-0 w-full h-full object-contain rounded-lg pointer-events-none"
+                              draggable={false}
+                            />
+                          ) : (() => {
+                            // CSS fallback while server overlay loads
+                            const layout = getTextOverlayPosition(pageNumber, pageText, (image as any)?.textPosition);
+                            const isFullWidth = layout.position.includes('full');
+                            return (
+                              <div
+                                className={getOverlayClasses(layout)}
+                                style={{
+                                  ...getOverlayPositionStyle(layout),
+                                  ...getGradientStyle(layout),
+                                }}
+                              >
+                                <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
+                                  <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
+                                     style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}>
+                                    {pageText.trim()}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()
+                        )}
                         {/* Busy spinner overlay — any image operation */}
                         {isPageBusy(pageNumber) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">

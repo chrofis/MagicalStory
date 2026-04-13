@@ -267,6 +267,82 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
   }
 });
 
+// POST /api/shared/:shareToken/text-overlay/:pageNumber - Render text overlay for shared story page
+apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) => {
+  try {
+    const { shareToken, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
+    if (!storyId) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Get the page image
+    const activeVersion = await getActiveVersion(storyId, pageNum);
+    let separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
+    if (!separateImage?.imageData && activeVersion !== 0) {
+      separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
+    }
+    if (!separateImage?.imageData) {
+      return res.status(404).json({ error: 'Page image not found' });
+    }
+
+    // Get text and textPosition from story data
+    let text = req.body?.text;
+    let textPosition = null;
+
+    const metaRows = await dbQuery(
+      `SELECT scene->>'textPosition' as text_position, scene->>'text' as page_text
+       FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+      [storyId, pageNum]
+    );
+
+    if (metaRows.length > 0) {
+      textPosition = metaRows[0].text_position || null;
+      if (!text) {
+        text = metaRows[0].page_text || '';
+      }
+    }
+
+    if (!text) {
+      // Fallback: parse story text
+      const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [storyId]);
+      if (dataRows.length > 0) {
+        const storyData = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+        const storyText = storyData.story || storyData.storyText || '';
+        const { parseStoryPages } = require('../lib/storyHelpers');
+        const pages = parseStoryPages(storyText, storyData.sceneImages?.length || 10);
+        text = pages[pageNum - 1] || '';
+      }
+    }
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'No text available for this page' });
+    }
+
+    // Enforce spread position rule
+    const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
+    textPosition = enforceSpreadTextPosition(textPosition, pageNum);
+
+    // Generate the overlay
+    const { generateTextOverlay } = require('../lib/textOverlayRenderer');
+    const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imgBuffer = Buffer.from(imgBase64, 'base64');
+
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
+
+    const overlayBase64 = result.overlayImage.toString('base64');
+    res.json({
+      overlayImage: `data:image/png;base64,${overlayBase64}`,
+    });
+  } catch (err) {
+    log.error('Error generating shared text overlay:', err);
+    res.status(500).json({ error: 'Failed to generate text overlay' });
+  }
+});
+
 // GET /api/shared/:shareToken/cover-image/:coverType - Get shared story cover image
 apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => {
   try {

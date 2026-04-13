@@ -6,6 +6,7 @@
 
 const PDFDocument = require('pdfkit');
 const { log } = require('../utils/logger');
+const { generateTextOverlay } = require('./textOverlayRenderer');
 
 // Convert millimeters to PDF points
 const mmToPoints = (mm) => mm * 2.83465;
@@ -426,7 +427,39 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 
     doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-    if (image && image.imageData) {
+    if (textOverlay && image?.imageData && cleanText) {
+      // Text overlay mode: render composited image (text baked in) — same renderer as browser
+      let overlayDrawn = false;
+      try {
+        const { enforceSpreadTextPosition } = require('./storyHelpers');
+        const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
+        const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
+        const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
+
+        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos);
+
+        await drawImageCovering(doc, compositedImage, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
+        overlayDrawn = true;
+      } catch (overlayErr) {
+        log.warn(`⚠️ [PDF] Text overlay rendering failed for page ${pageNumber}: ${overlayErr.message} — falling back`);
+      }
+
+      if (!overlayDrawn) {
+        // Fallback: draw image without overlay + text below
+        try {
+          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
+        } catch (imgErr) {
+          log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+        }
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+        const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
+        doc.text(cleanText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap });
+      }
+    } else if (image && image.imageData) {
+      // Draw image (no text overlay)
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
@@ -435,100 +468,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       }
     }
 
-    if (textOverlay && image?.imageData) {
-      // Text overlay mode: draw semi-transparent background + text on image
-      const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
-      const { enforceSpreadTextPosition } = require('./storyHelpers');
-      const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
-      const position = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
-      const wordCount = cleanText.split(/\s+/).length;
-      const isShort = wordCount < 20;
-      const isLong = wordCount >= 50;
-
-      const isFullWidth = position.includes('full');
-      const isTop = position.startsWith('top');
-      const isLeft = position.includes('left') || isFullWidth;
-      const overlayPad = mmToPoints(4);
-
-      // Use detected calm region rectangle if available (pixel coords from textRegion.js).
-      // Convert from image pixels to PDF points (image fills pageWidth × imageHeight).
-      const textRect = image.textRect;
-      let overlayX, overlayY, overlayW, overlayH;
-
-      if (textRect && textRect.w > 0 && textRect.h > 0 && textRect.imgWidth && textRect.imgHeight) {
-        // Scale from image pixels to PDF points (image fills interiorW including bleed)
-        const scaleX = (pageWidth + 2 * bleed) / textRect.imgWidth;
-        const scaleY = (imageHeight + bleed) / textRect.imgHeight;
-        overlayX = bleed + textRect.x * scaleX;
-        overlayY = bleed + textRect.y * scaleY;
-        overlayW = textRect.w * scaleX;
-        overlayH = textRect.h * scaleY;
-
-        // Clamp to page bounds with a small inset
-        const borderInset = pageWidth * 0.015;
-        overlayX = Math.max(bleed + borderInset, overlayX);
-        overlayY = Math.max(bleed + borderInset, overlayY);
-        if (overlayX + overlayW > bleed + pageWidth - borderInset) {
-          overlayW = bleed + pageWidth - borderInset - overlayX;
-        }
-        if (overlayY + overlayH > bleed + pageHeight - borderInset) {
-          overlayH = bleed + pageHeight - borderInset - overlayY;
-        }
-      } else {
-        // Fallback: fixed corner position (no detected rect)
-        overlayW = isFullWidth ? pageWidth : (pageWidth * (isShort ? 0.42 : isLong ? 0.62 : 0.52));
-        const borderInset = pageWidth * 0.015;
-        overlayX = bleed + borderInset;
-        overlayY = bleed + borderInset;
-        if (!isLeft && !isFullWidth) overlayX = bleed + pageWidth - overlayW - borderInset;
-      }
-
-      // Measure text to fit the overlay width, then cap height
-      const overlayTextWidth = overlayW - overlayPad * 2;
-      doc.fontSize(fontSize).font('Helvetica');
-      const measuredHeight = doc.heightOfString(cleanText, { width: overlayTextWidth, align: isFullWidth ? 'center' : (isLeft ? 'left' : 'right'), lineGap });
-
-      if (!textRect || !textRect.w) {
-        // Fallback path: compute height and vertical position from corner
-        overlayH = Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.4);
-        if (!isTop) overlayY = bleed + pageHeight - overlayH - pageWidth * 0.015;
-      } else {
-        // Detected rect path: ensure height is enough for the text
-        overlayH = Math.max(overlayH, Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.45));
-        // Re-enforce bottom clamp after height expansion (prevents spill past page bounds)
-        const maxH = bleed + pageHeight - (pageWidth * 0.015) - overlayY;
-        if (overlayH > maxH) overlayH = Math.max(0, maxH);
-      }
-
-      // Draw gradual feathered background — fades from text edge to transparent
-      // PDFKit linearGradient: from opaque white at text edge to transparent
-      doc.save();
-      if (isFullWidth) {
-        // Full-width: vertical gradient
-        const gradY1 = isTop ? overlayY : overlayY + overlayH;
-        const gradY2 = isTop ? overlayY + overlayH : overlayY;
-        const grad = doc.linearGradient(overlayX, gradY1, overlayX, gradY2);
-        grad.stop(0, '#FFFFFF', 0.55).stop(0.5, '#FFFFFF', 0.3).stop(1, '#FFFFFF', 0);
-        doc.rect(overlayX, overlayY, overlayW, overlayH).fill(grad);
-      } else {
-        // Corner: diagonal gradient from corner to opposite corner
-        const gradX1 = isLeft ? overlayX : overlayX + overlayW;
-        const gradY1 = isTop ? overlayY : overlayY + overlayH;
-        const gradX2 = isLeft ? overlayX + overlayW : overlayX;
-        const gradY2 = isTop ? overlayY + overlayH : overlayY;
-        const grad = doc.linearGradient(gradX1, gradY1, gradX2, gradY2);
-        grad.stop(0, '#FFFFFF', 0.55).stop(0.4, '#FFFFFF', 0.3).stop(1, '#FFFFFF', 0);
-        doc.rect(overlayX, overlayY, overlayW, overlayH).fill(grad);
-      }
-      doc.restore();
-
-      // Draw text with slight opacity for blend
-      doc.fontSize(fontSize).font('Helvetica').fillColor('#222222');
-      const textAlign = isFullWidth ? 'center' : (isLeft ? 'left' : 'right');
-      doc.text(cleanText, overlayX + overlayPad, overlayY + overlayPad, {
-        width: overlayTextWidth, align: textAlign, lineGap
-      });
-    } else {
+    if (!textOverlay || !image?.imageData || !cleanText) {
       // Classic mode: text in white area below image
       doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
       const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });

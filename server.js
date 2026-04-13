@@ -2907,6 +2907,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }, page.pageNumber);
           }
 
+          // Detect calm region for text overlay (~30ms, non-blocking)
+          let calmRegion = null;
+          if (genResult.imageData) {
+            try {
+              const { detectCalmRegion } = require('./server/lib/calmRegion');
+              const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
+              const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, page.pageNumber);
+              if (textPos) {
+                const imgBuf = Buffer.from(genResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                calmRegion = await detectCalmRegion(imgBuf, textPos).catch(() => null);
+              }
+            } catch (e) { /* calm region detection is optional */ }
+          }
+
           return {
             pageNumber: page.pageNumber,
             imageData: genResult.imageData,
@@ -2919,6 +2933,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             text: page.text,
             sceneCharacters,
             perCharClothing,
+            calmRegion,
           };
         } catch (err) {
           log.warn(`⚠️ [TRIAL-STREAM] Page ${page.pageNumber} image gen failed: ${err.message}`);
@@ -4773,6 +4788,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }, pageData.pageNumber);
             }
 
+            // Detect calm region for text overlay (~30ms, non-blocking)
+            let calmRegion = null;
+            if (genResult.imageData) {
+              try {
+                const { detectCalmRegion } = require('./server/lib/calmRegion');
+                const textPos = enforceSpreadTextPosition(pageData.sceneMetadata?.textPosition || null, pageData.pageNumber);
+                if (textPos) {
+                  const imgBuf = Buffer.from(genResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                  calmRegion = await detectCalmRegion(imgBuf, textPos).catch(() => null);
+                }
+              } catch (e) { /* calm region detection is optional */ }
+            }
+
             // Attach empty scene data for frontend display
             const emptySceneData = sceneBackgrounds[pageData.pageNumber] || null;
 
@@ -4800,7 +4828,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneCharacters: pageData.sceneCharacters,
               sceneMetadata: pageData.sceneMetadata,
               perCharClothing: pageData.perCharClothing,
-              scene: pageData.scene
+              scene: pageData.scene,
+              calmRegion,
             };
           } catch (genError) {
             log.error(`❌ [UNIFIED] Page ${pageData.pageNumber} generation failed: ${genError.message}`);
@@ -4923,6 +4952,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneCharacterClothing: img.perCharClothing,
           textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
+          calmRegion: img.calmRegion || null,
           outlineCharacters: img.scene?.outlineCharacters || null,
           imageVersions: [],
         }));
@@ -5021,6 +5051,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           entityReport: img.entityReport || null,
           textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
+          calmRegion: img.calmRegion || null,
           outlineCharacters: img.scene?.outlineCharacters || null
         }));
 

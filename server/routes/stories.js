@@ -14,6 +14,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
 const { dbToArrayIndex } = require('../lib/versionManager');
+const { generateTextOverlay } = require('../lib/textOverlayRenderer');
+const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -3098,6 +3100,95 @@ router.delete('/:id/share', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error disabling sharing:', err);
     res.status(500).json({ error: 'Failed to disable sharing' });
+  }
+});
+
+// ============================================
+// TEXT OVERLAY API
+// ============================================
+
+// POST /api/stories/:id/text-overlay/:pageNum - Render text overlay for a page
+// Body: { text?: string } — optional override, defaults to stored page text
+// Returns: { overlayImage: "data:image/png;base64,..." }
+router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum, 10);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get the page image
+    const activeVersion = await getActiveVersion(id, pageNumber);
+    const imageRow = await getStoryImage(id, 'scene', pageNumber, activeVersion);
+    if (!imageRow?.imageData) {
+      return res.status(404).json({ error: 'Page image not found' });
+    }
+
+    // Get text: use provided text or fall back to stored story text
+    let text = req.body?.text;
+    let textPosition = null;
+
+    // Get textPosition from scene image metadata in story data
+    const metaRows = await dbQuery(
+      `SELECT scene->>'textPosition' as text_position, scene->>'text' as page_text
+       FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+      [id, pageNumber]
+    );
+
+    if (metaRows.length > 0) {
+      textPosition = metaRows[0].text_position || null;
+      if (!text) {
+        text = metaRows[0].page_text || '';
+      }
+    }
+
+    if (!text) {
+      // Last fallback: parse story text
+      const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      if (dataRows.length > 0) {
+        const storyData = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+        const storyText = storyData.story || storyData.storyText || '';
+        const { parseStoryPages } = require('../lib/storyHelpers');
+        const pages = parseStoryPages(storyText, storyData.sceneImages?.length || 10);
+        text = pages[pageNumber - 1] || '';
+      }
+    }
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'No text available for this page' });
+    }
+
+    // Enforce spread position rule
+    textPosition = enforceSpreadTextPosition(textPosition, pageNumber);
+
+    // Generate the overlay
+    const imgBase64 = imageRow.imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imgBuffer = Buffer.from(imgBase64, 'base64');
+
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
+
+    // Return overlay as base64 data URL
+    const overlayBase64 = result.overlayImage.toString('base64');
+    res.json({
+      overlayImage: `data:image/png;base64,${overlayBase64}`,
+    });
+  } catch (err) {
+    console.error(`❌ Error generating text overlay for ${req.params.id}/page${req.params.pageNum}:`, err);
+    res.status(500).json({ error: 'Failed to generate text overlay', details: err.message });
   }
 });
 

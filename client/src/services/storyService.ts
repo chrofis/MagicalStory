@@ -2031,6 +2031,22 @@ export const storyService = {
       }));
   },
 
+  // Text overlay — server-rendered overlay image for a page
+  async getTextOverlay(storyId: string, pageNumber: number, text?: string): Promise<{ overlayImage: string }> {
+    return api.post<{ overlayImage: string }>(`/api/stories/${storyId}/text-overlay/${pageNumber}`, text ? { text } : {});
+  },
+
+  // Text overlay for shared stories (no auth required)
+  async getSharedTextOverlay(shareToken: string, pageNumber: number, text?: string): Promise<{ overlayImage: string }> {
+    const response = await fetch(`/api/shared/${shareToken}/text-overlay/${pageNumber}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(text ? { text } : {}),
+    });
+    if (!response.ok) throw new Error('Failed to get text overlay');
+    return response.json();
+  },
+
   // PDF generation
   async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'A4', textOverlay?: boolean): Promise<Blob> {
     const token = localStorage.getItem('auth_token');

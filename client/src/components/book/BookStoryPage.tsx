@@ -17,6 +17,7 @@ interface BookStoryPageProps {
   pageNumber: number;
   textPosition?: string | null;
   showTextOverlay: boolean;
+  overlayImage?: string | null;
   onImageClick?: (url: string) => void;
 }
 
@@ -25,7 +26,7 @@ interface BookStoryPageProps {
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, onImageClick }, ref) => {
+  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, overlayImage, onImageClick }, ref) => {
     const layout = getTextOverlayPosition(pageNumber, text, (textPosition || undefined) as TextPosition | undefined);
     const isFullWidth = layout.position.includes('full');
     const trimmedText = text.trim();
@@ -39,24 +40,33 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           draggable={false}
         />
 
-        {/* Text overlay — gradient on image */}
+        {/* Text overlay — server-rendered or CSS fallback */}
         {showTextOverlay && trimmedText && (
-          <div
-            className={getOverlayClasses(layout)}
-            style={{
-              ...getOverlayPositionStyle(layout),
-              ...getGradientStyle(layout),
-            }}
-          >
-            <div className="p-2 md:p-3" style={getTextContainerStyle(layout)}>
-              <p
-                className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}
-              >
-                {trimmedText}
-              </p>
+          overlayImage ? (
+            <img
+              src={overlayImage}
+              alt=""
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              draggable={false}
+            />
+          ) : (
+            <div
+              className={getOverlayClasses(layout)}
+              style={{
+                ...getOverlayPositionStyle(layout),
+                ...getGradientStyle(layout),
+              }}
+            >
+              <div className="p-2 md:p-3" style={getTextContainerStyle(layout)}>
+                <p
+                  className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
+                  style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}
+                >
+                  {trimmedText}
+                </p>
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {/* Translucent strip — when overlay is off */}
