@@ -6874,7 +6874,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // ratios for edits — can't pass raw "1024:768".
     const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
     log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, scene=${sceneMeta.width}x${sceneMeta.height} (aspect preset=${sceneAspectStr}), sending to Grok...`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri], { aspectRatio: sceneAspectStr });
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri], { aspectRatio: sceneAspectStr, skipOutputPadding: true });
 
     if (!grokResult.imageData) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
@@ -7070,10 +7070,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const cutoutAspectStr = aligned.preset;
     log.info(`👤 [CHAR REPAIR GROK] Preset-aligned extract: bbox ${pixelWidth}x${pixelHeight} at (${pixelLeft},${pixelTop}) → ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), aspect=${cutoutAspectStr}`);
 
-    // Extract the raw cutout (we'll also keep this for the feather blend later)
+    // Extract the raw cutout as PNG (lossless) — avoid JPEG round-trips that
+    // cause banding artifacts in the feather blend zone. Only the final
+    // composite back into the scene gets JPEG-encoded.
     const rawCutoutBuffer = await sharp(sceneBuffer)
       .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
-      .jpeg({ quality: 95 })
+      .png()
       .toBuffer();
 
     // Overlay a magenta crosshatch pattern on the figure area so Grok has
@@ -7129,17 +7131,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const hatchRegionBuffer = await sharp(rawCutoutBuffer)
         .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
         .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
-        .jpeg({ quality: 95 })
+        .png()
         .toBuffer();
       regionBuffer = await sharp(rawCutoutBuffer)
         .composite([{ input: hatchRegionBuffer, top: hatchTop, left: hatchLeft }])
-        .jpeg({ quality: 95 })
+        .png()
         .toBuffer();
       log.info(`👤 [CHAR REPAIR GROK] Cut-out ${extractWidth}x${extractHeight} at (${extractLeft},${extractTop}), hatch region ${hatchWidth}x${hatchHeight} @ stroke ${HATCH_STROKE}px spacing ${hatchSpacing}px`);
     } catch (err) {
       log.warn(`⚠️ [CHAR REPAIR GROK] Cut-out hatch overlay failed: ${err.message} — sending raw cutout`);
     }
-    const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
+    const regionDataUri = `data:image/png;base64,${regionBuffer.toString('base64')}`;
 
     // Extract structured character data (expression, pose, gaze) so the
     // repaired figure matches the original emotion and body language.
@@ -7176,19 +7178,25 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
+    // Art style context — helps Grok match the illustration style
+    const artStyleContext = options.artStyle
+      ? `\n\nArt style: ${options.artStyle}`
+      : '';
+
     const prompt = PROMPT_TEMPLATES.characterRepairCutout
       ? fillTemplate(PROMPT_TEMPLATES.characterRepairCutout, {
           charName,
           clothingContext,
           actionContext,
           issueContext,
+          artStyleContext,
         })
-      : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}`;
+      : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 
     // The cutout dims were picked to land exactly on a Grok preset aspect,
     // so editWithGrok's pad-loop will no-op (drift < 1%). No letterbox.
     log.info(`👤 [CHAR REPAIR GROK] Sending cutout ${extractWidth}x${extractHeight} (preset ${cutoutAspectStr}) to Grok`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri], { aspectRatio: cutoutAspectStr });
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri], { aspectRatio: cutoutAspectStr, skipOutputPadding: true });
 
     if (!grokResult.imageData) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
@@ -7221,8 +7229,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     if (!cutoutAspectMatches) {
       log.warn(`⚠️ [CHAR REPAIR GROK] Cutout post-trim ${grokCutoutMeta.width}x${grokCutoutMeta.height} (aspect ${grokCutoutAspect.toFixed(3)}), expected ${extractWidth}x${extractHeight} (aspect ${cutoutAspect.toFixed(3)}) — cover-cropping`);
     }
+    // Always use 'cover' — 'fill' stretches when aspects differ by even 1-2 pixels
+    // after border trimming. Cover crops at most a few pixels and never distorts.
     const resizedRegion = await sharp(repairedRegionBuffer)
-      .resize(extractWidth, extractHeight, { fit: cutoutAspectMatches ? 'fill' : 'cover', position: 'center' })
+      .resize(extractWidth, extractHeight, { fit: 'cover', position: 'center' })
       .raw()
       .toBuffer();
 

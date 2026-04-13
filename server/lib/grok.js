@@ -153,6 +153,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     model = GROK_MODELS.STANDARD,
     aspectRatio = '1:1',
     resolution = '1k',
+    skipOutputPadding = false, // character repair handles its own border detection
   } = options;
 
   if (!XAI_API_KEY) {
@@ -283,7 +284,9 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     // aspect_ratio param, but empirically it sometimes returns a different
     // aspect (usually its preferred 1024x1024). Detect drift and letterbox/pad
     // back to the requested aspect so the caller gets what it asked for.
-    try {
+    // Character repair callers set skipOutputPadding=true because they handle
+    // border detection themselves — double-padding creates white bar artifacts.
+    if (!skipOutputPadding) try {
       const outBuf = Buffer.from(imageBase64, 'base64');
       const outMeta = await sharp(outBuf).metadata();
       if (outMeta.width && outMeta.height) {
