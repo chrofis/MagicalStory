@@ -739,6 +739,12 @@ export interface SceneImage {
   emptySceneImage?: string;  // Base64 data URL of generated empty scene
   emptyScenePrompt?: string;  // Prompt used for empty scene generation
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
+  emptySceneQc?: {  // QC data when empty scene was retried (dev mode)
+    v1ImageData?: string;
+    v1Issues?: string[];
+    visionFeedback?: string;
+    retryPrompt?: string;
+  } | null;
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)

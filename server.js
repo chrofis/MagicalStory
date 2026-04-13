@@ -4660,12 +4660,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues };
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt };
                     }
                     log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues };
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt };
                   }
                 }
               }
@@ -4683,8 +4683,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneBackgrounds[bg.pageNumber] = {
               imageData: bg.imageData,
               prompt: bg.prompt,
-              // Store v1 (failed QC) alongside v2 (retry) for dev mode comparison
-              ...(bg.v1ImageData ? { v1ImageData: bg.v1ImageData, v1Issues: bg.v1Issues } : {}),
+              // Store QC data for dev mode comparison (v1 failed, v2 retry)
+              ...(bg.v1ImageData ? {
+                v1ImageData: bg.v1ImageData,
+                v1Issues: bg.v1Issues,
+                visionFeedback: bg.visionFeedback || null,
+                retryPrompt: bg.retryPrompt || null,
+              } : {}),
             };
           }
         }
@@ -4784,6 +4789,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               grokRefImages: genResult.grokRefImages || null,
               emptySceneImage: emptySceneData?.imageData || null,
               emptyScenePrompt: emptySceneData?.prompt || null,
+              emptySceneQc: emptySceneData?.v1Issues ? {
+                v1ImageData: emptySceneData.v1ImageData,
+                v1Issues: emptySceneData.v1Issues,
+                visionFeedback: emptySceneData.visionFeedback || null,
+                retryPrompt: emptySceneData.retryPrompt || null,
+              } : null,
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,

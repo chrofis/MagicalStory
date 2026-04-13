@@ -20,6 +20,7 @@ interface ReferencePhotosDisplayProps {
   emptySceneImage?: string | null;  // Pre-generated empty scene (Pass 1)
   emptyScenePrompt?: string | null;  // Prompt used for empty scene
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
+  emptySceneQc?: { v1ImageData?: string; v1Issues?: string[]; visionFeedback?: string; retryPrompt?: string } | null;
   language: string;
   // For lazy loading
   storyId?: string;
@@ -38,6 +39,7 @@ export function ReferencePhotosDisplay({
   emptySceneImage,
   emptyScenePrompt,
   hasEmptySceneImage,
+  emptySceneQc,
   language,
   storyId,
   pageNumber
@@ -246,6 +248,67 @@ export function ReferencePhotosDisplay({
               </div>
             )}
           </div>
+
+          {/* QC comparison: V1 (failed) vs V2 (retry) */}
+          {emptySceneQc && (
+            <details className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-amber-800 flex items-center gap-1.5">
+                ⚠️ {language === 'de' ? 'Szene-QC' : 'Scene QC'} — {emptySceneQc.v1Issues?.length || 0} {language === 'de' ? 'Probleme gefunden, neu generiert' : 'issues found, retried'}
+              </summary>
+              <div className="mt-3 space-y-3">
+                {/* V1 failed image */}
+                {emptySceneQc.v1ImageData && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">V1 (failed)</div>
+                    <img
+                      src={emptySceneQc.v1ImageData}
+                      alt="Empty scene V1 (failed)"
+                      className="max-h-48 rounded border border-red-300 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setLightboxImage(emptySceneQc.v1ImageData || null)}
+                    />
+                  </div>
+                )}
+                {/* Issues */}
+                {(emptySceneQc.v1Issues?.length ?? 0) > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">{language === 'de' ? 'Probleme' : 'Issues'}</div>
+                    <ul className="text-sm text-red-700 list-disc pl-5 space-y-0.5">
+                      {emptySceneQc.v1Issues!.map((issue: string, i: number) => (
+                        <li key={i}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {/* Gemini feedback */}
+                {emptySceneQc.visionFeedback && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">Gemini feedback</div>
+                    <p className="text-sm text-gray-800 bg-white p-2.5 rounded border border-gray-200">{emptySceneQc.visionFeedback}</p>
+                  </div>
+                )}
+                {/* Retry prompt (collapsed) */}
+                {emptySceneQc.retryPrompt && (
+                  <details className="bg-white rounded border border-gray-200 p-2">
+                    <summary className="text-sm text-gray-600 cursor-pointer">{language === 'de' ? 'Retry-Prompt anzeigen' : 'Show retry prompt'}</summary>
+                    <pre className="mt-2 text-xs whitespace-pre-wrap font-mono max-h-64 overflow-y-auto text-gray-700 bg-gray-50 p-2 rounded">{emptySceneQc.retryPrompt}</pre>
+                  </details>
+                )}
+                {/* V2 image (current, in use) */}
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                    V2 (retry — in use)
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">active</span>
+                  </div>
+                  <img
+                    src={displayEmptySceneImage}
+                    alt="Empty scene V2 (retry)"
+                    className="max-h-48 rounded border border-green-300 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setLightboxImage(displayEmptySceneImage)}
+                  />
+                </div>
+              </div>
+            </details>
+          )}
         </div>
       )}
 
