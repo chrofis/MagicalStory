@@ -49,6 +49,27 @@ Story guidance:
 - Key props: shield with emblem, wooden sword, banner, castle tower, drawbridge
 
 
+[princess]
+COSTUME: costumed:princess (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Golden invitation arrives to a royal castle
+- Dressing up leads into a real fairy-tale kingdom
+- A secret garden behind a castle wall opens a magical world
+- Helping a lost fairy or enchanted creature
+- Dream of attending a grand royal ball
+- Magic mirror or wardrobe that transports them to a kingdom
+- A crown found in the attic that turns out to be real
+
+Story guidance:
+- Set in castles, royal gardens, ballrooms, enchanted forests
+- Include a grand ball, royal feast, or celebration
+- Talking animals, friendly fairies, magical helpers
+- True royalty comes from kindness, not crowns
+- Focus on kindness, self-expression, helping others, inner beauty
+- Key props: tiara/crown, glass slippers, golden invitation, magic mirror, rose garden, grand staircase
+
+
 [viking]
 COSTUME: costumed:viking (mandatory for adventure scenes)
 
