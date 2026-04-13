@@ -2921,7 +2921,8 @@ def detect_illustration_faces():
             if j not in matched_haar:
                 results.append({"source": "haar_only", "box_px": hf, "confidence": 0.5})
 
-        # Build response with normalized coordinates and padded crops
+        # Build response with pixel coordinates and padded crops
+        # JS merger (entityConsistency.js) normalizes to 0-1 by dividing by image dimensions
         faces = []
         for r in results:
             x, y, fw, fh = r["box_px"]
@@ -2942,16 +2943,16 @@ def detect_illustration_faces():
                 "source": r["source"],
                 "confidence": r["confidence"],
                 "faceBox": {
-                    "x": round(x / width, 4),
-                    "y": round(y / height, 4),
-                    "width": round(fw / width, 4),
-                    "height": round(fh / height, 4)
+                    "x": x,
+                    "y": y,
+                    "width": fw,
+                    "height": fh
                 },
                 "paddedBox": {
-                    "x": round(px / width, 4),
-                    "y": round(py / height, 4),
-                    "width": round(pw / width, 4),
-                    "height": round(ph / height, 4)
+                    "x": px,
+                    "y": py,
+                    "width": pw,
+                    "height": ph
                 },
                 "cropData": "data:image/jpeg;base64," + crop_b64,
                 "cropSize": {"width": pw, "height": ph}

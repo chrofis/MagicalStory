@@ -95,8 +95,8 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
 
   // For each Gemini figure, find the closest cascade face near its bodyBox.
   // Gemini bodyBox/faceBox are [ymin, xmin, ymax, xmax] normalized 0-1.
-  // Cascade faceBox/paddedBox are {x, y, width, height} in pixels.
-  // All comparisons normalize cascade coords to 0-1 first.
+  // Cascade faceBox/paddedBox are {x, y, width, height} in pixels (from Python service).
+  // All comparisons normalize cascade pixel coords to 0-1 by dividing by imgWidth/imgHeight.
   for (const fig of geminiFigures) {
     const bb = fig.bodyBox; // [ymin, xmin, ymax, xmax] normalized 0-1
     if (!bb || !Array.isArray(bb)) continue;
