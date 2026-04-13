@@ -153,7 +153,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     model = GROK_MODELS.STANDARD,
     aspectRatio = '1:1',
     resolution = '1k',
-    skipOutputPadding = false, // character repair handles its own border detection
+    skipOutputPadding = true, // Don't letterbox-pad Grok's output — callers handle varying aspects
   } = options;
 
   if (!XAI_API_KEY) {

@@ -892,7 +892,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     } else {
       response = await withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
-        return fetch(url, {
+        const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -901,7 +901,14 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
             safetySettings: GEMINI_SAFETY_SETTINGS
           })
         });
-      }, { maxRetries: 2, baseDelay: 2000 });
+        // Throw on 5xx so withRetry can retry with backoff
+        if (resp.status >= 500) {
+          const err = new Error(`Gemini ${resp.status}`);
+          err.status = resp.status;
+          throw err;
+        }
+        return resp;
+      }, { maxRetries: 3, baseDelay: 2000 });
     }
 
     if (!response.ok) {

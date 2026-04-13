@@ -1477,7 +1477,17 @@ class UnifiedStoryParser {
           if (sceneData?.characters && Array.isArray(sceneData.characters)) {
             for (const char of sceneData.characters) {
               if (char.name && char.clothing) {
-                const baseName = char.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                let baseName = char.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                // Resolve VB IDs (CHR001, ANI001, etc.) to actual names
+                if (/^(CHR|ANI|ART|LOC|VEH|CLO)\d{3}$/i.test(baseName) && this._cache?.visualBible) {
+                  const vb = this._cache.visualBible;
+                  const allEntries = [...(vb.mainCharacters || []), ...(vb.secondaryCharacters || []), ...(vb.animals || []), ...(vb.artifacts || []), ...(vb.locations || []), ...(vb.vehicles || []), ...(vb.clothing || [])];
+                  const match = allEntries.find(e => e.id === baseName.toUpperCase());
+                  if (match?.name) {
+                    log.debug(`[UNIFIED-PARSER] Resolved VB ID ${baseName} → ${match.name}`);
+                    baseName = match.name;
+                  }
+                }
                 // Normalize: only 4 valid categories
                 const raw = char.clothing.toLowerCase();
                 const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);

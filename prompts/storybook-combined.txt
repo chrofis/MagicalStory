@@ -66,7 +66,7 @@ Instead, create humor through funny situations, silly reactions, or absurd momen
 
 # Scene Guidelines
 - Focus on 1-2 characters per page for clear illustrations
-- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions. Every character in a scene description MUST be named explicitly
+- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions. Every character in a scene description MUST be named explicitly. NEVER use Visual Bible IDs (CHR001, ANI001, ART001, LOC001, etc.) as character names — always use the real name from the Characters list
 - NEVER use generic terms like "the family", "everyone", "the group", "the children", "the parents"
 - If a group is doing something, pick 1-2 key characters to focus on in the scene
 - Fewer characters = better illustration quality
