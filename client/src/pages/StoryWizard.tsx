@@ -4513,27 +4513,29 @@ export default function StoryWizard() {
                                 createdAt: new Date().toISOString(),
                                 type: 'original' as const
                               }];
-                          const updatedVersions = [
-                              ...existingVersions,
-                              {
-                                imageData,
-                                versionIndex,
-                                createdAt: new Date().toISOString(),
-                                type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
-                                description: metadata?.description,
-                                prompt: metadata?.prompt,
-                                qualityScore: metadata?.qualityScore,
-                                qualityReasoning: metadata?.qualityReasoning,
-                                modelId: metadata?.modelId,
-                                fixTargets: metadata?.fixTargets,
-                                totalAttempts: metadata?.totalAttempts,
-                              }
-                            ];
+                          // Deduplicate: if a version with this index already exists, replace it
+                          const newVersion = {
+                            imageData,
+                            versionIndex,
+                            createdAt: new Date().toISOString(),
+                            type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
+                            description: metadata?.description,
+                            prompt: metadata?.prompt,
+                            qualityScore: metadata?.qualityScore,
+                            qualityReasoning: metadata?.qualityReasoning,
+                            modelId: metadata?.modelId,
+                            fixTargets: metadata?.fixTargets,
+                            totalAttempts: metadata?.totalAttempts,
+                          };
+                          const existsIdx = existingVersions.findIndex((v: any) => v.versionIndex === versionIndex);
+                          const updatedVersions = existsIdx >= 0
+                            ? existingVersions.map((v: any, i: number) => i === existsIdx ? newVersion : v)
+                            : [...existingVersions, newVersion];
                           return {
                             ...img,
                             imageData,
                             imageVersions: updatedVersions,
-                            activeVersion: updatedVersions.length - 1,
+                            activeVersion: versionIndex ?? updatedVersions.length - 1,
                           };
                         }
                         return img;
@@ -4563,9 +4565,9 @@ export default function StoryWizard() {
                             if (!prev) return prev;
                             const c = allImagesResult.covers!;
                             return {
-                              frontCover: c.frontCover ? { ...prev.frontCover, imageData: c.frontCover.imageData } : prev.frontCover,
-                              initialPage: c.initialPage ? { ...prev.initialPage, imageData: c.initialPage.imageData } : prev.initialPage,
-                              backCover: c.backCover ? { ...prev.backCover, imageData: c.backCover.imageData } : prev.backCover,
+                              frontCover: c.frontCover ? { ...prev.frontCover, ...c.frontCover } : prev.frontCover,
+                              initialPage: c.initialPage ? { ...prev.initialPage, ...c.initialPage } : prev.initialPage,
+                              backCover: c.backCover ? { ...prev.backCover, ...c.backCover } : prev.backCover,
                             };
                           });
                         }
@@ -5062,7 +5064,7 @@ export default function StoryWizard() {
                           ...existingVersions,
                           { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
                         ];
-                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 } };
+                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex ?? updatedVersions.length - 1 } };
                       });
                     } else {
                       // Scene repair — update sceneImages
@@ -5075,7 +5077,7 @@ export default function StoryWizard() {
                           ...existingVersions,
                           { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
                         ];
-                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 };
+                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex ?? updatedVersions.length - 1 };
                       }));
                     }
                     // Trigger full image refresh so version picker gets DB-sourced versions

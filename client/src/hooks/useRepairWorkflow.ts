@@ -723,9 +723,8 @@ export function useRepairWorkflow({
           if (result?.success) {
             pagesCompleted.push(pageNumber);
 
-            // Find version index (imageVersions length after update)
-            const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-            const versionIndex = (scene?.imageVersions?.length ?? 0);
+            // Use server-returned versionIndex (authoritative), fall back to local count
+            const versionIndex = result.versionIndex ?? (sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length ?? 0);
             newVersions[pageNumber] = versionIndex;
 
             // Capture before/after details for comparison display
@@ -1270,7 +1269,7 @@ export function useRepairWorkflow({
                 allChangedPages.add(pageNumber);
                 if (!signal.aborted) {
                   const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-                  const newVersionIndex = (scene?.imageVersions?.length ?? 0);
+                  const newVersionIndex = result.versionIndex ?? (scene?.imageVersions?.length ?? 0);
                   onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
                     description: result.sceneDescription,
                     prompt: result.imagePrompt,
