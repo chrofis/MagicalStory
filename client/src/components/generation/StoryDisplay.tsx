@@ -9,7 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
-import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle } from '@/utils/textOverlay';
+import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_SHADOW } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -4650,7 +4650,7 @@ export function StoryDisplay({
                         <DiagnosticImage
                           src={(image?.imageData || progressiveImageData) ?? ''}
                           alt={`Scene for page ${pageNumber}`}
-                          className={`w-full rounded-lg shadow-md object-cover ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
+                          className={`w-full rounded-lg shadow-md object-contain ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
                         {/* Text overlay on image (children's book style) */}
@@ -4662,14 +4662,12 @@ export function StoryDisplay({
                               className={getOverlayClasses(layout)}
                               style={{
                                 ...getOverlayPositionStyle(layout),
-                                width: `${layout.widthPercent}%`,
-                                maxHeight: `${layout.heightPercent}%`,
-                                overflow: 'hidden',
+                                ...getGradientStyle(layout),
                               }}
                             >
-                              <div className="p-3 md:p-4 h-full" style={getGradientStyle(layout)}>
+                              <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
                                 <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                                   style={{ fontSize: 'clamp(0.75rem, 1.8vw, 1.1rem)', textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)' }}>
+                                   style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}>
                                   {pageText.trim()}
                                 </p>
                               </div>
@@ -5282,8 +5280,8 @@ export function StoryDisplay({
                       </div>
                     )}
 
-                    {/* Text below — shown when overlay is off, in edit mode, or when no image */}
-                    {(!textOverlay || isEditMode || isGenerating || !hasPageImage) && (
+                    {/* Text below — shown when overlay is off or when no image */}
+                    {(!textOverlay || isGenerating || !hasPageImage) && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea
@@ -5298,6 +5296,23 @@ export function StoryDisplay({
                         </p>
                       )}
                     </div>
+                    )}
+                    {/* Collapsible text editor — when overlay is on and editing */}
+                    {textOverlay && isEditMode && !isGenerating && hasPageImage && (
+                    <details className="w-full mt-2 bg-amber-50 rounded-lg border border-amber-200">
+                      <summary className="p-2 cursor-pointer text-sm font-medium text-amber-700 flex items-center gap-1.5">
+                        <Edit3 size={14} />
+                        {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit text'}
+                      </summary>
+                      <div className="p-3">
+                        <textarea
+                          value={pageText.trim()}
+                          onChange={(e) => handlePageTextChange(index, e.target.value)}
+                          className="w-full min-h-[120px] p-3 text-gray-800 leading-snug font-serif text-base bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
+                        />
+                      </div>
+                    </details>
                     )}
                   </div>
                 ) : (
@@ -5319,7 +5334,7 @@ export function StoryDisplay({
                           <img
                             src={image.imageData}
                             alt={`Scene for page ${pageNumber}`}
-                            className={`w-full rounded-lg shadow-md object-cover ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
+                            className={`w-full rounded-lg shadow-md object-contain ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           />
                           {/* Busy spinner overlay — any image operation */}
                           {isPageBusy(pageNumber) && (

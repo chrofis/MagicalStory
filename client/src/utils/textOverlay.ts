@@ -4,12 +4,20 @@
  * Calculates where to place story text on page images, cycling through
  * 6 positions for visual variety. Sizes adapt to text length.
  *
+ * The overlay covers the ENTIRE image — the gradient shape itself defines the
+ * visible area (radial ellipse for corners, linear band for full-width).
+ * No rectangular container, no clipping, no hard edges.
+ *
  * Used by: StoryDisplay (browser CSS), pdf.js (PDFKit rendering)
  */
 
 import type { CSSProperties } from 'react';
 
 export type TextPosition = 'top-left' | 'bottom-full' | 'top-right' | 'bottom-left' | 'top-full' | 'bottom-right';
+
+/** Consistent overlay font size across all browser views (matches PDF ~14pt). */
+export const OVERLAY_FONT_SIZE = 'clamp(0.7rem, 1.6vw, 1rem)';
+export const OVERLAY_TEXT_SHADOW = '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)';
 
 // 6-position cycle
 const POSITION_CYCLE: TextPosition[] = [
@@ -28,8 +36,8 @@ export interface TextOverlayLayout {
   bottom: string | 'auto';
   left: string | 'auto';
   right: string | 'auto';
-  widthPercent: number;   // Width as % of image
-  heightPercent: number;  // Max height as % of image
+  widthPercent: number;   // Max width for text area as % of image
+  heightPercent: number;  // Max height for text area as % of image
   textAlign: 'left' | 'center' | 'right';
   // Gradient direction (Tailwind format)
   gradientFrom: string;  // e.g., 'from-white/80'
@@ -97,37 +105,60 @@ export function getTextOverlayPosition(pageNumber: number, text: string, explici
 }
 
 /**
- * Get CSS classes for the text overlay container.
- * Uses a small inset (1.5%) so the overlay never lands on a Grok-added border
- * or gets clipped by the image's rounded corners.
+ * CSS class for the overlay container.
+ * Covers the full image — the gradient defines the visible shape.
  */
 export function getOverlayClasses(_layout: TextOverlayLayout): string {
-  return 'absolute';
+  return 'absolute flex pointer-events-none';
 }
 
 /**
  * Inline positioning style for the overlay container.
- * Adds a 1.5% inset from image edges so text never sits on Grok borders
- * or gets clipped by rounded corners.
+ * Covers the full image with a small inset, plus flexbox alignment
+ * to position text in the correct corner/edge.
  */
 export function getOverlayPositionStyle(layout: TextOverlayLayout): CSSProperties {
   const inset = '1.5%';
-  const style: CSSProperties = {};
-  if (layout.top !== 'auto') style.top = inset;
-  else style.bottom = inset;
-  if (layout.left !== 'auto') style.left = inset;
-  if (layout.right !== 'auto') style.right = inset;
+  const isTop = layout.position.startsWith('top');
+  const isFullWidth = layout.position.includes('full');
+
+  const style: CSSProperties = {
+    top: inset, bottom: inset, left: inset, right: inset,
+    alignItems: isTop ? 'flex-start' : 'flex-end',
+  };
+
+  if (isFullWidth) {
+    style.justifyContent = 'center';
+  } else if (layout.position.includes('left')) {
+    style.justifyContent = 'flex-start';
+  } else {
+    style.justifyContent = 'flex-end';
+  }
+
   return style;
 }
 
 /**
+ * Inline style for the text container inside the overlay.
+ * Constrains text width for corner positions.
+ */
+export function getTextContainerStyle(layout: TextOverlayLayout): CSSProperties {
+  const isFullWidth = layout.position.includes('full');
+  return {
+    maxWidth: isFullWidth ? '100%' : `${layout.widthPercent}%`,
+    maxHeight: `${layout.heightPercent}%`,
+    overflow: 'hidden' as const,
+    textAlign: layout.textAlign,
+  };
+}
+
+/**
  * Get inline style for the gradient background.
- * Uses radial gradient from the corner for corners, linear for full-width.
- * Fades gradually in ALL directions — no hard box edges.
+ * Applied to the full-image overlay — the gradient shape itself defines
+ * the visible area (no rectangular box, no clipping).
  *
- * Corner positions also get a CSS mask that feathers the two non-corner edges
- * (e.g. bottom + right for top-left) so `overflow:hidden` on the container
- * never creates a visible hard line.
+ * Corner positions: radial ellipse emanating from the corner.
+ * Full-width: linear gradient from the edge.
  */
 export function getGradientStyle(layout: TextOverlayLayout): CSSProperties {
   const isTop = layout.position.startsWith('top');
@@ -135,30 +166,23 @@ export function getGradientStyle(layout: TextOverlayLayout): CSSProperties {
   const isLeft = layout.position.includes('left') || isFullWidth;
 
   if (isFullWidth) {
-    // Full-width: vertical gradient from edge
+    // Full-width: linear gradient concentrated in the text band.
+    // Stops scaled to heightPercent so the fade matches the text area.
     const dir = isTop ? 'to bottom' : 'to top';
+    const h = layout.heightPercent;
     return {
-      background: `linear-gradient(${dir}, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%)`,
+      background: `linear-gradient(${dir}, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.3) ${h * 0.5}%, rgba(255,255,255,0) ${h}%)`,
     };
   }
 
-  // Corner: radial gradient emanating from the corner
+  // Corner: radial ellipse sized to the text area.
+  // Explicit size keeps the fade tight around the corner regardless of image dimensions.
   const originX = isLeft ? '0%' : '100%';
   const originY = isTop ? '0%' : '100%';
-
-  // Feather mask: fade the two non-corner edges to transparent so the container
-  // clip (`overflow:hidden`) never shows a hard line.
-  // E.g. top-left → fade bottom edge (to top) + fade right edge (to left)
-  const vertDir = isTop ? 'to top' : 'to bottom';   // toward the anchored edge
-  const horizDir = isLeft ? 'to left' : 'to right';  // toward the anchored edge
-  const maskEdgeV = `linear-gradient(${vertDir}, transparent 0%, black 25%)`;
-  const maskEdgeH = `linear-gradient(${horizDir}, transparent 0%, black 25%)`;
+  const w = layout.widthPercent;
+  const h = layout.heightPercent;
 
   return {
-    background: `radial-gradient(ellipse at ${originX} ${originY}, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0) 80%)`,
-    WebkitMaskImage: `${maskEdgeV}, ${maskEdgeH}`,
-    WebkitMaskComposite: 'destination-in' as any,
-    maskImage: `${maskEdgeV}, ${maskEdgeH}`,
-    maskComposite: 'intersect',
+    background: `radial-gradient(${w}% ${h}% at ${originX} ${originY}, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0) 80%)`,
   };
 }
