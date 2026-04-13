@@ -4364,6 +4364,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           ...(sceneMetadataForClothing?.characterClothing || {}),
           ...(scene.characterClothing || {})
         };
+        // Warn when scene expansion metadata disagrees with outline clothing
+        // (the outline wins via the spread operator above, but the prose may still
+        // describe the wrong outfit — the prompt fix in scene-expansion.txt addresses this)
+        const outlineClothing = scene.characterClothing || {};
+        const sceneClothing = sceneMetadataForClothing?.characterClothing || {};
+        for (const [name, outfitFromOutline] of Object.entries(outlineClothing)) {
+          const outfitFromScene = sceneClothing[name];
+          if (outfitFromScene && outfitFromScene !== outfitFromOutline) {
+            log.warn(`⚠️ [CLOTHING MISMATCH] P${pageNum} ${name}: outline="${outfitFromOutline}" but scene expansion wrote "${outfitFromScene}" — using outline`);
+          }
+        }
         // Trial mode fallback: if parser didn't extract clothing from JSON scene hint,
         // use the trial costume type for main characters
         if (inputData.trialMode && inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
