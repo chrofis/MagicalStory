@@ -1,45 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X, Eye, EyeOff } from 'lucide-react';
-import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_SHADOW } from '@/utils/textOverlay';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from '@/components/common/CreditsModal';
-
-// Swipe detection hook — only triggers on the image area, not scrollable text
-function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const touchEnd = useRef<{ x: number; y: number } | null>(null);
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    // Only allow swipe on image area — skip if touch started in a scrollable text container
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-text-scroll]')) return;
-    touchEnd.current = null;
-    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart.current) return;
-    touchEnd.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart.current || !touchEnd.current) return;
-    const dx = touchStart.current.x - touchEnd.current.x;
-    const dy = Math.abs(touchStart.current.y - touchEnd.current.y);
-    // Only count as swipe if horizontal distance exceeds vertical (not a scroll)
-    if (dy > Math.abs(dx)) { touchStart.current = null; return; }
-    if (dx > minSwipeDistance) onSwipeLeft();
-    if (dx < -minSwipeDistance) onSwipeRight();
-    touchStart.current = null;
-  };
-
-  return { onTouchStart, onTouchMove, onTouchEnd };
-}
+import { ImageLightbox } from '@/components/common/ImageLightbox';
+import { BookViewer } from '@/components/book';
+import type { BookViewerHandle } from '@/components/book';
 
 interface SharedStoryPage {
   pageNumber: number;
@@ -72,52 +41,6 @@ type PageEntry =
   | { type: 'backCover' }
   | { type: 'endPage' };
 
-// End page translations keyed by story language
-const endPageText: Record<string, Record<string, string>> = {
-  de: {
-    secureTitle: 'Sichere deine Geschichte!',
-    secureDesc: 'Setze ein Passwort, damit du jederzeit auf deine Geschichte zugreifen kannst. Ohne Passwort geht deine Geschichte verloren.',
-    setPassword: 'Passwort setzen',
-    benefits: 'Mit deinem kostenlosen Konto kannst du:',
-    endTitle: 'Ende der Geschichte',
-    printBook: 'Als Buch drucken',
-    newStory: 'Neue Geschichte erstellen',
-    f1: 'Mehrere Figuren in einer Geschichte',
-    f2: 'Längere Geschichten mit mehr Seiten',
-    f3: 'Verschiedene Zeichenstile',
-    f4: 'Höhere Bildqualität und Titelseite',
-    f5: 'Als gedrucktes Buch bestellen',
-  },
-  en: {
-    secureTitle: 'Secure your story!',
-    secureDesc: 'Set a password so you can access your story anytime. Without a password your story will be lost.',
-    setPassword: 'Set password',
-    benefits: 'With your free account you can:',
-    endTitle: 'The End',
-    printBook: 'Print as a book',
-    newStory: 'Create a new story',
-    f1: 'Multiple characters in one story',
-    f2: 'Longer stories with more pages',
-    f3: 'Different drawing styles',
-    f4: 'Higher image quality and title page',
-    f5: 'Order as a printed book',
-  },
-  fr: {
-    secureTitle: 'Sécurisez votre histoire !',
-    secureDesc: 'Définissez un mot de passe pour accéder à votre histoire à tout moment. Sans mot de passe, votre histoire sera perdue.',
-    setPassword: 'Définir un mot de passe',
-    benefits: 'Avec votre compte gratuit, vous pouvez :',
-    endTitle: 'Fin de l\'histoire',
-    printBook: 'Imprimer en livre',
-    newStory: 'Créer une nouvelle histoire',
-    f1: 'Plusieurs personnages dans une même histoire',
-    f2: 'Des histoires plus longues',
-    f3: 'Différents styles de dessin',
-    f4: 'Meilleure qualité d\'image et page de titre',
-    f5: 'Commander en livre imprimé',
-  },
-};
-
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
@@ -126,7 +49,7 @@ export default function SharedStoryViewer() {
   const [story, setStory] = useState<SharedStoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(0); // 0 = cover, 1+ = pages
+  const [currentPage, setCurrentPage] = useState(0);
   const [sharingEnabled, setSharingEnabled] = useState(false);
   const [sharingLoading, setSharingLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -134,11 +57,8 @@ export default function SharedStoryViewer() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [showTextOverlay, setShowTextOverlay] = useState(true);
-  const [pageTransition, setPageTransition] = useState<'none' | 'turning'>('none');
-  const [turningOut, setTurningOut] = useState(false); // true = current page image is turning away
-  const [newImageVisible, setNewImageVisible] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
-  const textScrollRef = useRef<HTMLDivElement>(null);
+  const bookRef = useRef<BookViewerHandle>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -197,56 +117,52 @@ export default function SharedStoryViewer() {
     setSharingLoading(true);
     try {
       const authToken = localStorage.getItem('auth_token');
-      const method = sharingEnabled ? 'DELETE' : 'POST';
-      const response = await fetch(`/api/stories/${story.id}/share`, {
-        method,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSharingEnabled(data.isShared);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      if (sharingEnabled) {
+        await fetch(`/api/stories/${story.id}/share`, { method: 'DELETE', headers });
+        setSharingEnabled(false);
+      } else {
+        await fetch(`/api/stories/${story.id}/share`, { method: 'POST', headers });
+        setSharingEnabled(true);
       }
-    } catch {
-      // Ignore errors
+    } catch (err) {
+      // Silently fail
     } finally {
       setSharingLoading(false);
     }
   };
 
-  // Native share (mobile) or copy link
+  // Share link via native share or clipboard
   const handleShare = async () => {
-    if (!shareToken) return;
-    const shareUrl = `${window.location.origin}/s/${shareToken}`;
-
-    // If not shared yet, enable first
-    if (!sharingEnabled && story?.isOwner) {
+    if (!sharingEnabled) {
+      // Auto-enable sharing before sharing
       setSharingLoading(true);
       try {
         const authToken = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/stories/${story.id}/share`, {
-          method: 'POST',
-          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSharingEnabled(data.isShared);
-        }
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        await fetch(`/api/stories/${story!.id}/share`, { method: 'POST', headers });
+        setSharingEnabled(true);
       } catch {
-        // Continue anyway
+        setSharingLoading(false);
+        return;
       } finally {
         setSharingLoading(false);
       }
     }
 
+    const shareUrl = window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: story?.title || 'Story', url: shareUrl });
+        await navigator.share({ title: story!.title, url: shareUrl });
       } catch {
         // User cancelled
       }
     } else {
       try {
         await navigator.clipboard.writeText(shareUrl);
+        // Could show a toast notification here
       } catch {
         // Fallback
       }
@@ -268,14 +184,11 @@ export default function SharedStoryViewer() {
   })() : [];
 
   const totalPages = pageList.length;
-  const currentEntry = pageList[currentPage] || null;
 
   // Preload adjacent page images for faster navigation
   useEffect(() => {
     if (!story || !shareToken || totalPages === 0) return;
-
-    // Preload next and previous pages
-    for (const offset of [-1, 1]) {
+    for (const offset of [-2, -1, 1, 2]) {
       const idx = currentPage + offset;
       if (idx < 0 || idx >= totalPages) continue;
       const entry = pageList[idx];
@@ -289,50 +202,19 @@ export default function SharedStoryViewer() {
     }
   }, [currentPage, story, shareToken, totalPages]);
 
-  // Scroll text back to top when page changes
+  // Navigation via book ref
+  const flipNext = useCallback(() => bookRef.current?.flipNext(), []);
+  const flipPrev = useCallback(() => bookRef.current?.flipPrev(), []);
+
+  // Keyboard navigation
   useEffect(() => {
-    textScrollRef.current?.scrollTo(0, 0);
-  }, [currentPage]);
-
-  const goToPage = useCallback((page: number) => {
-    if (page >= 0 && page < totalPages && page !== currentPage && pageTransition === 'none') {
-      const fromEntry = pageList[currentPage];
-      const toEntry = pageList[page];
-
-      // Page turn only between pages with right-panel images (initialPage, story), forward only
-      const fromHasPanel = fromEntry?.type === 'initialPage' || fromEntry?.type === 'story';
-      const toHasPanel = toEntry?.type === 'initialPage' || toEntry?.type === 'story';
-
-      if (!fromHasPanel || !toHasPanel || page < currentPage) {
-        // Instant: cover pages or going backwards
-        setCurrentPage(page);
-        return;
-      }
-
-      // Animate current page's image turning away, then switch pages
-      setPageTransition('turning');
-      setTurningOut(true);
-      setNewImageVisible(false);
-
-      // Switch page after image is past 90° (edge-on, barely visible)
-      setTimeout(() => {
-        setTurningOut(false);
-        setCurrentPage(page);
-        // Delay by one frame so new page mounts at opacity 0 first, then fades in
-        requestAnimationFrame(() => setNewImageVisible(true));
-      }, 850);
-
-      // Allow navigation again after new image has faded in
-      setTimeout(() => {
-        setPageTransition('none');
-      }, 1300);
-    }
-  }, [totalPages, currentPage, pageTransition, pageList, story, shareToken, tokenParam]);
-
-  const swipeHandlers = useSwipe(
-    () => goToPage(currentPage + 1), // swipe left = next
-    () => goToPage(currentPage - 1)  // swipe right = prev
-  );
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); flipNext(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); flipPrev(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [flipNext, flipPrev]);
 
   if (loading) {
     return (
@@ -368,15 +250,6 @@ export default function SharedStoryViewer() {
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* Page turn animation keyframes */}
-      <style>{`
-        @keyframes pageTurnLeft {
-          0% { transform: rotateY(0deg); opacity: 1; }
-          50% { transform: rotateY(-90deg); opacity: 0.7; }
-          75% { transform: rotateY(-140deg); opacity: 0.3; }
-          100% { transform: rotateY(-180deg); opacity: 0; }
-        }
-      `}</style>
       {/* Header */}
       {isAuthenticated ? (
         <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
@@ -487,15 +360,12 @@ export default function SharedStoryViewer() {
         </div>
       )}
 
-      {/* Story Content with side arrows */}
-      <main
-        className="flex-1 flex items-center justify-center px-2 md:px-4 py-4 md:py-6"
-        {...swipeHandlers}
-      >
-        {/* Left navigation - desktop only */}
+      {/* Book with side navigation arrows */}
+      <main className="flex-1 flex items-center justify-center px-2 md:px-4 py-2 md:py-4">
+        {/* Left arrow - desktop only */}
         <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
           <button
-            onClick={() => goToPage(currentPage - 1)}
+            onClick={flipPrev}
             disabled={currentPage === 0}
             className="p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
             aria-label="Previous page"
@@ -504,7 +374,7 @@ export default function SharedStoryViewer() {
           </button>
           {currentPage > 1 && (
             <button
-              onClick={() => setCurrentPage(0)}
+              onClick={() => bookRef.current?.flipTo(0)}
               className="p-1.5 rounded-full bg-white shadow border border-indigo-200 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
               aria-label="Go to first page"
               title="Go to first page"
@@ -514,238 +384,24 @@ export default function SharedStoryViewer() {
           )}
         </div>
 
-        {/* Book container */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100 sm:border-2 sm:border-indigo-200 flex-1 max-w-6xl">
-          <div>
-          {/* Cover pages (frontCover, backCover) — centered full-width */}
-          {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'backCover') && (
-            <div
-              className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-2 sm:p-4 cursor-pointer"
-              onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`)}
-            >
-              <img
-                src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
-                alt={currentEntry.type === 'frontCover' ? story.title : 'Back Cover'}
-                className="max-h-[calc(100dvh-200px)] max-w-full object-contain rounded-lg shadow-lg pointer-events-none"
-                loading="eager"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
-          {/* Initial/dedication page — blank left + image right (like a real book) */}
-          {currentEntry && currentEntry.type === 'initialPage' && (
-            <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
-              {/* Blank page — left on desktop, bottom on mobile */}
-              <div className="h-1/2 md:h-full bg-white order-2 md:order-1" />
-              {/* Image — right on desktop, top on mobile (matches story page image area) */}
-              <div
-                className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 md:order-2 cursor-pointer relative overflow-hidden p-2 sm:p-4"
-                style={{ perspective: '2000px' }}
-                onClick={() => setFullscreenImage(`/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`)}
-              >
-                <img
-                  src={`/api/shared/${shareToken}/cover-image/initialPage${tokenParam}`}
-                  alt="Dedication"
-                  className="max-h-full max-w-full object-contain pointer-events-none rounded-lg shadow-lg"
-                  loading="eager"
-                  style={turningOut ? {
-                    transformOrigin: 'left center',
-                    backfaceVisibility: 'hidden',
-                    animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                  } : {
-                    transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
-                    opacity: newImageVisible ? 1 : 0,
-                  }}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Story Pages — book spread: alternating image/text sides (desktop) */}
-          {currentEntry && currentEntry.type === 'story' && (() => {
-            const page = story.pages[currentEntry.storyPageIdx];
-            if (!page) return null;
-            const isOddPage = page.pageNumber % 2 === 1;
-            // Odd pages: image LEFT, text RIGHT. Even pages: text LEFT, image RIGHT.
-            // Page turn always animates the RIGHT panel (hinge at spine = left edge).
-
-            const imagePanel = (
-              <div
-                className="h-1/2 md:h-full bg-white flex items-center justify-center order-1 cursor-pointer relative overflow-hidden"
-                onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}
-              >
-                <img
-                  src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
-                  alt={`Page ${currentEntry.storyPageIdx + 1}`}
-                  className="w-full h-full object-contain pointer-events-none"
-                  loading="eager"
-                  style={{
-                    transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
-                    opacity: newImageVisible ? 1 : 0,
-                  }}
-                />
-                {/* Text overlay on image (matching print layout) */}
-                {showTextOverlay && page.text.trim() && (() => {
-                  const layout = getTextOverlayPosition(page.pageNumber, page.text, (page.textPosition || undefined) as import('@/utils/textOverlay').TextPosition | undefined);
-                  const isFullWidth = layout.position.includes('full');
-                  return (
-                    <div
-                      className={getOverlayClasses(layout)}
-                      style={{
-                        ...getOverlayPositionStyle(layout),
-                        ...getGradientStyle(layout),
-                        transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
-                        opacity: newImageVisible ? 1 : 0,
-                      }}
-                    >
-                      <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
-                        <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                           style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}>
-                          {page.text.trim()}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-
-            const textPanel = (
-              <div
-                className="h-1/2 md:h-full p-5 md:p-8 lg:p-10 flex flex-col md:justify-center bg-white overflow-hidden order-2"
-                style={{
-                  transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
-                  opacity: newImageVisible ? 1 : 0,
-                }}
-              >
-                <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
-                  <p className="text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-gray-800 whitespace-pre-wrap">
-                    {page.text}
-                  </p>
-                </div>
-              </div>
-            );
-
-            // Desktop: odd = [image, text], even = [text, image]
-            // The RIGHT panel (second child on desktop) gets the page turn animation
-            const leftPanel = isOddPage ? imagePanel : textPanel;
-            const rightPanel = isOddPage ? textPanel : imagePanel;
-
-            return (
-              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100dvh-180px)] md:h-[calc(100dvh-160px)] min-h-[400px] max-h-[900px]">
-                {/* Left panel on desktop */}
-                <div className="hidden md:block md:h-full">
-                  {leftPanel}
-                </div>
-                {/* Right panel on desktop — perspective on outer, animation on inner */}
-                <div
-                  className="hidden md:flex md:h-full relative overflow-hidden"
-                  style={{ perspective: '2000px' }}
-                >
-                  <div
-                    className="w-full h-full"
-                    style={turningOut ? {
-                      transformOrigin: 'left center',
-                      backfaceVisibility: 'hidden',
-                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                    } : undefined}
-                  >
-                    {rightPanel}
-                  </div>
-                </div>
-                {/* Mobile: always image top, text bottom */}
-                <div className="md:hidden h-1/2 bg-white flex items-center justify-center relative overflow-hidden cursor-pointer"
-                     onClick={() => setFullscreenImage(`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`)}>
-                  <img
-                    src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
-                    alt={`Page ${currentEntry.storyPageIdx + 1}`}
-                    className="w-full h-full object-contain"
-                    loading="eager"
-                  />
-                </div>
-                <div className="md:hidden h-1/2 p-4 overflow-y-auto bg-white">
-                  <p className="text-base leading-relaxed text-gray-800 whitespace-pre-wrap">{page.text}</p>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* End Page — CTA after last page */}
-          {currentEntry && currentEntry.type === 'endPage' && (() => {
-            const lang = (story.language || 'en').split('-')[0].toLowerCase();
-            const et = endPageText[lang] || endPageText.en;
-            return (
-            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 min-h-[400px] h-[calc(100dvh-200px)] max-h-[800px] p-6">
-              <div className="text-center max-w-md">
-                {story.needsPassword ? (
-                  <>
-                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Lock className="w-8 h-8 text-amber-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{et.secureTitle}</h2>
-                    <p className="text-gray-600 mb-4">{et.secureDesc}</p>
-                    <button
-                      onClick={() => setShowChangePasswordModal(true)}
-                      className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors mb-4"
-                    >
-                      {et.setPassword}
-                    </button>
-                    <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 text-left">
-                      <p className="text-xs font-semibold text-indigo-700 mb-2">{et.benefits}</p>
-                      <ul className="text-xs text-gray-600 space-y-1">
-                        {[et.f1, et.f2, et.f3, et.f4, et.f5].map((f, i) => (
-                          <li key={i} className="flex items-center gap-1.5"><span className="text-indigo-500 font-bold">+</span> {f}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <BookOpenCheck className="w-8 h-8 text-indigo-500" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{et.endTitle}</h2>
-                    <p className="text-gray-500 mb-6">{story.title}</p>
-                    <div className="flex flex-col gap-3">
-                      <button
-                        onClick={() => navigate('/stories')}
-                        className="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <BookOpen className="w-5 h-5" />
-                        {et.printBook}
-                      </button>
-                      <button
-                        onClick={() => navigate('/create?new=true')}
-                        className="w-full bg-white text-indigo-500 py-3 rounded-lg font-semibold border-2 border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        {et.newStory}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            );
-          })()}
-
-
-          {/* Page counter - desktop only, inside book */}
-          <div className="hidden md:flex items-center justify-center py-2 sm:py-3 bg-white border-t border-indigo-50 sm:border-indigo-100">
-            <span className="text-indigo-400 text-sm font-medium">
-              {currentPage + 1} / {totalPages}
-            </span>
-          </div>
-          </div>{/* close inner animated div */}
+        {/* Book viewer */}
+        <div className="flex-1 max-w-5xl">
+          <BookViewer
+            ref={bookRef}
+            pageList={pageList}
+            story={story}
+            shareToken={shareToken!}
+            showTextOverlay={showTextOverlay}
+            onImageClick={(url) => setFullscreenImage(url + tokenParam)}
+            onPageChange={setCurrentPage}
+            onNavigate={(path) => navigate(path)}
+            onSetPassword={() => setShowChangePasswordModal(true)}
+          />
         </div>
 
         {/* Right arrow - desktop only */}
         <button
-          onClick={() => goToPage(currentPage + 1)}
+          onClick={flipNext}
           disabled={currentPage >= totalPages - 1}
           className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors ml-3 lg:ml-6 flex-shrink-0"
           aria-label="Next page"
@@ -754,52 +410,52 @@ export default function SharedStoryViewer() {
         </button>
       </main>
 
-      {/* Text overlay toggle — desktop */}
-      <div className="hidden md:flex justify-center mt-2">
+      {/* Text overlay toggle + page counter */}
+      <div className="flex items-center justify-center gap-4 pb-3">
+        {/* Mobile: first page button */}
+        <div className="md:hidden">
+          {currentPage > 1 && (
+            <button
+              onClick={() => bookRef.current?.flipTo(0)}
+              className="p-2.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
+              aria-label="Go to first page"
+            >
+              <ChevronsLeft className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Mobile: prev button */}
+        <button
+          onClick={flipPrev}
+          disabled={currentPage === 0}
+          className="md:hidden p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+
+        {/* Text overlay toggle — both mobile and desktop */}
         <button
           onClick={() => setShowTextOverlay(!showTextOverlay)}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            showTextOverlay ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-sm border border-indigo-200 ${
+            showTextOverlay ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400'
           }`}
         >
           {showTextOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
           {showTextOverlay ? 'Text on' : 'Text off'}
         </button>
-      </div>
 
-      {/* Mobile navigation - bottom */}
-      <div className="md:hidden flex items-center justify-center gap-4 pb-4">
-        {currentPage > 1 && (
-          <button
-            onClick={() => setCurrentPage(0)}
-            className="p-2.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
-            aria-label="Go to first page"
-          >
-            <ChevronsLeft className="w-5 h-5" />
-          </button>
-        )}
+        {/* Page counter */}
+        <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">
+          {currentPage + 1} / {totalPages}
+        </span>
+
+        {/* Mobile: next button */}
         <button
-          onClick={() => goToPage(currentPage - 1)}
-          disabled={currentPage === 0}
-          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Previous page"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <button
-          onClick={() => setShowTextOverlay(!showTextOverlay)}
-          className={`p-2.5 rounded-full shadow-md border border-indigo-200 ${
-            showTextOverlay ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-gray-400'
-          }`}
-          aria-label={showTextOverlay ? 'Hide text overlay' : 'Show text overlay'}
-        >
-          {showTextOverlay ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-        </button>
-        <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">{currentPage + 1} / {totalPages}</span>
-        <button
-          onClick={() => goToPage(currentPage + 1)}
+          onClick={flipNext}
           disabled={currentPage >= totalPages - 1}
-          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="md:hidden p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Next page"
         >
           <ChevronRight className="w-6 h-6" />
@@ -807,21 +463,11 @@ export default function SharedStoryViewer() {
       </div>
 
       {/* Fullscreen image viewer */}
-      {fullscreenImage && (
-        <div
-          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
-          onClick={() => setFullscreenImage(null)}
-        >
-          <img
-            src={fullscreenImage}
-            alt="Fullscreen"
-            className="max-w-full max-h-full object-contain"
-          />
-          <button className="absolute top-3 right-3 text-white/70 hover:text-white p-2" onClick={() => setFullscreenImage(null)}>
-            <X size={24} />
-          </button>
-        </div>
-      )}
+      <ImageLightbox
+        src={fullscreenImage}
+        alt="Story page"
+        onClose={() => setFullscreenImage(null)}
+      />
 
       {/* Modals */}
       {showCreditsModal && <CreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />}
