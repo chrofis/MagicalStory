@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus, X, Eye, EyeOff } from 'lucide-react';
-import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle } from '@/utils/textOverlay';
+import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_SHADOW } from '@/utils/textOverlay';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -597,16 +597,14 @@ export default function SharedStoryViewer() {
                       className={getOverlayClasses(layout)}
                       style={{
                         ...getOverlayPositionStyle(layout),
-                        width: `${layout.widthPercent}%`,
-                        maxHeight: `${layout.heightPercent}%`,
-                        overflow: 'hidden',
+                        ...getGradientStyle(layout),
                         transition: newImageVisible ? 'opacity 0.4s ease-in' : 'none',
                         opacity: newImageVisible ? 1 : 0,
                       }}
                     >
-                      <div className="p-3 md:p-4 h-full" style={getGradientStyle(layout)}>
+                      <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
                         <p className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                           style={{ fontSize: 'clamp(0.65rem, 1.5vw, 0.95rem)', textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)' }}>
+                           style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}>
                           {page.text.trim()}
                         </p>
                       </div>
@@ -643,17 +641,21 @@ export default function SharedStoryViewer() {
                 <div className="hidden md:block md:h-full">
                   {leftPanel}
                 </div>
-                {/* Right panel on desktop — page turn animation applied here */}
+                {/* Right panel on desktop — perspective on outer, animation on inner */}
                 <div
                   className="hidden md:flex md:h-full relative overflow-hidden"
-                  style={turningOut ? {
-                    perspective: '2000px',
-                    transformOrigin: 'left center',
-                    backfaceVisibility: 'hidden',
-                    animation: 'pageTurnLeft 1.6s ease-in-out forwards',
-                  } : { perspective: '2000px' }}
+                  style={{ perspective: '2000px' }}
                 >
-                  {rightPanel}
+                  <div
+                    className="w-full h-full"
+                    style={turningOut ? {
+                      transformOrigin: 'left center',
+                      backfaceVisibility: 'hidden',
+                      animation: 'pageTurnLeft 1.6s ease-in-out forwards',
+                    } : undefined}
+                  >
+                    {rightPanel}
+                  </div>
                 </div>
                 {/* Mobile: always image top, text bottom */}
                 <div className="md:hidden h-1/2 bg-white flex items-center justify-center relative overflow-hidden cursor-pointer"
@@ -783,6 +785,15 @@ export default function SharedStoryViewer() {
           aria-label="Previous page"
         >
           <ChevronLeft className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setShowTextOverlay(!showTextOverlay)}
+          className={`p-2.5 rounded-full shadow-md border border-indigo-200 ${
+            showTextOverlay ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-gray-400'
+          }`}
+          aria-label={showTextOverlay ? 'Hide text overlay' : 'Show text overlay'}
+        >
+          {showTextOverlay ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
         </button>
         <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">{currentPage + 1} / {totalPages}</span>
         <button

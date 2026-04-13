@@ -10597,7 +10597,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
       const labelHeight = 24;
       const totalHeight = resized.info.height + labelHeight;
       const labelText = `${el.name} (${el.type})`;
-      const displayText = labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText;
+      const displayText = escapeXml(labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText);
       const labelSvg = `<svg width="512" height="${labelHeight}">
         <rect width="512" height="${labelHeight}" fill="#555"/>
         <text x="256" y="17" font-family="Arial, sans-serif" font-size="13" fill="white" text-anchor="middle">${displayText}</text>
@@ -10647,7 +10647,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
     for (const { el, buffer, height } of resizedElements) {
       // Label above the image
       const labelText = `${el.name} (${el.type})`;
-      const displayText = labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText;
+      const displayText = escapeXml(labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText);
       const labelSvg = `
         <svg width="${cellWidth}" height="${labelHeight}">
           <rect width="${cellWidth}" height="${labelHeight}" fill="#333"/>

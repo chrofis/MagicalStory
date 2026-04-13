@@ -177,6 +177,12 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       }
     }
 
+    // Guard: if no pixel passed the threshold, bbox stays at init values (negative dims)
+    if (maxX <= minX || maxY <= minY) {
+      log.info(`📝 [TEXT-REGION] P${pageNumber}: washed but no pixels above bbox threshold — using position only`);
+      return { imageData: washedDataUri, position: preferredPosition, rect: null, score: washCoverage, overridden: false };
+    }
+
     const rect = {
       x: minX,
       y: minY,

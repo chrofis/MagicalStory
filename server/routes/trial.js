@@ -63,15 +63,38 @@ const inFlightTitlePagePromises = new Map(); // userId -> Promise
 // ─── Admin bypass: admins can test the trial flow repeatedly ─────────────────
 // Checks for an adminToken in req.body — if it decodes to a valid admin JWT,
 // returns true so the caller can skip turnstile/fingerprint/quota checks.
+// Admin bypass uses a short-lived HMAC token instead of the primary JWT.
+// The frontend creates this via /api/trial/admin-bypass-token (authenticated),
+// and the trial endpoint verifies the HMAC without ever seeing the admin JWT.
+const BYPASS_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 function isAdminRequest(req) {
   const token = req.body?.adminToken;
   if (!token) return false;
   try {
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded.role === 'admin';
+    const hmac = require('crypto');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return false;
+    // Token format: "timestamp:hmac"
+    const [ts, sig] = token.split(':');
+    if (!ts || !sig) return false;
+    const timestamp = parseInt(ts, 10);
+    if (isNaN(timestamp) || Date.now() - timestamp > BYPASS_TTL_MS) return false;
+    const expected = hmac.createHmac('sha256', secret).update(`trial-bypass:${ts}`).digest('hex');
+    return sig === expected;
   } catch { return false; }
 }
+
+// Authenticated endpoint: admin gets a short-lived HMAC token for trial bypass.
+// This token is NOT the JWT — it's a purpose-scoped, 5-minute HMAC.
+const { authenticateToken } = require('../middleware/auth');
+router.get('/admin-bypass-token', authenticateToken, (req, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const hmac = require('crypto');
+  const ts = Date.now().toString();
+  const sig = hmac.createHmac('sha256', process.env.JWT_SECRET).update(`trial-bypass:${ts}`).digest('hex');
+  res.json({ token: `${ts}:${sig}` });
+});
 
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 

@@ -115,12 +115,14 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
       const faceCenterX = (cf.faceBox.x + cf.faceBox.width / 2) / imgWidth;
       const faceCenterY = (cf.faceBox.y + cf.faceBox.height / 2) / imgHeight;
 
-      // Face should be within ~1.5x body width horizontally and above body center
+      // Face should be within ~1.5x body width horizontally and above body center.
+      // Both dx and dy normalized to body dimensions for consistent scale.
+      const bodyH = bb[2] - bb[0]; // ymax - ymin
       const dx = Math.abs(faceCenterX - bodyCenterX) / (bodyW || 0.1);
-      const dy = faceCenterY - bodyCenterY; // negative = face above body top (expected)
+      const dy = (faceCenterY - bodyCenterY) / (bodyH || 0.1); // normalize to body heights
 
       // Distance metric: horizontal offset + penalty for face below body top
-      const dist = dx + (dy > 0.1 ? dy * 5 : 0);
+      const dist = dx + (dy > 0.3 ? dy * 3 : 0);
 
       if (dist < bestDist && dx < 1.5) {
         bestDist = dist;

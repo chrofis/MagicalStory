@@ -455,10 +455,10 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       const textRect = image.textRect;
       let overlayX, overlayY, overlayW, overlayH;
 
-      if (textRect && textRect.w > 0 && textRect.h > 0 && textRect.imgWidth) {
-        // Scale from image pixels to PDF points
-        const scaleX = pageWidth / textRect.imgWidth;
-        const scaleY = imageHeight / textRect.imgHeight;
+      if (textRect && textRect.w > 0 && textRect.h > 0 && textRect.imgWidth && textRect.imgHeight) {
+        // Scale from image pixels to PDF points (image fills interiorW including bleed)
+        const scaleX = (pageWidth + 2 * bleed) / textRect.imgWidth;
+        const scaleY = (imageHeight + bleed) / textRect.imgHeight;
         overlayX = bleed + textRect.x * scaleX;
         overlayY = bleed + textRect.y * scaleY;
         overlayW = textRect.w * scaleX;
@@ -495,6 +495,9 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       } else {
         // Detected rect path: ensure height is enough for the text
         overlayH = Math.max(overlayH, Math.min(measuredHeight + overlayPad * 2, pageHeight * 0.45));
+        // Re-enforce bottom clamp after height expansion (prevents spill past page bounds)
+        const maxH = bleed + pageHeight - (pageWidth * 0.015) - overlayY;
+        if (overlayH > maxH) overlayH = Math.max(0, maxH);
       }
 
       // Draw gradual feathered background — fades from text edge to transparent

@@ -165,6 +165,17 @@ export default function TrialWizard() {
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
   const [trialStoryId, setTrialStoryId] = useState<string | null>(null);
+  const [adminBypassToken, setAdminBypassToken] = useState<string | null>(null);
+
+  // Fetch a short-lived bypass token for admin trial testing (not the full JWT)
+  useEffect(() => {
+    if (!isAdmin) return;
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) return;
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/admin-bypass-token`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    }).then(r => r.json()).then(d => setAdminBypassToken(d.token)).catch(() => {});
+  }, [isAdmin]);
 
   // Check if trial is already used on mount
   useEffect(() => {
@@ -365,7 +376,7 @@ export default function TrialWizard() {
                 onAccountCreated={handleAccountCreated}
                 sessionToken={sessionToken}
                 language={language}
-                adminToken={isAdmin ? localStorage.getItem('auth_token') : null}
+                adminToken={isAdmin ? adminBypassToken : null}
               />
             )}
             {currentStep === 'topic' && (

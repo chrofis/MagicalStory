@@ -601,7 +601,7 @@ export default function BookBuilder() {
             )}
 
             {/* Promo code input — only if user hasn't used a referral code before */}
-            {!isOverLimit && price && canUsePromo && (
+            {!isOverLimit && price && canUsePromo !== false && (
               <div className="mb-4">
                 <label className="text-sm text-gray-600 mb-1 block">{t.promoLabel}</label>
                 <div className="flex gap-2">

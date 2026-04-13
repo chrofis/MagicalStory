@@ -1476,22 +1476,26 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
     let code = userResult.rows[0].referral_code;
     if (!code) {
       const uname = userResult.rows[0].username;
+      let generated = false;
       for (let attempt = 0; attempt < 10; attempt++) {
         code = generateReferralCode(uname);
         try {
           await getDbPool().query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, userId]);
+          generated = true;
           break;
         } catch (e) {
           if (attempt === 9) {
             log.error(`❌ [REFERRAL] Failed to generate unique code for user ${userId} (${uname}) after 10 attempts`);
             logActivity(userId, uname, 'REFERRAL_CODE_GENERATION_FAILED', { attempts: 10, lastCode: code });
-            throw e;
           }
         }
       }
-      // Re-read the stored code — a concurrent request may have won the race
+      // Always re-read — a concurrent request may have won, or our own write succeeded
       const stored = await getDbPool().query('SELECT referral_code FROM users WHERE id = $1', [userId]);
-      code = stored.rows[0]?.referral_code || code;
+      code = stored.rows[0]?.referral_code;
+      if (!code) {
+        return res.status(500).json({ error: 'Failed to generate referral code' });
+      }
     }
 
     const statsResult = await getDbPool().query(
@@ -1600,10 +1604,20 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     if (referralCode) {
       const refResult = await validateReferralCodeForUser(referralCode, userId);
       if (refResult.valid) {
-        discountCents = CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF * 100;
-        referrerUserId = refResult.referrerUserId;
-        validatedReferralCode = refResult.storedCode;
-        log.info(`🎁 [CHECKOUT] Referral code ${validatedReferralCode} applied: CHF ${CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF} off (referrer: ${referrerUserId})`);
+        // Atomically claim the referral NOW (before Stripe session) to prevent TOCTOU.
+        // If another concurrent checkout already claimed it, rowCount = 0 and we skip the discount.
+        const claimResult = await getDbPool().query(
+          'UPDATE users SET referred_by = $1 WHERE id = $2 AND referred_by IS NULL',
+          [refResult.storedCode, userId]
+        );
+        if (claimResult.rowCount === 1) {
+          discountCents = CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF * 100;
+          referrerUserId = refResult.referrerUserId;
+          validatedReferralCode = refResult.storedCode;
+          log.info(`🎁 [CHECKOUT] Referral code ${validatedReferralCode} applied: CHF ${CREDIT_CONFIG.REFERRAL.BUYER_DISCOUNT_CHF} off (referrer: ${referrerUserId})`);
+        } else {
+          log.info(`🎁 [CHECKOUT] Referral code already used (concurrent checkout)`);
+        }
       } else {
         log.info(`🎁 [CHECKOUT] Referral code rejected: ${refResult.reason}`);
       }

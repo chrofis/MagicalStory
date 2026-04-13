@@ -902,15 +902,15 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             try {
               await client.query('BEGIN');
 
-              // Step 1: atomically mark the buyer as referred — this is the lock.
-              // If another webhook already set referred_by, rowCount = 0 and we skip.
-              const markResult = await client.query(
-                'UPDATE users SET referred_by = $1 WHERE id = $2 AND referred_by IS NULL',
-                [refCode, userId]
+              // Idempotency: the unique constraint on order_stripe_session_id prevents
+              // duplicate credit grants. referred_by was already set at checkout creation
+              // time (TOCTOU fix), so we don't check it here.
+              const existing = await client.query(
+                'SELECT id FROM referral_events WHERE order_stripe_session_id = $1', [fullSession.id]
               );
-              if (markResult.rowCount === 0) {
+              if (existing.rows.length > 0) {
                 await client.query('ROLLBACK');
-                log.warn('⚠️ [STRIPE WEBHOOK] Buyer already referred, skipping referral credit for session:', fullSession.id);
+                log.warn('⚠️ [STRIPE WEBHOOK] Referral already processed for session:', fullSession.id);
               } else {
                 const creditsToGrant = CREDIT_CONFIG.REFERRAL.REFERRER_CREDITS;
 
