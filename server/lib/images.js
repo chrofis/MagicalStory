@@ -2827,13 +2827,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
           bestMatch = { ...bestMatch, elementType: 'object', faceBox: null };
         }
       } else {
-        // Generic fallback: largest element in scene
-        const allWithArea = allElements.map(e => ({
-          element: e,
-          area: e.bodyBox ? (e.bodyBox[2] - e.bodyBox[0]) * (e.bodyBox[3] - e.bodyBox[1]) : 0
-        }));
-        allWithArea.sort((a, b) => b.area - a.area);
-        bestMatch = allWithArea[0]?.element;
+        // No match — skip this issue rather than targeting an unrelated element
+        log.debug(`📦 [BBOX-ENRICH] Issue "${(issue.description || '').substring(0, 60)}" — no matching element, skipping`);
       }
     }
 

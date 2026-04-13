@@ -79,9 +79,36 @@ async function validateFaceCropWithGemini(cropData) {
 }
 
 /**
+ * For every figure that has both faceBox and bodyBox, expand bodyBox to contain
+ * the faceBox. Gemini often places faceBox above bodyBox in illustrations.
+ * This runs after cascade merge (for cascade-improved figures) AND as a standalone
+ * fallback when cascade detection is unavailable.
+ */
+function ensureFaceInsideBody(figures) {
+  for (const fig of figures) {
+    const fb = fig.faceBox;
+    const bb = fig.bodyBox;
+    if (!fb || !Array.isArray(fb) || fb.length < 4) continue;
+    if (!bb || !Array.isArray(bb) || bb.length < 4) continue;
+
+    const [fymin, fxmin, fymax, fxmax] = fb;
+    const [bymin, bxmin, bymax, bxmax] = bb;
+
+    if (fymin < bymin || fxmin < bxmin || fymax > bymax || fxmax > bxmax) {
+      fig.bodyBox = [
+        Math.min(bymin, fymin),
+        Math.min(bxmin, fxmin),
+        Math.max(bymax, fymax),
+        Math.max(bxmax, fxmax),
+      ];
+      log.debug(`[BBOX-FIX] ${fig.name || fig.label}: expanded bodyBox to include faceBox`);
+    }
+  }
+}
+
+/**
  * Merge cascade-detected faces into Gemini bbox figures.
  * Replaces Gemini's unreliable faceBox with cascade face locations.
- * Adds new faces that Gemini missed entirely.
  * @param {Array} geminiFigures - figures from detectAllBoundingBoxes
  * @param {Array} cascadeFaces - faces from detectIllustrationFaces
  * @param {number} imgWidth - image width for normalization
@@ -173,6 +200,10 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
   if (unmatchedCount > 0) {
     log.debug(`[CASCADE-MERGE] ${unmatchedCount} unmatched cascade faces ignored (not adding as new figures)`);
   }
+
+  // Even for figures NOT improved by cascade, ensure bodyBox contains faceBox.
+  // Gemini often returns a faceBox above/outside the bodyBox for illustrations.
+  ensureFaceInsideBody(geminiFigures);
 
   return geminiFigures;
 }
@@ -928,6 +959,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     // Run cascade face detection to improve faceBox coordinates
     // Anime + Haar cascades are much more accurate than Gemini for locating faces in illustrations
     if (figures.length > 0) {
+      let cascadeRan = false;
       try {
         const cascadeFaces = await detectIllustrationFaces(imageData, 60);
         if (cascadeFaces.length > 0) {
@@ -940,6 +972,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           } catch { /* use defaults */ }
 
           figures = await mergeCascadeFacesWithGemini(figures, cascadeFaces, imgW, imgH);
+          cascadeRan = true;
           const cascadeImproved = figures.filter(f => f._cascadeFace).length;
           if (cascadeImproved > 0) {
             log.info(`🎯 [ENTITY-COLLECT] Page ${pageNumber}: Cascade improved ${cascadeImproved}/${figures.length} face boxes`);
@@ -947,6 +980,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         }
       } catch (err) {
         log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Cascade face detection skipped: ${err.message}`);
+      }
+      // Fallback: even without cascade, ensure bodyBox contains faceBox
+      if (!cascadeRan) {
+        ensureFaceInsideBody(figures);
       }
     }
 
