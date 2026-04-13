@@ -64,6 +64,10 @@ const TRIAL_COSTUMES = {
       male: "Tweed jacket, white shirt, brown trousers, polished shoes, magnifying glass on a chain",
       female: "Tweed blazer, white blouse, plaid skirt, polished shoes, magnifying glass on a chain"
     },
+    princess: {
+      male: "Royal blue velvet doublet with gold embroidery, white silk shirt, dark blue trousers, polished boots, thin gold circlet crown",
+      female: "Flowing pink and gold ball gown with puffy sleeves, satin gloves, sparkling tiara, delicate glass slippers"
+    },
     unicorn: {
       male: "Shimmering white tunic with rainbow trim, silver boots, crystal pendant, star-dusted cape",
       female: "Shimmering white dress with rainbow ribbons, silver shoes, crystal tiara, star-dusted cape"

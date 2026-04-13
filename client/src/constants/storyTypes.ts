@@ -88,7 +88,8 @@ export const adventureThemeGroups: AdventureThemeGroup[] = [
 export const storyTypes: StoryType[] = [
   // Historical Times
   { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️', group: 'historical' },
-  { id: 'knight', name: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & Princesse' }, emoji: '⚔️', group: 'historical' },
+  { id: 'knight', name: { en: 'Knights & Dragons', de: 'Ritter & Drachen', fr: 'Chevaliers & Dragons' }, emoji: '⚔️', group: 'historical' },
+  { id: 'princess', name: { en: 'Princess & Castle', de: 'Prinzessin & Schloss', fr: 'Princesse & Château' }, emoji: '👑', group: 'historical' },
   { id: 'cowboy', name: { en: 'Cowboys & Indians', de: 'Cowboys und Indianer', fr: 'Cowboys et Indiens' }, emoji: '🤠', group: 'historical' },
   { id: 'ninja', name: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret' }, emoji: '🥷', group: 'historical' },
   { id: 'viking', name: { en: 'Viking Adventure', de: 'Wikinger-Abenteuer', fr: 'Aventure Viking' }, emoji: '⚓', group: 'historical' },
