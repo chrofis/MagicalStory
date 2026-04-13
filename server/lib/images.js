@@ -650,6 +650,188 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
 }
 
 /**
+ * Three-stage image evaluation: vision inventory (flash-lite) + prompt compliance (Haiku).
+ * Stage 1 describes the image without seeing the prompt (unbiased).
+ * Stage 2 compares the vision inventory against the original prompt (text-only, no image).
+ * Returns a compliance score (0-100) and fixable issues, or null on failure.
+ *
+ * @param {string} imageData - Base64 encoded image with data URI prefix
+ * @param {string} imagePrompt - The prompt used to generate the image
+ * @param {string|null} sceneHint - Original scene description (may contain interaction metadata)
+ * @param {Object} options
+ * @param {string|null} options.qualityModelOverride - Override model for Stage 1 vision
+ * @param {string} options.pageContext - Page context for logging (e.g., "PAGE 5")
+ * @returns {Promise<Object|null>} Three-stage result or null on failure
+ */
+async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {}) {
+  const { qualityModelOverride = null, pageContext = '' } = options;
+  const pageLabel = pageContext ? `[${pageContext}] ` : '';
+
+  const visionPrompt = PROMPT_TEMPLATES.imageVisionInventory;
+  const complianceTemplate = PROMPT_TEMPLATES.imagePromptCompliance;
+
+  if (!visionPrompt || !complianceTemplate) {
+    log.warn(`[THREE-STAGE] ${pageLabel}Templates not loaded, skipping`);
+    return null;
+  }
+
+  // Extract interactions from sceneHint for Stage 2
+  let interactionsBlock = '(none declared)';
+  try {
+    const { extractSceneMetadata } = getStoryHelpers();
+    const meta = extractSceneMetadata(sceneHint || imagePrompt);
+    const interactions = meta?.interactions
+      || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
+    if (interactions && interactions.length > 0) {
+      interactionsBlock = interactions
+        .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
+        .join('\n');
+    }
+  } catch { /* silent */ }
+
+  // --- Stage 1: Vision inventory with flash-lite (WITH image, no prompt) ---
+  let visionText = null;
+  let stage1Usage = { input_tokens: 0, output_tokens: 0 };
+  try {
+    const visionModel = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash-lite';
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      log.warn(`[THREE-STAGE] ${pageLabel}No Gemini API key, skipping`);
+      return null;
+    }
+
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+
+    const parts = [
+      { inline_data: { mime_type: mimeType, data: base64Data } },
+      { text: visionPrompt }
+    ];
+
+    // Route to Grok vision for xAI models
+    const modelConfig = TEXT_MODELS[visionModel];
+    let response;
+    if (modelConfig?.provider === 'xai') {
+      response = await callGrokVisionAPI(visionModel, modelConfig.modelId || visionModel, parts, visionPrompt);
+    } else {
+      response = await withRetry(async () => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+            safetySettings: GEMINI_SAFETY_SETTINGS
+          })
+        });
+      }, { maxRetries: 2, baseDelay: 2000 });
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 API error: ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    stage1Usage = {
+      input_tokens: data.usageMetadata?.promptTokenCount || 0,
+      output_tokens: data.usageMetadata?.candidatesTokenCount || 0
+    };
+
+    if (isBlockedResponse(data)) {
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 blocked by safety filter`);
+      return null;
+    }
+
+    visionText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!visionText) {
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 returned no text`);
+      return null;
+    }
+
+    log.info(`[THREE-STAGE] ${pageLabel}Stage 1 vision inventory: ${visionText.length} chars`);
+  } catch (err) {
+    log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 failed: ${err.message}`);
+    return null;
+  }
+
+  // --- Stage 2: Prompt compliance with Haiku (text only, NO image) ---
+  let complianceResult = null;
+  let stage2Usage = { input_tokens: 0, output_tokens: 0 };
+  try {
+    const complianceInput = fillTemplate(complianceTemplate, {
+      ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
+      VISUAL_INVENTORY: visionText,
+      INTERACTIONS_BLOCK: interactionsBlock
+    });
+
+    const { callTextModel } = require('./textModels');
+    const haikuResult = await callTextModel(complianceInput, 4096, 'claude-haiku');
+
+    stage2Usage = {
+      input_tokens: haikuResult.usage?.input_tokens || 0,
+      output_tokens: haikuResult.usage?.output_tokens || 0
+    };
+
+    // Parse JSON from Haiku response
+    const parsed = getStoryHelpers().extractJsonFromText(haikuResult.text);
+    if (parsed && typeof parsed.score === 'number') {
+      complianceResult = parsed;
+    } else {
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 could not parse JSON from Haiku response`);
+      return null;
+    }
+
+    log.info(`[THREE-STAGE] ${pageLabel}Stage 2 compliance: score=${complianceResult.score}/10, verdict=${complianceResult.verdict || 'N/A'}`);
+  } catch (err) {
+    log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 failed: ${err.message}`);
+    return null;
+  }
+
+  // Parse fixable issues from compliance result
+  let fixableIssues = [];
+  if (Array.isArray(complianceResult.fixable_issues)) {
+    fixableIssues = complianceResult.fixable_issues
+      .filter(i => i.description)
+      .map(i => ({
+        description: i.description,
+        severity: i.severity || 'MODERATE',
+        type: i.type || 'default',
+        fix: i.fix || `Fix: ${i.description}`
+      }));
+  }
+
+  // Convert 0-10 score to 0-100
+  const score100 = complianceResult.score * 10;
+
+  // Issues summary
+  let issuesSummary = complianceResult.issues_summary || '';
+  if (Array.isArray(issuesSummary)) {
+    issuesSummary = issuesSummary.join('. ');
+  }
+
+  return {
+    score: score100,
+    rawScore: complianceResult.score,
+    verdict: complianceResult.verdict || 'UNKNOWN',
+    issuesSummary,
+    fixableIssues,
+    visionInventory: visionText,
+    complianceResult,
+    usage: {
+      threeStage_input_tokens: stage1Usage.input_tokens + stage2Usage.input_tokens,
+      threeStage_output_tokens: stage1Usage.output_tokens + stage2Usage.output_tokens,
+      stage1_input_tokens: stage1Usage.input_tokens,
+      stage1_output_tokens: stage1Usage.output_tokens,
+      stage2_input_tokens: stage2Usage.input_tokens,
+      stage2_output_tokens: stage2Usage.output_tokens
+    }
+  };
+}
+
+/**
  * Evaluate image quality using Gemini API (visual quality + optional semantic fidelity)
  * Sends the image to Gemini for quality assessment, with parallel semantic check when storyText provided
  * @param {string} imageData - Base64 encoded image with data URI prefix
@@ -739,6 +921,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const { evaluateSemanticFidelity } = require('./sceneValidator');
       semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt, sceneHint);
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
+    }
+
+    // Start three-stage eval in parallel for scene evaluations
+    let threeStagePromise = null;
+    if (evaluationType === 'scene') {
+      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, { qualityModelOverride, pageContext });
+      log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }
 
     // Extract base64 and mime type for generated image
@@ -1149,27 +1338,55 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
-      // Aggregate usage from quality + P1 + semantic evaluations
+      // Await three-stage eval and merge (use lower score)
+      let threeStageResult = null;
+      if (threeStagePromise) {
+        try {
+          threeStageResult = await threeStagePromise;
+          if (threeStageResult && threeStageResult.score < finalScore) {
+            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} < quality ${finalScore} — using three-stage score`);
+            finalScore = threeStageResult.score;
+            // Merge fixable issues
+            if (threeStageResult.fixableIssues?.length) {
+              fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
+            }
+            combinedIssuesSummary = threeStageResult.issuesSummary
+              ? (combinedIssuesSummary ? `${combinedIssuesSummary}; THREE-STAGE: ${threeStageResult.issuesSummary}` : `THREE-STAGE: ${threeStageResult.issuesSummary}`)
+              : combinedIssuesSummary;
+          } else if (threeStageResult) {
+            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} >= quality ${finalScore} — keeping quality score`);
+          }
+        } catch (tsErr) {
+          log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
+        }
+      }
+
+      // Aggregate usage from quality + P1 + semantic + three-stage evaluations
       const semanticUsage = semanticResult?.usage || {};
+      const threeStageUsage = threeStageResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0),
-        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
-        semantic_output_tokens: semanticUsage.output_tokens || 0
+        semantic_output_tokens: semanticUsage.output_tokens || 0,
+        threeStage_input_tokens: threeStageUsage.threeStage_input_tokens || 0,
+        threeStage_output_tokens: threeStageUsage.threeStage_output_tokens || 0
       };
 
       // SCORE NAMING CONVENTION (counterintuitive but intentional):
-      // - score:        FINAL penalized score = visual - semantic - entity penalties. Used for redo decisions.
+      // - score:        FINAL penalized score = visual - semantic - entity - three-stage penalties. Used for redo decisions.
       // - qualityScore: RAW visual quality score from Gemini eval only (before any penalties).
       // - semanticScore: Separate semantic fidelity score (0-100, null if not evaluated).
+      // - threeStageScore: Separate three-stage compliance score (0-100, null if not evaluated).
       // When writing to scene.qualityScore in DB, use evaluation.qualityScore (NOT evaluation.score).
       return {
         score: finalScore,                    // Combined final score
         qualityScore: score,                  // Visual quality score only
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
+        threeStageScore: threeStageResult?.score ?? null, // Three-stage compliance score (0-100)
         rawScore, // Original 0-10 score (visual only)
         verdict,
         reasoning,
@@ -1181,6 +1398,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         semanticResult,                   // Full semantic evaluation result (if available)
+        threeStageResult,                 // Full three-stage evaluation result (if available)
         usage: totalUsage,
         modelId: modelId
       };
@@ -1223,27 +1441,51 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // Await three-stage eval and merge (use lower score)
+      let threeStageResult = null;
+      if (threeStagePromise) {
+        try {
+          threeStageResult = await threeStagePromise;
+          if (threeStageResult && threeStageResult.score < finalScore) {
+            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} < quality ${finalScore} — using three-stage score`);
+            finalScore = threeStageResult.score;
+            issuesSummary = threeStageResult.issuesSummary
+              ? (issuesSummary ? `${issuesSummary}; THREE-STAGE: ${threeStageResult.issuesSummary}` : `THREE-STAGE: ${threeStageResult.issuesSummary}`)
+              : issuesSummary;
+          } else if (threeStageResult) {
+            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} >= quality ${finalScore} — keeping quality score`);
+          }
+        } catch (tsErr) {
+          log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
+        }
+      }
+
       // Aggregate usage
       const semanticUsage = semanticResult?.usage || {};
+      const threeStageUsage = threeStageResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0),
-        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
-        semantic_output_tokens: semanticUsage.output_tokens || 0
+        semantic_output_tokens: semanticUsage.output_tokens || 0,
+        threeStage_input_tokens: threeStageUsage.threeStage_input_tokens || 0,
+        threeStage_output_tokens: threeStageUsage.threeStage_output_tokens || 0
       };
 
       return {
         score: finalScore,                    // Combined final score
         qualityScore: qualityScore,           // Visual quality score only
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
+        threeStageScore: threeStageResult?.score ?? null, // Three-stage compliance score (0-100)
         reasoning,
         rawOutput: responseText,              // Full unparsed API response
         issuesSummary,
         fixTargets,
         semanticResult,
+        threeStageResult,
         usage: totalUsage,
         modelId: modelId
       };
@@ -1277,12 +1519,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Await parallel promises to prevent memory leak
     if (p1Promise) await p1Promise.catch(() => {});
     if (semanticPromise) await semanticPromise.catch(() => {});
+    if (threeStagePromise) await threeStagePromise.catch(() => {});
     return null;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
     // Await parallel promises to prevent memory leak
     if (p1Promise) await p1Promise.catch(() => {});
     if (semanticPromise) await semanticPromise.catch(() => {});
+    if (threeStagePromise) await threeStagePromise.catch(() => {});
     return null;
   }
 }

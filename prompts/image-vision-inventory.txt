@@ -1,0 +1,30 @@
+Describe exactly what you see in this illustration. No interpretation, no guessing what was intended — only what is visible.
+
+For EACH human figure:
+- Position in frame (left/center/right, foreground/midground/background)
+- Facing direction (toward viewer, away from viewer, left, right, toward another figure)
+- Hair color, length, style
+- Clothing: describe every visible garment with colors and type
+- What they are doing (action, pose)
+- What they hold in each hand (or nothing)
+- Expression (if face visible)
+- Approximate age group (child/teenager/adult/elderly)
+
+For EACH notable object, animal, or vehicle:
+- What it is
+- Position in frame
+- Is it grounded properly or floating?
+- Relative size
+
+Setting:
+- Indoor/outdoor
+- Key visual elements (architecture, landscape, weather)
+- Lighting direction and quality
+- Camera angle (low/eye-level/high, close/medium/wide)
+
+Physics check:
+- Does any figure have more than 2 arms or 2 legs?
+- Are all figures and objects grounded on surfaces (not floating)?
+- Any body parts merged, detached, or phasing through objects?
+
+Output as structured free text, not JSON. Be precise and factual.

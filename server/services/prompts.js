@@ -30,6 +30,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.imageGenerationStorybook = PROMPT_TEMPLATES.imageGeneration;
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageVisualInventory = await fs.readFile(path.join(promptsDir, 'image-visual-inventory.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageVisionInventory = await fs.readFile(path.join(promptsDir, 'image-vision-inventory.txt'), 'utf-8');
     PROMPT_TEMPLATES.imagePromptCompliance = await fs.readFile(path.join(promptsDir, 'image-prompt-compliance.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageSemantic = await fs.readFile(path.join(promptsDir, 'image-semantic.txt'), 'utf-8');
     PROMPT_TEMPLATES.coverImageEvaluation = await fs.readFile(path.join(promptsDir, 'cover-image-evaluation.txt'), 'utf-8');
