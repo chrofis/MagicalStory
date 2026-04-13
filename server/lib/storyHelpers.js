@@ -2350,7 +2350,12 @@ function buildCharacterPhysicalDescription(char) {
   if (face) {
     description += `, ${stripAgeWords(face)}`;
   }
-  // Add other physical traits (glasses, birthmarks, always-present accessories)
+  // Add glasses (dedicated field)
+  const glasses = physical.glasses;
+  if (glasses && glasses.toLowerCase() !== 'none') {
+    description += `. Glasses: ${glasses}`;
+  }
+  // Add other physical traits (birthmarks, always-present accessories)
   if (other && other !== 'none') {
     description += `, ${stripAgeWords(other)}`;
   }
@@ -2610,7 +2615,9 @@ function buildCharacterReferenceList(photos, characters = null) {
         : '',
       // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
       physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
-      // Distinguishing marks only (freckles, scars, moles, glasses).
+      // Glasses (dedicated field)
+      physical.glasses && physical.glasses.toLowerCase() !== 'none' ? `Glasses: ${physical.glasses}` : '',
+      // Distinguishing marks only (freckles, scars, moles, birthmarks).
       physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
       // Include clothing description from avatar if available
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
@@ -3804,7 +3811,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
           : '',
         // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
         physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
-        // Distinguishing marks only (freckles, scars, moles, glasses).
+        // Glasses (dedicated field)
+        physical.glasses && physical.glasses.toLowerCase() !== 'none' ? `Glasses: ${physical.glasses}` : '',
+        // Distinguishing marks only (freckles, scars, moles, birthmarks).
         physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
