@@ -1215,7 +1215,9 @@ export default function StoryWizard() {
                     // Keep existing imageData from fast load (correct active version)
                     // Only use full load's imageData if we don't have one yet
                     imageData: scene.imageData || img.imageData,
-                    imageVersions: mergedVersions
+                    imageVersions: mergedVersions,
+                    // Preserve activeVersion from the API (backend is authoritative)
+                    activeVersion: img.activeVersion ?? scene.activeVersion,
                   };
                 }));
               }
@@ -1246,6 +1248,7 @@ export default function StoryWizard() {
                       ...cover,
                       imageData: (existing as { imageData?: string })?.imageData || cover.imageData,
                       ...(mergedVersions ? { imageVersions: mergedVersions } : {}),
+                      activeVersion: cover.activeVersion ?? (existing as any)?.activeVersion,
                     } as any;
                   }
                 }

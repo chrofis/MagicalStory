@@ -458,7 +458,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               imageVersions: [],
-              activeVersionIndex: activeVersion  // Track which version is active
+              activeVersion: activeVersion  // Track which version is active
             });
           }
           // Add all versions (including version 0) to imageVersions array
@@ -2373,7 +2373,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
                   delete v.imageData;
                 }
               });
-              scene.activeVersionIndex = activeArrayIdx;
+              scene.activeVersion = activeArrayIdx;
             }
           }
         }
