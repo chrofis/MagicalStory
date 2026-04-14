@@ -2352,11 +2352,12 @@ function buildCharacterPhysicalDescription(char) {
   }
   // Add glasses (dedicated field)
   const glasses = physical.glasses;
-  if (glasses && glasses.toLowerCase() !== 'none') {
+  const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
+  if (glasses && !NONE_WORDS.has(glasses.toLowerCase().trim())) {
     description += `. Glasses: ${glasses}`;
   }
   // Add other physical traits (birthmarks, always-present accessories)
-  if (other && other !== 'none') {
+  if (other && !NONE_WORDS.has(String(other).toLowerCase().trim())) {
     description += `, ${stripAgeWords(other)}`;
   }
   if (clothing) {

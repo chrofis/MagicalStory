@@ -3685,6 +3685,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     skipCache = false,
     artStyle = 'watercolor',
     sceneBackground = null,
+    // Text area mask — black/white PNG telling the model where to keep calm
+    // space for text overlay. White region = calm/light, black = full detail.
+    // Used primarily by empty scene generation.
+    textAreaMask = null,
     // Output aspect ratio — defaults to MODEL_DEFAULTS.pageAspect (A4 portrait)
     // so callers that forget to pass one still get the configured page aspect.
     // Callers can override: avatars pass '9:16', covers pass MODEL_DEFAULTS.coverAspect.
@@ -3767,7 +3771,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
         { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '' }
       );
 
@@ -4813,16 +4817,16 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // splits per-character fixes from scene fixes.
   // ---------------------------------------------------------------------------
   const { consolidateFeedback } = require('./feedbackConsolidator');
+  // Pass full character objects so the consolidator can build authoritative
+  // physical descriptions (with glasses, facial hair, etc.) — which override
+  // any stale/incomplete scene descriptions or false eval flags.
   const consolidation = await consolidateFeedback({
     imageDataUri: imageData,
     sceneDescription,
     evaluation,
     entityReport,
     pageNumber,
-    characters: (characters || []).map(c => ({
-      name: c.name,
-      physicalDescription: c.physicalDescription || c.description || '',
-    })),
+    characters: characters || [],
   });
 
   // Decide the instruction to send Grok.

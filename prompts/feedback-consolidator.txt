@@ -8,21 +8,28 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 ## Rules
 
-1. Grok does NOT know character names. Never write "Roger" or "Verena" — always refer to people by visual identifier: "the tall man in the center holding a book", "the elderly woman with silver hair on the left".
+1. **The character profile is the absolute source of truth for appearance** — stronger than the scene description, stronger than any evaluator. Before including any appearance issue, cross-check the profile:
+   - Profile says `Glasses: schwarze Brille` → the character WEARS black glasses. If an eval says "remove glasses", DROP that issue — the eval was wrong because the scene description forgot to mention glasses. NEVER tell Grok to remove an accessory that's in the profile.
+   - Profile says `Hair: brown ponytail` → character has a ponytail. If the image shows short hair, it's an issue. If the eval says "cut the ponytail off", DROP that issue.
+   - Profile says `Facial hair: clean-shaven` → no beard. If image shows beard, it's an issue.
+   - Profile omits a trait (e.g. no Glasses field) → that trait should NOT appear in the image.
+   - Rule of thumb: if profile has trait X, the image MUST have trait X. Never instruct removal of profile-specified traits.
 
-2. Split every issue into one of two buckets:
+2. Grok does NOT know character names. Never write "Roger" or "Verena" in `fix_instruction` or `scene_fix.instruction` — always refer to people by visual identifier: "the tall man in the center holding a book", "the elderly woman with silver hair on the left".
+
+3. Split every issue into one of two buckets:
    - **per_character** — fixable only by swapping a character's appearance: hair, face, skin, eye color, glasses, clothing, facial hair. These require the character's reference avatar.
    - **scene** — fixable by editing the environment, objects, poses, gaze direction, lighting, sky, setting. No avatar needed.
 
-3. Deduplicate. If three evaluators all say "hair is wrong", consolidate into one entry.
+4. Deduplicate. If three evaluators all say "hair is wrong", consolidate into one entry.
 
-4. Drop contradictory or trivially minor issues. Explain each drop in `dropped_issues`.
+5. Drop contradictory or trivially minor issues AND drop issues that contradict the character profile. Explain each drop in `dropped_issues`.
 
-5. For per_character fixes, cite the character by their original name AND provide a `visual_identifier` that Grok can locate in the image.
+6. For per_character fixes, cite the character by their original name AND provide a `visual_identifier` that Grok can locate in the image.
 
-6. For scene fixes, write a single consolidated instruction. Reference characters by visual identifier only.
+7. For scene fixes, write a single consolidated instruction. Reference characters by visual identifier only.
 
-7. Use the detected figures' bboxes and positions to ground your visual identifiers. If bbox data is missing or wrong, describe the character from what you see in the image.
+8. Use the detected figures' bboxes and positions to ground your visual identifiers. If bbox data is missing or wrong, describe the character from what you see in the image.
 
 ## Output format (strict JSON, no prose)
 

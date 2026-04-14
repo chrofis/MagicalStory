@@ -14,7 +14,7 @@
 
 const { callTextModel } = require('./textModels');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
-const { extractJsonFromText } = require('./storyHelpers');
+const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
 
 /**
@@ -182,11 +182,21 @@ async function consolidateFeedback({
       entityIssues = entityIssues.filter(e => !e.pageNumbers || e.pageNumbers.includes(pageNumber));
     }
 
-    // Build compact character descriptions map
+    // Build character descriptions from the character profile (source of truth).
+    // Fall back to a pre-built description if provided. The character profile
+    // overrides stale scene descriptions — e.g. Roger HAS glasses per his profile,
+    // even if an older scene description omitted them.
     const characterDescriptions = {};
     for (const c of characters) {
       if (!c?.name) continue;
-      const desc = c.physicalDescription || c.description || '';
+      let desc = c.physicalDescription || c.description || '';
+      if (!desc) {
+        try {
+          desc = buildCharacterPhysicalDescription(c) || '';
+        } catch {
+          desc = '';
+        }
+      }
       if (desc) characterDescriptions[c.name] = desc;
     }
 
