@@ -2223,6 +2223,30 @@ Respond with ONLY the JSON.`;
       }
     }
 
+    // Cascade face merge — Gemini face boxes are often tight/cropped. The cascade
+    // detector (anime + haar) typically finds looser, better-centered faces. Merge
+    // them in before returning so every downstream consumer (character repair,
+    // masking, entity check) gets the improved box.
+    try {
+      const { detectIllustrationFaces, mergeCascadeFacesWithGemini } = require('./entityConsistency');
+      const cascadeFaces = await detectIllustrationFaces(imageData, 60);
+      if (cascadeFaces.length > 0) {
+        let imgW = 1024, imgH = 1024;
+        try {
+          const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+          imgW = meta.width || 1024;
+          imgH = meta.height || 1024;
+        } catch { /* use defaults */ }
+        finalFigures = await mergeCascadeFacesWithGemini(finalFigures, cascadeFaces, imgW, imgH);
+        const improved = finalFigures.filter(f => f._cascadeFace).length;
+        if (improved > 0) {
+          log.info(`🎯 [BBOX-DETECT] ${pageLabel}Cascade improved ${improved}/${finalFigures.length} face boxes`);
+        }
+      }
+    } catch (cascadeErr) {
+      log.debug(`[BBOX-DETECT] ${pageLabel}Cascade merge skipped: ${cascadeErr.message}`);
+    }
+
     // Compute found/missing objects from final results
     const foundObjects = finalObjects.filter(o => o.found).map(o => o.name);
     const missingObjects = finalObjects.filter(o => !o.found).map(o => o.name);

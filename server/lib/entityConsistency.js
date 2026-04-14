@@ -2841,6 +2841,8 @@ module.exports = {
   repairSinglePage,
 
   // Helper functions (exported for testing)
+  detectIllustrationFaces,
+  mergeCascadeFacesWithGemini,
   normalizeClothingCategory,
   groupAppearancesByClothing,
   collectEntityAppearances,
