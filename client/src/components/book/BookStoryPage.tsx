@@ -17,6 +17,8 @@ interface BookStoryPageProps {
   pageNumber: number;
   textPosition?: string | null;
   showTextOverlay: boolean;
+  /** When true, the text is shown on a separate facing page — don't render any text on the image. */
+  textOnSidePage?: boolean;
   overlayImage?: string | null;
   onImageClick?: (url: string) => void;
 }
@@ -26,13 +28,13 @@ interface BookStoryPageProps {
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, overlayImage, onImageClick }, ref) => {
+  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, textOnSidePage, overlayImage, onImageClick }, ref) => {
     const layout = getTextOverlayPosition(pageNumber, text, (textPosition || undefined) as TextPosition | undefined);
     const isFullWidth = layout.position.includes('full');
     const trimmedText = text.trim();
 
     return (
-      <div ref={ref} className="w-full h-full relative bg-white overflow-hidden">
+      <div ref={ref} className="w-full h-full relative bg-white overflow-hidden group">
         <img
           src={imageUrl}
           alt={`Page ${pageNumber}`}
@@ -69,8 +71,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           )
         )}
 
-        {/* Translucent strip — when overlay is off */}
-        {!showTextOverlay && trimmedText && (
+        {/* Translucent strip — when overlay is off AND text isn't shown on a facing page */}
+        {!showTextOverlay && !textOnSidePage && trimmedText && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent pt-8 pb-3 px-3">
             <p className="text-white text-xs leading-snug font-serif line-clamp-4 text-center">
               {trimmedText}
@@ -78,11 +80,11 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           </div>
         )}
 
-        {/* Fullscreen button */}
+        {/* Fullscreen button — top-center, only visible on hover so it doesn't block the page-flip corners */}
         {onImageClick && (
           <button
             onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-colors z-10"
+            className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
             aria-label="Fullscreen"
           >
             <Maximize2 size={14} />

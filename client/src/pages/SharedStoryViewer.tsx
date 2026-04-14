@@ -404,6 +404,7 @@ export default function SharedStoryViewer() {
             story={story}
             shareToken={shareToken!}
             showTextOverlay={showTextOverlay}
+            textOnSidePage={readingMode === 'sidepage'}
             onImageClick={(url) => setFullscreenImage(url)}
             onPageChange={setCurrentPage}
             onNavigate={(path) => navigate(path)}

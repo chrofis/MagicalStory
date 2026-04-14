@@ -13,7 +13,7 @@ interface BookCoverPageProps {
  */
 const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
   ({ imageUrl, alt, onImageClick }, ref) => (
-    <div ref={ref} className="w-full h-full relative bg-white">
+    <div ref={ref} className="w-full h-full relative bg-white group">
       <img
         src={imageUrl}
         alt={alt}
@@ -23,7 +23,7 @@ const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
       {onImageClick && (
         <button
           onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-colors z-10"
+          className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
           aria-label="Fullscreen"
         >
           <Maximize2 size={14} />

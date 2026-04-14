@@ -50,6 +50,8 @@ interface BookViewerProps {
   story: SharedStoryData;
   shareToken: string;
   showTextOverlay: boolean;
+  /** True when text is on a separate facing page (sidepage mode) — image pages should not show any text. */
+  textOnSidePage?: boolean;
   onImageClick: (url: string) => void;
   onPageChange: (pageIndex: number) => void;
   onNavigate: (path: string) => void;
@@ -67,7 +69,7 @@ BlankPage.displayName = 'BlankPage';
  * and maps PageEntry[] to the appropriate book page components.
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
-  ({ pageList, story, shareToken, showTextOverlay, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
@@ -185,6 +187,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 pageNumber={storyPage.pageNumber}
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay}
+                textOnSidePage={textOnSidePage}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
