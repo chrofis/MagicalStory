@@ -26,8 +26,14 @@ function normalizeName(name) {
 /**
  * Find names that appear in scene hints but aren't declared anywhere.
  *
+ * Checks every named-entity list in the Visual Bible — not just secondary
+ * characters. Animals (e.g. a dragon companion), vehicles, artifacts, and
+ * locations all have names that the scene generator can reference as
+ * characters in the metadata. Without checking these lists we duplicate
+ * a known animal as a phantom secondary character.
+ *
  * @param {Array} storyPages - Pages from the parser, each with `characterClothing`
- * @param {Object} visualBible - VB object with `secondaryCharacters`
+ * @param {Object} visualBible - VB object with named-entity lists
  * @param {Array} inputCharacters - User-provided main + primary characters
  * @returns {string[]} array of phantom names (original casing)
  */
@@ -36,8 +42,19 @@ function findPhantomNames(storyPages, visualBible, inputCharacters) {
   for (const c of (inputCharacters || [])) {
     if (c.name) known.add(normalizeName(c.name));
   }
-  for (const sc of (visualBible.secondaryCharacters || [])) {
-    if (sc.name) known.add(normalizeName(sc.name));
+  // Every Visual Bible list with named entities — anything Claude could
+  // reasonably reference by name in the scene metadata's `characters` array.
+  const vbLists = [
+    visualBible?.secondaryCharacters,
+    visualBible?.mainCharacters,  // may be empty in some pipelines, defensive
+    visualBible?.animals,         // dragons, pets, creatures
+    visualBible?.vehicles,        // named bikes, trains, ships
+    visualBible?.artifacts,       // named magical objects
+  ];
+  for (const list of vbLists) {
+    for (const entry of (list || [])) {
+      if (entry?.name) known.add(normalizeName(entry.name));
+    }
   }
 
   const phantoms = new Map(); // normalizedName -> originalName
