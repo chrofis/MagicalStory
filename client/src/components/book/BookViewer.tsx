@@ -220,12 +220,13 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       }
     }
 
-    // Parity: interior pages (everything between first and last) must be even.
-    // First child = front cover, last child = end page (or back cover).
-    // Interior = bookPages[1] through bookPages[length-2]
-    const interiorCount = bookPages.length - 2;
+    // Parity: with showCover=true, page 0 is the cover (alone), then pages 1+ pair up
+    // into spreads. The total interior page count (everything after the cover) must be
+    // even so every spread has both a left and right page. The end page sits naturally
+    // on the same spread as the back cover when the count is right.
+    const interiorCount = bookPages.length - 1;
     if (interiorCount > 0 && interiorCount % 2 !== 0) {
-      // Insert blank page before the last page
+      // Insert blank page before the last page so the last spread is complete
       bookPages.splice(bookPages.length - 1, 0, <BlankPage key="parity-blank" />);
     }
 
