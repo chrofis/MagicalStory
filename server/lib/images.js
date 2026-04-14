@@ -4773,15 +4773,21 @@ function chooseRepairStrategy(evaluation) {
  * @returns {Promise<{imageData: string|null, repaired: boolean, instruction: string|null, usage: Object|null}>}
  */
 async function inpaintPage(imageData, evaluation, options = {}) {
-  const { visualBible = null, characters = null } = options;
+  const {
+    visualBible = null,
+    characters = null,
+    entityReport = null,
+    pageNumber = null,
+    sceneDescription = '',
+  } = options;
 
-  // Collect quality issues
+  // Collect quality issues (legacy path)
   const qualityIssues = (evaluation.fixableIssues || []).map(i => ({
     description: i.description || i.issue || i,
     source: 'quality'
   }));
 
-  // Collect semantic issues
+  // Collect semantic issues (legacy path)
   const semanticIssues = (evaluation.semanticResult?.issues || evaluation.semanticResult?.semanticIssues || [])
     .map(si => ({
       description: si.problem || `${si.type}: ${si.item || ''}`,
@@ -4802,76 +4808,143 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     return { imageData: null, repaired: false, instruction: null, usage: null };
   }
 
-  // Find reference images for missing characters/animals from Visual Bible or character data
+  // ---------------------------------------------------------------------------
+  // NEW: Haiku consolidation — translates names to visual identifiers and
+  // splits per-character fixes from scene fixes.
+  // ---------------------------------------------------------------------------
+  const { consolidateFeedback } = require('./feedbackConsolidator');
+  const consolidation = await consolidateFeedback({
+    imageDataUri: imageData,
+    sceneDescription,
+    evaluation,
+    entityReport,
+    pageNumber,
+    characters: (characters || []).map(c => ({
+      name: c.name,
+      physicalDescription: c.physicalDescription || c.description || '',
+    })),
+  });
+
+  // Decide the instruction to send Grok.
+  // - If consolidator produced a plan: use scene_fix.instruction + attach avatars
+  //   of any character referenced in per_character_fixes (Grok now KNOWS who to fix).
+  // - Else fall back to the legacy concat instruction.
+  let editInstruction;
+  let consolidatedPlan = null;
   const referenceImages = [];
+  const referenceImageSources = [];
+
+  if (consolidation?.plan && !consolidation.error) {
+    consolidatedPlan = consolidation.plan;
+    const sceneInstr = consolidatedPlan.scene_fix?.instruction || '';
+    const perCharInstrs = (consolidatedPlan.per_character_fixes || [])
+      .map(p => `- For ${p.visual_identifier || 'a character'}: ${p.fix_instruction || (p.issues || []).join('; ')}`)
+      .filter(Boolean);
+
+    const parts = [];
+    if (sceneInstr) parts.push(sceneInstr);
+    if (perCharInstrs.length > 0) {
+      parts.push('Character adjustments:');
+      parts.push(...perCharInstrs);
+    }
+    editInstruction = parts.join('\n');
+
+    // Attach avatars for every character referenced in per_character_fixes
+    // — Grok needs a visual reference for appearance fixes.
+    if (characters && consolidatedPlan.per_character_fixes?.length > 0) {
+      for (const pcf of consolidatedPlan.per_character_fixes) {
+        const charName = (pcf.characterName || '').toLowerCase();
+        if (!charName) continue;
+        const mainChar = characters.find(c => c.name?.toLowerCase() === charName);
+        if (!mainChar) continue;
+        const avatar = mainChar.avatars?.standard || mainChar.avatars?.styledAvatars?.watercolor?.standard;
+        const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+          referenceImages.push(photoUrl);
+          referenceImageSources.push(`avatar:${mainChar.name}`);
+          log.info(`[INPAINT PAGE] Attaching avatar for ${mainChar.name} (Grok ref image)`);
+        }
+      }
+    }
+
+    log.info(`[INPAINT PAGE] Using consolidated plan: ${consolidatedPlan.per_character_fixes.length} per-char + scene=${consolidatedPlan.scene_fix?.severity || 'NONE'}, ${consolidatedPlan.dropped_issues?.length || 0} dropped`);
+  } else {
+    // Fallback: legacy concat
+    editInstruction = combinedIssues.map(i => i.description).filter(Boolean).join('. ');
+    log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), falling back to legacy instruction`);
+  }
+
+  // Find reference images for missing characters/animals from Visual Bible (still useful)
   const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
   for (const missing of missingItems) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
 
-    // Check VB animals (e.g., Funke the dragon)
     const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
     if (vbAnimal) {
       referenceImages.push(vbAnimal.referenceImageData);
+      referenceImageSources.push(`vb-animal:${missing.item}`);
       log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
       continue;
     }
-    // Check VB secondary characters
     const vbChar = visualBible?.secondaryCharacters?.find(c => c.name?.toLowerCase() === itemName && c.referenceImageData);
     if (vbChar) {
       referenceImages.push(vbChar.referenceImageData);
+      referenceImageSources.push(`vb-char:${missing.item}`);
       log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item}"`);
       continue;
     }
-    // Check VB artifacts
     const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
     if (vbArtifact) {
       referenceImages.push(vbArtifact.referenceImageData);
+      referenceImageSources.push(`vb-artifact:${missing.item}`);
       log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item}"`);
       continue;
     }
-    // Check main characters (by first name match)
     if (characters) {
       const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
       if (mainChar) {
         const avatar = mainChar.avatars?.standard || mainChar.avatars?.styledAvatars?.watercolor?.standard;
         const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
-        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image') && !referenceImages.includes(photoUrl)) {
           referenceImages.push(photoUrl);
+          referenceImageSources.push(`avatar-missing:${missing.item}`);
           log.info(`[INPAINT PAGE] Adding character avatar reference for missing "${missing.item}"`);
         }
       }
     }
   }
 
-  const editInstruction = combinedIssues
-    .map(i => i.description)
-    .filter(Boolean)
-    .join('. ');
+  if (!editInstruction || editInstruction.trim().length === 0) {
+    log.debug(`[INPAINT PAGE] Empty instruction after consolidation, skipping`);
+    return { imageData: null, repaired: false, instruction: null, consolidatedPlan, usage: null };
+  }
 
-  const fullInstruction = `Fix these issues in this children's book illustration: ${editInstruction}`;
-  log.info(`[INPAINT PAGE] Inpainting with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}, refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}`;
+  log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
     const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages);
     if (editResult?.imageData) {
-      // Validate: reject too-small or identical results
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
-        return { imageData: null, repaired: false, instruction: editInstruction, usage: editResult.usage };
+        return { imageData: null, repaired: false, instruction: editInstruction, consolidatedPlan, usage: editResult.usage };
       }
       return {
         imageData: editResult.imageData,
         repaired: true,
         instruction: editInstruction,
-        referenceImages, // VB/character refs sent to Grok
-        usage: editResult.usage
+        referenceImages,
+        referenceImageSources,
+        consolidatedPlan,
+        consolidatorUsage: consolidation?.usage || null,
+        usage: editResult.usage,
       };
     }
-    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, usage: null };
+    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, referenceImageSources, consolidatedPlan, usage: null };
   } catch (err) {
     log.error(`[INPAINT PAGE] Edit failed: ${err.message}`);
-    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, usage: null, error: err.message };
+    return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, referenceImageSources, consolidatedPlan, usage: null, error: err.message };
   }
 }
 
@@ -5181,6 +5254,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
+      entityReport: currentEntityReport,
+      pageNumber: img.pageNumber,
+      sceneDescription: img.sceneDescription || img.description || '',
     });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
@@ -5333,6 +5409,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 modelId: inpaintResult.usage?.model || 'grok-text-edit',
                 inpaintInstruction: inpaintResult.instruction,
                 inpaintReferenceImages: inpaintResult.referenceImages || null,
+                inpaintReferenceSources: inpaintResult.referenceImageSources || null,
+                consolidatedPlan: inpaintResult.consolidatedPlan || null,
                 grokRefImages: null,
               };
             }
@@ -5682,7 +5760,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       if (anyFixApplied) {
         const preFixScore = bestPerPage.get(pageNumber)?.score ?? 0;
-        charFixResults.set(pageNumber, { imageData: currentImageData, source: 'character-fix' });
+        // Capture the last repair's model info so the version record shows what was used
+        const lastFixChar = pageFixes[pageFixes.length - 1]?.charName;
+        const lastMethod = lastFixChar ? charFixDetails.get(lastFixChar)?.get(pageNumber)?.method : null;
+        const modelLabel = lastMethod ? `grok-imagine (${lastMethod})` : 'grok-imagine';
+        charFixResults.set(pageNumber, {
+          imageData: currentImageData,
+          source: 'character-fix',
+          modelId: modelLabel,
+          method: lastMethod || null,
+        });
         if (preFixScore >= 85) {
           log.info(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied to high-score page (pre-fix: ${preFixScore}%), monitor for quality regression`);
         } else {

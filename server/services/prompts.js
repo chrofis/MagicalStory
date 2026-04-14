@@ -98,6 +98,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.generatedImageAnalysis = await fs.readFile(path.join(promptsDir, 'generated-image-analysis.txt'), 'utf-8');
     // Empty scene template (for style-anchor background generation)
     PROMPT_TEMPLATES.emptyScene = await fs.readFile(path.join(promptsDir, 'empty-scene.txt'), 'utf-8');
+    // Feedback consolidator (Haiku) — splits per-character vs scene issues, translates names to visual identifiers
+    PROMPT_TEMPLATES.feedbackConsolidator = await fs.readFile(path.join(promptsDir, 'feedback-consolidator.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
