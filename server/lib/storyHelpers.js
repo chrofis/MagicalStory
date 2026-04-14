@@ -841,12 +841,11 @@ function extractSceneMetadata(sceneDescription) {
     for (const char of metadata.characters || []) {
       if (!char.name) continue;
       characterNames.push(char.name);
-      // Prose format dropped the `position` field, but downstream code (bbox
-      // detection, batch eval) iterates over `characterPositions` to know
-      // which characters are in the scene. We populate it with every character
-      // from metadata (empty string value if no position) so secondary
-      // characters like Visual Bible entries still flow into expectedCharacters.
-      characterPositions[char.name] = '';
+      // Read position from metadata if the scene expansion emitted it (e.g.
+      // "right foreground", "center background"). Falls back to empty string
+      // if absent — downstream code still iterates characterPositions to know
+      // which characters are in the scene, so we always include the key.
+      characterPositions[char.name] = typeof char.position === 'string' ? char.position.trim() : '';
       // Clothing normalization (same logic as JSON format)
       if (char.clothing) {
         const raw = char.clothing.toLowerCase();
