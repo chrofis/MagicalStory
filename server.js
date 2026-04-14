@@ -3398,7 +3398,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, visualBible }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
@@ -5257,7 +5257,12 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     if (byFunc.inpaint?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
+      // Grok/Runware bill per-image and report cost as direct_cost, not as tokens.
+      // Use direct_cost when present; fall back to token-based for Gemini.
+      const directCost = byFunc.inpaint.direct_cost || 0;
+      const cost = directCost > 0
+        ? { total: directCost }
+        : calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
       log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
     }
 

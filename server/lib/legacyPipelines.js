@@ -765,7 +765,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             // Use quality retry with labeled character photos (name + photoUrl)
             // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: streamingIncrConfig, sceneCharacters });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: streamingIncrConfig, sceneCharacters, visualBible });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -1459,7 +1459,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                 ...incrConfig,
                 currentCharacters: sceneCharacters.map(c => c.name)
               } : null;
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrConfigWithCurrentChars, sceneCharacters });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrConfigWithCurrentChars, sceneCharacters, visualBible });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -3160,7 +3160,7 @@ Output Format:
               try {
                 // Pass visualBibleGrid for combined reference (instead of individual VB element photos)
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: parallelPipelineIncrConfig, sceneCharacters });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: parallelPipelineIncrConfig, sceneCharacters, visualBible });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -3722,7 +3722,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
                 imageResult = await generateImageWithQualityRetry(
                   imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
-                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrementalConsistencyConfig, sceneCharacters }
+                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, incrementalConsistency: incrementalConsistencyConfig, sceneCharacters, visualBible }
                 );
               } catch (error) {
                 retries++;
@@ -4126,7 +4126,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     if (byFunc.inpaint.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
+      // Grok/Runware bill per-image and report cost as direct_cost, not as tokens.
+      const directCost = byFunc.inpaint.direct_cost || 0;
+      const cost = directCost > 0
+        ? { total: directCost }
+        : calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
       log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);

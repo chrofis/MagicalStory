@@ -219,6 +219,32 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
   }
 });
 
+// Normalize image to 3:4 portrait aspect for consistent display.
+// Repair pipeline sometimes outputs 1:1 squares for portrait pages, causing
+// inconsistent image sizes in the book viewer (squares letterbox top/bottom).
+async function normalizeToPortrait(imageBuffer) {
+  try {
+    const sharp = require('sharp');
+    const meta = await sharp(imageBuffer).metadata();
+    const TARGET_RATIO = 3 / 4; // width / height
+    const currentRatio = meta.width / meta.height;
+    // Within 5% of 3:4 → no-op
+    if (Math.abs(currentRatio - TARGET_RATIO) / TARGET_RATIO < 0.05) {
+      return imageBuffer;
+    }
+    // Pick output size based on existing dimensions
+    const targetHeight = Math.max(meta.height, Math.round(meta.width / TARGET_RATIO));
+    const targetWidth = Math.round(targetHeight * TARGET_RATIO);
+    return await sharp(imageBuffer)
+      .resize(targetWidth, targetHeight, { fit: 'cover', position: 'centre' })
+      .png()
+      .toBuffer();
+  } catch (err) {
+    log.warn(`[NORMALIZE] Failed to normalize image: ${err.message}`);
+    return imageBuffer;
+  }
+}
+
 // GET /api/shared/:shareToken/image/:pageNumber - Get shared story page image
 apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
   try {
@@ -239,7 +265,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     }
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-      const imageBuffer = Buffer.from(base64, 'base64');
+      const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
       res.set('Content-Type', 'image/png');
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
@@ -359,7 +385,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     const separateImage = await getStoryImage(storyId, coverType, null, activeVersionIdx);
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-      const imageBuffer = Buffer.from(base64, 'base64');
+      const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
       res.set('Content-Type', 'image/png');
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);

@@ -341,7 +341,12 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
 async function runEntityConsistencyChecks(storyData, characters = [], options = {}) {
   const {
     checkCharacters = true,
-    checkObjects = true,  // Enable object consistency checking
+    // Object/animal/artifact consistency disabled by default.
+    // Reasons: (a) bbox detection rarely returns reliable crops for small artifacts,
+    //         (b) characters who handle artifacts already drive the scene quality eval,
+    //         (c) noisy "0 valid crops" warnings without actionable repair output.
+    // Pass checkObjects:true explicitly only when investigating object continuity.
+    checkObjects = false,
     minAppearances = MIN_APPEARANCES,
     saveGrids = false,
     outputDir = null

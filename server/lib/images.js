@@ -6441,7 +6441,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground }
+      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground, visualBible: storyData?.visualBible || null }
     );
   }
 
@@ -7717,6 +7717,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // coverAspect / avatarAspect defaults inside callGeminiAPIForImage.
     // Used by iteratePage to preserve the scene's configured aspect across repairs.
     aspectRatio: aspectRatioOverride = null,
+    // Full Visual Bible — used to enrich bbox character descriptions when scene
+    // metadata references entities (animals, secondary characters) that aren't in
+    // sceneCharacters. Without this, e.g. a dragon "Floh" registered as ANI001
+    // gets sent to the bbox detector with no traits and is reported as UNKNOWN.
+    visualBible = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -8007,6 +8012,51 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     } else {
       // Fallback: parse minimal descriptions from prompt
       characterDescriptions = getStoryHelpers().parseCharacterDescriptions(currentPrompt);
+    }
+
+    // Enrich with Visual Bible entities (animals, secondary characters) that
+    // appear in the scene but aren't in sceneCharacters (which only has main
+    // input characters). Without this, e.g. a dragon "Floh" registered as ANI001
+    // is sent to the bbox detector with no description → returned as UNKNOWN
+    // → all evaluation issues mentioning Floh fail to match a character.
+    if (visualBible) {
+      const knownNames = new Set(Object.keys(characterDescriptions).map(n => n.toLowerCase()));
+      const expectedNames = Object.keys(expectedCharacterPositions || {});
+      for (const name of expectedNames) {
+        if (knownNames.has(name.toLowerCase())) continue;
+        // Search Visual Bible: secondary characters first, then animals.
+        // (Vehicles/artifacts go through the objects list, not characters.)
+        const vbLists = [
+          { list: visualBible.secondaryCharacters, kind: 'secondary character' },
+          { list: visualBible.animals, kind: 'creature' },
+        ];
+        let matched = null;
+        for (const { list, kind } of vbLists) {
+          if (!Array.isArray(list)) continue;
+          const entry = list.find(e => e?.name && e.name.toLowerCase() === name.toLowerCase());
+          if (entry) { matched = { entry, kind }; break; }
+        }
+        if (!matched) continue;
+
+        const e = matched.entry;
+        // Compose a compact rich description from VB fields (varies by entity type).
+        const parts = [];
+        if (e.species) parts.push(`Species: ${e.species}`);
+        if (e.size) parts.push(`Size: ${e.size}`);
+        if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
+        if (e.features) parts.push(`Features: ${e.features}`);
+        if (e.hair) parts.push(`Hair: ${e.hair}`);
+        if (e.face) parts.push(`Face: ${e.face}`);
+        if (e.signatureLook) parts.push(`Distinctive: ${e.signatureLook}`);
+        if (e.clothing) parts.push(`Wearing: ${e.clothing}`);
+        const baseDesc = e.description || parts.join('. ');
+        const rich = baseDesc
+          ? `${e.name} (${matched.kind}). ${baseDesc}`
+          : `${e.name} (${matched.kind})`;
+
+        characterDescriptions[e.name] = { richDescription: rich };
+        log.debug(`📦 [BBOX-PREP] ${pageLabel}Enriched bbox description for VB ${matched.kind} "${e.name}"`);
+      }
     }
 
     // Parse Visual Bible objects from prompt (REQUIRED OBJECTS section)
