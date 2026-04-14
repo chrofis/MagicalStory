@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye, EyeOff } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -37,9 +37,13 @@ interface SharedStoryData {
 type PageEntry =
   | { type: 'frontCover' }
   | { type: 'initialPage' }
+  | { type: 'storyText'; storyPageIdx: number }
   | { type: 'story'; storyPageIdx: number }
   | { type: 'backCover' }
   | { type: 'endPage' };
+
+/** Reading mode for the shared story view. */
+type ReadingMode = 'inline' | 'sidepage';
 
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
@@ -56,7 +60,8 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [showTextOverlay, setShowTextOverlay] = useState(true);
+  const [readingMode, setReadingMode] = useState<ReadingMode>('inline');
+  const showTextOverlay = readingMode === 'inline';
   const menuRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<BookViewerHandle>(null);
 
@@ -178,6 +183,10 @@ export default function SharedStoryViewer() {
     if (c.frontCover) list.push({ type: 'frontCover' });
     if (c.initialPage) list.push({ type: 'initialPage' });
     for (let i = 0; i < story.pages.length; i++) {
+      // sidepage mode: text on left page, image on right page (book spread)
+      if (readingMode === 'sidepage') {
+        list.push({ type: 'storyText', storyPageIdx: i });
+      }
       list.push({ type: 'story', storyPageIdx: i });
     }
     if (c.backCover) list.push({ type: 'backCover' });
@@ -194,7 +203,7 @@ export default function SharedStoryViewer() {
       const idx = currentPage + offset;
       if (idx < 0 || idx >= totalPages) continue;
       const entry = pageList[idx];
-      if (entry.type === 'endPage') continue;
+      if (entry.type === 'endPage' || entry.type === 'storyText') continue;
       const img = new Image();
       if (entry.type === 'story') {
         img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
@@ -437,15 +446,14 @@ export default function SharedStoryViewer() {
           <ChevronLeft className="w-6 h-6" />
         </button>
 
-        {/* Text overlay toggle — both mobile and desktop */}
+        {/* Reading mode toggle: inline (text on image, print preview) vs sidepage (text on facing page, easier reading) */}
         <button
-          onClick={() => setShowTextOverlay(!showTextOverlay)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-sm border border-indigo-200 ${
-            showTextOverlay ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400'
-          }`}
+          onClick={() => setReadingMode(readingMode === 'inline' ? 'sidepage' : 'inline')}
+          title={readingMode === 'inline' ? 'Switch to side-by-side reading' : 'Switch to print preview'}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-sm border border-indigo-200 bg-indigo-100 text-indigo-700"
         >
-          {showTextOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
-          {showTextOverlay ? 'Text on' : 'Text off'}
+          {readingMode === 'inline' ? <Eye size={13} /> : <BookOpen size={13} />}
+          {readingMode === 'inline' ? 'Print preview' : 'Read mode'}
         </button>
 
         {/* Page counter */}

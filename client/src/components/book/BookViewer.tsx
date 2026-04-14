@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback, useImperativeHandle } 
 import HTMLFlipBook from 'react-pageflip';
 import BookCoverPage from './BookCoverPage';
 import BookStoryPage from './BookStoryPage';
+import BookTextPage from './BookTextPage';
 import BookEndPage from './BookEndPage';
 import storyService from '@/services/storyService';
 
@@ -32,6 +33,7 @@ interface SharedStoryData {
 type PageEntry =
   | { type: 'frontCover' }
   | { type: 'initialPage' }
+  | { type: 'storyText'; storyPageIdx: number }
   | { type: 'story'; storyPageIdx: number }
   | { type: 'backCover' }
   | { type: 'endPage' };
@@ -159,6 +161,19 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             />
           );
           break;
+        case 'storyText': {
+          const storyPage = story.pages[entry.storyPageIdx];
+          if (storyPage) {
+            bookPages.push(
+              <BookTextPage
+                key={`text-${storyPage.pageNumber}`}
+                text={storyPage.text}
+                pageNumber={storyPage.pageNumber}
+              />
+            );
+          }
+          break;
+        }
         case 'story': {
           const storyPage = story.pages[entry.storyPageIdx];
           if (storyPage) {
