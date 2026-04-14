@@ -398,6 +398,7 @@ export default function SharedStoryViewer() {
         {/* Book viewer */}
         <div className="flex-1 max-w-5xl">
           <BookViewer
+            key={readingMode}
             ref={bookRef}
             pageList={pageList}
             story={story}
