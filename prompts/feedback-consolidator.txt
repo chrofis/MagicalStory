@@ -10,7 +10,7 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 1. **The character profile is the source of truth for appearance.** If an eval flags an appearance trait (glasses, hair, facial hair, etc.) as wrong, cross-check the profile before including the issue. When the profile specifies the trait the eval wants removed, drop the issue — the eval is comparing against an incomplete scene description. When the profile and the eval agree, include the issue.
 
-2. Grok does NOT know character names. Never write "Roger" or "Verena" in `fix_instruction` or `scene_fix.instruction` — always refer to people by visual identifier: "the tall man in the center holding a book", "the elderly woman with silver hair on the left".
+2. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center holding a book", "the elderly woman with silver hair"). Never write "Roger's body", "Werner's head", "Lukas's gaze" — write "the man's body", "the elderly man's head", "the boy's gaze", or refer back to the visual identifier already introduced. If you catch yourself typing a name, replace it before returning the JSON.
 
 3. Split every issue into one of two buckets:
    - **per_character** — fixable only by swapping a character's appearance: hair, face, skin, eye color, glasses, clothing, facial hair. These require the character's reference avatar.
@@ -26,24 +26,42 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 8. Use the detected figures' bboxes and positions to ground your visual identifiers. If bbox data is missing or wrong, describe the character from what you see in the image.
 
+9. **Observe the image first.** Record where each character, object, and landmark actually is before planning any fix. Don't copy spatial claims from the eval — verify them against the pixels.
+
+10. **Gaze/pose geometry must match the image.** If you write "look at X", verify the vector from the character's position to X's position in the image makes sense. A character with back view cannot look at something in front of the camera. A character on the left cannot look right-ward at an object that is also on the left.
+
+11. **Only name the deltas.** Don't re-describe elements that are already correct. The scene is already painted; your instruction lists only the changes.
+
+12. **No atmosphere padding.** No "ethereal", "charged with wonder", "bathed in warm light". The image model cannot render adjectives that don't map to visible pixels.
+
+13. **One change per sentence.** If three things need fixing, write three short sentences. Don't merge them into a prose paragraph.
+
 ## Output format (strict JSON, no prose)
 
 ```json
 {
   "per_character_fixes": [
     {
-      "characterName": "Roger",
-      "visual_identifier": "the tall man in the center holding the book",
+      "characterName": "Lukas",
+      "visual_identifier": "the slim boy with brown hair in the center foreground",
       "bbox": [ymin, xmin, ymax, xmax],
-      "severity": "CRITICAL | MAJOR | MODERATE | MINOR",
-      "issues": ["short summary of each issue"],
-      "fix_instruction": "Redraw this character: neck-length brown hair tied in a ponytail, clean-shaven face, no glasses. Keep pose, clothing, position."
+      "severity": "MAJOR",
+      "issues": ["head facing camera instead of the stone"],
+      "fix_instruction": "Rotate the head and torso downward, eyes looking at the stone in the hands."
+    },
+    {
+      "characterName": "Roger",
+      "visual_identifier": "the tall brown-haired man on the right",
+      "bbox": [ymin, xmin, ymax, xmax],
+      "severity": "MAJOR",
+      "issues": ["face turned toward camera"],
+      "fix_instruction": "Angle the head over the boy's shoulder, tilting face down toward the stone."
     }
   ],
   "scene_fix": {
-    "severity": "CRITICAL | MAJOR | MODERATE | MINOR | NONE",
-    "instruction": "Change the tower from a generic clock tower to a medieval stone archway with violet luminescence and a rotating gold star disc at the peak. Change the sky from daytime blue to spring evening with scattered clouds and visible stars. The man in the center holding the book must turn his head upward to gaze at the glowing tower instead of looking down at the book.",
-    "preserve": ["the positions of all characters", "the cobblestone street"]
+    "severity": "MODERATE",
+    "instruction": "Add blue-golden glow to the stone in the boy's hands, casting light on his face and chest.",
+    "preserve": ["character positions", "portal location", "cobblestone path"]
   },
   "dropped_issues": [
     {"issue": "hair color slightly too light", "reason": "trivial — quality score already acceptable on this"}

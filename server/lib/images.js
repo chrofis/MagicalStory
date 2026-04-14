@@ -4866,9 +4866,45 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 
   if (consolidation?.plan && !consolidation.error) {
     consolidatedPlan = consolidation.plan;
-    const sceneInstr = consolidatedPlan.scene_fix?.instruction || '';
+
+    // SAFETY NET — Haiku is told never to use character names in fix
+    // instructions, but sometimes slips "Werner's body" or "Lukas's gaze"
+    // into the text. Strip any main-character names and replace with the
+    // character's own visual identifier (from per_character_fixes). Falls
+    // back to "the character" for names not in the plan.
+    const characterNames = (characters || []).map(c => c?.name).filter(Boolean);
+    const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Per-name visual-identifier lookup from the consolidator plan.
+    const visualIdByName = new Map();
+    for (const pcf of (consolidatedPlan.per_character_fixes || [])) {
+      if (pcf?.characterName && pcf?.visual_identifier) {
+        visualIdByName.set(pcf.characterName.toLowerCase(), pcf.visual_identifier);
+      }
+    }
+    const stripNames = (text, ownVisualId) => {
+      if (!text || typeof text !== 'string' || characterNames.length === 0) return text;
+      let out = text;
+      for (const name of characterNames) {
+        // Prefer the per-name visual identifier, else the current entry's own
+        // identifier, else a neutral placeholder.
+        const vid = visualIdByName.get(name.toLowerCase()) || ownVisualId || 'the character';
+        const possRe = new RegExp(`\\b${escapeRe(name)}['’]s\\b`, 'g');
+        out = out.replace(possRe, `${vid}'s`);
+        const bareRe = new RegExp(`\\b${escapeRe(name)}\\b`, 'g');
+        out = out.replace(bareRe, vid);
+      }
+      return out.replace(/\s{2,}/g, ' ').trim();
+    };
+
+    const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
+    const sceneInstr = stripNames(sceneInstrRaw, null);
     const perCharInstrs = (consolidatedPlan.per_character_fixes || [])
-      .map(p => `- For ${p.visual_identifier || 'a character'}: ${p.fix_instruction || (p.issues || []).join('; ')}`)
+      .map(p => {
+        const visualId = p.visual_identifier || 'this character';
+        const fixRaw = p.fix_instruction || (p.issues || []).join('; ');
+        const fix = stripNames(fixRaw, visualId);
+        return `- For ${visualId}: ${fix}`;
+      })
       .filter(Boolean);
 
     const parts = [];
