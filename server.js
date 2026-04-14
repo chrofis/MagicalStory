@@ -4600,9 +4600,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
             const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
-            const emptyTextAreaInstr = textPos
-              ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.`
-              : '';
+            // Load pre-built text area mask (white=text zone, black=full detail).
+            // The model uses this as a visual reference — much more reliable than prompt text.
+            const { getTextAreaMask } = require('./server/lib/textMasks');
+            const textAreaMask = getTextAreaMask(textPos, langLevel);
+
+            const emptyTextAreaInstr = textAreaMask
+              ? `See the attached reference mask image: the WHITE region marks where story text will be placed — paint this region in lighter tones of the scene with gentle, minimal detail. The BLACK region gets full scene detail. Do not paint a literal white box; continue the scene softly into the white region.`
+              : (textPos
+                ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.`
+                : '');
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
@@ -4624,6 +4631,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: emptySceneVbGrid,
+                textAreaMask,
                 pageNumber: pageData.pageNumber,
                 skipCache: true
               });
@@ -4667,6 +4675,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     imageBackendOverride: pageData.pageImageBackend,
                     visualBibleGrid: emptySceneVbGrid,
                     landmarkPhotos: emptySceneLandmarks,
+                    textAreaMask,
                     pageContext: `empty-P${pageData.pageNumber}-retry`,
                   });
                   if (retryResult?.imageData) {
