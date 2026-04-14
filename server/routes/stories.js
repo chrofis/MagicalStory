@@ -431,8 +431,21 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               userInput: v.userInput,
               modelId: v.modelId,
               type: v.type,
+              source: v.source,
               createdAt: v.createdAt,
               bboxDetection: v.bboxDetection || null,
+              qualityReasoning: v.qualityReasoning || null,
+              issuesSummary: v.issuesSummary || null,
+              fixableIssues: v.fixableIssues || null,
+              fixTargets: v.fixTargets || null,
+              semanticScore: v.semanticScore ?? null,
+              semanticResult: v.semanticResult || null,
+              rawQualityScore: v.rawQualityScore ?? null,
+              entityPenalty: v.entityPenalty ?? null,
+              evaluatedAt: v.evaluatedAt || null,
+              grokRefImages: v.grokRefImages || null,
+              inpaintInstruction: v.inpaintInstruction || null,
+              inpaintReferenceImages: v.inpaintReferenceImages || null,
             })));
           }
         }
@@ -484,7 +497,20 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             userInput: versionMeta.userInput,
             modelId: versionMeta.modelId,
             type: versionMeta.type,
+            source: versionMeta.source,
             bboxDetection: versionMeta.bboxDetection || null,
+            qualityReasoning: versionMeta.qualityReasoning || null,
+            issuesSummary: versionMeta.issuesSummary || null,
+            fixableIssues: versionMeta.fixableIssues || null,
+            fixTargets: versionMeta.fixTargets || null,
+            semanticScore: versionMeta.semanticScore ?? null,
+            semanticResult: versionMeta.semanticResult || null,
+            rawQualityScore: versionMeta.rawQualityScore ?? null,
+            entityPenalty: versionMeta.entityPenalty ?? null,
+            evaluatedAt: versionMeta.evaluatedAt || null,
+            grokRefImages: versionMeta.grokRefImages || null,
+            inpaintInstruction: versionMeta.inpaintInstruction || null,
+            inpaintReferenceImages: versionMeta.inpaintReferenceImages || null,
           });
           // Update main qualityScore and bboxDetection to reflect the ACTIVE version
           if (isActiveVersion) {

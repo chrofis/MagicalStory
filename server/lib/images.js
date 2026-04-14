@@ -7536,7 +7536,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const prompt = `Fix the character at the ${regionDesc} of this illustration. Their face does not match the reference photo of ${charName}. Change their face, hair, and skin tone to match the reference exactly. The character is at approximately ${centerX}% from left, ${centerY}% from top, ${regionWidth}% wide, ${regionHeight}% tall. Keep the pose, background, art style, and all other characters unchanged.${issueContext}`;
 
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, imageData]);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, imageData], { aspectRatio: CONFIG_DEFAULTS.pageAspect });
 
     log.info(`✅ [CHAR REPAIR GROK] Full-scene repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
 
@@ -7563,8 +7563,9 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
+  const aspectRatio = CONFIG_DEFAULTS.pageAspect;
 
-  log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length})`);
+  log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length}, aspect: ${aspectRatio})`);
 
   // Build the editing prompt from template
   const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
@@ -7577,7 +7578,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     // Include the current image + any additional character/VB references
     const allRefs = [imageData, ...referenceImages].slice(0, 3); // Grok max 3 refs
     try {
-      const grokResult = await editWithGrok(editPrompt, allRefs, { model: modelConfig.modelId });
+      const grokResult = await editWithGrok(editPrompt, allRefs, { model: modelConfig.modelId, aspectRatio });
       log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
       return {
         imageData: grokResult.imageData,
@@ -7597,7 +7598,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
         if (sanitized !== editPrompt) {
           log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
           try {
-            const retryResult = await editWithGrok(sanitized, [imageData], { model: modelConfig.modelId });
+            const retryResult = await editWithGrok(sanitized, [imageData], { model: modelConfig.modelId, aspectRatio });
             log.info(`✅ [IMAGE EDIT] Sanitized retry succeeded via Grok`);
             return {
               imageData: retryResult.imageData,

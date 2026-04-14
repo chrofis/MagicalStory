@@ -143,6 +143,7 @@ SCENE HINT:
 - **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it!
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
+- **ACTION MATCHES TEXT** - The `description` must depict the same action the page text narrates.
 - **INDOOR SCENES** - Use "n/a" for weather
 - **OBJECTS** - List Visual Bible IDs of any locations, animals, artifacts, or vehicles visible in this scene. Omit if none.
 - **NO POINTING** - BANNED: "points at", "points to". Use: gazes at, walks toward, reaches for, discovers.
@@ -325,6 +326,7 @@ For EACH character in the story, write one line:
 12. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
 13. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
 14. **Banned patterns** — Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders"? Any character "smiling" on more than 2-3 pages?
+15. **Action match** — Does each scene hint's action match what the page text narrates?
 
 **Cliché check:**
 15. Repeated gestures — Same gesture (hug, smile, wink) used more than once? Vary them.

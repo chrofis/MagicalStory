@@ -44,6 +44,14 @@ For each DECLARED INTERACTION:
 
 ---
 
+**IGNORE** (do not deduct for these):
+- Exact object colors (lilac vs purple, crimson vs red) — only clothing type/category and fully wrong clothing colour matter.
+- Depth labels (foreground / midground / background).
+- Small position drift (left-of-center vs center).
+- Exact pose, gesture, or framing.
+
+---
+
 **STEP 4: SCORING (0-10)**
 
 Start at 10:
