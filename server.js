@@ -4662,7 +4662,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     TEXT_AREA_INSTRUCTION: softerTextInstr,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
-                    aspectRatio: CONFIG_DEFAULTS.pageAspect,
+                    aspectRatio: MODEL_DEFAULTS.pageAspect,
                     imageModelOverride: pageData.pageImageModel,
                     imageBackendOverride: pageData.pageImageBackend,
                     visualBibleGrid: emptySceneVbGrid,
