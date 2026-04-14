@@ -71,7 +71,9 @@ export default function SharedStoryViewer() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  // Auth token suffix for image URLs (img tags can't send Authorization headers)
+  // Auth token suffix for image URLs (img tags can't send Authorization headers).
+  // The fullscreen viewer receives URLs that already have ?token=... from BookViewer,
+  // so don't double-append. Only use this where we build URLs from scratch.
   const authToken = localStorage.getItem('auth_token');
   const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
 
@@ -392,7 +394,7 @@ export default function SharedStoryViewer() {
             story={story}
             shareToken={shareToken!}
             showTextOverlay={showTextOverlay}
-            onImageClick={(url) => setFullscreenImage(url + tokenParam)}
+            onImageClick={(url) => setFullscreenImage(url)}
             onPageChange={setCurrentPage}
             onNavigate={(path) => navigate(path)}
             onSetPassword={() => setShowChangePasswordModal(true)}
