@@ -4608,14 +4608,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptyTextAreaInstr = textAreaMask
               ? `TEXT SPACE: The attached mask shows where a soft, light, contour-free patch must exist in your output (look at the WHITE region). Story text will be printed there, so this area must be quiet and readable.
 
-Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs:
-- INDOOR scene → use this room's plain wall, ceiling, floor, rug, tablecloth, or window light
-- OUTDOOR scene → use sky, distant open ground, grass, calm water, snow, or mist
-- STREET scene → use this street's cobblestones, pavement, light building wall, or sky between buildings
+Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
+- OUTDOOR scene (field, hill, beach, garden, forest): use sky, distant open ground, smooth grass, calm water, snow, or soft mist — whichever already belongs in this outdoor setting
+- INDOOR scene (room, house, shop, kitchen, bedroom): use the SAME room's plain wall, ceiling, floor, rug, tablecloth, or window light — stay inside the room
+- STREET / urban scene: use the SAME street's cobblestones, pavement, a light-coloured building wall, or a small patch of sky visible between buildings — stay in the street
 
-The bright patch must be: soft, lightly coloured, NO sharp edges, NO detailed objects, NO characters, NO elements foreign to this setting. Continue the scene naturally — the patch is just the quietest part of what's already there.
+The bright patch should be: soft, lightly coloured, with smooth edges, gentle gradients, and minimal texture. Keep it free of objects, characters, and any element that doesn't belong to this setting. The patch is simply the quietest part of what's already there.
 
-DO NOT paint a literal white box, a cutout, or a watercolor splash. The rest of the image is for the main scene detail described above.`
+Blend the bright patch seamlessly into the surrounding scene — it should be the same surface or material as the rest, just lighter and simpler. Same wall continuing into a calmer section, same floor extending into a softer area, same sky becoming a lighter expanse. Painted with the same brush, palette, and style as the rest of the illustration. The remaining area carries the main scene detail described above.`
               : (textPos
                 ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Place a SOFT patch of whatever naturally belongs in this scene — for outdoor scenes use sky or open ground, for indoor scenes use a plain wall or floor, for streets use the pavement. NEVER invent elements foreign to the scene. Soft, minimal detail, no sharp lines, no characters. DO NOT paint a white box.`
                 : '');
