@@ -2445,6 +2445,17 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
            characterClothing?.[name.toLowerCase()] || '';
   };
 
+  // Category names that aren't actual wearable descriptions — these are internal
+  // metadata tags (e.g. "standard", "costumed:wizard") and must never leak into
+  // the detector prompt as if they were clothing.
+  const isCategoryLabel = (str) => {
+    if (!str || typeof str !== 'string') return false;
+    const s = str.trim().toLowerCase();
+    if (['standard', 'winter', 'summer', 'formal'].includes(s)) return true;
+    if (s.startsWith('costumed:')) return true;
+    return false;
+  };
+
   // First, add characters from characterDescriptions (which have age/gender info)
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
@@ -2453,26 +2464,36 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     // Resolve category names (standard/winter/summer/costumed:X) to actual descriptions
     let clothing = clothingCategory;
     if (desc.clothingDescriptions && clothingCategory) {
-      const category = clothingCategory.startsWith('costumed:') ? clothingCategory : clothingCategory;
-      if (desc.clothingDescriptions[category]) {
-        clothing = desc.clothingDescriptions[category];
+      if (desc.clothingDescriptions[clothingCategory]) {
+        clothing = desc.clothingDescriptions[clothingCategory];
       } else if (clothingCategory === 'standard' && desc.clothingDescriptions.standard) {
         clothing = desc.clothingDescriptions.standard;
       }
     }
-    // Don't show bare category names like "standard" — only show actual descriptions
-    if (clothing === 'standard' || clothing === 'winter' || clothing === 'summer') {
+    // Strip bare category labels — they're metadata tags, not wearable descriptions
+    if (isCategoryLabel(clothing)) {
       clothing = '';
     }
+
     let description;
     if (desc.richDescription) {
-      // Strip all age/gender language to neutralize for content-safety filters.
-      // The prompt only needs hair/clothing/build to identify figures by visual.
-      const sanitized = sanitizeForGemini(desc.richDescription, 'full');
-      description = clothing ? `${sanitized}. Wearing: ${clothing}` : sanitized;
+      // For bbox DETECTION (not image generation), Gemini's safety filter is not
+      // triggered by gender words — this is a text comprehension task on an
+      // already-rendered image. Keep "boy"/"girl"/"man"/"woman": crucial for
+      // disambiguating multiple characters. Only strip explicit numeric ages.
+      const sanitized = desc.richDescription
+        .replace(/\b\d+[-\s]?years?[-\s]?old\s+/gi, '')   // "7-year-old " → ""
+        .replace(/\bage[sd]?\s*\d+\b/gi, '')              // "aged 7" → ""
+        .replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').trim();
+      // Only append clothing as a separate clause if the richDescription doesn't
+      // already carry a "Wearing:" clause — otherwise we emit contradictory duplicates
+      // like "Wearing: striped hoodie. Wearing: costumed:wizard".
+      const alreadyHasWearing = /\bwearing\s*:/i.test(sanitized);
+      description = (clothing && !alreadyHasWearing) ? `${sanitized}. Wearing: ${clothing}` : sanitized;
     } else {
-      // Minimal description from prompt parsing — drop age/gender entirely
-      const descParts = ['figure'];
+      // Minimal description from prompt parsing — keep "character" placeholder
+      // rather than "figure" (less likely to confuse the detector as a typo).
+      const descParts = ['character'];
       if (clothing) descParts.push(clothing);
       description = descParts.join(', ');
     }
@@ -2484,19 +2505,24 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     addedNames.add(name.toLowerCase());
   }
 
-  // Then, add any characters from expectedPositions that weren't in characterDescriptions
-  // These are characters that appear in the scene but didn't have parsed descriptions
+  // Then, add any characters from expectedPositions that weren't in characterDescriptions.
+  // Skip Visual-Bible IDs (e.g. "CHR001") entirely — they have no descriptive traits
+  // for the detector and just add noise ("figure, costumed:wizard" is unmatchable).
   for (const [name, position] of Object.entries(expectedPositions || {})) {
-    if (!addedNames.has(name.toLowerCase())) {
-      const clothing = getClothing(name);
-      chars.push({
-        name,
-        description: clothing || 'character',  // Use clothing if available, else fallback
-        position
-      });
-      addedNames.add(name.toLowerCase());
-      log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (clothing: ${clothing || 'none'})`);
+    if (addedNames.has(name.toLowerCase())) continue;
+    if (/^(CHR|LOC|ANI|VEH|ART|OBJ)\d+$/i.test(name)) {
+      log.debug(`📦 [BBOX-BUILD] Skipping VB-id "${name}" — no descriptive traits available`);
+      continue;
     }
+    let clothing = getClothing(name);
+    if (isCategoryLabel(clothing)) clothing = '';
+    chars.push({
+      name,
+      description: clothing || 'character',
+      position
+    });
+    addedNames.add(name.toLowerCase());
+    log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (clothing: ${clothing || 'none'})`);
   }
 
   return chars;
