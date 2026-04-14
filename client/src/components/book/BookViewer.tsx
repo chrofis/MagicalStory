@@ -56,7 +56,7 @@ interface BookViewerProps {
 
 /** Blank white page — used to keep interior page count even for spread pairing. */
 const BlankPage = React.forwardRef<HTMLDivElement>((_, ref) => (
-  <div ref={ref} className="w-full h-full bg-white" data-density="hard" />
+  <div ref={ref} className="w-full h-full bg-white" />
 ));
 BlankPage.displayName = 'BlankPage';
 

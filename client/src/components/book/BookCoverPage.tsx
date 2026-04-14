@@ -13,7 +13,7 @@ interface BookCoverPageProps {
  */
 const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
   ({ imageUrl, alt, onImageClick }, ref) => (
-    <div ref={ref} className="w-full h-full relative bg-white" data-density="hard">
+    <div ref={ref} className="w-full h-full relative bg-white">
       <img
         src={imageUrl}
         alt={alt}
