@@ -2038,9 +2038,12 @@ export const storyService = {
 
   // Text overlay for shared stories (no auth required)
   async getSharedTextOverlay(shareToken: string, pageNumber: number, text?: string): Promise<{ overlayImage: string }> {
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`/api/shared/${shareToken}/text-overlay/${pageNumber}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(text ? { text } : {}),
     });
     if (!response.ok) throw new Error('Failed to get text overlay');

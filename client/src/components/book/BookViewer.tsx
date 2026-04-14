@@ -121,11 +121,16 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showTextOverlay, shareToken, story.pages?.length]);
 
-    // Build image URL helpers
+    // Build image URL helpers — append auth token as query param so owners
+    // can view their own private (unshared) stories. <img> tags can't send
+    // Authorization headers, so we use the ?token= query param fallback that
+    // the optionalAuth middleware supports.
+    const authToken = localStorage.getItem('auth_token');
+    const tokenQuery = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
     const coverImageUrl = (type: string) =>
-      `/api/shared/${shareToken}/cover-image/${type}`;
+      `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}`;
     const pageImageUrl = (pageNum: number) =>
-      `/api/shared/${shareToken}/image/${pageNum}`;
+      `/api/shared/${shareToken}/image/${pageNum}${tokenQuery}`;
 
     // Build the page components list
     const bookPages: React.ReactNode[] = [];
