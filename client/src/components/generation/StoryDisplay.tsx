@@ -4905,8 +4905,8 @@ export function StoryDisplay({
                                             updated[idx] = { ...updated[idx], fixPrompt: e.target.value };
                                             setRepairPanel({ ...repairPanel, fixTargets: updated });
                                           }}
-                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                          rows={2}
+                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-amber-400 focus:border-amber-400 min-h-[140px] resize-y leading-snug"
+                                          rows={6}
                                         />
                                         <div className="text-[10px] text-gray-400 font-mono">
                                           bbox: [{target.boundingBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
@@ -5569,8 +5569,8 @@ export function StoryDisplay({
                                             updated[idx] = { ...updated[idx], fixPrompt: e.target.value };
                                             setRepairPanel({ ...repairPanel, fixTargets: updated });
                                           }}
-                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                          rows={2}
+                                          className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-amber-400 focus:border-amber-400 min-h-[140px] resize-y leading-snug"
+                                          rows={6}
                                         />
                                         <div className="text-[10px] text-gray-400 font-mono">
                                           bbox: [{target.boundingBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
