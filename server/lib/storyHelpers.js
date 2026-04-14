@@ -2294,77 +2294,139 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
     .filter(info => info.hasPhoto);
 }
 
+// ============================================================================
+// Character visual profile — single source of truth
+// ----------------------------------------------------------------------------
+// Historically we had four copy-pasted description builders (image prompt,
+// cover reference list, scene expansion, feedback validation). Each one read
+// the same physical fields but formatted them differently, and adding/fixing
+// a field (e.g. glasses) meant four edits. Now:
+//
+//   getPhysicalFromChar(char)
+//      ↓
+//   extractCharacterVisualProfile(char, opts)   ← one canonical data shape
+//      ↓
+//   buildLabeledPhysicalParts(profile, opts)    ← one formatter that emits
+//                                                  "Label: value" parts
+//      ↓
+//   thin public wrappers join the parts differently (prose / numbered /
+//   [Name]: markdown) for their caller's context.
+// ============================================================================
+
+// Synonyms for "no / none / absent" across the languages our users type in.
+const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
+const isNone = (v) => !v || NONE_WORDS.has(String(v).toLowerCase().trim());
+
 /**
- * Build a physical description of a character for image generation
- * Only includes visual attributes, not psychological traits
+ * Extract a canonical visual profile from a character object. This is the
+ * ONE place that knows which fields to read. Adding a new visual trait means
+ * a single line here — all downstream formatters pick it up automatically.
+ *
  * @param {Object} char - Character object
- * @returns {string} Physical description string
+ * @param {Object} [options]
+ * @param {string} [options.clothingOverride] - Pre-resolved clothing string (e.g. from avatar photo eval)
+ * @returns {Object} Normalized visual profile
+ */
+function extractCharacterVisualProfile(char, options = {}) {
+  if (!char || typeof char !== 'object') char = {};
+  const physical = getPhysicalFromChar(char) || {};
+  const numericAge = parseInt(char.age);
+  const resolvedAge = Number.isFinite(numericAge) ? numericAge : null;
+  const ageCategory = physical.apparentAge || char.ageCategory ||
+    (resolvedAge != null ? getAgeCategory(resolvedAge) : null);
+
+  return {
+    name: char.name,
+    gender: char.gender,
+    numericAge: resolvedAge,
+    ageCategory,
+    ageMarkers: ageCategory ? getAgeMarkers(ageCategory) : '',
+    genderTerm: getGenderTerm(char.gender, ageCategory),
+    height: char.height || char.physical?.height || null,
+    build: physical.build || char.physical?.build || null,
+    eyeColor: physical.eyeColor || null,
+    hair: buildHairDescription(physical, char.physicalTraitsSource) || null,
+    facialHair: physical.facialHair || char.physical?.facialHair || null,
+    face: physical.face || char.physical?.face || char.otherFeatures || null,
+    glasses: physical.glasses || null,
+    other: physical.other || char.physical?.other || null,
+    clothing: options.clothingOverride ||
+      char.clothing?.current ||
+      (typeof char.clothing === 'string' ? char.clothing : null),
+    clothingStyle: char.clothingStyle || char.clothing_style || char.clothing?.style ||
+      char.clothingColors || char.clothing_colors || char.clothing?.colors || null,
+  };
+}
+
+/**
+ * Build the shared labeled-parts array used by numbered-list and
+ * [Name]: markdown formatters. Returns an array of "Label: value" strings
+ * with "none"-synonyms filtered out and age-word cleanup applied.
+ *
+ * @param {Object} profile - result of extractCharacterVisualProfile
+ * @param {Object} [options]
+ * @param {boolean} [options.includeEyeColor=true]
+ * @param {boolean} [options.includeAgeMarkers=true]
+ * @param {string}  [options.clothingLabel='Wearing']
+ * @returns {string[]}
+ */
+function buildLabeledPhysicalParts(profile, options = {}) {
+  const { includeEyeColor = true, includeAgeMarkers = true, clothingLabel = 'Wearing' } = options;
+  const parts = [];
+
+  if (profile.build) parts.push(`Build: ${profile.build}`);
+  if (includeAgeMarkers && profile.ageMarkers) parts.push(`Age cues: ${profile.ageMarkers}`);
+  if (includeEyeColor && profile.eyeColor) parts.push(`Eyes: ${profile.eyeColor}`);
+  if (profile.hair) parts.push(`Hair: ${profile.hair}`);
+
+  if (profile.gender === 'male' && !isNone(profile.facialHair)) {
+    parts.push(profile.facialHair.toLowerCase() === 'clean-shaven'
+      ? 'Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
+      : `Facial hair: ${profile.facialHair}`);
+  }
+
+  if (!isNone(profile.face)) parts.push(`Face: ${stripAgeWords(profile.face)}`);
+  if (!isNone(profile.glasses)) parts.push(`Glasses: ${profile.glasses}`);
+  if (!isNone(profile.other)) parts.push(`Distinctive marks: ${stripAgeWords(profile.other)}`);
+
+  if (profile.clothing) parts.push(`${clothingLabel}: ${profile.clothing}`);
+  else if (profile.clothingStyle) parts.push(`Clothing style: ${profile.clothingStyle}`);
+
+  return parts;
+}
+
+/**
+ * Build a prose physical description of a character (used for simple
+ * validation / feedback text, NOT for image prompts).
+ * Format: "Name is a {age}-year-old {noun}, {height}cm tall, {build} build. Hair: ... ."
+ *
+ * @param {Object} char - Character object
+ * @returns {string} Prose description
  */
 function buildCharacterPhysicalDescription(char) {
-  const age = parseInt(char.age) || 10;
-  const gender = char.gender || 'child';
+  const p = extractCharacterVisualProfile(char);
+  const age = p.numericAge ?? 10;
+  const gender = p.gender || 'child';
+  const genderLabel = gender === 'male'
+    ? (age >= 18 ? 'man' : 'boy')
+    : gender === 'female'
+      ? (age >= 18 ? 'woman' : 'girl')
+      : (age >= 18 ? 'person' : 'child');
 
-  // Use age-appropriate gender labels
-  let genderLabel;
-  if (gender === 'male') {
-    genderLabel = age >= 18 ? 'man' : 'boy';
-  } else if (gender === 'female') {
-    genderLabel = age >= 18 ? 'woman' : 'girl';
-  } else {
-    genderLabel = age >= 18 ? 'person' : 'child';
+  let s = `${p.name} is a ${age}-year-old ${genderLabel}`;
+  if (p.height) s += `, ${p.height} cm tall`;
+  if (p.build) s += `, ${p.build} build`;
+  if (p.hair) s += `. Hair: ${p.hair}`;
+  if (p.gender === 'male' && !isNone(p.facialHair)) {
+    s += p.facialHair.toLowerCase() === 'clean-shaven'
+      ? '. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
+      : `. Facial hair: ${p.facialHair}`;
   }
-
-  let description = `${char.name} is a ${age}-year-old ${genderLabel}`;
-
-  // Build physical object from flat snake_case fields (how avatar generation saves traits)
-  const physical = getPhysicalFromChar(char);
-
-  // Support both new flat fields and legacy structures for height/clothing
-  const height = char.height || char.physical?.height;
-  const build = physical.build || char.physical?.build;
-  const face = char.physical?.face || char.otherFeatures;
-  const other = physical.other || char.physical?.other;
-  const clothing = char.clothing?.current || char.clothing;
-
-  if (height) {
-    description += `, ${height} cm tall`;
-  }
-  if (build) {
-    description += `, ${build} build`;
-  }
-
-  // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-  const hairDesc = buildHairDescription(physical, char.physicalTraitsSource);
-  if (hairDesc) {
-    description += `. Hair: ${hairDesc}`;
-  }
-  // Facial hair for males (skip if "none")
-  const facialHair = physical.facialHair || char.physical?.facialHair;
-  if (gender === 'male' && facialHair && facialHair.toLowerCase() !== 'none') {
-    if (facialHair.toLowerCase() === 'clean-shaven') {
-      description += `. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`;
-    } else {
-      description += `. Facial hair: ${facialHair}`;
-    }
-  }
-  if (face) {
-    description += `, ${stripAgeWords(face)}`;
-  }
-  // Add glasses (dedicated field)
-  const glasses = physical.glasses;
-  const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
-  if (glasses && !NONE_WORDS.has(glasses.toLowerCase().trim())) {
-    description += `. Glasses: ${glasses}`;
-  }
-  // Add other physical traits (birthmarks, always-present accessories)
-  if (other && !NONE_WORDS.has(String(other).toLowerCase().trim())) {
-    description += `, ${stripAgeWords(other)}`;
-  }
-  if (clothing) {
-    description += `. Wearing: ${clothing}`;
-  }
-
-  return description;
+  if (!isNone(p.face)) s += `, ${stripAgeWords(p.face)}`;
+  if (!isNone(p.glasses)) s += `. Glasses: ${p.glasses}`;
+  if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
+  if (p.clothing) s += `. Wearing: ${p.clothing}`;
+  return s;
 }
 
 /**
@@ -2456,35 +2518,10 @@ function estimateHeightFromAgeGender(char) {
  * @returns {string} Formatted line: "1. Lukas, Looks: school-age, boy, Build: slim. Age cues: ..."
  */
 function buildCharacterDescriptionForExpansion(char, clothingDescription, index) {
-  const physical = getPhysicalFromChar(char);
-  const visualAge = physical.apparentAge ? `Looks: ${physical.apparentAge.replace(/-/g, ' ')}` : '';
-  const ageMarkersText = getAgeMarkers(physical.apparentAge);
-  const gender = getGenderTerm(char.gender, physical.apparentAge);
-  const clothingStyle = char.clothingStyle || char.clothing_style || char.clothing?.style || char.clothingColors || char.clothing_colors || char.clothing?.colors;
-  const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
-  const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
-
-  const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
-  const isNone = (v) => !v || NONE_WORDS.has(String(v).toLowerCase().trim());
-  const physicalParts = [
-    physical.build ? `Build: ${physical.build}` : '',
-    ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
-    physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
-    hairDesc,
-    char.gender === 'male' && !isNone(physical.facialHair)
-      ? (physical.facialHair.toLowerCase() === 'clean-shaven'
-        ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
-        : `Facial hair: ${physical.facialHair}`)
-      : '',
-    !isNone(physical.face) ? `Face: ${stripAgeWords(physical.face)}` : '',
-    // Glasses (dedicated field) — was missing, causing scene descriptions to
-    // omit glasses for characters whose profile has them.
-    !isNone(physical.glasses) ? `Glasses: ${physical.glasses}` : '',
-    !isNone(physical.other) ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
-    clothingDescription ? `Wearing: ${clothingDescription}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
-  ].filter(Boolean);
-  const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-  const brief = [char.name, visualAge, gender, physicalDesc].filter(Boolean).join(', ');
+  const p = extractCharacterVisualProfile(char, { clothingOverride: clothingDescription });
+  const visualAge = p.ageCategory ? `Looks: ${p.ageCategory.replace(/-/g, ' ')}` : '';
+  const parts = buildLabeledPhysicalParts(p);
+  const brief = [p.name, visualAge, p.genderTerm, parts.join('. ')].filter(Boolean).join(', ');
   return `${index}. ${brief}`;
 }
 
@@ -2553,94 +2590,21 @@ function buildRelativeHeightDescription(characters) {
 function buildCharacterReferenceList(photos, characters = null) {
   if (!photos || photos.length === 0) return '';
 
-  // Age-specific gender term based on apparentAge
-  const getGenderTerm = (gender, apparentAge) => {
-    if (!gender || gender === 'other') return '';
-    const isMale = gender === 'male';
-    switch (apparentAge) {
-      case 'infant':
-        return isMale ? 'baby boy' : 'baby girl';
-      case 'toddler':
-      case 'preschooler':
-      case 'kindergartner':
-        return isMale ? 'little boy' : 'little girl';
-      case 'young-school-age':
-      case 'school-age':
-        return isMale ? 'boy' : 'girl';
-      case 'preteen':
-        // 11-12: still a child, NOT a teenager. Emitting "teenage girl" here
-        // used to contradict apparentAge="preteen" and confused image models.
-        return isMale ? 'boy' : 'girl';
-      case 'young-teen':
-        return isMale ? 'young teen boy' : 'young teen girl';
-      case 'teenager':
-        return isMale ? 'teenage boy' : 'teenage girl';
-      case 'young-adult':
-        return isMale ? 'young man' : 'young woman';
-      case 'adult':
-      case 'middle-aged':
-        return isMale ? 'man' : 'woman';
-      case 'senior':
-      case 'elderly':
-        return isMale ? 'elderly man' : 'elderly woman';
-      default:
-        return isMale ? 'boy/man' : 'girl/woman';
-    }
-  };
-
-  const charDescriptions = photos.map((photo, index) => {
-    // Find the original character to get full physical description
-    const char = characters?.find(c => c.name === photo.name);
-
-    // Build physical object from flat snake_case fields (how avatar generation saves traits)
-    const physical = getPhysicalFromChar(char);
-
-    // Visual age category (how old they look) — skip numeric age, category is enough
-    const effectiveAgeCategory = physical.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
-    const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
-    const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
-    // Concrete physical age markers (not just the category label) so mixed-age
-    // casts render at the right ages — the single "Looks: teenager" tag is too
-    // weak a signal for image models when the art style skews young.
-    const ageMarkersText = getAgeMarkers(effectiveAgeCategory);
-
-    // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-    const hairDescText = buildHairDescription(physical, char?.physicalTraitsSource);
-    const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
-
-    const physicalParts = [
-      physical.build ? `Build: ${physical.build}` : '',
-      ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
-      physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
-      hairDesc,
-      // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
-      char?.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
-        ? (physical.facialHair.toLowerCase() === 'clean-shaven'
-          ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
-          : `Facial hair: ${physical.facialHair}`)
-        : '',
-      // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
-      physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
-      // Glasses (dedicated field)
-      physical.glasses && physical.glasses.toLowerCase() !== 'none' ? `Glasses: ${physical.glasses}` : '',
-      // Distinguishing marks only (freckles, scars, moles, birthmarks).
-      physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
-      // Include clothing description from avatar if available
-      photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
-    ].filter(Boolean);
-    const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-    // Format: [Name] to match the label we put before each image in parts array
-    // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
-    const description = [visualAge, gender, physicalDesc].filter(Boolean).join(', ');
+  const charDescriptions = photos.map(photo => {
+    const char = characters?.find(c => c.name === photo.name) || { name: photo.name };
+    const p = extractCharacterVisualProfile(char, { clothingOverride: photo.clothingDescription });
+    const visualAge = p.ageCategory ? `Looks: ${p.ageCategory.replace(/-/g, ' ')}` : '';
+    const parts = buildLabeledPhysicalParts(p);
+    // Format: [Name] to match the label we put before each image in parts array.
+    // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation.
+    const description = [visualAge, p.genderTerm, parts.join('. ')].filter(Boolean).join(', ');
     return `[${photo.name}]: ${description}`;
   });
 
   let result = `\n**CHARACTER REFERENCE PHOTOS (match each name to the labeled image below):**\n${charDescriptions.join('\n')}\n`;
 
-  // Add relative height description if characters data is available
   if (characters && characters.length >= 2) {
-    // Filter to only characters in this scene (matching photo names)
-    const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
+    const sceneCharacters = characters.filter(c => photos.some(ph => ph.name === c.name));
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
     if (heightDescription) {
       result += `\n${heightDescription}\n`;
@@ -3745,88 +3709,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       });
     }
 
-    // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING
+    // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING.
+    // Uses the shared expansion helper so the format matches CHARACTER_DESCRIPTIONS in scene
+    // expansion exactly — one definition, one place to change.
     const charDescriptions = sceneCharacters.map((char, index) => {
-      // Build physical object from flat snake_case fields (how avatar generation saves traits)
-      const physical = getPhysicalFromChar(char);
-
-      // Visual age category (how old they look) — skip numeric age, category is enough
-      const visualAge = physical.apparentAge ? `Looks: ${physical.apparentAge.replace(/-/g, ' ')}` : '';
-      // Concrete physical age markers so teens don't render as children (and vice versa)
-      const ageMarkersText = getAgeMarkers(physical.apparentAge);
-
-      // Age-specific gender term based on apparentAge
-      const getGenderTerm = (gender, apparentAge) => {
-        if (!gender || gender === 'other') return '';
-        const isMale = gender === 'male';
-        switch (apparentAge) {
-          case 'infant':
-            return isMale ? 'baby boy' : 'baby girl';
-          case 'toddler':
-          case 'preschooler':
-          case 'kindergartner':
-            return isMale ? 'little boy' : 'little girl';
-          case 'young-school-age':
-          case 'school-age':
-            return isMale ? 'boy' : 'girl';
-          case 'preteen':
-            // 11-12: still a child, NOT a teenager.
-            return isMale ? 'boy' : 'girl';
-          case 'young-teen':
-            return isMale ? 'young teen boy' : 'young teen girl';
-          case 'teenager':
-            return isMale ? 'teenage boy' : 'teenage girl';
-          case 'young-adult':
-            return isMale ? 'young man' : 'young woman';
-          case 'adult':
-          case 'middle-aged':
-            return isMale ? 'man' : 'woman';
-          case 'senior':
-          case 'elderly':
-            return isMale ? 'elderly man' : 'elderly woman';
-          default:
-            return isMale ? 'boy/man' : 'girl/woman';
-        }
-      };
-      const gender = getGenderTerm(char.gender, physical.apparentAge);
-      // Get clothing STYLE from character analysis - colors AND patterns
-      // Avatar determines the garment type (coat, hoodie, t-shirt), we need colors + patterns to match
-      const clothingStyle = char.clothingStyle || char.clothing_style || char.clothing?.style || char.clothingColors || char.clothing_colors || char.clothing?.colors;
-      // Get clothing DESCRIPTION from avatar eval (what they're actually wearing in the selected avatar)
       const avatarClothing = clothingMap[char.name?.toLowerCase()] || null;
-      if (clothingStyle) {
-        log.debug(`[IMAGE PROMPT] ${char.name} clothing style: "${clothingStyle}"`);
-      }
       if (avatarClothing) {
         log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
-      // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
-      const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
-      const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
-
-      const physicalParts = [
-        physical.build ? `Build: ${physical.build}` : '',
-        ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
-        physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
-        hairDesc,
-        // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
-        char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
-          ? (physical.facialHair.toLowerCase() === 'clean-shaven'
-            ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
-            : `Facial hair: ${physical.facialHair}`)
-          : '',
-        // Anatomical face shape (jawline, nose, cheeks, lips). Age-neutral by prompt design.
-        physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
-        // Glasses (dedicated field)
-        physical.glasses && physical.glasses.toLowerCase() !== 'none' ? `Glasses: ${physical.glasses}` : '',
-        // Distinguishing marks only (freckles, scars, moles, birthmarks).
-        physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
-        // Prefer avatar clothing description if available, otherwise use clothing style
-        avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
-      ].filter(Boolean);
-      const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-      const brief = [char.name, visualAge, gender, physicalDesc].filter(Boolean).join(', ');
-      return `${index + 1}. ${brief}`;
+      return buildCharacterDescriptionForExpansion(char, avatarClothing, index + 1);
     });
 
     // Build relative height description (AI understands this better than cm values)
