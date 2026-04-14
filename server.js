@@ -4683,7 +4683,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                     imageModelOverride: pageData.pageImageModel,
                     imageBackendOverride: pageData.pageImageBackend,
                     visualBibleGrid: emptySceneVbGrid,
-                    landmarkPhotos: emptySceneLandmarks,
+                    landmarkPhotos: pageData.landmarkPhotos,
                     textAreaMask,
                     pageContext: `empty-P${pageData.pageNumber}-retry`,
                   });
