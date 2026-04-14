@@ -60,23 +60,46 @@ function parseCharacterClothingBlock(content) {
   const characterPerspectives = {};
   const characters = [];
 
-  // Debug: log content length and Characters section existence
-  const hasChars = content.includes('Characters:');
-  if (hasChars) {
-    const idx = content.indexOf('Characters:');
-    // Log the FULL Characters section to diagnose truncation
-    const endIdx = content.indexOf('\n\n', idx);
-    const fullSection = endIdx > idx ? content.substring(idx, endIdx) : content.substring(idx);
-    log.verbose(`[PARSE-CLOTHING] Characters section (full): "${fullSection.replace(/\n/g, '\\n')}"`);
+  // JSON scene hint format (current story-unified.txt page hints):
+  //   "characters": [
+  //     { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
+  //     { "name": "Sophie", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
+  //   ]
+  const jsonCharsMatch = content.match(/"characters"\s*:\s*\[([\s\S]*?)\]/);
+  if (jsonCharsMatch) {
+    const charsBlock = jsonCharsMatch[1];
+    // Match each { ... } object — supports nested braces (e.g., costumed:{type})
+    const charObjectPattern = /\{([^{}]*(?:\{[^}]*\}[^{}]*)*)\}/g;
+    let objMatch;
+    while ((objMatch = charObjectPattern.exec(charsBlock)) !== null) {
+      const obj = objMatch[1];
+      const nameMatch = obj.match(/"name"\s*:\s*"([^"]+)"/);
+      const clothingMatch = obj.match(/"clothing"\s*:\s*"([^"]+)"/);
+      if (!nameMatch || !clothingMatch) continue;
+      const name = nameMatch[1].trim();
+      const baseName = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      characters.push(name);
+      characterClothing[baseName] = clothingMatch[1].trim().toLowerCase();
+      const annotations = {};
+      const depthMatch = obj.match(/"depth"\s*:\s*"([^"]+)"/);
+      if (depthMatch) annotations.depth = depthMatch[1].trim();
+      const perspMatch = obj.match(/"perspective"\s*:\s*"([^"]+)"/);
+      if (perspMatch) annotations.perspective = perspMatch[1].trim();
+      const posMatch = obj.match(/"position"\s*:\s*"([^"]+)"/);
+      if (posMatch) annotations.position = posMatch[1].trim();
+      const holdsMatch = obj.match(/"holds"\s*:\s*"([^"]+)"/);
+      if (holdsMatch) annotations.holds = holdsMatch[1].trim();
+      if (Object.keys(annotations).length > 0) {
+        characterPerspectives[baseName] = annotations;
+      }
+    }
+    if (characters.length > 0) return { characterClothing, characterPerspectives, characters };
   }
 
-  // Try new per-character format first:
-  // Characters:
-  // - Name1: standard
-  // - Name2 (alias): costumed:type, depth: background, perspective: back view
-  // Also handles single-line comma-separated format:
-  // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
-  // Match "Characters:" with optional suffix like "(MAX 3)", "(MAX 5)", "(max 2-3)", etc.
+  // Bullet list format (used by cover scene hints in story-unified.txt):
+  //   Characters:
+  //   - Name1 (position): standard, holds: book
+  //   - Name2 (alias): costumed:type, depth: background, perspective: back view
   const charactersBlockMatch = content.match(/Characters(?:\s*\([^)]*\))?:\s*([\s\S]*?)(?=---\s*(?:Page|Seite|Página|Pagina)|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
@@ -123,81 +146,6 @@ function parseCharacterClothingBlock(content) {
       } else {
         log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
       }
-    }
-    // Debug: log if Characters block found but no per-character clothing parsed
-    if (characters.length === 0 && block.trim()) {
-      log.debug(`[CLOTHING-PARSE] Characters block found but no per-char format matched. Block: "${block.substring(0, 200)}..."`);
-    }
-  } else {
-    // Debug: log if no Characters block found at all
-    const hasCharactersWord = content.includes('Characters');
-    if (hasCharactersWord) {
-      log.debug(`[CLOTHING-PARSE] Content has "Characters" but regex didn't match. Content snippet: "${content.substring(content.indexOf('Characters'), content.indexOf('Characters') + 200)}..."`);
-    }
-  }
-
-  // JSON scene hint format (current story-unified.txt prompt):
-  // "characters": [
-  //   { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
-  //   { "name": "Sophie", "position": "right", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
-  // ]
-  if (characters.length === 0) {
-    // Match each character object inside a "characters": [ ... ] array.
-    // Handles nested braces (e.g., costumed:{type}) by stopping at the closing brace
-    // that matches the character object (approximated by matching up to the next
-    // `}` not inside another property value).
-    const jsonCharsMatch = content.match(/"characters"\s*:\s*\[([\s\S]*?)\]/);
-    if (jsonCharsMatch) {
-      const charsBlock = jsonCharsMatch[1];
-      // Match each { ... } object — supports costumed:{...} nested braces by using lazy match
-      const charObjectPattern = /\{([^{}]*(?:\{[^}]*\}[^{}]*)*)\}/g;
-      let objMatch;
-      while ((objMatch = charObjectPattern.exec(charsBlock)) !== null) {
-        const obj = objMatch[1];
-        const nameMatch = obj.match(/"name"\s*:\s*"([^"]+)"/);
-        const clothingMatch = obj.match(/"clothing"\s*:\s*"([^"]+)"/);
-        if (nameMatch && clothingMatch) {
-          const name = nameMatch[1].trim();
-          const baseName = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
-          characters.push(name);
-          characterClothing[baseName] = clothingMatch[1].trim().toLowerCase();
-          const annotations = {};
-          const depthMatch = obj.match(/"depth"\s*:\s*"([^"]+)"/);
-          if (depthMatch) annotations.depth = depthMatch[1].trim();
-          const perspMatch = obj.match(/"perspective"\s*:\s*"([^"]+)"/);
-          if (perspMatch) annotations.perspective = perspMatch[1].trim();
-          const posMatch = obj.match(/"position"\s*:\s*"([^"]+)"/);
-          if (posMatch) annotations.position = posMatch[1].trim();
-          const holdsMatch = obj.match(/"holds"\s*:\s*"([^"]+)"/);
-          if (holdsMatch) annotations.holds = holdsMatch[1].trim();
-          if (Object.keys(annotations).length > 0) {
-            characterPerspectives[baseName] = annotations;
-          }
-        }
-      }
-      if (characters.length > 0) {
-        log.debug(`[PARSE-CLOTHING] Extracted ${characters.length} characters from JSON format`);
-      }
-    }
-  }
-
-  // If no per-character format found, try legacy format
-  if (characters.length === 0) {
-    // Legacy: Characters: Name1, Name2 on single line
-    const legacyMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
-    if (legacyMatch) {
-      const charList = legacyMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0);
-      characters.push(...charList);
-    }
-    // Legacy: Clothing: category (single value for all)
-    const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
-    if (clothingMatch) {
-      const clothing = clothingMatch[1].toLowerCase();
-      // Apply same clothing to all characters
-      characters.forEach(char => {
-        const baseName = char.replace(/\s*\([^)]*\)\s*$/, '').trim();
-        characterClothing[baseName] = clothing === 'same' ? 'standard' : clothing;
-      });
     }
   }
 
@@ -2047,27 +1995,9 @@ class ProgressiveUnifiedParser {
         const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina)|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
-        // Extract per-character clothing using shared helper
-        // Debug: log raw content to see what format AI is producing
-        const charSection = content.match(/Characters(?:\s*\([^)]*\))?:[\s\S]{0,300}/i);
-        if (charSection) {
-          log.debug(`[PAGE-CLOTHING] Page ${pageNum} Characters section: "${charSection[0].replace(/\n/g, '\\n')}"`);
-        } else {
-          log.debug(`[PAGE-CLOTHING] Page ${pageNum} NO Characters section found. Content snippet: "${content.substring(0, 200).replace(/\n/g, '\\n')}..."`);
-        }
-        let { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
-
-        // Fallback: if no Characters section found in content, extract clothing
-        // from the scene hint (which may use "- Name: costumed:X" format inline)
-        if (Object.keys(characterClothing).length === 0 && sceneHint) {
-          const hintParsed = parseCharacterClothingBlock(sceneHint);
-          if (Object.keys(hintParsed.characterClothing).length > 0) {
-            characterClothing = hintParsed.characterClothing;
-            characterPerspectives = hintParsed.characterPerspectives;
-            characters = hintParsed.characters;
-            log.debug(`[PAGE-CLOTHING] Page ${pageNum}: extracted from scene hint: ${Object.entries(characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')}`);
-          }
-        }
+        // Extract per-character clothing from the page content (JSON scene hint format
+        // or legacy bullet list). parseCharacterClothingBlock handles both.
+        const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(content);
 
         this.emitted.pages.add(pageNum);
         const clothingStr = Object.keys(characterClothing).length > 0
