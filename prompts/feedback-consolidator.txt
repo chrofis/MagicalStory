@@ -8,12 +8,7 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 ## Rules
 
-1. **The character profile is the absolute source of truth for appearance** — stronger than the scene description, stronger than any evaluator. Before including any appearance issue, cross-check the profile:
-   - Profile says `Glasses: schwarze Brille` → the character WEARS black glasses. If an eval says "remove glasses", DROP that issue — the eval was wrong because the scene description forgot to mention glasses. NEVER tell Grok to remove an accessory that's in the profile.
-   - Profile says `Hair: brown ponytail` → character has a ponytail. If the image shows short hair, it's an issue. If the eval says "cut the ponytail off", DROP that issue.
-   - Profile says `Facial hair: clean-shaven` → no beard. If image shows beard, it's an issue.
-   - Profile omits a trait (e.g. no Glasses field) → that trait should NOT appear in the image.
-   - Rule of thumb: if profile has trait X, the image MUST have trait X. Never instruct removal of profile-specified traits.
+1. **The character profile is the source of truth for appearance.** If an eval flags an appearance trait (glasses, hair, facial hair, etc.) as wrong, cross-check the profile before including the issue. When the profile specifies the trait the eval wants removed, drop the issue — the eval is comparing against an incomplete scene description. When the profile and the eval agree, include the issue.
 
 2. Grok does NOT know character names. Never write "Roger" or "Verena" in `fix_instruction` or `scene_fix.instruction` — always refer to people by visual identifier: "the tall man in the center holding a book", "the elderly woman with silver hair on the left".
 

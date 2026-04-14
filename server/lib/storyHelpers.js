@@ -2464,18 +2464,23 @@ function buildCharacterDescriptionForExpansion(char, clothingDescription, index)
   const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
   const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
+  const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
+  const isNone = (v) => !v || NONE_WORDS.has(String(v).toLowerCase().trim());
   const physicalParts = [
     physical.build ? `Build: ${physical.build}` : '',
     ageMarkersText ? `Age cues: ${ageMarkersText}` : '',
     physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
     hairDesc,
-    char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
+    char.gender === 'male' && !isNone(physical.facialHair)
       ? (physical.facialHair.toLowerCase() === 'clean-shaven'
         ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
         : `Facial hair: ${physical.facialHair}`)
       : '',
-    physical.face && physical.face.toLowerCase() !== 'none' ? `Face: ${stripAgeWords(physical.face)}` : '',
-    physical.other && physical.other.toLowerCase() !== 'none' ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
+    !isNone(physical.face) ? `Face: ${stripAgeWords(physical.face)}` : '',
+    // Glasses (dedicated field) — was missing, causing scene descriptions to
+    // omit glasses for characters whose profile has them.
+    !isNone(physical.glasses) ? `Glasses: ${physical.glasses}` : '',
+    !isNone(physical.other) ? `Distinctive marks: ${stripAgeWords(physical.other)}` : '',
     clothingDescription ? `Wearing: ${clothingDescription}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
   ].filter(Boolean);
   const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
