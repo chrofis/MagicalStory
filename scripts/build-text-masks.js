@@ -62,7 +62,9 @@ async function buildMask(position, sizeName, outPath) {
   <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="white"/>
 </svg>`;
 
-  // Blur radius scales with frame size (~4% of smaller dimension)
+  // Blur radius scales with frame size (~4% of smaller dimension = ~31px for 768x1024).
+  // Tested heavier blur (80px) — corners then read as "matte frame" and the model
+  // paints a black border around the scene. 31px is the sweet spot.
   const blurSigma = Math.max(20, Math.round(Math.min(WIDTH, HEIGHT) * 0.04));
 
   await sharp(Buffer.from(svg))

@@ -4606,9 +4606,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const textAreaMask = getTextAreaMask(textPos, langLevel);
 
             const emptyTextAreaInstr = textAreaMask
-              ? `See the attached reference mask image: the WHITE region marks where story text will be placed — paint this region in lighter tones of the scene with gentle, minimal detail. The BLACK region gets full scene detail. Do not paint a literal white box; continue the scene softly into the white region.`
+              ? `TEXT SPACE: The attached mask shows where a soft, light, contour-free patch must exist in your output (look at the WHITE region). Story text will be printed there, so this area must be quiet and readable.
+
+Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs:
+- INDOOR scene → use this room's plain wall, ceiling, floor, rug, tablecloth, or window light
+- OUTDOOR scene → use sky, distant open ground, grass, calm water, snow, or mist
+- STREET scene → use this street's cobblestones, pavement, light building wall, or sky between buildings
+
+The bright patch must be: soft, lightly coloured, NO sharp edges, NO detailed objects, NO characters, NO elements foreign to this setting. Continue the scene naturally — the patch is just the quietest part of what's already there.
+
+DO NOT paint a literal white box, a cutout, or a watercolor splash. The rest of the image is for the main scene detail described above.`
               : (textPos
-                ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.`
+                ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Place a SOFT patch of whatever naturally belongs in this scene — for outdoor scenes use sky or open ground, for indoor scenes use a plain wall or floor, for streets use the pavement. NEVER invent elements foreign to the scene. Soft, minimal detail, no sharp lines, no characters. DO NOT paint a white box.`
                 : '');
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
