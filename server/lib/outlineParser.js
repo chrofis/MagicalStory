@@ -136,6 +136,51 @@ function parseCharacterClothingBlock(content) {
     }
   }
 
+  // JSON scene hint format (current story-unified.txt prompt):
+  // "characters": [
+  //   { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
+  //   { "name": "Sophie", "position": "right", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
+  // ]
+  if (characters.length === 0) {
+    // Match each character object inside a "characters": [ ... ] array.
+    // Handles nested braces (e.g., costumed:{type}) by stopping at the closing brace
+    // that matches the character object (approximated by matching up to the next
+    // `}` not inside another property value).
+    const jsonCharsMatch = content.match(/"characters"\s*:\s*\[([\s\S]*?)\]/);
+    if (jsonCharsMatch) {
+      const charsBlock = jsonCharsMatch[1];
+      // Match each { ... } object — supports costumed:{...} nested braces by using lazy match
+      const charObjectPattern = /\{([^{}]*(?:\{[^}]*\}[^{}]*)*)\}/g;
+      let objMatch;
+      while ((objMatch = charObjectPattern.exec(charsBlock)) !== null) {
+        const obj = objMatch[1];
+        const nameMatch = obj.match(/"name"\s*:\s*"([^"]+)"/);
+        const clothingMatch = obj.match(/"clothing"\s*:\s*"([^"]+)"/);
+        if (nameMatch && clothingMatch) {
+          const name = nameMatch[1].trim();
+          const baseName = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+          characters.push(name);
+          characterClothing[baseName] = clothingMatch[1].trim().toLowerCase();
+          const annotations = {};
+          const depthMatch = obj.match(/"depth"\s*:\s*"([^"]+)"/);
+          if (depthMatch) annotations.depth = depthMatch[1].trim();
+          const perspMatch = obj.match(/"perspective"\s*:\s*"([^"]+)"/);
+          if (perspMatch) annotations.perspective = perspMatch[1].trim();
+          const posMatch = obj.match(/"position"\s*:\s*"([^"]+)"/);
+          if (posMatch) annotations.position = posMatch[1].trim();
+          const holdsMatch = obj.match(/"holds"\s*:\s*"([^"]+)"/);
+          if (holdsMatch) annotations.holds = holdsMatch[1].trim();
+          if (Object.keys(annotations).length > 0) {
+            characterPerspectives[baseName] = annotations;
+          }
+        }
+      }
+      if (characters.length > 0) {
+        log.debug(`[PARSE-CLOTHING] Extracted ${characters.length} characters from JSON format`);
+      }
+    }
+  }
+
   // If no per-character format found, try legacy format
   if (characters.length === 0) {
     // Legacy: Characters: Name1, Name2 on single line
