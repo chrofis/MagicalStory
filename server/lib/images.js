@@ -2635,21 +2635,27 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '') {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null) {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
-  log.info(`📦 [BBOX-ENRICH] ${pageLabel}Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
 
-  // Call bbox detection WITH character/object context - AI identifies directly by name
-  const allDetections = await detectAllBoundingBoxes(imageData, {
-    expectedCharacters,
-    expectedObjects,
-    sceneContext,
-    bboxModelOverride,
-    pageContext
-  });
+  // Reuse shared bbox detection if provided (avoids redundant API call)
+  let allDetections;
+  if (sharedBboxDetection) {
+    log.info(`♻️  [BBOX-ENRICH] ${pageLabel}Reusing shared bbox detection (${sharedBboxDetection.figures?.length || 0} figures, ${sharedBboxDetection.objects?.length || 0} objects)`);
+    allDetections = sharedBboxDetection;
+  } else {
+    log.info(`📦 [BBOX-ENRICH] ${pageLabel}Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
+    allDetections = await detectAllBoundingBoxes(imageData, {
+      expectedCharacters,
+      expectedObjects,
+      sceneContext,
+      bboxModelOverride,
+      pageContext
+    });
+  }
 
   if (!allDetections) {
     log.warn(`🔄 [FALLBACK] Detection failed, no bounding boxes available`);
@@ -4457,7 +4463,8 @@ async function evaluateImageBatch(images, options = {}) {
           expectedCharacterClothing,
           null,
           null,
-          `PAGE ${img.pageNumber}`
+          `PAGE ${img.pageNumber}`,
+          img.sharedBboxDetection || null // Reuse pre-detected bbox if available
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
@@ -5012,7 +5019,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
           return acc;
         }, {}),
-        retryHistory: []
+        retryHistory: [],
+        // Shared bbox detection from pre-step (avoids redundant Gemini call)
+        sharedBboxDetection: orig.sharedBboxDetection || null,
       };
     }),
     // Pass scene descriptions so entity-collect can determine per-page characters.

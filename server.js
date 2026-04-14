@@ -4959,6 +4959,40 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       } else {
         log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
 
+        // Phase 5b-pre: Shared bbox detection — runs ONCE per image before quality eval
+        // and entity consistency. Both consume the same result, avoiding redundant API calls.
+        const { detectAllBoundingBoxes } = require('./server/lib/images');
+        const bboxLimit = pLimit(3); // throttle to 3 parallel Gemini calls to avoid 503s
+        const bboxStartTime = Date.now();
+        log.info(`🔍 [UNIFIED] Phase 5b-pre: Shared bbox detection for ${rawImages.length} images...`);
+        await Promise.all(rawImages.filter(img => img.imageData).map(img => bboxLimit(async () => {
+          try {
+            const expectedCharacters = (img.sceneCharacters || []).map(c => ({
+              name: c.name || c,
+              description: typeof c === 'object' ? (c.description || '') : '',
+            }));
+            const sceneMetadata = img.sceneMetadata || {};
+            const expectedObjects = Array.isArray(sceneMetadata.objects)
+              ? sceneMetadata.objects.filter(o => typeof o === 'string')
+              : [];
+            img.sharedBboxDetection = await detectAllBoundingBoxes(img.imageData, {
+              expectedCharacters,
+              expectedObjects,
+              sceneContext: img.sceneDescription || null,
+              pageContext: `PAGE ${img.pageNumber}`,
+            });
+            const figCount = img.sharedBboxDetection?.figures?.length || 0;
+            const idCount = img.sharedBboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
+            log.debug(`🔍 [BBOX-SHARED] P${img.pageNumber}: ${figCount} figures, ${idCount} identified`);
+          } catch (err) {
+            log.warn(`⚠️ [BBOX-SHARED] P${img.pageNumber}: Detection failed: ${err.message} — fallback will run`);
+            img.sharedBboxDetection = null;
+          }
+        })));
+        const bboxElapsed = ((Date.now() - bboxStartTime) / 1000).toFixed(1);
+        const sharedCount = rawImages.filter(img => img.sharedBboxDetection).length;
+        log.info(`🔍 [UNIFIED] Phase 5b-pre: ${sharedCount}/${rawImages.length} shared bbox detections in ${bboxElapsed}s`);
+
         // Build storyData for iterate (needs scene descriptions, characters, visual bible)
         const pipelineStoryData = {
           characters: inputData.characters,

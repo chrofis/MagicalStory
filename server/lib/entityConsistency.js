@@ -773,9 +773,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
     if (!imageData) continue;
 
-    // Use cached bboxDetection if available (now stored per-version, loaded by rehydrateStoryImages).
-    // Fresh detection runs below if this is null (no cached bbox for active version).
-    let bboxDetection = img.bboxDetection || null;
+    // Use cached bboxDetection if available. Priority: sharedBboxDetection (from unified
+    // pipeline pre-step) > img.bboxDetection (from prior eval). Fresh detection runs below
+    // if neither is available.
+    let bboxDetection = img.sharedBboxDetection || img.bboxDetection || null;
 
     // Get clothing info for this page - try multiple sources
     // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
@@ -1158,9 +1159,10 @@ function collectObjectAppearances(sceneImages, visualBible = null) {
 
     if (!imageData) continue;
 
-    // Use cached bboxDetection if available (now stored per-version, loaded by rehydrateStoryImages).
-    // Fresh detection runs below if this is null (no cached bbox for active version).
-    let bboxDetection = img.bboxDetection || null;
+    // Use cached bboxDetection if available. Priority: sharedBboxDetection (from unified
+    // pipeline pre-step) > img.bboxDetection (from prior eval). Fresh detection runs below
+    // if neither is available.
+    let bboxDetection = img.sharedBboxDetection || img.bboxDetection || null;
 
     if (!bboxDetection?.objects) continue;
 
