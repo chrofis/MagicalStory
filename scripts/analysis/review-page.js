@@ -91,9 +91,15 @@ async function main() {
     }
 
     // =========================================================================
-    // 4. DIFFERENCES (hint → expansion)
+    // 4. REQUESTED SCENE (checklist to hold against the image)
     // =========================================================================
-    hr('-', '4. DIFFERENCES  (hint → expansion)');
+    hr('-', '4. REQUESTED SCENE  (what the image should show)');
+    printRequestedScene(hint, metadata, prose || '', d.visualBible);
+
+    // =========================================================================
+    // 4b. CHANGES (hint → expansion) — kept as a smaller subsection
+    // =========================================================================
+    hr('-', '4b. CHANGES  (what the expansion altered from the hint)');
     printDifferences(hint, metadata, prose || '');
 
     // =========================================================================
@@ -416,6 +422,148 @@ function printDifferences(hint, meta, prose) {
   } else {
     for (const f of findings) console.log(f);
   }
+}
+
+/**
+ * Build a pre-flight checklist of what the image should contain.
+ * Pulls from hint + expansion metadata + prose so you can eyeball the rendered
+ * image against explicit expectations.
+ */
+function printRequestedScene(hint, meta, prose, visualBible) {
+  if (!hint && !meta) { console.log('(no hint or expansion — nothing to describe)'); return; }
+
+  // One-line description from hint (the human-readable summary)
+  const desc = hint?.description || '';
+  if (desc) {
+    console.log('Description:');
+    console.log('  ' + desc);
+    console.log();
+  }
+
+  // Setting / shot / time / weather / background (prefer hint values)
+  const settingParts = [];
+  if (hint?.setting) settingParts.push(hint.setting);
+  if (hint?.time) settingParts.push(hint.time);
+  if (hint?.weather && hint.weather !== 'n/a') settingParts.push(hint.weather);
+  if (hint?.shot) settingParts.push(`${hint.shot} shot`);
+  if (settingParts.length > 0) {
+    console.log(`Setting:  ${settingParts.join(', ')}`);
+  }
+  if (hint?.background) console.log(`Background: ${hint.background}`);
+  console.log();
+
+  // Characters — merge hint entries with expansion metadata entries and interactions.
+  // Hint gives position/clothing, expansion interactions give explicit actions ("stirring",
+  // "leaning", "reaching toward the tower"), expansion metadata may refine position/perspective.
+  const hintChars = hint?.characters || [];
+  const expChars = meta?.characters || [];
+  const interactions = meta?.interactions || [];
+  const allNames = [];
+  const seen = new Set();
+  for (const c of [...hintChars, ...expChars]) {
+    if (!c?.name) continue;
+    const k = c.name.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    allNames.push(c.name);
+  }
+
+  if (allNames.length > 0) {
+    console.log(`Characters (${allNames.length}):`);
+    for (const name of allNames) {
+      const h = hintChars.find(c => c.name?.toLowerCase() === name.toLowerCase()) || {};
+      const e = expChars.find(c => c.name?.toLowerCase() === name.toLowerCase()) || {};
+      // Attribute merge: prefer expansion if it has more detail, else hint
+      const position = e.position || h.position;
+      const clothing = e.clothing || h.clothing;
+      const perspective = e.perspective || h.perspective;
+      const depth = e.depth || h.depth;
+      const parts = [];
+      if (position) parts.push(`position=${position}`);
+      if (clothing) parts.push(`clothing=${clothing}`);
+      if (perspective) parts.push(`perspective=${perspective}`);
+      if (depth) parts.push(`depth=${depth}`);
+      console.log(`  ${name}  (${parts.join(', ') || 'no attributes'})`);
+
+      // What this character is doing (from interactions)
+      const myInteractions = interactions.filter(i => i.character?.toLowerCase() === name.toLowerCase());
+      for (const i of myInteractions) {
+        const where = i.where ? `: ${i.where}` : '';
+        console.log(`    → ${i.object}${where}`);
+      }
+
+      // Gaze / pose signals from hint description
+      const gaze = extractGazeFromText(name, desc);
+      if (gaze) console.log(`    [gaze] ${gaze}`);
+    }
+    console.log();
+  }
+
+  // Objects — resolve IDs against Visual Bible for readable names
+  const hintObjs = hint?.objects || [];
+  const metaObjs = meta?.objects || [];
+  const allObjs = [...new Set([...hintObjs, ...metaObjs])];
+  if (allObjs.length > 0) {
+    console.log(`Objects (${allObjs.length}):`);
+    for (const id of allObjs) {
+      const resolved = resolveVbId(id, visualBible);
+      console.log(`  ${id}${resolved ? `  —  ${resolved}` : ''}`);
+    }
+    console.log();
+  }
+
+  // Text-overlay placement
+  if (meta?.textPosition || hint?.textPosition) {
+    console.log(`Text overlay position: ${meta?.textPosition || hint?.textPosition}`);
+  }
+}
+
+/**
+ * Extract a gaze/facing hint for a specific character from a short description
+ * sentence. Looks for patterns like "Werner ... schaut den Drachen direkt an",
+ * "Lukas ... Blick auf ... gerichtet".
+ */
+function extractGazeFromText(name, text) {
+  if (!name || !text) return null;
+  const lower = text.toLowerCase();
+  const nameLower = name.toLowerCase();
+  const idx = lower.indexOf(nameLower);
+  if (idx < 0) return null;
+  // Pull the clause starting at the character's name, up to the next comma or period
+  const rest = text.substring(idx);
+  const clause = rest.split(/[.!?]|,\s+(?=[A-Z])/)[0];
+  // Find verbs that imply gaze/facing direction
+  const gazePatterns = [
+    /schaut[^.,]*/i, /blick[^.,]*gerichtet/i, /sieht[^.,]*an/i, /looks?[^.,]*at/i,
+    /faces?[^.,]*/i, /gazes?[^.,]*at/i, /facing[^.,]*/i,
+  ];
+  for (const pat of gazePatterns) {
+    const m = clause.match(pat);
+    if (m) return m[0].trim();
+  }
+  return null;
+}
+
+/** Resolve a VB id (LOC001, ART003, ANI001, CHR001) to a readable name. */
+function resolveVbId(id, vb) {
+  if (!id || !vb) return null;
+  const prefix = String(id).substring(0, 3).toUpperCase();
+  const lists = {
+    LOC: vb.locations,
+    ART: vb.artifacts,
+    ANI: vb.animals,
+    VEH: vb.vehicles,
+    CHR: vb.secondaryCharacters,
+  };
+  const list = lists[prefix];
+  if (!Array.isArray(list)) return null;
+  const cleanId = String(id).split('.')[0]; // strip variant suffix (.2 etc.)
+  const entry = list.find(e => e?.id === cleanId);
+  if (!entry) return null;
+  const parts = [];
+  if (entry.name) parts.push(entry.name);
+  if (prefix === 'ANI' && entry.species) parts.push(`(${entry.species})`);
+  return parts.join(' ');
 }
 
 function norm(s) { return (s || '').trim().toLowerCase(); }
