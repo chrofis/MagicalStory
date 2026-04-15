@@ -381,10 +381,11 @@ async function labelCharacterImage(buffer, name) {
   const height = meta.height;
   if (!width || !height) return buffer;
 
-  // Label height ~9% of image width, clamped so tiny/huge slots stay readable.
-  const labelHeight = Math.max(52, Math.min(110, Math.round(width * 0.09)));
-  const fontSize = Math.max(28, Math.round(labelHeight * 0.58));
-  const baselineY = Math.round(labelHeight * 0.7);
+  // Label height ~12% of image width, clamped so tiny/huge slots stay readable
+  // AFTER the slot is resized down to 1024px tall inside packReferences.
+  const labelHeight = Math.max(68, Math.min(140, Math.round(width * 0.12)));
+  const fontSize = Math.max(36, Math.round(labelHeight * 0.62));
+  const baselineY = Math.round(labelHeight * 0.72);
   const display = escapeLabelXml(name.length > 28 ? name.substring(0, 26) + '…' : name);
 
   const labelSvg = `<svg width="${width}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -600,7 +601,7 @@ async function composeStack(topRow, bottomRow) {
  * @param {string} aspectRatio - Target slot aspect (e.g. '1:1', '3:4')
  * @returns {Promise<Buffer|null>} null if rawBuffers is empty or n > 3.
  */
-async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio) {
+async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, charNames = []) {
   const n = rawBuffers.length;
   if (n === 0 || n > 3) return null;
 
@@ -612,13 +613,18 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio) {
     parts.push(isGrid ? await extractFaceAndBody(rawBuffers[i]) : null);
   }
 
-  // Helper: vertical stack if grid, else use raw buffer as-is
-  const buildVertical = async (i) =>
-    parts[i] ? composeFaceBodyVertical(parts[i].face, parts[i].body) : rawBuffers[i];
+  // Helper: vertical stack if grid, else use raw buffer as-is — then stamp the
+  // character's name on a dark bar below so Grok can bind name↔face.
+  const buildVertical = async (i) => {
+    const composed = parts[i] ? await composeFaceBodyVertical(parts[i].face, parts[i].body) : rawBuffers[i];
+    return labelCharacterImage(composed, charNames[i]);
+  };
 
-  // Helper: horizontal strip if grid, else raw
-  const buildHorizontal = async (i) =>
-    parts[i] ? composeBodyFaceHorizontal(parts[i].face, parts[i].body) : rawBuffers[i];
+  // Helper: horizontal strip if grid, else raw — labeled the same way.
+  const buildHorizontal = async (i) => {
+    const composed = parts[i] ? await composeBodyFaceHorizontal(parts[i].face, parts[i].body) : rawBuffers[i];
+    return labelCharacterImage(composed, charNames[i]);
+  };
 
   if (n === 1) {
     return buildHorizontal(0);
@@ -817,7 +823,8 @@ async function packReferences(refs = {}, options = {}) {
     const composed = await buildCharacterGroupSlot(
       group.map(c => c.rawBuffer),
       group.map(c => c.photoType),
-      aspectRatio
+      aspectRatio,
+      group.map(c => c.charName),
     );
     if (!composed) return;
     const resized = await sharp(composed).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
@@ -885,20 +892,20 @@ async function packReferences(refs = {}, options = {}) {
     const w = meta?.width || 0;
     const h = meta?.height || 0;
 
-    // Metadata invalid → force the slot into a fallback square and continue
+    // Metadata invalid → force the slot into the target aspect with a safe crop
     if (!w || !h) {
       try {
         const fallbackRatio = targetRatio;
         const fw = Math.round(FALLBACK_SIZE * (fallbackRatio >= 1 ? 1 : fallbackRatio));
         const fh = Math.round(FALLBACK_SIZE / (fallbackRatio >= 1 ? fallbackRatio : 1));
-        const padded = await sharp(buf)
-          .resize(fw, fh, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        const cropped = await sharp(buf)
+          .resize(fw, fh, { fit: 'cover', position: 'centre' })
           .jpeg({ quality: 90 })
           .toBuffer();
-        paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-        log.debug(`🎨 ${tag} Slot ${i + 1}: fallback padded to ${fw}x${fh}`);
+        paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+        log.debug(`🎨 ${tag} Slot ${i + 1}: fallback sized to ${fw}x${fh}`);
       } catch (fallbackErr) {
-        log.error(`❌ [GROK] Slot ${i + 1}: fallback padding failed (${fallbackErr.message}) — dropping slot`);
+        log.error(`❌ [GROK] Slot ${i + 1}: fallback resize failed (${fallbackErr.message}) — dropping slot`);
       }
       continue;
     }
@@ -912,27 +919,29 @@ async function packReferences(refs = {}, options = {}) {
       continue;
     }
 
-    // Compute the smallest box that contains the source and matches target aspect
+    // Crop to target aspect — never pad with white, those bars survive through
+    // Grok editing and end up baked into the output. Keep the shorter relative
+    // dimension intact and trim the longer one to match aspect.
     let targetW, targetH;
     if (currentRatio > targetRatio) {
-      // Source is wider than target → keep width, grow height with letterbox bars
-      targetW = w;
-      targetH = Math.round(w / targetRatio);
-    } else {
-      // Source is taller than target → keep height, grow width with letterbox bars
+      // Source wider than target → keep height, crop width
       targetH = h;
       targetW = Math.round(h * targetRatio);
+    } else {
+      // Source taller than target → keep width, crop height
+      targetW = w;
+      targetH = Math.round(w / targetRatio);
     }
 
     try {
-      const padded = await sharp(buf)
-        .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      const cropped = await sharp(buf)
+        .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
         .jpeg({ quality: 90 })
         .toBuffer();
-      paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-      log.debug(`🎨 ${tag} Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
+      paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+      log.debug(`🎨 ${tag} Slot ${i + 1}: cropped ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
     } catch (padErr) {
-      log.warn(`⚠️ [GROK] Slot ${i + 1}: pad failed (${padErr.message}) — dropping slot`);
+      log.warn(`⚠️ [GROK] Slot ${i + 1}: crop failed (${padErr.message}) — dropping slot`);
     }
   }
 
@@ -969,9 +978,13 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
   const CELL = 256;
   const MAX_ELEMENTS = 9;
 
-  // Resize scene to exactly 1024x1024 (contain so we don't crop the artwork)
+  // Resize scene to exactly 1024x1024. Cover-crop instead of contain+black —
+  // black letterbox bars on the scene input survive through Grok's editing and
+  // end up baked into every output (stacked with the outer white bars from the
+  // editWithGrok input padder when that was still using contain). Cropping
+  // loses a thin edge slice on one axis but keeps the illustration edge-to-edge.
   const sceneResized = await sharp(sceneBuffer)
-    .resize(SCENE, SCENE, { fit: 'contain', background: { r: 0, g: 0, b: 0 } })
+    .resize(SCENE, SCENE, { fit: 'cover', position: 'centre' })
     .toBuffer();
 
   // Cell positions: 4 right column, then 5 bottom row
