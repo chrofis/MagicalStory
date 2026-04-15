@@ -217,15 +217,17 @@ export default function SharedStoryViewer() {
   const flipNext = useCallback(() => bookRef.current?.flipNext(), []);
   const flipPrev = useCallback(() => bookRef.current?.flipPrev(), []);
 
-  // Keyboard navigation
+  // Keyboard navigation — disabled while the fullscreen lightbox is open,
+  // so arrows/space in the lightbox don't also flip pages underneath.
   useEffect(() => {
+    if (fullscreenImage) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); flipNext(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); flipPrev(); }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [flipNext, flipPrev]);
+  }, [flipNext, flipPrev, fullscreenImage]);
 
   if (loading) {
     return (

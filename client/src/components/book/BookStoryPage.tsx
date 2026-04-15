@@ -48,6 +48,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
             />
             {onImageClick && (
               <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
                 className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
                 aria-label="Fullscreen"
@@ -118,6 +120,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
         {/* Fullscreen button — top-center, only visible on hover so it doesn't block the page-flip corners */}
         {onImageClick && (
           <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
             className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
             aria-label="Fullscreen"
