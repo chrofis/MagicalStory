@@ -19,6 +19,8 @@ interface BookStoryPageProps {
   showTextOverlay: boolean;
   /** When true, the text is shown on a separate facing page — don't render any text on the image. */
   textOnSidePage?: boolean;
+  /** Mobile read mode: image at top of page with full story text below it. */
+  textBelowImage?: boolean;
   overlayImage?: string | null;
   onImageClick?: (url: string) => void;
 }
@@ -28,10 +30,43 @@ interface BookStoryPageProps {
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, textOnSidePage, overlayImage, onImageClick }, ref) => {
+  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick }, ref) => {
     const layout = getTextOverlayPosition(pageNumber, text, (textPosition || undefined) as TextPosition | undefined);
     const isFullWidth = layout.position.includes('full');
     const trimmedText = text.trim();
+
+    // Mobile read mode: image at top, full text below — no overlay or facing page.
+    if (textBelowImage) {
+      return (
+        <div ref={ref} className="w-full h-full relative bg-white overflow-hidden group flex flex-col">
+          <div className="relative flex-shrink-0" style={{ height: '60%' }}>
+            <img
+              src={imageUrl}
+              alt={`Page ${pageNumber}`}
+              className="w-full h-full object-contain"
+              draggable={false}
+            />
+            {onImageClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
+                className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
+                aria-label="Fullscreen"
+              >
+                <Maximize2 size={14} />
+              </button>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto bg-amber-50 px-4 py-3">
+            <p
+              className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
+              style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
+            >
+              {trimmedText}
+            </p>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div ref={ref} className="w-full h-full relative bg-white overflow-hidden group">

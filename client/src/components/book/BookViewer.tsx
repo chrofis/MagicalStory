@@ -73,6 +73,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
 
     // Expose navigation methods
     useImperativeHandle(ref, () => ({
@@ -87,6 +88,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       if (!containerRef.current) return;
       const cw = containerRef.current.clientWidth;
       const ch = containerRef.current.clientHeight;
+      setIsMobile(window.innerWidth < 768);
       // In landscape (desktop), 2 pages fit side by side → each page ≤ half the width
       // In portrait (mobile), 1 page fills the width
       const maxPageWidth = Math.min(cw / 2, 550);
@@ -152,8 +154,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
           );
           break;
         case 'initialPage':
-          // Blank left page + dedication right page to form a spread
-          bookPages.push(<BlankPage key="blank-initial" />);
+          // On desktop: blank left page + dedication right page to form a spread.
+          // On mobile (single-page view): just the dedication, no blank page.
+          if (!isMobile) {
+            bookPages.push(<BlankPage key="blank-initial" />);
+          }
           bookPages.push(
             <BookCoverPage
               key="initial-page"
@@ -164,6 +169,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
           );
           break;
         case 'storyText': {
+          // On mobile, the story page renders text below the image — no separate text page.
+          if (isMobile) break;
           const storyPage = story.pages[entry.storyPageIdx];
           if (storyPage) {
             bookPages.push(
@@ -187,7 +194,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 pageNumber={storyPage.pageNumber}
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay}
-                textOnSidePage={textOnSidePage}
+                textOnSidePage={textOnSidePage && !isMobile}
+                textBelowImage={textOnSidePage && isMobile}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
