@@ -352,10 +352,11 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
     textPosition = enforceSpreadTextPosition(textPosition, pageNum);
 
-    // Generate the overlay
+    // Generate the overlay — normalize the image to the same 3:4 aspect we serve
+    // so the overlay polygon and the displayed image line up pixel-for-pixel.
     const { generateTextOverlay } = require('../lib/textOverlayRenderer');
     const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imgBuffer = Buffer.from(imgBase64, 'base64');
+    const imgBuffer = await normalizeToPortrait(Buffer.from(imgBase64, 'base64'));
 
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
 
