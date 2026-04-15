@@ -33,6 +33,8 @@ cyber: Cyberpunk aesthetic, neon reflections, rainy streets, chrome, dense compl
 
 # CHARACTER/AVATAR ART STYLES (for character reference sheets on plain backgrounds)
 # These focus on rendering style without environmental elements
+realistic-character: Photorealistic portrait, natural human proportions, accurate skin tones, realistic hair texture, soft even studio lighting, sharp focus on the face, true-to-life colors, no stylization or cartoon features
+
 pixar-character: 3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading
 
 cartoon-character: 2D cartoon style, bold black outlines, vibrant flat colors, minimal shading, smooth vector quality, clean linework
