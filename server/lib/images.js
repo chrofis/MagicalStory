@@ -5996,6 +5996,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       grokRefImages: best?.grokRefImages || img.grokRefImages || null,
       emptySceneImage: img.emptySceneImage || null,
       emptyScenePrompt: img.emptyScenePrompt || null,
+      emptySceneQc: img.emptySceneQc || null,
+      textAreaMask: img.textAreaMask || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       perCharClothing: img.perCharClothing,

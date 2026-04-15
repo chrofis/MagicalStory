@@ -21,6 +21,7 @@ interface ReferencePhotosDisplayProps {
   emptyScenePrompt?: string | null;  // Prompt used for empty scene
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   emptySceneQc?: { v1ImageData?: string; v1Issues?: string[]; visionFeedback?: string; retryPrompt?: string } | null;
+  textAreaMask?: string | null;  // Black/white mask sent to Grok marking the text-overlay calm zone
   language: string;
   // For lazy loading
   storyId?: string;
@@ -40,6 +41,7 @@ export function ReferencePhotosDisplay({
   emptyScenePrompt,
   hasEmptySceneImage,
   emptySceneQc,
+  textAreaMask,
   language,
   storyId,
   pageNumber
@@ -207,20 +209,24 @@ export function ReferencePhotosDisplay({
             🎬 {language === 'de' ? 'Pass 1: Leere Szene (Stil-Anker)' : 'Pass 1: Empty Scene (Style Anchor)'}
           </div>
 
-          {/* Pass 1 inputs: landmark photos + VB grid */}
+          {/* Pass 1 inputs: landmark photos + VB grid + text-area mask */}
           <div className="text-[10px] text-emerald-600 font-medium">
             {language === 'de' ? 'Eingaben →' : 'Inputs →'}
             {hasLandmarkPhotos && ` 📍 ${displayLandmarkPhotos!.length} landmark`}
             {hasVBGrid && ' 🔲 VB grid'}
-            {!hasLandmarkPhotos && !hasVBGrid && (language === 'de' ? ' nur Text-Prompt' : ' text prompt only')}
+            {textAreaMask && ' ◳ text-area mask'}
+            {!hasLandmarkPhotos && !hasVBGrid && !textAreaMask && (language === 'de' ? ' nur Text-Prompt' : ' text prompt only')}
           </div>
-          {(hasLandmarkPhotos || hasVBGrid) && (
+          {(hasLandmarkPhotos || hasVBGrid || textAreaMask) && (
             <div className="flex gap-2 flex-wrap">
               {displayLandmarkPhotos?.map((lm, i) => lm.photoData && (
                 <img key={`lm-${i}`} src={lm.photoData} alt={lm.name} className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(lm.photoData!)} title={`📍 ${lm.name}`} />
               ))}
               {displayVBGrid && (
                 <img src={displayVBGrid} alt="VB Grid" className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(displayVBGrid)} title="🔲 Visual Bible Grid" />
+              )}
+              {textAreaMask && (
+                <img src={textAreaMask} alt="Text area mask" className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(textAreaMask)} title={language === 'de' ? '◳ Text-Bereich-Maske (weiss = ruhige Zone für Text)' : '◳ Text-area mask (white = calm zone for text)'} />
               )}
             </div>
           )}

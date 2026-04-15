@@ -4693,17 +4693,17 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt };
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask };
                     }
                     log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt };
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask };
                   }
                 }
               }
 
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt };
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
               return null;
@@ -4716,6 +4716,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
             sceneBackgrounds[bg.pageNumber] = {
               imageData: bg.imageData,
               prompt: bg.prompt,
+              textAreaMask: bg.textAreaMask || null,
               // Store QC data for dev mode comparison (v1 failed, v2 retry)
               ...(bg.v1ImageData ? {
                 v1ImageData: bg.v1ImageData,
@@ -4835,6 +4836,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
               grokRefImages: genResult.grokRefImages || null,
               emptySceneImage: emptySceneData?.imageData || null,
               emptyScenePrompt: emptySceneData?.prompt || null,
+              textAreaMask: emptySceneData?.textAreaMask || null,
               emptySceneQc: emptySceneData?.v1Issues ? {
                 v1ImageData: emptySceneData.v1ImageData,
                 v1Issues: emptySceneData.v1Issues,

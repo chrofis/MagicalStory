@@ -745,6 +745,7 @@ export interface SceneImage {
     visionFeedback?: string;
     retryPrompt?: string;
   } | null;
+  textAreaMask?: string | null;  // Base64 data URL — black/white reference mask sent to Grok showing where text-overlay calm zone must exist (white = calm patch)
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)

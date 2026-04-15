@@ -5098,6 +5098,7 @@ export function StoryDisplay({
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
                                 emptySceneQc={image.emptySceneQc}
+                                textAreaMask={image.textAreaMask}
                                 grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)]?.grokRefImages ?? (image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}

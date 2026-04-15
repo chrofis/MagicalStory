@@ -767,6 +767,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         hasVisualBibleGrid: !!img.visualBibleGrid,
         grokRefImages: img.grokRefImages || null,
         emptyScenePrompt: img.emptyScenePrompt || null,
+        emptySceneQc: img.emptySceneQc || null,
+        textAreaMask: img.textAreaMask || null,
         hasEmptySceneImage: pagesWithEmptyScene.has(img.pageNumber) || undefined,
         // Consistency regeneration - flags only, images lazy loaded
         consistencyRegen: img.consistencyRegen ? {
