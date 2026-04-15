@@ -179,8 +179,12 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   }
 
   // Grok edit output matches the input image aspect ratio (ignores aspect_ratio
-  // param). To get a specific output aspect, pad every input image to that aspect
-  // with white letterbox bars. Parses aspectRatio strings like '3:4', '1:1', '9:16'.
+  // param). To get a specific output aspect we must normalise every input image
+  // to that aspect. We CROP (fit: cover) rather than PAD (fit: contain+white)
+  // because white-bar padding on inputs survives through Grok's editing and ends
+  // up baked into every output — visible as letterbox bars on the stored image.
+  // Cropping loses a sliver of edge content on one axis but keeps the illustration
+  // edge-to-edge. Parses aspectRatio strings like '3:4', '1:1', '9:16'.
   const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
   const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
   for (let i = 0; i < images.length; i++) {
@@ -192,25 +196,26 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const currentRatio = meta.width / meta.height;
       // Skip if already within 1% of target (avoid gratuitous re-encode)
       if (Math.abs(currentRatio - targetRatio) / targetRatio < 0.01) continue;
-      // Compute the smallest box that contains the source and matches target aspect
+      // Pick the crop target so the SHORTER relative dimension stays intact
+      // and the LONGER is trimmed to match aspect.
       let targetW, targetH;
       if (currentRatio > targetRatio) {
-        // Source is wider — keep width, grow height
-        targetW = meta.width;
-        targetH = Math.round(meta.width / targetRatio);
-      } else {
-        // Source is taller — keep height, grow width
+        // Source wider than target — keep height, crop width
         targetH = meta.height;
         targetW = Math.round(meta.height * targetRatio);
+      } else {
+        // Source taller than target — keep width, crop height
+        targetW = meta.width;
+        targetH = Math.round(meta.width / targetRatio);
       }
-      const padded = await sharp(buf)
-        .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      const cropped = await sharp(buf)
+        .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
         .jpeg({ quality: 90 })
         .toBuffer();
-      images[i] = `data:image/jpeg;base64,${padded.toString('base64')}`;
-      log.debug(`🎨 [GROK] Padded edit image ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
+      images[i] = `data:image/jpeg;base64,${cropped.toString('base64')}`;
+      log.debug(`🎨 [GROK] Cropped edit input ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
     } catch (padErr) {
-      log.warn(`⚠️ [GROK] Failed to pad edit image ${i}: ${padErr.message}`);
+      log.warn(`⚠️ [GROK] Failed to crop edit image ${i}: ${padErr.message}`);
     }
   }
 
@@ -348,6 +353,56 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 // Shared constants for character composition
 const CHAR_BG = { r: 220, g: 220, b: 220 };
 const CHAR_GAP = 4;
+const LABEL_BG = { r: 26, g: 26, b: 26 };
+
+function escapeLabelXml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Stamp a bold name caption onto a character image so Grok can map each name
+ * to the right face. Label is appended BELOW the image on a dark bar with
+ * white bold text — matches the VB grid labeling pattern (see images.js).
+ * Sized proportionally to image width so it stays legible after the slot is
+ * resized down to ~1024px tall.
+ *
+ * @param {Buffer} buffer - Pre-composed character image (vertical stack or horizontal strip)
+ * @param {string|null} name - Character name; if falsy the buffer is returned unchanged
+ */
+async function labelCharacterImage(buffer, name) {
+  if (!name || typeof name !== 'string') return buffer;
+  const meta = await sharp(buffer).metadata();
+  const width = meta.width;
+  const height = meta.height;
+  if (!width || !height) return buffer;
+
+  // Label height ~9% of image width, clamped so tiny/huge slots stay readable.
+  const labelHeight = Math.max(52, Math.min(110, Math.round(width * 0.09)));
+  const fontSize = Math.max(28, Math.round(labelHeight * 0.58));
+  const baselineY = Math.round(labelHeight * 0.7);
+  const display = escapeLabelXml(name.length > 28 ? name.substring(0, 26) + '…' : name);
+
+  const labelSvg = `<svg width="${width}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${width}" height="${labelHeight}" fill="#1a1a1a"/>
+    <rect width="${width}" height="3" fill="#ffcc33"/>
+    <text x="${width / 2}" y="${baselineY}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="white" text-anchor="middle" stroke="black" stroke-width="1">${display}</text>
+  </svg>`;
+
+  return sharp({
+    create: { width, height: height + labelHeight, channels: 3, background: LABEL_BG },
+  })
+    .composite([
+      { input: buffer, left: 0, top: 0 },
+      { input: Buffer.from(labelSvg), left: 0, top: height },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
 
 /**
  * Extract Face Front and Body Front quadrants from a 2x2 avatar grid.
