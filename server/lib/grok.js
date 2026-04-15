@@ -282,10 +282,16 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
     // Verify output aspect ratio. Grok edit output is *supposed* to follow the
     // aspect_ratio param, but empirically it sometimes returns a different
-    // aspect (usually its preferred 1024x1024). Detect drift and letterbox/pad
-    // back to the requested aspect so the caller gets what it asked for.
+    // aspect (usually its preferred 1024x1024). Detect drift and CROP to the
+    // requested aspect so the caller gets what it asked for.
+    //
+    // We crop (cover) instead of padding (contain+white) because padding
+    // produces highly visible white bars on the stored image — scenes with
+    // ~0.89 aspect fitted to 0.7 target end up with 20% of vertical space
+    // being white. Center-cropping zooms the content slightly but keeps
+    // the image fully illustrated, which is what children's book pages need.
     // Character repair callers set skipOutputPadding=true because they handle
-    // border detection themselves — double-padding creates white bar artifacts.
+    // border detection themselves.
     if (!skipOutputPadding) try {
       const outBuf = Buffer.from(imageBase64, 'base64');
       const outMeta = await sharp(outBuf).metadata();
@@ -293,21 +299,26 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
         const outRatio = outMeta.width / outMeta.height;
         const drift = Math.abs(outRatio - targetRatio) / targetRatio;
         if (drift >= 0.01) {
-          log.warn(`⚠️ [GROK] Output aspect drift: ${outMeta.width}x${outMeta.height} (ratio ${outRatio.toFixed(3)}) vs requested ${aspectRatio} (ratio ${targetRatio.toFixed(3)}) — letterbox padding to correct`);
+          // Scale source so the SHORTER dimension (relative to target) fills
+          // the target, then center-crop the excess on the longer dimension.
+          // Derive targetW/targetH preserving the source's smaller side.
           let targetW, targetH;
           if (outRatio > targetRatio) {
-            targetW = outMeta.width;
-            targetH = Math.round(outMeta.width / targetRatio);
-          } else {
+            // Source wider than target: keep height, crop width
             targetH = outMeta.height;
             targetW = Math.round(outMeta.height * targetRatio);
+          } else {
+            // Source taller than target: keep width, crop height
+            targetW = outMeta.width;
+            targetH = Math.round(outMeta.width / targetRatio);
           }
-          const padded = await sharp(outBuf)
-            .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+          log.warn(`⚠️ [GROK] Output aspect drift: ${outMeta.width}x${outMeta.height} (ratio ${outRatio.toFixed(3)}) vs requested ${aspectRatio} (ratio ${targetRatio.toFixed(3)}) — center-cropping to ${targetW}x${targetH}`);
+          const cropped = await sharp(outBuf)
+            .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
             .jpeg({ quality: 90 })
             .toBuffer();
-          imageData = `data:image/jpeg;base64,${padded.toString('base64')}`;
-          log.info(`🎨 [GROK] Output corrected: ${outMeta.width}x${outMeta.height} → ${targetW}x${targetH}`);
+          imageData = `data:image/jpeg;base64,${cropped.toString('base64')}`;
+          log.info(`🎨 [GROK] Output corrected: ${outMeta.width}x${outMeta.height} → ${targetW}x${targetH} (cover-crop)`);
         } else {
           log.debug(`🎨 [GROK] Output ${outMeta.width}x${outMeta.height} matches target ${aspectRatio}`);
         }
