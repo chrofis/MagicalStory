@@ -116,7 +116,15 @@ async function main() {
   console.log('='.repeat(78));
   console.log(fullInstruction);
 
-  await pool.end();
+  pool.end().catch(() => {});
 }
 
-main().catch(e => { console.error('FAIL:', e.message); console.error(e.stack); process.exit(1); });
+// Windows + pg pool + process.exit races with libuv's async handle close,
+// tripping an assertion. Give the event loop one tick to settle, then exit.
+main()
+  .then(() => setTimeout(() => process.exit(0), 150))
+  .catch((e) => {
+    console.error('FAIL:', e.message);
+    console.error(e.stack);
+    setTimeout(() => process.exit(1), 150);
+  });
