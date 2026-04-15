@@ -94,6 +94,23 @@ async function detectCalmRegion(imageBuffer, textPosition, options = {}) {
       simplified = simplifyPolygon(pixelPolygon, epsilon * 0.5);
     }
 
+    // Step 9b: Rectangularize if the polygon is mostly boxy.
+    // When the calm region is a uniform sky/wall, per-row width variations create
+    // diagonal edges after simplification. If the polygon fills ≥85% of its bounding
+    // box, just use the bounding box (clean straight edges).
+    const polyAreaRaw = polygonArea(simplified);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of simplified) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    const bboxArea = (maxX - minX) * (maxY - minY);
+    if (bboxArea > 0 && polyAreaRaw / bboxArea >= 0.85) {
+      simplified = [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]];
+    }
+
     // Step 10: Validate and return
     const polyArea = polygonArea(simplified);
     const imageArea = width * height;
