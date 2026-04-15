@@ -2209,11 +2209,14 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
               photoUrl = fallbackData;
             }
             actualClothingUsed = fallbackCategory;
-            if (avatars.clothing && avatars.clothing[fallbackCategory]) {
+            // Only fill clothingDescription if not already set. The costumed branch
+            // above may have set it from clothingRequirements — don't overwrite the
+            // costume description with the standard one just because the photo fell back.
+            if (!clothingDescription && avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
               clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
             }
-            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${resolvedClothing}, using unstyled ${fallbackCategory}`);
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${resolvedClothing}, using unstyled ${fallbackCategory} (clothing desc kept: ${!!clothingDescription})`);
             break;
           }
         }
