@@ -54,7 +54,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -82,6 +82,16 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
       testMatch: /demo-story\.spec\.ts/,
+    },
+
+    // Trial → full-account end-to-end (no auth dep — the test itself registers
+    // a fresh account via the trial wizard → DB-flip → auto-claim flow).
+    {
+      name: 'trial-flow',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /trial-to-full\.spec\.ts/,
     },
 
     {
