@@ -280,9 +280,11 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
         return firstCostume;
       }
     }
-    // Fallback to standard styled if no costume found
+    // Fallback to standard styled if no costume found. This is a real clothing
+    // mismatch — the scene needed a costume but we're sending the standard
+    // avatar. Warn so it surfaces in logs and the repair can be diagnosed.
     if (styledForArt.standard) {
-      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed avatars, using standard as fallback`);
+      log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but no costumed avatars exist — sending standard (output will show standard clothing)`);
       return styledForArt.standard;
     }
   }
@@ -294,16 +296,18 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
     return styledAvatar;
   }
 
-  // Fallback chain: requested → standard → any other styled avatar → original photo
+  // Fallback chain: requested → standard → any other styled avatar → original photo.
+  // Each of these is a real clothing-category mismatch — warn on the actual
+  // substitution so the repair pipeline's inputs are auditable.
   if (styledForArt.standard) {
-    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}, using standard`);
+    log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory}, sending standard (output will show standard clothing)`);
     return styledForArt.standard;
   }
 
   // Try any other available styled avatar (winter, summer, or first costumed)
   for (const [key, value] of Object.entries(styledForArt)) {
     if (key !== 'costumed' && value && typeof value === 'string') {
-      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}/standard, using ${key} as fallback`);
+      log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but only ${key} exists — sending ${key} (output will show ${key} clothing)`);
       return value;
     }
   }
@@ -312,7 +316,7 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
     const firstCostume = Object.values(styledForArt.costumed)[0];
     if (firstCostume) {
-      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}/standard, using first costumed avatar as fallback`);
+      log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but only costumed exists — sending costumed (output will show the costume)`);
       return firstCostume;
     }
   }

@@ -4816,6 +4816,28 @@ function chooseRepairStrategy(evaluation) {
 }
 
 /**
+ * Force strategy switch when two consecutive repairs of the same kind have
+ * already failed on this page. If the page is entering a new repair round
+ * (meaning it's still bad) and the two previous rounds both used 'inpaint'
+ * (or both used 'iterate'), flip to the other approach. A third attempt of
+ * the same kind rarely succeeds where the first two didn't; swapping gives
+ * the alternative strategy a real chance before we spend the round budget.
+ *
+ * Returns 'inpaint' | 'iterate' | null. null means don't force anything.
+ */
+function forcedStrategyAfterFailures(versions) {
+  if (!Array.isArray(versions)) return null;
+  const repairs = versions.filter(v =>
+    v?.source && (v.source.startsWith('inpaint-') || v.source.startsWith('iterate-'))
+  );
+  if (repairs.length < 2) return null;
+  const last = repairs.slice(-2);
+  const strat = (v) => v.source.startsWith('inpaint-') ? 'inpaint' : 'iterate';
+  if (strat(last[0]) !== strat(last[1])) return null;
+  return strat(last[0]) === 'inpaint' ? 'iterate' : 'inpaint';
+}
+
+/**
  * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
  * and applies it via editImageWithPrompt().
  *
@@ -5493,13 +5515,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const progressBase = 35 + Math.floor((round - 1) / maxRegenAttempts * 25);
     await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
 
-    // Choose strategy for each bad page
+    // Choose strategy for each bad page. If the last two repair rounds on
+    // this page both used the same approach and didn't fix it, force a flip
+    // — doing inpaint a third time rarely succeeds where two already failed.
     const pageStrategies = badPages.map(img => {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
 
-      const { strategy, reason } = chooseRepairStrategy(latestEval || {});
+      const forced = forcedStrategyAfterFailures(versions);
+      let strategy, reason;
+      if (forced) {
+        strategy = forced;
+        reason = `forced ${forced} — last two rounds both used ${forced === 'inpaint' ? 'iterate' : 'inpaint'} without fixing it`;
+      } else {
+        const chosen = chooseRepairStrategy(latestEval || {});
+        strategy = chosen.strategy;
+        reason = chosen.reason;
+      }
       log.info(`  📋 [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: ${strategy} (${reason})`);
 
       return { img, strategy, latestEval };

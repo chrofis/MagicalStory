@@ -88,8 +88,12 @@ function extractJobs(lines) {
     const line = lines[i];
     const msg = line.message;
 
-    // Find job IDs in various patterns
-    const jobIdMatch = msg.match(/(job_\S+)/);
+    // Find job IDs in various patterns. Normalize by capturing ONLY the base
+    // id (digits + alnum suffix) — without this, variants like
+    // "job_123_abc,", "job_123_abc/metadata", "job_123_abc/dev-metadata"
+    // spawned duplicate "jobs" in the report. The canonical id has exactly
+    // this shape: `job_<digits>_<alnum>`.
+    const jobIdMatch = msg.match(/(job_\d+_[a-z0-9]+)/);
     if (jobIdMatch) {
       const jobId = jobIdMatch[1];
       if (!jobsById.has(jobId)) {
@@ -105,15 +109,23 @@ function extractJobs(lines) {
         });
       }
       const job = jobsById.get(jobId);
-      job.endIndex = i;
+      // Only push endIndex forward before the job has completed — prevents
+      // post-completion lines from being swept into the job's line range.
+      if (!job.completionTime) {
+        job.endIndex = i;
+      }
 
-      // Update timestamps
+      // Update timestamps. Once a completion line has been seen, freeze the
+      // end window — without this, any post-completion activity that happens
+      // to mention the job ID (e.g. a user re-fetching story metadata 50
+      // minutes later, which causes unrelated background prefetches to land
+      // in the same log section) gets pulled into the job's "issues" list.
       const ts = parseTimestamp(line.timestamp);
       if (!job.startTime || ts < job.startTime) {
         job.startTime = ts;
         job.startIndex = i;
       }
-      if (!job.endTime || ts > job.endTime) {
+      if (!job.completionTime && (!job.endTime || ts > job.endTime)) {
         job.endTime = ts;
       }
 
@@ -521,8 +533,9 @@ function extractImageStats(jobLines) {
     }
 
     // ── Unified Repair Pipeline ──────────────────────────────────────────
-    // Start: "🔧 [UNIFIED PIPELINE] Starting: 8 images, threshold=60, maxAttempts=2, mode=generateImageOnly"
-    const pipelineStartMatch = msg.match(/\[UNIFIED PIPELINE\] Starting:\s*(\d+)\s*images,\s*threshold=(\d+),\s*maxAttempts=(\d+),\s*mode=(\S+)/);
+    // Start: "🔧 [UNIFIED PIPELINE] Starting: 8 images, threshold=60, maxPasses=2, mode=generateImageOnly"
+    // (older logs used maxAttempts= instead of maxPasses=)
+    const pipelineStartMatch = msg.match(/\[UNIFIED PIPELINE\] Starting:\s*(\d+)\s*images,\s*threshold=(\d+),\s*(?:maxAttempts|maxPasses)=(\d+),\s*mode=(\S+)/);
     if (pipelineStartMatch) {
       stats.repairPipeline.ran = true;
       stats.repairPipeline.imageCount = parseInt(pipelineStartMatch[1]);
@@ -586,12 +599,34 @@ function extractImageStats(jobLines) {
       });
     }
 
+    // Newer pipeline uses "Round N" instead of "pass N" to open each repair
+    // round: "🔄 [UNIFIED PIPELINE] Round 1: 10 bad pages → 10 inpaint, 0 iterate"
+    const roundStartMatch = msg.match(/\[UNIFIED PIPELINE\] Round (\d+):\s*(\d+)\s*bad pages/);
+    if (roundStartMatch) {
+      const passNum = parseInt(roundStartMatch[1]);
+      if (!stats.repairPipeline.passes.find(p => p.pass === passNum)) {
+        stats.repairPipeline.passes.push({
+          pass: passNum,
+          pagesRegenerated: parseInt(roundStartMatch[2]),
+          duration: null
+        });
+      }
+    }
+
     // Pass complete: "✅ [UNIFIED PIPELINE] Pass 1: 1/1 regenerated in 9.3s"
     const passCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Pass (\d+):\s*(\d+)\/(\d+)\s*regenerated in ([\d.]+)s/);
     if (passCompleteMatch) {
       const passNum = parseInt(passCompleteMatch[1]);
       const pass = stats.repairPipeline.passes.find(p => p.pass === passNum);
       if (pass) pass.duration = parseFloat(passCompleteMatch[4]);
+    }
+
+    // Newer pipeline: "✅ [UNIFIED PIPELINE] Round 1: 10/10 repaired in 65.0s"
+    const roundCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Round (\d+):\s*(\d+)\/(\d+)\s*repaired in ([\d.]+)s/);
+    if (roundCompleteMatch) {
+      const passNum = parseInt(roundCompleteMatch[1]);
+      const pass = stats.repairPipeline.passes.find(p => p.pass === passNum);
+      if (pass) pass.duration = parseFloat(roundCompleteMatch[4]);
     }
 
     // Page upgraded: "📊 [UNIFIED PIPELINE] Page 11: selected regen-attempt-1 (score 80) over original (score 45)"
@@ -1175,6 +1210,34 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
         });
         if (stillBad.length > 0) {
           console.log(`     Still below: ${stillBad.map(p => pageLabel(p)).join(', ')}`);
+        }
+      }
+
+      // Regression summary — surface pages that actively got WORSE across the
+      // repair pipeline. A single-pass delta can dip; persistent backwards
+      // trajectory is the real red flag (the strategy flip helper in images.js
+      // exists to head these off).
+      const regressions = [];
+      for (const page of allPages) {
+        const history = [];
+        for (let p = 0; p <= Math.max(...scoresByPass.keys()); p++) {
+          const s = scoresByPass.get(p)?.get(page);
+          if (s) history.push({ pass: p, score: s.final });
+        }
+        if (history.length < 2) continue;
+        const maxScore = Math.max(...history.map(h => h.score));
+        const lastScore = history[history.length - 1].score;
+        const worstDip = maxScore - Math.min(...history.map(h => h.score));
+        // Only flag if the page ended below its peak AND the dip was meaningful
+        if (lastScore < maxScore && worstDip >= 10) {
+          regressions.push({ page, history, maxScore, lastScore, dip: worstDip });
+        }
+      }
+      if (regressions.length > 0) {
+        console.log(`\n   ⚠️  Score regressions (score went down across passes):`);
+        for (const r of regressions) {
+          const trajectory = r.history.map(h => `p${h.pass}:${h.score}%`).join(' → ');
+          console.log(`     ${pageLabel(r.page)}: ${trajectory}  (peak ${r.maxScore}% → final ${r.lastScore}%, dip ${r.dip})`);
         }
       }
     }
