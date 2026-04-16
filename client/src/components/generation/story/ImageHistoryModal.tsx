@@ -426,6 +426,12 @@ export function ImageHistoryModal({
                   {detailVersion.modelId && (
                     <div className="text-sm text-gray-500">Model: <code className="bg-gray-100 px-1 rounded">{detailVersion.modelId}</code></div>
                   )}
+                  {detailVersion.textSpaceCoveragePct != null && (
+                    <div className="text-sm text-gray-500">
+                      Text-space coverage: <span className="font-semibold text-gray-700">{detailVersion.textSpaceCoveragePct}%</span>
+                      {detailVersion.textSpacePosition && <span className="ml-1 text-gray-400">({detailVersion.textSpacePosition})</span>}
+                    </div>
+                  )}
                   {detailVersion.userInput && (
                     <DetailBlock
                       label={language === 'de' ? 'Benutzer-Eingabe' : language === 'fr' ? 'Entrée utilisateur' : 'User Input'}

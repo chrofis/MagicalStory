@@ -5017,9 +5017,12 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
           const words = countWords(img.text);
           const requiredPct = requiredTextCoveragePct(words, fontPt);
 
-          // Candidate = { rawImage, washedImage, coverage (fraction), rect, position }
+          // Candidate = { rawImage, washedImage, coverage (fraction), rect, position, prompt?, modelId? }
+          // Candidate 0 is always the original generated image; candidates 1..N
+          // are the text-space-repair attempts (each a fresh Grok/Gemini call
+          // with a mask hint, so each is a different composition).
           const candidates = [];
-          const runDetection = async (rawImage) => {
+          const runDetection = async (rawImage, extra = {}) => {
             const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber);
             candidates.push({
               rawImage,
@@ -5028,6 +5031,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
               rect: r.rect,
               position: r.position,
               overridden: r.overridden,
+              ...extra,
             });
             return r;
           };
@@ -5065,7 +5069,10 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                   const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                   addUsage(provider, repairResult.usage, 'page_images', repairResult.modelId);
                 }
-                await runDetection(repairResult.imageData);
+                await runDetection(repairResult.imageData, {
+                  prompt: repairPrompt,
+                  modelId: repairResult.modelId || null,
+                });
                 const latest = candidates[candidates.length - 1];
                 log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%`);
                 if (latest.coverage * 100 >= requiredPct) break; // good enough, stop early
@@ -5083,6 +5090,27 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
           const passed = finalPct >= requiredPct;
 
           img.imageData = winner.washedImage; // wash already baked in by detectAndLightenTextRegion
+          // Keep every candidate so the repair pipeline can expand them into
+          // separate versions. Without this, the retry attempts AND the
+          // truly-original image are discarded — the viewer then shows the
+          // coverage winner labeled "original" and the user has no way back.
+          // When the winner has dropped image quality for the sake of
+          // coverage (terrible scene / wrong characters / broken composition),
+          // we want every candidate visible so a different one can be picked.
+          img.textSpaceCandidates = candidates.length > 1
+            ? candidates.map((c, i) => ({
+                imageData: c.washedImage,
+                coverage: c.coverage,
+                coveragePct: Number((c.coverage * 100).toFixed(1)),
+                position: c.position,
+                rect: c.rect,
+                overridden: c.overridden,
+                prompt: c.prompt || null,         // repair prompt (null for original)
+                modelId: c.modelId || img.modelId || null,
+                source: i === 0 ? 'original' : `text-space-repair-${i}`,
+                isWinner: i === winnerIdx,
+              }))
+            : null;
           img.textCoverageReport = {
             words,
             fontPt,

@@ -5304,7 +5304,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const pageVersions = new Map();
   for (const img of rawImages) {
     const ev = evalMap.get(img.pageNumber);
-    pageVersions.set(img.pageNumber, [{
+    const baseVersion = {
       imageData: img.imageData,
       score: ev?.score ?? ev?.qualityScore ?? null,
       source: 'original',
@@ -5313,7 +5313,37 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       grokRefImages: img.grokRefImages || null,
       entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
       evaluatedAt: new Date().toISOString(),
-    }]);
+    };
+
+    // If the text-space repair ran, it already produced multiple candidates
+    // (the truly-original image plus 1–2 repair attempts). Expand them into
+    // separate versions so the viewer shows each one and the user can switch
+    // between them — otherwise only the coverage-winner survives and the
+    // others are lost. Eval only runs on the winner (img.imageData), so the
+    // non-winner versions start without scores; that's fine — they're there
+    // for inspection and manual selection.
+    if (Array.isArray(img.textSpaceCandidates) && img.textSpaceCandidates.length > 1) {
+      const allVersions = img.textSpaceCandidates.map((c) => {
+        const isWinner = c.isWinner;
+        return {
+          imageData: c.imageData,
+          score: isWinner ? baseVersion.score : null,
+          source: c.source,
+          evaluation: isWinner ? baseVersion.evaluation : null,
+          modelId: c.modelId || baseVersion.modelId,
+          grokRefImages: isWinner ? baseVersion.grokRefImages : null,
+          entityPenalty: isWinner ? baseVersion.entityPenalty : 0,
+          evaluatedAt: new Date().toISOString(),
+          // Surface the text-space repair inputs in the viewer's repair section.
+          inpaintInstruction: c.prompt || null,
+          textSpaceCoveragePct: c.coveragePct,
+          textSpacePosition: c.position,
+        };
+      });
+      pageVersions.set(img.pageNumber, allVersions);
+    } else {
+      pageVersions.set(img.pageNumber, [baseVersion]);
+    }
   }
 
   // Helper: execute an iterate action for a page
@@ -6029,6 +6059,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // Build imageVersions array — ALL versions in chronological order
     const imageVersions = [];
+    const typeFor = (source) => {
+      if (source === 'original') return 'original';
+      if (source === 'character-fix') return 'entity-repair';
+      if (typeof source === 'string' && source.startsWith('text-space-repair')) return 'text-space-repair';
+      return 'repair';
+    };
     const buildVersionEntry = (v) => ({
       imageData: v.imageData,
       qualityScore: v.score,                                    // combined final (visual − semantic penalty)
@@ -6040,7 +6076,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       issuesSummary: v.evaluation?.issuesSummary || null,
       fixableIssues: v.evaluation?.fixableIssues || [],
       source: v.source,
-      type: v.source === 'original' ? 'original' : (v.source === 'character-fix' ? 'entity-repair' : 'repair'),
+      type: typeFor(v.source),
       modelId: v.modelId,
       generatedAt: new Date().toISOString(),
       qualityReasoning: v.evaluation?.reasoning || null,
@@ -6051,6 +6087,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       grokRefImages: v.grokRefImages || null,
       inpaintInstruction: v.inpaintInstruction || null,
       inpaintReferenceImages: v.inpaintReferenceImages || null,
+      textSpaceCoveragePct: v.textSpaceCoveragePct ?? null,
+      textSpacePosition: v.textSpacePosition || null,
     });
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));

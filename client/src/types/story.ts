@@ -692,6 +692,11 @@ export interface ImageVersion {
   // Entity repair specific
   entityRepairedFor?: string;
   clothingCategory?: string;
+  // Text-space repair: coverage % of the calm region detected for overlay text,
+  // and the side the text sits on (top-left/bottom-right/etc). Present on
+  // original + each text-space-repair-N candidate so the user can compare.
+  textSpaceCoveragePct?: number | null;
+  textSpacePosition?: string | null;
 }
 
 // Landmark reference photo for real-world locations
