@@ -1428,6 +1428,8 @@ async function getPriceForPages(pageCount, isHardcover) {
 // ── Referral / promo code helpers ───────────────────────────────────────────
 
 const { generateReferralCode } = require('../lib/referral');
+const { hasPaidOrder } = require('../lib/orders');
+const referralBalance = require('../lib/referralBalance');
 
 /**
  * Validate a referral code for a given buyer. Returns { valid, referrerUserId, discountChf, reason }.
@@ -1454,6 +1456,12 @@ async function validateReferralCodeForUser(code, buyerUserId) {
   );
   if (buyerResult.rows.length > 0 && buyerResult.rows[0].referred_by) {
     return { valid: false, reason: 'You have already used a referral code' };
+  }
+
+  // First-time-buyer rule: only users with no past paid order can redeem.
+  // Webhook re-checks this after Stripe completion (race protection).
+  if (await hasPaidOrder(buyerUserId)) {
+    return { valid: false, reason: 'Referral codes are only available for first-time customers' };
   }
 
   return {
@@ -1533,6 +1541,147 @@ router.post('/referral/validate', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/referral/balance — referrer's CHF balance + recent ledger
+router.get('/referral/balance', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { balanceCents, pendingCents, availableCents } = await referralBalance.getBalance(userId);
+    const history = await referralBalance.getPayoutHistory(userId, 20);
+    res.json({
+      balanceCents,
+      pendingCents,
+      availableCents,
+      creditsPerChf: CREDIT_CONFIG.REFERRAL.CREDITS_PER_CHF,
+      cashoutMinCents: CREDIT_CONFIG.REFERRAL.CASHOUT_MIN_CENTS,
+      convertMinCents: CREDIT_CONFIG.REFERRAL.CONVERT_MIN_CENTS,
+      history,
+    });
+  } catch (err) {
+    log.error('❌ Error fetching referral balance:', err);
+    res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
+
+// POST /api/referral/convert-to-credits — spend balance to top up story credits
+router.post('/referral/convert-to-credits', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const amountCents = parseInt(req.body.amountCents);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      return res.status(400).json({ error: 'Invalid amountCents' });
+    }
+    if (amountCents < CREDIT_CONFIG.REFERRAL.CONVERT_MIN_CENTS) {
+      return res.status(400).json({ error: `Minimum convert is CHF ${(CREDIT_CONFIG.REFERRAL.CONVERT_MIN_CENTS / 100).toFixed(2)}` });
+    }
+    const result = await referralBalance.spendForCredits({
+      userId,
+      amountCents,
+      creditsPerChf: CREDIT_CONFIG.REFERRAL.CREDITS_PER_CHF,
+    });
+    if (!result.ok) {
+      if (result.reason === 'insufficient_available') {
+        return res.status(422).json({ error: 'Insufficient available balance' });
+      }
+      return res.status(400).json({ error: result.reason });
+    }
+    const after = await referralBalance.getBalance(userId);
+    res.json({
+      ok: true,
+      creditsAdded: result.creditsAdded,
+      newCredits: result.newCredits,
+      ...after,
+    });
+  } catch (err) {
+    log.error('❌ Error converting referral balance to credits:', err);
+    res.status(500).json({ error: 'Failed to convert' });
+  }
+});
+
+// POST /api/referral/cash-out — spend balance via Stripe refund(s) to original card(s).
+// Refunds are issued newest-first across the user's paid orders, capped by each
+// PaymentIntent's remaining refundable amount (queried live from Stripe).
+// Partial success is the only correct behavior — Stripe has no "un-refund".
+router.post('/referral/cash-out', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const amountCents = parseInt(req.body.amountCents);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      return res.status(400).json({ error: 'Invalid amountCents' });
+    }
+    if (amountCents < CREDIT_CONFIG.REFERRAL.CASHOUT_MIN_CENTS) {
+      return res.status(400).json({ error: `Minimum cashout is CHF ${(CREDIT_CONFIG.REFERRAL.CASHOUT_MIN_CENTS / 100).toFixed(2)}` });
+    }
+
+    const balance = await referralBalance.getBalance(userId);
+    if (balance.availableCents < amountCents) {
+      return res.status(422).json({ error: 'Insufficient available balance', availableCents: balance.availableCents });
+    }
+
+    // Caller passes the order-aware Stripe picker so refunds hit the correct
+    // account (test vs live based on order.stripe_mode, NOT current user state).
+    const { getStripeClientForOrder } = req.app.locals;
+    if (typeof getStripeClientForOrder !== 'function') {
+      log.error('❌ [REFERRAL CASHOUT] getStripeClientForOrder not registered on app.locals');
+      return res.status(500).json({ error: 'Stripe client picker missing' });
+    }
+
+    const refundable = await referralBalance.getRefundableAmount(userId, getStripeClientForOrder);
+    if (refundable.totalRefundableCents < amountCents) {
+      return res.status(422).json({
+        error: `Only CHF ${(refundable.totalRefundableCents / 100).toFixed(2)} can be refunded to your card. Use the rest as a discount on your next book or convert to credits.`,
+        refundableCents: refundable.totalRefundableCents,
+      });
+    }
+
+    let remaining = amountCents;
+    const succeeded = [];
+    const failed = [];
+
+    for (const order of refundable.orders) {
+      if (remaining <= 0) break;
+      const refundAmount = Math.min(remaining, order.refundableCents);
+      const stripe = getStripeClientForOrder({ stripe_mode: order.stripeMode });
+      if (!stripe) {
+        failed.push({ orderId: order.orderId, error: 'No Stripe client for mode ' + order.stripeMode });
+        continue;
+      }
+      try {
+        const refund = await stripe.refunds.create({
+          payment_intent: order.paymentIntentId,
+          amount: refundAmount,
+          reason: 'requested_by_customer',
+          metadata: { type: 'referral_cashout', user_id: userId, order_session_id: order.sessionId },
+        });
+        await referralBalance.spendForRefund({
+          userId,
+          amountCents: refundAmount,
+          refundId: refund.id,
+          sessionId: order.sessionId,
+        });
+        succeeded.push({ orderId: order.orderId, refundId: refund.id, amountCents: refundAmount });
+        remaining -= refundAmount;
+        log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${refund.id} (PI ${order.paymentIntentId})`);
+      } catch (stripeErr) {
+        failed.push({ orderId: order.orderId, error: stripeErr.message, code: stripeErr.code });
+        log.warn(`⚠️ [REFERRAL CASHOUT] Refund failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${stripeErr.message}`);
+        // Continue to next order — Stripe has no "un-refund"
+      }
+    }
+
+    const after = await referralBalance.getBalance(userId);
+    res.json({
+      ok: succeeded.length > 0,
+      refundedCents: amountCents - remaining,
+      succeeded,
+      failed,
+      ...after,
+    });
+  } catch (err) {
+    log.error('❌ Error processing referral cashout:', err);
+    res.status(500).json({ error: 'Failed to process cashout' });
+  }
+});
+
 // Create Stripe checkout session for book purchase
 router.post('/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
@@ -1540,6 +1689,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     const { storyId, storyIds, coverType = 'softcover', bookFormat = 'A4', referralCode } = req.body;
     const quantity = Math.max(1, Math.min(5, parseInt(req.body.quantity) || 1));
     const userId = req.user.id;
+    // Optional: spend referral balance on this checkout (additional discount beyond referral code)
+    const requestedUseBalanceCents = Math.max(0, parseInt(req.body.useBalanceCents) || 0);
 
     // Normalize to array
     const allStoryIds = storyIds || (storyId ? [storyId] : []);
@@ -1623,8 +1774,23 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
       }
     }
 
-    const price = Math.max(0, totalPriceChf * 100 - discountCents);
-    log.info(`💰 [CHECKOUT] ${quantity}× CHF ${priceInChf} (${booksSubtotal}) + CHF ${SHIPPING_COST_CHF} shipping${discountCents ? ` - CHF ${discountCents / 100} referral` : ''} = CHF ${price / 100}`);
+    // Apply referral balance spend (separate from buyer-side referral code discount).
+    // Cap so the final Stripe charge stays >= CHF 1.00 (Stripe minimum).
+    let useBalanceCents = 0;
+    if (requestedUseBalanceCents > 0) {
+      const bal = await referralBalance.getBalance(userId);
+      const priceAfterRefDiscount = Math.max(0, totalPriceChf * 100 - discountCents);
+      const maxSpendable = Math.max(0, priceAfterRefDiscount - 100); // leave at least CHF 1
+      useBalanceCents = Math.min(requestedUseBalanceCents, bal.availableCents, maxSpendable);
+      if (useBalanceCents > 0) {
+        log.info(`💰 [CHECKOUT] Will hold CHF ${(useBalanceCents / 100).toFixed(2)} referral balance after session creation (available: CHF ${(bal.availableCents / 100).toFixed(2)})`);
+      } else if (requestedUseBalanceCents > 0) {
+        log.warn(`💰 [CHECKOUT] User asked to spend CHF ${(requestedUseBalanceCents / 100).toFixed(2)} but available is CHF ${(bal.availableCents / 100).toFixed(2)} or order too small — ignoring`);
+      }
+    }
+
+    const price = Math.max(0, totalPriceChf * 100 - discountCents - useBalanceCents);
+    log.info(`💰 [CHECKOUT] ${quantity}× CHF ${priceInChf} (${booksSubtotal}) + CHF ${SHIPPING_COST_CHF} shipping${discountCents ? ` - CHF ${discountCents / 100} referral` : ''}${useBalanceCents ? ` - CHF ${useBalanceCents / 100} balance` : ''} = CHF ${price / 100}`);
 
     const firstStory = stories[0].data;
     const bookTitle = stories.length === 1
@@ -1659,10 +1825,16 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         coverType: coverType,
         bookFormat: bookFormat,
         quantity: quantity.toString(),
+        // stripeMode: persisted on orders.stripe_mode at webhook completion so
+        // refunds (cashout flow) hit the same Stripe account as the original PI.
+        stripeMode: isTestMode ? 'test' : 'live',
         ...(validatedReferralCode && {
           referralCode: validatedReferralCode,
           referrerUserId: referrerUserId,
           discountCents: discountCents.toString(),
+        }),
+        ...(useBalanceCents > 0 && {
+          useBalanceCents: useBalanceCents.toString(),
         }),
       },
       shipping_address_collection: {
@@ -1672,6 +1844,26 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 
     console.log(`✅ Checkout session created: ${session.id}`);
     log.debug(`   Stories: ${stories.length}, Pages: ${totalPages}, Price: CHF ${price / 100}`);
+
+    // Hold the referral balance now that we have a sessionId. If hold fails,
+    // the discount is already baked into Stripe — log and continue (the worst
+    // case is the user gets a discount they didn't draw from balance, which
+    // self-corrects to "free money" for them, small loss).
+    if (useBalanceCents > 0) {
+      try {
+        const holdResult = await referralBalance.holdPending({
+          userId,
+          amountCents: useBalanceCents,
+          sessionId: session.id,
+          description: `Hold for checkout ${session.id} (${stories.length} stories)`,
+        });
+        if (!holdResult.ok) {
+          log.error(`❌ [CHECKOUT] holdPending failed for user ${userId} session ${session.id}: ${holdResult.reason} — discount granted but balance not held`);
+        }
+      } catch (holdErr) {
+        log.error(`❌ [CHECKOUT] holdPending threw for user ${userId} session ${session.id}: ${holdErr.message}`);
+      }
+    }
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err) {

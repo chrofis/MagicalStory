@@ -56,6 +56,16 @@ function getStripeForUser(user) {
   return stripeLive || stripeTest || stripeLegacy; // fallback chain for live users
 }
 
+// Pick Stripe client by recorded order mode (NOT current user state).
+// Required for refunds: a user's role may change between order and refund;
+// refunds must hit the same Stripe account that processed the original PI.
+// Legacy orders without stripe_mode are treated as live (admins were rare pre-cutover).
+function getStripeClientForOrder(order) {
+  const mode = order?.stripe_mode || 'live';
+  if (mode === 'test') return stripeTest || stripeLegacy;
+  return stripeLive || stripeTest || stripeLegacy;
+}
+
 // Helper: Check if user should use test mode
 // Admins AND impersonating admins use test mode (Gelato drafts, test Stripe)
 function isUserTestMode(user) {
@@ -831,14 +841,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             return;
           }
 
+          // stripe_mode: which Stripe account processed this PI. Required for
+          // refunds — refunds must hit the same account that took the payment.
+          // Set in checkout session metadata at creation time. Default 'live'
+          // for legacy/missing metadata.
+          const stripeMode = fullSession.metadata?.stripeMode === 'test' ? 'test' : 'live';
+
           await dbPool.query(`
             INSERT INTO orders (
               user_id, story_id, stripe_session_id, stripe_payment_intent_id,
               customer_name, customer_email,
               shipping_name, shipping_address_line1, shipping_address_line2,
               shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              amount_total, currency, payment_status, quantity
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+              amount_total, currency, payment_status, quantity, stripe_mode
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           `, [
             userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
             customerInfo.name, customerInfo.email,
@@ -846,7 +862,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             address.line1, address.line2,
             address.city, address.state, address.postal_code, address.country,
             fullSession.amount_total, fullSession.currency, fullSession.payment_status,
-            orderQuantity
+            orderQuantity, stripeMode
           ]);
 
           // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
@@ -889,11 +905,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
           }
 
-          // ── Referral credit: if a valid referral code was used, reward the referrer.
-          // Uses referred_by as the atomic idempotency lock: if the UPDATE touches 0
-          // rows the buyer was already referred (by this or another concurrent webhook),
-          // so we skip the credit grant entirely. All steps run in a transaction so
-          // they either all succeed or all roll back.
+          // ── Referral cashback: if a valid referral code was used, credit
+          // the referrer's CHF balance (was credits pre-cutover). Idempotent
+          // via referral_events UNIQUE(stripe_session_id) AND the partial unique
+          // index on referral_payouts(session_id) WHERE type='earned'.
+          //
+          // RACE PROTECTION: re-check hasPaidOrder(buyerUserId) inside the
+          // transaction. The referral code claim happens at checkout creation
+          // (print.js TOCTOU lock on referred_by), but a buyer could complete
+          // a non-referral checkout between code claim and this webhook, which
+          // would mean they're no longer a first-time buyer. Skip the reward
+          // in that case — leave referred_by claim intact for audit.
           const refCode = fullSession.metadata?.referralCode;
           const refReferrerId = fullSession.metadata?.referrerUserId;
           const refDiscountCents = parseInt(fullSession.metadata?.discountCents) || 0;
@@ -902,9 +924,6 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             try {
               await client.query('BEGIN');
 
-              // Idempotency: the unique constraint on order_stripe_session_id prevents
-              // duplicate credit grants. referred_by was already set at checkout creation
-              // time (TOCTOU fix), so we don't check it here.
               const existing = await client.query(
                 'SELECT id FROM referral_events WHERE order_stripe_session_id = $1', [fullSession.id]
               );
@@ -912,49 +931,75 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
                 await client.query('ROLLBACK');
                 log.warn('⚠️ [STRIPE WEBHOOK] Referral already processed for session:', fullSession.id);
               } else {
-                const creditsToGrant = CREDIT_CONFIG.REFERRAL.REFERRER_CREDITS;
-
-                // Step 2: record the referral event (unique constraint on stripe_session_id
-                // is a backstop — the referred_by lock above is the primary guard)
-                await client.query(`
-                  INSERT INTO referral_events (referrer_user_id, buyer_user_id, order_stripe_session_id, discount_cents, credits_granted)
-                  VALUES ($1, $2, $3, $4, $5)
-                `, [refReferrerId, userId, fullSession.id, refDiscountCents, creditsToGrant]);
-
-                // Step 3: update the order with referral info
-                await client.query(
-                  'UPDATE orders SET referral_code_used = $1, discount_cents = $2 WHERE stripe_session_id = $3',
-                  [refCode, refDiscountCents, fullSession.id]
+                // First-time-buyer race re-check. NOTE: this order itself
+                // hasn't been counted yet (orders.payment_status update happens
+                // above but in same flow) — exclude THIS session from the check.
+                const { hasPaidOrder } = require('./server/lib/orders');
+                const otherPaid = await client.query(
+                  `SELECT 1 FROM orders
+                     WHERE user_id = $1
+                       AND payment_status = 'paid'
+                       AND stripe_session_id != $2
+                     LIMIT 1`,
+                  [userId, fullSession.id]
                 );
+                if (otherPaid.rows.length > 0) {
+                  await client.query('ROLLBACK');
+                  log.warn(`⚠️ [STRIPE WEBHOOK] Buyer ${userId} already had a paid order — skipping referral reward (race window).`);
+                } else {
+                  const cashbackCents = CREDIT_CONFIG.REFERRAL.REFERRER_CASHBACK_CENTS;
 
-                // Step 4: credit the referrer
-                await client.query(
-                  'UPDATE users SET credits = CASE WHEN credits = -1 THEN -1 ELSE credits + $1 END WHERE id = $2',
-                  [creditsToGrant, refReferrerId]
-                );
+                  // Audit row (legacy table; credits_granted=0 since we no longer grant credits)
+                  await client.query(`
+                    INSERT INTO referral_events (referrer_user_id, buyer_user_id, order_stripe_session_id, discount_cents, credits_granted)
+                    VALUES ($1, $2, $3, $4, 0)
+                  `, [refReferrerId, userId, fullSession.id, refDiscountCents]);
 
-                // Step 5: record credit transaction for referrer
-                const refBalanceResult = await client.query('SELECT credits FROM users WHERE id = $1', [refReferrerId]);
-                await client.query(`
-                  INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-                  VALUES ($1, $2, $3, 'referral', $4, $5)
-                `, [
-                  refReferrerId,
-                  creditsToGrant,
-                  refBalanceResult.rows[0]?.credits || creditsToGrant,
-                  fullSession.id,
-                  `Referral reward: a friend used your code ${refCode}`
-                ]);
+                  // Buyer's order: record code + discount applied
+                  await client.query(
+                    'UPDATE orders SET referral_code_used = $1, discount_cents = $2 WHERE stripe_session_id = $3',
+                    [refCode, refDiscountCents, fullSession.id]
+                  );
 
-                await client.query('COMMIT');
-                log.info(`🎁 [STRIPE WEBHOOK] Referral reward: ${creditsToGrant} credits to ${refReferrerId} (code ${refCode}, buyer ${userId}, discount CHF ${refDiscountCents / 100})`);
+                  // Credit referrer's CHF balance via the dedicated module.
+                  const { creditEarned } = require('./server/lib/referralBalance');
+                  await creditEarned({
+                    userId: refReferrerId,
+                    amountCents: cashbackCents,
+                    sessionId: fullSession.id,
+                    sourceUserId: userId,
+                    description: `Referral cashback: code ${refCode} used by buyer ${userId}`,
+                  }, client);
+
+                  await client.query('COMMIT');
+                  log.info(`🎁 [STRIPE WEBHOOK] Referral cashback: CHF ${(cashbackCents / 100).toFixed(2)} to ${refReferrerId} (code ${refCode}, buyer ${userId}, discount CHF ${refDiscountCents / 100})`);
+                }
               }
             } catch (refErr) {
               await client.query('ROLLBACK').catch(() => {});
-              log.error('❌ [STRIPE WEBHOOK] Referral credit failed (rolled back):', refErr.message);
+              log.error('❌ [STRIPE WEBHOOK] Referral cashback failed (rolled back):', refErr.message);
               // Don't throw — the order itself is already saved outside this block
             } finally {
               client.release();
+            }
+          }
+
+          // ── Confirm pending balance hold: if the BUYER used their referral
+          // balance on this checkout, convert the pending hold into a confirmed
+          // spend (decrement both balance and pending). Idempotent.
+          const useBalanceCents = parseInt(fullSession.metadata?.useBalanceCents) || 0;
+          if (useBalanceCents > 0 && userId) {
+            try {
+              const { confirmPending } = require('./server/lib/referralBalance');
+              const result = await confirmPending({ userId, sessionId: fullSession.id });
+              if (result.confirmed) {
+                log.info(`💰 [STRIPE WEBHOOK] Confirmed referral balance spend: CHF ${(result.amountCents / 100).toFixed(2)} from ${userId} (session ${fullSession.id})`);
+              } else if (result.alreadyResolved) {
+                log.warn(`⚠️ [STRIPE WEBHOOK] Pending balance already ${result.resolvedAs} for session ${fullSession.id}`);
+              }
+            } catch (confirmErr) {
+              log.error(`❌ [STRIPE WEBHOOK] confirmPending failed for session ${fullSession.id}:`, confirmErr.message);
+              // Don't throw — order is saved, this is a balance bookkeeping issue
             }
           }
 
@@ -1003,6 +1048,32 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         log.error('   Error stack:', retrieveError.stack);
         log.error('   Session ID:', session.id);
         log.error('   This payment succeeded but order processing failed!');
+      }
+    }
+
+    // ── checkout.session.expired: release any referral balance hold so the
+    // user gets their pending CHF back. Stripe expires unfinished sessions
+    // after ~24h. Idempotent.
+    if (event.type === 'checkout.session.expired') {
+      const session = event.data.object;
+      const useBalanceCents = parseInt(session.metadata?.useBalanceCents) || 0;
+      const buyerUserId = session.metadata?.userId;
+      if (useBalanceCents > 0 && buyerUserId) {
+        try {
+          const { releasePending } = require('./server/lib/referralBalance');
+          const result = await releasePending({
+            userId: buyerUserId,
+            sessionId: session.id,
+            reason: `Checkout session expired (${new Date().toISOString()})`,
+          });
+          if (result.released) {
+            log.info(`💰 [STRIPE WEBHOOK] Released referral balance hold: CHF ${(result.amountCents / 100).toFixed(2)} back to ${buyerUserId} (expired session ${session.id})`);
+          } else if (result.alreadyResolved) {
+            log.warn(`⚠️ [STRIPE WEBHOOK] Pending balance already ${result.resolvedAs} for expired session ${session.id} — skipping`);
+          }
+        } catch (relErr) {
+          log.error(`❌ [STRIPE WEBHOOK] releasePending failed for expired session ${session.id}:`, relErr.message);
+        }
       }
     }
 
@@ -1371,6 +1442,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/photos', photosRoutes);
 app.use('/api', express.json({ limit: '50mb' }), avatarsRoutes);  // /api/analyze-photo, /api/avatar-prompt, /api/generate-clothing-avatars
 app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
+// Expose order-aware Stripe picker so the referral cashout route can pick test/live
+// based on the order's stripe_mode rather than current user state.
+app.locals.getStripeClientForOrder = getStripeClientForOrder;
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api/jobs', express.json({ limit: '50mb' }), jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', express.json({ limit: '50mb' }), storyIdeasRoutes);  // Story idea generation

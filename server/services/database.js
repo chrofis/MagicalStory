@@ -289,6 +289,44 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_referral_events_referrer ON referral_events(referrer_user_id)`);
 
+    // Referral CHF balance: referrer earns CHF per redemption (instead of credits).
+    // referral_balance_cents = total earned - total spent (discount/credits/refund).
+    // referral_pending_cents = amount held during in-flight checkouts (subtracted
+    // from available balance, restored on session expiry).
+    // available = balance - pending. CHECK (>=0) + conditional UPDATE in
+    // referralBalance.adjustBalance prevents double-spend without SELECT FOR UPDATE.
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (referral_balance_cents >= 0)`);
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_pending_cents INTEGER NOT NULL DEFAULT 0 CHECK (referral_pending_cents >= 0)`);
+
+    // Stripe mode at order creation. Required for refunds: isUserTestMode() is
+    // current-state and would route refunds to the wrong account if a user's
+    // role changed between order and refund. Existing orders left NULL — refund
+    // helper treats NULL as 'live' (admins were rare pre-cutover).
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_mode VARCHAR(8)`);
+
+    // Referral payout ledger — one row per balance change. Source of truth for
+    // the available/pending values on users; users.referral_*_cents are caches.
+    // type ∈ earned | pending_checkout | spent_discount | spent_credits |
+    //        spent_refund | restored | admin_adjust
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS referral_payouts (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount_cents INTEGER NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        balance_after_cents INTEGER NOT NULL,
+        pending_after_cents INTEGER NOT NULL,
+        order_stripe_session_id VARCHAR(255),
+        stripe_refund_id VARCHAR(255),
+        source_user_id VARCHAR(255),
+        description TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_referral_payouts_user_id ON referral_payouts(user_id, created_at DESC)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_payouts_earned_session ON referral_payouts(order_stripe_session_id) WHERE type = 'earned'`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_payouts_pending_session ON referral_payouts(order_stripe_session_id) WHERE type = 'pending_checkout'`);
+
     // Backfill referral codes for existing users who don't have one yet
     {
       const { generateReferralCode: genCode } = require('../lib/referral');

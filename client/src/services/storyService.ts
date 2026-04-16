@@ -2064,8 +2064,10 @@ export const storyService = {
     return response.blob();
   },
 
-  // Stripe checkout for book purchase (supports single story or multiple stories)
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string): Promise<{ url: string }> {
+  // Stripe checkout for book purchase (supports single story or multiple stories).
+  // useBalanceCents: optional, spends from the user's referral balance (in addition
+  // to any referralCode discount). Held server-side until session completes/expires.
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string, useBalanceCents?: number): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const body: Record<string, unknown> = {
       storyIds: ids,
@@ -2074,6 +2076,7 @@ export const storyService = {
       quantity: quantity || 1,
     };
     if (referralCode) body.referralCode = referralCode;
+    if (useBalanceCents && useBalanceCents > 0) body.useBalanceCents = useBalanceCents;
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', body);
     return response;
   },
@@ -2086,6 +2089,63 @@ export const storyService = {
   // Referral: validate a promo code before checkout
   async validateReferralCode(code: string): Promise<{ valid: boolean; discountChf?: number; reason?: string }> {
     return api.post('/api/referral/validate', { code });
+  },
+
+  // Referral balance: CHF cashback the user has earned. Spendable as discount on next
+  // book, converted to story credits, or cashed out via Stripe refund to original card.
+  async getReferralBalance(): Promise<{
+    balanceCents: number;
+    pendingCents: number;
+    availableCents: number;
+    creditsPerChf: number;
+    cashoutMinCents: number;
+    convertMinCents: number;
+    history: Array<{
+      id: number;
+      amountCents: number;
+      type: string;
+      balanceAfterCents: number;
+      pendingAfterCents: number;
+      sessionId: string | null;
+      refundId: string | null;
+      sourceUserId: string | null;
+      description: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    return api.get('/api/referral/balance');
+  },
+
+  // Convert CHF balance to story credits at the configured rate (preserves
+  // today's CHF 10 = 350 credits ratio).
+  async convertReferralToCredits(amountCents: number): Promise<{
+    ok: boolean;
+    creditsAdded: number;
+    newCredits: number;
+    balanceCents: number;
+    pendingCents: number;
+    availableCents: number;
+    error?: string;
+  }> {
+    return api.post('/api/referral/convert-to-credits', { amountCents });
+  },
+
+  // Cash out CHF balance via Stripe refund(s) to original payment card(s).
+  // Capped at lifetime spend on Stripe (refunds run against past PaymentIntents).
+  // Partial success is normal — Stripe has no "un-refund" so each PI refund
+  // is committed independently.
+  async cashOutReferral(amountCents: number): Promise<{
+    ok: boolean;
+    refundedCents: number;
+    succeeded: Array<{ orderId: number; refundId: string; amountCents: number }>;
+    failed: Array<{ orderId: number; error: string; code?: string }>;
+    balanceCents: number;
+    pendingCents: number;
+    availableCents: number;
+    error?: string;
+    refundableCents?: number;
+  }> {
+    return api.post('/api/referral/cash-out', { amountCents });
   },
 
   // Stripe checkout for credits purchase (server determines price from package)

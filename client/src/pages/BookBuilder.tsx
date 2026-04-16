@@ -56,6 +56,12 @@ export default function BookBuilder() {
   const [promoError, setPromoError] = useState('');
   const [promoChecking, setPromoChecking] = useState(false);
   const [canUsePromo, setCanUsePromo] = useState<boolean | null>(null); // null = loading
+  // Referral balance (CHF cashback the user has accumulated as a referrer).
+  // useBalanceCents = how much they want to spend on this checkout, capped server-side
+  // at min(availableCents, orderTotal - 100) so Stripe still gets >= CHF 1.
+  const [balanceAvailableCents, setBalanceAvailableCents] = useState(0);
+  const [useBalance, setUseBalance] = useState(false);
+  const [useBalanceCents, setUseBalanceCents] = useState(0);
 
   // Fetch pricing tiers on mount
   useEffect(() => {
@@ -77,6 +83,14 @@ export default function BookBuilder() {
     storyService.getMyReferralCode()
       .then(data => setCanUsePromo(data.referredBy === null))
       .catch(() => setCanUsePromo(true)); // default to showing field — server will reject if ineligible
+  }, [isAuthenticated]);
+
+  // Load the user's referral CHF balance so we can offer to spend it on this order.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    storyService.getReferralBalance()
+      .then(b => setBalanceAvailableCents(b.availableCents || 0))
+      .catch(() => setBalanceAvailableCents(0));
   }, [isAuthenticated]);
 
   const handleApplyPromo = async () => {
@@ -146,6 +160,10 @@ export default function BookBuilder() {
       promoApply: 'Apply',
       promoApplied: 'CHF 10 discount applied',
       promoDiscount: 'Referral discount',
+      balanceLabel: 'Use referral balance',
+      balanceAvailable: 'Available: CHF',
+      balanceDiscount: 'Referral balance',
+      balanceMaxHint: 'CHF 1.00 minimum charge — adjust if too high.',
     },
     de: {
       title: 'Erstelle dein Buch',
@@ -191,6 +209,10 @@ export default function BookBuilder() {
       promoApply: 'Einlösen',
       promoApplied: 'CHF 10 Rabatt angewendet',
       promoDiscount: 'Empfehlungsrabatt',
+      balanceLabel: 'Empfehlungs-Guthaben verwenden',
+      balanceAvailable: 'Verfügbar: CHF',
+      balanceDiscount: 'Empfehlungs-Guthaben',
+      balanceMaxHint: 'Mindestbetrag CHF 1.00 — bitte anpassen, falls zu hoch.',
     },
     fr: {
       title: 'Créer votre livre',
@@ -236,6 +258,10 @@ export default function BookBuilder() {
       promoApply: 'Appliquer',
       promoApplied: 'Réduction CHF 10 appliquée',
       promoDiscount: 'Réduction parrainage',
+      balanceLabel: 'Utiliser le solde de parrainage',
+      balanceAvailable: 'Disponible : CHF',
+      balanceDiscount: 'Solde de parrainage',
+      balanceMaxHint: 'Montant minimum CHF 1.00 — ajustez si trop élevé.',
     },
   };
 
@@ -292,7 +318,12 @@ export default function BookBuilder() {
       const storyIds = stories.map(s => s.id);
       log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages, quantity });
 
-      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat, quantity, promoValid ? promoCode.trim() : undefined);
+      const balanceSpend = useBalance && useBalanceCents > 0 ? useBalanceCents : undefined;
+      const { url } = await storyService.createCheckoutSession(
+        storyIds, coverType, bookFormat, quantity,
+        promoValid ? promoCode.trim() : undefined,
+        balanceSpend,
+      );
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
@@ -635,13 +666,66 @@ export default function BookBuilder() {
               </div>
             )}
 
+            {/* Use referral balance — only when user has CHF in their balance */}
+            {!isOverLimit && price && balanceAvailableCents > 0 && (() => {
+              const booksSubtotal = price * quantity;
+              const promoDisc = promoValid ? promoDiscount : 0;
+              const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - promoDisc);
+              // Server clamps to (orderTotal - 100) cents to leave CHF 1 for Stripe; mirror here.
+              const maxSpendCents = Math.max(0, priceAfterPromo * 100 - 100);
+              const sliderMaxCents = Math.min(balanceAvailableCents, maxSpendCents);
+              const effectiveCents = useBalance ? Math.min(useBalanceCents, sliderMaxCents) : 0;
+              return (
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useBalance}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setUseBalance(on);
+                        if (on && useBalanceCents === 0) setUseBalanceCents(sliderMaxCents);
+                      }}
+                      className="w-4 h-4 accent-emerald-500"
+                    />
+                    <span className="font-medium">{t.balanceLabel}</span>
+                    <span className="text-xs text-gray-500">
+                      ({t.balanceAvailable} {(balanceAvailableCents / 100).toFixed(2)})
+                    </span>
+                  </label>
+                  {useBalance && (
+                    <div className="mt-2 ml-6">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max={(sliderMaxCents / 100).toFixed(2)}
+                        value={(effectiveCents / 100).toFixed(2)}
+                        onChange={(e) => {
+                          const cents = Math.max(0, Math.round(parseFloat(e.target.value || '0') * 100));
+                          setUseBalanceCents(Math.min(cents, sliderMaxCents));
+                        }}
+                        className="w-32 px-3 py-1 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                      />
+                      {sliderMaxCents < balanceAvailableCents && (
+                        <p className="text-xs text-gray-500 mt-1">{t.balanceMaxHint}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Price summary */}
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
                   const booksSubtotal = price * quantity;
                   const discount = promoValid ? promoDiscount : 0;
-                  const totalPrice = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - discount);
+                  const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - discount);
+                  const maxSpendCents = Math.max(0, priceAfterPromo * 100 - 100);
+                  const balanceCents = useBalance ? Math.min(useBalanceCents, balanceAvailableCents, maxSpendCents) : 0;
+                  const totalPrice = Math.max(0, priceAfterPromo - balanceCents / 100);
                   return (
                     <>
                       <div className="flex items-center justify-between mb-1 text-sm text-gray-600">
@@ -660,9 +744,15 @@ export default function BookBuilder() {
                           <span>-CHF {discount}.-</span>
                         </div>
                       )}
+                      {balanceCents > 0 && (
+                        <div className="flex items-center justify-between mb-2 text-sm text-emerald-600 font-medium">
+                          <span>{t.balanceDiscount}</span>
+                          <span>-CHF {(balanceCents / 100).toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-2 border-t border-indigo-200">
                         <span className="text-gray-700 font-semibold">{t.totalPrice}</span>
-                        <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice}.-</span>
+                        <span className="text-3xl font-bold text-indigo-700">CHF {totalPrice.toFixed(2)}</span>
                       </div>
                     </>
                   );

@@ -31,10 +31,18 @@ const CREDIT_CONFIG = {
   },
 
   // Referral / promo code rewards
+  // Buyer side: CHF discount on this checkout (only for users with no past paid order).
+  // Referrer side: earns CHF cashback to their referral balance, spendable as
+  //   - discount on future books
+  //   - converted to credits at CREDITS_PER_CHF rate
+  //   - cashed out via Stripe refund (capped at lifetime spend on Stripe)
   REFERRAL: {
-    BUYER_DISCOUNT_CHF: 10,     // CHF 10 off the book price at checkout
-    REFERRER_CREDITS: 350,      // credits added to referrer's balance (= CHF 10 package value)
-    CODE_LENGTH: 8,             // 8-char uppercase alphanumeric, no ambiguous chars
+    BUYER_DISCOUNT_CHF: 10,         // CHF 10 off buyer's order
+    REFERRER_CASHBACK_CENTS: 1000,  // CHF 10 cashback to referrer's balance
+    CREDITS_PER_CHF: 35,            // conversion rate (mirrors 350-credits-for-CHF-10 package)
+    CASHOUT_MIN_CENTS: 500,         // CHF 5 minimum cashout (avoids spam/dust refunds)
+    CONVERT_MIN_CENTS: 100,         // CHF 1 minimum convert-to-credits
+    CODE_LENGTH: 8,                 // 8-char uppercase alphanumeric, no ambiguous chars
   },
 
   // Story page limits
