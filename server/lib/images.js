@@ -2480,6 +2480,28 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     return false;
   };
 
+  // Resolve a clothing category (including nested costumed:type) to a prose
+  // description. char.avatars.clothing has this shape:
+  //   { standard: "...", winter: "...", costumed: { cowboy: "...", wizard: "..." } }
+  // so "costumed:cowboy" needs to hit avatars.clothing.costumed.cowboy, not
+  // avatars.clothing["costumed:cowboy"] which doesn't exist.
+  const resolveClothingDesc = (clothingDescriptions, category) => {
+    if (!clothingDescriptions || !category) return '';
+    if (category.startsWith('costumed:')) {
+      const type = category.split(':')[1];
+      const costumed = clothingDescriptions.costumed;
+      if (costumed && typeof costumed === 'object') {
+        if (costumed[type]) return costumed[type];
+        // Any costume description is better than none on a costumed page
+        const firstCostume = Object.values(costumed).find(v => typeof v === 'string');
+        if (firstCostume) return firstCostume;
+      }
+      return '';
+    }
+    if (clothingDescriptions[category]) return clothingDescriptions[category];
+    return '';
+  };
+
   // First, add characters from characterDescriptions (which have age/gender info)
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
@@ -2488,8 +2510,9 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     // Resolve category names (standard/winter/summer/costumed:X) to actual descriptions
     let clothing = clothingCategory;
     if (desc.clothingDescriptions && clothingCategory) {
-      if (desc.clothingDescriptions[clothingCategory]) {
-        clothing = desc.clothingDescriptions[clothingCategory];
+      const resolved = resolveClothingDesc(desc.clothingDescriptions, clothingCategory);
+      if (resolved) {
+        clothing = resolved;
       } else if (clothingCategory === 'standard' && desc.clothingDescriptions.standard) {
         clothing = desc.clothingDescriptions.standard;
       }
@@ -2509,11 +2532,17 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
         .replace(/\b\d+[-\s]?years?[-\s]?old\s+/gi, '')   // "7-year-old " → ""
         .replace(/\bage[sd]?\s*\d+\b/gi, '')              // "aged 7" → ""
         .replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').trim();
-      // Only append clothing as a separate clause if the richDescription doesn't
-      // already carry a "Wearing:" clause — otherwise we emit contradictory duplicates
-      // like "Wearing: striped hoodie. Wearing: costumed:wizard".
-      const alreadyHasWearing = /\bwearing\s*:/i.test(sanitized);
-      description = (clothing && !alreadyHasWearing) ? `${sanitized}. Wearing: ${clothing}` : sanitized;
+      // If we have a resolved per-page clothing, it OVERRIDES the baked-in
+      // default clothing from richDescription. Without this, the detector
+      // was told to look for "Lukas wearing striped hoodie" on a cowboy-page
+      // where Lukas is actually in a cowboy costume — Gemini saw the
+      // clothing mismatch and tagged every figure UNKNOWN.
+      if (clothing) {
+        const stripped = sanitized.replace(/\.?\s*Wearing:\s*[^.]+\.?\s*$/i, '').trim().replace(/[.,;]\s*$/, '');
+        description = `${stripped}. Wearing: ${clothing}`;
+      } else {
+        description = sanitized;
+      }
     } else {
       // Minimal description from prompt parsing — keep "character" placeholder
       // rather than "figure" (less likely to confuse the detector as a typo).
@@ -8417,7 +8446,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       characterDescriptions = {};
       for (const char of sceneCharacters) {
         characterDescriptions[char.name] = {
-          richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char)
+          richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
+          // Pass the full clothing map (including nested costumed.*) so bbox
+          // detection can resolve per-page clothing — otherwise the detector
+          // gets told "Lukas wearing striped hoodie" on cowboy-costumed pages
+          // and tags every figure UNKNOWN because the clothes don't match.
+          clothingDescriptions: char.avatars?.clothing || {}
         };
       }
     } else {
