@@ -19,6 +19,11 @@
 const { log } = require('../utils/logger');
 const { callClaudeAPI } = require('./textModels');
 
+// Phantom strings matching this pattern are Visual Bible ID placeholders that
+// Claude emitted in scene metadata without declaring an actual entry — not
+// literal character names. Store them as the entry's `id`, not `name`.
+const VB_ID_PATTERN = /^CHR\d+$/i;
+
 function normalizeName(name) {
   return (name || '').trim().toLowerCase();
 }
@@ -86,9 +91,18 @@ function buildPatchPrompt(phantomNames, storyPages, knownNames) {
     return `### ${name}\n${samples || '(no sample text available)'}`;
   }).join('\n\n');
 
-  return `These character names appear in a story but are missing from its Visual Bible:
+  // Annotate ID-pattern phantoms so Claude knows to invent a descriptive name.
+  // Without this, Claude echoes back the placeholder (e.g. "CHR001") as the name
+  // and downstream code mistakes the entry's name for a VB id.
+  const phantomLines = phantomNames.map(n => {
+    return VB_ID_PATTERN.test(n)
+      ? `- ${n}  [placeholder ID — invent a descriptive name from the passages]`
+      : `- ${n}`;
+  }).join('\n');
 
-${phantomNames.map(n => `- ${n}`).join('\n')}
+  return `These character references appear in a story but are missing from its Visual Bible:
+
+${phantomLines}
 
 Sample passages where each character appears:
 
@@ -99,11 +113,14 @@ ${knownNames.length > 0 ? knownNames.map(n => `- ${n}`).join('\n') : '(none)'}
 
 For EACH missing character above, write a Visual Bible entry. Infer age, gender, build, hair, and clothing from the passages. If the passages give no clue for some field, pick reasonable defaults consistent with the story tone. Make every character VISUALLY DISTINCT from each other and from the already-known characters above (different hair color, different build, different signature element).
 
+For a "placeholder ID" phantom (e.g. CHR001), the "name" field must be a descriptive human name or role invented from the passages (e.g. "Wanderer", "Oma", "Baker"). Do NOT echo the placeholder ID back as the name.
+
 Output ONLY a JSON array — no markdown fence, no commentary:
 
 [
   {
-    "name": "<exact name as written above>",
+    "phantom": "<exact phantom string from the list above>",
+    "name": "<descriptive name — invented for placeholder IDs, echoed verbatim for regular names>",
     "age": "<age category, e.g. 'child ~8', 'teen ~15', 'adult ~30', 'elderly ~70'>",
     "build": "<height + body type>",
     "hair": "<color, length, style>",
@@ -189,16 +206,34 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
 
   let added = 0;
   for (const entry of entries) {
-    if (!entry || !entry.name) continue;
-    // Drop entries Claude returned for characters that are NOT phantoms
-    // (defensive against the model adding extras)
-    const isPhantom = phantoms.some(p => normalizeName(p) === normalizeName(entry.name));
-    if (!isPhantom) continue;
+    if (!entry) continue;
+    // Match the entry back to its phantom via the `phantom` field (new) or
+    // the `name` field (fallback for older model outputs that didn't include phantom).
+    const phantomKey = entry.phantom || entry.name;
+    if (!phantomKey) continue;
+    const matchedPhantom = phantoms.find(p => normalizeName(p) === normalizeName(phantomKey));
+    if (!matchedPhantom) continue;
 
-    entry.id = nextId();
-    entry.pages = pagesByPhantom[normalizeName(entry.name)] || [];
+    // ID-pattern phantom (e.g. "CHR001") → preserve the placeholder as the id.
+    // Regular name phantom (e.g. "Oma") → sequential CHR id, name echoed.
+    if (VB_ID_PATTERN.test(matchedPhantom)) {
+      entry.id = matchedPhantom.toUpperCase();
+      existingIds.add(entry.id);
+      // entry.name should be the descriptive name Claude invented. If Claude
+      // ignored the instruction and echoed the placeholder, fall back to a
+      // generic label so downstream name-based lookups don't re-trip the VB-id regex.
+      if (!entry.name || VB_ID_PATTERN.test(entry.name)) {
+        entry.name = 'unnamed character';
+      }
+    } else {
+      entry.id = nextId();
+      // Preserve the original name casing from the phantom reference
+      entry.name = matchedPhantom;
+    }
+    delete entry.phantom;
+    entry.pages = pagesByPhantom[normalizeName(matchedPhantom)] || [];
     visualBible.secondaryCharacters.push(entry);
-    log.info(`👻 [PHANTOM] Added "${entry.name}" to Visual Bible as ${entry.id} (pages: ${entry.pages.join(',')})`);
+    log.info(`👻 [PHANTOM] Added "${entry.name}" (phantom=${matchedPhantom}) to Visual Bible as ${entry.id} (pages: ${entry.pages.join(',')})`);
     added++;
   }
 

@@ -2212,11 +2212,25 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
             // Only fill clothingDescription if not already set. The costumed branch
             // above may have set it from clothingRequirements — don't overwrite the
             // costume description with the standard one just because the photo fell back.
+            const descriptionPreservedFromCostumed = !!clothingDescription;
             if (!clothingDescription && avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
               clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
             }
-            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${resolvedClothing}, using unstyled ${fallbackCategory} (clothing desc kept: ${!!clothingDescription})`);
+            // Distinguish benign pre-resolution from real problems:
+            // - Costumed with description already preserved: styled avatar isn't ready
+            //   yet (scene-expansion pre-resolve runs before prepareStyledAvatars). The
+            //   photo URL is unused in that context. Not a problem.
+            // - Description now describes the fallback category (e.g. wanted winter,
+            //   got standard): output will describe the wrong clothing. Real problem.
+            // - No description at all: requested clothing has no description anywhere.
+            if (resolvedClothing === 'costumed' && descriptionPreservedFromCostumed) {
+              log.debug(`[AVATAR] ${char.name}: costumed photo not yet styled, using ${fallbackCategory} photo as reference (costume description preserved)`);
+            } else if (!clothingDescription) {
+              log.warn(`⚠️ [AVATAR] ${char.name}: wanted ${resolvedClothing}, fell back to ${fallbackCategory} photo AND no clothing description available — output will lack clothing guidance`);
+            } else {
+              log.warn(`⚠️ [AVATAR] ${char.name}: wanted ${resolvedClothing}, fell back to ${fallbackCategory} — output will describe ${fallbackCategory} clothing instead of ${resolvedClothing}`);
+            }
             break;
           }
         }
@@ -3924,16 +3938,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
     // Storybook mode + legacy JSON format (iteratePage path): the scene description
     // is JSON, so character descriptions and VB elements are NOT in the prose.
-    // Prepend the structured blocks so the prompt still has everything the image model needs.
+    // Let the template's own placeholders position char refs + required objects —
+    // previously we ALSO prepended them into SCENE_DESCRIPTION, producing duplicate
+    // copies that inflated iterate prompts past Grok's 7500-char limit.
     if (isStorybook && !isProseFormat) {
-      const structuredScene = [
-        characterReferenceList,
-        cleanSceneDescription,
-        requiredObjectsSection
-      ].filter(Boolean).join('\n\n');
       return fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
-        SCENE_DESCRIPTION: structuredScene,
+        SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_REFERENCE_LIST: characterReferenceList,
         REQUIRED_OBJECTS: requiredObjectsSection,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,

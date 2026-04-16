@@ -489,25 +489,25 @@ export function ImageHistoryModal({
                       </div>
                     );
                   })()}
-                  {/* Inpaint instruction + reference images */}
+                  {/* Repair instruction (inpaint or character-fix) */}
                   {detailVersion.inpaintInstruction && (
                     <div className="mt-2">
                       <div className="text-xs font-medium text-amber-700 mb-1">
-                        {language === 'de' ? 'Inpaint-Anweisung' : 'Inpaint Instruction'}
+                        {language === 'de' ? 'Reparatur-Anweisung' : 'Repair Instruction'}
                       </div>
-                      <p className="text-xs text-gray-600 bg-amber-50 rounded p-2 border border-amber-200">
+                      <p className="text-xs text-gray-600 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
                         {detailVersion.inpaintInstruction}
                       </p>
                     </div>
                   )}
                   {detailVersion.inpaintReferenceImages && detailVersion.inpaintReferenceImages.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-xs font-medium text-green-700 mb-1">
-                        {language === 'de' ? 'Referenzbilder (VB/Charakter)' : 'Reference Images (VB/Character)'} ({detailVersion.inpaintReferenceImages.length})
+                      <div className="text-xs font-medium text-orange-700 mb-1">
+                        {language === 'de' ? 'An Grok gesendet (Repair-Referenzbilder)' : 'Sent to Grok (repair references)'} ({detailVersion.inpaintReferenceImages.length})
                       </div>
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
                         {detailVersion.inpaintReferenceImages.map((img, idx) => (
-                          <img key={idx} src={img} alt={`Ref ${idx + 1}`} className="h-24 rounded border border-green-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
+                          <img key={idx} src={img} alt={`Ref ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
                         ))}
                       </div>
                     </div>

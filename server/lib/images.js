@@ -4833,7 +4833,22 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     entityReport = null,
     pageNumber = null,
     sceneDescription = '',
+    artStyle = null,
+    characterClothing = null,
   } = options;
+
+  // Resolve the current-page clothing category for a character. Case-insensitive.
+  // Falls back to 'standard' if the scene metadata doesn't list this character.
+  const clothingFor = (name) => {
+    if (!characterClothing || !name) return 'standard';
+    const lower = name.toLowerCase();
+    for (const [k, v] of Object.entries(characterClothing)) {
+      if (k.toLowerCase() === lower) return (v || 'standard').toLowerCase();
+    }
+    return 'standard';
+  };
+
+  const { getStyledAvatarForClothing } = require('./entityConsistency');
 
   // Collect quality issues (legacy path)
   const qualityIssues = (evaluation.fixableIssues || []).map(i => ({
@@ -4940,19 +4955,23 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     editInstruction = parts.join('\n');
 
     // Attach avatars for every character referenced in per_character_fixes
-    // — Grok needs a visual reference for appearance fixes.
+    // — Grok needs a visual reference for appearance fixes. The avatar must
+    // match the character's CURRENT clothing on this page (e.g. costumed:superhero),
+    // not their unstyled base photo. Uses getStyledAvatarForClothing which
+    // resolves: styled+clothing → styled standard → base → face photo.
     if (characters && consolidatedPlan.per_character_fixes?.length > 0) {
       for (const pcf of consolidatedPlan.per_character_fixes) {
         const charName = (pcf.characterName || '').toLowerCase();
         if (!charName) continue;
         const mainChar = characters.find(c => c.name?.toLowerCase() === charName);
         if (!mainChar) continue;
-        const avatar = mainChar.avatars?.standard || mainChar.avatars?.styledAvatars?.watercolor?.standard;
+        const pageClothing = clothingFor(mainChar.name);
+        const avatar = getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
         const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
         if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
           referenceImages.push(photoUrl);
-          referenceImageSources.push(`avatar:${mainChar.name}`);
-          log.info(`[INPAINT PAGE] Attaching avatar for ${mainChar.name} (Grok ref image)`);
+          referenceImageSources.push(`avatar:${mainChar.name}:${pageClothing}`);
+          log.info(`[INPAINT PAGE] Attaching ${pageClothing} avatar for ${mainChar.name} (Grok ref image, style=${artStyle || 'watercolor'})`);
         }
       }
     }
@@ -4977,7 +4996,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
       continue;
     }
-    const vbChar = visualBible?.secondaryCharacters?.find(c => c.name?.toLowerCase() === itemName && c.referenceImageData);
+    const vbChar = visualBible?.secondaryCharacters?.find(c => (c.name?.toLowerCase() === itemName || c.id?.toLowerCase() === itemName) && c.referenceImageData);
     if (vbChar) {
       referenceImages.push(vbChar.referenceImageData);
       referenceImageSources.push(`vb-char:${missing.item}`);
@@ -4994,12 +5013,13 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     if (characters) {
       const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
       if (mainChar) {
-        const avatar = mainChar.avatars?.standard || mainChar.avatars?.styledAvatars?.watercolor?.standard;
+        const pageClothing = clothingFor(mainChar.name);
+        const avatar = getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
         const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
         if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image') && !referenceImages.includes(photoUrl)) {
           referenceImages.push(photoUrl);
-          referenceImageSources.push(`avatar-missing:${missing.item}`);
-          log.info(`[INPAINT PAGE] Adding character avatar reference for missing "${missing.item}"`);
+          referenceImageSources.push(`avatar-missing:${missing.item}:${pageClothing}`);
+          log.info(`[INPAINT PAGE] Adding ${pageClothing} avatar for missing "${missing.item}" (style=${artStyle || 'watercolor'})`);
         }
       }
     }
@@ -5341,12 +5361,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const versions = pageVersions.get(img.pageNumber) || [];
     const bestSoFar = selectBestVersion(versions);
     const inputImage = bestSoFar?.imageData || img.imageData;
+    // Parse per-character clothing for this page so the avatar lookup picks the
+    // styled+costumed variant matching what's actually drawn on this page.
+    // Without this, inpaint attaches unstyled base photos and Grok has no visual
+    // reference for the current costume/style.
+    const { parseCharacterClothing } = getStoryHelpers();
+    const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
       entityReport: currentEntityReport,
       pageNumber: img.pageNumber,
       sceneDescription: img.sceneDescription || img.description || '',
+      artStyle: storyData?.artStyle || artStyle || null,
+      characterClothing: pageCharacterClothing,
     });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
@@ -5591,6 +5619,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             modelId: repairResult.modelId,
             grokRefImages: repairResult.grokRefImages || null,
             inpaintInstruction: repairResult.inpaintInstruction || null,
+            inpaintReferenceImages: repairResult.inpaintReferenceImages || null,
             entityPenalty: getEntityPenalty(ev.pageNumber, currentEntityReport),
             evaluatedAt: new Date().toISOString(),
           });
@@ -5813,6 +5842,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             protectedFaces,
             protectedBodies,
             whiteoutTarget: useFaceOnly ? 'face' : 'body',
+            includeDebug: true,  // Returns prompt + sceneSent + avatarSent for version-viewer inspection
           });
 
           if (repairResult?.imageData) {
@@ -5834,6 +5864,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               blendMask: repairResult.blendMask || null,
               croppedAvatar: repairResult.croppedAvatar || null,
               method: repairResult.method || 'grok_blended',
+              prompt: repairResult.debug?.prompt || null,
+              avatarSent: repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
+              bbox: repairResult.debug?.bbox || null,
             });
 
             if (repairResult.usage && usageTracker) {
@@ -5850,15 +5883,29 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       if (anyFixApplied) {
         const preFixScore = bestPerPage.get(pageNumber)?.score ?? 0;
-        // Capture the last repair's model info so the version record shows what was used
-        const lastFixChar = pageFixes[pageFixes.length - 1]?.charName;
-        const lastMethod = lastFixChar ? charFixDetails.get(lastFixChar)?.get(pageNumber)?.method : null;
+        // Capture repair info per fix for the version-viewer dev panel, so every
+        // character-fix step is visible: what we asked, what avatar we sent.
+        const perCharRepairs = pageFixes
+          .map(pf => {
+            const d = charFixDetails.get(pf.charName)?.get(pageNumber);
+            if (!d) return null;
+            return { character: pf.charName, prompt: d.prompt, avatarSent: d.avatarSent, bbox: d.bbox, method: d.method };
+          })
+          .filter(Boolean);
+        const combinedPrompt = perCharRepairs
+          .map(r => `[${r.character}${r.method ? ' · ' + r.method : ''}]\n${r.prompt || '(no prompt captured)'}`)
+          .join('\n\n');
+        const avatarsSent = perCharRepairs.map(r => r.avatarSent).filter(Boolean);
+        const lastMethod = perCharRepairs[perCharRepairs.length - 1]?.method || null;
         const modelLabel = lastMethod ? `grok-imagine (${lastMethod})` : 'grok-imagine';
         charFixResults.set(pageNumber, {
           imageData: currentImageData,
           source: 'character-fix',
           modelId: modelLabel,
           method: lastMethod || null,
+          repairPrompt: combinedPrompt || null,
+          repairAvatars: avatarsSent.length > 0 ? avatarsSent : null,
+          repairs: perCharRepairs,
         });
         if (preFixScore >= 85) {
           log.info(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied to high-score page (pre-fix: ${preFixScore}%), monitor for quality regression`);
@@ -5902,6 +5949,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           evaluation: ev,
           modelId: fix.modelId || null,
           grokRefImages: null,
+          // Reuse the same viewer fields as inpaint: these are the Grok repair
+          // prompt and avatar(s) sent as references for the character-fix step.
+          inpaintInstruction: fix.repairPrompt || null,
+          inpaintReferenceImages: fix.repairAvatars || null,
         });
         fix.afterScore = ev.score ?? ev.qualityScore ?? null;
       }
@@ -8322,7 +8373,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         let matched = null;
         for (const { list, kind } of vbLists) {
           if (!Array.isArray(list)) continue;
-          const entry = list.find(e => e?.name && e.name.toLowerCase() === name.toLowerCase());
+          const entry = list.find(e => (e?.name && e.name.toLowerCase() === name.toLowerCase()) || (e?.id && e.id.toLowerCase() === name.toLowerCase()));
           if (entry) { matched = { entry, kind }; break; }
         }
         if (!matched) continue;
@@ -8343,8 +8394,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           ? `${e.name} (${matched.kind}). ${baseDesc}`
           : `${e.name} (${matched.kind})`;
 
-        characterDescriptions[e.name] = { richDescription: rich };
-        log.debug(`📦 [BBOX-PREP] ${pageLabel}Enriched bbox description for VB ${matched.kind} "${e.name}"`);
+        // Key by the scene-metadata name (which may be a VB id placeholder like
+        // "CHR001") so buildExpectedCharactersForBbox finds it via the same key
+        // that appears in expectedCharacterPositions.
+        characterDescriptions[name] = { richDescription: rich };
+        log.debug(`📦 [BBOX-PREP] ${pageLabel}Enriched bbox description for VB ${matched.kind} "${e.name}" (key: "${name}")`);
       }
     }
 
