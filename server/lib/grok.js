@@ -755,10 +755,19 @@ async function packReferences(refs = {}, options = {}) {
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
     ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
     : [];
-  // Always bake VB elements into the scene background when both exist.
-  // This frees up a slot for characters — 3 chars can split across 2 slots
-  // instead of being crammed into 1.
-  const useBorderedScene = hasSceneBackground && rawVbElements.length > 0;
+  // Include the text-zone mask as another element baked into the scene border.
+  // Same treatment as VB elements — labeled cell in the border composite — so
+  // Grok reads it as layout metadata instead of painting its colours into the
+  // scene. Keeps the mask always paired with slot 1 without using a slot.
+  const hasMask = textAreaMask && typeof textAreaMask === 'string' && textAreaMask.startsWith('data:image');
+  const borderElements = [
+    ...rawVbElements,
+    ...(hasMask ? [{ imageData: textAreaMask, name: 'Mask', type: 'text-zone' }] : []),
+  ];
+  // Bake border elements into the scene background whenever there's at least
+  // one element (VB or mask). Frees up character slots and keeps the mask
+  // visually anchored to the scene.
+  const useBorderedScene = hasSceneBackground && borderElements.length > 0;
 
   // Scene background goes first — style anchor for visual consistency
   if (hasSceneBackground) {
@@ -766,9 +775,10 @@ async function packReferences(refs = {}, options = {}) {
     const buf = Buffer.from(base64, 'base64');
 
     if (useBorderedScene) {
-      const bordered = await composeSceneWithVbBorder(buf, rawVbElements);
+      const bordered = await composeSceneWithVbBorder(buf, borderElements, { aspectRatio });
+      const bm = await sharp(bordered).metadata();
       slots.push(`data:image/jpeg;base64,${bordered.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: scene background + ${Math.min(rawVbElements.length, 9)} VB cells (bordered 1280x1280)`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: scene background + ${Math.min(borderElements.length, 9)} cells (${rawVbElements.length} VB${hasMask ? ' + 1 Mask' : ''}, bordered ${bm.width}x${bm.height} for ${aspectRatio})`);
     } else {
       const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
@@ -784,15 +794,6 @@ async function packReferences(refs = {}, options = {}) {
     const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
     log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
-  }
-
-  // Text area mask gets its own priority slot, same tier as VB grid. The bright
-  // region tells the model to leave that area calm and uncluttered for text
-  // overlay. Passed alongside the scene/previous image at generation time so
-  // characters are placed correctly from the start — no post-gen repair needed.
-  if (textAreaMask && typeof textAreaMask === 'string' && textAreaMask.startsWith('data:image') && slots.length < 3) {
-    slots.push(textAreaMask);
-    log.info(`🎨 ${tag} Slot ${slots.length}: text area mask (bright=calm/text zone, dark=full detail)`);
   }
 
   // Layout strategy (all char groups go through buildCharacterGroupSlot which
@@ -864,6 +865,15 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
   } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
     log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
+  }
+
+  // Text area mask fallback: if there's no scene background (repair / iterate
+  // flows that use `previousImage` instead), the mask can't be baked into the
+  // border composite. Drop it into the last free slot so the mask still
+  // reaches Grok. No-op when the scene border already has it.
+  if (hasMask && !useBorderedScene && slots.length < 3) {
+    slots.push(textAreaMask);
+    log.info(`🎨 ${tag} Slot ${slots.length}: text area mask (fallback — no scene border to bake into)`);
   }
 
   // Grok edit output matches the input image aspect ratio (it mostly ignores the
