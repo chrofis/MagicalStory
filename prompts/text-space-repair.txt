@@ -1,8 +1,15 @@
-Characters or main action are covering the WHITE region of the attached mask. That region is reserved for story text and must be calm and light.
+This illustration already exists. Reframe it so the bright area of the attached layout mask stays calm and light in the output — characters and main action have been drifting into that area and must move out.
 
-KEEP UNCHANGED: the setting, background, lighting, art style, color palette, character identities (same faces, hair, skin tone, clothing, expressions) and the scene's narrative.
+TEXT SPACE: The attached mask shows where a soft, light, contour-free patch must exist in your output (look at the bright area). Story text will be printed there, so this area must be quiet and readable.
 
-CHANGE: character positions. Move the characters so they sit entirely inside the BLACK region of the mask. The WHITE region must show only calm natural scenery that already belongs in this scene — sky, wall, floor, open ground, smooth water — painted in the same style as the rest of the illustration. No characters, no objects, no major action in the WHITE region.
+Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
+- OUTDOOR scene (field, hill, beach, garden, forest): use sky, distant open ground, smooth grass, calm water, snow, or soft mist — whichever already belongs in this outdoor setting
+- INDOOR scene (room, house, shop, kitchen, bedroom): use the SAME room's plain wall, ceiling, floor, rug, tablecloth, or window light — stay inside the room
+- STREET / urban scene: use the SAME street's cobblestones, pavement, a light-coloured building wall, or a small patch of sky visible between buildings — stay in the street
+
+The bright patch should be: soft, lightly coloured, with smooth edges, gentle gradients, and minimal texture. Keep it free of objects, characters, and any major action. Blend it seamlessly into the surrounding scene — same surface or material as the rest, just lighter and simpler. Do NOT paint a flat white rectangle. Do NOT paint a black block. Do NOT copy the mask's shape as colour.
+
+Characters: keep every character's identity (faces, hair, skin tone, clothing, expressions) and the scene's narrative. Shift the characters and main action entirely into the dark area of the mask — the part of the scene NOT covered by the bright patch.
 
 Scene context:
 {SCENE_DESCRIPTION}

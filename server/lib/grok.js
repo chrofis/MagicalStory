@@ -786,6 +786,15 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
   }
 
+  // Text area mask gets its own priority slot, same tier as VB grid. The bright
+  // region tells the model to leave that area calm and uncluttered for text
+  // overlay. Passed alongside the scene/previous image at generation time so
+  // characters are placed correctly from the start — no post-gen repair needed.
+  if (textAreaMask && typeof textAreaMask === 'string' && textAreaMask.startsWith('data:image') && slots.length < 3) {
+    slots.push(textAreaMask);
+    log.info(`🎨 ${tag} Slot ${slots.length}: text area mask (bright=calm/text zone, dark=full detail)`);
+  }
+
   // Layout strategy (all char groups go through buildCharacterGroupSlot which
   // picks the best shape based on count and aspect ratio):
   //
@@ -855,15 +864,6 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
   } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
     log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
-  }
-
-  // Text area mask: last-priority slot. The white region shows where to leave calm
-  // light space for text overlay. Only added when there's a free slot.
-  if (textAreaMask && typeof textAreaMask === 'string' && textAreaMask.startsWith('data:image') && slots.length < 3) {
-    slots.push(textAreaMask);
-    log.info(`🎨 ${tag} Slot ${slots.length}: text area mask (white=calm/text zone, black=full detail)`);
-  } else if (textAreaMask && slots.length >= 3) {
-    log.debug(`🎨 ${tag} Text area mask skipped — all 3 slots used`);
   }
 
   // Grok edit output matches the input image aspect ratio (it mostly ignores the

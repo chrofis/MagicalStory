@@ -4858,7 +4858,11 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
-                sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null
+                sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+                // Pass the text-zone mask so Grok leaves the calm area open for
+                // the text overlay at generation time (same pattern as empty
+                // scene). Avoids the per-page repair iteration afterwards.
+                textAreaMask: sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null
               }
             );
 
@@ -5042,12 +5046,16 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
             && candidates[0].coverage * 100 < requiredPct
             && TEXT_REPAIR.maxRetries > 0);
           if (needsRepair) {
-            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: coverage ${(candidates[0].coverage * 100).toFixed(1)}% < required ${requiredPct.toFixed(1)}% (${words} words @ ${fontPt}pt) — repairing`);
+            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: coverage ${(candidates[0].coverage * 100).toFixed(1)}% < required ${requiredPct.toFixed(1)}% (${words} words @ ${fontPt}pt) — repairing (zone: ${preferred})`);
             for (let attempt = 1; attempt <= TEXT_REPAIR.maxRetries; attempt++) {
               try {
                 const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
                   SCENE_DESCRIPTION: (img.sceneDescription || '').substring(0, 1200),
                 });
+                // Pass the current page as previousImage + the mask as a spatial
+                // reference. The prompt must tell Grok explicitly that the mask
+                // is a LAYOUT guide (not content to paint), otherwise Grok bleeds
+                // hard-edged white/black patches into the output.
                 const repairResult = await generateImageOnly(repairPrompt, img.characterPhotos || [], {
                   imageModelOverride: img.sceneMetadata?.pageImageModel || null,
                   imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
