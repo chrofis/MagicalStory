@@ -83,7 +83,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       getCurrentPage: () => bookRef.current?.pageFlip()?.getCurrentPageIndex() ?? 0,
     }));
 
-    // Calculate page dimensions from container — 3:4 aspect ratio per page
+    // Calculate page dimensions from container — A4 aspect per page so the
+    // preview matches the printed book 1:1 (no letterbox, no crop).
     const updateDimensions = useCallback(() => {
       if (!containerRef.current) return;
       const cw = containerRef.current.clientWidth;
@@ -93,12 +94,13 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       // In portrait (mobile), 1 page fills the width
       const maxPageWidth = Math.min(cw / 2, 550);
       const maxPageHeight = Math.min(ch - 10, 780);
-      // Fit 3:4 ratio within constraints
+      // A4 portrait: width / height = 210 / 297
+      const A4_W = 210, A4_H = 297;
       let pw = maxPageWidth;
-      let ph = pw * (4 / 3);
+      let ph = pw * (A4_H / A4_W);
       if (ph > maxPageHeight) {
         ph = maxPageHeight;
-        pw = ph * (3 / 4);
+        pw = ph * (A4_W / A4_H);
       }
       setDimensions({ width: Math.round(pw), height: Math.round(ph) });
     }, []);

@@ -219,17 +219,19 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
   }
 });
 
-// Normalize image to 3:4 portrait aspect for consistent display.
-// Repair pipeline sometimes outputs 1:1 squares for portrait pages, causing
-// inconsistent image sizes in the book viewer (squares letterbox top/bottom).
+// Normalize image to A4 portrait aspect (210/297 = 0.7071) so what the viewer
+// shows matches the printed book 1:1. Grok's "3:4" preset natively returns
+// 896×1280 (ratio 0.700), ~13px off A4 — a tiny invisible crop. True squares
+// from legacy repair output also get snapped here.
 async function normalizeToPortrait(imageBuffer) {
   try {
     const sharp = require('sharp');
     const meta = await sharp(imageBuffer).metadata();
-    const TARGET_RATIO = 3 / 4; // width / height
+    const TARGET_RATIO = 210 / 297; // A4 portrait
     const currentRatio = meta.width / meta.height;
-    // Within 5% of 3:4 → no-op
-    if (Math.abs(currentRatio - TARGET_RATIO) / TARGET_RATIO < 0.05) {
+    // Within 0.5% of A4 → no-op. Tighter than drift catches Grok's 0.700
+    // output (1% off A4) and snaps it to exact 0.7071 — invisible 13px crop.
+    if (Math.abs(currentRatio - TARGET_RATIO) / TARGET_RATIO < 0.005) {
       return imageBuffer;
     }
     // Pick output size based on existing dimensions
