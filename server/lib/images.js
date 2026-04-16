@@ -6944,20 +6944,26 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   }
 
   // Default repair mode depends on whiteoutTarget:
-  //   - face repair  → blended (small blur radius, good for face-only fixes)
-  //   - body repair  → cutout  (extract figure, inpaint replacement, composite back)
-  // Blended blurs a rectangle that can include background/objects for large
-  // bboxes, so it only makes sense for face-sized regions. Cutout keeps the
-  // rest of the page untouched and is better for full-figure repairs.
-  // Callers can force a specific mode via useBlended/useCutout flags.
+  //   - face repair  → blended       (face blur + feathered blend back)
+  //   - body repair  → fullSceneInpaint (mirror-pad to 2:3 → crosshatch body +
+  //                                      solid face block → Grok edits full scene →
+  //                                      unpad. No compositing back, no zoom drift.)
+  // Cutout (cropped figure + paste back) is still available via useCutout: true.
+  // Blackout (full scene, no mask) is the legacy fallback.
   const whiteoutTargetOpt = options.whiteoutTarget || 'body';
   const defaultToBlended = whiteoutTargetOpt === 'face';
-  let useBlended, useCutout;
-  if (options.useBlended === true) { useBlended = true; useCutout = false; }
-  else if (options.useCutout === true) { useBlended = false; useCutout = true; }
-  else if (options.useBlended === false && options.useCutout === false) { useBlended = false; useCutout = false; }
-  else { useBlended = defaultToBlended; useCutout = !defaultToBlended; }
-  const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : 'grok_blackout';
+  let useBlended, useCutout, useFullScene;
+  if (options.useBlended === true) { useBlended = true; useCutout = false; useFullScene = false; }
+  else if (options.useCutout === true) { useBlended = false; useCutout = true; useFullScene = false; }
+  else if (options.useFullScene === true) { useBlended = false; useCutout = false; useFullScene = true; }
+  else if (options.useBlended === false && options.useCutout === false && options.useFullScene === false) {
+    useBlended = false; useCutout = false; useFullScene = false;
+  } else {
+    useBlended = defaultToBlended;
+    useCutout = false;
+    useFullScene = !defaultToBlended;
+  }
+  const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : useFullScene ? 'grok_inpaint' : 'grok_blackout';
 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
@@ -7549,6 +7555,225 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         bbox: [ymin, xmin, ymax, xmax],
         extractRegion: { left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight },
         featherPx: FEATHER_PX,
+      } : null,
+    };
+  } else if (useFullScene) {
+    // ── Full-scene inpaint: pad scene to Grok's 2:3 preset with mirror,
+    //    paint magenta crosshatch on the body bbox + solid magenta block
+    //    on the face area, send full padded scene to Grok. Grok edits the
+    //    whole scene; we crop the mirror padding off and we're done.
+    //    No paste-back → no seam artifacts. Aspect padding → no zoom drift
+    //    on repeated iterations. ──
+    const sceneMeta = await sharp(sceneBuffer).metadata();
+
+    // Step 1 — pad scene to exact 2:3 aspect (Grok's standard preset).
+    // Mirror extension keeps the padding visually plausible so Grok doesn't
+    // try to "fix" the padding region. After Grok responds we crop it off
+    // exactly, losing zero scene pixels per iteration.
+    const GROK_ASPECT_W = 2;
+    const GROK_ASPECT_H = 3;
+    const targetAspect = GROK_ASPECT_W / GROK_ASPECT_H;
+    const sceneAspect = sceneMeta.width / sceneMeta.height;
+    let padTop = 0, padBottom = 0, padLeft = 0, padRight = 0;
+    let paddedW = sceneMeta.width, paddedH = sceneMeta.height;
+    if (Math.abs(sceneAspect - targetAspect) > 0.005) {
+      if (sceneAspect > targetAspect) {
+        paddedH = Math.round(sceneMeta.width / targetAspect);
+        const total = paddedH - sceneMeta.height;
+        padTop = Math.floor(total / 2);
+        padBottom = total - padTop;
+      } else {
+        paddedW = Math.round(sceneMeta.height * targetAspect);
+        const total = paddedW - sceneMeta.width;
+        padLeft = Math.floor(total / 2);
+        padRight = total - padLeft;
+      }
+    }
+    const paddedScene = (padTop || padBottom || padLeft || padRight)
+      ? await sharp(sceneBuffer)
+          .extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, extendWith: 'mirror' })
+          .jpeg({ quality: 95 }).toBuffer()
+      : sceneBuffer;
+
+    // Step 2 — figure & face rectangles in padded-canvas pixel coords.
+    const figLeft   = Math.floor(xmin * sceneMeta.width) + padLeft;
+    const figTop    = Math.floor(ymin * sceneMeta.height) + padTop;
+    const figWidth  = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
+    const figHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
+
+    // Step 3 — magenta crosshatch on the body bbox + 12% safety margin.
+    const HATCH_SAFETY = 0.12;
+    const HATCH_STROKE = 2;
+    const HATCH_COLOR = '#FF00FF';
+    const hatchMarginX = Math.round(figWidth * HATCH_SAFETY);
+    const hatchMarginY = Math.round(figHeight * HATCH_SAFETY);
+    const hatchLeft   = Math.max(0, figLeft - hatchMarginX);
+    const hatchTop    = Math.max(0, figTop - hatchMarginY);
+    const hatchRight  = Math.min(paddedW, figLeft + figWidth + hatchMarginX);
+    const hatchBottom = Math.min(paddedH, figTop + figHeight + hatchMarginY);
+    const hatchWidth  = hatchRight - hatchLeft;
+    const hatchHeight = hatchBottom - hatchTop;
+    const hatchSpacing = Math.max(16, Math.round(Math.min(hatchWidth, hatchHeight) * 0.06));
+    const hatchSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${hatchWidth}" height="${hatchHeight}">
+  <defs>
+    <pattern id="h" x="0" y="0" width="${hatchSpacing}" height="${hatchSpacing}" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="${hatchSpacing}" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
+      <line x1="${hatchSpacing}" y1="0" x2="0" y2="${hatchSpacing}" stroke="${HATCH_COLOR}" stroke-width="${HATCH_STROKE}"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="${hatchWidth}" height="${hatchHeight}" fill="url(#h)"/>
+</svg>`;
+    const hatchRegion = await sharp(paddedScene)
+      .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+      .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
+      .png().toBuffer();
+    let masked = await sharp(paddedScene)
+      .composite([{ input: hatchRegion, top: hatchTop, left: hatchLeft }])
+      .jpeg({ quality: 92 }).toBuffer();
+
+    // Step 4 — solid magenta block over the face. Use options.faceBbox if
+    // provided (entity consistency passes one when face detection ran);
+    // otherwise heuristic = top 22% of body, narrower than full body width.
+    let faceLeft, faceTop, faceWidth, faceHeight;
+    const faceBboxOpt = options.faceBbox;
+    if (Array.isArray(faceBboxOpt) && faceBboxOpt.length === 4
+        && faceBboxOpt.every(v => v != null && !isNaN(v) && v >= 0 && v <= 1)) {
+      const [fy0, fx0, fy1, fx1] = faceBboxOpt;
+      faceLeft   = Math.floor(fx0 * sceneMeta.width) + padLeft;
+      faceTop    = Math.floor(fy0 * sceneMeta.height) + padTop;
+      faceWidth  = Math.max(1, Math.ceil((fx1 - fx0) * sceneMeta.width));
+      faceHeight = Math.max(1, Math.ceil((fy1 - fy0) * sceneMeta.height));
+    } else {
+      const headFraction = 0.22;
+      const headWidthFraction = 0.60;
+      faceHeight = Math.round(figHeight * headFraction);
+      faceWidth  = Math.round(figWidth * headWidthFraction);
+      faceTop    = figTop;
+      faceLeft   = figLeft + Math.round((figWidth - faceWidth) / 2);
+    }
+    // Pad ~10% so ears/jawline are covered too.
+    const facePad = Math.round(Math.min(faceWidth, faceHeight) * 0.10);
+    faceLeft = Math.max(0, faceLeft - facePad);
+    faceTop  = Math.max(0, faceTop - facePad);
+    const faceRight  = Math.min(paddedW, faceLeft + faceWidth + facePad * 2);
+    const faceBottom = Math.min(paddedH, faceTop + faceHeight + facePad * 2);
+    faceWidth  = faceRight - faceLeft;
+    faceHeight = faceBottom - faceTop;
+    const solidFace = await sharp({
+      create: { width: faceWidth, height: faceHeight, channels: 3, background: HATCH_COLOR },
+    }).jpeg({ quality: 95 }).toBuffer();
+    masked = await sharp(masked)
+      .composite([{ input: solidFace, top: faceTop, left: faceLeft }])
+      .jpeg({ quality: 92 }).toBuffer();
+
+    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); face block ${faceWidth}x${faceHeight} @ (${faceLeft},${faceTop})`);
+
+    // Step 5 — build action context (expression / pose / gaze / holding).
+    // This is what stops repaired characters defaulting to "smiling at the
+    // camera". The block is placed early in the prompt where image models
+    // weight it most heavily.
+    let actionContext = '';
+    if (sceneDescription) {
+      try {
+        const sceneMetadata = getStoryHelpers().extractSceneMetadata(sceneDescription);
+        const charData = sceneMetadata?.fullData?.characters?.find(
+          c => c.name?.toLowerCase() === charName.toLowerCase()
+        );
+        if (charData) {
+          const parts = [];
+          if (charData.action)     parts.push(`Action: ${charData.action}`);
+          if (charData.pose)       parts.push(`Pose: ${charData.pose}`);
+          if (charData.expression) parts.push(`Expression: ${charData.expression}`);
+          if (charData.gaze)       parts.push(`Gaze: ${charData.gaze}`);
+          if (charData.holding && typeof charData.holding === 'object') {
+            const h = [];
+            if (charData.holding.leftHand && charData.holding.leftHand !== 'empty')   h.push(`left hand: ${charData.holding.leftHand}`);
+            if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') h.push(`right hand: ${charData.holding.rightHand}`);
+            if (h.length) parts.push(`Holding: ${h.join(', ')}`);
+          }
+          if (parts.length) {
+            actionContext = `\n\n${charName} in this scene (the repainted figure MUST match this exactly):\n- ${parts.join('\n- ')}`;
+          }
+        }
+      } catch { /* fall through to text fallback */ }
+      if (!actionContext) {
+        const lower = charName.toLowerCase();
+        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(lower));
+        if (lines.length) {
+          actionContext = `\n\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
+        }
+      }
+    }
+
+    // Step 6 — build the prompt.
+    const cx = Math.round(((xmin + xmax) / 2) * 100);
+    const cy = Math.round(((ymin + ymax) / 2) * 100);
+    const hPos = cx < 33 ? 'left side' : cx > 66 ? 'right side' : 'center';
+    const vPos = cy < 33 ? 'upper' : cy > 66 ? 'lower' : 'middle';
+    const regionDesc = `${vPos} ${hPos}`;
+    const artStyleContext = options.artStyle ? `\n\nArt style of the surrounding illustration: ${options.artStyle}.` : '';
+
+    const prompt = PROMPT_TEMPLATES.characterRepairInpaint
+      ? fillTemplate(PROMPT_TEMPLATES.characterRepairInpaint, {
+          charName,
+          regionDesc,
+          actionContext,
+          clothingContext,
+          issueContext,
+          artStyleContext,
+        })
+      : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with one ${charName} from the reference photo.${actionContext}\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
+
+    // Step 7 — send to Grok at 2:3 (already matches our padded canvas).
+    log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok`);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, `data:image/jpeg;base64,${masked.toString('base64')}`], {
+      aspectRatio: '2:3',
+      skipOutputPadding: true,
+    });
+
+    if (!grokResult.imageData) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] No image in Grok response (inpaint mode)`);
+      return { imageData: null, character: charName, method };
+    }
+
+    // Step 8 — resize Grok output to padded dims (aspects match → fill is safe),
+    // then crop the mirror padding off → exact original scene dims, zero loss.
+    const rawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const resizedToPadded = await sharp(rawBuf)
+      .resize(paddedW, paddedH, { fit: 'fill' })
+      .toBuffer();
+    const finalBuf = await sharp(resizedToPadded)
+      .extract({ left: padLeft, top: padTop, width: sceneMeta.width, height: sceneMeta.height })
+      .jpeg({ quality: 95 }).toBuffer();
+
+    const finalImageData = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
+    const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
+    const sentToGrokDataUri = `data:image/jpeg;base64,${masked.toString('base64')}`;
+    log.info(`✅ [CHAR REPAIR GROK] Inpaint repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
+
+    return {
+      imageData: finalImageData,
+      comparison: {
+        before: originalSceneDataUri,
+        after: finalImageData,
+        sentToGrok: sentToGrokDataUri,
+        grokRawResult: grokResult.imageData,
+      },
+      croppedAvatar: croppedAvatarDataUri,
+      character: charName,
+      usage: grokResult.usage,
+      method,
+      debug: options.includeDebug ? {
+        prompt,
+        sceneSent: sentToGrokDataUri,
+        avatarSent: croppedAvatarDataUri,
+        grokRawResult: grokResult.imageData,
+        bbox: [ymin, xmin, ymax, xmax],
+        faceBbox: faceBboxOpt || null,
+        padInfo: { padTop, padBottom, padLeft, padRight, paddedW, paddedH },
+        hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight },
+        faceRect: { left: faceLeft, top: faceTop, width: faceWidth, height: faceHeight },
       } : null,
     };
   } else {

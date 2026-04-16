@@ -63,6 +63,10 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.characterRepairBodyBlended = await fs.readFile(path.join(promptsDir, 'character-repair-body-blended.txt'), 'utf-8');
     // Character repair (Grok cutout mode) — replace figure in extracted region, composite back
     PROMPT_TEMPLATES.characterRepairCutout = await fs.readFile(path.join(promptsDir, 'character-repair-cutout.txt'), 'utf-8');
+    // Character repair (Grok full-scene inpaint) — crosshatch body + solid face block on the
+    // FULL scene (mirror-padded to Grok's aspect), no compositing back. Replaces cutout as
+    // the default for body repairs.
+    PROMPT_TEMPLATES.characterRepairInpaint = await fs.readFile(path.join(promptsDir, 'character-repair-inpaint.txt'), 'utf-8');
     // Bbox refinement (iterate overlay with vision model)
     PROMPT_TEMPLATES.bboxRefine = await fs.readFile(path.join(promptsDir, 'bbox-refine.txt'), 'utf-8');
     // Scene expansion - UNUSED, moved to prompts/_unused/
@@ -120,11 +124,17 @@ function fillTemplate(template, replacements) {
   if (!template) return '';
   let result = template;
   for (const [key, value] of Object.entries(replacements)) {
-    if (value === undefined || value === null) continue;
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const safeValue = String(value).replace(/\$/g, '$$$$');
+    // Treat undefined/null as empty — without this, missing keys leave literal
+    // `{KEY}` placeholders in the output, which get shipped to image models.
+    const safeValue = String(value ?? '').replace(/\$/g, '$$$$');
     result = result.replace(new RegExp(`\\{${escapedKey}\\}`, 'g'), safeValue);
   }
+  // Strip any placeholders the caller didn't provide at all (e.g. a new template
+  // variable added before its caller was updated). Collapse any resulting
+  // blank-line runs so the output stays tight.
+  result = result.replace(/\{[A-Z][A-Z0-9_]*\}/g, '');
+  result = result.replace(/\n{3,}/g, '\n\n');
   return result;
 }
 

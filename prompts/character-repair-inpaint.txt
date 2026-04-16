@@ -1,0 +1,15 @@
+Inpaint task: paint {charName} into this children's book illustration. Magenta marks (at the {regionDesc}) show what to repaint — crosshatch over the body, solid block over the face. Replace ALL magenta with one {charName} underneath.{actionContext}
+
+CRITICAL — match the action above exactly. The repainted figure must be DOING what the scene calls for, with the right expression and gaze. Never default to "standing still and smiling at the camera". Do not face the camera unless the original was facing the camera.
+
+For the face: it is fully blocked by the solid magenta. Invent a new face from the reference photo — match the face shape, eyes, nose, mouth, hair, and skin tone exactly.
+
+For the body: keep the original pose, body language, hand positions, and held items — infer these from the figure faintly visible through the crosshatch and from the action description above.
+
+PRESERVE THE FRAMING. Do not zoom in or crop. {charName} occupies the same area of the frame in the output as the magenta area in the input. Buildings, cobblestones, lampposts, and other background stay in the same positions.
+
+Only ONE figure should appear inside the magenta area. If a partial figure pokes outside the marks, absorb it into {charName} — do not paint a second character.
+
+Background outside the magenta stays the same. Other characters stay unchanged — same faces, same clothing, same poses, same positions.
+
+Match the art style of the surrounding illustration exactly — same brush technique, same level of stylization, same color palette. Do not push toward photorealism, anime, or cartoon.{artStyleContext}{clothingContext}{issueContext}
