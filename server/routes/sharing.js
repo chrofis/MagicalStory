@@ -219,30 +219,17 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
   }
 });
 
-// Normalize image to A4 portrait aspect (210/297 = 0.7071) so what the viewer
-// shows matches the printed book 1:1. Grok's "3:4" preset natively returns
-// 896×1280 (ratio 0.700), ~13px off A4 — a tiny invisible crop. True squares
-// from legacy repair output also get snapped here.
+// Safety net for legacy images written before write-time A4 normalization
+// landed. New images come out of the DB already at A4 so this is a no-op for
+// them. Old 896×1280 stored rows still get the tiny crop here.
 async function normalizeToPortrait(imageBuffer) {
   try {
-    const sharp = require('sharp');
-    const meta = await sharp(imageBuffer).metadata();
-    const TARGET_RATIO = 210 / 297; // A4 portrait
-    const currentRatio = meta.width / meta.height;
-    // Within 0.5% of A4 → no-op. Tighter than drift catches Grok's 0.700
-    // output (1% off A4) and snaps it to exact 0.7071 — invisible 13px crop.
-    if (Math.abs(currentRatio - TARGET_RATIO) / TARGET_RATIO < 0.005) {
-      return imageBuffer;
-    }
-    // Pick output size based on existing dimensions
-    const targetHeight = Math.max(meta.height, Math.round(meta.width / TARGET_RATIO));
-    const targetWidth = Math.round(targetHeight * TARGET_RATIO);
-    return await sharp(imageBuffer)
-      .resize(targetWidth, targetHeight, { fit: 'cover', position: 'centre' })
-      .png()
-      .toBuffer();
+    const { normalizeImageToA4 } = require('../lib/aspectNormalize');
+    const base64 = imageBuffer.toString('base64');
+    const normalized = await normalizeImageToA4(base64);
+    return normalized === base64 ? imageBuffer : Buffer.from(normalized, 'base64');
   } catch (err) {
-    log.warn(`[NORMALIZE] Failed to normalize image: ${err.message}`);
+    log.warn(`[NORMALIZE] Failed: ${err.message}`);
     return imageBuffer;
   }
 }

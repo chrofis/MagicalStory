@@ -1081,6 +1081,14 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
 
   const { qualityScore = null, generatedAt = null, versionIndex = 0 } = options;
 
+  // Normalize every book-facing image to exact A4 aspect at write time.
+  // Means every serve path reads an A4 image from DB — preview matches print 1:1.
+  const A4_TYPES = new Set(['scene', 'empty_scene', 'frontCover', 'initialPage', 'backCover']);
+  if (imageData && A4_TYPES.has(imageType)) {
+    const { normalizeImageToA4 } = require('../lib/aspectNormalize');
+    imageData = await normalizeImageToA4(imageData);
+  }
+
   if (pageNumber == null) {
     // Covers: use partial index ON CONFLICT for NULL page_number
     await dbQuery(

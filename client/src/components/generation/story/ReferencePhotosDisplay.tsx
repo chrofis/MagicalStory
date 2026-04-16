@@ -22,6 +22,16 @@ interface ReferencePhotosDisplayProps {
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   emptySceneQc?: { v1ImageData?: string; v1Issues?: string[]; visionFeedback?: string; retryPrompt?: string } | null;
   textAreaMask?: string | null;  // Black/white mask sent to Grok marking the text-overlay calm zone
+  textCoverageReport?: {
+    words: number;
+    fontPt: number;
+    requiredPct: number;
+    finalPct: number;
+    passed: boolean;
+    retriesUsed: number;
+    winnerIndex: number;
+    candidates: { index: number; coveragePct: number; position: string; overridden: boolean }[];
+  } | null;
   language: string;
   // For lazy loading
   storyId?: string;
@@ -42,6 +52,7 @@ export function ReferencePhotosDisplay({
   hasEmptySceneImage,
   emptySceneQc,
   textAreaMask,
+  textCoverageReport,
   language,
   storyId,
   pageNumber
@@ -314,6 +325,40 @@ export function ReferencePhotosDisplay({
                 </div>
               </div>
             </details>
+          )}
+
+          {/* Text-space coverage report */}
+          {textCoverageReport && (
+            <div className={`mt-2 border rounded-lg p-3 ${textCoverageReport.passed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+              <div className={`text-sm font-semibold flex items-center gap-2 ${textCoverageReport.passed ? 'text-emerald-800' : 'text-amber-800'}`}>
+                {textCoverageReport.passed ? '✅' : '⚠️'} {language === 'de' ? 'Text-Platz' : 'Text space'}
+                <span className="text-xs font-normal text-gray-700">
+                  {textCoverageReport.finalPct}% / {textCoverageReport.requiredPct}% {language === 'de' ? 'benötigt' : 'required'}
+                </span>
+                <span className="text-xs font-normal text-gray-600">
+                  · {textCoverageReport.words} {language === 'de' ? 'Wörter' : 'words'} @ {textCoverageReport.fontPt}pt
+                </span>
+                {textCoverageReport.retriesUsed > 0 && (
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                    {language === 'de' ? 'repariert' : 'repaired'} ({textCoverageReport.retriesUsed})
+                  </span>
+                )}
+              </div>
+              {textCoverageReport.candidates.length > 1 && (
+                <div className="mt-2 text-xs text-gray-700 space-y-0.5">
+                  {textCoverageReport.candidates.map((c) => (
+                    <div key={c.index} className="flex items-center gap-2">
+                      <span className={c.index === textCoverageReport.winnerIndex ? 'font-semibold text-emerald-700' : ''}>
+                        {c.index === 0 ? (language === 'de' ? 'Original' : 'original') : `${language === 'de' ? 'Wiederholung' : 'retry'} ${c.index}`}
+                      </span>
+                      <span>→ {c.coveragePct}%</span>
+                      <span className="text-gray-500">({c.position})</span>
+                      {c.index === textCoverageReport.winnerIndex && <span className="text-xs bg-emerald-100 text-emerald-700 px-1 rounded">{language === 'de' ? 'ausgewählt' : 'picked'}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
