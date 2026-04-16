@@ -34,62 +34,124 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     fontFamily = 'Georgia'
   } = options;
 
+  const baseFontSize = fontSizeOverride || Math.round(height * 0.018);
+  const minFontSize = Math.max(10, Math.round(baseFontSize * 0.6));
+  const font = `${fontFamily}, serif`;
+
+  // Escalation stages — if text doesn't fit in the current region, grow the
+  // region anchored to the text corner and try again. Stage 0 is the detected
+  // calm region (or default fallback rect). Later stages are progressively
+  // larger rectangles so the full text always has somewhere to go.
+  const stages = [polygon || buildFallbackRect(width, height, textPosition)];
+  for (let i = 1; i <= 4; i++) {
+    stages.push(buildExpandedRect(width, height, textPosition, i));
+  }
+
+  let lastResult = null;
+  for (let s = 0; s < stages.length; s++) {
+    const isFinalStage = s === stages.length - 1;
+    const result = renderStage(width, height, text, stages[s], textPosition, baseFontSize, minFontSize, font, isFinalStage);
+    lastResult = result;
+    if (result.fits) {
+      console.log(`[TEXT-OVERLAY] Rendered at ${result.fontSize}px, ${stages[s].length} vertices, position ${textPosition}, stage ${s}/${stages.length - 1}`);
+      return result.buffer;
+    }
+  }
+
+  console.log(`[TEXT-OVERLAY] Rendered at ${lastResult.fontSize}px (force at max stage), position ${textPosition}`);
+  return lastResult.buffer;
+}
+
+/**
+ * Render one stage: given a clipPath, try shrinking font to fit, return the
+ * canvas buffer plus whether text fully fit.
+ * @param {boolean} forceOnFinal - If true, force render at min font even on overflow
+ *   (used for the biggest stage so we always return something).
+ */
+function renderStage(width, height, text, clipPath, textPosition, baseFontSize, minFontSize, font, forceOnFinal) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  // Parse position flags
   const isTop = textPosition.startsWith('top');
   const isLeft = textPosition.includes('left') || textPosition.includes('full');
   const isFull = textPosition.includes('full');
   const isRight = textPosition.includes('right');
 
-  // Step 1: Determine the clipping region
-  const clipPath = polygon || buildFallbackRect(width, height, textPosition);
-
-  // Step 2: Clip and draw gradient
   ctx.save();
   applyClipPath(ctx, clipPath);
   drawGradient(ctx, clipPath, width, height, isTop, isLeft, isRight, isFull);
   ctx.restore();
 
-  // Step 3: Render text inside the polygon
-  const baseFontSize = fontSizeOverride || Math.round(height * 0.018);
-  const font = `${fontFamily}, serif`;
   const textPadding = 20;
-
   const insetPoly = insetPolygon(clipPath, textPadding);
   const scanlines = buildScanlineMap(insetPoly, height);
 
-  // Determine text alignment
   let align = 'left';
   if (isFull) align = 'center';
   else if (isRight) align = 'right';
 
-  // Determine vertical bounds of the inset polygon
   const ys = insetPoly.map(p => p[1]);
   const polyTop = Math.max(0, Math.min(...ys));
   const polyBottom = Math.min(height, Math.max(...ys));
 
-  // Try to render text, shrink font if it doesn't fit
   let renderedFontSize = baseFontSize;
-  const minFontSize = Math.max(10, Math.round(baseFontSize * 0.6));
+  let fits = false;
 
   for (let fs = baseFontSize; fs >= minFontSize; fs -= 1) {
-    const fits = tryRenderText(ctx, text, scanlines, fs, font, align, polyTop, polyBottom, isTop, width);
-    if (fits) {
+    if (tryRenderText(ctx, text, scanlines, fs, font, align, polyTop, polyBottom, isTop, width)) {
       renderedFontSize = fs;
+      fits = true;
       break;
-    }
-    if (fs === minFontSize) {
-      // Force render at minimum size even if it overflows
-      tryRenderText(ctx, text, scanlines, fs, font, align, polyTop, polyBottom, isTop, width, true);
-      renderedFontSize = fs;
     }
   }
 
-  console.log(`[TEXT-OVERLAY] Rendered at ${renderedFontSize}px, polygon ${clipPath.length} vertices, position ${textPosition}`);
+  if (!fits && forceOnFinal) {
+    tryRenderText(ctx, text, scanlines, minFontSize, font, align, polyTop, polyBottom, isTop, width, true);
+    renderedFontSize = minFontSize;
+  }
 
-  return canvas.toBuffer('image/png');
+  return { buffer: canvas.toBuffer('image/png'), fits, fontSize: renderedFontSize };
+}
+
+/**
+ * Progressive rectangle expansion anchored to the text corner.
+ * Stage N grows wider and taller so longer text always has somewhere to fit.
+ */
+function buildExpandedRect(width, height, textPosition, stage) {
+  const isTop = textPosition.startsWith('top');
+  const isLeft = textPosition.includes('left');
+  const isFull = textPosition.includes('full');
+
+  // Stage 1..4 — progressively larger. Stage 4 covers most of the image as
+  // last-resort so extra-long text has room.
+  const heightRatios = [0.38, 0.50, 0.62, 0.75];
+  const widthRatios = [0.60, 0.72, 0.85, 0.95];
+  const fullRatios = [0.30, 0.42, 0.55, 0.70];
+
+  const idx = Math.min(Math.max(stage - 1, 0), 3);
+  const hr = heightRatios[idx];
+  const wr = widthRatios[idx];
+  const fr = fullRatios[idx];
+
+  let rw, rh, rx, ry;
+  if (isFull) {
+    rw = width;
+    rh = Math.round(height * fr);
+    rx = 0;
+    ry = isTop ? 0 : height - rh;
+  } else {
+    rw = Math.round(width * wr);
+    rh = Math.round(height * hr);
+    rx = isLeft ? 0 : width - rw;
+    ry = isTop ? 0 : height - rh;
+  }
+
+  return [
+    [rx, ry],
+    [rx + rw, ry],
+    [rx + rw, ry + rh],
+    [rx, ry + rh]
+  ];
 }
 
 /**

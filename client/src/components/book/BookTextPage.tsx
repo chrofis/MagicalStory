@@ -13,9 +13,9 @@ const BookTextPage = React.forwardRef<HTMLDivElement, BookTextPageProps>(
   ({ text, pageNumber }, ref) => (
     <div
       ref={ref}
-      className="w-full h-full bg-amber-50 flex items-center justify-center px-6 py-8 md:px-10 md:py-12"
+      className="w-full h-full bg-amber-50 overflow-y-auto overscroll-contain px-6 py-8 md:px-10 md:py-12"
     >
-      <div className="max-w-md w-full">
+      <div className="max-w-md w-full mx-auto">
         <p
           className="text-gray-900 font-serif leading-relaxed whitespace-pre-wrap"
           style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)', lineHeight: 1.6 }}
