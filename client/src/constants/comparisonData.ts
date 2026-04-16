@@ -127,6 +127,24 @@ export const comparisons: ComparisonData[] = [
         them: '4.5/5 Trustpilot, 82K reviews',
         winner: 'them',
       },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
     ],
     ourStrengths: {
       en: [
@@ -293,6 +311,24 @@ export const comparisons: ComparisonData[] = [
         us: 'CHF 33-48',
         them: 'From ~CHF 39',
         winner: 'tie',
+      },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not available (template-based)',
+        winner: 'us',
       },
     ],
     ourStrengths: {
@@ -464,6 +500,24 @@ export const comparisons: ComparisonData[] = [
         them: 'CHF 34.99-44.99',
         winner: 'tie',
       },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
     ],
     ourStrengths: {
       en: [
@@ -624,6 +678,24 @@ export const comparisons: ComparisonData[] = [
         us: 'CHF 33-48',
         them: 'CHF 30-40',
         winner: 'them',
+      },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not available (template-based)',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not available (template-based)',
+        winner: 'us',
       },
     ],
     ourStrengths: {
@@ -790,6 +862,24 @@ export const comparisons: ComparisonData[] = [
         them: 'Standard',
         winner: 'us',
       },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not advertised',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not advertised',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not advertised',
+        winner: 'us',
+      },
     ],
     ourStrengths: {
       en: [
@@ -944,6 +1034,24 @@ export const comparisons: ComparisonData[] = [
         label: { en: 'Town-specific stories', de: 'Ortsgeschichten', fr: 'Histoires locales' },
         us: 'Yes (50+ Swiss towns)',
         them: 'No',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Edit story text after generation', de: 'Text nach Generierung bearbeiten', fr: 'Modifier le texte après génération' },
+        us: 'Yes — every word, every page',
+        them: 'Not advertised',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas' },
+        us: 'Yes — unlimited retries',
+        them: 'Not advertised',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Multiple versions to pick from', de: 'Mehrere Versionen zur Auswahl', fr: 'Plusieurs versions au choix' },
+        us: 'Yes — keep the best',
+        them: 'Not advertised',
         winner: 'us',
       },
     ],

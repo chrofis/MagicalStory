@@ -76,7 +76,15 @@ const faqContent: Record<string, {
           },
           {
             question: 'Can I edit the story after it\'s generated?',
-            answer: 'Yes. You can regenerate individual pages, adjust illustrations, and fine-tune the story to your liking before ordering a printed version.',
+            answer: 'Yes, completely. Every word of every page is editable — rewrite sentences, change names, swap dialogue. The AI writes the first draft, you make it yours.',
+          },
+          {
+            question: 'What if I don\'t like a page?',
+            answer: 'Regenerate it. Individual pages can be re-generated as many times as you want until you\'re happy, with the same characters and art style preserved. Each regeneration creates a new version — you keep the one you like best.',
+          },
+          {
+            question: 'Do I have to accept the first version?',
+            answer: 'No. Nothing is final until you order the printed book. You can keep iterating — edit text, regenerate images, refine character appearances — until the book is exactly how you imagined it.',
           },
         ],
       },
@@ -185,7 +193,15 @@ const faqContent: Record<string, {
           },
           {
             question: 'Kann ich die Geschichte nach der Erstellung bearbeiten?',
-            answer: 'Ja. Du kannst einzelne Seiten neu generieren, Illustrationen anpassen und die Geschichte nach deinen Wünschen verfeinern, bevor du eine gedruckte Version bestellst.',
+            answer: 'Ja, komplett. Jedes Wort auf jeder Seite ist editierbar — Sätze umschreiben, Namen ändern, Dialoge austauschen. Die KI schreibt den ersten Entwurf, du machst ihn zu deinem.',
+          },
+          {
+            question: 'Was wenn mir eine Seite nicht gefällt?',
+            answer: 'Einfach neu generieren. Einzelne Seiten können beliebig oft neu erstellt werden — mit denselben Figuren und im gleichen Kunststil. Jede neue Version wird gespeichert, du wählst die beste aus.',
+          },
+          {
+            question: 'Muss ich die erste Version akzeptieren?',
+            answer: 'Nein. Nichts ist endgültig, bis du das gedruckte Buch bestellst. Du kannst so lange iterieren — Texte bearbeiten, Bilder neu generieren, Figuren verfeinern — bis das Buch genau so ist, wie du es dir vorgestellt hast.',
           },
         ],
       },
@@ -294,7 +310,15 @@ const faqContent: Record<string, {
           },
           {
             question: 'Puis-je modifier l\'histoire après sa création ?',
-            answer: 'Oui. Vous pouvez régénérer des pages individuelles, ajuster les illustrations et affiner l\'histoire selon vos souhaits avant de commander une version imprimée.',
+            answer: 'Oui, entièrement. Chaque mot de chaque page est modifiable — réécrivez des phrases, changez les noms, remplacez les dialogues. L\'IA écrit le premier brouillon, vous le personnalisez.',
+          },
+          {
+            question: 'Et si une page ne me plaît pas ?',
+            answer: 'Régénérez-la. Les pages individuelles peuvent être recréées autant de fois que vous le souhaitez, en conservant les mêmes personnages et style artistique. Chaque nouvelle version est sauvegardée, vous choisissez celle que vous préférez.',
+          },
+          {
+            question: 'Dois-je accepter la première version ?',
+            answer: 'Non. Rien n\'est définitif avant la commande du livre imprimé. Vous pouvez continuer à itérer — modifier le texte, régénérer les images, affiner les personnages — jusqu\'à ce que le livre soit exactement comme vous l\'imaginez.',
           },
         ],
       },

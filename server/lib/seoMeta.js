@@ -248,14 +248,14 @@ const STATIC_ROUTES = {
   },
   '/so-funktionierts': {
     title: {
-      en: 'Your Book, Your Vision – Full Creative Control | Magical Story',
-      de: 'Dein Buch, deine Vision – Volle kreative Kontrolle | Magical Story',
-      fr: 'Votre livre, votre vision – Contrôle créatif total | Magical Story',
+      en: 'Customize Every Page – Edit, Regenerate, Perfect It | Magical Story',
+      de: 'Kinderbuch selbst gestalten – Jede Seite bearbeiten & neu generieren | Magical Story',
+      fr: 'Livre enfant personnalisable – Modifiez et régénérez chaque page | Magical Story',
     },
     description: {
-      en: 'Edit every text, shape every illustration. MagicalStory gives you full control over your personalized children\'s book. 170+ themes, 8 art styles. First story free.',
-      de: 'Bearbeite jeden Text, gestalte jedes Bild. MagicalStory gibt dir volle Kontrolle über dein personalisiertes Kinderbuch. 170+ Themen, 8 Kunststile. Erste Geschichte gratis.',
-      fr: 'Modifiez chaque texte, façonnez chaque illustration. MagicalStory vous donne le contrôle total. 170+ thèmes, 8 styles. Première histoire gratuite.',
+      en: 'Don\'t accept the first draft. Edit every word, regenerate any page, refine any character — keep going until your personalized children\'s book is exactly right. First story free.',
+      de: 'Akzeptiere nicht einfach den ersten Entwurf. Jedes Wort bearbeiten, jede Seite neu generieren, Charaktere verfeinern — bis dein Kinderbuch genau richtig ist. Erste Geschichte gratis.',
+      fr: 'N\'acceptez pas le premier brouillon. Modifiez chaque mot, régénérez chaque page, affinez les personnages — jusqu\'à ce que votre livre soit parfait. Première histoire gratuite.',
     },
   },
   '/about': {
