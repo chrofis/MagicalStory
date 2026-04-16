@@ -1,0 +1,8 @@
+Characters or main action are covering the WHITE region of the attached mask. That region is reserved for story text and must be calm and light.
+
+KEEP UNCHANGED: the setting, background, lighting, art style, color palette, character identities (same faces, hair, skin tone, clothing, expressions) and the scene's narrative.
+
+CHANGE: character positions. Move the characters so they sit entirely inside the BLACK region of the mask. The WHITE region must show only calm natural scenery that already belongs in this scene — sky, wall, floor, open ground, smooth water — painted in the same style as the rest of the illustration. No characters, no objects, no major action in the WHITE region.
+
+Scene context:
+{SCENE_DESCRIPTION}

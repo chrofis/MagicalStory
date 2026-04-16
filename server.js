@@ -4922,27 +4922,124 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
       const skipQualityEval = inputData.skipQualityEval === true;
 
-      // ── Text region detection: analyze each generated image to find the actual
-      // calmest/lightest region and override textPosition if significantly better.
-      // Runs in parallel across all pages — cheap (pure pixel math, no API call).
       // ── Text region detection + lightening wash: find the calmest region in
       // each generated image and bake a white wash directly into the image.
-      // The wash follows the organic contour of the calm area — no fixed boxes.
+      // If the calm area is too small for the page's text, run a repair pass
+      // that asks the model to move characters out of the white mask region.
+      // Pick the best (highest-coverage) version across original + retries.
       const { detectAndLightenTextRegion } = require('./server/lib/textRegion');
-      const textRegionResults = {}; // pageNumber → { imageData, position, rect, score }
+      const {
+        requiredTextCoveragePct,
+        requiredFontPt,
+        countWords,
+        REPAIR: TEXT_REPAIR,
+      } = require('./server/config/textRegion');
+      const textRegionResults = {}; // pageNumber → { imageData, position, rect, score, report }
       try {
         const scenePages = rawImages.filter(img => img.pageNumber > 0 && img.imageData);
+        const fontPt = requiredFontPt(inputData.languageLevel);
         await Promise.all(scenePages.map(async (img) => {
           const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);
-          const result = await detectAndLightenTextRegion(img.imageData, preferred || 'top-left', img.pageNumber);
-          textRegionResults[img.pageNumber] = result;
-          // Replace the stored image with the lightened version
-          if (result.imageData !== img.imageData) {
-            img.imageData = result.imageData;
+          const words = countWords(img.text);
+          const requiredPct = requiredTextCoveragePct(words, fontPt);
+
+          // Candidate = { rawImage, washedImage, coverage (fraction), rect, position }
+          const candidates = [];
+          const runDetection = async (rawImage) => {
+            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber);
+            candidates.push({
+              rawImage,
+              washedImage: r.imageData,
+              coverage: r.score || 0,
+              rect: r.rect,
+              position: r.position,
+              overridden: r.overridden,
+            });
+            return r;
+          };
+
+          await runDetection(img.imageData);
+
+          const needsRepair = (img.textAreaMask
+            && candidates[0].coverage * 100 < requiredPct
+            && TEXT_REPAIR.maxRetries > 0);
+          if (needsRepair) {
+            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: coverage ${(candidates[0].coverage * 100).toFixed(1)}% < required ${requiredPct.toFixed(1)}% (${words} words @ ${fontPt}pt) — repairing`);
+            for (let attempt = 1; attempt <= TEXT_REPAIR.maxRetries; attempt++) {
+              try {
+                const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
+                  SCENE_DESCRIPTION: (img.sceneDescription || '').substring(0, 1200),
+                });
+                const repairResult = await generateImageOnly(repairPrompt, img.characterPhotos || [], {
+                  imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+                  imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+                  landmarkPhotos: img.landmarkPhotos || [],
+                  visualBibleGrid: img.visualBibleGrid || null,
+                  previousImage: candidates[0].rawImage, // always repair off the original, not a retry
+                  textAreaMask: img.textAreaMask,
+                  pageNumber: img.pageNumber,
+                  skipCache: true,
+                  aspectRatio: MODEL_DEFAULTS.pageAspect,
+                });
+                if (!repairResult?.imageData) {
+                  log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: no image returned`);
+                  continue;
+                }
+                if (repairResult.usage) {
+                  const isRunware = repairResult.modelId?.startsWith('runware:');
+                  const isGrok = repairResult.modelId?.startsWith('grok-imagine');
+                  const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+                  addUsage(provider, repairResult.usage, 'page_images', repairResult.modelId);
+                }
+                await runDetection(repairResult.imageData);
+                const latest = candidates[candidates.length - 1];
+                log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%`);
+                if (latest.coverage * 100 >= requiredPct) break; // good enough, stop early
+              } catch (repairErr) {
+                log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt} failed: ${repairErr.message}`);
+              }
+            }
+          }
+
+          // Pick the winner by coverage (original or any retry)
+          const winnerIdx = candidates.reduce((best, c, i) =>
+            c.coverage > candidates[best].coverage ? i : best, 0);
+          const winner = candidates[winnerIdx];
+          const finalPct = winner.coverage * 100;
+          const passed = finalPct >= requiredPct;
+
+          img.imageData = winner.washedImage; // wash already baked in by detectAndLightenTextRegion
+          img.textCoverageReport = {
+            words,
+            fontPt,
+            requiredPct: Number(requiredPct.toFixed(1)),
+            finalPct: Number(finalPct.toFixed(1)),
+            passed,
+            retriesUsed: candidates.length - 1,
+            winnerIndex: winnerIdx,
+            candidates: candidates.map((c, i) => ({
+              index: i,
+              coveragePct: Number((c.coverage * 100).toFixed(1)),
+              position: c.position,
+              overridden: c.overridden,
+            })),
+          };
+          textRegionResults[img.pageNumber] = {
+            imageData: winner.washedImage,
+            position: winner.position,
+            rect: winner.rect,
+            score: winner.coverage,
+            overridden: winner.overridden,
+            report: img.textCoverageReport,
+          };
+
+          if (candidates.length > 1) {
+            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: picked v${winnerIdx} (coverage ${finalPct.toFixed(1)}%, required ${requiredPct.toFixed(1)}%, ${passed ? 'PASS' : 'BELOW'})`);
           }
         }));
         const washed = Object.entries(textRegionResults).filter(([, r]) => r.score > 0);
-        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${washed.length} got a white wash`);
+        const repaired = Object.entries(textRegionResults).filter(([, r]) => r.report?.retriesUsed > 0);
+        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${washed.length} washed, ${repaired.length} repaired for text space`);
       } catch (trErr) {
         log.warn(`⚠️ [TEXT-REGION] Detection failed: ${trErr.message} — using original images`);
       }
@@ -4972,6 +5069,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
           sceneCharacterClothing: img.perCharClothing,
           textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
+          textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,
           outlineCharacters: img.scene?.outlineCharacters || null,
           imageVersions: [],
@@ -5105,6 +5203,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
           entityReport: img.entityReport || null,
           textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
+          textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,
           outlineCharacters: img.scene?.outlineCharacters || null
         }));

@@ -5998,6 +5998,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       emptyScenePrompt: img.emptyScenePrompt || null,
       emptySceneQc: img.emptySceneQc || null,
       textAreaMask: img.textAreaMask || null,
+      textCoverageReport: img.textCoverageReport || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       perCharClothing: img.perCharClothing,
