@@ -140,10 +140,16 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const pageImageUrl = (pageNum: number) =>
       `/api/shared/${shareToken}/image/${pageNum}${tokenQuery}`;
 
-    // Build the page components list
+    // Build the page components list.
+    // physicalToLogical maps each flipbook index back to the pageList index
+    // (spacers/blanks inherit the logical index of the neighbouring entry),
+    // so the page counter in the parent shows the logical position regardless
+    // of desktop blank spacers or parity blanks.
     const bookPages: React.ReactNode[] = [];
+    const physicalToLogical: number[] = [];
 
-    for (const entry of pageList) {
+    for (let i = 0; i < pageList.length; i++) {
+      const entry = pageList[i];
       switch (entry.type) {
         case 'frontCover':
           bookPages.push(
@@ -154,12 +160,14 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               onImageClick={onImageClick}
             />
           );
+          physicalToLogical.push(i);
           break;
         case 'initialPage':
           // On desktop: blank left page + dedication right page to form a spread.
           // On mobile (single-page view): just the dedication, no blank page.
           if (!isMobile) {
             bookPages.push(<BlankPage key="blank-initial" />);
+            physicalToLogical.push(i); // blank spacer counts as still on the dedication logical page
           }
           bookPages.push(
             <BookCoverPage
@@ -169,6 +177,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               onImageClick={onImageClick}
             />
           );
+          physicalToLogical.push(i);
           break;
         case 'storyText': {
           // On mobile, the story page renders text below the image — no separate text page.
@@ -182,6 +191,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 pageNumber={storyPage.pageNumber}
               />
             );
+            physicalToLogical.push(i);
           }
           break;
         }
@@ -202,6 +212,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 onImageClick={onImageClick}
               />
             );
+            physicalToLogical.push(i);
           }
           break;
         }
@@ -214,6 +225,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               onImageClick={onImageClick}
             />
           );
+          physicalToLogical.push(i);
           break;
         case 'endPage':
           bookPages.push(
@@ -226,6 +238,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               onSetPassword={onSetPassword}
             />
           );
+          physicalToLogical.push(i);
           break;
       }
     }
@@ -236,8 +249,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     // on the same spread as the back cover when the count is right.
     const interiorCount = bookPages.length - 1;
     if (interiorCount > 0 && interiorCount % 2 !== 0) {
-      // Insert blank page before the last page so the last spread is complete
+      // Insert blank page before the last page so the last spread is complete.
+      // The parity blank sits on the same logical page as its neighbour.
+      const lastLogical = physicalToLogical[physicalToLogical.length - 1] ?? 0;
       bookPages.splice(bookPages.length - 1, 0, <BlankPage key="parity-blank" />);
+      physicalToLogical.splice(physicalToLogical.length - 1, 0, lastLogical);
     }
 
     return (
@@ -262,7 +278,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             mobileScrollSupport={true}
             maxShadowOpacity={0.4}
             drawShadow={true}
-            onFlip={(e: any) => onPageChange(e.data)}
+            onFlip={(e: any) => {
+              const physicalIdx = Number(e.data) || 0;
+              const logicalIdx = physicalToLogical[physicalIdx] ?? physicalIdx;
+              onPageChange(logicalIdx);
+            }}
             className="book-viewer"
             style={{}}
             startZIndex={0}

@@ -451,14 +451,30 @@ export default function SharedStoryViewer() {
         </button>
 
         {/* Reading mode toggle: inline (text on image, print preview) vs sidepage (text on facing page, easier reading) */}
-        <button
-          onClick={() => setReadingMode(readingMode === 'inline' ? 'sidepage' : 'inline')}
-          title={readingMode === 'inline' ? 'Switch to side-by-side reading' : 'Switch to print preview'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-sm border border-indigo-200 bg-indigo-100 text-indigo-700"
-        >
-          {readingMode === 'inline' ? <Eye size={13} /> : <BookOpen size={13} />}
-          {readingMode === 'inline' ? 'Print preview' : 'Read mode'}
-        </button>
+        <div className="inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
+          <button
+            onClick={() => setReadingMode('inline')}
+            title="Text printed over the image — matches the printed book"
+            aria-pressed={readingMode === 'inline'}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors ${
+              readingMode === 'inline' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+            }`}
+          >
+            <Eye size={13} />
+            Print preview
+          </button>
+          <button
+            onClick={() => setReadingMode('sidepage')}
+            title="Text on a separate facing page — easier to read"
+            aria-pressed={readingMode === 'sidepage'}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors ${
+              readingMode === 'sidepage' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+            }`}
+          >
+            <BookOpen size={13} />
+            Read mode
+          </button>
+        </div>
 
         {/* Page counter */}
         <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">

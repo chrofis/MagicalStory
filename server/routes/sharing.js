@@ -234,6 +234,18 @@ async function normalizeToPortrait(imageBuffer) {
   }
 }
 
+// Detect image content-type from buffer magic bytes (JPEG/PNG/GIF/WebP).
+// Covers the mix of formats that flow through sharing routes (legacy PNG +
+// new JPEG from the A4 write-time normalize).
+function sniffImageMime(buf) {
+  if (!buf || buf.length < 8) return 'image/jpeg';
+  if (buf[0] === 0xFF && buf[1] === 0xD8) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) return 'image/webp';
+  return 'image/jpeg';
+}
+
 // GET /api/shared/:shareToken/image/:pageNumber - Get shared story page image
 apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
   try {
@@ -255,7 +267,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
-      res.set('Content-Type', 'image/png');
+      res.set('Content-Type', sniffImageMime(imageBuffer));
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
     }
@@ -273,7 +285,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
 
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
-    res.set('Content-Type', 'image/png');
+    res.set('Content-Type', sniffImageMime(imageBuffer));
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(imageBuffer);
   } catch (err) {
@@ -376,7 +388,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
-      res.set('Content-Type', 'image/png');
+      res.set('Content-Type', sniffImageMime(imageBuffer));
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
     }
@@ -394,7 +406,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
 
     const base64Data = coverImageData.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
-    res.set('Content-Type', 'image/png');
+    res.set('Content-Type', sniffImageMime(imageBuffer));
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(imageBuffer);
   } catch (err) {
