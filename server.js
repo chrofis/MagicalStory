@@ -2193,7 +2193,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
         const sceneDesc = data.description || data.sceneDescription?.description || data.sceneDescription || '';
         if (sceneDesc && !sceneDescMap.has(pageNum)) sceneDescMap.set(pageNum, sceneDesc);
         if (data.imageData) {
-          sceneImages.push({ pageNumber: pageNum, imageData: data.imageData, description: sceneDesc, prompt: data.prompt || data.imagePrompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, totalAttempts: data.totalAttempts, retryHistory: data.retryHistory, wasRegenerated: data.wasRegenerated, originalImage: data.originalImage, originalScore: data.originalScore, originalReasoning: data.originalReasoning, modelId: data.modelId || null, referencePhotos: data.referencePhotos || null });
+          sceneImages.push({ pageNumber: pageNum, imageData: data.imageData, description: sceneDesc, prompt: data.prompt || data.imagePrompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, totalAttempts: data.totalAttempts, retryHistory: data.retryHistory, wasRegenerated: data.wasRegenerated, originalImage: data.originalImage, originalScore: data.originalScore, originalReasoning: data.originalReasoning, modelId: data.modelId || null, referencePhotos: data.referencePhotos || null, imageAspect: inputData?.layout?.imageAspect || data.imageAspect, textInImage: inputData?.layout?.textInImage ?? data.textInImage });
         }
       } else if (cp.step_name === 'cover' || cp.step_name === 'partial_cover') {
         if (data.imageData && data.type) {
@@ -2529,7 +2529,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // (image on top, text below). The reading level controls text density only.
   const sceneCount = inputData.pages;
   const lang = inputData.language || 'en';
-  log.debug(`📖 [UNIFIED] Input: ${inputData.pages} pages, level: ${inputData.languageLevel} → ${sceneCount} scenes`);
+
+  // Resolve page layout once at the top of the pipeline so every downstream
+  // function (buildImagePrompt, generateImageOnly, empty-scene gen, repair,
+  // PDF) reads from one source of truth. Stashed on inputData so existing
+  // helpers that already receive inputData get it without signature changes.
+  // 'advanced' → square + text-below. Others → A4 + text-overlay.
+  const { resolveLayout } = require('./server/lib/layout');
+  const layout = resolveLayout(inputData.languageLevel, inputData.layoutOverride);
+  inputData.layout = layout;
+  log.debug(`📖 [UNIFIED] Input: ${inputData.pages} pages, level: ${inputData.languageLevel} → ${sceneCount} scenes, layout: ${layout.mode} (${layout.imageAspect}, textInImage=${layout.textInImage})`);
   const { getLanguageNameEnglish } = require('./server/lib/languages');
   const langText = getLanguageNameEnglish(lang);
 
@@ -2952,6 +2961,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const startTime = Date.now();
 
           const genResult = await generateImageOnly(imagePrompt, pagePhotos, {
+            aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
             imageModelOverride: pageImageModel,
             imageBackendOverride: pageImageBackend,
             pageNumber: page.pageNumber,
@@ -4674,12 +4684,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
             const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
             const langLevel = inputData.languageLevel || 'standard';
+            // textInImage drives whether we ask the model to keep a calm zone for
+            // text overlay AND whether we attach the visual mask reference. When
+            // text is rendered below the image (advanced layout), neither is needed.
+            const layoutTextInImage = inputData?.layout?.textInImage !== false;
+            const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
             // Load pre-built text area mask (white=text zone, black=full detail).
             // The model uses this as a visual reference — much more reliable than prompt text.
             const { getTextAreaMask } = require('./server/lib/textMasks');
-            const textAreaMask = getTextAreaMask(textPos, langLevel);
+            const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
 
-            const emptyTextAreaInstr = textAreaMask
+            const emptyTextAreaInstr = !layoutTextInImage
+              ? ''
+              : textAreaMask
               ? `TEXT SPACE: The attached mask shows where a soft, light, contour-free patch must exist in your output (look at the WHITE region). Story text will be printed there, so this area must be quiet and readable.
 
 Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
@@ -4710,6 +4727,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || []);
 
               const result = await generateImageOnly(emptyPrompt, [], {
+                aspectRatio: layoutAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: pageData.landmarkPhotos,
@@ -4729,7 +4747,9 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
               // Validate the empty scene before using it as a background.
               // Phase 1: pixel analysis (white boxes, too dark, text area calmness) — <50ms, free
               // Phase 2: Gemini Flash-lite vision (people, landmark, artifacts) — ~2s, cheap
-              if (result?.imageData) {
+              // Skipped entirely when layout has no text-in-image: the calm-zone QC
+              // checks don't apply, and we save the vision call cost on those pages.
+              if (result?.imageData && layoutTextInImage) {
                 const { validateEmptyScene } = require('./server/lib/images');
                 const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
@@ -4753,7 +4773,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                     TEXT_AREA_INSTRUCTION: softerTextInstr,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
-                    aspectRatio: MODEL_DEFAULTS.pageAspect,
+                    aspectRatio: layoutAspect,
                     imageModelOverride: pageData.pageImageModel,
                     imageBackendOverride: pageData.pageImageBackend,
                     visualBibleGrid: emptySceneVbGrid,
@@ -4853,16 +4873,19 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
               pageData.prompt,
               pageData.characterPhotos,
               {
+                aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: pageData.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
                 sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
-                // Pass the text-zone mask so Grok leaves the calm area open for
-                // the text overlay at generation time (same pattern as empty
-                // scene). Avoids the per-page repair iteration afterwards.
-                textAreaMask: sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null
+                // Text-zone mask only attached when text is overlaid on image
+                // (textInImage=true). For square+below layout this is null —
+                // the model is free to fill the whole frame.
+                textAreaMask: (inputData?.layout?.textInImage !== false)
+                  ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
+                  : null
               }
             );
 
@@ -5013,8 +5036,16 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
         REPAIR: TEXT_REPAIR,
       } = require('./server/config/textRegion');
       const textRegionResults = {}; // pageNumber → { imageData, position, rect, score, report }
+      // Skip the entire text-region detection + wash + repair phase for layouts
+      // where text isn't overlaid on the image (advanced/square+below). The text
+      // is typeset on a separate strip below the image — no calm zone needed,
+      // no wash to bake in, no repair to run.
+      const skipTextRegionPhase = inputData?.layout?.textInImage === false;
       try {
-        const scenePages = rawImages.filter(img => img.pageNumber > 0 && img.imageData);
+        if (skipTextRegionPhase) {
+          log.info(`📝 [TEXT-REGION] Skipped (layout.textInImage=false — text rendered below image)`);
+        }
+        const scenePages = !skipTextRegionPhase ? rawImages.filter(img => img.pageNumber > 0 && img.imageData) : [];
         const fontPt = requiredFontPt(inputData.languageLevel);
         await Promise.all(scenePages.map(async (img) => {
           const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);

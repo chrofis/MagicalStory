@@ -798,6 +798,13 @@ export interface SceneImage {
   // Text overlay positioning (from scene expansion + post-gen region detection)
   textPosition?: string;
   textRect?: { x: number; y: number; w: number; h: number; imgWidth: number; imgHeight: number };
+  // Layout per page — set at scene-expansion time from languageLevel via resolveLayout().
+  // imageAspect: '1:1' (square) for advanced level, '3:4' (A4 portrait) otherwise.
+  // textInImage: true means text is rendered as overlay on the image (calm-zone QC + mask + repair run).
+  // false means text is rendered in a separate strip below the image (none of those run).
+  // Both default to legacy values (3:4 + true) for stories generated before this field existed.
+  imageAspect?: '1:1' | '3:4';
+  textInImage?: boolean;
 }
 
 export interface CoverImageData {

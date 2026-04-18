@@ -97,6 +97,8 @@ interface WizardStep6Props {
   developerMode: boolean;
   generationMode?: GenerationMode;
   onGenerationModeChange?: (mode: GenerationMode) => void;
+  layoutOverride?: 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page';
+  onLayoutOverrideChange?: (mode: 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page') => void;
 }
 
 /**
@@ -137,6 +139,8 @@ export function WizardStep6Summary({
   developerMode,
   generationMode = 'auto',
   onGenerationModeChange,
+  layoutOverride = 'auto',
+  onLayoutOverrideChange,
 }: WizardStep6Props) {
   const { language } = useLanguage();
   const lang = language as 'en' | 'de' | 'fr';
@@ -587,6 +591,28 @@ export function WizardStep6Summary({
               </select>
               <p className="text-xs text-gray-600 mt-1">
                 Auto: 1st-grade uses single prompt, standard/advanced use outline+text.
+              </p>
+            </div>
+          )}
+
+          {/* Layout Override */}
+          {onLayoutOverrideChange && (
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Page Layout
+              </label>
+              <select
+                value={layoutOverride}
+                onChange={(e) => onLayoutOverrideChange(e.target.value as 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page')}
+                className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-sm font-medium bg-white"
+              >
+                <option value="auto">Auto (based on reading level)</option>
+                <option value="a4-overlay">A4 portrait + text overlay on image</option>
+                <option value="square-below">Square image + text strip below</option>
+                <option value="legacy-square-2page">Legacy: separate image + text pages (stub)</option>
+              </select>
+              <p className="text-xs text-gray-600 mt-1">
+                Auto: 1st-grade & standard ⇒ A4+overlay. Advanced ⇒ square+below. The legacy mode is a stub — it routes to square+below until the old 2-page code (commit 4d953cba) is revived.
               </p>
             </div>
           )}

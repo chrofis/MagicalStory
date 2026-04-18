@@ -197,6 +197,7 @@ export default function StoryWizard() {
   const {
     developerMode, setDeveloperMode,
     generationMode, setGenerationMode,
+    layoutOverride, setLayoutOverride,
     devSkipOutline, setDevSkipOutline,
     devSkipText, setDevSkipText,
     devSkipSceneDescriptions, setDevSkipSceneDescriptions,
@@ -3861,6 +3862,8 @@ export default function StoryWizard() {
         skipImages: overrides?.skipImages ?? devSkipImages,
         // Developer generation mode override (auto = use reading level default)
         generationMode: generationMode !== 'auto' ? generationMode : undefined,
+        // Developer layout override (auto = derive from languageLevel via resolveLayout)
+        layoutOverride: layoutOverride !== 'auto' ? layoutOverride : undefined,
         // Developer skip options
         skipOutline: devSkipOutline,
         skipText: devSkipText,
@@ -4408,6 +4411,8 @@ export default function StoryWizard() {
             developerMode={developerMode}
             generationMode={generationMode}
             onGenerationModeChange={setGenerationMode}
+            layoutOverride={layoutOverride}
+            onLayoutOverrideChange={setLayoutOverride}
           />
         );
 

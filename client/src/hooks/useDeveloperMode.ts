@@ -4,12 +4,22 @@ import type { ModelSelections } from '@/components/generation';
 // Generation mode: auto follows reading level, others force specific pipeline
 export type GenerationMode = 'auto' | 'pictureBook' | 'outlineAndText';
 
+// Layout override: dev-only force of the page-layout decision normally derived
+// from languageLevel. 'auto' uses the mapping (advanced ⇒ square+below, others
+// ⇒ A4 + text-overlay). 'legacy-square-2page' is a stub for the old image-page /
+// text-page mode (see commit 4d953cba) — accepted but currently unimplemented
+// downstream; pipeline falls back to square+below.
+export type LayoutOverride = 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page';
+
 interface DeveloperModeState {
   developerMode: boolean;
   setDeveloperMode: (enabled: boolean) => void;
   // Generation pipeline mode (dev override for reading level behavior)
   generationMode: GenerationMode;
   setGenerationMode: (mode: GenerationMode) => void;
+  // Page layout override (dev-only force; production uses 'auto')
+  layoutOverride: LayoutOverride;
+  setLayoutOverride: (mode: LayoutOverride) => void;
   // Skip flags for faster testing
   devSkipOutline: boolean;
   setDevSkipOutline: (skip: boolean) => void;
@@ -73,6 +83,10 @@ export function useDeveloperMode(): DeveloperModeState {
   // Generation pipeline mode (override reading level behavior)
   const [generationMode, setGenerationMode] = useState<GenerationMode>('auto');
 
+  // Page layout override — only inspected when developerMode is true. Defaults
+  // to 'auto' so production users always follow the languageLevel mapping.
+  const [layoutOverride, setLayoutOverride] = useState<LayoutOverride>('auto');
+
   // Developer skip options for faster testing
   const [devSkipOutline, setDevSkipOutline] = useState(false);
   const [devSkipText, setDevSkipText] = useState(false);
@@ -127,6 +141,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDeveloperMode,
     generationMode,
     setGenerationMode,
+    layoutOverride,
+    setLayoutOverride,
     devSkipOutline,
     setDevSkipOutline,
     devSkipText,

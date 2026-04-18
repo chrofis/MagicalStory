@@ -311,6 +311,15 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const isPictureBook = bookFormat !== 'square';
   log.debug(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (1 page per scene)' : 'Standard (2 pages per scene)'}`);
 
+  // textInImage: text overlay vs text strip below. Read first from per-scene
+  // metadata (stamped at expansion time), fall back to layout helper for legacy
+  // stories that pre-date that field. When false, the image is square at the
+  // top and text fills the bottom strip — clean separation, no overlay.
+  const { resolveLayout } = require('./layout');
+  const layoutFromLevel = resolveLayout(storyData.languageLevel);
+  const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
+  const textInImage = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
+
   // Calculate consistent font size for all pages BEFORE rendering
   let fontSizeWarning = null;
   let consistentFontSize;
@@ -318,15 +327,18 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   if (isPictureBook) {
     // Picture-book text area scales with languageLevel (1st-grade=15%,
     // standard=20%, advanced=35%). Target font: 14pt for 1st-grade, 12pt
-    // for the others. Min font: 10pt floor.
-    const textRatio = getPictureBookTextRatio(storyData.languageLevel);
+    // for the others. Min font: 10pt floor. When textInImage=false the image
+    // is square and the text strip becomes a fixed ~30% (1/3 of page).
+    const textRatio = textInImage
+      ? getPictureBookTextRatio(storyData.languageLevel)
+      : 0.30;  // square image fills top 70% (210×208mm), text strip bottom 30%
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
     const textMargin = mmToPoints(3);
     const textWidth = pageWidth - (textMargin * 2);
     const textAreaHeight = pageHeight * textRatio;
     const availableTextHeight = textAreaHeight - textMargin;
 
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, 'center');
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, textInImage ? 'center' : 'left');
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 

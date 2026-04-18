@@ -4685,8 +4685,10 @@ export function StoryDisplay({
                           className={`w-full rounded-lg shadow-md object-contain ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
-                        {/* Text overlay on image — server-rendered with calm region detection */}
-                        {textOverlay && !isGenerating && pageText.trim() && (
+                        {/* Text overlay on image — server-rendered with calm region detection.
+                            Skipped when scene has textInImage=false (square layout, advanced level):
+                            text is rendered in the dedicated white block below the image instead. */}
+                        {textOverlay && !isGenerating && pageText.trim() && image?.textInImage !== false && (
                           overlayImages[pageNumber] ? (
                             <img
                               src={overlayImages[pageNumber]}
@@ -5325,8 +5327,10 @@ export function StoryDisplay({
                       </div>
                     )}
 
-                    {/* Text below — shown when overlay is off or when no image */}
-                    {(!textOverlay || isGenerating || !hasPageImage) && (
+                    {/* Text below — shown when overlay is off, when no image, or when this scene
+                        is a square+text-below layout (image.textInImage === false). The latter is
+                        the new "advanced" reading level layout where text is never on the image. */}
+                    {(!textOverlay || isGenerating || !hasPageImage || image?.textInImage === false) && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea

@@ -3659,6 +3659,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Enforce spread rule: odd pages = left, even pages = right
   const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
   const langLevel = inputData?.languageLevel || 'standard';
+  // textInImage: false ⇒ text is rendered in a separate strip below the image
+  // (advanced reading level / square layout). The image has no text overlay,
+  // so we MUST NOT inject COPY SPACE — let the model fill the whole frame.
+  // Defaults to true for legacy callers that don't pass inputData.layout.
+  const textInImage = inputData?.layout?.textInImage !== false;
   // Text area instruction: tell the model to keep an area calm for text overlay.
   // Critical: do NOT say "white", "blank", "empty", or "negative space" — the model
   // will paint a literal white box. Instead say "continue the scene but keep it simple".
@@ -3671,7 +3676,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     'top-full': 'upper third',
     'bottom-full': 'lower third',
   };
-  const textAreaInstruction = textPosition
+  const textAreaInstruction = (textInImage && textPosition)
     ? `**COPY SPACE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) will have dark text printed over it. Continue the scene naturally into this area — same sky, same wall, same ground — but keep it SOFT and SIMPLE there. Use lighter tones of the same colours already in the scene, with gentle gradients and minimal detail. DO NOT paint a white box, a blank patch, or a sharp colour change. The area should look like a natural, calm continuation of the illustration — just quieter and lighter than the rest, so dark text is readable over it. No characters, no sharp lines, no high-contrast detail in this zone.`
     : '';
 
