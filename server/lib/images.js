@@ -1072,7 +1072,7 @@ const isBlockedResponse = (responseData) => {
   return false;
 };
 
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null) {
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -1166,8 +1166,31 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
 
+    // Build expected head-to-body ratios per character (for STEP 2C proportion
+    // check). Uses getHeadBodyRatio() from storyHelpers — single source of
+    // truth shared with avatar generation. Age words ("child"/"toddler") are
+    // never sent to Gemini, only the numeric ratios, which are safety-filter
+    // neutral. Empty string when no characters or none have age set.
+    let figureProportionsBlock = '';
+    try {
+      const { getHeadBodyRatio } = getStoryHelpers();
+      const lines = [];
+      for (const c of (sceneCharacters || [])) {
+        if (!c?.name) continue;
+        const ratio = getHeadBodyRatio(c.age);
+        if (ratio) lines.push(`- ${c.name}: ${ratio}`);
+      }
+      if (lines.length > 0) {
+        figureProportionsBlock = `EXPECTED FIGURE PROPORTIONS (standing, head-to-body):\n${lines.join('\n')}`;
+      }
+    } catch { /* silent — evaluator tolerates empty block */ }
+
     const evaluationPrompt = evaluationTemplate
-      ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: promptForEval, INTERACTIONS_BLOCK: interactionsBlock })
+      ? fillTemplate(evaluationTemplate, {
+          ORIGINAL_PROMPT: promptForEval,
+          INTERACTIONS_BLOCK: interactionsBlock,
+          FIGURE_PROPORTIONS: figureProportionsBlock,
+        })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
     // Build content array for Gemini format
@@ -1432,10 +1455,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             description: i.description,
             severity: i.severity || 'MODERATE',
             type: i.type || 'default',
+            character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
             fix: i.fix || `Fix: ${i.description}`
           }));
         if (fixableIssues.length > 0) {
-          log.info(`📊 [EVAL] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
+          const proportionCount = fixableIssues.filter(f => f.type === 'proportion').length;
+          if (proportionCount > 0) {
+            log.info(`📊 [EVAL] Parsed ${fixableIssues.length} fixable issues (two-stage detection, ${proportionCount} proportion)`);
+          } else {
+            log.info(`📊 [EVAL] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
+          }
         }
       }
 
@@ -3012,7 +3041,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Buffer|null} visualBibleGrid - Combined grid image of VB elements and secondary landmarks
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null, aspectRatioOverride = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null, aspectRatioOverride = null, sceneCharacters = null) {
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -3082,7 +3111,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         qualityModelOverride,
         pageContext,
         storyText,
-        sceneHint
+        sceneHint,
+        sceneCharacters      // Enables STEP 2C head-to-body proportion check
       );
       if (!qualityResult) {
         log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware) — returning image with score=null so pipeline can re-evaluate next round`);
@@ -3448,7 +3478,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         qualityModelOverride,
         pageContext,
         storyText,
-        sceneHint
+        sceneHint,
+        sceneCharacters      // Enables STEP 2C head-to-body proportion check
       );
       if (!qualityResult) {
         log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
@@ -3521,7 +3552,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
       const qualityResult = await evaluateImageQuality(
         result.imageData, prompt, characterPhotos, evaluationType,
-        qualityModelOverride, pageContext, storyText, sceneHint
+        qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
       );
       if (!qualityResult) {
         log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
@@ -3678,7 +3709,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         // Evaluate image quality with prompt and reference images
         log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -4510,7 +4541,8 @@ async function evaluateImageBatch(images, options = {}) {
         qualityModelOverride,
         pageLabel,
         img.pageText || null,  // Story text for semantic fidelity check
-        img.sceneHint || null  // Scene hint for semantic evaluation
+        img.sceneHint || null, // Scene hint for semantic evaluation
+        img.sceneCharacters || null  // Enables STEP 2C head-to-body proportion check
       );
 
       // Use pre-extracted scene metadata if available, otherwise extract from scene description
@@ -8338,7 +8370,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground, aspectRatioOverride);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground, aspectRatioOverride, sceneCharacters);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
@@ -8820,7 +8852,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             qualityModelOverride,
             pageContext,
             storyText,
-            sceneHint
+            sceneHint,
+            sceneCharacters  // Enables STEP 2C head-to-body proportion check
           );
 
           if (reEvalResult && reEvalResult.score !== null) {

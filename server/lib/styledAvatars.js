@@ -16,7 +16,7 @@ const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-const { buildHairDescription } = require('./storyHelpers');
+const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
 const { generateStyledCostumedAvatar, evaluateAvatarFaceMatch } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
@@ -168,16 +168,19 @@ function buildPhysicalTraitsString(character) {
   const traits = character?.physical || {};
   const parts = [];
 
-  // Age and body proportions — critical for correct child vs adult rendering
+  // Age and body proportions — critical for correct child vs adult rendering.
+  // Ratio comes from getHeadBodyRatio() in storyHelpers so avatar generation
+  // and image evaluation share a single source of truth.
   const age = character?.age ? parseInt(character.age, 10) : null;
   if (age) {
-    let ageCategory, headToBody;
-    if (age <= 3) { ageCategory = 'toddler'; headToBody = '1:4'; }
-    else if (age <= 6) { ageCategory = 'young child'; headToBody = '1:5'; }
-    else if (age <= 10) { ageCategory = 'child'; headToBody = '1:6'; }
-    else if (age <= 12) { ageCategory = 'preteen'; headToBody = '1:6.5'; }
-    else if (age <= 17) { ageCategory = 'teenager'; headToBody = '1:7'; }
-    else { ageCategory = 'adult'; headToBody = '1:8'; }
+    let ageCategory;
+    if (age <= 3) ageCategory = 'toddler';
+    else if (age <= 6) ageCategory = 'young child';
+    else if (age <= 10) ageCategory = 'child';
+    else if (age <= 12) ageCategory = 'preteen';
+    else if (age <= 17) ageCategory = 'teenager';
+    else ageCategory = 'adult';
+    const headToBody = getHeadBodyRatio(age);
     parts.push(`Age: ${age} years old (${ageCategory}) — head-to-body ratio ${headToBody}`);
   }
 

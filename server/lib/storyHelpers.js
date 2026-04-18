@@ -3270,32 +3270,26 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   }
 
   // Compute per-character text-zone overrides from the outline JSON.
-  // If the outline places a character on the same side as textPosition, we inject
-  // a named move instruction so the model doesn't have to reason about it abstractly.
+  // textPosition is not known yet (it's chosen by scene expansion), but the spread rule
+  // determines the forbidden side: even pages → text on RIGHT → characters must go LEFT.
+  //                                odd pages  → text on LEFT  → characters must go RIGHT.
+  // We inject named move instructions so the model doesn't have to reason abstractly.
   let textZoneOverride = '';
   try {
     const hintObj = JSON.parse(draftSceneDescription.match(/\{[\s\S]*\}/)?.[0] || '{}');
-    const textPos = hintObj.textPosition || '';
-    const forbiddenSide = textPos.includes('right') ? 'right'
-      : textPos.includes('left') ? 'left'
-      : textPos === 'bottom-full' ? 'bottom'
-      : textPos === 'top-full' ? 'top'
-      : '';
-    const allowedSide = forbiddenSide === 'right' ? 'left'
-      : forbiddenSide === 'left' ? 'right'
-      : forbiddenSide === 'bottom' ? 'upper'
-      : forbiddenSide === 'top' ? 'lower'
-      : '';
-    if (forbiddenSide && Array.isArray(hintObj.characters)) {
+    const forbiddenSide = pageNumber % 2 === 0 ? 'right' : 'left';
+    const allowedSide = forbiddenSide === 'right' ? 'left' : 'right';
+    const expectedTextPos = pageNumber % 2 === 0 ? 'bottom-right or top-right' : 'bottom-left or top-left';
+    if (Array.isArray(hintObj.characters)) {
       const conflicts = hintObj.characters.filter(c =>
         (c.position || '').toLowerCase().includes(forbiddenSide)
       );
       if (conflicts.length > 0) {
         const moves = conflicts.map(c =>
-          `- ${c.name}: outline says "${c.position}" → place on the ${allowedSide} side instead (text zone conflict)`
+          `- ${c.name}: outline says "${c.position}" → move to ${allowedSide} side (text will occupy the ${forbiddenSide})`
         ).join('\n');
-        textZoneOverride = `**TEXT ZONE POSITION FIXES (textPosition=${textPos}, forbidden side=${forbiddenSide}):**\n${moves}\nApply these moves in your prose and metadata before writing anything else.\n`;
-        log.info(`[SCENE EXPANSION P${pageNumber}] Text-zone override: ${conflicts.length} character(s) moved away from ${forbiddenSide}`);
+        textZoneOverride = `**TEXT ZONE POSITION FIXES (page ${pageNumber} → textPosition will be ${expectedTextPos}, forbidden side = ${forbiddenSide}):**\n${moves}\nApply these moves in your prose and metadata before writing anything else.\n`;
+        log.info(`[SCENE EXPANSION P${pageNumber}] Text-zone override: ${conflicts.length} character(s) moved from ${forbiddenSide} to ${allowedSide}`);
       }
     }
   } catch { /* non-JSON outline — skip */ }
@@ -4702,6 +4696,26 @@ function updatePageText(storyText, pageNumber, newText) {
   }
 }
 
+/**
+ * Age → head-to-body ratio lookup, used both at avatar-generation time
+ * (prescribes the expected proportion) and at image-evaluation time (verifies
+ * the generated figure matches). Returns a string like "1:6" or null if age
+ * is missing/non-numeric.
+ *
+ * Keep this the single source of truth — `styledAvatars.js` and
+ * `images.js` both call it so the prescribed and checked ratios can't drift.
+ */
+function getHeadBodyRatio(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 3) return '1:4';
+  if (n <= 6) return '1:5';
+  if (n <= 10) return '1:6';
+  if (n <= 12) return '1:6.5';
+  if (n <= 17) return '1:7';
+  return '1:8';
+}
+
 module.exports = {
   // Config
   ART_STYLES,
@@ -4730,6 +4744,7 @@ module.exports = {
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
   buildHairDescription,
+  getHeadBodyRatio,
 
   // Text position
   enforceSpreadTextPosition,

@@ -311,6 +311,7 @@ function mapIssueType(type) {
 
   if (typeStr.includes('face') || typeStr.includes('identity')) return 'face';
   if (typeStr.includes('hand') || typeStr.includes('finger')) return 'hand';
+  if (typeStr.includes('proportion') || typeStr.includes('head size') || typeStr.includes('head-to-body')) return 'proportion';
   if (typeStr.includes('limb') || typeStr.includes('arm') || typeStr.includes('leg') || typeStr.includes('anatomy')) return 'anatomy';
   if (typeStr.includes('cloth') || typeStr.includes('outfit') || typeStr.includes('dress')) return 'clothing';
   if (typeStr.includes('object') || typeStr.includes('prop') || typeStr.includes('item')) return 'object';

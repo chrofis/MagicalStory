@@ -43,6 +43,31 @@ If the prompt mentions animals, landmarks, vehicles, or notable objects:
 
 ---
 
+**STEP 2C: FIGURE PROPORTION CHECK**
+
+{FIGURE_PROPORTIONS}
+
+For each figure, compare the rendered head-to-body ratio to the expected ratio above (head height divided by total visible body height).
+
+- CRITICAL: rendered ratio differs from expected by MORE than 50% (e.g. expected 1:6, rendered head ≈ 1/3 of body, OR expected 1:8, rendered head ≈ 1/4 of body).
+- MAJOR: rendered ratio differs by 25–50%.
+- Otherwise `proportion_ok: true`.
+
+**Skip this check** and set `proportion_ok: true, proportion_issue: "n/a — pose"` if the figure is:
+- sitting, kneeling, crouching, lying down
+- cropped so the body below the waist is not visible
+- partially occluded by furniture, other figures, or scene elements
+
+For every figure in `figures[]` add:
+  `"proportion_ok": true | false`
+  `"proportion_issue": null | "head too large" | "head too small" | "n/a — pose"`
+
+If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, matching severity (CRITICAL or MAJOR), and `description` including the character name and whether head is too large or too small.
+
+If the EXPECTED FIGURE PROPORTIONS block above is empty (no ratios provided), set `proportion_ok: true, proportion_issue: null` for every figure and skip the check entirely.
+
+---
+
 **STEP 3: RENDERING & PHYSICS CHECK**
 
 Check for AI artifacts and physics violations:
@@ -51,7 +76,7 @@ ANATOMY (Critical):
 - Extra limbs: THREE arms, third hand, extra legs = CRITICAL
 - 3+ items in `items_held` from STEP 1 = extra hand = CRITICAL
 - Limb attachment: Arms/legs properly connected to body
-- Body proportions: Head size, limb length reasonable
+- Head and body proportions: scored separately in STEP 2C (do not duplicate here)
 
 PHYSICS & GRAVITY:
 - People/objects grounded (not floating in air unless flying)
@@ -151,7 +176,9 @@ Return JSON only (no other text):
       "clothing": "blue hoodie, dark pants",
       "action": "holding stuffed toy",
       "view": "front",
-      "items_held": ["stuffed toy"]
+      "items_held": ["stuffed toy"],
+      "proportion_ok": true,
+      "proportion_issue": null
     }
   ],
   "matches": [
@@ -229,7 +256,7 @@ Return JSON only (no other text):
   - `character`: REQUIRED for any character-related issue. Use the EXACT character name from the reference list above (e.g. "Lukas", "Werner"). Only null for non-character issues (environment, background). NEVER leave null when a specific character is affected.
   - `description`: What is WRONG — ALWAYS use the character's name, NEVER describe them by appearance or position alone. GOOD: "Werner has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
   - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
-  - `type`: face, limb, clothing, object, environment, physics
+  - `type`: face, limb, clothing, object, environment, physics, proportion
   - `fix`: How to fix THIS EXACT issue described above (visual description only, NO character names — use position and appearance)
   - CRITICAL: `description` and `fix` MUST refer to the SAME issue. If pants are wrong, fix the pants. If hair clips are missing, add hair clips. Never mix issues between entries.
 - Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting
