@@ -6512,12 +6512,43 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // Extract metadata from the new scene description for per-character clothing
   const newSceneMetadata = extractSceneMetadata(newSceneDescription);
 
-  // Resolve clothing — use per-character data from the new scene description (priority 1)
-  // or stored pageClothing (priority 2), falling back to parsed/primary clothing
+  // Resolve clothing. The stored pageClothing was set by the unified Sonnet
+  // call at generation time and reflects the canonical per-page costume
+  // decision — if it says costumed:mittelalterlich for this page, the Haiku
+  // iterate call must not downgrade it to standard. So: when the stored
+  // pageClothing has any costumed entry, it wins. Otherwise fall back to
+  // Claude's iterate output (for pages that legitimately change clothing
+  // mid-story).
   let clothingCategory;
   let effectiveClothingRequirements = clothingRequirements;
 
-  if (newSceneMetadata?.characterClothing && Object.keys(newSceneMetadata.characterClothing).length > 0) {
+  const storedPageClothing = pageClothingData?.pageClothing?.[pageNumber];
+  const storedHasCostumed = (() => {
+    if (!storedPageClothing) return false;
+    if (typeof storedPageClothing === 'string') return storedPageClothing.startsWith('costumed');
+    return Object.values(storedPageClothing).some(v => typeof v === 'string' && v.startsWith('costumed'));
+  })();
+
+  if (storedHasCostumed && typeof storedPageClothing === 'object') {
+    // Authoritative: use stored pageClothing and ignore Haiku's downgrade
+    const perPageClothing = convertClothingToCurrentFormat(storedPageClothing);
+    effectiveClothingRequirements = { ...clothingRequirements };
+    for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+      effectiveClothingRequirements[charName] = {
+        ...effectiveClothingRequirements[charName],
+        ...charClothing
+      };
+    }
+    const clothingValues = Object.values(storedPageClothing);
+    const firstClothing = clothingValues[0];
+    clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+    const iterateCh = newSceneMetadata?.characterClothing || null;
+    if (iterateCh && Object.values(iterateCh).some(v => !String(v).startsWith('costumed'))) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: Haiku tried to downgrade clothing to ${JSON.stringify(iterateCh)} — overriding with stored pageClothing ${JSON.stringify(storedPageClothing)}`);
+    } else {
+      log.debug(`🔄 [ITERATE] Using stored pageClothing (authoritative costumed): ${JSON.stringify(storedPageClothing)}`);
+    }
+  } else if (newSceneMetadata?.characterClothing && Object.keys(newSceneMetadata.characterClothing).length > 0) {
     // Priority 1: Per-character clothing from newly generated scene description
     const sceneClothing = newSceneMetadata.characterClothing;
     const perCharClothing = convertClothingToCurrentFormat(sceneClothing);
@@ -6534,7 +6565,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     log.debug(`🔄 [ITERATE] Using per-character clothing from scene description: ${JSON.stringify(sceneClothing)}`);
   } else {
     // Priority 2: Per-character clothing from pageClothing (stored data)
-    const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+    const pageClothingEntry = storedPageClothing;
     if (typeof pageClothingEntry === 'string') {
       clothingCategory = pageClothingEntry;
     } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
@@ -7274,7 +7305,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   };
   const textPositionDesc = options.textPosition ? TEXT_POSITION_DESC[options.textPosition] : null;
   const textPositionContext = textPositionDesc
-    ? `\n\nText overlay zone: dark text will be printed over the ${textPositionDesc}. Do not place the character's face or any high-contrast detail in that zone — keep it visually calm.`
+    ? `\n\nQuiet zone: keep the ${textPositionDesc} soft and visually calm — do not place the character's face or any high-contrast detail there. It is intentional negative space in the composition.`
     : '';
 
   if (useBlended) {

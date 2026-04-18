@@ -4705,22 +4705,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { getTextAreaMask } = require('./server/lib/textMasks');
             const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
 
-            const emptyTextAreaInstr = !layoutTextInImage
+            // Composition instruction — keep the chosen area calm and visually
+            // quiet. Deliberately avoids the words "text", "text overlay",
+            // "readable", or any mention of a mask, because Grok/Gemini
+            // interpret those as "paint fake letterforms here" and end up
+            // baking lorem-ipsum gibberish into the empty scene.
+            const emptyTextAreaInstr = (!layoutTextInImage || !textPos)
               ? ''
-              : textAreaMask
-              ? `TEXT SPACE: The attached mask shows where a soft, light, contour-free patch must exist in your output (look at the WHITE region). Story text will be printed there, so this area must be quiet and readable.
-
-Paint the bright area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
-- OUTDOOR scene (field, hill, beach, garden, forest): use sky, distant open ground, smooth grass, calm water, snow, or soft mist — whichever already belongs in this outdoor setting
-- INDOOR scene (room, house, shop, kitchen, bedroom): use the SAME room's plain wall, ceiling, floor, rug, tablecloth, or window light — stay inside the room
-- STREET / urban scene: use the SAME street's cobblestones, pavement, a light-coloured building wall, or a small patch of sky visible between buildings — stay in the street
-
-The bright patch should be: soft, lightly coloured, with smooth edges, gentle gradients, and minimal texture. Keep it free of objects, characters, and any element that doesn't belong to this setting. The patch is simply the quietest part of what's already there.
-
-Blend the bright patch seamlessly into the surrounding scene — it should be the same surface or material as the rest, just lighter and simpler. Same wall continuing into a calmer section, same floor extending into a softer area, same sky becoming a lighter expanse. Painted with the same brush, palette, and style as the rest of the illustration. The remaining area carries the main scene detail described above.`
-              : (textPos
-                ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Place a SOFT patch of whatever naturally belongs in this scene — for outdoor scenes use sky or open ground, for indoor scenes use a plain wall or floor, for streets use the pavement. NEVER invent elements foreign to the scene. Soft, minimal detail, no sharp lines, no characters. DO NOT paint a white box.`
-                : '');
+              : `COMPOSITION — KEEP THIS AREA QUIET: The ${textPos.replace('-', ' ')} area of the scene must stay soft, light, and visually simple. Treat it as intentional negative space in the illustration. Fill it with whatever naturally belongs in this setting — sky, open ground, smooth grass, calm water, snow, or soft mist for outdoor scenes; a plain wall, ceiling, floor, or window light for indoor scenes; light cobblestones, pavement, or a lightly-coloured building wall for street scenes. Gentle gradients, minimal texture, no objects, no characters, no sharp contrast. Painted with the same brush, palette, and style as the rest of the illustration — just lighter and quieter in that corner.`;
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
