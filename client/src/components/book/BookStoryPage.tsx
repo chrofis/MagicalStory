@@ -7,7 +7,7 @@ import {
   getGradientStyle,
   getTextContainerStyle,
   OVERLAY_FONT_SIZE,
-  OVERLAY_TEXT_SHADOW,
+  OVERLAY_TEXT_STROKE_STYLE,
 } from '@/utils/textOverlay';
 import type { TextPosition } from '@/utils/textOverlay';
 
@@ -98,8 +98,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
             >
               <div className="p-2 md:p-3" style={getTextContainerStyle(layout)}>
                 <p
-                  className={`text-gray-900 leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                  style={{ fontSize: OVERLAY_FONT_SIZE, textShadow: OVERLAY_TEXT_SHADOW }}
+                  className={`leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
+                  style={{ fontSize: OVERLAY_FONT_SIZE, ...OVERLAY_TEXT_STROKE_STYLE }}
                 >
                   {trimmedText}
                 </p>

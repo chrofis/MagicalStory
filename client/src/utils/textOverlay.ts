@@ -17,7 +17,14 @@ export type TextPosition = 'top-left' | 'bottom-full' | 'top-right' | 'bottom-le
 
 /** Consistent overlay font size across all browser views (matches PDF ~14pt). */
 export const OVERLAY_FONT_SIZE = 'clamp(0.7rem, 1.6vw, 1rem)';
-export const OVERLAY_TEXT_SHADOW = '0 0 8px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.7)';
+/** Legacy — kept for back-compat. Prefer OVERLAY_TEXT_STROKE_STYLE below. */
+export const OVERLAY_TEXT_SHADOW = 'none';
+/** Crisp glyph-aware white outline — mirrors the server-rendered overlay. */
+export const OVERLAY_TEXT_STROKE_STYLE: CSSProperties = {
+  WebkitTextStroke: '2.5px rgba(255,255,255,0.95)',
+  paintOrder: 'stroke fill',
+  color: '#1a1a1a',
+};
 
 // 6-position cycle
 const POSITION_CYCLE: TextPosition[] = [

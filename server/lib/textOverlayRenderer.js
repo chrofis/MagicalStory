@@ -436,22 +436,19 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
       drawX = line.left;
     }
 
-    // Pass 1: white glow behind text for readability (draw twice for stronger effect)
+    // Crisp glyph-aware outline: draw a white stroke first, then the dark fill
+    // on top. Equivalent to CSS paint-order: stroke fill — curves stay curves.
+    // Line width is relative to font size so it scales with the page.
     ctx.save();
     ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.shadowColor = 'rgba(255, 255, 255, 1.0)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText(line.text, drawX, line.y);
-    ctx.fillText(line.text, drawX, line.y); // double pass for stronger glow
-    ctx.restore();
-
-    // Pass 2: dark text on top
-    ctx.save();
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.fillStyle = '#333333';
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    // strokeText centers the stroke on the glyph path, so visible width = lineWidth / 2.
+    // ~16% of font size visible each side → lineWidth = fontSize * 0.32.
+    ctx.lineWidth = Math.max(2.5, fontSize * 0.32);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeText(line.text, drawX, line.y);
+    ctx.fillStyle = '#1a1a1a';
     ctx.fillText(line.text, drawX, line.y);
     ctx.restore();
   }
