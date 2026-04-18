@@ -80,6 +80,20 @@ export default function SharedStoryViewer() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Lock the document so swipes inside the book don't scroll the whole page
+  // (iOS/Android mobile — `h-[100dvh] overflow-hidden` on the root isn't
+  // enough; the body still rubber-bands).
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

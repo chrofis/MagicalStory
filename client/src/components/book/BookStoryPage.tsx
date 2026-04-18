@@ -57,7 +57,12 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
               </button>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto bg-amber-50 px-4 py-3">
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-amber-50 px-4 py-3"
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
             <p
               className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
               style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
