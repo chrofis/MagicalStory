@@ -8,12 +8,11 @@ Create a back cover illustration for a children's book.
 **ART STYLE (secondary):** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
-- This is a GROUP scene - include all characters together
-- Give EQUAL visual prominence to all characters - like a family/group photo
-- Arrange characters as a balanced group where each person is clearly visible
-- Characters should look happy and relaxed — smiling, laughing, or at ease
-- Warm lighting, relaxed poses, a sense of togetherness after the adventure
-- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
+- Draw EXACTLY the characters listed in the scene — no more, no fewer. Do not invent extra figures.
+- If more than one character is listed, arrange them as a balanced group with equal prominence.
+- Characters should look happy and relaxed — smiling, laughing, or at ease after the adventure.
+- Warm lighting, relaxed poses.
+- Each character has 2 hands. Show at most 2 items held per character.
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact text: "magicalstory.ch"

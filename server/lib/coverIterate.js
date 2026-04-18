@@ -343,10 +343,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
     if (coverSceneBackground) {
       elementRefs = elementRefs.filter(e => e.type !== 'location');
     }
-    // Fallback: also match by IDs found in the cover's expanded scene metadata
-    // (covers the case where appearsInPages doesn't include -1/-2/-3).
+    // Additional sources of VB IDs — merge all into one set so covers get
+    // the same VB parity as regular pages. Priority:
+    //   1. coverHint.objects — authoritative list from the unified prompt
+    //      ("Objects: [LOC###, ART###, ...]" under each cover block).
+    //   2. coverSceneMetadata.fullData — IDs picked up by expansion, if any.
+    const sceneIds = [];
+    for (const id of coverHint?.objects || []) {
+      if (typeof id === 'string' && !id.startsWith('LOC')) sceneIds.push(id.toUpperCase());
+    }
     if (coverSceneMetadata?.fullData) {
-      const sceneIds = [];
       for (const char of coverSceneMetadata.fullData.characters || []) {
         if (char.id && char.id !== 'null') sceneIds.push(char.id);
       }
@@ -354,14 +360,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
         const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
         if (id && !id.startsWith('LOC')) sceneIds.push(id);
       }
-      if (sceneIds.length > 0) {
-        const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
-        const existingIds = new Set(elementRefs.map(r => r.id));
-        const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
-        if (newRefs.length > 0) {
-          log.info(`🔗 [VB-MATCH] Cover ${coverLabel}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
-          elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
-        }
+    }
+    if (sceneIds.length > 0) {
+      const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+      const existingIds = new Set(elementRefs.map(r => r.id));
+      const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+      if (newRefs.length > 0) {
+        log.info(`🔗 [VB-MATCH] Cover ${coverLabel}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
+        elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
       }
     }
     // Safety net for the iterate path: cover descriptions are plain text, so

@@ -3455,14 +3455,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (coverSceneBackground) {
           coverElementRefs = coverElementRefs.filter(e => e.type !== 'location');
         }
-        // Fallback: also match by IDs found in the cover's expanded scene metadata
-        // (covers the case where appearsInPages doesn't include -1/-2/-3).
-        if (streamingVisualBible && coverExpandedMetadata?.fullData) {
+        // Additional sources of VB IDs — merge all into one set so covers
+        // get the same VB parity as regular pages. Priority:
+        //   1. hint.objects — authoritative list from the unified prompt
+        //      ("Objects: [LOC###, ART###, ...]" under each cover block).
+        //   2. coverExpandedMetadata.fullData — IDs picked up by cover
+        //      scene-expansion, if Claude echoed them into JSON metadata.
+        // Without using hint.objects directly, artifacts only show up on
+        // covers when appearsInPages includes -1/-2/-3, which the VB
+        // extraction rarely does for covers.
+        if (streamingVisualBible) {
           const sceneIds = [];
-          for (const char of coverExpandedMetadata.fullData.characters || []) {
+          for (const id of hint?.objects || []) {
+            if (typeof id === 'string' && !id.startsWith('LOC')) sceneIds.push(id.toUpperCase());
+          }
+          for (const char of coverExpandedMetadata?.fullData?.characters || []) {
             if (char.id && char.id !== 'null') sceneIds.push(char.id);
           }
-          for (const obj of coverExpandedMetadata.fullData.objects || []) {
+          for (const obj of coverExpandedMetadata?.fullData?.objects || []) {
             const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
             if (id && !id.startsWith('LOC')) sceneIds.push(id);
           }

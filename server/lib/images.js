@@ -1146,7 +1146,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
 
       if (expectedText) {
-        promptForEval = `⚠️ EXPECTED TEXT ON THIS IMAGE: "${expectedText}"\nIf text is misspelled or missing, score = 0. If text is correct, evaluate normally.\n\n${promptForEval}`;
+        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE (HARD FAIL):\nAllowed text: "${expectedText}" — and NOTHING else.\nScore MUST be 0 if ANY of the following are true:\n- The allowed text is missing or misspelled (even one wrong letter).\n- The image shows ANY other text anywhere (character names, labels, watermarks, captions, extra words, stray letters on clothing or signs).\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\n${promptForEval}`;
       }
     }
 
@@ -5335,6 +5335,42 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     evalMap.set(ev.pageNumber, ev);
   }
 
+  // Evaluate the truly-original image when text-space repair picked a different
+  // candidate as winner. Without this, retryHistory[0] (the original) shows no
+  // score and we lose the baseline needed to judge whether text-space repair
+  // helped or hurt quality. Runs in parallel via evaluateImageBatch concurrency.
+  const baselineEvalInputs = [];
+  for (const img of rawImages) {
+    const cands = img.textSpaceCandidates;
+    if (!Array.isArray(cands) || cands.length <= 1) continue;
+    const original = cands.find(c => c.source === 'original');
+    if (!original || original.isWinner) continue;
+    baselineEvalInputs.push({
+      imageData: original.imageData,
+      pageNumber: img.pageNumber,
+      prompt: img.prompt,
+      characterPhotos: img.characterPhotos,
+      allCharacterPhotos,
+      sceneDescription: img.sceneDescription,
+      sceneCharacters: img.sceneCharacters,
+      sceneMetadata: img.sceneMetadata,
+      pageText: img.text,
+      sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null,
+      evaluationType: img.evaluationType,
+    });
+  }
+  const baselineEvalsByPage = new Map();
+  if (baselineEvalInputs.length > 0) {
+    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+    for (const ev of baselineEvals) {
+      baselineEvalsByPage.set(ev.pageNumber, ev);
+      if (ev.usage && usageTracker) {
+        usageTracker('gemini_quality', ev.usage, 'page_quality_original_baseline', ev.modelId);
+      }
+    }
+    log.info(`📊 [UNIFIED PIPELINE] Evaluated ${baselineEvalInputs.length} non-winner originals for baseline scores`);
+  }
+
   // =========================================================================
   // Shared helpers for the round loop
   // =========================================================================
@@ -5376,13 +5412,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // non-winner versions start without scores; that's fine — they're there
     // for inspection and manual selection.
     if (Array.isArray(img.textSpaceCandidates) && img.textSpaceCandidates.length > 1) {
+      const baselineEval = baselineEvalsByPage.get(img.pageNumber);
       const allVersions = img.textSpaceCandidates.map((c) => {
         const isWinner = c.isWinner;
+        const isOriginal = c.source === 'original';
+        const evalForThis = isWinner ? baseVersion.evaluation : (isOriginal ? baselineEval : null);
+        const scoreForThis = isWinner
+          ? baseVersion.score
+          : (isOriginal ? (baselineEval?.score ?? baselineEval?.qualityScore ?? null) : null);
         return {
           imageData: c.imageData,
-          score: isWinner ? baseVersion.score : null,
+          score: scoreForThis,
           source: c.source,
-          evaluation: isWinner ? baseVersion.evaluation : null,
+          evaluation: evalForThis,
           modelId: c.modelId || baseVersion.modelId,
           grokRefImages: isWinner ? baseVersion.grokRefImages : null,
           entityPenalty: isWinner ? baseVersion.entityPenalty : 0,
