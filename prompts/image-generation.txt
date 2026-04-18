@@ -2,7 +2,7 @@ Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No border
 
 When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment. Preserve any calm, low-detail areas — they are reserved for text overlay.
 
-The attached reference photos are the source of truth for each character's face, hair, build, and clothing. Match them exactly. Where a text description and a reference photo disagree, follow the photo. The text descriptions below are supplementary.
+The attached reference photos define each character's IDENTITY only: face, hair, skin tone, build, and clothing. Copy those exactly. Do NOT copy the pose, framing, camera angle, or composition from the reference photos — the characters' positions, actions, body direction, and size in the scene come entirely from the scene description and the COMPOSITION rules below.
 
 {CHARACTER_REFERENCE_LIST}
 
