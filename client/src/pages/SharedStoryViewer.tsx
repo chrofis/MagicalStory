@@ -279,13 +279,13 @@ export default function SharedStoryViewer() {
 
   // Reading-mode toggle — sits in the top bar so it doesn't overlap the book image.
   const readingModeToggle = (
-    <div className="inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
+    <div className="inline-flex rounded-full bg-indigo-100 border border-indigo-300 p-0.5 shadow-sm text-xs font-medium">
       <button
         onClick={() => setReadingMode('inline')}
         title="Text printed over the image — matches the printed book"
         aria-pressed={readingMode === 'inline'}
         className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'inline' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+          readingMode === 'inline' ? 'bg-indigo-600 text-white shadow' : 'text-indigo-700 hover:bg-indigo-200'
         }`}
       >
         <Eye size={13} />
@@ -296,7 +296,7 @@ export default function SharedStoryViewer() {
         title="Text on a separate facing page — easier to read"
         aria-pressed={readingMode === 'sidepage'}
         className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'sidepage' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+          readingMode === 'sidepage' ? 'bg-indigo-600 text-white shadow' : 'text-indigo-700 hover:bg-indigo-200'
         }`}
       >
         <BookOpen size={13} />
