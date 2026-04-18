@@ -24,42 +24,46 @@ const SIZES = { small: 0.10, medium: 0.25, large: 0.40 };
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-// Compute rectangle coordinates for a given position and area fraction
-function getRect(position, areaPct) {
+// Build the SVG shape (white fill, black background) for a given position and area.
+// Full positions = horizontal strip. Corners = right triangle with its right angle
+// at the corner of the frame and its hypotenuse pointing toward the scene center.
+// Triangles match area to the rectangle version but leave more usable space for
+// characters near the frame edge opposite the corner.
+function getShapeSvg(position, areaPct) {
   const isFull = position.includes('full');
   const isTop = position.startsWith('top');
   const isLeft = position.includes('left');
 
-  let rectW, rectH, rectX, rectY;
-
   if (isFull) {
-    // Horizontal strip: full width, area% tall
-    rectW = WIDTH;
-    rectH = Math.round(HEIGHT * areaPct);
-    rectX = 0;
-    rectY = isTop ? 0 : HEIGHT - rectH;
-  } else {
-    // Corner: sqrt(area%) on each dimension (same aspect as frame)
-    const scale = Math.sqrt(areaPct);
-    rectW = Math.round(WIDTH * scale);
-    rectH = Math.round(HEIGHT * scale);
-    rectX = isLeft ? 0 : WIDTH - rectW;
-    rectY = isTop ? 0 : HEIGHT - rectH;
+    const rectH = Math.round(HEIGHT * areaPct);
+    const rectY = isTop ? 0 : HEIGHT - rectH;
+    return `<rect x="0" y="${rectY}" width="${WIDTH}" height="${rectH}" fill="white"/>`;
   }
 
-  return { rectX, rectY, rectW, rectH };
+  // Right triangle for corners. Leg length = sqrt(2 * areaPct) so the white
+  // area = areaPct × frame (same as the old rectangle). Legs are longer than
+  // the old rectangle legs but the triangle is half the rectangle's area.
+  const scale = Math.sqrt(2 * areaPct);
+  const legW = Math.round(WIDTH * scale);
+  const legH = Math.round(HEIGHT * scale);
+  const cx = isLeft ? 0 : WIDTH;
+  const cy = isTop ? 0 : HEIGHT;
+  const ax = isLeft ? legW : WIDTH - legW;   // along the top/bottom edge
+  const ay = cy;                              // stays on the corner's row
+  const bx = cx;                              // stays on the corner's column
+  const by = isTop ? legH : HEIGHT - legH;    // along the left/right edge
+  return `<polygon points="${cx},${cy} ${ax},${ay} ${bx},${by}" fill="white"/>`;
 }
 
-// Build a single mask using an SVG rectangle, then Gaussian blur for soft edges
+// Build a single mask using an SVG shape, then Gaussian blur for soft edges
 async function buildMask(position, sizeName, outPath) {
   const areaPct = SIZES[sizeName];
-  const { rectX, rectY, rectW, rectH } = getRect(position, areaPct);
+  const shapeSvg = getShapeSvg(position, areaPct);
 
-  // SVG: black background, white rectangle at the target position
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
   <rect width="${WIDTH}" height="${HEIGHT}" fill="black"/>
-  <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="white"/>
+  ${shapeSvg}
 </svg>`;
 
   // Blur radius scales with frame size (~4% of smaller dimension = ~31px for 768x1024).
@@ -72,7 +76,8 @@ async function buildMask(position, sizeName, outPath) {
     .png({ compressionLevel: 9 })
     .toFile(outPath);
 
-  console.log(`✓ ${path.basename(outPath)}  rect ${rectX},${rectY} ${rectW}×${rectH}  blur ${blurSigma}px`);
+  const shape = position.includes('full') ? 'strip' : 'triangle';
+  console.log(`✓ ${path.basename(outPath)}  ${shape} ${(areaPct * 100).toFixed(0)}% area  blur ${blurSigma}px`);
 }
 
 async function main() {
