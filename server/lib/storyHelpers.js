@@ -3269,27 +3269,45 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     return buildSceneDescriptionPrompt(pageNumber, pageContent, characters, '', language, visualBible, [], {}, '', availableAvatars, rawOutlineContext, null);
   }
 
-  // Compute per-character text-zone overrides from the outline JSON.
-  // textPosition is not known yet (it's chosen by scene expansion), but the spread rule
-  // determines the forbidden side: even pages → text on RIGHT → characters must go LEFT.
-  //                                odd pages  → text on LEFT  → characters must go RIGHT.
-  // We inject named move instructions so the model doesn't have to reason abstractly.
+  // Compute text-zone overrides by SHIFTING every character one zone away from the
+  // forbidden side. Preserves relative composition — avoids Haiku "rebalancing" the
+  // scene and pulling a previously-safe character into the text zone.
+  // Even pages → text on RIGHT → shift everyone LEFT (far-right→right, right→center, center→left, left→far-left).
+  // Odd pages  → text on LEFT  → shift everyone RIGHT (far-left→left, left→center, center→right, right→far-right).
   let textZoneOverride = '';
   try {
     const hintObj = JSON.parse(draftSceneDescription.match(/\{[\s\S]*\}/)?.[0] || '{}');
     const forbiddenSide = pageNumber % 2 === 0 ? 'right' : 'left';
-    const allowedSide = forbiddenSide === 'right' ? 'left' : 'right';
     const expectedTextPos = pageNumber % 2 === 0 ? 'bottom-right or top-right' : 'bottom-left or top-left';
-    if (Array.isArray(hintObj.characters)) {
-      const conflicts = hintObj.characters.filter(c =>
-        (c.position || '').toLowerCase().includes(forbiddenSide)
-      );
-      if (conflicts.length > 0) {
-        const moves = conflicts.map(c =>
-          `- ${c.name}: outline says "${c.position}" → move to ${allowedSide} side (text will occupy the ${forbiddenSide})`
-        ).join('\n');
-        textZoneOverride = `**TEXT ZONE POSITION FIXES (page ${pageNumber} → textPosition will be ${expectedTextPos}, forbidden side = ${forbiddenSide}):**\n${moves}\nApply these moves in your prose and metadata before writing anything else.\n`;
-        log.info(`[SCENE EXPANSION P${pageNumber}] Text-zone override: ${conflicts.length} character(s) moved from ${forbiddenSide} to ${allowedSide}`);
+
+    const shifts = forbiddenSide === 'left'
+      ? { 'far left': 'left', 'far-left': 'left', 'left': 'center', 'center': 'right', 'right': 'far right' }
+      : { 'far right': 'right', 'far-right': 'right', 'right': 'center', 'center': 'left', 'left': 'far left' };
+
+    const shiftLateral = (position) => {
+      const raw = position || 'center';
+      const norm = raw.toLowerCase()
+        .replace(/center[-\s]left/g, 'left')
+        .replace(/center[-\s]right/g, 'right')
+        .replace(/left[-\s]center/g, 'left')
+        .replace(/right[-\s]center/g, 'right');
+      for (const [from, to] of Object.entries(shifts)) {
+        const re = new RegExp('^' + from.replace(/[-]/g, '[-\\s]') + '\\b', 'i');
+        if (re.test(norm)) {
+          const shifted = norm.replace(re, to);
+          return { to: shifted, changed: shifted !== norm };
+        }
+      }
+      return { to: raw, changed: false };
+    };
+
+    if (Array.isArray(hintObj.characters) && hintObj.characters.length > 0) {
+      const results = hintObj.characters.map(c => ({ name: c.name, from: c.position || '(unspecified)', ...shiftLateral(c.position) }));
+      if (results.some(r => r.changed)) {
+        const moves = results.map(r => `- ${r.name}: ${r.from} → ${r.to}`).join('\n');
+        const allowedRange = forbiddenSide === 'left' ? 'CENTER, RIGHT, or FAR RIGHT' : 'CENTER, LEFT, or FAR LEFT';
+        textZoneOverride = `**TEXT ZONE POSITION FIXES (page ${pageNumber} → textPosition will be ${expectedTextPos}, text will cover the ${forbiddenSide} side of the image).**\nThe ${forbiddenSide} side of the image is reserved for printed text — NO characters, NO character bodies, NO shadows or parts of characters may appear on the ${forbiddenSide}. Every character must stand on the ${allowedRange} only.\nShift the entire composition one zone away from the ${forbiddenSide}. Use EXACTLY these positions for every character — do not re-arrange, do not invent new positions:\n${moves}\nThe relative order of characters stays the same. Apply these positions in your prose and metadata before writing anything else.\nREMINDER: text is on the ${forbiddenSide} → characters are only allowed on ${allowedRange}.\n`;
+        log.info(`[SCENE EXPANSION P${pageNumber}] Text-zone shift: composition shifted away from ${forbiddenSide}`);
       }
     }
   } catch { /* non-JSON outline — skip */ }
