@@ -67,8 +67,12 @@ async function flipEmailVerified(email: string): Promise<{ userId: string; wasFl
     ssl: { rejectUnauthorized: false },
   });
   try {
+    // Mirror what /api/auth/verify-email/:token does: set both email_verified
+    // AND anonymous=false. Otherwise the test's final DB snapshot diverges
+    // from what a real email-link click produces (is_trial stays true by
+    // design until password-set; that part is correct).
     const r = await pool.query(
-      `UPDATE users SET email_verified = true
+      `UPDATE users SET email_verified = true, anonymous = false
        WHERE email = $1
        RETURNING id, email_verified`,
       [email.toLowerCase()]

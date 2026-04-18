@@ -3,6 +3,7 @@ import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
 import storage, { STORAGE_KEYS } from '@/services/storage';
 import { signInWithGoogle, getIdToken, firebaseSignOut, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
+import { isNavigationAbort } from '@/utils/fetchErrors';
 
 interface BotProtectionData {
   website?: string;
@@ -97,7 +98,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.info('Token refreshed successfully');
       return true;
     } catch (error) {
-      logger.error('Token refresh error:', error);
+      // Fetches cancelled by browser navigation (e.g. trial → /stories
+      // redirect) surface as AbortError or "Failed to fetch" TypeError.
+      // These are expected transitions, not bugs — log at debug so real
+      // errors still surface at error level.
+      if (isNavigationAbort(error)) {
+        logger.debug('Token refresh aborted (navigation):', error);
+      } else {
+        logger.error('Token refresh error:', error);
+      }
       return false;
     }
   }, []);

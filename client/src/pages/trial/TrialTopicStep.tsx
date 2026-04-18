@@ -237,7 +237,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
           {getStoryTypesByGroup('popular').map((type) => (
             <button
               key={type.id}
-              onClick={() => { handleThemeSelect(type.id); onNext(); }}
+              onClick={() => handleThemeSelect(type.id)}
               className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
             >
               <div className="text-2xl mb-1">{type.emoji}</div>

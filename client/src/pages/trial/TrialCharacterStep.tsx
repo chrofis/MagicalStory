@@ -30,6 +30,8 @@ const strings: Record<string, {
   customTraitsLabel: string;
   customTraitsPlaceholder: string;
   next: string;
+  nextNoPhoto: string;
+  nextNoDetails: string;
   consent1: string;
   consent2: string;
   termsLink: string;
@@ -62,6 +64,8 @@ const strings: Record<string, {
     customTraitsLabel: 'Additional characteristics',
     customTraitsPlaceholder: 'Loves dinosaurs, afraid of the dark, has a little sister...',
     next: 'Next',
+    nextNoPhoto: 'Add photo and details to continue',
+    nextNoDetails: 'Add details to continue',
     consent1: 'I confirm I have the right to use the uploaded photos and, for photos of minors, I am the parent/guardian or have obtained their consent.',
     consent2: 'I agree to the',
     termsLink: 'Terms of Service',
@@ -94,6 +98,8 @@ const strings: Record<string, {
     customTraitsLabel: 'Weitere Eigenschaften',
     customTraitsPlaceholder: 'Liebt Dinosaurier, hat Angst vor der Dunkelheit, hat eine kleine Schwester...',
     next: 'Weiter',
+    nextNoPhoto: 'Foto und Details hinzufügen, um fortzufahren',
+    nextNoDetails: 'Details hinzufügen, um fortzufahren',
     consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
     consent2: 'Ich stimme den',
     termsLink: 'Nutzungsbedingungen',
@@ -126,6 +132,8 @@ const strings: Record<string, {
     customTraitsLabel: 'Caractéristiques supplémentaires',
     customTraitsPlaceholder: 'Aime les dinosaures, a peur du noir, a une petite soeur...',
     next: 'Suivant',
+    nextNoPhoto: 'Ajoute photo et détails pour continuer',
+    nextNoDetails: 'Ajoute les détails pour continuer',
     consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
     consent2: 'J\'accepte les',
     termsLink: 'Conditions d\'Utilisation',
@@ -527,12 +535,25 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             </div>
           )}
 
-          {/* Consent checkboxes - shown before first upload only */}
+          {/* Consent checkboxes - shown before first upload only.
+              Uses role=checkbox + aria-checked + Space/Enter keyboard
+              handler so screen-reader and keyboard-only users can
+              interact — without these, VoiceOver/NVDA see a plain div
+              and keyboard users can't tab to it. */}
           {!hasPhoto && !hasConsented && (
             <div className="bg-white rounded-lg p-4 mb-4 space-y-3 border border-gray-200">
               <div
+                role="checkbox"
+                aria-checked={consent1Checked}
+                tabIndex={0}
                 onClick={() => setConsent1Checked(!consent1Checked)}
-                className="flex items-start gap-3 cursor-pointer group"
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    setConsent1Checked(!consent1Checked);
+                  }
+                }}
+                className="flex items-start gap-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
               >
                 <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
                   {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
@@ -542,12 +563,24 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 </span>
               </div>
               <div
+                role="checkbox"
+                aria-checked={consent2Checked}
+                tabIndex={0}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).tagName !== 'A') {
                     setConsent2Checked(!consent2Checked);
                   }
                 }}
-                className="flex items-start gap-3 cursor-pointer group"
+                onKeyDown={(e) => {
+                  // Enter inside a link element should follow the link,
+                  // not toggle the consent — let the browser handle it.
+                  if ((e.target as HTMLElement).tagName === 'A') return;
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    setConsent2Checked(!consent2Checked);
+                  }
+                }}
+                className="flex items-start gap-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
               >
                 <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
                   {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
@@ -744,12 +777,18 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
             </>
-          ) : isGeneratingAvatar ? (
+          ) : isGeneratingAvatar && canProceed ? (
+            // Avatar prewarm running but all required fields filled — button
+            // is enabled, label reflects the background work that's finishing.
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : 'is being created'}</span>
               <ArrowRight className="w-4 h-4" />
             </>
+          ) : !canProceed ? (
+            // Button is disabled because required fields are missing — tell
+            // the user what's outstanding instead of a plain greyed-out "Weiter".
+            <span>{!hasPhoto ? t.nextNoPhoto : t.nextNoDetails}</span>
           ) : (
             <>
               {t.next}

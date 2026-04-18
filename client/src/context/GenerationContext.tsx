@@ -3,6 +3,7 @@ import { storyService } from '@/services';
 import storage from '@/services/storage';
 import logger from '@/services/logger';
 import { useAuth } from '@/context/AuthContext';
+import { isNavigationAbort } from '@/utils/fetchErrors';
 
 // Storage key for persisting active job
 const ACTIVE_JOB_KEY = 'active_story_job';
@@ -135,7 +136,14 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
           }
         })
         .catch(err => {
-          logger.error('[GenerationContext] Failed to fetch active jobs:', err);
+          // Navigation-cancelled fetches (e.g. trial → /stories redirect)
+          // surface here as AbortError / "Failed to fetch" — expected, not
+          // a bug. Real errors still log at error level.
+          if (isNavigationAbort(err)) {
+            logger.debug('[GenerationContext] Active-jobs fetch aborted (navigation):', err);
+          } else {
+            logger.error('[GenerationContext] Failed to fetch active jobs:', err);
+          }
         });
     }
   }, [user?.id]);
