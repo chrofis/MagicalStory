@@ -1,0 +1,431 @@
+{
+  "_comment": "Source of truth for demo families used by homepage story generation. Loaded by demo-characters.ts (TS, Playwright) AND by admin scripts (plain JS). Each family has 4 members with unique IDs across ALL families — one demo user per family holds only that family's characters. Keep IDs stable once released; they're referenced in relationship keys.",
+  "families": [
+    {
+      "id": "berger",
+      "label": "Berger",
+      "email": "demo@magicalstory.ch",
+      "primaryLanguage": "de",
+      "characters": [
+        {
+          "id": 1,
+          "name": "Emma",
+          "gender": "female",
+          "age": "5",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "brown",
+            "hairLength": "long",
+            "hairStyle": "pigtails",
+            "eyeColor": "brown",
+            "skinTone": "light",
+            "build": "average",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": ["Neugierig", "Fröhlich", "Fantasievoll"],
+            "flaws": ["Ungeduldig", "Anhänglich"],
+            "challenges": ["Mit anderen teilen", "Angst vor der Dunkelheit"],
+            "specialDetails": "Liebt Schmetterlinge, malt gerne, Lieblingsteddy heisst Bärli"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "rosa T-Shirt mit Schmetterlings-Aufdruck",
+              "lowerBody": "blaue Jeans",
+              "shoes": "weisse Turnschuhe"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 5-year-old European girl named Emma. She has brown hair in pigtails, warm brown eyes, light/fair skin, and a cheerful smile. She is wearing a pink t-shirt with a butterfly print. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 2,
+          "name": "Noah",
+          "gender": "male",
+          "age": "7",
+          "ageCategory": "young-school-age",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "blonde",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "build": "average",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": ["Mutig", "Kreativ", "Abenteuerlustig"],
+            "flaws": ["Stur", "Schlechter Verlierer"],
+            "challenges": ["Regeln befolgen", "Gefühle kontrollieren"],
+            "specialDetails": "Liebt Dinosaurier, baut gerne Lego, spielt Fussball"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "grünes Kapuzenpullover",
+              "lowerBody": "dunkelgraue Jogginghose",
+              "shoes": "blaue Sneakers"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 7-year-old European boy named Noah. He has short straight blonde hair, bright blue eyes, light/fair skin, and a confident smile. He is wearing a green hoodie. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 3,
+          "name": "Daniel",
+          "gender": "male",
+          "age": "38",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "dark brown",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "brown",
+            "skinTone": "light",
+            "facialHair": "trimmed beard",
+            "build": "average",
+            "height": "tall"
+          },
+          "traits": {
+            "strengths": ["Geduldig", "Beschützend", "Lustig"],
+            "flaws": ["Vergesslich", "Zerstreut"],
+            "challenges": ["Mit Veränderungen umgehen"],
+            "specialDetails": "Ingenieur, liebt Wandern und kocht gerne"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "dunkelblaues Hemd",
+              "lowerBody": "beige Chinos",
+              "shoes": "braune Lederschuhe"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 38-year-old European man named Daniel. He has short dark brown hair, a neatly trimmed beard, brown eyes, light skin, tall build. He is wearing a dark blue button-up shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+        },
+        {
+          "id": 4,
+          "name": "Sarah",
+          "gender": "female",
+          "age": "36",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "blonde",
+            "hairLength": "shoulder-length",
+            "hairStyle": "straight",
+            "eyeColor": "green",
+            "skinTone": "light",
+            "build": "average",
+            "height": "average",
+            "other": "wears glasses"
+          },
+          "traits": {
+            "strengths": ["Hilfsbereit", "Klug", "Grosszügig"],
+            "flaws": ["Perfektionist", "Ungeduldig"],
+            "challenges": ["Für sich einstehen"],
+            "specialDetails": "Lehrerin, liest gerne Bücher, liebt Gartenarbeit"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "weisse Bluse",
+              "lowerBody": "dunkelblauer Rock",
+              "shoes": "schwarze Ballerinas"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 36-year-old European woman named Sarah. She has shoulder-length straight blonde hair, green eyes, light skin, and she wears modern rectangular glasses. She is wearing a white blouse. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+        }
+      ],
+      "relationships": {
+        "1-2": "sibling",
+        "1-3": "parent-child",
+        "1-4": "parent-child",
+        "2-3": "parent-child",
+        "2-4": "parent-child",
+        "3-4": "partner"
+      }
+    },
+    {
+      "id": "miller",
+      "label": "Miller",
+      "email": "demo-miller@magicalstory.ch",
+      "primaryLanguage": "en",
+      "characters": [
+        {
+          "id": 5,
+          "name": "Lily",
+          "gender": "female",
+          "age": "6",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "red",
+            "hairLength": "medium",
+            "hairStyle": "curly",
+            "eyeColor": "green",
+            "skinTone": "light",
+            "build": "average",
+            "height": "short",
+            "other": "freckles across nose and cheeks"
+          },
+          "traits": {
+            "strengths": ["Curious", "Kind", "Creative"],
+            "flaws": ["Shy", "Worries a lot"],
+            "challenges": ["Speaking up in class", "Making new friends"],
+            "specialDetails": "Loves horses, collects smooth stones, cuddles a stuffed fox named Rusty"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "yellow overall dress",
+              "lowerBody": "yellow overall dress",
+              "shoes": "red rubber boots"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 6-year-old American girl named Lily. She has medium-length curly red hair, green eyes, light skin with freckles across her nose and cheeks, and a gentle smile. She is wearing a yellow overall dress. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 6,
+          "name": "Ethan",
+          "gender": "male",
+          "age": "9",
+          "ageCategory": "young-school-age",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "curly",
+            "eyeColor": "brown",
+            "skinTone": "medium",
+            "build": "athletic",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": ["Brave", "Loyal", "Athletic"],
+            "flaws": ["Impatient", "Competitive"],
+            "challenges": ["Losing at games", "Sitting still"],
+            "specialDetails": "Plays soccer, loves dogs, wants to be an astronaut"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "blue striped t-shirt",
+              "lowerBody": "khaki shorts",
+              "shoes": "white sneakers"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 9-year-old American boy named Ethan. He has short curly black hair, warm brown eyes, medium skin tone, and a confident smile. He is wearing a blue striped t-shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 7,
+          "name": "James",
+          "gender": "male",
+          "age": "42",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "salt-and-pepper",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "hazel",
+            "skinTone": "light",
+            "facialHair": "clean-shaven",
+            "build": "average",
+            "height": "tall",
+            "other": "wears thin-framed glasses"
+          },
+          "traits": {
+            "strengths": ["Calm", "Thoughtful", "Funny"],
+            "flaws": ["Overly cautious", "Loses track of time"],
+            "challenges": ["Saying no", "Switching off from work"],
+            "specialDetails": "Architect, plays guitar, weekend woodworker"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "grey henley shirt",
+              "lowerBody": "dark jeans",
+              "shoes": "brown leather boots"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 42-year-old American man named James. He has short salt-and-pepper hair, hazel eyes, light skin, and thin-framed glasses. He is clean-shaven and wearing a grey henley shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+        },
+        {
+          "id": 8,
+          "name": "Aisha",
+          "gender": "female",
+          "age": "40",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "medium",
+            "hairStyle": "natural curls",
+            "eyeColor": "dark brown",
+            "skinTone": "dark",
+            "build": "average",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": ["Warm", "Decisive", "Encouraging"],
+            "flaws": ["Over-commits", "Perfectionist"],
+            "challenges": ["Slowing down", "Delegating"],
+            "specialDetails": "Pediatrician, loves cooking, runs marathons"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "burgundy blouse",
+              "lowerBody": "black tailored trousers",
+              "shoes": "brown ankle boots"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 40-year-old American woman named Aisha. She has medium-length natural black curls, warm dark brown eyes, and rich dark brown skin with a radiant complexion. She is wearing a burgundy blouse. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+        }
+      ],
+      "relationships": {
+        "5-6": "sibling",
+        "5-7": "parent-child",
+        "5-8": "parent-child",
+        "6-7": "parent-child",
+        "6-8": "parent-child",
+        "7-8": "partner"
+      }
+    },
+    {
+      "id": "dubois",
+      "label": "Dubois",
+      "email": "demo-dubois@magicalstory.ch",
+      "primaryLanguage": "fr",
+      "characters": [
+        {
+          "id": 9,
+          "name": "Léa",
+          "gender": "female",
+          "age": "4",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "bob",
+            "eyeColor": "dark brown",
+            "skinTone": "light",
+            "build": "average",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": ["Curieuse", "Affectueuse", "Drôle"],
+            "flaws": ["Têtue", "Impatiente"],
+            "challenges": ["Partager avec son frère", "Dormir seule"],
+            "specialDetails": "Adore les chats, chante tout le temps, peluche préférée: un lapin nommé Câlin"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "robe rouge à pois blancs",
+              "lowerBody": "collants blancs",
+              "shoes": "chaussures Mary Jane noires"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 4-year-old French girl named Léa. She has a short black bob haircut, dark brown eyes, light/fair skin, and a playful smile. She is wearing a red polka-dot dress. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 10,
+          "name": "Hugo",
+          "gender": "male",
+          "age": "8",
+          "ageCategory": "young-school-age",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "light brown",
+            "hairLength": "medium",
+            "hairStyle": "wavy",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "build": "average",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": ["Réfléchi", "Bienveillant", "Débrouillard"],
+            "flaws": ["Rêveur", "Dispersé"],
+            "challenges": ["Finir ses devoirs", "Parler en public"],
+            "specialDetails": "Passionné d'astronomie, collectionne les cailloux, joue de la flûte"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "pull rayé bleu marine et blanc",
+              "lowerBody": "pantalon beige",
+              "shoes": "baskets blanches"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of an 8-year-old French boy named Hugo. He has medium-length wavy light brown hair, bright blue eyes, light/fair skin, and a thoughtful smile. He is wearing a navy and white striped sweater. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+        },
+        {
+          "id": 11,
+          "name": "Marc",
+          "gender": "male",
+          "age": "36",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "dark brown",
+            "hairLength": "short",
+            "hairStyle": "neat side part",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "facialHair": "clean-shaven",
+            "build": "average",
+            "height": "tall"
+          },
+          "traits": {
+            "strengths": ["Patient", "Curieux", "Chaleureux"],
+            "flaws": ["Tête en l'air", "Trop optimiste"],
+            "challenges": ["Gérer le stress"],
+            "specialDetails": "Professeur d'histoire, fait du vélo, amateur de fromages"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "chemise bleu ciel",
+              "lowerBody": "pantalon en velours côtelé marron",
+              "shoes": "derbies marron"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 36-year-old French man named Marc. He has short neatly side-parted dark brown hair, blue eyes, and light skin. He is clean-shaven and wearing a sky-blue button-up shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+        },
+        {
+          "id": 12,
+          "name": "Élodie",
+          "gender": "female",
+          "age": "34",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "dark brown",
+            "hairLength": "long",
+            "hairStyle": "straight",
+            "eyeColor": "dark brown",
+            "skinTone": "light",
+            "build": "average",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": ["Créative", "Attentive", "Élégante"],
+            "flaws": ["Perfectionniste", "Anxieuse"],
+            "challenges": ["Lâcher prise"],
+            "specialDetails": "Illustratrice, aime les vieilles librairies, pratique le yoga"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "blouse crème avec fines rayures",
+              "lowerBody": "jupe midi bleu marine",
+              "shoes": "ballerines noires"
+            }
+          },
+          "portraitPrompt": "Professional portrait photograph of a 34-year-old French woman named Élodie. She has long straight dark brown hair, dark brown eyes, and light skin. She is wearing a cream blouse with fine stripes. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+        }
+      ],
+      "relationships": {
+        "9-10": "sibling",
+        "9-11": "parent-child",
+        "9-12": "parent-child",
+        "10-11": "parent-child",
+        "10-12": "parent-child",
+        "11-12": "partner"
+      }
+    }
+  ]
+}
