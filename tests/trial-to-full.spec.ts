@@ -82,6 +82,28 @@ async function flipEmailVerified(email: string): Promise<{ userId: string; wasFl
   }
 }
 
+// Poll the DB for the user row created by link-email. We can't assume a fixed
+// wait time — the anonymous row is created when /api/trial/create-story fires
+// on page mount, and the email column is updated when /api/trial/link-email
+// succeeds. Poll until the row appears, up to `timeoutMs`.
+async function waitForUserByEmail(email: string, timeoutMs = 60000): Promise<string> {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      const r = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+      if (r.rows.length > 0) return r.rows[0].id;
+      await new Promise(res => setTimeout(res, 2000));
+    }
+    throw new Error(`User with email ${email} never appeared in DB within ${timeoutMs}ms`);
+  } finally {
+    await pool.end();
+  }
+}
+
 async function waitWithLog(page: Page, label: string, ms: number) {
   console.log(`⏳ [${new Date().toISOString()}] ${label} (${ms}ms)`);
   await page.waitForTimeout(ms);
@@ -118,22 +140,18 @@ test.describe('Trial → full-account end-to-end', () => {
     await expect(page).toHaveURL(/\/try/);
     console.log('✅ [P1] /try loaded');
 
-    // Accept the two consent checkboxes (they appear before upload)
-    const consentBoxes = page.locator('[class*="cursor-pointer"]').filter({
-      has: page.locator('svg'),
-    });
-    // Click both consent rows by their text proxy — easier than finding the checkbox svgs
-    // The consent block appears above the upload dropzone and contains "Terms" + "Privacy" links.
-    const termsLink = page.getByRole('link', { name: /terms|agb|conditions/i }).first();
-    const privacyLink = page.getByRole('link', { name: /privacy|datenschutz/i }).first();
-    await expect(termsLink).toBeVisible({ timeout: WIZARD_STEP_TIMEOUT });
-    // Each consent row wraps the icon + text — click the icon's parent to toggle.
-    // Fall back: click twice on each of the two consent-row containers by their SVG-first children.
+    // Accept the two consent checkboxes. Each row is a
+    // `div.flex.items-start.gap-3.cursor-pointer.group` containing an SVG
+    // checkbox as its first child. The 2nd row has nested <a> links (Terms,
+    // Privacy) that suppress the toggle when clicked — so we click the SVG
+    // directly instead of the row center.
     const consentRows = page.locator('div.flex.items-start.gap-3.cursor-pointer.group');
+    await expect(consentRows.first()).toBeVisible({ timeout: WIZARD_STEP_TIMEOUT });
     const rowCount = await consentRows.count();
     console.log(`   Found ${rowCount} consent rows`);
     for (let i = 0; i < rowCount; i++) {
-      await consentRows.nth(i).click();
+      const checkboxIcon = consentRows.nth(i).locator('svg').first();
+      await checkboxIcon.click({ force: true });
     }
     console.log('✅ [P1] Consent checkboxes clicked');
 
@@ -178,114 +196,186 @@ test.describe('Trial → full-account end-to-end', () => {
       }
     }
 
-    // Pick a gender (optional — try to click "male"/"männlich")
-    const maleBtn = page.getByRole('button', { name: /\b(male|m[äa]nnlich|boy|junge)\b/i }).first();
-    if (await maleBtn.count() > 0) {
-      try {
-        await maleBtn.click({ timeout: 2000 });
-      } catch { /* skip */ }
-    }
+    // Gender is required (canProceed in TrialCharacterStep gates Next).
+    // Button labels are locale-dependent: en "Boy", de "Junge", fr "Garçon",
+    // and sometimes just "Male"/"Männlich". Include every variant.
+    const maleBtn = page.getByRole('button', {
+      name: /^(boy|junge|gar[çc]on|male|m[äa]nnlich)\s*$/i,
+    }).first();
+    await expect(maleBtn).toBeVisible({ timeout: 10000 });
+    await maleBtn.click();
+    console.log('✅ [P1] Gender selected: male');
 
-    // Click Next / Weiter
-    const nextBtn = page.getByRole('button', { name: /^(next|weiter|continue|suivant)/i }).first();
-    await expect(nextBtn).toBeEnabled({ timeout: 30000 });
+    // After photo upload, the wizard silently kicks off an avatar preview
+    // generation (30-90s). During that window the Next button is disabled
+    // and labelled "{name} wird erstellt / is being created". We wait for
+    // generation to finish (button text flips to Weiter/Next) before clicking.
+    console.log('⏳ [P1] Waiting for avatar preview generation to complete (up to 2 min)...');
+    const nextBtn = page.locator('button').filter({ hasText: /^(weiter|next|continue|suivant)\s*$/i }).first();
+    await expect(nextBtn).toBeVisible({ timeout: 120000 });
+    await expect(nextBtn).toBeEnabled({ timeout: 120000 });
     await nextBtn.click();
     console.log('✅ [P1] Character step complete → topic');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 2: Topic step — pick anything quick
+    // PHASE 2: Topic step — card-based selection (category → theme/topic)
     // ═══════════════════════════════════════════════════════════════════════
-    await waitWithLog(page, 'topic step render', 1500);
-    // Look for a topic textarea / input — type a simple topic
-    const topicInput = page.locator('textarea, input[type=text]').first();
-    if (await topicInput.count() > 0) {
-      await topicInput.fill(STORY_TOPIC);
-      console.log(`✅ [P2] Topic: ${STORY_TOPIC}`);
+    await waitWithLog(page, 'topic step render', 2000);
+
+    // Step 2a: pick the first category card.
+    // Categories are buttons with large emojis + a text label — the wizard
+    // shows 3-4 in a grid. We pick the first to minimize downstream choices.
+    const categoryCards = page.locator('button.p-6.rounded-xl.border-2').filter({
+      has: page.locator('.text-5xl'),  // emoji inside
+    });
+    await expect(categoryCards.first()).toBeVisible({ timeout: 30000 });
+    const categoryCount = await categoryCards.count();
+    console.log(`   Found ${categoryCount} category cards`);
+    await categoryCards.first().click();
+    console.log('✅ [P2a] Category picked (first)');
+
+    // Step 2b: pick a theme (second screen after adventure category).
+    // Adventure theme buttons are `button.p-2.5.rounded-lg.border.border-gray-200`.
+    // Other categories may have different class names, so fall back to the
+    // grid structure too.
+    await waitWithLog(page, 'theme screen render', 1500);
+    const themeGrid = page.locator('div.grid').filter({ has: page.locator('button') }).last();
+    const themeButtons = themeGrid.locator('button');
+    const themeCount = await themeButtons.count();
+    console.log(`   Found ${themeCount} buttons in theme grid`);
+    if (themeCount > 0) {
+      await themeButtons.first().click();
+      console.log('✅ [P2b] Theme picked (first)');
     }
 
-    // Sometimes art-style picker is here — click the first style tile to pick one
-    const styleTile = page.locator('button, div[role="button"]').filter({ has: page.locator('img') }).first();
-    if (await styleTile.count() > 0) {
-      try {
-        await styleTile.click({ timeout: 2000 });
-      } catch { /* first thing might not be clickable, skip */ }
+    // Some flows need one more pick (life-challenge has theme + topic).
+    // If the Weiter button already shows, we're done; otherwise pick another.
+    await waitWithLog(page, 'post-theme settle', 1500);
+    const weiterVisible = await page.locator('button').filter({ hasText: /^(weiter|next|continue|suivant)\s*$/i }).first().isVisible().catch(() => false);
+    if (!weiterVisible) {
+      const subGrid = page.locator('div.grid').filter({ has: page.locator('button') }).last();
+      const subButtons = subGrid.locator('button');
+      const subCount = await subButtons.count();
+      console.log(`   Need another pick: ${subCount} sub-topic buttons`);
+      if (subCount > 0) {
+        await subButtons.first().click();
+        console.log('✅ [P2c] Sub-topic picked');
+      }
     }
 
-    const nextBtn2 = page.getByRole('button', { name: /^(next|weiter|continue|suivant|create ideas|ideen)/i }).first();
-    await expect(nextBtn2).toBeEnabled({ timeout: 30000 });
-    await nextBtn2.click();
-    console.log('✅ [P2] Topic step complete → ideas');
+    // Topic step auto-advances to the ideas step when the theme is selected
+    // (TrialTopicStep.tsx:240 — adventure themes call onNext() in onClick).
+    // If we're already on the ideas step, skip ahead; otherwise wait/click Weiter.
+    await waitWithLog(page, 'post-topic settle', 2000);
+    const ideasHeading = page.getByRole('heading', { name: /ideen|ideas|id[ée]es/i }).first();
+    const autoAdvanced = await ideasHeading.isVisible().catch(() => false);
+    if (autoAdvanced) {
+      console.log('✅ [P2] Topic auto-advanced → ideas step visible');
+    } else {
+      const nextBtn2 = page.locator('button').filter({
+        hasText: /^(weiter|next|continue|suivant)\s*$/i,
+      }).first();
+      await expect(nextBtn2).toBeVisible({ timeout: 30000 });
+      await expect(nextBtn2).toBeEnabled({ timeout: 30000 });
+      await nextBtn2.click();
+      console.log('✅ [P2] Topic Weiter clicked → ideas');
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 3: Ideas step — wait for ideas, pick first, create
     // ═══════════════════════════════════════════════════════════════════════
-    console.log('⏳ [P3] Waiting for Claude to generate ideas (can take 20-60s)...');
-    // Ideas render as clickable cards. Wait until at least one is visible.
-    const ideaCard = page.locator('button, [role="button"], div').filter({
-      hasText: /^[A-Z][A-Za-zäöü]+.*[.!?]$/, // rough heuristic — a sentence-like card
-    });
-    await page.waitForTimeout(3000);
-    // More reliable: wait for the "create story" button to become enabled
-    const createBtn = page.getByRole('button', {
-      name: /create (story|my story|this story)|geschichte erstellen|create this|create!/i,
+    console.log('⏳ [P3] Waiting for Claude to generate 2 idea cards (30-90s)...');
+
+    // Idea cards are clickable divs with class "relative text-left p-5 rounded-xl border-2 ..."
+    // They START in an empty/loading state and fill with text once Claude responds.
+    // Wait for at least one card to have a readable title text node.
+    const ideaCards = page.locator('div.relative.text-left.p-5.rounded-xl.border-2');
+    await expect(ideaCards.first()).toBeVisible({ timeout: 30000 });
+    // Wait for text to arrive in the first card (means streaming is done enough
+    // to select). We look for any textarea since each idea renders as a textarea
+    // when editable.
+    const firstIdeaTextarea = ideaCards.first().locator('textarea');
+    await expect(firstIdeaTextarea).toBeVisible({ timeout: 3 * 60 * 1000 });
+    // Give the textarea a beat to actually contain text — streaming can start
+    // before the content has arrived.
+    for (let i = 0; i < 60; i++) {
+      const val = await firstIdeaTextarea.inputValue();
+      if (val.length > 20) break;
+      await page.waitForTimeout(1000);
+    }
+    console.log('✅ [P3] First idea textarea has content');
+
+    // Each idea card has an explicit "Klicke zum Auswählen" / "Click to
+    // select" / "Cliquer pour choisir" button. Click it — clicking the card
+    // div itself can hit the textarea (stopPropagation) or get rejected
+    // while ideas are still streaming (isEditable=false). The select-button
+    // is only rendered once the idea is final.
+    const selectBtn = ideaCards.first().locator('button').filter({
+      hasText: /auswählen|select|choisir|wählen/i,
     }).first();
-
-    // While waiting, if we see a "generate ideas" button, click it
-    const genIdeasBtn = page.getByRole('button', { name: /generate (ideas|stories)|ideen generieren|create ideas/i }).first();
-    if (await genIdeasBtn.count() > 0 && await genIdeasBtn.isEnabled()) {
-      try { await genIdeasBtn.click({ timeout: 2000 }); console.log('   Clicked "Generate Ideas"'); } catch { /* skip */ }
+    // If the select button isn't present yet, wait a bit longer for streaming
+    // to finalize before falling back to a direct card click.
+    try {
+      await expect(selectBtn).toBeVisible({ timeout: 60000 });
+      await selectBtn.click();
+      console.log('✅ [P3] First idea selected via select-button');
+    } catch {
+      // Fallback: click the card header area (not the textarea)
+      await ideaCards.first().locator('div').first().click({ force: true });
+      console.log('✅ [P3] First idea selected via card header fallback');
     }
 
-    // Wait up to 2 min for ideas to appear and be selectable
-    await expect(createBtn).toBeVisible({ timeout: 2 * 60 * 1000 });
-    console.log('✅ [P3] Ideas rendered — selecting first');
-
-    // Click the first idea card to select it, then click create
-    // Try h3 inside a clickable container (idea titles are typically bold)
-    const firstIdeaTitle = page.locator('h3, h4').first();
-    if (await firstIdeaTitle.count() > 0) {
-      try {
-        await firstIdeaTitle.click({ timeout: 3000 });
-        console.log('   Clicked first idea title');
-      } catch { /* skip */ }
-    }
-
-    await expect(createBtn).toBeEnabled({ timeout: 30000 });
+    // Click the create-story button at the bottom
+    const createBtn = page.locator('button').filter({
+      hasText: /create (story|my story|this story)|meine geschichte erstellen|geschichte erstellen|cr[ée]er mon histoire/i,
+    }).first();
+    await expect(createBtn).toBeVisible({ timeout: 30000 });
+    await expect(createBtn).toBeEnabled({ timeout: 60000 });
     await createBtn.click();
-    console.log('✅ [P3] Create clicked → trial-generation');
+    console.log('✅ [P3] Create clicked → /trial-generation');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 4: Wait for trial story generation to complete
+    // PHASE 4: Arrive on /trial-generation; the email form is shown from the
+    // start (users can sign up WHILE the story generates). Wait for the email
+    // input to be enabled — that's our signal that the page mounted + the
+    // create-story API call kicked off (giving us a sessionToken).
     // ═══════════════════════════════════════════════════════════════════════
     await expect(page).toHaveURL(/\/trial-generation/, { timeout: 30000 });
-    console.log('✅ [P4] On /trial-generation — waiting for completion');
-
-    // A completed trial shows an email-input form OR the story preview
-    // We look for the email input (it's the "sign up to see" gate)
+    console.log('✅ [P4] On /trial-generation');
     const emailInput = page.locator('input[type=email]').first();
-    await expect(emailInput).toBeVisible({ timeout: TRIAL_GEN_TIMEOUT_MS });
-    console.log('✅ [P4] Trial generation complete — email input visible');
+    await expect(emailInput).toBeVisible({ timeout: 60000 });
+    await expect(emailInput).toBeEnabled({ timeout: 60000 });
+    console.log('✅ [P4] Email input enabled — ready to link email');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 5: Submit email → DB flip verified → auto-claim
+    // PHASE 5: Submit email → wait for DB row → flip verified → wait for
+    //         generation to complete → auto-claim → redirect
     // ═══════════════════════════════════════════════════════════════════════
     await emailInput.fill(testEmail);
-    const submitEmailBtn = page.getByRole('button', {
-      name: /^(sign up|create account|send|submit|weiter|anmelden|registrieren)/i,
-    }).first();
+    // The email-submit button is the SUBMIT button inside the <form> — NOT
+    // the Google button above it (which also matches "Weiter mit Google").
+    // Text is locale-dependent: de "Geschichte ansehen", en "View my story",
+    // fr "Voir mon histoire".
+    const submitEmailBtn = page.locator('form button[type=submit]').first();
+    await expect(submitEmailBtn).toBeEnabled({ timeout: 15000 });
     await submitEmailBtn.click();
     console.log(`✅ [P5] Email submitted — ${testEmail}`);
 
-    // Give the backend a moment to create the user row
-    await waitWithLog(page, 'link-email settle', 4000);
+    // Wait for the user row to exist in DB with this email (means link-email
+    // succeeded). Backend creates the anonymous row on page mount, updates
+    // email column on link-email.
+    const userId = await waitForUserByEmail(testEmail, 60000);
+    console.log(`✅ [P5] User row confirmed in DB — userId=${userId}`);
 
-    // DB-flip email_verified for this address
-    const { userId } = await flipEmailVerified(testEmail);
-    console.log(`✅ [P5] DB flipped email_verified=true for userId=${userId}`);
+    // DB-flip email_verified
+    await flipEmailVerified(testEmail);
+    console.log(`✅ [P5] DB flipped email_verified=true`);
 
-    // The page polls check-status every 5s. Wait for the /stories redirect.
-    await page.waitForURL(/\/stories|\/welcome/, { timeout: 90000 });
-    console.log('✅ [P5] Auto-claim succeeded — redirected to /stories');
+    // Wait for trial story to finish generating AND polling to flip isVerified.
+    // The page auto-redirects to /stories once BOTH conditions are met.
+    console.log('⏳ [P5] Waiting for story generation + auto-claim redirect (up to 25 min)...');
+    await page.waitForURL(/\/stories|\/welcome/, { timeout: TRIAL_GEN_TIMEOUT_MS });
+    console.log('✅ [P5] Redirected — trial generation complete and account claimed');
 
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 6: Verify full wizard loads (no generation — save cost)
