@@ -8,4 +8,4 @@ Match the expression from scene context (worried, surprised, focused, determined
 
 Match the gaze direction. Do not make the character face the camera unless they already were.
 
-Do not change the camera angle, composition, or background. Non-blurred characters stay exactly the same. Match the existing art style, lighting, and color palette so the repainted figure blends seamlessly.{clothingContext}{actionContext}{issueContext}
+Do not change the camera angle, composition, or background. Non-blurred characters stay exactly the same. Match the existing art style, lighting, and color palette so the repainted figure blends seamlessly.{clothingContext}{actionContext}{issueContext}{textPositionContext}

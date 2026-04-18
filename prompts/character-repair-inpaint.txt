@@ -12,4 +12,4 @@ Only ONE figure should appear inside the magenta area. If a partial figure pokes
 
 Background outside the magenta stays the same. Other characters stay unchanged — same faces, same clothing, same poses, same positions.
 
-Match the art style of the surrounding illustration exactly — same brush technique, same level of stylization, same color palette. Do not push toward photorealism, anime, or cartoon.{artStyleContext}{clothingContext}{issueContext}
+Match the art style of the surrounding illustration exactly — same brush technique, same level of stylization, same color palette. Do not push toward photorealism, anime, or cartoon.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}

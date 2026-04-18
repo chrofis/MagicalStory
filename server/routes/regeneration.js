@@ -4480,6 +4480,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,
               artStyle,
+              textPosition: sceneImage.textPosition || null,
             }
           );
 

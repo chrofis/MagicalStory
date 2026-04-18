@@ -5284,6 +5284,11 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
             description: r.sceneDescription,
             imageAspect: inputData?.layout?.imageAspect,
             textInImage: inputData?.layout?.textInImage,
+            // The page's locked text-overlay position. Used by iteratePageCore
+            // (re-injected as COPY SPACE) and by character-repair (so Grok
+            // doesn't drop the figure into the text zone during inpaint).
+            textPosition: textRegionResults[r.pageNumber]?.position
+              || enforceSpreadTextPosition(r.sceneMetadata?.textPosition || null, r.pageNumber),
           })),
           coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
           coverHints,   // Needed by iterateCover for per-character clothing on covers

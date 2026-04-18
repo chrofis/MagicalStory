@@ -11,4 +11,4 @@ CRITICAL — preserve the original emotion and direction:
 
 Each character's body, pose, clothing, and position are fully visible — preserve these exactly. Keep the same age and body proportions — do not make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
 
-Maintain the exact same art style, lighting, and color palette as the rest of the illustration. The repaired face must blend seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}
+Maintain the exact same art style, lighting, and color palette as the rest of the illustration. The repaired face must blend seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}{textPositionContext}

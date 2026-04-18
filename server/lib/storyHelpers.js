@@ -3269,6 +3269,37 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     return buildSceneDescriptionPrompt(pageNumber, pageContent, characters, '', language, visualBible, [], {}, '', availableAvatars, rawOutlineContext, null);
   }
 
+  // Compute per-character text-zone overrides from the outline JSON.
+  // If the outline places a character on the same side as textPosition, we inject
+  // a named move instruction so the model doesn't have to reason about it abstractly.
+  let textZoneOverride = '';
+  try {
+    const hintObj = JSON.parse(draftSceneDescription.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    const textPos = hintObj.textPosition || '';
+    const forbiddenSide = textPos.includes('right') ? 'right'
+      : textPos.includes('left') ? 'left'
+      : textPos === 'bottom-full' ? 'bottom'
+      : textPos === 'top-full' ? 'top'
+      : '';
+    const allowedSide = forbiddenSide === 'right' ? 'left'
+      : forbiddenSide === 'left' ? 'right'
+      : forbiddenSide === 'bottom' ? 'upper'
+      : forbiddenSide === 'top' ? 'lower'
+      : '';
+    if (forbiddenSide && Array.isArray(hintObj.characters)) {
+      const conflicts = hintObj.characters.filter(c =>
+        (c.position || '').toLowerCase().includes(forbiddenSide)
+      );
+      if (conflicts.length > 0) {
+        const moves = conflicts.map(c =>
+          `- ${c.name}: outline says "${c.position}" → place on the ${allowedSide} side instead (text zone conflict)`
+        ).join('\n');
+        textZoneOverride = `**TEXT ZONE POSITION FIXES (textPosition=${textPos}, forbidden side=${forbiddenSide}):**\n${moves}\nApply these moves in your prose and metadata before writing anything else.\n`;
+        log.info(`[SCENE EXPANSION P${pageNumber}] Text-zone override: ${conflicts.length} character(s) moved away from ${forbiddenSide}`);
+      }
+    }
+  } catch { /* non-JSON outline — skip */ }
+
   const languageInstruction = getLanguageInstruction(language);
   const languageName = getLanguageNameEnglish(language);
 
@@ -3285,6 +3316,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     RECURRING_ELEMENTS: recurringElements,
     AVAILABLE_AVATARS: '', // Clothing comes from scene hint — no need to list all avatars
     LOCKED_PERSPECTIVES: lockedPerspectivesText,
+    TEXT_ZONE_OVERRIDE: textZoneOverride,
     LANGUAGE_NAME: languageName,
     LANGUAGE_INSTRUCTION: languageInstruction,
     LANGUAGE_NOTE: getLanguageNote(language),
@@ -3656,8 +3688,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const isProseFormat = parseProseMetadataFormat(sceneDescription) !== null;
 
   // Build text area instruction if textPosition is specified (keeps illustration uncluttered where text goes)
-  // Enforce spread rule: odd pages = left, even pages = right
-  const textPosition = enforceSpreadTextPosition(metadata?.textPosition || null, pageNumber);
+  // Enforce spread rule: odd pages = left, even pages = right.
+  // options.textPositionOverride takes priority — used by iteratePageCore to carry
+  // the locked first-generation textPosition through re-generation, since
+  // scene-iteration.txt doesn't emit textPosition in its JSON.
+  const textPosition = enforceSpreadTextPosition(
+    options.textPositionOverride || metadata?.textPosition || null,
+    pageNumber
+  );
   const langLevel = inputData?.languageLevel || 'standard';
   // textInImage: false ⇒ text is rendered in a separate strip below the image
   // (advanced reading level / square layout). The image has no text overlay,

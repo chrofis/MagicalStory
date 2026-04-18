@@ -5992,6 +5992,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
           const sceneDesc = rawImg?.sceneDescription || rawImg?.text || '';
 
+          // Look up the page's locked text-overlay position so the repair
+          // prompt can warn Grok not to land the redrawn figure in that zone.
+          const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
+
           log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} (bbox: [${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
           const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, fix.charName, {
             imageBackend: 'grok',
@@ -6007,6 +6011,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             protectedFaces,
             protectedBodies,
             whiteoutTarget: useFaceOnly ? 'face' : 'body',
+            textPosition: pageTextPosition,
             includeDebug: true,  // Returns prompt + sceneSent + avatarSent for version-viewer inspection
           });
 
@@ -6367,6 +6372,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`No scene description found for page ${pageNumber}`);
   }
 
+  // The page's textPosition is locked at first generation — iterate must NOT
+  // re-pick it (would break the spread rule and shift the calm zone). Pull the
+  // saved value from sceneImages so buildImagePrompt and the empty-scene
+  // re-gen can both inject the same COPY SPACE instruction the original had.
+  const savedScene = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber) || {};
+  const lockedTextPosition = savedScene.textPosition || null;
+
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
   // Step 1: Analyze the current image using analyzeGeneratedImage (composition analysis)
@@ -6559,7 +6571,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           || resolveArtStyleForEmptyScene('pixar')
           || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
           || '';
-        const textPos = iterateSceneMetadata?.textPosition || null;
+        const textPos = lockedTextPosition || iterateSceneMetadata?.textPosition || null;
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
@@ -6635,7 +6647,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   // Build image prompt
-  let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend });
+  let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition });
 
   // Append evaluation feedback if provided
   if (evaluationFeedback) {
@@ -7212,6 +7224,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const sceneDescription = options.sceneDescription || '';
   const issueContext = issueDescription ? `\nIssues to fix: ${issueDescription}` : '';
   const clothingContext = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
+  // textPositionContext: when text overlay will land on a fixed zone of the
+  // image, tell the model not to move the character into that zone. Inpaint
+  // can shift bodies — a face landing in the bottom-left text area would
+  // become unreadable once text is composited on top.
+  const TEXT_POSITION_DESC = {
+    'top-left': 'upper left corner',
+    'top-right': 'upper right corner',
+    'bottom-left': 'lower left corner',
+    'bottom-right': 'lower right corner',
+    'top-full': 'upper third (full width)',
+    'bottom-full': 'lower third (full width)',
+  };
+  const textPositionDesc = options.textPosition ? TEXT_POSITION_DESC[options.textPosition] : null;
+  const textPositionContext = textPositionDesc
+    ? `\n\nText overlay zone: dark text will be printed over the ${textPositionDesc}. Do not place the character's face or any high-contrast detail in that zone — keep it visually calm.`
+    : '';
 
   if (useBlended) {
     // ── Blended mode: whiteout head → Grok redraws face → feathered blend ──
@@ -7355,6 +7383,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           clothingContext,
           actionContext,
           issueContext,
+          textPositionContext,
         })
       : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. CRITICAL: preserve the original expression (look at body language and scene context — match the emotion, do not default to a smile) and gaze direction (do not make the character face the camera if they were not). Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
@@ -7681,6 +7710,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           actionContext,
           issueContext,
           artStyleContext,
+          textPositionContext,
         })
       : `Inpaint: replace the figure in this cutout with ${charName} from the reference photo. Match the reference's face, hair, skin tone, build, and clothing. Keep the original pose, expression, and gaze. Do not change the background or edges — this cutout will be composited back into a larger scene.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 
@@ -7951,6 +7981,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           clothingContext,
           issueContext,
           artStyleContext,
+          textPositionContext,
         })
       : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with one ${charName} from the reference photo.${actionContext}\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
 

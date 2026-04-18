@@ -2726,6 +2726,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
 
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Grok repair for ${charName} on page ${pageNumber} (whiteoutTarget=${whiteoutTarget})`);
 
+    const pageTextPosition = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
     const grokResult = await repairCharacterMismatch(
       pageImage, avatarDataUri, bbox, charName, {
         imageBackend: 'grok',
@@ -2735,6 +2736,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         clothingDescription: clothingDescription || '',
         sceneDescription: sceneDesc,
         faceBbox: targetAppearance.faceBox || null,
+        textPosition: pageTextPosition,
       }
     );
 

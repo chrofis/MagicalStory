@@ -8,4 +8,4 @@ Only ONE figure should appear in the result. If a partial figure is visible just
 
 The repainted figure MUST match the art style of the surrounding illustration exactly — same rendering technique, same brush texture, same level of detail, same color palette. Do not render the character more realistically or with a different style than the background.{artStyleContext}
 
-The background outside the crosshatch area should stay the same.{clothingContext}{actionContext}{issueContext}
+The background outside the crosshatch area should stay the same.{clothingContext}{actionContext}{issueContext}{textPositionContext}
