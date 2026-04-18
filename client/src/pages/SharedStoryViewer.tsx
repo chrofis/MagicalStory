@@ -60,7 +60,11 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [readingMode, setReadingMode] = useState<ReadingMode>('inline');
+  const [readingMode, setReadingMode] = useState<ReadingMode>(() => {
+    // Default to "Read mode" on mobile (text below image) so tiny text doesn't overlay the illustration.
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return 'sidepage';
+    return 'inline';
+  });
   const showTextOverlay = readingMode === 'inline';
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -273,17 +277,48 @@ export default function SharedStoryViewer() {
 
   if (!story) return null;
 
+  // Reading-mode toggle — sits in the top bar so it doesn't overlap the book image.
+  const readingModeToggle = (
+    <div className="inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
+      <button
+        onClick={() => setReadingMode('inline')}
+        title="Text printed over the image — matches the printed book"
+        aria-pressed={readingMode === 'inline'}
+        className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
+          readingMode === 'inline' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+        }`}
+      >
+        <Eye size={13} />
+        <span className="hidden sm:inline">Print preview</span>
+      </button>
+      <button
+        onClick={() => setReadingMode('sidepage')}
+        title="Text on a separate facing page — easier to read"
+        aria-pressed={readingMode === 'sidepage'}
+        className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
+          readingMode === 'sidepage' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
+        }`}
+      >
+        <BookOpen size={13} />
+        <span className="hidden sm:inline">Read mode</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header */}
       {isAuthenticated ? (
         <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
           <div className="flex items-center justify-between">
-            {/* Left: Title */}
-            <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
+            {/* Left: Title — text hides on small screens so the reading-mode toggle fits */}
+            <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
               <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
-              {t.title}
+              <span className="hidden md:inline">{t.title}</span>
             </button>
+
+            {/* Center: reading mode toggle */}
+            <div className="mx-2">{readingModeToggle}</div>
 
             {/* Right: Story actions + Menu */}
             <div className="flex items-center gap-2">
@@ -353,17 +388,18 @@ export default function SharedStoryViewer() {
         </header>
       ) : (
         <header className="bg-white/80 backdrop-blur-sm border-b border-indigo-200 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <BookOpen className="w-6 h-6 text-indigo-500" />
-              <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
+              <span className="font-bold text-indigo-900 hidden md:inline">MagicalStory</span>
             </div>
+            {readingModeToggle}
             <Link
               to="/"
-              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
+              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all flex-shrink-0"
             >
               <Sparkles className="w-4 h-4" />
-              Create Your Own Story
+              <span className="hidden sm:inline">Create Your Own Story</span>
             </Link>
           </div>
         </header>
@@ -398,7 +434,7 @@ export default function SharedStoryViewer() {
       )}
 
       {/* Book with side navigation arrows */}
-      <main className="flex-1 flex items-center justify-center px-2 md:px-4 py-2 md:py-4">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-2 md:py-4">
         {/* Left arrow - desktop only */}
         <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
           <button
@@ -422,16 +458,15 @@ export default function SharedStoryViewer() {
         </div>
 
         {/* Book viewer */}
-        <div className="flex-1 max-w-5xl">
+        <div className="flex-1 max-w-5xl h-full min-h-0 flex items-center justify-center">
           <BookViewer
             key={`${readingMode}-${isMobile ? 'm' : 'd'}`}
             ref={bookRef}
             pageList={pageList}
             story={story}
             shareToken={shareToken!}
-            showTextOverlay={showTextOverlay && !isMobile}
+            showTextOverlay={showTextOverlay}
             textOnSidePage={readingMode === 'sidepage'}
-            forceTextBelowOnMobile={true}
             onImageClick={(url) => setFullscreenImage(url)}
             onPageChange={setCurrentPage}
             onNavigate={(path) => navigate(path)}
@@ -474,33 +509,6 @@ export default function SharedStoryViewer() {
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
-
-        {/* Reading mode toggle: inline (text on image, print preview) vs sidepage (text on facing page, easier reading).
-            Hidden on mobile — text is always below the image there. */}
-        <div className="hidden md:inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
-          <button
-            onClick={() => setReadingMode('inline')}
-            title="Text printed over the image — matches the printed book"
-            aria-pressed={readingMode === 'inline'}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors ${
-              readingMode === 'inline' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
-            }`}
-          >
-            <Eye size={13} />
-            Print preview
-          </button>
-          <button
-            onClick={() => setReadingMode('sidepage')}
-            title="Text on a separate facing page — easier to read"
-            aria-pressed={readingMode === 'sidepage'}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors ${
-              readingMode === 'sidepage' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-500 hover:text-indigo-700'
-            }`}
-          >
-            <BookOpen size={13} />
-            Read mode
-          </button>
-        </div>
 
         {/* Page counter */}
         <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">

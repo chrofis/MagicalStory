@@ -94,8 +94,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       setIsMobile(window.innerWidth < 768);
       // In landscape (desktop), 2 pages fit side by side → each page ≤ half the width
       // In portrait (mobile), 1 page fills the width
-      const maxPageWidth = Math.min(cw / 2, 550);
-      const maxPageHeight = Math.min(ch - 10, 780);
+      const maxPageWidth = Math.min(cw / 2, 460);
+      const maxPageHeight = Math.min(ch - 10, 650);
       // A4 portrait: width / height = 210 / 297
       const A4_W = 210, A4_H = 297;
       let pw = maxPageWidth;
@@ -261,8 +261,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     return (
       <div
         ref={containerRef}
-        className="w-full flex items-center justify-center"
-        style={{ height: 'calc(100dvh - 200px)', minHeight: 300, maxHeight: 800 }}
+        className="w-full h-full flex items-center justify-center"
+        style={{ minHeight: 300 }}
       >
         {dimensions.width > 0 && (
           <HTMLFlipBook
@@ -271,9 +271,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             height={dimensions.height}
             size="stretch"
             minWidth={250}
-            maxWidth={550}
+            maxWidth={460}
             minHeight={333}
-            maxHeight={733}
+            maxHeight={650}
             showCover={true}
             flippingTime={800}
             usePortrait={true}
