@@ -52,6 +52,8 @@ interface BookViewerProps {
   showTextOverlay: boolean;
   /** True when text is on a separate facing page (sidepage mode) — image pages should not show any text. */
   textOnSidePage?: boolean;
+  /** When true, on mobile the text is always rendered below the image (scrollable), regardless of reading mode. */
+  forceTextBelowOnMobile?: boolean;
   onImageClick: (url: string) => void;
   onPageChange: (pageIndex: number) => void;
   onNavigate: (path: string) => void;
@@ -69,7 +71,7 @@ BlankPage.displayName = 'BlankPage';
  * and maps PageEntry[] to the appropriate book page components.
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
-  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
@@ -207,7 +209,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay}
                 textOnSidePage={textOnSidePage && !isMobile}
-                textBelowImage={textOnSidePage && isMobile}
+                textBelowImage={isMobile && (forceTextBelowOnMobile || textOnSidePage)}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
@@ -244,16 +246,16 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     }
 
     // Parity: with showCover=true, page 0 is the cover (alone), then pages 1+ pair up
-    // into spreads. The total interior page count (everything after the cover) must be
-    // even so every spread has both a left and right page. The end page sits naturally
-    // on the same spread as the back cover when the count is right.
-    const interiorCount = bookPages.length - 1;
-    if (interiorCount > 0 && interiorCount % 2 !== 0) {
-      // Insert blank page before the last page so the last spread is complete.
-      // The parity blank sits on the same logical page as its neighbour.
-      const lastLogical = physicalToLogical[physicalToLogical.length - 1] ?? 0;
-      bookPages.splice(bookPages.length - 1, 0, <BlankPage key="parity-blank" />);
-      physicalToLogical.splice(physicalToLogical.length - 1, 0, lastLogical);
+    // into spreads. On desktop, the interior page count must be even so every spread has
+    // both sides. On mobile (single-page portrait) each flip is one page, so parity is
+    // unnecessary and a parity blank would cause asymmetric forward/back navigation.
+    if (!isMobile) {
+      const interiorCount = bookPages.length - 1;
+      if (interiorCount > 0 && interiorCount % 2 !== 0) {
+        const lastLogical = physicalToLogical[physicalToLogical.length - 1] ?? 0;
+        bookPages.splice(bookPages.length - 1, 0, <BlankPage key="parity-blank" />);
+        physicalToLogical.splice(physicalToLogical.length - 1, 0, lastLogical);
+      }
     }
 
     return (

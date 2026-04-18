@@ -4243,7 +4243,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
         // Get language for email localization - prefer user's preference, fall back to story language
         const emailLanguage = user.preferred_language || inputData.language || 'English';
-        await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId, emailLanguage);
+        // Fetch share token so the email links to the read view
+        let legacyShareToken = null;
+        try {
+          const stRes = await dbPool.query('SELECT share_token FROM stories WHERE id = $1', [storyId]);
+          legacyShareToken = stRes.rows[0]?.share_token || null;
+        } catch { /* non-critical */ }
+        await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId, emailLanguage, legacyShareToken ? { shareToken: legacyShareToken } : {});
       }
     } catch (emailErr) {
       log.error('❌ Failed to send story complete email:', emailErr);

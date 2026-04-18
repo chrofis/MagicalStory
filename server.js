@@ -5122,6 +5122,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                 await runDetection(repairResult.imageData, {
                   prompt: repairPrompt,
                   modelId: repairResult.modelId || null,
+                  grokRefImages: repairResult.grokRefImages || null,
                 });
                 const latest = candidates[candidates.length - 1];
                 log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%`);
@@ -5157,6 +5158,10 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
                 overridden: c.overridden,
                 prompt: c.prompt || null,         // repair prompt (null for original)
                 modelId: c.modelId || img.modelId || null,
+                // i === 0 is the truly-original image — inherit the initial
+                // Grok refs from the generation call. Repair candidates carry
+                // their own refs captured in runDetection().
+                grokRefImages: i === 0 ? (img.grokRefImages || null) : (c.grokRefImages || null),
                 source: i === 0 ? 'original' : `text-space-repair-${i}`,
                 isWinner: i === winnerIdx,
               }))
@@ -5949,6 +5954,7 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
         const emailLanguage = inputData.language || user.preferred_language || 'English';
 
         const emailOptions = {};
+        if (shareToken) emailOptions.shareToken = shareToken;
 
         // For trial users: generate PDF and claim URL to include in email
         if (user.is_trial) {

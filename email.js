@@ -191,8 +191,10 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
     return null;
   }
 
-  // Build direct story URL (uses /create?storyId= format)
-  const storyUrl = storyId
+  // Prefer the shared read-view link (works for owner + public); fall back to editor.
+  const storyUrl = options.shareToken
+    ? `https://www.magicalstory.ch/s/${options.shareToken}`
+    : storyId
     ? `https://www.magicalstory.ch/create?storyId=${storyId}`
     : 'https://www.magicalstory.ch';
 

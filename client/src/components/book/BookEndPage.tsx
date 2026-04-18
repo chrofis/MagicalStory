@@ -65,7 +65,7 @@ const BookEndPage = React.forwardRef<HTMLDivElement, BookEndPageProps>(
 
     return (
       <div ref={ref} className="w-full h-full bg-gradient-to-br from-indigo-100 to-blue-100 flex items-center justify-center p-4">
-        <div className="text-center max-w-[85%]">
+        <div className="w-full max-w-xs mx-auto text-center">
           {needsPassword ? (
             <>
               <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">

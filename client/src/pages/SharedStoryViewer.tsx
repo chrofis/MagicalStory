@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
@@ -62,8 +62,19 @@ export default function SharedStoryViewer() {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [readingMode, setReadingMode] = useState<ReadingMode>('inline');
   const showTextOverlay = readingMode === 'inline';
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('privateStoryBannerDismissed') === '1';
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<BookViewerHandle>(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -183,8 +194,9 @@ export default function SharedStoryViewer() {
     if (c.frontCover) list.push({ type: 'frontCover' });
     if (c.initialPage) list.push({ type: 'initialPage' });
     for (let i = 0; i < story.pages.length; i++) {
-      // sidepage mode: text on left page, image on right page (book spread)
-      if (readingMode === 'sidepage') {
+      // sidepage mode on desktop: text on left page, image on right page (book spread).
+      // On mobile, text is rendered below the image on the same page — no extra storyText entry.
+      if (readingMode === 'sidepage' && !isMobile) {
         list.push({ type: 'storyText', storyPageIdx: i });
       }
       list.push({ type: 'story', storyPageIdx: i });
@@ -357,19 +369,31 @@ export default function SharedStoryViewer() {
         </header>
       )}
 
-      {/* Private story banner — shown to owner when story is not shared */}
-      {story.isOwner && !sharingEnabled && (
+      {/* Private story banner — shown to owner when story is not shared; dismissable per session */}
+      {story.isOwner && !sharingEnabled && !bannerDismissed && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3">
-          <p className="text-sm text-amber-800">
+          <p className="text-sm text-amber-800 min-w-0 flex-1">
             {language === 'de' ? 'Diese Geschichte ist privat — nur du kannst sie sehen.' : language === 'fr' ? 'Cette histoire est privée — vous seul pouvez la voir.' : 'This story is private — only you can see it.'}
           </p>
-          <button
-            onClick={handleShare}
-            disabled={sharingLoading}
-            className="flex-shrink-0 bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
-          >
-            {sharingLoading ? '...' : language === 'de' ? 'Teilen' : language === 'fr' ? 'Partager' : 'Share'}
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleShare}
+              disabled={sharingLoading}
+              className="bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {sharingLoading ? '...' : language === 'de' ? 'Teilen' : language === 'fr' ? 'Partager' : 'Share'}
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.setItem('privateStoryBannerDismissed', '1');
+                setBannerDismissed(true);
+              }}
+              aria-label={language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+              className="p-1.5 rounded-md text-amber-700 hover:bg-amber-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -400,13 +424,14 @@ export default function SharedStoryViewer() {
         {/* Book viewer */}
         <div className="flex-1 max-w-5xl">
           <BookViewer
-            key={readingMode}
+            key={`${readingMode}-${isMobile ? 'm' : 'd'}`}
             ref={bookRef}
             pageList={pageList}
             story={story}
             shareToken={shareToken!}
-            showTextOverlay={showTextOverlay}
+            showTextOverlay={showTextOverlay && !isMobile}
             textOnSidePage={readingMode === 'sidepage'}
+            forceTextBelowOnMobile={true}
             onImageClick={(url) => setFullscreenImage(url)}
             onPageChange={setCurrentPage}
             onNavigate={(path) => navigate(path)}
@@ -450,8 +475,9 @@ export default function SharedStoryViewer() {
           <ChevronLeft className="w-6 h-6" />
         </button>
 
-        {/* Reading mode toggle: inline (text on image, print preview) vs sidepage (text on facing page, easier reading) */}
-        <div className="inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
+        {/* Reading mode toggle: inline (text on image, print preview) vs sidepage (text on facing page, easier reading).
+            Hidden on mobile — text is always below the image there. */}
+        <div className="hidden md:inline-flex rounded-full bg-indigo-50 border border-indigo-200 p-0.5 shadow-sm text-xs font-medium">
           <button
             onClick={() => setReadingMode('inline')}
             title="Text printed over the image — matches the printed book"
