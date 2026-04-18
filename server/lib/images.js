@@ -5458,7 +5458,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           source: c.source,
           evaluation: evalForThis,
           modelId: c.modelId || baseVersion.modelId,
-          grokRefImages: isWinner ? baseVersion.grokRefImages : null,
+          // Each candidate now carries its own refs (original inherits from
+          // the initial Grok call; repair attempts capture refs from their
+          // own generateImageOnly call). Fall back to baseVersion only when
+          // the candidate didn't capture any.
+          grokRefImages: c.grokRefImages || baseVersion.grokRefImages || null,
           entityPenalty: isWinner ? baseVersion.entityPenalty : 0,
           evaluatedAt: new Date().toISOString(),
           // Surface the text-space repair inputs in the viewer's repair section.

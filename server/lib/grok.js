@@ -794,41 +794,15 @@ async function packReferences(refs = {}, options = {}) {
   // characters we have a free slot, so the scene stays clean and VB gets
   // its own slot at full size.
   const hasSceneBackground = sceneBackground && sceneBackground.startsWith('data:image');
-  // Filter out location elements when scene background exists — the location is
-  // already painted in the background, so a border cell showing the same thing
-  // wastes a reference slot.
-  const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
-    ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
-    : [];
-  // Include the text-zone mask as another element baked into the scene border.
-  // Same treatment as VB elements — labeled cell in the border composite — so
-  // Grok reads it as layout metadata instead of painting its colours into the
-  // scene. Keeps the mask always paired with slot 1 without using a slot.
-  const hasMask = textAreaMask && typeof textAreaMask === 'string' && textAreaMask.startsWith('data:image');
-  const borderElements = [
-    ...rawVbElements,
-    ...(hasMask ? [{ imageData: textAreaMask, name: 'Mask', type: 'text-zone' }] : []),
-  ];
-  // Bake border elements into the scene background whenever there's at least
-  // one element (VB or mask). Frees up character slots and keeps the mask
-  // visually anchored to the scene.
-  const useBorderedScene = hasSceneBackground && borderElements.length > 0;
-
-  // Scene background goes first — style anchor for visual consistency
+  // Scene always goes in alone — clean style anchor. No VB, no mask, no border.
+  // The mask confused Grok (it copied abstract black/white shapes into the output).
+  // VB elements now ride in the same slot(s) as the character avatars instead.
   if (hasSceneBackground) {
     const base64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
-
-    if (useBorderedScene) {
-      const bordered = await composeSceneWithVbBorder(buf, borderElements, { aspectRatio });
-      const bm = await sharp(bordered).metadata();
-      slots.push(`data:image/jpeg;base64,${bordered.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: scene background + ${Math.min(borderElements.length, 9)} cells (${rawVbElements.length} VB${hasMask ? ' + 1 Mask' : ''}, bordered ${bm.width}x${bm.height} for ${aspectRatio})`);
-    } else {
-      const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: scene background (clean style anchor)`);
-    }
+    const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: scene background (clean, alone)`);
   }
 
   // Previous image goes FIRST — it's the scene being re-rendered (style transfer)
@@ -854,26 +828,17 @@ async function packReferences(refs = {}, options = {}) {
   // the old "one char per slot" approach — so 2 chars can have VB grid AND
   // the char composite, and 3 chars get the same.
   //
-  // Skip VB grid only when it's baked into a bordered scene.
-  const skipContext = useBorderedScene;
+  // Visual Bible elements: bundle them INTO the last character slot (as a row
+  // of cells below the char composite) so the scene stays clean. Filter out
+  // location elements since those are already painted in the scene background.
+  const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
+    ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
+    : [];
 
-  // VB grid gets its own slot only when NOT baked into the scene border
-  // AND there are non-location elements to show (locations are in the empty scene already)
-  if (!skipContext && visualBibleGrid && slots.length < 3) {
-    // Check if there are any non-location elements worth showing
-    const hasNonLocationElements = !hasSceneBackground || !Array.isArray(visualBibleGrid.rawElements) ||
-      visualBibleGrid.rawElements.some(e => e.type !== 'location');
-    if (hasNonLocationElements) {
-      const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: VB grid`);
-    } else {
-      log.debug(`🎨 ${tag} Skipping VB grid — all elements are locations already in scene background`);
-    }
-  }
-
-  // Pack character photos into 1 or 2 slots depending on count
-  const pushCharSlot = async (group) => {
+  // Pack character photos — ONE char per slot when space allows. Bundle only
+  // when we'd exceed the 3-slot limit. The LAST char slot also absorbs any
+  // VB elements as a cell row below the character.
+  const pushCharSlot = async (group, includeVb) => {
     if (slots.length >= 3 || group.length === 0) return;
     const composed = await buildCharacterGroupSlot(
       group.map(c => c.rawBuffer),
@@ -882,44 +847,50 @@ async function packReferences(refs = {}, options = {}) {
       group.map(c => c.charName),
     );
     if (!composed) return;
-    const resized = await sharp(composed).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    let slotBuf = composed;
+    let vbCount = 0;
+    if (includeVb && rawVbElements.length > 0) {
+      slotBuf = await composeCharWithVbRow(composed, rawVbElements);
+      vbCount = Math.min(rawVbElements.length, 6);
+    }
+    const resized = await sharp(slotBuf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
     const rm = await sharp(resized).metadata();
+    const vbLabel = vbCount > 0 ? ` + ${vbCount} VB cell(s)` : '';
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''} composed (${rm.width}x${rm.height})`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''}${vbLabel} composed (${rm.width}x${rm.height})`);
   };
 
+  // Decide char grouping — one per slot when space allows.
   const availableCharSlots = 3 - slots.length;
-  if (charCount > 0 && charCount <= 2) {
-    // 1-2 chars: single slot is fine
-    await pushCharSlot(rawCharData);
-  } else if (charCount >= 3 && availableCharSlots >= 2) {
-    // 3+ chars with 2 free slots: split into two groups for better detail
-    const mid = Math.ceil(charCount / 2);
-    await pushCharSlot(rawCharData.slice(0, mid));
-    await pushCharSlot(rawCharData.slice(mid));
-  } else if (charCount >= 3) {
-    // 3+ chars but only 1 slot: cram all into one
-    await pushCharSlot(rawCharData);
+  let charGroups = [];
+  if (charCount > 0 && charCount <= availableCharSlots) {
+    charGroups = rawCharData.map(c => [c]); // each in own slot
+  } else if (charCount > 0 && availableCharSlots >= 2) {
+    const per = Math.ceil(charCount / availableCharSlots);
+    for (let i = 0; i < availableCharSlots; i++) {
+      const start = i * per;
+      if (start < charCount) charGroups.push(rawCharData.slice(start, Math.min(start + per, charCount)));
+    }
+  } else if (charCount > 0 && availableCharSlots === 1) {
+    charGroups = [rawCharData]; // cram all into last slot
+  }
+  for (let i = 0; i < charGroups.length; i++) {
+    await pushCharSlot(charGroups[i], i === charGroups.length - 1);
   }
 
-  // Landmark: only gets a slot when there's NO scene background (scene bg
-  // already has the landmark baked in from the empty-scene pass).
+  // Landmark: only when there's no scene background (rare — scene bg already
+  // has the landmark baked in).
   if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
     const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
     log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
   } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
-    log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already baked into scene background`);
+    log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already in scene background`);
   }
 
-  // Text area mask fallback: if there's no scene background (repair / iterate
-  // flows that use `previousImage` instead), the mask can't be baked into the
-  // border composite. Drop it into the last free slot so the mask still
-  // reaches Grok. No-op when the scene border already has it.
-  if (hasMask && !useBorderedScene && slots.length < 3) {
-    slots.push(textAreaMask);
-    log.info(`🎨 ${tag} Slot ${slots.length}: text area mask (fallback — no scene border to bake into)`);
-  }
+  // NOTE: the text-area mask is intentionally NOT added as a reference slot.
+  // Grok copies the mask's abstract black/white shapes into the output, which
+  // confuses the composition. The textPosition is communicated via the prompt.
 
   // Grok edit output matches the input image aspect ratio (it mostly ignores the
   // aspect_ratio API param for edits). Pad every slot to the requested aspect so
@@ -1027,6 +998,50 @@ async function packReferences(refs = {}, options = {}) {
  * @param {Array<{imageData: string, name: string, type: string}>} vbElements - Up to 9 VB elements
  * @returns {Promise<Buffer>} JPEG buffer of the composited 1280x1280 image
  */
+/**
+ * Append a row of VB element cells below a character composite.
+ * Keeps the char composite at natural size and adds 1-6 labeled cells as a
+ * bottom strip, so VB references travel with the avatars rather than polluting
+ * the scene background.
+ */
+async function composeCharWithVbRow(charBuffer, vbElements = []) {
+  const elements = vbElements.slice(0, 6);
+  if (elements.length === 0) return charBuffer;
+
+  const meta = await sharp(charBuffer).metadata();
+  const W = meta.width;
+  const H = meta.height;
+  const CELL_W = Math.floor(W / elements.length);
+  const CELL_H = Math.min(CELL_W, Math.round(H * 0.25)); // cap at 25% of char height
+  const newH = H + CELL_H;
+
+  const composites = [{ input: charBuffer, left: 0, top: 0 }];
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (!el.imageData) continue;
+    try {
+      const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const elBuf = Buffer.from(base64, 'base64');
+      const cell = await sharp(elBuf).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+      composites.push({ input: cell, left: i * CELL_W, top: H });
+
+      // Small caption label at the bottom of the cell
+      const labelH = Math.max(14, Math.round(CELL_H * 0.14));
+      const label = String(el.name || '').slice(0, 18);
+      const fontPx = Math.max(9, Math.round(labelH * 0.55));
+      const svg = `<svg width="${CELL_W}" height="${labelH}"><rect width="100%" height="100%" fill="rgba(0,0,0,0.65)"/><text x="${CELL_W/2}" y="${Math.round(labelH*0.72)}" font-family="Arial,sans-serif" font-size="${fontPx}" fill="white" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text></svg>`;
+      composites.push({ input: Buffer.from(svg), left: i * CELL_W, top: H + CELL_H - labelH });
+    } catch (err) {
+      log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
+    }
+  }
+
+  return sharp({ create: { width: W, height: newH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+    .composite(composites)
+    .jpeg({ quality: 88 })
+    .toBuffer();
+}
+
 async function composeSceneWithVbBorder(sceneBuffer, vbElements = [], options = {}) {
   const SCENE = 1024;
   const CELL_W = 256;          // right-column cell width (and right-column cell height stays 256)
