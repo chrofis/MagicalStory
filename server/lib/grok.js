@@ -1126,7 +1126,7 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = [], options = 
     .jpeg({ quality: 90 })
     .toBuffer();
 
-  log.info(`🖼️ [GROK] Composed scene+VB border: ${CANVAS}x${CANVAS}, scene=${SCENE}px, ${elements.length} VB cells (${CELL}x${CELL})`);
+  log.info(`🖼️ [GROK] Composed scene+VB border: ${CANVAS_W}x${CANVAS_H}, scene=${SCENE}px, ${elements.length} VB cells (right ${CELL_W}×${CELL_W}, bottom ${CELL_W}×${BOTTOM_H})`);
   return out;
 }
 

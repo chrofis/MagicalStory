@@ -3384,7 +3384,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // - Covers: Gemini 3 Pro Image (higher quality)
   // - Scenes: Gemini 2.5 Flash Image (faster)
   const defaultModel = evaluationType === 'cover' ? MODEL_DEFAULTS.coverImage : MODEL_DEFAULTS.pageImage;
-  const modelId = imageModelOverride || defaultModel;
+  // let — may be swapped to a Gemini model below if we reach the Gemini
+  // branch via a Grok/Runware fallback.
+  let modelId = imageModelOverride || defaultModel;
   if (imageModelOverride) {
     log.debug(`🔧 [IMAGE GEN] Using model override: ${modelId}`);
   }
@@ -3552,6 +3554,16 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       log.error(`❌ [IMAGE GEN] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
       // Fall through to Gemini below
     }
+  }
+
+  // If modelId points at a non-Gemini backend (Grok/Runware) we reached here
+  // via the fallback path — swap to a known-good Gemini image model so the
+  // URL below is valid. Without this, the URL becomes
+  // `.../models/grok-imagine:generateContent` → Google returns 404.
+  if (IMAGE_MODELS[modelId]?.backend && IMAGE_MODELS[modelId].backend !== 'gemini') {
+    const originalModelId = modelId;
+    modelId = 'gemini-2.5-flash-image';
+    log.warn(`🔄 [IMAGE GEN] Fallback: swapped model ${originalModelId} → ${modelId} for Gemini API call`);
   }
 
   const systemInstruction = getImageSystemInstruction();
@@ -4014,7 +4026,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Use model override if provided
   const defaultModel = MODEL_DEFAULTS.pageImage;
-  const modelId = imageModelOverride || defaultModel;
+  // let — may be swapped to a Gemini model below if we reach the Gemini
+  // branch via a Grok/Runware fallback.
+  let modelId = imageModelOverride || defaultModel;
 
   // Check if the selected model is a Runware model
   const modelConfig = IMAGE_MODELS[modelId];
@@ -4110,6 +4124,16 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       log.error(`❌ [IMAGE GEN-ONLY] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
       // Fall through to Gemini below
     }
+  }
+
+  // If modelId points at a non-Gemini backend (Grok/Runware) we reached here
+  // via the fallback path — swap to a known-good Gemini image model so the
+  // URL below is valid. Without this, the URL becomes
+  // `.../models/grok-imagine:generateContent` → Google returns 404.
+  if (IMAGE_MODELS[modelId]?.backend && IMAGE_MODELS[modelId].backend !== 'gemini') {
+    const originalModelId = modelId;
+    modelId = 'gemini-2.5-flash-image';
+    log.warn(`🔄 [IMAGE GEN-ONLY] Fallback: swapped model ${originalModelId} → ${modelId} for Gemini API call`);
   }
 
   // Gemini API call
