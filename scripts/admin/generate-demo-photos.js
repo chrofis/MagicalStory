@@ -5,12 +5,17 @@
  * Reads portrait prompts from tests/helpers/demo-families.json.
  *
  * Usage:
- *   node scripts/admin/generate-demo-photos.js                    # All families
- *   node scripts/admin/generate-demo-photos.js --family=berger    # Single family
+ *   node scripts/admin/generate-demo-photos.js                       # All families, upload only
+ *   node scripts/admin/generate-demo-photos.js --family=berger       # Single family
+ *   node scripts/admin/generate-demo-photos.js --save-to=./demo-photos  # Also save to disk
+ *   node scripts/admin/generate-demo-photos.js --save-to=./demo-photos --no-upload  # Disk only
+ *
+ * Default save location when --save-to is passed without a value:
+ *   tests/fixtures/demo-photos/{family}/{name}.jpg  (gitignored — local inspection only)
  *
  * Requires:
  *   - GEMINI_API_KEY in .env
- *   - Demo users already created (run setup-demo-user.js first)
+ *   - Demo users already created (run setup-demo-user.js first), unless --no-upload
  */
 
 require('dotenv').config();
@@ -37,7 +42,7 @@ function parseArgs() {
   return out;
 }
 
-async function generatePortrait(prompt, name) {
+async function generateJpegBuffer(prompt, name) {
   console.log(`  Generating portrait for ${name}...`);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -77,18 +82,52 @@ async function generatePortrait(prompt, name) {
     .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 85 })
     .toBuffer();
-  const jpegBase64 = jpegBuffer.toString('base64');
   const jpegKb = Math.round(jpegBuffer.length / 1024);
 
   console.log(`  Generated ${name}: ${rawKb}KB → ${jpegKb}KB (JPEG)`);
-  return `data:image/jpeg;base64,${jpegBase64}`;
+  return jpegBuffer;
 }
 
-async function processFamily(apiBase, family) {
+function bufferToDataUri(buf) {
+  return `data:image/jpeg;base64,${buf.toString('base64')}`;
+}
+
+async function processFamily(apiBase, family, opts) {
+  const { saveDir, doUpload } = opts;
   console.log(`\n── ${family.label} (${family.email}) ──────────────────`);
 
-  // 1. Login
-  console.log('1. Logging in...');
+  // 1. Generate portraits
+  console.log(`1. Generating ${family.characters.length} portraits...`);
+  const portraits = {};  // characterId → Buffer
+  for (const charDef of family.characters) {
+    try {
+      portraits[charDef.id] = await generateJpegBuffer(charDef.portraitPrompt, charDef.name);
+    } catch (err) {
+      console.error(`   Failed to generate ${charDef.name}: ${err.message}`);
+    }
+  }
+  console.log(`   Generated ${Object.keys(portraits).length}/${family.characters.length}`);
+
+  // 2. Save to disk (optional)
+  if (saveDir) {
+    const familyDir = path.join(saveDir, family.id);
+    fs.mkdirSync(familyDir, { recursive: true });
+    for (const charDef of family.characters) {
+      const buf = portraits[charDef.id];
+      if (!buf) continue;
+      const filePath = path.join(familyDir, `${charDef.name}.jpg`);
+      fs.writeFileSync(filePath, buf);
+      console.log(`   Saved ${path.relative(process.cwd(), filePath)}`);
+    }
+  }
+
+  // 3. Upload (optional)
+  if (!doUpload) {
+    console.log('   (--no-upload: skipping upload to demo account)');
+    return;
+  }
+
+  console.log('2. Logging in...');
   const loginRes = await fetch(`${apiBase}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -99,8 +138,7 @@ async function processFamily(apiBase, family) {
   }
   const { token } = await loginRes.json();
 
-  // 2. Fetch existing characters
-  console.log('2. Fetching existing characters...');
+  console.log('3. Fetching existing characters...');
   const charRes = await fetch(`${apiBase}/api/characters`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
@@ -111,26 +149,14 @@ async function processFamily(apiBase, family) {
     throw new Error(`No characters on ${family.email}. Run setup-demo-user.js first.`);
   }
 
-  // 3. Generate portraits
-  console.log(`3. Generating ${family.characters.length} portraits...`);
-  const photos = {};
-  for (const charDef of family.characters) {
-    try {
-      photos[charDef.id] = await generatePortrait(charDef.portraitPrompt, charDef.name);
-    } catch (err) {
-      console.error(`   Failed to generate ${charDef.name}: ${err.message}`);
-    }
-  }
-  console.log(`   Generated ${Object.keys(photos).length}/${family.characters.length}`);
-
-  // 4. Upload
   console.log('4. Uploading to character profiles...');
   const updated = characters.map(char => {
-    const photo = photos[char.id];
-    if (!photo) return char;
+    const buf = portraits[char.id];
+    if (!buf) return char;
+    const dataUri = bufferToDataUri(buf);
     return {
       ...char,
-      photos: { ...(char.photos || {}), original: photo, face: photo },
+      photos: { ...(char.photos || {}), original: dataUri, face: dataUri },
     };
   });
 
@@ -164,11 +190,23 @@ async function main() {
     throw new Error(`No family matched --family=${args.family}. Known: ${families.map(f => f.id).join(', ')}`);
   }
 
-  console.log(`Generating demo portraits → ${apiBase}`);
+  // Resolve --save-to: explicit path, or "true" → default to tests/fixtures/demo-photos
+  const DEFAULT_SAVE_DIR = path.join(__dirname, '..', '..', 'tests', 'fixtures', 'demo-photos');
+  const saveDir = args['save-to'] === 'true'
+    ? DEFAULT_SAVE_DIR
+    : args['save-to'] ? path.resolve(args['save-to']) : null;
+  const doUpload = args['no-upload'] !== 'true';
+
+  if (!doUpload && !saveDir) {
+    throw new Error('--no-upload requires --save-to=<dir> (otherwise nothing happens).');
+  }
+
+  console.log(`Generating demo portraits${doUpload ? ` → ${apiBase}` : ' (no upload)'}`);
+  if (saveDir) console.log(`Saving JPEGs to: ${saveDir}`);
   console.log(`Families: ${targetFamilies.map(f => f.id).join(', ')}`);
 
   for (const family of targetFamilies) {
-    await processFamily(apiBase, family);
+    await processFamily(apiBase, family, { saveDir, doUpload });
   }
 
   console.log('\n════════════════════════════════════════════════════');

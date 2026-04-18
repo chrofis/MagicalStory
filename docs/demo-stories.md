@@ -42,6 +42,10 @@ node scripts/admin/setup-demo-user.js
 # 2. Generate Gemini photo-realistic portraits and upload as character photos
 node scripts/admin/generate-demo-photos.js
 # Or just one: node scripts/admin/generate-demo-photos.js --family=miller
+# Also save JPEGs to disk for inspection (gitignored — local only):
+#   node scripts/admin/generate-demo-photos.js --save-to=true
+# Inspect-only (no upload):
+#   node scripts/admin/generate-demo-photos.js --save-to=true --no-upload
 
 # 3. (If credits get low) Top up via SQL
 #    UPDATE users SET credits = -1 WHERE email IN (
