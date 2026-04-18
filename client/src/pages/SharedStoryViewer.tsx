@@ -320,7 +320,7 @@ export default function SharedStoryViewer() {
   );
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header */}
       {isAuthenticated ? (
         <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
