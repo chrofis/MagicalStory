@@ -601,6 +601,42 @@ async function composeStack(topRow, bottomRow) {
  * @param {string} aspectRatio - Target slot aspect (e.g. '1:1', '3:4')
  * @returns {Promise<Buffer|null>} null if rawBuffers is empty or n > 3.
  */
+/**
+ * Pad a composed character slot to the exact target aspect using CHAR_BG (the
+ * same grey already used between characters in composeRow / composeStack).
+ * Grok sees this as more of the existing inter-character background, so it
+ * doesn't bake "bars" into the output the way black/white padding did. After
+ * this step packReferences's aspect-pad cover-crop becomes a no-op and no
+ * heads get cropped off the slot edges.
+ */
+async function padCharacterSlotToAspect(buffer, aspectRatio) {
+  const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const meta = await sharp(buffer).metadata();
+  if (!meta.width || !meta.height) return buffer;
+  const currentRatio = meta.width / meta.height;
+  if (Math.abs(currentRatio - targetRatio) / targetRatio < 0.01) return buffer;
+
+  let padTop = 0, padBottom = 0, padLeft = 0, padRight = 0;
+  if (currentRatio > targetRatio) {
+    // Source wider than target → grow height (pad top + bottom)
+    const targetH = Math.round(meta.width / targetRatio);
+    const total = targetH - meta.height;
+    padTop = Math.floor(total / 2);
+    padBottom = total - padTop;
+  } else {
+    // Source taller than target → grow width (pad left + right)
+    const targetW = Math.round(meta.height * targetRatio);
+    const total = targetW - meta.width;
+    padLeft = Math.floor(total / 2);
+    padRight = total - padLeft;
+  }
+  return sharp(buffer)
+    .extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, background: CHAR_BG })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
 async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, charNames = []) {
   const n = rawBuffers.length;
   if (n === 0 || n > 3) return null;
@@ -626,29 +662,32 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
     return labelCharacterImage(composed, charNames[i]);
   };
 
+  let composed;
   if (n === 1) {
-    return buildHorizontal(0);
-  }
-
-  if (n === 2) {
+    composed = await buildHorizontal(0);
+  } else if (n === 2) {
     const stacks = [await buildVertical(0), await buildVertical(1)];
-    return composeRow(stacks);
+    composed = await composeRow(stacks);
+  } else {
+    // n === 3: aspect-aware layout choice
+    const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
+    const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+    if (targetRatio >= 0.95) {
+      // Square-ish target: 3 vertical stacks side by side
+      const stacks = [await buildVertical(0), await buildVertical(1), await buildVertical(2)];
+      composed = await composeRow(stacks);
+    } else {
+      // Portrait target: 2 vertical stacks on top, horizontal strip on bottom
+      const topRow = await composeRow([await buildVertical(0), await buildVertical(1)]);
+      const bottomRow = await buildHorizontal(2);
+      composed = await composeStack(topRow, bottomRow);
+    }
   }
 
-  // n === 3: aspect-aware
-  const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
-  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
-
-  if (targetRatio >= 0.95) {
-    // Square-ish target: 3 vertical stacks side by side
-    const stacks = [await buildVertical(0), await buildVertical(1), await buildVertical(2)];
-    return composeRow(stacks);
-  }
-
-  // Portrait target: 2 vertical stacks on top, horizontal strip on bottom
-  const topRow = await composeRow([await buildVertical(0), await buildVertical(1)]);
-  const bottomRow = await buildHorizontal(2);
-  return composeStack(topRow, bottomRow);
+  // Pad to exact target aspect with CHAR_BG so packReferences's aspect-pad
+  // cover-crop is a no-op (within tolerance). Without this the cover-crop
+  // would trim edges and cut character heads.
+  return padCharacterSlotToAspect(composed, aspectRatio);
 }
 
 /**
@@ -982,10 +1021,29 @@ async function packReferences(refs = {}, options = {}) {
  * @param {Array<{imageData: string, name: string, type: string}>} vbElements - Up to 9 VB elements
  * @returns {Promise<Buffer>} JPEG buffer of the composited 1280x1280 image
  */
-async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
-  const CANVAS = 1280;
+async function composeSceneWithVbBorder(sceneBuffer, vbElements = [], options = {}) {
   const SCENE = 1024;
-  const CELL = 256;
+  const CELL_W = 256;          // right-column cell width (and right-column cell height stays 256)
+  const RIGHT_COL_X = SCENE;
+  const CANVAS_W = SCENE + CELL_W;  // 1280: scene + right column
+
+  // For 1:1 target the bottom row cells stay 256×256 → canvas 1280×1280.
+  // For non-1:1 targets we GROW the bottom-row HEIGHT so the canvas hits the
+  // exact requested aspect. The packReferences aspect-pad loop is then a no-op
+  // and no VB cells get cropped off the side.
+  //
+  //   Canvas = 1280 wide × (1024 + bottomH) tall
+  //   bottomH = 1280 / targetRatio - 1024
+  //
+  // For 3:4 (0.75) → bottomH = 683 → canvas 1280×1707, bottom cells 256×683.
+  // For 1:1 → bottomH = 256 → canvas 1280×1280 (preserved).
+  const { aspectRatio = '1:1' } = options;
+  const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const naturalCanvasH = SCENE + CELL_W;             // 1280 (1:1 default)
+  const aspectCanvasH = Math.round(CANVAS_W / targetRatio);
+  const CANVAS_H = Math.max(naturalCanvasH, aspectCanvasH);
+  const BOTTOM_H = CANVAS_H - SCENE;                  // height of the bottom-row cells
   const MAX_ELEMENTS = 9;
 
   // Resize scene to exactly 1024x1024. Cover-crop instead of contain+black —
@@ -997,19 +1055,21 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
     .resize(SCENE, SCENE, { fit: 'cover', position: 'centre' })
     .toBuffer();
 
-  // Cell positions: 4 right column, then 5 bottom row
+  // Cell positions: 4 right column (256×256 squares), 5 bottom row
+  // (256×BOTTOM_H — taller than wide for portrait targets, square for 1:1).
   const cellPositions = [
     // Right column (x = 1024, y = 0/256/512/768)
-    { left: SCENE, top: 0 },
-    { left: SCENE, top: CELL },
-    { left: SCENE, top: CELL * 2 },
-    { left: SCENE, top: CELL * 3 },
-    // Bottom row (y = 1024, x = 0/256/512/768/1024) — fills full 1280 width
-    { left: 0, top: SCENE },
-    { left: CELL, top: SCENE },
-    { left: CELL * 2, top: SCENE },
-    { left: CELL * 3, top: SCENE },
-    { left: CELL * 4, top: SCENE },
+    { left: RIGHT_COL_X, top: 0,           w: CELL_W, h: CELL_W },
+    { left: RIGHT_COL_X, top: CELL_W,      w: CELL_W, h: CELL_W },
+    { left: RIGHT_COL_X, top: CELL_W * 2,  w: CELL_W, h: CELL_W },
+    { left: RIGHT_COL_X, top: CELL_W * 3,  w: CELL_W, h: CELL_W },
+    // Bottom row (y = 1024, x = 0/256/512/768/1024) — fills full 1280 width.
+    // Height = BOTTOM_H so the canvas hits the requested aspect.
+    { left: 0,           top: SCENE,       w: CELL_W, h: BOTTOM_H },
+    { left: CELL_W,      top: SCENE,       w: CELL_W, h: BOTTOM_H },
+    { left: CELL_W * 2,  top: SCENE,       w: CELL_W, h: BOTTOM_H },
+    { left: CELL_W * 3,  top: SCENE,       w: CELL_W, h: BOTTOM_H },
+    { left: CELL_W * 4,  top: SCENE,       w: CELL_W, h: BOTTOM_H },
   ];
 
   const elements = vbElements.slice(0, MAX_ELEMENTS);
@@ -1026,27 +1086,28 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
 
       // Fill the cell with the element image (cover crops to fit, maximizes visibility)
       const cellImage = await sharp(elBuf)
-        .resize(CELL, CELL, { fit: 'cover' })
+        .resize(pos.w, pos.h, { fit: 'cover' })
         .toBuffer();
       composites.push({ input: cellImage, left: pos.left, top: pos.top });
 
-      // Caption strip overlay at the bottom of the cell (40px tall, dark translucent)
+      // Caption strip overlay at the bottom of the cell (~14% of cell height,
+      // min 36px). Stays anchored to the cell bottom regardless of cell height.
       const labelText = `${el.name} (${el.type})`;
       const displayText = labelText.length > 28 ? labelText.substring(0, 25) + '...' : labelText;
-      // Escape XML special chars
       const safeText = displayText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const captionHeight = 36;
+      const captionHeight = Math.max(36, Math.round(pos.h * 0.14));
+      const fontSize = Math.max(18, Math.round(captionHeight * 0.5));
       const captionSvg = `
-        <svg width="${CELL}" height="${captionHeight}">
-          <rect width="${CELL}" height="${captionHeight}" fill="black" fill-opacity="0.65"/>
-          <text x="${CELL / 2}" y="24" font-family="Arial, sans-serif" font-size="18"
+        <svg width="${pos.w}" height="${captionHeight}">
+          <rect width="${pos.w}" height="${captionHeight}" fill="black" fill-opacity="0.65"/>
+          <text x="${pos.w / 2}" y="${Math.round(captionHeight * 0.7)}" font-family="Arial, sans-serif" font-size="${fontSize}"
                 font-weight="bold" fill="white" text-anchor="middle">${safeText}</text>
         </svg>
       `;
       composites.push({
         input: Buffer.from(captionSvg),
         left: pos.left,
-        top: pos.top + CELL - captionHeight,
+        top: pos.top + pos.h - captionHeight,
       });
     } catch (err) {
       log.warn(`⚠️ [GROK] composeSceneWithVbBorder: failed to render cell ${i} (${el.name}): ${err.message}`);
@@ -1055,8 +1116,8 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = []) {
 
   const out = await sharp({
     create: {
-      width: CANVAS,
-      height: CANVAS,
+      width: CANVAS_W,
+      height: CANVAS_H,
       channels: 3,
       background: { r: 0, g: 0, b: 0 },
     },
