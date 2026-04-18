@@ -5388,7 +5388,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       const inputImage = bestSoFar?.imageData || img.imageData;
+      // Read the per-scene aspect from saved metadata so a 1:1 advanced page
+      // doesn't get redone as 3:4. img.imageAspect (preserved in pipelineStoryData)
+      // is the source of truth; null falls back to global default in iteratePageCore.
+      const sceneAspect = img.imageAspect
+        || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
+        || null;
       result = await iteratePage(inputImage, img.pageNumber, storyData, {
+        aspectRatio: sceneAspect,
         modelOverrides,
         usageTracker, // pass through so Haiku scene re-expansion + image gen are tracked
         evaluationFeedback: evalFeedback,
@@ -6244,7 +6251,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     previewOnly = false,
     customImagePrompt = null,
     emptySceneCallbacks = null,
+    // Per-scene aspect override — caller (regeneration route or repair pipeline)
+    // passes the scene's saved imageAspect so the regenerated image matches the
+    // shape the layout expects. null/undefined falls back to the global default.
+    aspectRatio: aspectRatioIn = null,
   } = options;
+  const sceneAspect = aspectRatioIn || CONFIG_DEFAULTS.pageAspect;
 
   const {
     analyzeGeneratedImage
@@ -6497,7 +6509,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           visualBibleGrid: emptySceneVbGrid,
           pageNumber,
           skipCache: true,
-          aspectRatio: isCoverPage ? CONFIG_DEFAULTS.coverAspect : CONFIG_DEFAULTS.pageAspect
+          aspectRatio: isCoverPage ? CONFIG_DEFAULTS.coverAspect : sceneAspect
         });
         if (emptyResult?.imageData) {
           sceneBackground = emptyResult.imageData;
@@ -6655,7 +6667,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: CONFIG_DEFAULTS.pageAspect, sceneBackground, visualBible: storyData?.visualBible || null }
+      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground, visualBible: storyData?.visualBible || null }
     );
   }
 

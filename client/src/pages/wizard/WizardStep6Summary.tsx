@@ -6,7 +6,7 @@ import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realis
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
-import type { GenerationMode } from '@/hooks/useDeveloperMode';
+import type { GenerationMode, LayoutOverride } from '@/hooks/useDeveloperMode';
 
 // All story language options for display lookup (user-friendly names, no codes shown)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string }[] = [
@@ -97,8 +97,8 @@ interface WizardStep6Props {
   developerMode: boolean;
   generationMode?: GenerationMode;
   onGenerationModeChange?: (mode: GenerationMode) => void;
-  layoutOverride?: 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page';
-  onLayoutOverrideChange?: (mode: 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page') => void;
+  layoutOverride?: LayoutOverride;
+  onLayoutOverrideChange?: (mode: LayoutOverride) => void;
 }
 
 /**
@@ -603,7 +603,7 @@ export function WizardStep6Summary({
               </label>
               <select
                 value={layoutOverride}
-                onChange={(e) => onLayoutOverrideChange(e.target.value as 'auto' | 'a4-overlay' | 'square-below' | 'legacy-square-2page')}
+                onChange={(e) => onLayoutOverrideChange(e.target.value as LayoutOverride)}
                 className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-sm font-medium bg-white"
               >
                 <option value="auto">Auto (based on reading level)</option>

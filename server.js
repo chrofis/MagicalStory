@@ -2530,10 +2530,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const sceneCount = inputData.pages;
   const lang = inputData.language || 'en';
 
-  // Resolve page layout once at the top of the pipeline so every downstream
-  // function (buildImagePrompt, generateImageOnly, empty-scene gen, repair,
-  // PDF) reads from one source of truth. Stashed on inputData so existing
-  // helpers that already receive inputData get it without signature changes.
+  // Resolve page layout once at the top of the pipeline. Read from layout
+  // throughout via inputData.layout — passing as a separate parameter would
+  // require threading through many existing helpers. inputData is request-
+  // local (sanitized in the route handler, not shared), so augmenting it here
+  // is safe.
   // 'advanced' → square + text-below. Others → A4 + text-overlay.
   const { resolveLayout } = require('./server/lib/layout');
   const layout = resolveLayout(inputData.languageLevel, inputData.layoutOverride);
@@ -5263,7 +5264,17 @@ Blend the bright patch seamlessly into the surrounding scene — it should be th
           language: inputData.language,
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
-          sceneImages: rawImages.map(r => ({ pageNumber: r.pageNumber, imageData: r.imageData, description: r.sceneDescription })),
+          // Preserve per-scene layout fields (imageAspect, textInImage) so any
+          // iterate/redo inside the repair pipeline regenerates at the right
+          // aspect. Stripping these would silently revert advanced-layout pages
+          // back to 3:4 on auto-repair.
+          sceneImages: rawImages.map(r => ({
+            pageNumber: r.pageNumber,
+            imageData: r.imageData,
+            description: r.sceneDescription,
+            imageAspect: inputData?.layout?.imageAspect,
+            textInImage: inputData?.layout?.textInImage,
+          })),
           coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
           coverHints,   // Needed by iterateCover for per-character clothing on covers
           title,
