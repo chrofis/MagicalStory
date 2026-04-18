@@ -1,19 +1,18 @@
 /**
- * Text region detection + frosted-glass blur.
+ * Text region detection (calmness + coverage).
  *
- * After image generation, finds the calmest region and bakes a soft blur of
- * the image back onto itself through an organic alpha mask so white text with
- * a dark outline on top reads clearly without a visible box. The blurred area
- * follows the contour of the calm region — not a rectangle.
+ * Detects the calmest (low-variance) region of a generated image so the text
+ * space repair loop can decide whether to re-roll and the overlay renderer
+ * knows where text will land. The image is NOT modified here — any frosted
+ * blur / outline / backdrop is applied at text-render time, not baked into
+ * storage.
  *
  * Algorithm:
  * 1. Convert to greyscale, divide into blocks, compute brightness + variance
  * 2. Calmness = (1 - variance) — low-variance regions, regardless of brightness
- * 3. Build a per-pixel alpha mask: high calmness → strong blur substitution
- * 4. Gaussian-blur the mask edges for organic feathering
- * 5. Constrain to the correct side (odd=left, even=right) + target area
- * 6. Composite a blurred copy of the image through the mask onto the original
- * 7. Return the partially-blurred image + bounding box for text placement
+ * 3. Build a per-pixel alpha mask from calmness (used only for bbox + score)
+ * 4. Constrain to the correct side (odd=left, even=right) + target area
+ * 5. Return the original image unchanged + position + rect + coverage score
  */
 
 const sharp = require('sharp');
@@ -33,8 +32,9 @@ const BLOCK_SIZE = 16;
  * @returns {{ imageData: string, position: string, rect: {x,y,w,h}, score: number, overridden: boolean }}
  */
 async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
-  // washOpacity is reused as the max alpha of the blur substitution.
-  const { washOpacity = 0.9, calmThreshold = 0.35, blurRadius = 18 } = options;
+  // washOpacity and calmThreshold are kept for the coverage/rect math below;
+  // no wash is actually baked into the image anymore.
+  const { washOpacity = 0.9, calmThreshold = 0.35 } = options;
 
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -145,34 +145,9 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
     }
 
-    // ── Step 6: Composite a blurred copy of the image through the mask ──
-    // Frosted-glass effect: the calm area is replaced with a blurred version
-    // of itself (no tinted wash, no box), so the illustration still shows but
-    // high-frequency detail that would fight with the text is softened.
-    const blurredRgb = await sharp(buf)
-      .blur(blurRadius)
-      .removeAlpha()
-      .raw()
-      .toBuffer();
-
-    const blurredRgba = Buffer.alloc(width * height * 4);
-    for (let i = 0; i < width * height; i++) {
-      blurredRgba[i * 4] = blurredRgb[i * 3];
-      blurredRgba[i * 4 + 1] = blurredRgb[i * 3 + 1];
-      blurredRgba[i * 4 + 2] = blurredRgb[i * 3 + 2];
-      blurredRgba[i * 4 + 3] = maskPixels[i]; // A from calmness mask
-    }
-
-    const washOverlay = await sharp(blurredRgba, { raw: { width, height, channels: 4 } })
-      .png()
-      .toBuffer();
-
-    const washedImage = await sharp(buf)
-      .composite([{ input: washOverlay, blend: 'over' }])
-      .jpeg({ quality: 92 })
-      .toBuffer();
-
-    const washedDataUri = `data:image/jpeg;base64,${washedImage.toString('base64')}`;
+    // Image is returned untouched — blur + text are composited at render time,
+    // not baked in.
+    const washedDataUri = imageData;
 
     // ── Step 7: Compute bounding box of the washed region for text placement ──
     let minX = width, minY = height, maxX = 0, maxY = 0;
