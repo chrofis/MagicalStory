@@ -898,6 +898,7 @@ async function updateStoryDataOnly(storyId, storyData) {
 
   // Deep clone to avoid modifying original
   const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  let imagesSaved = 0;
 
   // Strip imageData from scenes (but don't save them - they're already in story_images)
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
@@ -1060,6 +1061,12 @@ async function upsertStory(storyId, userId, storyData) {
             }
           }
         }
+      }
+      // Save empty scene image separately and set flag for lazy loading (same as saveStoryData)
+      if (img.emptySceneImage) {
+        await saveStoryImage(storyId, 'empty_scene', img.pageNumber, img.emptySceneImage);
+        imagesSaved++;
+        img.hasEmptySceneImage = true;
       }
       delete img.originalImage;
       delete img.preEntityRepairImage;
