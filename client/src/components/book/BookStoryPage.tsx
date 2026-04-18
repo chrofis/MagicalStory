@@ -4,7 +4,6 @@ import {
   getTextOverlayPosition,
   getOverlayClasses,
   getOverlayPositionStyle,
-  getGradientStyle,
   getTextContainerStyle,
   OVERLAY_FONT_SIZE,
   OVERLAY_TEXT_STROKE_STYLE,
@@ -91,10 +90,7 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           ) : (
             <div
               className={getOverlayClasses(layout)}
-              style={{
-                ...getOverlayPositionStyle(layout),
-                ...getGradientStyle(layout),
-              }}
+              style={getOverlayPositionStyle(layout)}
             >
               <div className="p-2 md:p-3" style={getTextContainerStyle(layout)}>
                 <p

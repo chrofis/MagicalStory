@@ -9,7 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
-import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getGradientStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_STROKE_STYLE } from '@/utils/textOverlay';
+import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_STROKE_STYLE } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -4703,10 +4703,7 @@ export function StoryDisplay({
                             return (
                               <div
                                 className={getOverlayClasses(layout)}
-                                style={{
-                                  ...getOverlayPositionStyle(layout),
-                                  ...getGradientStyle(layout),
-                                }}
+                                style={getOverlayPositionStyle(layout)}
                               >
                                 <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
                                   <p className={`leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}

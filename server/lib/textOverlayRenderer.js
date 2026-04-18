@@ -77,10 +77,8 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   const isFull = textPosition.includes('full');
   const isRight = textPosition.includes('right');
 
-  ctx.save();
-  applyClipPath(ctx, clipPath);
-  drawGradient(ctx, clipPath, width, height, isTop, isLeft, isRight, isFull);
-  ctx.restore();
+  // No backdrop gradient — the baked blur under the text is enough.
+  // The polygon still drives text placement (insetPolygon below).
 
   const textPadding = 20;
   const insetPoly = insetPolygon(clipPath, textPadding);

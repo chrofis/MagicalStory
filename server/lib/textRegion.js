@@ -1,19 +1,19 @@
 /**
- * Text region detection + darkening wash.
+ * Text region detection + frosted-glass blur.
  *
- * After image generation, finds the calmest region and bakes a semi-transparent
- * dark wash directly into the image so white text on top reads clearly. The
- * washed area follows the organic contour of the calm region — not a fixed
- * rectangle.
+ * After image generation, finds the calmest region and bakes a soft blur of
+ * the image back onto itself through an organic alpha mask so white text with
+ * a dark outline on top reads clearly without a visible box. The blurred area
+ * follows the contour of the calm region — not a rectangle.
  *
  * Algorithm:
  * 1. Convert to greyscale, divide into blocks, compute brightness + variance
  * 2. Calmness = (1 - variance) — low-variance regions, regardless of brightness
- * 3. Build a per-pixel alpha mask: high calmness → strong dark wash
+ * 3. Build a per-pixel alpha mask: high calmness → strong blur substitution
  * 4. Gaussian-blur the mask edges for organic feathering
  * 5. Constrain to the correct side (odd=left, even=right) + target area
- * 6. Composite the dark wash onto the original image
- * 7. Return the darkened image + bounding box for text placement
+ * 6. Composite a blurred copy of the image through the mask onto the original
+ * 7. Return the partially-blurred image + bounding box for text placement
  */
 
 const sharp = require('sharp');
@@ -33,7 +33,8 @@ const BLOCK_SIZE = 16;
  * @returns {{ imageData: string, position: string, rect: {x,y,w,h}, score: number, overridden: boolean }}
  */
 async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
-  const { washOpacity = 0.4, calmThreshold = 0.35 } = options;
+  // washOpacity is reused as the max alpha of the blur substitution.
+  const { washOpacity = 0.9, calmThreshold = 0.35, blurRadius = 18 } = options;
 
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -144,18 +145,25 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
     }
 
-    // ── Step 6: Composite dark wash onto original image ──
-    // Create a dark (near-black) plane with the mask as alpha channel. The wash
-    // darkens busy / light regions just enough for white text to read on top.
-    const darkPlane = Buffer.alloc(width * height * 4);
+    // ── Step 6: Composite a blurred copy of the image through the mask ──
+    // Frosted-glass effect: the calm area is replaced with a blurred version
+    // of itself (no tinted wash, no box), so the illustration still shows but
+    // high-frequency detail that would fight with the text is softened.
+    const blurredRgb = await sharp(buf)
+      .blur(blurRadius)
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+
+    const blurredRgba = Buffer.alloc(width * height * 4);
     for (let i = 0; i < width * height; i++) {
-      darkPlane[i * 4] = 0;          // R
-      darkPlane[i * 4 + 1] = 0;      // G
-      darkPlane[i * 4 + 2] = 0;      // B
-      darkPlane[i * 4 + 3] = maskPixels[i]; // A from calmness mask
+      blurredRgba[i * 4] = blurredRgb[i * 3];
+      blurredRgba[i * 4 + 1] = blurredRgb[i * 3 + 1];
+      blurredRgba[i * 4 + 2] = blurredRgb[i * 3 + 2];
+      blurredRgba[i * 4 + 3] = maskPixels[i]; // A from calmness mask
     }
 
-    const washOverlay = await sharp(darkPlane, { raw: { width, height, channels: 4 } })
+    const washOverlay = await sharp(blurredRgba, { raw: { width, height, channels: 4 } })
       .png()
       .toBuffer();
 
