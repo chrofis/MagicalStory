@@ -19,11 +19,11 @@ export type TextPosition = 'top-left' | 'bottom-full' | 'top-right' | 'bottom-le
 export const OVERLAY_FONT_SIZE = 'clamp(0.7rem, 1.6vw, 1rem)';
 /** Legacy — kept for back-compat. Prefer OVERLAY_TEXT_STROKE_STYLE below. */
 export const OVERLAY_TEXT_SHADOW = 'none';
-/** Crisp glyph-aware white outline — mirrors the server-rendered overlay. */
+/** White text with a crisp dark glyph-stroke — mirrors the server-rendered overlay. */
 export const OVERLAY_TEXT_STROKE_STYLE: CSSProperties = {
-  WebkitTextStroke: '2.5px rgba(255,255,255,0.95)',
+  WebkitTextStroke: '2.5px rgba(0,0,0,0.85)',
   paintOrder: 'stroke fill',
-  color: '#1a1a1a',
+  color: '#ffffff',
 };
 
 // 6-position cycle

@@ -3727,7 +3727,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     'bottom-full': 'lower third',
   };
   const textAreaInstruction = (textInImage && textPosition)
-    ? `**COMPOSITION — QUIET ZONE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) must stay soft and visually simple — intentional negative space in the composition. Continue the scene naturally into this area — same sky, same wall, same ground — but keep it SOFT and SIMPLE there. Use lighter tones of the same colours already in the scene, with gentle gradients and minimal detail. DO NOT paint a white box, a blank patch, or a sharp colour change. The area should look like a natural, calm continuation of the illustration — just quieter and lighter than the rest. No characters, no sharp lines, no high-contrast detail in this zone.`
+    ? `**COMPOSITION — QUIET ZONE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) must stay visually simple — intentional negative space in the composition. Continue the scene naturally into this area — same sky, same wall, same ground — but keep it SOFT and UNCLUTTERED there. Slightly deeper / more muted tones of the same colours already in the scene work well. DO NOT paint a box, a blank patch, or a sharp colour change — keep it a natural, calm continuation of the illustration, just quieter than the rest. No characters, no sharp lines, no high-contrast detail in this zone.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)
@@ -3738,11 +3738,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     const lines = [];
     for (const [name, ann] of Object.entries(metadata.characterPerspectives)) {
       if (ann.perspective === 'back view' || ann.perspective === 'back-view') {
-        lines.push(`- ${name}: back view (face not visible)`);
+        lines.push(`- ${name}: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.`);
       } else if (ann.perspective === 'side' || ann.perspective === 'profile') {
-        lines.push(`- ${name}: side profile`);
+        lines.push(`- ${name}: side profile — shoulders, hips, and feet all line up sideways. Nose points to one edge, not at the camera.`);
       } else if (ann.perspective === 'over-the-shoulder') {
-        lines.push(`- ${name}: over-the-shoulder (camera behind)`);
+        lines.push(`- ${name}: over-the-shoulder — camera sits behind one shoulder; back of head and shoulder visible in near foreground, feet turned away from camera.`);
       }
     }
     if (lines.length > 0) {

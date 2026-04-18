@@ -283,9 +283,10 @@ function drawGradient(ctx, polygon, width, height, isTop, isLeft, isRight, isFul
     grad = ctx.createLinearGradient(x1, y1, x2, y2);
   }
 
-  grad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
-  grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-  grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+  // Dark gradient for white text — darkens the zone so the fill pops.
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.55)');
+  grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
 
   ctx.fillStyle = grad;
   // Fill a large rect — the clip will constrain it to the polygon
@@ -436,19 +437,17 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
       drawX = line.left;
     }
 
-    // Crisp glyph-aware outline: draw a white stroke first, then the dark fill
-    // on top. Equivalent to CSS paint-order: stroke fill — curves stay curves.
-    // Line width is relative to font size so it scales with the page.
+    // White text with a dark glyph-stroke — paint-order: stroke fill.
+    // Works on any background: the dark outline gives contrast on light areas,
+    // the white fill gives contrast on dark areas.
     ctx.save();
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
-    // strokeText centers the stroke on the glyph path, so visible width = lineWidth / 2.
-    // ~16% of font size visible each side → lineWidth = fontSize * 0.32.
     ctx.lineWidth = Math.max(2.5, fontSize * 0.32);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.strokeText(line.text, drawX, line.y);
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(line.text, drawX, line.y);
     ctx.restore();
   }

@@ -1,18 +1,19 @@
 /**
- * Text region detection + lightening wash.
+ * Text region detection + darkening wash.
  *
- * After image generation, finds the calmest/lightest region and bakes a
- * semi-transparent white wash directly into the image. The washed area
- * follows the organic contour of the calm region — not a fixed rectangle.
+ * After image generation, finds the calmest region and bakes a semi-transparent
+ * dark wash directly into the image so white text on top reads clearly. The
+ * washed area follows the organic contour of the calm region — not a fixed
+ * rectangle.
  *
  * Algorithm:
  * 1. Convert to greyscale, divide into blocks, compute brightness + variance
- * 2. Calmness = brightness^1.5 × (1 - normalized_variance)
- * 3. Build a per-pixel alpha mask: high calmness → strong white wash
+ * 2. Calmness = (1 - variance) — low-variance regions, regardless of brightness
+ * 3. Build a per-pixel alpha mask: high calmness → strong dark wash
  * 4. Gaussian-blur the mask edges for organic feathering
  * 5. Constrain to the correct side (odd=left, even=right) + target area
- * 6. Composite the white wash onto the original image
- * 7. Return the lightened image + bounding box for text placement
+ * 6. Composite the dark wash onto the original image
+ * 7. Return the darkened image + bounding box for text placement
  */
 
 const sharp = require('sharp');
@@ -32,7 +33,7 @@ const BLOCK_SIZE = 16;
  * @returns {{ imageData: string, position: string, rect: {x,y,w,h}, score: number, overridden: boolean }}
  */
 async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
-  const { washOpacity = 0.45, calmThreshold = 0.35 } = options;
+  const { washOpacity = 0.4, calmThreshold = 0.35 } = options;
 
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -77,9 +78,10 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     if (vMax === 0) vMax = 1;
 
     for (let i = 0; i < calmness.length; i++) {
-      const bNorm = means[i] / 255;
+      // Low-variance wins, regardless of brightness — white text with a dark
+      // stroke reads on both light and dark as long as the area isn't busy.
       const vNorm = variances[i] / vMax;
-      calmness[i] = Math.pow(bNorm, 1.5) * (1 - vNorm);
+      calmness[i] = 1 - vNorm;
     }
 
     // ── Step 3: Build a per-pixel alpha mask from the calmness map ──
@@ -142,17 +144,18 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
     }
 
-    // ── Step 6: Composite white wash onto original image ──
-    // Create a white image with the mask as alpha channel
-    const whitePlane = Buffer.alloc(width * height * 4);
+    // ── Step 6: Composite dark wash onto original image ──
+    // Create a dark (near-black) plane with the mask as alpha channel. The wash
+    // darkens busy / light regions just enough for white text to read on top.
+    const darkPlane = Buffer.alloc(width * height * 4);
     for (let i = 0; i < width * height; i++) {
-      whitePlane[i * 4] = 255;      // R
-      whitePlane[i * 4 + 1] = 255;  // G
-      whitePlane[i * 4 + 2] = 255;  // B
-      whitePlane[i * 4 + 3] = maskPixels[i]; // A from calmness mask
+      darkPlane[i * 4] = 0;          // R
+      darkPlane[i * 4 + 1] = 0;      // G
+      darkPlane[i * 4 + 2] = 0;      // B
+      darkPlane[i * 4 + 3] = maskPixels[i]; // A from calmness mask
     }
 
-    const washOverlay = await sharp(whitePlane, { raw: { width, height, channels: 4 } })
+    const washOverlay = await sharp(darkPlane, { raw: { width, height, channels: 4 } })
       .png()
       .toBuffer();
 
