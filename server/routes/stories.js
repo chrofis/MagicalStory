@@ -1886,6 +1886,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.userInput = source.userInput || null;
         target.modelId = source.modelId || target.modelId || null;
         target.type = source.type || null;
+        target.source = source.source || target.source || null;
         target.qualityReasoning = source.qualityReasoning || null;
         target.fixTargets = source.fixTargets || [];
         target.totalAttempts = source.totalAttempts || null;
@@ -1897,6 +1898,13 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.entityPenalty = source.entityPenalty || 0;
         target.evaluatedAt = source.evaluatedAt || null;
         target.issuesSummary = source.issuesSummary || null;
+        target.grokRefImages = source.grokRefImages || null;
+        target.inpaintInstruction = source.inpaintInstruction || null;
+        target.inpaintReferenceImages = source.inpaintReferenceImages || null;
+        target.textSpaceCoveragePct = source.textSpaceCoveragePct ?? null;
+        target.textSpacePosition = source.textSpacePosition || null;
+        target.iterationFeedback = source.iterationFeedback || null;
+        target.previewMismatches = source.previewMismatches || null;
         target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
       };
 

@@ -152,7 +152,9 @@ SCENE HINT:
 - **VISUAL ONLY** - Describe what the CAMERA sees. ❌ "excitedly runs" ✅ "runs with arms spread wide". No emotions, only body language.
 - **ONE MOMENT** - Description = one frozen instant. ❌ "opens door, walks in, sits" ✅ "steps through the doorway"
 - **SHOT + EXPRESSIONS** - `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = no facial detail, body language only.
-- **BACKGROUND** - Add `"background"` to the JSON: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`. Tells the image generator if the scene feels isolated or populated.
+- **BACKGROUND** - Add `"background"` to the JSON. Use it for the scene's physical atmosphere AND for any unnamed supporting figures who are essential to the story moment but aren't main characters.
+  - Ambient populations: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`
+  - Narratively important supporting figures: whenever the page text shows unnamed figures actively doing something to or near a main character (capturing, chasing, guarding, blocking the way, rescuing, watching, reacting), describe them here with count + role + action + placement so the illustrator draws them. Without this, scene expansion will drop them and the image won't match the story.
 
 **Scene Variety (IMPORTANT for great illustrations):**
 - **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.

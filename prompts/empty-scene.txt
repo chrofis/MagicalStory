@@ -1,4 +1,4 @@
-Generate a SINGLE illustration of ONLY the background environment. NO people, NO objects, NO animals, NO artifacts. Just the setting, architecture, and atmosphere.
+Generate a SINGLE illustration of the background environment. Do not include named main or secondary characters, tracked animals, or Visual Bible artifacts — those get composited separately. Anonymous extras (crowd, villagers, vendors, distant onlookers) ARE allowed when the description below calls for a populated setting — paint them as atmospheric density, silhouettes or loose figures, and keep them clear of the space reserved for named characters.
 
 {EMPTY_SCENE_DESCRIPTION}
 
