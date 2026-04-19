@@ -1906,9 +1906,14 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
             body: JSON.stringify({
               contents: [{ parts }],
               generationConfig: {
-                // 32k gives ~2× headroom over the 16k we kept hitting when
-                // Gemini produced verbose labels for multi-figure scenes.
-                maxOutputTokens: 32000,
+                // A clean bbox response for 5 figures + 5 objects is ~600
+                // tokens. When Gemini 2.5-flash-lite hits 15k+ it's stuck in
+                // a repetition loop inside a verbose label, not producing
+                // more figures. A tighter cap (2500) fails fast on repetition
+                // loops so the Grok fallback kicks in quickly. The real fix
+                // is the ≤10-word label cap in the prompt — this cap is the
+                // pressure valve if the prompt rule doesn't hold.
+                maxOutputTokens: 2500,
                 temperature: 0.5,  // Google recommends >0 for bbox to prevent repetition loops
                 responseMimeType: 'application/json',
                 // Disable thinking for bbox — Google says it adds latency without improving spatial accuracy
@@ -2214,7 +2219,9 @@ Respond with ONLY the JSON.`;
                     { text: refinePrompt }
                   ] }],
                   generationConfig: {
-                    maxOutputTokens: 32000,
+                    // Refine pass: smaller response (just refined main character boxes),
+                    // so a tight cap is fine and prevents repetition loops.
+                    maxOutputTokens: 2500,
                     temperature: 0.5,
                     responseMimeType: 'application/json',
                     ...(modelSupportsThinking(refineModelId) && { thinkingConfig: { thinkingBudget: 0 } })
