@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Mail, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Mail, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
@@ -62,19 +61,16 @@ export function GenerationProgress({
   message: _message,
   isGenerating = true,
   coverImages,
-  jobId,
-  onCancel,
+  jobId: _jobId,
+  onCancel: _onCancel,
   onMinimize,
   characters = [],
   isStalled = false,
   onDismissStalled,
-  isImpersonating = false,
+  isImpersonating: _isImpersonating = false,
   pageCount = 20,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || isImpersonating;
-  const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
   // 25 funny messages per character - uses {name} placeholder
@@ -637,76 +633,31 @@ export function GenerationProgress({
           />
         </div>
 
-        {/* Cancel button - admin only, shown from the start */}
-        {isAdmin && jobId && onCancel && (
-          <button
-            onClick={async () => {
-              if (isCancelling) return;
-              setIsCancelling(true);
-              try {
-                onCancel();
-              } finally {
-                setIsCancelling(false);
-              }
-            }}
-            disabled={isCancelling}
-            className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm"
-          >
-            {isCancelling ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <XCircle size={16} />
-            )}
-            {isCancelling ? t.cancelling : t.cancelJob}
-          </button>
-        )}
-
-        {/* Continue in background button */}
+        {/* Continue in background — single ghost button, neutral palette */}
         {onMinimize && (
           <button
             onClick={onMinimize}
-            className="w-full mb-4 px-4 py-2.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium transition-colors text-sm"
+            className="w-full mb-4 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors text-sm"
           >
             {t.continueInBackground}
           </button>
         )}
 
-        {/* Stalled warning */}
+        {/* Stalled notice — muted, informational, no cancel button */}
         {isStalled && (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-medium text-amber-800 mb-1">{t.stalled}</h4>
-                <p className="text-sm text-amber-700 mb-3">{t.stalledDesc}</p>
-                <div className="flex gap-2">
-                  {onDismissStalled && (
-                    <button
-                      onClick={onDismissStalled}
-                      className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      {t.continueWaiting}
-                    </button>
-                  )}
-                  {isAdmin && onCancel && (
-                    <button
-                      onClick={() => {
-                        if (isCancelling) return;
-                        setIsCancelling(true);
-                        try {
-                          onCancel();
-                        } finally {
-                          setIsCancelling(false);
-                        }
-                      }}
-                      disabled={isCancelling}
-                      className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                    >
-                      {isCancelling ? t.cancelling : t.cancelJob}
-                    </button>
-                  )}
-                </div>
-              </div>
+          <div className="mb-4 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-medium text-gray-800 mb-1">{t.stalled}</h4>
+              <p className="text-sm text-gray-600 mb-3">{t.stalledDesc}</p>
+              {onDismissStalled && (
+                <button
+                  onClick={onDismissStalled}
+                  className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                >
+                  {t.continueWaiting}
+                </button>
+              )}
             </div>
           </div>
         )}
