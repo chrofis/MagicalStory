@@ -217,28 +217,41 @@ async function buildBlurLayer(imageBuffer, textPng, width, height) {
   const featherPx = 2;   // soft fade at the halo edge
   const imageBlurSigma = 4; // subtle blur of the image under the halo
 
-  // 1) Alpha channel of the rendered text — shape of the glyphs + stroke
+  // 1) Alpha channel of the rendered text — shape of the glyphs + stroke.
+  //    extractChannel + toColourspace('b-w') forces a single-channel output so
+  //    downstream blur can't silently upconvert to RGB (which would scramble
+  //    our pixel-index math later).
   const textAlpha = await sharp(textPng)
     .extractChannel('alpha')
+    .toColourspace('b-w')
     .raw()
     .toBuffer();
 
   // 2) Dilate by blurring then thresholding to a hard binary mask — this
   //    grows the glyph shape by ~dilatePx without smearing alpha outward.
+  //    toColourspace('b-w') again: sharp's blur on a 1-channel raw input
+  //    can re-expand to 3 channels; force single-channel back.
   const spread = await sharp(textAlpha, { raw: { width, height, channels: 1 } })
     .blur(dilatePx)
+    .toColourspace('b-w')
     .raw()
     .toBuffer();
+  if (spread.length !== width * height) {
+    throw new Error(`spread buffer wrong size: got ${spread.length}, expected ${width * height}`);
+  }
   const binary = Buffer.alloc(width * height);
   for (let i = 0; i < binary.length; i++) binary[i] = spread[i] > 20 ? 255 : 0;
 
   // 3) Feather the hard edges so the halo fades smoothly into the original,
-  //    then hard-clamp any sub-visible alpha (< 8) to 0 so we can't leak a
-  //    tiny percentage of blur across a large area of the image.
+  //    then hard-clamp any sub-visible alpha (< 8) to 0.
   const haloMaskRaw = await sharp(binary, { raw: { width, height, channels: 1 } })
     .blur(featherPx)
+    .toColourspace('b-w')
     .raw()
     .toBuffer();
+  if (haloMaskRaw.length !== width * height) {
+    throw new Error(`haloMask buffer wrong size: got ${haloMaskRaw.length}, expected ${width * height}`);
+  }
   const haloMask = Buffer.from(haloMaskRaw);
   for (let i = 0; i < haloMask.length; i++) {
     if (haloMask[i] < 8) haloMask[i] = 0;

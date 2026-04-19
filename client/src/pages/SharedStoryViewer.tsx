@@ -73,6 +73,10 @@ export default function SharedStoryViewer() {
   });
   const menuRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<BookViewerHandle>(null);
+  // Remembers the last-viewed pageList entry so reading-mode switches can
+  // map to the equivalent entry in the new pageList (same story page),
+  // instead of reusing a logical index that points to a different page.
+  const lastEntryRef = useRef<PageEntry | null>(null);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -479,9 +483,29 @@ export default function SharedStoryViewer() {
             shareToken={shareToken!}
             showTextOverlay={showTextOverlay}
             textOnSidePage={readingMode === 'sidepage'}
-            initialLogicalPage={currentPage}
+            initialLogicalPage={(() => {
+              // Use the entry remembered from the previous mode so we land on
+              // the same story page / cover instead of reusing a stale index
+              // (pageList length differs between inline and sidepage modes).
+              const last = lastEntryRef.current;
+              if (!last) return Math.min(currentPage, Math.max(0, pageList.length - 1));
+              if (last.type === 'story' || last.type === 'storyText') {
+                const idx = pageList.findIndex(p => p.type === 'story' && p.storyPageIdx === last.storyPageIdx);
+                if (idx >= 0) return idx;
+              } else {
+                const idx = pageList.findIndex(p => p.type === last.type);
+                if (idx >= 0) return idx;
+              }
+              return Math.min(currentPage, Math.max(0, pageList.length - 1));
+            })()}
             onImageClick={(url) => setFullscreenImage(url)}
-            onPageChange={setCurrentPage}
+            onPageChange={(idx) => {
+              setCurrentPage(idx);
+              // Snapshot the entry from THIS render's pageList so a subsequent
+              // mode switch (which rebuilds pageList) can still find the right
+              // story page in the new list.
+              lastEntryRef.current = pageList[idx] ?? null;
+            }}
             onNavigate={(path) => navigate(path)}
             onSetPassword={() => setShowChangePasswordModal(true)}
           />

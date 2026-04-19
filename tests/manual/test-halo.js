@@ -1,32 +1,51 @@
+const fs = require('fs');
+const path = require('path');
 const sharp = require('sharp');
 const { generateTextOverlay } = require('../../server/lib/textOverlayRenderer');
 
-(async () => {
-  // Make a 1024x1365 test image (solid color so we can see the blur mask clearly)
-  const bg = await sharp({
-    create: { width: 1024, height: 1365, channels: 3, background: { r: 30, g: 80, b: 160 } }
-  }).jpeg().toBuffer();
+const SOURCE = process.argv[2] || path.join(__dirname, '..', 'fixtures', 'age-test-A-structured.jpg');
+const POSITION = process.argv[3] || 'bottom-left';
+const LONG = process.argv[4] === 'long';
 
-  const r = await generateTextOverlay(bg, 'This is page 1 test text spanning a couple of lines so we can see the halo shape.', 'bottom-left');
-
-  // Examine alpha distribution of the overlay
-  const { data, info } = await sharp(r.overlayImage).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+async function alphaStats(buf, label) {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   let opaque = 0, partial = 0, transparent = 0;
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] === 0) transparent++;
-    else if (data[i] === 255) opaque++;
-    else partial++;
+  let maxY = 0, minY = info.height;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      const a = data[(y * info.width + x) * 4 + 3];
+      if (a === 0) transparent++;
+      else if (a === 255) opaque++;
+      else partial++;
+      if (a > 0) {
+        if (y > maxY) maxY = y;
+        if (y < minY) minY = y;
+      }
+    }
   }
   const total = info.width * info.height;
-  console.log(`overlay ${info.width}x${info.height}`);
-  console.log(`  transparent: ${(100*transparent/total).toFixed(1)}%`);
-  console.log(`  partial alpha: ${(100*partial/total).toFixed(1)}%`);
-  console.log(`  fully opaque: ${(100*opaque/total).toFixed(1)}%`);
+  console.log(`${label}: ${info.width}x${info.height}`);
+  console.log(`  transparent ${(100*transparent/total).toFixed(1)}%  partial ${(100*partial/total).toFixed(1)}%  opaque ${(100*opaque/total).toFixed(1)}%`);
+  console.log(`  alpha-bearing y range: ${minY}-${maxY} (height ${info.height})`);
+}
 
-  // Save for visual inspection
-  const path = require('path');
-  const outDir = path.join(__dirname, '..', 'fixtures');
-  await sharp(r.overlayImage).toFile(path.join(outDir, 'halo-overlay.png'));
-  await sharp(r.compositedImage).toFile(path.join(outDir, 'halo-composited.jpg'));
-  console.log('saved to tests/fixtures/halo-overlay.png and halo-composited.jpg');
+(async () => {
+  const fileBuf = fs.readFileSync(SOURCE);
+  const bg = await sharp(fileBuf).resize(1024, 1365, { fit: 'cover' }).jpeg().toBuffer();
+
+  const shortText = 'A short story sentence for the calm region.';
+  const longText = 'Lina opened the small wooden box she had found in the attic. Inside, nestled in faded velvet, was a silver compass whose needle spun slowly even though she was standing perfectly still. She tilted it toward the window and the needle steadied, pointing at the old oak tree in the garden as if it were waiting for her to follow. She pulled on her boots, tucked the compass into her coat pocket, and stepped out into the cold garden light.';
+  const text = LONG ? longText : shortText;
+
+  console.log(`source: ${SOURCE}`);
+  console.log(`position: ${POSITION}`);
+  console.log(`text length: ${text.length} chars`);
+
+  const r = await generateTextOverlay(bg, text, POSITION);
+  await alphaStats(r.overlayImage, 'overlayImage');
+
+  const fixtures = path.join(__dirname, '..', 'fixtures');
+  await sharp(r.overlayImage).toFile(path.join(fixtures, 'halo-overlay.png'));
+  await sharp(r.compositedImage).toFile(path.join(fixtures, 'halo-composited.jpg'));
+  console.log('saved tests/fixtures/halo-overlay.png and halo-composited.jpg');
 })().catch(e => { console.error(e); process.exit(1); });
