@@ -34,7 +34,11 @@ async function alphaStats(buf, label) {
   const bg = await sharp(fileBuf).resize(1024, 1365, { fit: 'cover' }).jpeg().toBuffer();
 
   const shortText = 'A short story sentence for the calm region.';
-  const longText = 'Lina opened the small wooden box she had found in the attic. Inside, nestled in faded velvet, was a silver compass whose needle spun slowly even though she was standing perfectly still. She tilted it toward the window and the needle steadied, pointing at the old oak tree in the garden as if it were waiting for her to follow. She pulled on her boots, tucked the compass into her coat pocket, and stepped out into the cold garden light.';
+  const longText = [
+    'Lina opened the small wooden box she had found in the attic. Inside, nestled in faded velvet, was a silver compass.',
+    'Its needle spun slowly even though she was standing perfectly still. She tilted it toward the window and the needle steadied, pointing at the old oak tree in the garden.',
+    'She pulled on her boots, tucked the compass into her coat pocket, and stepped out into the cold garden light.',
+  ].join('\n\n');
   const text = LONG ? longText : shortText;
 
   console.log(`source: ${SOURCE}`);

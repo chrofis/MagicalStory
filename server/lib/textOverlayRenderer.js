@@ -488,9 +488,14 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
 
   ctx.font = `${fontSize}px ${fontFamily}`;
 
-  // Word-wrap text line by line within the polygon
-  const words = text.split(/\s+/).filter(w => w.length > 0);
-  if (words.length === 0) return true;
+  // Split into paragraphs on any run of newlines, then into words per paragraph.
+  // Claude's story text usually has \n or \n\n between paragraphs; either works.
+  const paragraphs = text
+    .split(/\n+/)
+    .map(p => p.trim().split(/\s+/).filter(w => w.length > 0))
+    .filter(words => words.length > 0);
+  if (paragraphs.length === 0) return true;
+  const totalWords = paragraphs.reduce((s, w) => s + w.length, 0);
 
   // Generate y positions from top of polygon downward
   const yPositions = [];
@@ -502,13 +507,12 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
   // and reverse-wrap the words so text anchors to the bottom edge.
   let lines;
   if (!isTop) {
-    lines = wrapLinesBottomUp(ctx, words, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+    lines = wrapLinesBottomUp(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
   } else {
-    lines = wrapLinesTopDown(ctx, words, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+    lines = wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
   }
 
   // Check if all words were placed
-  const totalWords = words.length;
   const placedWords = lines.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
   const allFit = placedWords >= totalWords;
   if (!allFit && !force) return false;
@@ -545,113 +549,80 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
 }
 
 /**
- * Wrap words top-down: fill lines from the top of the polygon downward.
+ * Wrap paragraphs top-down. A blank y-slot is skipped between consecutive
+ * paragraphs so the reader sees paragraph breaks, not one solid block.
  */
-function wrapLinesTopDown(ctx, words, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
+function wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
   const lines = [];
-  let wordIdx = 0;
+  let yIdx = 0;
 
   ctx.font = `${fontSize}px ${fontFamily}`;
 
-  for (const y of yPositions) {
-    if (wordIdx >= words.length) break;
+  for (let p = 0; p < paragraphs.length; p++) {
+    const words = paragraphs[p];
+    let wordIdx = 0;
 
-    const scan = findScanlineWidth(scanlines, y, lineHeight);
-    if (!scan || (scan.right - scan.left) < minLineWidth) continue;
+    while (wordIdx < words.length && yIdx < yPositions.length) {
+      const y = yPositions[yIdx];
+      const scan = findScanlineWidth(scanlines, y, lineHeight);
+      if (!scan || (scan.right - scan.left) < minLineWidth) { yIdx++; continue; }
 
-    const availableWidth = scan.right - scan.left;
-    let lineText = '';
-    let lineWidth = 0;
+      const availableWidth = scan.right - scan.left;
+      let lineText = '';
+      let lineWidth = 0;
 
-    while (wordIdx < words.length) {
-      const testWord = lineText ? lineText + ' ' + words[wordIdx] : words[wordIdx];
-      const testWidth = ctx.measureText(testWord).width;
-      if (testWidth > availableWidth && lineText) break;
-      lineText = testWord;
-      lineWidth = testWidth;
-      wordIdx++;
+      while (wordIdx < words.length) {
+        const testWord = lineText ? lineText + ' ' + words[wordIdx] : words[wordIdx];
+        const testWidth = ctx.measureText(testWord).width;
+        if (testWidth > availableWidth && lineText) break;
+        lineText = testWord;
+        lineWidth = testWidth;
+        wordIdx++;
+      }
+
+      if (lineText) {
+        lines.push({ text: lineText, y, left: scan.left, right: scan.right, width: lineWidth });
+      }
+      yIdx++;
     }
 
-    if (lineText) {
-      lines.push({ text: lineText, y, left: scan.left, right: scan.right, width: lineWidth });
-    }
+    // Paragraph break — skip one y-slot so there's vertical breathing room.
+    if (p < paragraphs.length - 1) yIdx++;
   }
 
   return lines;
 }
 
 /**
- * Wrap words bottom-up: anchor text to the bottom of the polygon.
- * First estimate how many lines we need, then place them from the bottom.
+ * Wrap paragraphs bottom-up: anchor text to the bottom of the polygon,
+ * preserving paragraph spacing. Runs the top-down packer first to get the
+ * line layout, then shifts every line down by the delta between the last
+ * yPosition and the last used yPosition.
  */
-function wrapLinesBottomUp(ctx, words, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
-  ctx.font = `${fontSize}px ${fontFamily}`;
+function wrapLinesBottomUp(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
+  const topLines = wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+  if (topLines.length === 0 || yPositions.length === 0) return topLines;
 
-  // First pass top-down to figure out how many lines we need
-  const tempLines = [];
-  let wordIdx = 0;
-
-  for (const y of yPositions) {
-    if (wordIdx >= words.length) break;
-
-    const scan = findScanlineWidth(scanlines, y, lineHeight);
-    if (!scan || (scan.right - scan.left) < minLineWidth) continue;
-
-    const availableWidth = scan.right - scan.left;
-    let lineText = '';
-
-    while (wordIdx < words.length) {
-      const testWord = lineText ? lineText + ' ' + words[wordIdx] : words[wordIdx];
-      const testWidth = ctx.measureText(testWord).width;
-      if (testWidth > availableWidth && lineText) break;
-      lineText = testWord;
-      wordIdx++;
-    }
-
-    if (lineText) tempLines.push(lineText);
-  }
-
-  const linesNeeded = tempLines.length;
-
-  // Use the last N y-positions from the available slots
-  // Filter yPositions to only those with sufficient scanline width
-  const usablePositions = yPositions.filter(y => {
-    const scan = findScanlineWidth(scanlines, y, lineHeight);
-    return scan && (scan.right - scan.left) >= minLineWidth;
+  const usable = yPositions.filter(y => {
+    const s = findScanlineWidth(scanlines, y, lineHeight);
+    return s && (s.right - s.left) >= minLineWidth;
   });
+  if (usable.length === 0) return topLines;
 
-  const startIdx = Math.max(0, usablePositions.length - linesNeeded);
-  const bottomPositions = usablePositions.slice(startIdx);
+  const lastUsableY = usable[usable.length - 1];
+  const lastDrawnY = topLines[topLines.length - 1].y;
+  const delta = lastUsableY - lastDrawnY;
+  if (delta <= 0) return topLines;
 
-  // Re-wrap at the actual bottom y positions (widths may differ)
-  const lines = [];
-  wordIdx = 0;
-
-  for (const y of bottomPositions) {
-    if (wordIdx >= words.length) break;
-
-    const scan = findScanlineWidth(scanlines, y, lineHeight);
-    if (!scan || (scan.right - scan.left) < minLineWidth) continue;
-
-    const availableWidth = scan.right - scan.left;
-    let lineText = '';
-    let lineWidth = 0;
-
-    while (wordIdx < words.length) {
-      const testWord = lineText ? lineText + ' ' + words[wordIdx] : words[wordIdx];
-      const testWidth = ctx.measureText(testWord).width;
-      if (testWidth > availableWidth && lineText) break;
-      lineText = testWord;
-      lineWidth = testWidth;
-      wordIdx++;
-    }
-
-    if (lineText) {
-      lines.push({ text: lineText, y, left: scan.left, right: scan.right, width: lineWidth });
-    }
-  }
-
-  return lines;
+  // Shift every line down by `delta`, and re-read the scanline at the new y
+  // so left/right bounds match the (possibly different) polygon width there.
+  return topLines.map(l => {
+    const newY = l.y + delta;
+    const scan = findScanlineWidth(scanlines, newY, lineHeight);
+    return scan
+      ? { ...l, y: newY, left: scan.left, right: scan.right }
+      : { ...l, y: newY };
+  });
 }
 
 /**
