@@ -366,7 +366,7 @@ export default function SharedStoryViewer() {
                     {sharingLoading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : sharingEnabled ? (
-                      <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                      <Globe className="w-3.5 h-3.5 text-amber-300" />
                     ) : (
                       <Lock className="w-3.5 h-3.5" />
                     )}
