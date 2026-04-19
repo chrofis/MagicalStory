@@ -31,11 +31,8 @@ For each character:
 **STEP 3: FACING DIRECTION & INTERACTION**
 
 This is the most important check. For each character:
-- **Facing**: Does the character face the direction the prompt describes?
-  - "over-the-shoulder" or "back view" = character should face AWAY from viewer
-  - Characters described as interacting with each other should face EACH OTHER, not the camera
-  - If 3+ characters all face the camera like a group photo when the prompt describes interaction = MAJOR
-- **Actions**: Is each character doing what was described (holding, reaching, kneeling, aiming)?
+- **Facing**: Only flag facing/gaze when a DECLARED INTERACTION is violated. If two characters are listed in DECLARED INTERACTIONS as interacting with each other and one faces away, flag MAJOR. If a character is listed in DECLARED INTERACTIONS as watching a specific named object and is looking elsewhere, flag MAJOR. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "eyes on the horizon" are NOT declared interactions — do NOT flag.
+- **Actions**: Is each character doing what was described in DECLARED INTERACTIONS (holding, reaching, kneeling, aiming)?
 
 For each DECLARED INTERACTION:
 - Is the object present?
@@ -51,6 +48,8 @@ For each DECLARED INTERACTION:
 - Depth labels (foreground / midground / background).
 - Small position drift (left-of-center vs center).
 - Exact pose, gesture, or framing.
+- Motion verbs in the prose (walking, running, approaching, scanning). A still image cannot show motion; any frozen pose satisfies them.
+- Internal-state claims ("appears thoughtful", "looks distracted").
 
 ---
 
@@ -58,7 +57,7 @@ For each DECLARED INTERACTION:
 
 Start at 10:
 - CRITICAL (-3): Missing character, clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure
-- MAJOR (-2): Character facing wrong direction (back when should face forward, or vice versa), 3+ characters facing camera when interaction described, wrong clothing color, wrong age appearance, cross-eyes
+- MAJOR (-2): Character facing the wrong way for a DECLARED INTERACTION (e.g. two characters declared as interacting but facing away from each other; character declared as watching a named object but looking elsewhere), wrong clothing color, wrong age appearance, cross-eyes
 - MODERATE (-1): Character on wrong side, minor clothing detail, key object missing
 - MINOR (-0.5): Small differences
 

@@ -113,6 +113,7 @@ Write one continuous paragraph, 250–350 words. Open with the main subject and 
 - **Text zone off-limits.** The `textPosition` you set names a corner where printed text covers the image. No character may be placed there. Derive the forbidden side (`bottom-right`/`top-right` → right, `bottom-left`/`top-left` → left, `*-full` → that half). Stage characters on the opposite side.
 - **One moment, one focal point.** Single instant. One main action draws the eye. No time-lapse ("opens door, walks in, sits").
 - **Characters are active.** Every character does something specific. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
+- **Still frame, not a verb-stream.** Describe the pose, not the motion or thought. No "walks briskly", "about to reach", "thoughtful", "distracted". Use the body position the reader sees in the frozen moment.
 - **Physically possible.** Two hands = max two items.
 - **No age collectives** — never "the children", "the kids". Use names or "all three", "the group".
 - **Never describe** weapons touching a character's body, characters bound or held by another, or wounds / blood.

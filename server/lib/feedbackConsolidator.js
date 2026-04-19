@@ -218,14 +218,17 @@ async function consolidateFeedback({
 
     const callOptions = imageDataUri ? { images: [imageDataUri] } : {};
 
-    const result = await callTextModel(fullPrompt, 3000, 'claude-haiku', callOptions);
+    // Sonnet — Haiku padded fix instructions with adjectives and negations
+    // ("show effort", "rather than X") that Grok cannot execute, and was
+    // soft on the "drop trivial flags" rules. Sonnet follows the policy.
+    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', callOptions);
     if (!result?.text) {
-      return { plan: null, usage: result?.usage || null, error: 'no text in haiku response' };
+      return { plan: null, usage: result?.usage || null, error: 'no text in consolidator response' };
     }
 
     const plan = extractJsonFromText(result.text);
     if (!plan) {
-      return { plan: null, usage: result.usage || null, error: 'failed to parse JSON from haiku response' };
+      return { plan: null, usage: result.usage || null, error: 'failed to parse JSON from consolidator response' };
     }
 
     // Normalize shape

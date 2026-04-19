@@ -36,6 +36,8 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 13. **One change per sentence.** If three things need fixing, write three short sentences. Don't merge them into a prose paragraph.
 
+14. **Fix instructions are short imperatives.** Each `fix_instruction` sentence is ≤15 words and starts with the verb (Rotate, Move, Replace, Tilt, Open, Close, Add, Remove). Banned: "to show X", "as if X", "with focus on X", "not engaged in X", "rather than X", "while maintaining X", any "-ing" descriptive clause hanging off the end. Grok cannot execute negations — write only the target state, not what to avoid. Adjectives like "slightly", "subtly", "gently" add no information; drop them.
+
 ## Output format (strict JSON, no prose)
 
 ```json

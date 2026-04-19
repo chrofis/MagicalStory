@@ -6140,10 +6140,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} (bbox: [${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
           const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, fix.charName, {
             imageBackend: 'grok',
-            // Cutout mode (default): extracts the figure's bbox, repaints it,
-            // composites back with a feathered edge. Keeps background and
-            // other characters untouched — blended mode was blurring too much
-            // surrounding context and couldn't be repaired afterwards.
             issueDescription: fix.issueDescription,
             clothingDescription: clothingDesc,
             photoType: avatarPhotoType,
