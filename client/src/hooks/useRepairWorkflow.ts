@@ -171,7 +171,7 @@ export interface UseRepairWorkflowReturn {
   runConsistencyCheck: () => Promise<void>;
 
   // Step 6: Character repair
-  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
+  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout' | 'fullScene'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
   rejectRepair: (characterName: string, pageNumber: number, previousVersionIndex: number) => Promise<void>;
 
   // Step 7: Inpaint repair (targeted fix-target-based region repair)
@@ -851,7 +851,7 @@ export function useRepairWorkflow({
   }, [storyId, startStep, completeStep, failStep]);
 
   // Step 6: Repair character on specific pages
-  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body'; useGeminiRepair?: boolean }) => {
+  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout' | 'fullScene'; whiteoutTarget?: 'face' | 'body'; useGeminiRepair?: boolean }) => {
     if (!storyId || pages.length === 0) return;
 
     startStep('character-repair');

@@ -4430,8 +4430,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           // Decide Grok mode: explicit grokRepairMode wins; otherwise default by target
-          // (face → blended for small tight blur, body → cutout for figure replacement)
-          const effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'cutout');
+          // (face → blended for small tight blur, body → fullScene magenta mask on full picture)
+          const effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'fullScene');
 
           log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair — mode=${effectiveMode} (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
           log.info(`👤 [CHAR REPAIR] ${characterName} body:[${bbox.map(v => Math.round(v*100)+'%').join(', ')}] face:[${faceBbox ? faceBbox.map(v => Math.round(v*100)+'%').join(', ') : 'none'}]`);
@@ -4470,6 +4470,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               imageBackend: 'grok',
               useBlended: effectiveMode === 'blended',
               useCutout: effectiveMode === 'cutout',
+              useFullScene: effectiveMode === 'fullScene',
               issueDescription: issueDesc,
               clothingDescription: clothingDesc,
               sceneDescription: sceneDesc,
