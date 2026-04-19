@@ -48,7 +48,7 @@ type ReadingMode = 'inline' | 'sidepage';
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { language, t } = useLanguage();
   const [story, setStory] = useState<SharedStoryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +129,14 @@ export default function SharedStoryViewer() {
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
         const response = await fetch(`/api/shared/${shareToken}`, { headers });
         if (!response.ok) {
+          // Private story + not logged in: could be the owner viewing their
+          // own story from the email link with an expired session. Redirect
+          // to login with return URL — matches the editor's old behaviour.
+          if (response.status === 404 && !isAuthenticated) {
+            const returnTo = `/shared/${shareToken}`;
+            navigate(`/?login=true&redirect=${encodeURIComponent(returnTo)}`);
+            return;
+          }
           if (response.status === 404) {
             setError('This story is no longer available or the link is invalid.');
           } else {
@@ -148,8 +156,11 @@ export default function SharedStoryViewer() {
       }
     }
 
+    // Wait for auth state to resolve before fetching — otherwise a private
+    // story owned by a logged-in user may 404 during the brief pre-auth window.
+    if (isAuthLoading) return;
     fetchStory();
-  }, [shareToken]);
+  }, [shareToken, isAuthLoading, isAuthenticated, navigate]);
 
   // Toggle sharing on/off (owner only)
   const toggleSharing = async () => {

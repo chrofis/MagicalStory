@@ -191,9 +191,13 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
     return null;
   }
 
-  // Prefer the shared read-view link (works for owner + public); fall back to editor.
+  // Point at the React reader route. The client handles auth: a logged-out
+  // owner gets bounced to login with a return URL back here, same as the
+  // editor's old behaviour. /shared/ skips the server-side /s/ handler that
+  // gates on is_shared and sends non-authenticated recipients to the landing
+  // page.
   const storyUrl = options.shareToken
-    ? `https://www.magicalstory.ch/s/${options.shareToken}`
+    ? `https://www.magicalstory.ch/shared/${options.shareToken}`
     : storyId
     ? `https://www.magicalstory.ch/create?storyId=${storyId}`
     : 'https://www.magicalstory.ch';
