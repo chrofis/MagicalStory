@@ -184,21 +184,21 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
     }
   }
 
-  // Step 3: Render text-only transparent PNG (no backdrop)
+  // Step 3: Render text-only transparent PNG (no backdrop). Its alpha channel
+  // is also the source mask for the frosted halo below.
   const textLayer = renderTextOverlay(width, height, text, polygon, {
     textPosition,
     fontSize: options.fontSize,
     fontFamily: options.fontFamily
   });
 
-  // Step 4: Build a frosted-glass layer — blurred image pixels with a soft
-  // alpha mask shaped like the polygon. Composited BENEATH the text so the
-  // calm region reads as "slightly blurred under the text" without any box.
-  const blurLayer = await buildBlurLayer(imageBuffer, polygon || buildFallbackRect(width, height, textPosition), width, height);
+  // Step 4: Build a tight frosted-glass halo AROUND the glyphs (not the whole
+  // calm polygon). Blurred image pixels show through only where the glyph
+  // mask dilated by ~2% of the image extends — so the halo is local to the
+  // text, not a big washed area.
+  const blurLayer = await buildBlurLayer(imageBuffer, textLayer, width, height);
 
-  // Step 5: Stack blur → text into a single overlay PNG. The frontend still
-  // positions this over the stored (untouched) image; the calm region ends
-  // up blurred and the text sits on top with its white-fill/dark-stroke.
+  // Step 5: Stack halo → text into a single overlay PNG.
   const overlayImage = await sharp(blurLayer)
     .composite([{ input: textLayer }])
     .png()
@@ -219,47 +219,46 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
 }
 
 /**
- * Build a PNG where the calm polygon is filled with a BLURRED copy of the
- * image (soft feathered edges), and everything else is fully transparent.
- * Used as the "frosted glass" backdrop beneath the text glyphs.
+ * Build a PNG where a small halo *around the text glyphs* contains blurred
+ * image pixels and everything else is fully transparent. Not the whole calm
+ * area — just ~2% of the min image dimension beyond each glyph. That keeps
+ * the frosted effect local to the text.
  */
-async function buildBlurLayer(imageBuffer, polygon, width, height) {
-  const blurRadius = Math.max(8, Math.round(Math.min(width, height) * 0.012));
+async function buildBlurLayer(imageBuffer, textPng, width, height) {
+  const minDim = Math.min(width, height);
+  const halo = Math.max(6, Math.round(minDim * 0.015));      // spread of the halo
+  const feather = Math.max(2, Math.round(halo * 0.5));       // soft edge
+  const imageBlurSigma = Math.max(3, Math.round(minDim * 0.006)); // slight blur of the image itself
 
-  // 1) Blur the whole image
+  // 1) Alpha channel of the rendered text — shape of the glyphs + stroke
+  const textAlpha = await sharp(textPng)
+    .extractChannel('alpha')
+    .raw()
+    .toBuffer();
+
+  // 2) Dilate + feather: blur the alpha to spread it (halo), boost so the
+  //    center stays opaque, then a short blur for soft edges.
+  const haloMask = await sharp(textAlpha, { raw: { width, height, channels: 1 } })
+    .blur(halo)
+    .linear(6, 0)      // boost: amplify low alpha back toward 255
+    .blur(feather)
+    .raw()
+    .toBuffer();
+
+  // 3) Slightly blur the image — pixels under the halo show softened detail
   const blurredRgb = await sharp(imageBuffer)
-    .blur(blurRadius)
+    .blur(imageBlurSigma)
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  // 2) Rasterize the polygon to a single-channel mask via canvas, then blur
-  //    the mask so the edges feather organically.
-  const maskCanvas = createCanvas(width, height);
-  const mctx = maskCanvas.getContext('2d');
-  mctx.fillStyle = 'white';
-  mctx.beginPath();
-  mctx.moveTo(polygon[0][0], polygon[0][1]);
-  for (let i = 1; i < polygon.length; i++) mctx.lineTo(polygon[i][0], polygon[i][1]);
-  mctx.closePath();
-  mctx.fill();
-  const rawMask = maskCanvas.toBuffer('raw'); // BGRA
-  const singleCh = Buffer.alloc(width * height);
-  for (let i = 0; i < width * height; i++) singleCh[i] = rawMask[i * 4]; // B channel == 255 inside, 0 outside
-
-  const featherBlur = Math.max(4, Math.round(Math.min(width, height) * 0.015));
-  const softMask = await sharp(singleCh, { raw: { width, height, channels: 1 } })
-    .blur(featherBlur)
-    .raw()
-    .toBuffer();
-
-  // 3) Combine blurred RGB with soft mask as alpha → RGBA frosted layer
+  // 4) Combine blurred RGB with halo mask as alpha
   const rgba = Buffer.alloc(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     rgba[i * 4] = blurredRgb[i * 3];
     rgba[i * 4 + 1] = blurredRgb[i * 3 + 1];
     rgba[i * 4 + 2] = blurredRgb[i * 3 + 2];
-    rgba[i * 4 + 3] = softMask[i];
+    rgba[i * 4 + 3] = haloMask[i];
   }
   return await sharp(rgba, { raw: { width, height, channels: 4 } })
     .png()
