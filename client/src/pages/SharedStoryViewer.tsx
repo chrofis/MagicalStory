@@ -241,6 +241,23 @@ export default function SharedStoryViewer() {
 
   const totalPages = pageList.length;
 
+  // When reading mode flips, pageList rebuilds and BookViewer remounts to the
+  // equivalent entry via initialLogicalPage — but BookViewer's onPageChange
+  // only fires on flip, so currentPage stays stale until the user navigates.
+  // Mirror the initial-index logic here so the page counter updates immediately.
+  useEffect(() => {
+    const last = lastEntryRef.current;
+    if (!last || pageList.length === 0) return;
+    let idx = -1;
+    if (last.type === 'story' || last.type === 'storyText') {
+      idx = pageList.findIndex(p => p.type === 'story' && p.storyPageIdx === last.storyPageIdx);
+    } else {
+      idx = pageList.findIndex(p => p.type === last.type);
+    }
+    if (idx >= 0 && idx !== currentPage) setCurrentPage(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readingMode, isMobile]);
+
   // Preload adjacent page images for faster navigation
   useEffect(() => {
     if (!story || !shareToken || totalPages === 0) return;

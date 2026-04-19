@@ -508,9 +508,16 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
   const allFit = placedWords >= totalWords;
   if (!allFit && !force) return false;
 
-  // Always left-aligned — easier to read than centre/right on varying polygon widths.
+  // Always left-aligned. Use the polygon's minimum left x (constant across
+  // lines) instead of each line's own scan.left — for right-corner triangles
+  // the left edge is the diagonal hypotenuse and scan.left grows with y, so
+  // drawing at line.left made lower lines start farther right and the last
+  // line looked right-aligned.
+  const polyMinLeft = lines.reduce((m, l) => Math.min(m, l.left), Infinity);
+
+  ctx.textAlign = 'left';
   for (const line of lines) {
-    const drawX = line.left;
+    const drawX = polyMinLeft;
 
     ctx.save();
     ctx.font = `${fontSize}px ${fontFamily}`;
