@@ -144,7 +144,7 @@ METADATA:
 **Character fields:**
 - `position` (required): combined horizontal + depth phrase — `left foreground`, `center background`, `right midground`, etc.
 - `clothing` (required): must match an available avatar category exactly.
-- `depth` (optional, default `foreground`): `foreground`, `midground`, `background`.
+- `depth` (optional, default `foreground`): camera distance, NOT frame position. `foreground` = large and close, filling ~1/3+ of frame height. `midground` = head and torso visible, middle band. `background` = small/distant; a tiny silhouette roughly 1/6 of frame height or less. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size, `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is named as a single distant figure, `depth` MUST be `background`.
 - `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder`.
 
 **objects[]** — Visual Bible IDs. **When a landmark has numbered photo variants** (e.g. `LOC003.1`, `LOC003.2`, `LOC003.3`), emit the specific variant whose description matches the scene's `shot` and perspective — not the bare `LOC003`. Default to `.1` only if no variant is a clear match.
@@ -365,7 +365,8 @@ For EACH character in the story, write one line:
 13. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
 14. **Banned patterns** — Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders"? Any character "smiling" on more than 2-3 pages?
 15. **Action match** — Does each scene hint's action match what the page text narrates?
-16. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
+16. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
+17. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
     - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
     - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
     - **Top/bottom balance:** at least 30% of pages must be `top-*` and at least 30% `bottom-*`.

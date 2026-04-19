@@ -4714,21 +4714,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptySceneDesc = expandedEmptyPrompt
               || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
 
-            // Count foreground vs background characters for space allocation
+            // Count characters by depth so the empty scene leaves room in the right band.
+            // Prefer the explicit `depth` field; fall back to parsing the position string so
+            // older scene data still works. "tiny figure" and "far background" both read as bg.
             const characters = sceneMetadata?.fullData?.characters || [];
-            let fgCount = 0, bgCount = 0;
+            let fgCount = 0, mgCount = 0, bgCount = 0;
             for (const char of characters) {
+              const depth = (char.depth || '').toLowerCase();
               const pos = (char.position || '').toLowerCase();
-              if (pos.includes('far background') || pos.includes('tiny figure')) {
-                bgCount++;
-              } else {
-                fgCount++;
-              }
+              const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
+              const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
+              if (isBg) bgCount++;
+              else if (isMg) mgCount++;
+              else fgCount++;
             }
             let characterSpace = '';
-            if (fgCount > 0 || bgCount > 0) {
+            if (fgCount > 0 || mgCount > 0 || bgCount > 0) {
               const parts = [];
               if (fgCount > 0) parts.push(`${fgCount} character${fgCount > 1 ? 's' : ''} in the foreground`);
+              if (mgCount > 0) parts.push(`${mgCount} character${mgCount > 1 ? 's' : ''} in the midground`);
               if (bgCount > 0) parts.push(`${bgCount} tiny figure${bgCount > 1 ? 's' : ''} in the far background`);
               characterSpace = `Leave open, uncluttered space for ${parts.join(' and ')}. Don't fill those areas with detail.`;
 
