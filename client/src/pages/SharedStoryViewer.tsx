@@ -291,15 +291,16 @@ export default function SharedStoryViewer() {
 
   if (!story) return null;
 
-  // Reading-mode toggle — sits in the top bar so it doesn't overlap the book image.
+  // Reading-mode toggle — monochrome segmented control that sits on the dark
+  // header. Active = solid white pill, inactive = muted foreground on hover.
   const readingModeToggle = (
-    <div className="inline-flex rounded-full bg-indigo-100 border border-indigo-300 p-0.5 shadow-sm text-xs font-medium">
+    <div className="inline-flex rounded-full bg-white/10 p-0.5 text-xs font-medium" role="tablist">
       <button
         onClick={() => setReadingMode('inline')}
         title="Text printed over the image — matches the printed book"
         aria-pressed={readingMode === 'inline'}
-        className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'inline' ? 'bg-indigo-600 text-white shadow' : 'text-indigo-700 hover:bg-indigo-200'
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
+          readingMode === 'inline' ? 'bg-white text-zinc-900' : 'text-white/70 hover:text-white'
         }`}
       >
         <Eye size={13} />
@@ -309,8 +310,8 @@ export default function SharedStoryViewer() {
         onClick={() => setReadingMode('sidepage')}
         title="Text on a separate facing page — easier to read"
         aria-pressed={readingMode === 'sidepage'}
-        className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'sidepage' ? 'bg-indigo-600 text-white shadow' : 'text-indigo-700 hover:bg-indigo-200'
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
+          readingMode === 'sidepage' ? 'bg-white text-zinc-900' : 'text-white/70 hover:text-white'
         }`}
       >
         <BookOpen size={13} />
@@ -321,57 +322,53 @@ export default function SharedStoryViewer() {
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* Header */}
+      {/* Header — single dark surface, ghost action buttons, one white primary (Share). */}
       {isAuthenticated ? (
-        <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            {/* Left: Title — text hides on small screens so the reading-mode toggle fits */}
-            <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
-              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+        <header className="bg-zinc-900 text-white px-3 py-2.5 sticky top-0 z-10 border-b border-white/10">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left: Logo + optional title */}
+            <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
+              <img src="/images/logo-book.png" alt="" className="h-9 md:h-10 -my-2 w-auto" />
               <span className="hidden md:inline">{t.title}</span>
             </button>
 
             {/* Center: reading mode toggle */}
-            <div className="mx-2">{readingModeToggle}</div>
+            {readingModeToggle}
 
-            {/* Right: Story actions + Menu */}
-            <div className="flex items-center gap-2">
+            {/* Right: story actions. Ghost style; one primary (Share) stands out. */}
+            <div className="flex items-center gap-1">
               {story?.isOwner && (
                 <>
-                  {/* Share toggle */}
+                  {/* Visibility toggle — ghost, subtle status dot instead of colour fill */}
                   <button
                     onClick={toggleSharing}
                     disabled={sharingLoading}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
-                      sharingEnabled
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                     title={sharingEnabled ? 'Public — anyone with the link can view' : 'Private — only you can view'}
                   >
                     {sharingLoading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : sharingEnabled ? (
-                      <Globe className="w-3.5 h-3.5" />
+                      <Globe className="w-3.5 h-3.5 text-emerald-400" />
                     ) : (
                       <Lock className="w-3.5 h-3.5" />
                     )}
                     <span className="hidden sm:inline">{sharingEnabled ? 'Public' : 'Private'}</span>
                   </button>
 
-                  {/* Share button */}
+                  {/* Share — primary CTA on the dark bar */}
                   <button
                     onClick={handleShare}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-500 text-white rounded text-xs font-medium hover:bg-indigo-600 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-zinc-900 rounded-md text-xs font-semibold hover:bg-white/90 transition-colors"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Share</span>
                   </button>
 
-                  {/* Edit button */}
+                  {/* Edit — ghost */}
                   <Link
                     to={`/create?storyId=${story.id}`}
-                    className="inline-flex items-center gap-1 bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-indigo-600 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Edit</span>
@@ -379,11 +376,12 @@ export default function SharedStoryViewer() {
                 </>
               )}
 
-              {/* Menu Button */}
+              {/* Menu — ghost */}
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-gray-700 flex items-center gap-2"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Menu"
                 >
                   <Menu size={16} />
                   <span className="hidden md:inline">Menu</span>
