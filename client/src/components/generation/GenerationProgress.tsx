@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Mail, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Mail, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
@@ -61,16 +62,19 @@ export function GenerationProgress({
   message: _message,
   isGenerating = true,
   coverImages,
-  jobId: _jobId,
-  onCancel: _onCancel,
+  jobId,
+  onCancel,
   onMinimize,
   characters = [],
   isStalled = false,
   onDismissStalled,
-  isImpersonating: _isImpersonating = false,
+  isImpersonating = false,
   pageCount = 20,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || isImpersonating;
+  const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
   // 25 funny messages per character - uses {name} placeholder
@@ -643,7 +647,7 @@ export function GenerationProgress({
           </button>
         )}
 
-        {/* Stalled notice — muted, informational, no cancel button */}
+        {/* Stalled notice — muted, informational */}
         {isStalled && (
           <div className="mb-4 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
@@ -660,6 +664,31 @@ export function GenerationProgress({
               )}
             </div>
           </div>
+        )}
+
+        {/* Admin-only cancel — muted, kept small and at the bottom so it
+            doesn't compete with the calm user-facing wait flow. */}
+        {isAdmin && jobId && onCancel && (
+          <button
+            onClick={async () => {
+              if (isCancelling) return;
+              setIsCancelling(true);
+              try {
+                onCancel();
+              } finally {
+                setIsCancelling(false);
+              }
+            }}
+            disabled={isCancelling}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+          >
+            {isCancelling ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <XCircle size={13} />
+            )}
+            {isCancelling ? t.cancelling : t.cancelJob} (admin)
+          </button>
         )}
 
       </div>
