@@ -2757,12 +2757,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let expansionPagePhotos = null;
         try {
           // Merge per-page clothing into a copy of clothing requirements so
-          // getCharacterPhotoDetails picks the correct avatar (costumed vs standard)
+          // getCharacterPhotoDetails picks the correct avatar (costumed vs standard).
+          // CRITICAL: must clone the nested character entry before writing
+          // _currentClothing. A shallow spread shares nested references, so
+          // mutating pageClothingReqs[charName]._currentClothing would write
+          // straight through to streamingClothingRequirements[charName] and
+          // leak that per-page value into every future page.
           const pageClothingReqs = { ...streamingClothingRequirements };
           if (page.characterClothing) {
             for (const [charName, clothingCat] of Object.entries(page.characterClothing)) {
-              if (!pageClothingReqs[charName]) pageClothingReqs[charName] = {};
-              pageClothingReqs[charName]._currentClothing = clothingCat;
+              pageClothingReqs[charName] = {
+                ...(pageClothingReqs[charName] || {}),
+                _currentClothing: clothingCat
+              };
             }
           }
           expansionPagePhotos = getCharacterPhotoDetails(
@@ -2906,14 +2913,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             inputData.characters
           );
 
-          // Build clothing requirements with _currentClothing per character
+          // Build clothing requirements with _currentClothing per character.
+          // Clone the character entry before writing — sharing the nested
+          // object with inputData._trialClothingRequirements lets a per-scene
+          // value pollute the global requirements and leak into later pages.
           const sceneClothingRequirements = { ...(inputData._trialClothingRequirements || {}) };
           for (const char of sceneCharacters) {
             const charClothing = perCharClothing[char.name] || 'standard';
-            if (!sceneClothingRequirements[char.name]) {
-              sceneClothingRequirements[char.name] = {};
-            }
-            sceneClothingRequirements[char.name]._currentClothing = charClothing;
+            sceneClothingRequirements[char.name] = {
+              ...(sceneClothingRequirements[char.name] || {}),
+              _currentClothing: charClothing
+            };
           }
 
           // Get character photos with styled avatars applied
@@ -3716,12 +3726,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 }
               }
             }
-            // Fallback: apply trial costume type for characters without explicit clothing
+            // Fallback: apply trial costume type for characters without explicit clothing.
+            // Clone the entry before assigning so we don't pollute inputData._trialClothingRequirements.
             if (inputData._trialCostumeType) {
               for (const char of coverCharacters) {
                 if (!coverClothingReqs[char.name]?._currentClothing) {
-                  if (!coverClothingReqs[char.name]) coverClothingReqs[char.name] = {};
-                  coverClothingReqs[char.name]._currentClothing = `costumed:${inputData._trialCostumeType}`;
+                  coverClothingReqs[char.name] = {
+                    ...(coverClothingReqs[char.name] || {}),
+                    _currentClothing: `costumed:${inputData._trialCostumeType}`
+                  };
                 }
               }
             }
@@ -4498,6 +4511,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         const defaultClothing = 'standard';
+        // Shallow spread shares nested character objects with clothingRequirements.
+        // We MUST clone the inner entry before assigning _currentClothing —
+        // otherwise the per-scene value leaks into storyData.clothingRequirements
+        // and sticks around for every subsequent page and iterate call.
         const sceneClothingRequirements = { ...clothingRequirements };
         for (const char of sceneCharacters) {
           const charNameTrimmed = char.name.trim().toLowerCase();
@@ -4515,10 +4532,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               charClothing = defaultClothing;
             }
           }
-          if (!sceneClothingRequirements[char.name]) {
-            sceneClothingRequirements[char.name] = {};
-          }
-          sceneClothingRequirements[char.name]._currentClothing = charClothing;
+          sceneClothingRequirements[char.name] = {
+            ...(sceneClothingRequirements[char.name] || {}),
+            _currentClothing: charClothing
+          };
         }
         let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, inputData.artStyle, sceneClothingRequirements);
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);

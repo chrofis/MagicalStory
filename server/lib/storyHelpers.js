@@ -2072,12 +2072,32 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       // Check for per-character clothing from scene (_currentClothing field)
       // This overrides the defaultClothing for this specific character
       let resolvedClothing = defaultClothing;
-      if (clothingRequirements && clothingRequirements[char.name]?._currentClothing) {
-        resolvedClothing = clothingRequirements[char.name]._currentClothing;
+      const charReqs = clothingRequirements?.[char.name];
+      if (charReqs?._currentClothing) {
+        resolvedClothing = charReqs._currentClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
       } else {
         log.debug(`[AVATAR LOOKUP] ${char.name}: no per-scene clothing, defaulting to ${resolvedClothing || 'standard'}`);
       }
+
+      // Safety net against leaked/stale _currentClothing: if the requested
+      // category isn't marked `used` for this character but a costumed variant
+      // IS `used`, switch to costumed. Characters that only have a costumed
+      // variant in the story must always render in costume — a leaked
+      // "standard" from an earlier page must not downgrade them.
+      const resolvedBase = resolvedClothing && resolvedClothing.startsWith('costumed')
+        ? 'costumed'
+        : resolvedClothing;
+      const reqUsed = (cat) => {
+        const entry = charReqs?.[cat];
+        return entry && typeof entry === 'object' && entry.used === true;
+      };
+      if (charReqs && resolvedBase && resolvedBase !== 'costumed' && !reqUsed(resolvedBase) && reqUsed('costumed')) {
+        const costumeType = charReqs.costumed?.costume;
+        resolvedClothing = costumeType ? `costumed:${costumeType}` : 'costumed';
+        log.warn(`🧥 [AVATAR LOOKUP] ${char.name}: _currentClothing was "${charReqs._currentClothing}" but only costumed is used — resolving to ${resolvedClothing}`);
+      }
+
       // Normalize: costumed:anything → costumed (only one costume per story)
       if (resolvedClothing && resolvedClothing.startsWith('costumed')) {
         resolvedClothing = 'costumed';
