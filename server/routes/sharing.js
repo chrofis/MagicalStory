@@ -362,6 +362,7 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
 
     const overlayBase64 = result.overlayImage.toString('base64');
+    res.set('Cache-Control', 'no-store');
     res.json({
       overlayImage: `data:image/png;base64,${overlayBase64}`,
     });

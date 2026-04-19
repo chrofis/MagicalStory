@@ -232,11 +232,17 @@ async function buildBlurLayer(imageBuffer, textPng, width, height) {
   const binary = Buffer.alloc(width * height);
   for (let i = 0; i < binary.length; i++) binary[i] = spread[i] > 20 ? 255 : 0;
 
-  // 3) Feather the hard edges so the halo fades smoothly into the original
-  const haloMask = await sharp(binary, { raw: { width, height, channels: 1 } })
+  // 3) Feather the hard edges so the halo fades smoothly into the original,
+  //    then hard-clamp any sub-visible alpha (< 8) to 0 so we can't leak a
+  //    tiny percentage of blur across a large area of the image.
+  const haloMaskRaw = await sharp(binary, { raw: { width, height, channels: 1 } })
     .blur(featherPx)
     .raw()
     .toBuffer();
+  const haloMask = Buffer.from(haloMaskRaw);
+  for (let i = 0; i < haloMask.length; i++) {
+    if (haloMask[i] < 8) haloMask[i] = 0;
+  }
 
   // 4) Compute halo bbox so we only touch pixels that will actually be
   //    shown. Guarantees no blur can leak outside the halo — the rest of

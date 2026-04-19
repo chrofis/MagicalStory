@@ -54,6 +54,8 @@ interface BookViewerProps {
   textOnSidePage?: boolean;
   /** When true, on mobile the text is always rendered below the image (scrollable), regardless of reading mode. */
   forceTextBelowOnMobile?: boolean;
+  /** Optional logical page to open on — used to preserve position when parent remounts the book (e.g. on reading-mode switch). */
+  initialLogicalPage?: number;
   onImageClick: (url: string) => void;
   onPageChange: (pageIndex: number) => void;
   onNavigate: (path: string) => void;
@@ -71,7 +73,7 @@ BlankPage.displayName = 'BlankPage';
  * and maps PageEntry[] to the appropriate book page components.
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
-  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
@@ -293,7 +295,12 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             swipeDistance={30}
             showPageCorners={true}
             disableFlipByClick={false}
-            startPage={0}
+            startPage={(() => {
+              if (typeof initialLogicalPage !== 'number' || initialLogicalPage <= 0) return 0;
+              // Find the first physical index that maps to this logical index.
+              const idx = physicalToLogical.indexOf(initialLogicalPage);
+              return idx >= 0 ? idx : 0;
+            })()}
             autoSize={true}
           >
             {bookPages}
