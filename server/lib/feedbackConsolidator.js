@@ -264,33 +264,25 @@ async function consolidateFeedback({
 }
 
 /**
- * Append one consolidator call record to stories.data.consolidatorCalls[].
- * Keeps only the last 200 calls per story to bound storage growth.
+ * Persist one consolidator call to the consolidator_calls table.
+ * Uses a dedicated table (not stories.data) because upsertStory overwrites
+ * the stories.data blob with the in-memory copy at the end of generation,
+ * which would stomp any field written mid-flight via jsonb_set.
  */
 async function persistConsolidatorCall({ storyId, pageNumber, round, fullPrompt, rawResponse, plan, usage }) {
   const { dbQuery } = require('../services/database');
-  const record = {
-    pageNumber,
-    round: round ?? null,
-    timestamp: new Date().toISOString(),
-    fullPrompt,
-    rawResponse,
-    plan,
-    usage,
-  };
-  // jsonb_set with coalesce to create the array if missing, then append.
   await dbQuery(
-    `UPDATE stories
-       SET data = jsonb_set(
-         data::jsonb,
-         '{consolidatorCalls}',
-         (
-           COALESCE(data::jsonb->'consolidatorCalls', '[]'::jsonb)
-           || $2::jsonb
-         )
-       )
-     WHERE id = $1`,
-    [storyId, JSON.stringify([record])]
+    `INSERT INTO consolidator_calls (story_id, page_number, round, full_prompt, raw_response, plan, usage)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      storyId,
+      pageNumber ?? null,
+      round ?? null,
+      fullPrompt || null,
+      rawResponse || null,
+      plan ? JSON.stringify(plan) : null,
+      usage ? JSON.stringify(usage) : null,
+    ]
   );
 }
 

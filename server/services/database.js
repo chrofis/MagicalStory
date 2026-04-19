@@ -446,6 +446,26 @@ async function initializeDatabase() {
       )
     `);
 
+    // Consolidator calls table — per-call audit for the feedback consolidator.
+    // Lives in its own table because upsertStory writes the whole stories.data
+    // blob at the end of generation and would stomp any field written mid-flight
+    // by jsonb_set. Separate table sidesteps that race.
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS consolidator_calls (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        page_number INT,
+        round INT,
+        full_prompt TEXT,
+        raw_response TEXT,
+        plan JSONB,
+        usage JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story ON consolidator_calls(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story_page ON consolidator_calls(story_id, page_number, round)`);
+
     // Story retry images table - stores retry history images separately to keep data blob small
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_retry_images (

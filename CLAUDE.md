@@ -70,6 +70,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Prompts must stay generic — no story-specific examples.** When writing or editing anything in `prompts/*.txt` or prompt builders, never embed names, characters, settings, or plotlines from a specific test story (e.g. "Gessler's soldiers", "Manuel", "Altdorf square"). The prompts run on every story — a Wilhelm Tell reference leaks into an unrelated unicorn story. Use archetypal examples only: "the main character", "a guard", "N soldiers surrounding the hero", "a marketplace crowd". Same rule for bug-fix wording: don't write "Lukas sat on the right" into a rule; write "if a character's outline position is on the forbidden side". If you can read the prompt and tell which test story it came from, rewrite it.
 - **Check memory before recommending vendors, models, or technologies.** Every time you're about to suggest a specific API, model, library, or external service as a solution, FIRST read the relevant memory files (especially `project_image_model_tests.md`, `project_lora_investigation.md`, `project_image_pipeline_ideas.md`). Past experiments have usually already been done — don't recommend something that's already been rejected. If you make a recommendation based on tested experience, log the verdict in the matching project memory so future sessions don't waste the user's time re-litigating it.
 - **Log decisions and verdicts — don't rely on human memory.** When a technology, vendor, parameter, or approach is tried and evaluated, write the verdict (✅ kept / ❌ rejected / 🟡 conditional) plus a one-line reason into a project memory file. The only place "we tried FLUX Dev and it's unusable" belongs is a memory file — not in someone's head or buried in a commit message.
+- **Never assume — check.** When diagnosing a pipeline bug, always pull the actual stored data (DB row, log line, cached image, prompt sent to the model) before proposing a fix. Do not speculate about what "probably" happened at a prior stage. The evidence is always retrievable: scene metadata in `story_images` / `stories.data`, consolidator audit records, retry history, Railway logs. If you catch yourself writing "probably" or "must have" about pipeline state, stop and query the source.
 
 ## Folder Organization Rules
 
@@ -536,3 +537,17 @@ The script analyzes Railway logs and shows:
 - **Issues**: errors (especially TEXT CHECK, CONSISTENCY failures), warnings, fallbacks, low quality scores
 
 Log files are downloaded from Railway and stored in `~/Downloads/logs.*.log`
+
+### Timezone — Railway logs are UTC, user lives in Switzerland (CEST / CET)
+
+**Every timestamp in Railway logs, Railway dashboards, and the Postgres DB is UTC.** The user talks in Swiss local time. Always translate before comparing:
+
+- **Summer (CEST, last Sunday of March → last Sunday of October)**: local = UTC + 2h
+- **Winter (CET, rest of the year)**: local = UTC + 1h
+
+Examples for unambiguity:
+- User says "around 01:40" in summer → look for events near **23:40 UTC the previous day**.
+- Log says `2026-04-19T06:39 UTC` in summer → that's **08:39 CEST** in the user's day.
+- User says "yesterday evening 21:00" in winter → look at **20:00 UTC** in the log.
+
+When reporting log findings back to the user, convert UTC → local time or quote both, so there's no confusion. "23:50 UTC (01:50 CEST)" is fine; quoting UTC alone invites a miscount.

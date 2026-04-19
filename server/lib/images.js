@@ -6246,6 +6246,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   log.info(`📦 [UNIFIED PIPELINE] Building final results...`);
 
+  // Repair rounds' eval can leave bboxDetection.figures empty for iterate/inpaint
+  // outputs, which makes the UI show all expected characters as "missing" even
+  // when they ARE in the image. Re-run bbox detection on the picked best image
+  // for any page where figures is empty.
+  const freshBboxMap = new Map();
+  await Promise.all(rawImages.map(async img => {
+    const pageNumber = img.pageNumber;
+    const versions = pageVersions.get(pageNumber) || [];
+    const best = finalBestPerPage.get(pageNumber) || versions[0];
+    const bestBbox = best?.evaluation?.bboxDetection;
+    const hasFigures = Array.isArray(bestBbox?.figures) && bestBbox.figures.length > 0;
+    if (best?.imageData && !hasFigures && best.source !== 'original') {
+      try {
+        const fresh = await detectAllBoundingBoxes(best.imageData, {
+          pageContext: `P${pageNumber}-final-bbox`,
+        });
+        if (fresh && Array.isArray(fresh.figures) && fresh.figures.length > 0) {
+          freshBboxMap.set(pageNumber, fresh);
+          log.info(`📦 [UNIFIED PIPELINE] P${pageNumber}: refreshed bbox (${fresh.figures.length} figures, ${fresh.objects?.length || 0} objects) for ${best.source}`);
+        }
+      } catch (err) {
+        log.warn(`📦 [UNIFIED PIPELINE] P${pageNumber}: bbox refresh failed: ${err.message}`);
+      }
+    }
+  }));
+
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
@@ -6333,7 +6359,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       verdict: finalEval?.verdict ?? null,
       fixTargets: finalEval?.enrichedFixTargets || finalEval?.fixTargets || [],
       fixableIssues: finalEval?.fixableIssues || [],
-      bboxDetection: finalEval?.bboxDetection ?? null,
+      bboxDetection: freshBboxMap.get(pageNumber) || finalEval?.bboxDetection || null,
       bboxOverlayImage: finalEval?.bboxOverlayImage ?? null,
       figures: finalEval?.figures || [],
       matches: finalEval?.matches || [],
