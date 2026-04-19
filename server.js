@@ -2458,6 +2458,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     byFunction: {
       unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      scene_iterate: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      cover_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      phantom_patch: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
@@ -3304,7 +3307,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             modelOverrides.sceneDescriptionModel
           );
           const coverExpansionProvider = coverExpansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
-          addUsage(coverExpansionProvider, coverExpansionResult.usage, 'scene_expansion', coverExpansionResult.modelId);
+          addUsage(coverExpansionProvider, coverExpansionResult.usage, 'cover_expansion', coverExpansionResult.modelId);
           coverExpandedDescription = coverExpansionResult.text || sceneDescription;
           coverExpandedMetadata = extractSceneMetadata(coverExpandedDescription);
           log.debug(`✅ [STREAM-COVER] ${coverType} scene expanded`);
@@ -4016,7 +4019,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
       });
       if (phantomUsage) {
-        addUsage('anthropic', phantomUsage, 'scene_expansion', phantomUsage.modelId || MODEL_DEFAULTS.sceneIteration);
+        addUsage('anthropic', phantomUsage, 'phantom_patch', phantomUsage.modelId || MODEL_DEFAULTS.sceneIteration);
       }
     } catch (err) {
       log.warn(`👻 [PHANTOM] Detection/patch failed (continuing): ${err.message}`);
@@ -5561,6 +5564,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (byFunc.scene_expansion?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.scene_expansion), byFunc.scene_expansion.input_tokens, byFunc.scene_expansion.output_tokens, byFunc.scene_expansion.thinking_tokens);
       log.debug(`   Scene Expand:  ${byFunc.scene_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_expansion)}]`);
+    }
+    if (byFunc.scene_iterate?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.scene_iterate), byFunc.scene_iterate.input_tokens, byFunc.scene_iterate.output_tokens, byFunc.scene_iterate.thinking_tokens);
+      log.debug(`   Scene Iterate:${byFunc.scene_iterate.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_iterate.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_iterate.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_iterate)}]`);
+    }
+    if (byFunc.cover_expansion?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.cover_expansion), byFunc.cover_expansion.input_tokens, byFunc.cover_expansion.output_tokens, byFunc.cover_expansion.thinking_tokens);
+      log.debug(`   Cover Expand: ${byFunc.cover_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_expansion)}]`);
+    }
+    if (byFunc.phantom_patch?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.phantom_patch), byFunc.phantom_patch.input_tokens, byFunc.phantom_patch.output_tokens, byFunc.phantom_patch.thinking_tokens);
+      log.debug(`   Phantom Patch:${byFunc.phantom_patch.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.phantom_patch.output_tokens.toLocaleString().padStart(8)} out (${byFunc.phantom_patch.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.phantom_patch)}]`);
     }
     if (byFunc.cover_images?.calls > 0) {
       const model = getModels(byFunc.cover_images);

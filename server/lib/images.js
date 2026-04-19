@@ -6609,7 +6609,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   // Track usage (Claude Haiku scene re-expansion)
   if (usageTracker && sceneResult.usage) {
-    usageTracker('anthropic', sceneResult.usage, 'scene_expansion', sceneResult.modelId || effectiveSceneModel);
+    usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
   }
 
   // Parse the scene JSON to extract previewMismatches and checksRun
