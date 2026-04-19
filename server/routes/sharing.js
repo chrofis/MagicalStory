@@ -359,7 +359,18 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
     const imgBuffer = await normalizeToPortrait(Buffer.from(imgBase64, 'base64'));
 
-    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
+    // Pick the mask size the page was generated with (so the polygon matches
+    // the dark area the image model was asked to paint).
+    let languageLevel = 'standard';
+    try {
+      const lvlRows = await dbQuery(
+        `SELECT data->>'languageLevel' as lvl FROM stories WHERE id = $1`,
+        [storyId]
+      );
+      if (lvlRows.length > 0 && lvlRows[0].lvl) languageLevel = lvlRows[0].lvl;
+    } catch { /* non-critical */ }
+
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { languageLevel });
 
     const overlayBase64 = result.overlayImage.toString('base64');
     res.set('Cache-Control', 'no-store');

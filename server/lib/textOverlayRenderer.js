@@ -8,7 +8,7 @@
 
 const { createCanvas } = require('canvas');
 const sharp = require('sharp');
-const { detectCalmRegion } = require('./calmRegion');
+const { getTextZonePolygon } = require('./textMasks');
 
 const VALID_POSITIONS = ['top-left', 'top-right', 'top-full', 'bottom-left', 'bottom-right', 'bottom-full'];
 
@@ -123,17 +123,17 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
   const { width, height } = metadata;
   console.log(`[TEXT-OVERLAY] Image ${width}x${height}, position ${textPosition}`);
 
-  // Step 2: Detect calm region
-  let calmRegion = null;
+  // Step 2: Build the text zone from the mask shape we already committed to
+  // (rectangle for top-/bottom-full, right-triangle for corners). No detection
+  // — the image was generated with this exact mask as a layout hint, so the
+  // polygon is predetermined.
+  const languageLevel = options.languageLevel || 'standard';
   let polygon = null;
-
+  const calmRegion = null;
   if (VALID_POSITIONS.includes(textPosition)) {
-    calmRegion = await detectCalmRegion(imageBuffer, textPosition);
-    if (calmRegion) {
-      polygon = calmRegion.polygon;
-      console.log(`[TEXT-OVERLAY] Calm region: ${polygon.length} vertices, ${(calmRegion.areaFraction * 100).toFixed(1)}% area`);
-    } else {
-      console.log('[TEXT-OVERLAY] No calm region found, using rectangular fallback');
+    polygon = getTextZonePolygon(textPosition, languageLevel, width, height);
+    if (polygon) {
+      console.log(`[TEXT-OVERLAY] Text zone from mask: ${polygon.length} vertices, position ${textPosition}, level ${languageLevel}`);
     }
   }
 
