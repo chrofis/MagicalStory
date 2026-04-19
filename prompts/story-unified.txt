@@ -179,7 +179,15 @@ METADATA:
   - Ambient populations: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`
   - Narratively important supporting figures: whenever the page text shows unnamed figures actively doing something to or near a main character (capturing, chasing, guarding, blocking the way, rescuing, watching, reacting), describe them here with count + role + action + placement so the illustrator draws them. Without this, scene expansion will drop them and the image won't match the story.
 - **FRAMING PATTERN** - Set `framingPattern` when the scene involves a weapon in use, combat, capture, restraint, or injury. Aftermath scenes with no people may instead describe a still-life object (split apple, broken arrow, empty chair).
-- **TEXT POSITION** - Set `textPosition` for every page. Text is rendered WHITE, so the chosen corner must be a low-luminance area of the scene — shadowed, saturated dark, or a rich deep colour (deep blue/indigo sky, dusk, shaded wall, dark foliage, shadowed ground). Any tone works as long as it is NOT pale/bright/whitish. Odd pages (1, 3, 5…) use the left side (`top-left`, `bottom-left`, `top-full`, `bottom-full`); even pages use the right side (`top-right`, `bottom-right`, `top-full`, `bottom-full`). Across the full story: at least 30% of pages use a `top-*` value, at least 30% use a `bottom-*` value; never more than 3 consecutive pages in the same half. `top-full` / `bottom-full` count toward their half and work well for wide or aerial shots. Pick what naturally suits each scene — close-up with dark sky above → top; outdoor with shadowed ground → bottom.
+- **TEXT POSITION** - Set `textPosition` for every page. Valid values: `top-left`, `top-right`, `bottom-left`, `bottom-right`, `top-full`, `bottom-full`. Text is rendered WHITE, so the chosen area must be low-luminance — shadowed, saturated dark, or a rich deep colour (deep blue/indigo sky, dusk, shaded wall, dark foliage, shadowed ground). Any tone works as long as it is NOT pale/bright/whitish.
+
+  Distribution requirements across the full story:
+  - **Parity (side rule):** corner positions (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity — odd pages (1, 3, 5, …) on the LEFT side, even pages (2, 4, 6, …) on the RIGHT side. `top-full` and `bottom-full` span both sides, so they are valid on any page regardless of parity.
+  - **Full-width usage (non-negotiable):** between **30% and 50%** of all pages MUST use `top-full` or `bottom-full`. These span the whole width of the frame and work especially well for wide or ultra-wide shots, aerial shots, landscape-heavy scenes, group shots, or any scene where the dark zone naturally runs edge-to-edge (a dark sky band above, a shadowed ground band below). Do not default to corners for every page — full-width is the preferred choice whenever the scene has a sweeping top or bottom band.
+  - **Top/bottom balance:** at least 30% of pages use a `top-*` value, at least 30% use a `bottom-*` value.
+  - **Streak limit:** never more than 3 consecutive pages in the same half (top or bottom).
+
+  Pick what naturally suits each scene — close-up with dark sky above → `top-*`; outdoor with shadowed ground → `bottom-*`; wide/ultra-wide with a clean horizon band → `top-full` or `bottom-full`.
 
 **Scene Variety (IMPORTANT for great illustrations):**
 - **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
@@ -354,6 +362,12 @@ For EACH character in the story, write one line:
 13. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
 14. **Banned patterns** — Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders"? Any character "smiling" on more than 2-3 pages?
 15. **Action match** — Does each scene hint's action match what the page text narrates?
+16. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
+    - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
+    - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
+    - **Top/bottom balance:** at least 30% of pages must be `top-*` and at least 30% `bottom-*`.
+    - **Streak:** never more than 3 consecutive pages in the same half.
+    - Emit a fix line for each violation, e.g. `Page 3: textPosition bottom-right on odd page → bottom-left` or `Only 0% full-width — flip Page 9 (ultra-wide storm) to bottom-full`.
 
 **Cliché check:**
 15. Repeated gestures — Same gesture (hug, smile, wink) used more than once? Vary them.
