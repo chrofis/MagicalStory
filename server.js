@@ -4731,14 +4731,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { getTextAreaMask } = require('./server/lib/textMasks');
             const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
 
-            // Composition instruction — keep the chosen area calm and visually
-            // quiet. Deliberately avoids the words "text", "text overlay",
-            // "readable", or any mention of a mask, because Grok/Gemini
-            // interpret those as "paint fake letterforms here" and end up
-            // baking lorem-ipsum gibberish into the empty scene.
+            // Composition instruction — keep the chosen area DARK and calm.
+            // Deliberately avoids the words "text", "text overlay", "readable",
+            // or any mention of a mask, because Grok/Gemini interpret those as
+            // "paint fake letterforms here" and bake lorem-ipsum gibberish.
+            // The zone must be dark because white text with a dark stroke will
+            // be overlaid on top; a bright zone destroys contrast.
             const emptyTextAreaInstr = (!layoutTextInImage || !textPos)
               ? ''
-              : `COMPOSITION — KEEP THIS AREA QUIET: The ${textPos.replace('-', ' ')} area of the scene must stay soft, light, and visually simple. Treat it as intentional negative space in the illustration. Fill it with whatever naturally belongs in this setting — sky, open ground, smooth grass, calm water, snow, or soft mist for outdoor scenes; a plain wall, ceiling, floor, or window light for indoor scenes; light cobblestones, pavement, or a lightly-coloured building wall for street scenes. Gentle gradients, minimal texture, no objects, no characters, no sharp contrast. Painted with the same brush, palette, and style as the rest of the illustration — just lighter and quieter in that corner.`;
+              : `COMPOSITION — KEEP THIS AREA DARK AND QUIET: The ${textPos.replace('-', ' ')} area of the scene must stay dark, low-luminance, and visually simple. Treat it as intentional negative space in the illustration. Fill it with whatever naturally belongs in this setting in its DARKEST natural form — dusk sky, night sky, deep water, shaded ground, shadowed grass, dark foliage, or soft mist for outdoor scenes; a shadowed wall, dim ceiling, dark floor, or unlit corner for indoor scenes; shadowed cobblestones, dark pavement, or a dark-toned building wall in shade for street scenes. Gentle gradients, minimal texture, no objects, no characters, no sharp contrast, no bright highlights. Painted with the same brush, palette, and style as the rest of the illustration — just darker and quieter in that corner.`;
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
