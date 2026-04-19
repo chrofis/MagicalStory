@@ -8219,7 +8219,13 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
       }
     ];
 
-    const geminiModelId = modelConfig?.modelId || modelId;
+    // When this branch is reached via Grok fallback, modelConfig.modelId is a
+    // Grok model id ('grok-imagine-image'), which Gemini's API doesn't know
+    // and returns 404 for. Only trust modelConfig.modelId when the backend is
+    // actually Gemini — otherwise use the canonical Gemini image model id.
+    const geminiModelId = modelConfig?.backend === 'gemini'
+      ? modelConfig.modelId
+      : 'gemini-2.5-flash-image';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${apiKey}`;
 
     const systemInstruction = getImageSystemInstruction();
