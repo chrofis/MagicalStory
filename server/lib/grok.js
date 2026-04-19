@@ -12,6 +12,7 @@
  */
 
 const sharp = require('sharp');
+const { createCanvas } = require('canvas');
 const { log } = require('../utils/logger');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
@@ -384,9 +385,23 @@ async function labelCharacterImage(buffer, name) {
   // Label height ~12% of image width, clamped so tiny/huge slots stay readable
   // AFTER the slot is resized down to 1024px tall inside packReferences.
   const labelHeight = Math.max(68, Math.min(140, Math.round(width * 0.12)));
-  const fontSize = Math.max(36, Math.round(labelHeight * 0.62));
   const baselineY = Math.round(labelHeight * 0.72);
-  const display = escapeLabelXml(name.length > 28 ? name.substring(0, 26) + '…' : name);
+  const rawDisplay = name.length > 28 ? name.substring(0, 26) + '…' : name;
+  const display = escapeLabelXml(rawDisplay);
+
+  // Shrink fontSize until the rendered name fits the label width. Without this,
+  // long names in narrow slots (e.g. 2-character composites where each stack is
+  // ~width/2) overflow the SVG bounds and get clipped on both sides.
+  const padding = Math.max(8, Math.round(width * 0.04));
+  const maxTextWidth = Math.max(40, width - padding * 2);
+  const measureCtx = createCanvas(10, 10).getContext('2d');
+  let fontSize = Math.max(36, Math.round(labelHeight * 0.62));
+  const minFontSize = 22;
+  while (fontSize > minFontSize) {
+    measureCtx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+    if (measureCtx.measureText(rawDisplay).width <= maxTextWidth) break;
+    fontSize -= 2;
+  }
 
   const labelSvg = `<svg width="${width}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${width}" height="${labelHeight}" fill="#1a1a1a"/>
@@ -1020,11 +1035,17 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
   const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
   const finalH = Math.round(W / targetRatio);
 
-  // VB row takes ~18% of final canvas height (or up to 1/n of the width so
-  // square-ish cells stay legible — whichever is smaller).
+  // VB row takes ~18% of final canvas height. Cell width is capped so cells
+  // stay roughly square — without the cap, a single VB element would span the
+  // full slot width but only ~18% height, and `fit:contain` below would
+  // letterbox-shrink the VB to a tiny strip in the middle. Square-ish cells
+  // keep the VB reference visible at a useful size.
   const VB_ROW_FRACTION = 0.18;
-  const cellW = Math.floor(W / elements.length);
-  const cellH = Math.min(cellW, Math.round(finalH * VB_ROW_FRACTION));
+  const cellH = Math.round(finalH * VB_ROW_FRACTION);
+  const naturalCellW = Math.floor(W / elements.length);
+  const cellW = Math.min(naturalCellW, Math.round(cellH * 1.2));
+  const rowW = cellW * elements.length;
+  const rowOffsetX = Math.floor((W - rowW) / 2);
   const charH = finalH - cellH;
 
   // Shrink the char composite to fit the remaining height. Char is already at
@@ -1041,21 +1062,26 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
     try {
       const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
       const elBuf = Buffer.from(base64, 'base64');
-      const cell = await sharp(elBuf).resize(cellW, cellH, { fit: 'cover' }).toBuffer();
-      composites.push({ input: cell, left: i * cellW, top: charH });
+      // `fit:contain` keeps the whole VB image visible inside the cell — `cover`
+      // chopped portrait/landscape elements when cell aspect didn't match.
+      const cell = await sharp(elBuf)
+        .resize(cellW, cellH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+        .toBuffer();
+      const cellLeft = rowOffsetX + i * cellW;
+      composites.push({ input: cell, left: cellLeft, top: charH });
 
       // Caption strip at the bottom of the cell
       const labelH = Math.max(16, Math.round(cellH * 0.16));
       const label = String(el.name || '').slice(0, 18);
       const fontPx = Math.max(10, Math.round(labelH * 0.55));
       const svg = `<svg width="${cellW}" height="${labelH}"><rect width="100%" height="100%" fill="rgba(0,0,0,0.65)"/><text x="${cellW/2}" y="${Math.round(labelH*0.72)}" font-family="Arial,sans-serif" font-size="${fontPx}" fill="white" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text></svg>`;
-      composites.push({ input: Buffer.from(svg), left: i * cellW, top: charH + cellH - labelH });
+      composites.push({ input: Buffer.from(svg), left: cellLeft, top: charH + cellH - labelH });
     } catch (err) {
       log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
     }
   }
 
-  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charH} + VB row ${elements.length} cells @ ${cellW}x${cellH}), target ${aspectRatio}, orig char ${W}x${charHOrig}`);
+  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charH} + VB row ${elements.length} cells @ ${cellW}x${cellH}, row offset ${rowOffsetX}), target ${aspectRatio}, orig char ${W}x${charHOrig}`);
   return sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite(composites)
     .jpeg({ quality: 88 })

@@ -4949,6 +4949,38 @@ function forcedStrategyAfterFailures(versions) {
 }
 
 /**
+ * If the most recent repair regressed the score (final image is worse than the
+ * best version that existed BEFORE the repair), flip strategy. A regression
+ * means the chosen approach actively damaged the image — repeating it is much
+ * more likely to keep damaging it than to recover. Switch to the other approach
+ * for the next round instead of waiting for two failures.
+ *
+ * Returns 'inpaint' | 'iterate' | null. null = no regression, no forced flip.
+ */
+function lastRepairRegressed(versions) {
+  if (!Array.isArray(versions) || versions.length < 2) return null;
+  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  // Find the most recent repair version and its index.
+  let lastIdx = -1;
+  for (let i = versions.length - 1; i >= 0; i--) {
+    const src = versions[i]?.source || '';
+    if (src.startsWith('inpaint-') || src.startsWith('iterate-')) { lastIdx = i; break; }
+  }
+  if (lastIdx <= 0) return null;
+  const last = versions[lastIdx];
+  const lastScore = scoreOf(last);
+  if (lastScore == null) return null;
+  let priorBest = -Infinity;
+  for (let i = 0; i < lastIdx; i++) {
+    const s = scoreOf(versions[i]);
+    if (s != null && s > priorBest) priorBest = s;
+  }
+  if (!isFinite(priorBest)) return null;
+  if (lastScore >= priorBest) return null;
+  return last.source.startsWith('inpaint-') ? 'iterate' : 'inpaint';
+}
+
+/**
  * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
  * and applies it via editImageWithPrompt().
  *
@@ -5747,9 +5779,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const bestSoFar = selectBestVersion(versions);
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
 
+      const regressedFlip = lastRepairRegressed(versions);
       const forced = forcedStrategyAfterFailures(versions);
       let strategy, reason;
-      if (forced) {
+      if (regressedFlip) {
+        strategy = regressedFlip;
+        const prevStrat = regressedFlip === 'inpaint' ? 'iterate' : 'inpaint';
+        reason = `forced ${regressedFlip} — last ${prevStrat} regressed the score, flipping strategy`;
+      } else if (forced) {
         strategy = forced;
         reason = `forced ${forced} — last two rounds both used ${forced === 'inpaint' ? 'iterate' : 'inpaint'} without fixing it`;
       } else {
