@@ -162,6 +162,11 @@ async function consolidateFeedback({
   entityReport = null,
   pageNumber = null,
   characters = [],
+  // Optional audit trail — callers pass storyId + round so every consolidator
+  // invocation persists its exact input + output to the DB. This lets us
+  // inspect any past call later without reconstructing from partial state.
+  storyId = null,
+  round = null,
 }) {
   try {
     const template = PROMPT_TEMPLATES.feedbackConsolidator;
@@ -234,11 +239,59 @@ async function consolidateFeedback({
       `🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${plan.per_character_fixes.length} per-char fixes, scene=${plan.scene_fix.severity || 'NONE'}, dropped=${plan.dropped_issues.length}`
     );
 
+    // Persist the call to the story's data blob for later analysis.
+    // Fire-and-forget: any DB failure must not break the repair pipeline.
+    // Full prompt (input) + raw Haiku response + parsed plan are captured
+    // so `scripts/analysis/inspect-consolidator-call.js` can replay without
+    // re-invoking Haiku.
+    if (storyId && pageNumber != null) {
+      persistConsolidatorCall({
+        storyId,
+        pageNumber,
+        round,
+        fullPrompt,
+        rawResponse: result.text,
+        plan,
+        usage: result.usage || null,
+      }).catch(err => log.debug(`[FEEDBACK-CONSOLIDATOR] Persist failed (non-fatal): ${err.message}`));
+    }
+
     return { plan, usage: result.usage || null, error: null };
   } catch (err) {
     log.warn(`⚠️ [FEEDBACK-CONSOLIDATOR] failed: ${err.message}`);
     return { plan: null, usage: null, error: err.message };
   }
+}
+
+/**
+ * Append one consolidator call record to stories.data.consolidatorCalls[].
+ * Keeps only the last 200 calls per story to bound storage growth.
+ */
+async function persistConsolidatorCall({ storyId, pageNumber, round, fullPrompt, rawResponse, plan, usage }) {
+  const { dbQuery } = require('../services/database');
+  const record = {
+    pageNumber,
+    round: round ?? null,
+    timestamp: new Date().toISOString(),
+    fullPrompt,
+    rawResponse,
+    plan,
+    usage,
+  };
+  // jsonb_set with coalesce to create the array if missing, then append.
+  await dbQuery(
+    `UPDATE stories
+       SET data = jsonb_set(
+         data::jsonb,
+         '{consolidatorCalls}',
+         (
+           COALESCE(data::jsonb->'consolidatorCalls', '[]'::jsonb)
+           || $2::jsonb
+         )
+       )
+     WHERE id = $1`,
+    [storyId, JSON.stringify([record])]
+  );
 }
 
 module.exports = {

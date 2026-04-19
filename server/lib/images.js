@@ -4942,6 +4942,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     sceneDescription = '',
     artStyle = null,
     characterClothing = null,
+    // Audit trail: when provided, consolidator calls get persisted to DB
+    storyId = null,
+    round = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -4999,6 +5002,8 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     entityReport,
     pageNumber,
     characters: characters || [],
+    storyId,
+    round,
   });
 
   // Decide the instruction to send Grok.
@@ -5569,7 +5574,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   };
 
   // Helper: execute an inpaint action for a page
-  const executeInpaintAction = async (img, latestEval) => {
+  const executeInpaintAction = async (img, latestEval, roundNum = null) => {
     const versions = pageVersions.get(img.pageNumber) || [];
     const bestSoFar = selectBestVersion(versions);
     const inputImage = bestSoFar?.imageData || img.imageData;
@@ -5587,6 +5592,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneDescription: img.sceneDescription || img.description || '',
       artStyle: storyData?.artStyle || artStyle || null,
       characterClothing: pageCharacterClothing,
+      // Thread storyId + round so consolidator calls get persisted
+      storyId: storyData?.id || jobId || null,
+      round: roundNum,
     });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
@@ -5741,7 +5749,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const pageNumber = img.pageNumber;
         try {
           if (strategy === 'inpaint') {
-            const inpaintResult = await executeInpaintAction(img, latestEval);
+            const inpaintResult = await executeInpaintAction(img, latestEval, round);
             if (inpaintResult.repaired && inpaintResult.imageData) {
               return {
                 pageNumber,

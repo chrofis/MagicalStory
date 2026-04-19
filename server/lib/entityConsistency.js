@@ -630,8 +630,28 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         report.characters[charName].totalIssues += issueCount;
         report.totalIssues += issueCount;
 
+        // Stamp issues with the pages that were evaluated in this group so
+        // the feedback-consolidator can filter entity issues to the page it's
+        // currently repairing. Without this, every page's consolidator sees
+        // every other page's entity noise, ~80% of the prompt wasted on
+        // irrelevant cross-page issues.
+        //
+        // If the eval text names a specific cell ("Cell B"), narrow to that
+        // single page; otherwise attribute to all pages in the group.
+        const groupPages = groupAppearances.map(a => a.pageNumber).filter(n => n != null);
+        const cellToPage = new Map();
+        for (let i = 0; i < groupAppearances.length; i++) {
+          const letter = String.fromCharCode(65 + i); // A, B, C...
+          cellToPage.set(letter, groupAppearances[i].pageNumber);
+        }
         for (const issue of (evalResult.issues || [])) {
-          report.characters[charName].issues.push({ ...issue, clothingCategory });
+          let pageNumbers = groupPages;
+          const desc = String(issue.description || issue.issue || '');
+          const cellMatches = [...desc.matchAll(/\bCell\s+([A-Z])\b/g)]
+            .map(m => cellToPage.get(m[1]))
+            .filter(n => n != null);
+          if (cellMatches.length > 0) pageNumbers = [...new Set(cellMatches)];
+          report.characters[charName].issues.push({ ...issue, clothingCategory, pageNumbers });
         }
 
         if (evalResult.score < report.characters[charName].overallScore) {
