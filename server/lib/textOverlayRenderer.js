@@ -68,17 +68,13 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
  * @param {boolean} forceOnFinal - If true, force render at min font even on overflow
  *   (used for the biggest stage so we always return something).
  */
-function renderStage(width, height, text, clipPath, textPosition, baseFontSize, minFontSize, font, forceOnFinal) {
+function renderStage(width, height, text, clipPath, textPosition, baseFontSize, _minFontSize, font, forceOnFinal) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
   const isTop = textPosition.startsWith('top');
-  const isLeft = textPosition.includes('left') || textPosition.includes('full');
   const isFull = textPosition.includes('full');
   const isRight = textPosition.includes('right');
-
-  // No backdrop gradient — the baked blur under the text is enough.
-  // The polygon still drives text placement (insetPolygon below).
 
   const textPadding = 20;
   const insetPoly = insetPolygon(clipPath, textPadding);
@@ -92,23 +88,13 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   const polyTop = Math.max(0, Math.min(...ys));
   const polyBottom = Math.min(height, Math.max(...ys));
 
-  let renderedFontSize = baseFontSize;
-  let fits = false;
+  // Font size is FIXED across all pages — never shrink. If the text doesn't
+  // fit this region, the caller escalates to a larger rectangle (stages 1-4
+  // in renderTextOverlay). Only the final forced stage draws if still
+  // doesn't fit.
+  const fits = tryRenderText(ctx, text, scanlines, baseFontSize, font, align, polyTop, polyBottom, isTop, width, !!forceOnFinal);
 
-  for (let fs = baseFontSize; fs >= minFontSize; fs -= 1) {
-    if (tryRenderText(ctx, text, scanlines, fs, font, align, polyTop, polyBottom, isTop, width)) {
-      renderedFontSize = fs;
-      fits = true;
-      break;
-    }
-  }
-
-  if (!fits && forceOnFinal) {
-    tryRenderText(ctx, text, scanlines, minFontSize, font, align, polyTop, polyBottom, isTop, width, true);
-    renderedFontSize = minFontSize;
-  }
-
-  return { buffer: canvas.toBuffer('image/png'), fits, fontSize: renderedFontSize };
+  return { buffer: canvas.toBuffer('image/png'), fits, fontSize: baseFontSize };
 }
 
 /**
@@ -225,10 +211,11 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
  * the frosted effect local to the text.
  */
 async function buildBlurLayer(imageBuffer, textPng, width, height) {
-  const minDim = Math.min(width, height);
-  const halo = Math.max(6, Math.round(minDim * 0.015));      // spread of the halo
-  const feather = Math.max(2, Math.round(halo * 0.5));       // soft edge
-  const imageBlurSigma = Math.max(3, Math.round(minDim * 0.006)); // slight blur of the image itself
+  // Tight halo — the frosted area extends ~dilatePx beyond each glyph, period.
+  // Anything past that stays original (no blur leak).
+  const dilatePx = 5;    // how far the halo extends beyond glyph edges
+  const featherPx = 2;   // soft fade at the halo edge
+  const imageBlurSigma = 4; // subtle blur of the image under the halo
 
   // 1) Alpha channel of the rendered text — shape of the glyphs + stroke
   const textAlpha = await sharp(textPng)
@@ -236,23 +223,29 @@ async function buildBlurLayer(imageBuffer, textPng, width, height) {
     .raw()
     .toBuffer();
 
-  // 2) Dilate + feather: blur the alpha to spread it (halo), boost so the
-  //    center stays opaque, then a short blur for soft edges.
-  const haloMask = await sharp(textAlpha, { raw: { width, height, channels: 1 } })
-    .blur(halo)
-    .linear(6, 0)      // boost: amplify low alpha back toward 255
-    .blur(feather)
+  // 2) Dilate by blurring then thresholding to a hard binary mask — this
+  //    grows the glyph shape by ~dilatePx without smearing alpha outward.
+  const spread = await sharp(textAlpha, { raw: { width, height, channels: 1 } })
+    .blur(dilatePx)
+    .raw()
+    .toBuffer();
+  const binary = Buffer.alloc(width * height);
+  for (let i = 0; i < binary.length; i++) binary[i] = spread[i] > 20 ? 255 : 0;
+
+  // 3) Feather the hard edges so the halo fades smoothly into the original
+  const haloMask = await sharp(binary, { raw: { width, height, channels: 1 } })
+    .blur(featherPx)
     .raw()
     .toBuffer();
 
-  // 3) Slightly blur the image — pixels under the halo show softened detail
+  // 4) Slightly blur the image — pixels under the halo show softened detail
   const blurredRgb = await sharp(imageBuffer)
     .blur(imageBlurSigma)
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  // 4) Combine blurred RGB with halo mask as alpha
+  // 5) Combine blurred RGB with halo mask as alpha
   const rgba = Buffer.alloc(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     rgba[i * 4] = blurredRgb[i * 3];
