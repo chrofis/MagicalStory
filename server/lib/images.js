@@ -5062,6 +5062,27 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // splits per-character fixes from scene fixes.
   // ---------------------------------------------------------------------------
   const { consolidateFeedback } = require('./feedbackConsolidator');
+
+  // Resolve per-scene clothing descriptions so the consolidator reads the
+  // variant the scene actually uses (e.g. costumed:mittelalterlich) instead
+  // of the character's default (modern) clothing. Without this the
+  // consolidator writes fixes like "redress figure in grey hoodie" for a
+  // medieval scene.
+  const sceneClothing = {};
+  try {
+    const helpers = getStoryHelpers();
+    const charReqs = {};
+    for (const [name, variant] of Object.entries(characterClothing || {})) {
+      charReqs[name] = { _currentClothing: variant };
+    }
+    const photos = helpers.getCharacterPhotoDetails(characters || [], null, artStyle || 'watercolor', charReqs);
+    for (const p of photos) {
+      if (p?.name && p?.clothingDescription) sceneClothing[p.name] = p.clothingDescription;
+    }
+  } catch (err) {
+    log.debug(`[INPAINT PAGE] scene-clothing resolve failed: ${err.message}`);
+  }
+
   // Pass full character objects so the consolidator can build authoritative
   // physical descriptions (with glasses, facial hair, etc.) — which override
   // any stale/incomplete scene descriptions or false eval flags.
@@ -5072,6 +5093,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     entityReport,
     pageNumber,
     characters: characters || [],
+    sceneClothing,
     storyId,
     round,
   });

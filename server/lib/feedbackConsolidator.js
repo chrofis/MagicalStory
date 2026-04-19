@@ -162,6 +162,10 @@ async function consolidateFeedback({
   entityReport = null,
   pageNumber = null,
   characters = [],
+  // Per-scene clothing text keyed by character name. Overrides each
+  // character's default (modern) clothing so fix instructions don't tell
+  // Grok to redress a medieval scene in hoodies.
+  sceneClothing = null,
   // Optional audit trail — callers pass storyId + round so every consolidator
   // invocation persists its exact input + output to the DB. This lets us
   // inspect any past call later without reconstructing from partial state.
@@ -191,15 +195,32 @@ async function consolidateFeedback({
     // Fall back to a pre-built description if provided. The character profile
     // overrides stale scene descriptions — e.g. Roger HAS glasses per his profile,
     // even if an older scene description omitted them.
+    // Look up the per-scene clothing text for this character (if provided).
+    // Falls back to the character's default clothing when the scene doesn't
+    // override. The override matters for costumed scenes — without it, the
+    // description reads the default modern outfit and fix instructions
+    // redress medieval characters in hoodies.
+    const clothingLookup = (name) => {
+      if (!sceneClothing || !name) return null;
+      const lower = String(name).toLowerCase();
+      for (const [k, v] of Object.entries(sceneClothing)) {
+        if (k.toLowerCase() === lower) return v || null;
+      }
+      return null;
+    };
+
     const characterDescriptions = {};
     for (const c of characters) {
       if (!c?.name) continue;
+      const override = clothingLookup(c.name);
       let desc = c.physicalDescription || c.description || '';
-      if (!desc) {
+      if (!desc || override) {
+        // Rebuild when an override exists so the scene clothing wins over the
+        // stored prose (which is usually the modern default).
         try {
-          desc = buildCharacterPhysicalDescription(c) || '';
+          desc = buildCharacterPhysicalDescription(c, override) || desc || '';
         } catch {
-          desc = '';
+          desc = desc || '';
         }
       }
       if (desc) characterDescriptions[c.name] = desc;

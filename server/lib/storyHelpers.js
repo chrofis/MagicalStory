@@ -2445,8 +2445,8 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  * @param {Object} char - Character object
  * @returns {string} Prose description
  */
-function buildCharacterPhysicalDescription(char) {
-  const p = extractCharacterVisualProfile(char);
+function buildCharacterPhysicalDescription(char, clothingOverride = null) {
+  const p = extractCharacterVisualProfile(char, { clothingOverride });
   const age = p.numericAge ?? 10;
   const gender = p.gender || 'child';
   const genderLabel = gender === 'male'
