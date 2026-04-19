@@ -850,7 +850,7 @@ async function packReferences(refs = {}, options = {}) {
     let slotBuf = composed;
     let vbCount = 0;
     if (includeVb && rawVbElements.length > 0) {
-      slotBuf = await composeCharWithVbRow(composed, rawVbElements);
+      slotBuf = await composeCharWithVbRow(composed, rawVbElements, aspectRatio);
       vbCount = Math.min(rawVbElements.length, 6);
     }
     const resized = await sharp(slotBuf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
@@ -1004,39 +1004,59 @@ async function packReferences(refs = {}, options = {}) {
  * bottom strip, so VB references travel with the avatars rather than polluting
  * the scene background.
  */
-async function composeCharWithVbRow(charBuffer, vbElements = []) {
+async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '1:1') {
   const elements = vbElements.slice(0, 6);
   if (elements.length === 0) return charBuffer;
 
   const meta = await sharp(charBuffer).metadata();
   const W = meta.width;
-  const H = meta.height;
-  const CELL_W = Math.floor(W / elements.length);
-  const CELL_H = Math.min(CELL_W, Math.round(H * 0.25)); // cap at 25% of char height
-  const newH = H + CELL_H;
+  const charHOrig = meta.height;
 
-  const composites = [{ input: charBuffer, left: 0, top: 0 }];
+  // Produce a canvas already at the target aspect ratio so the
+  // packReferences cover-crop at the end is a no-op. Without this the
+  // cover-crop trims the bottom of the canvas — exactly where the VB row
+  // lives — and the VB cells get sheared off.
+  const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const finalH = Math.round(W / targetRatio);
+
+  // VB row takes ~18% of final canvas height (or up to 1/n of the width so
+  // square-ish cells stay legible — whichever is smaller).
+  const VB_ROW_FRACTION = 0.18;
+  const cellW = Math.floor(W / elements.length);
+  const cellH = Math.min(cellW, Math.round(finalH * VB_ROW_FRACTION));
+  const charH = finalH - cellH;
+
+  // Shrink the char composite to fit the remaining height. Char is already at
+  // a portrait aspect from padCharacterSlotToAspect, so contain-fit preserves
+  // it and pads side edges only if needed.
+  const charResized = await sharp(charBuffer)
+    .resize(W, charH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+    .toBuffer();
+
+  const composites = [{ input: charResized, left: 0, top: 0 }];
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
     if (!el.imageData) continue;
     try {
       const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
       const elBuf = Buffer.from(base64, 'base64');
-      const cell = await sharp(elBuf).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
-      composites.push({ input: cell, left: i * CELL_W, top: H });
+      const cell = await sharp(elBuf).resize(cellW, cellH, { fit: 'cover' }).toBuffer();
+      composites.push({ input: cell, left: i * cellW, top: charH });
 
-      // Small caption label at the bottom of the cell
-      const labelH = Math.max(14, Math.round(CELL_H * 0.14));
+      // Caption strip at the bottom of the cell
+      const labelH = Math.max(16, Math.round(cellH * 0.16));
       const label = String(el.name || '').slice(0, 18);
-      const fontPx = Math.max(9, Math.round(labelH * 0.55));
-      const svg = `<svg width="${CELL_W}" height="${labelH}"><rect width="100%" height="100%" fill="rgba(0,0,0,0.65)"/><text x="${CELL_W/2}" y="${Math.round(labelH*0.72)}" font-family="Arial,sans-serif" font-size="${fontPx}" fill="white" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text></svg>`;
-      composites.push({ input: Buffer.from(svg), left: i * CELL_W, top: H + CELL_H - labelH });
+      const fontPx = Math.max(10, Math.round(labelH * 0.55));
+      const svg = `<svg width="${cellW}" height="${labelH}"><rect width="100%" height="100%" fill="rgba(0,0,0,0.65)"/><text x="${cellW/2}" y="${Math.round(labelH*0.72)}" font-family="Arial,sans-serif" font-size="${fontPx}" fill="white" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text></svg>`;
+      composites.push({ input: Buffer.from(svg), left: i * cellW, top: charH + cellH - labelH });
     } catch (err) {
       log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
     }
   }
 
-  return sharp({ create: { width: W, height: newH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charH} + VB row ${elements.length} cells @ ${cellW}x${cellH}), target ${aspectRatio}, orig char ${W}x${charHOrig}`);
+  return sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite(composites)
     .jpeg({ quality: 88 })
     .toBuffer();

@@ -11452,13 +11452,28 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   let failed = 0;
   const processedElements = [];
 
-  // Batch elements into grids (max 4 per grid for quality)
+  // Batch elements into grids, balancing across batches so we never end up
+  // with a lone-element batch (which costs a full generation for 1 output
+  // and leaves no "neighbours" for the splitter to calibrate against).
+  // With N total and max per batch M: batchCount = ceil(N/M), perBatch =
+  // ceil(N/batchCount). Then distribute N elements across batchCount slots
+  // as evenly as possible.
+  //   N=5, M=4 → 2 batches of 3,2   (was 4,1)
+  //   N=6, M=4 → 2 batches of 3,3   (was 4,2)
+  //   N=9, M=4 → 3 batches of 3,3,3 (was 4,4,1)
   const batches = [];
-  for (let i = 0; i < needsReference.length; i += maxPerBatch) {
-    batches.push(needsReference.slice(i, i + maxPerBatch));
+  const N = needsReference.length;
+  const batchCount = Math.max(1, Math.ceil(N / maxPerBatch));
+  const basePer = Math.floor(N / batchCount);
+  const remainder = N - basePer * batchCount; // first `remainder` batches get +1
+  let cursor = 0;
+  for (let b = 0; b < batchCount; b++) {
+    const size = basePer + (b < remainder ? 1 : 0);
+    batches.push(needsReference.slice(cursor, cursor + size));
+    cursor += size;
   }
 
-  log.info(`[REF-SHEET] Processing ${batches.length} batch(es)`);
+  log.info(`[REF-SHEET] Processing ${batches.length} batch(es) — sizes: ${batches.map(b => b.length).join(', ')}`);
 
   // Capture source grids per batch so callers can persist them for debugging.
   // The grid image is normally discarded after splitting — keep it for the
