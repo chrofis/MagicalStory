@@ -454,7 +454,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
 
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos);
+        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
 
         await drawImageCovering(doc, compositedImage, 0, 0, interiorW, interiorH, { valign: 'top' });
         overlayDrawn = true;
@@ -595,6 +595,20 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
   let totalStoryPages = 0;
 
+  // Story 1's dedication is book page 1 (RIGHT), not counted in totalStoryPages.
+  // Every subsequent content page increments totalStoryPages, so totalStoryPages
+  // even ⇔ next book page is LEFT. Titles, back covers, and blank left pages all
+  // need to land on LEFT, so after each story's content we pad with a blank page
+  // when totalStoryPages is odd. Without this, picture-book stories with an odd
+  // page count misalign every subsequent title/back-cover onto the wrong side.
+  const padContentParity = () => {
+    if (totalStoryPages % 2 !== 0) {
+      doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      totalStoryPages++;
+      log.debug(`📚 [COMBINED PDF] Inserted parity blank (totalStoryPages=${totalStoryPages})`);
+    }
+  };
+
   const OVERLAY_POSITIONS = [
     'top-left', 'bottom-full', 'top-right', 'bottom-left', 'top-full', 'bottom-right'
   ];
@@ -636,7 +650,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
           const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
 
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos);
+          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
           // Fill the full interior page incl. top AND bottom bleed.
           await drawImageCovering(doc, compositedImage, 0, 0, interiorPageWidth, interiorPageHeight, { valign: 'top' });
           overlayDrawn = true;
@@ -730,6 +744,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       }
 
       await addStoryContentPages(storyData, storyPages);
+      padContentParity();
 
     } else {
       // STORY 2+: Title page (LEFT/even) + dedication page (RIGHT/odd)
@@ -757,6 +772,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       }
 
       await addStoryContentPages(storyData, storyPages);
+      padContentParity();
 
       // Back cover (LEFT) + blank separator (RIGHT) — only if story has a back cover
       // If no back cover, skip both pages (reduces page count by 2, preserves alignment)

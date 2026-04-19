@@ -3216,7 +3216,7 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
     const imgBase64 = imageRow.imageData.replace(/^data:image\/\w+;base64,/, '');
     const imgBuffer = Buffer.from(imgBase64, 'base64');
 
-    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left');
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { pageNumber });
 
     // Return overlay as base64 data URL
     const overlayBase64 = result.overlayImage.toString('base64');

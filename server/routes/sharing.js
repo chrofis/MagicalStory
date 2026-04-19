@@ -370,7 +370,7 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
       if (lvlRows.length > 0 && lvlRows[0].lvl) languageLevel = lvlRows[0].lvl;
     } catch { /* non-critical */ }
 
-    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { languageLevel });
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { languageLevel, pageNumber: pageNum });
 
     const overlayBase64 = result.overlayImage.toString('base64');
     res.set('Cache-Control', 'no-store');

@@ -31,7 +31,8 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   const {
     textPosition = 'bottom-left',
     fontSize: fontSizeOverride,
-    fontFamily = 'Georgia'
+    fontFamily = 'Georgia',
+    pageNumber = null,
   } = options;
 
   // Print-book target: ~12pt on A4. At our A4-normalized canvas (height 1365
@@ -42,32 +43,83 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   const minFontSize = Math.max(8, Math.round(baseFontSize * 0.6));
   const font = `${fontFamily}, serif`;
 
-  // Escalation stages — if text doesn't fit, *grow the polygon* instead of
-  // switching to a corner box. Stage 0 = the detected calm polygon (or a
-  // shape-appropriate fallback: a band for top-full/bottom-full, a triangle
-  // for corners). Stages 1-4 scale that same shape outward from its centroid
-  // so the text area always follows the calm-region contour.
-  const baseShape = (polygon && polygon.length >= 3)
+  // Escalation stages — grow the polygon instead of switching to a corner box.
+  // Stage 0 = the polygon for this textPosition (or a shape-appropriate
+  // fallback). Stages 1-4 scale that same shape outward from its centroid so
+  // the text area keeps the original contour. Every stage is margin-clamped
+  // (5% from outer edges, 10% from the spine) so growth can't run into the
+  // gutter or the bleed.
+  const rawBase = (polygon && polygon.length >= 3)
     ? polygon
     : buildFallbackShape(width, height, textPosition);
+  const baseShape = applyMarginClamp(rawBase, pageNumber, width, height);
   const stages = [baseShape];
   for (const scale of [1.15, 1.3, 1.55, 1.85]) {
-    stages.push(scalePolygon(baseShape, scale, width, height));
+    const scaled = scalePolygon(rawBase, scale, width, height);
+    stages.push(applyMarginClamp(scaled, pageNumber, width, height));
   }
 
-  let lastResult = null;
+  // Measure-only canvas — used to check whether a (stage, fontSize) combo
+  // fits without paying for a full-page render each attempt.
+  const measureCanvas = createCanvas(10, 10);
+  const measureCtx = measureCanvas.getContext('2d');
+
+  const isTop = textPosition.startsWith('top');
+
+  const fitsAtStage = (stage, fontSize) => {
+    const insetPoly = insetPolygon(stage, 20);
+    const scanlines = buildScanlineMap(insetPoly, height);
+    const ys = insetPoly.map(p => p[1]);
+    const polyTop = Math.max(0, Math.min(...ys));
+    const polyBottom = Math.min(height, Math.max(...ys));
+    const lineHeight = Math.round(fontSize * 1.45);
+    const minLineWidth = 60;
+    measureCtx.font = `${fontSize}px ${font}`;
+    const paragraphs = text
+      .split(/\n+/)
+      .map(p => p.trim().split(/\s+/).filter(w => w.length > 0))
+      .filter(words => words.length > 0);
+    if (paragraphs.length === 0) return { fits: true, placed: 0, total: 0 };
+    const total = paragraphs.reduce((s, w) => s + w.length, 0);
+    const lines = isTop
+      ? wrapLinesTopDown(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, font)
+      : wrapLinesBottomUp(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, font);
+    const placed = lines.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
+    return { fits: placed >= total, placed, total };
+  };
+
+  // 1. Biggest font first — find the SMALLEST stage that fits at baseFontSize.
   for (let s = 0; s < stages.length; s++) {
-    const isFinalStage = s === stages.length - 1;
-    const result = renderStage(width, height, text, stages[s], textPosition, baseFontSize, minFontSize, font, isFinalStage);
-    lastResult = result;
-    if (result.fits) {
-      console.log(`[TEXT-OVERLAY] Rendered at ${result.fontSize}px, ${stages[s].length} vertices, position ${textPosition}, stage ${s}/${stages.length - 1}`);
+    if (fitsAtStage(stages[s], baseFontSize).fits) {
+      const result = renderStage(width, height, text, stages[s], textPosition, baseFontSize, minFontSize, font, /*forceOnFinal=*/false);
+      console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${s}/${stages.length - 1}, pos=${textPosition}`);
       return result.buffer;
     }
   }
 
-  console.log(`[TEXT-OVERLAY] Rendered at ${lastResult.fontSize}px (force at max stage), position ${textPosition}`);
-  return lastResult.buffer;
+  // 2. Font shrink at max stage — only if no stage held the text at baseFontSize.
+  const maxStage = stages[stages.length - 1];
+  const fontCandidates = [];
+  for (const pct of [0.92, 0.85, 0.78, 0.7]) {
+    const f = Math.max(minFontSize, Math.round(baseFontSize * pct));
+    if (f < baseFontSize && !fontCandidates.includes(f)) fontCandidates.push(f);
+  }
+  if (!fontCandidates.includes(minFontSize)) fontCandidates.push(minFontSize);
+  for (const fontSize of fontCandidates) {
+    if (fitsAtStage(maxStage, fontSize).fits) {
+      const result = renderStage(width, height, text, maxStage, textPosition, fontSize, minFontSize, font, /*forceOnFinal=*/false);
+      console.log(`[TEXT-OVERLAY] Rendered at ${fontSize}px (shrunk from ${baseFontSize}), max stage, pos=${textPosition}`);
+      return result.buffer;
+    }
+  }
+
+  // 3. Loud fail — nothing fit. Force render at min font so the PDF pipeline
+  //    doesn't break, but log a concrete error the caller can grep for.
+  const overflow = fitsAtStage(maxStage, minFontSize);
+  const preview = text.replace(/\s+/g, ' ').trim().slice(0, 80);
+  console.error(`[TEXT-OVERLAY] OVERFLOW: position=${textPosition}, page=${pageNumber}, placed=${overflow.placed}/${overflow.total} words at minFont=${minFontSize}px on max stage (1.85×). Preview: "${preview}"`);
+  const result = renderStage(width, height, text, maxStage, textPosition, minFontSize, minFontSize, font, /*forceOnFinal=*/true);
+  return result.buffer;
 }
 
 /**
@@ -142,7 +194,8 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
   const textLayer = renderTextOverlay(width, height, text, polygon, {
     textPosition,
     fontSize: options.fontSize,
-    fontFamily: options.fontFamily
+    fontFamily: options.fontFamily,
+    pageNumber: options.pageNumber,
   });
 
   // Step 4: Build a tight frosted-glass halo AROUND the glyphs (not the whole
@@ -311,6 +364,40 @@ function buildFallbackShape(width, height, textPosition) {
   if (isTop && !isLeft)  return [[w, 0], [w * (1 - size), 0], [w, h * size]];
   if (!isTop && isLeft)  return [[0, h], [w * size, h], [0, h * (1 - size)]];
   return [[w, h], [w * (1 - size), h], [w, h * (1 - size)]];
+}
+
+/**
+ * Clamp every polygon vertex into the safe text box:
+ *   • 5% inset from the outer edges (top, bottom, outer-side x)
+ *   • 10% inset from the gutter (spine-side x)
+ * Odd pages sit on the left side of the spread → gutter on the right. Even
+ * pages → gutter on the left. Without a pageNumber (legacy callers) the box
+ * is symmetric 5% on every side. Applied to the base polygon AND every
+ * scaled escalation stage so growth can't creep back into the spine or trim
+ * area.
+ */
+function applyMarginClamp(polygon, pageNumber, width, height) {
+  if (!polygon) return polygon;
+  const OUTER = 0.05;
+  const GUTTER = 0.10;
+  let minX = Math.round(width * OUTER);
+  let maxX = Math.round(width * (1 - OUTER));
+  const minY = Math.round(height * OUTER);
+  const maxY = Math.round(height * (1 - OUTER));
+  if (pageNumber) {
+    const isLeftPage = pageNumber % 2 === 1;
+    if (isLeftPage) {
+      // outer = left (5%), gutter = right (10%)
+      maxX = Math.round(width * (1 - GUTTER));
+    } else {
+      // gutter = left (10%), outer = right (5%)
+      minX = Math.round(width * GUTTER);
+    }
+  }
+  return polygon.map(([x, y]) => [
+    Math.min(maxX, Math.max(minX, x)),
+    Math.min(maxY, Math.max(minY, y)),
+  ]);
 }
 
 /**
@@ -540,7 +627,7 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
  */
 function wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
   ctx.font = `${fontSize}px ${fontFamily}`;
-  const paragraphGap = Math.round(lineHeight * 0.5);
+  const paragraphGap = Math.round(lineHeight * 0.25);
   const lines = [];
   let y = Math.round(polyTop + fontSize);
 
