@@ -482,14 +482,13 @@ function buildScanlineMap(polygon, imageHeight) {
  * @param {boolean} [force=false] - Render even if text doesn't fit
  * @returns {boolean} Whether all text fit within the polygon
  */
-function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTop, polyBottom, isTop, canvasWidth, force = false) {
+function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyTop, polyBottom, isTop, canvasWidth, force = false) {
   const lineHeight = Math.round(fontSize * 1.45);
   const minLineWidth = 60;
 
   ctx.font = `${fontSize}px ${fontFamily}`;
 
   // Split into paragraphs on any run of newlines, then into words per paragraph.
-  // Claude's story text usually has \n or \n\n between paragraphs; either works.
   const paragraphs = text
     .split(/\n+/)
     .map(p => p.trim().split(/\s+/).filter(w => w.length > 0))
@@ -497,42 +496,22 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
   if (paragraphs.length === 0) return true;
   const totalWords = paragraphs.reduce((s, w) => s + w.length, 0);
 
-  // Generate y positions from top of polygon downward
-  const yPositions = [];
-  for (let y = Math.round(polyTop + fontSize); y <= polyBottom; y += lineHeight) {
-    yPositions.push(y);
-  }
-
-  // For bottom positions, lay out lines bottom-up: use positions from the end
-  // and reverse-wrap the words so text anchors to the bottom edge.
+  // For bottom positions, lay out lines bottom-up (anchor to bottom of polygon).
   let lines;
   if (!isTop) {
-    lines = wrapLinesBottomUp(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+    lines = wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
   } else {
-    lines = wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+    lines = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
   }
 
-  // Check if all words were placed
   const placedWords = lines.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
   const allFit = placedWords >= totalWords;
   if (!allFit && !force) return false;
 
-  // Draw the text lines
+  // Always left-aligned — easier to read than centre/right on varying polygon widths.
   for (const line of lines) {
-    const availableWidth = line.right - line.left;
-    let drawX;
+    const drawX = line.left;
 
-    if (align === 'center') {
-      drawX = line.left + (availableWidth - line.width) / 2;
-    } else if (align === 'right') {
-      drawX = line.right - line.width;
-    } else {
-      drawX = line.left;
-    }
-
-    // White text with a dark glyph-stroke — paint-order: stroke fill.
-    // Works on any background: the dark outline gives contrast on light areas,
-    // the white fill gives contrast on dark areas.
     ctx.save();
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.lineJoin = 'round';
@@ -549,28 +528,28 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, align, polyTo
 }
 
 /**
- * Wrap paragraphs top-down. A blank y-slot is skipped between consecutive
- * paragraphs so the reader sees paragraph breaks, not one solid block.
+ * Wrap paragraphs top-down. Uses a continuous y cursor so paragraph breaks
+ * can be half a line instead of a full one.
  */
-function wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
-  const lines = [];
-  let yIdx = 0;
-
+function wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
   ctx.font = `${fontSize}px ${fontFamily}`;
+  const paragraphGap = Math.round(lineHeight * 0.5);
+  const lines = [];
+  let y = Math.round(polyTop + fontSize);
 
   for (let p = 0; p < paragraphs.length; p++) {
     const words = paragraphs[p];
     let wordIdx = 0;
 
-    while (wordIdx < words.length && yIdx < yPositions.length) {
-      const y = yPositions[yIdx];
+    while (wordIdx < words.length && y <= polyBottom) {
       const scan = findScanlineWidth(scanlines, y, lineHeight);
-      if (!scan || (scan.right - scan.left) < minLineWidth) { yIdx++; continue; }
-
+      if (!scan || (scan.right - scan.left) < minLineWidth) {
+        y += lineHeight;
+        continue;
+      }
       const availableWidth = scan.right - scan.left;
       let lineText = '';
       let lineWidth = 0;
-
       while (wordIdx < words.length) {
         const testWord = lineText ? lineText + ' ' + words[wordIdx] : words[wordIdx];
         const testWidth = ctx.measureText(testWord).width;
@@ -579,15 +558,12 @@ function wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, mi
         lineWidth = testWidth;
         wordIdx++;
       }
-
       if (lineText) {
         lines.push({ text: lineText, y, left: scan.left, right: scan.right, width: lineWidth });
       }
-      yIdx++;
+      y += lineHeight;
     }
-
-    // Paragraph break — skip one y-slot so there's vertical breathing room.
-    if (p < paragraphs.length - 1) yIdx++;
+    if (p < paragraphs.length - 1) y += paragraphGap;
   }
 
   return lines;
@@ -599,23 +575,23 @@ function wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, mi
  * line layout, then shifts every line down by the delta between the last
  * yPosition and the last used yPosition.
  */
-function wrapLinesBottomUp(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
-  const topLines = wrapLinesTopDown(ctx, paragraphs, yPositions, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
-  if (topLines.length === 0 || yPositions.length === 0) return topLines;
+function wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
+  const topLines = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
+  if (topLines.length === 0) return topLines;
 
-  const usable = yPositions.filter(y => {
+  // Find the last y inside the polygon with usable width; shift every line
+  // down so the last drawn line sits at that y, preserving paragraph gaps.
+  let lastUsableY = -1;
+  for (let y = polyBottom; y >= polyTop; y -= 1) {
     const s = findScanlineWidth(scanlines, y, lineHeight);
-    return s && (s.right - s.left) >= minLineWidth;
-  });
-  if (usable.length === 0) return topLines;
+    if (s && (s.right - s.left) >= minLineWidth) { lastUsableY = y; break; }
+  }
+  if (lastUsableY < 0) return topLines;
 
-  const lastUsableY = usable[usable.length - 1];
   const lastDrawnY = topLines[topLines.length - 1].y;
   const delta = lastUsableY - lastDrawnY;
   if (delta <= 0) return topLines;
 
-  // Shift every line down by `delta`, and re-read the scanline at the new y
-  // so left/right bounds match the (possibly different) polygon width there.
   return topLines.map(l => {
     const newY = l.y + delta;
     const scan = findScanlineWidth(scanlines, newY, lineHeight);
