@@ -295,16 +295,27 @@ export default function SharedStoryViewer() {
 
   if (!story) return null;
 
-  // Reading-mode toggle — monochrome segmented control that sits on the dark
-  // header. Active = solid white pill, inactive = muted foreground on hover.
+  // Reading-mode toggle — segmented control that adapts to its header:
+  //   • dark (authenticated) header → white/10 base, white active pill
+  //   • cream (public) header       → amber base, amber-700 active pill
+  const darkHeader = isAuthenticated;
+  const toggleBase = darkHeader
+    ? 'bg-white/10'
+    : 'bg-amber-200/50 border border-amber-300';
+  const activeCls = darkHeader
+    ? 'bg-white text-zinc-900 shadow'
+    : 'bg-amber-700 text-white shadow';
+  const inactiveCls = darkHeader
+    ? 'text-white/70 hover:text-white'
+    : 'text-amber-900/70 hover:text-amber-900';
   const readingModeToggle = (
-    <div className="inline-flex rounded-full bg-white/10 p-0.5 text-xs font-medium" role="tablist">
+    <div className={`inline-flex rounded-full p-0.5 text-xs font-medium ${toggleBase}`} role="tablist">
       <button
         onClick={() => setReadingMode('inline')}
         title="Text printed over the image — matches the printed book"
         aria-pressed={readingMode === 'inline'}
         className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'inline' ? 'bg-white text-zinc-900' : 'text-white/70 hover:text-white'
+          readingMode === 'inline' ? activeCls : inactiveCls
         }`}
       >
         <Eye size={13} />
@@ -315,7 +326,7 @@ export default function SharedStoryViewer() {
         title="Text on a separate facing page — easier to read"
         aria-pressed={readingMode === 'sidepage'}
         className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
-          readingMode === 'sidepage' ? 'bg-white text-zinc-900' : 'text-white/70 hover:text-white'
+          readingMode === 'sidepage' ? activeCls : inactiveCls
         }`}
       >
         <BookOpen size={13} />
@@ -326,9 +337,11 @@ export default function SharedStoryViewer() {
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* Header — single dark surface, ghost action buttons, one white primary (Share). */}
+      {/* Header — single dark surface with a thin gold underline tying it to the
+          book-cover accent used throughout the product. Ghost action buttons,
+          one white primary (Share). */}
       {isAuthenticated ? (
-        <header className="bg-zinc-900 text-white px-3 py-2.5 sticky top-0 z-10 border-b border-white/10">
+        <header className="bg-zinc-900 text-white px-3 py-2.5 sticky top-0 z-10 border-b border-amber-400/60">
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + optional title */}
             <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
@@ -403,16 +416,16 @@ export default function SharedStoryViewer() {
           </div>
         </header>
       ) : (
-        <header className="bg-white/80 backdrop-blur-sm border-b border-indigo-200 sticky top-0 z-10">
+        <header className="bg-gradient-to-b from-amber-50 to-amber-100/60 backdrop-blur-sm border-b-2 border-amber-400 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-shrink-0">
-              <BookOpen className="w-6 h-6 text-indigo-500" />
-              <span className="font-bold text-indigo-900 hidden md:inline">MagicalStory</span>
+              <BookOpen className="w-6 h-6 text-amber-700" />
+              <span className="font-bold text-amber-900 hidden md:inline">MagicalStory</span>
             </div>
             {readingModeToggle}
             <Link
               to="/"
-              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all flex-shrink-0"
+              className="inline-flex items-center gap-1.5 bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold hover:bg-amber-800 transition-colors flex-shrink-0 shadow-sm"
             >
               <Sparkles className="w-4 h-4" />
               <span className="hidden sm:inline">Create Your Own Story</span>
