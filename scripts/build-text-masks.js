@@ -24,11 +24,13 @@ const SIZES = { small: 0.10, medium: 0.25, large: 0.40 };
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-// Build the SVG shape (white fill, black background) for a given position and area.
-// Full positions = horizontal strip. Corners = right triangle with its right angle
-// at the corner of the frame and its hypotenuse pointing toward the scene center.
-// Triangles match area to the rectangle version but leave more usable space for
-// characters near the frame edge opposite the corner.
+// Build the SVG shape (black fill, white background) for a given position and
+// area. Black = reserved text zone (where story text will be placed — image
+// models should paint this dark because white glyphs render on top).
+// Full positions = horizontal strip. Corners = right triangle with its right
+// angle at the corner of the frame and its hypotenuse pointing toward the
+// scene center. Triangles match area to the rectangle version but leave more
+// usable space for characters near the frame edge opposite the corner.
 function getShapeSvg(position, areaPct) {
   const isFull = position.includes('full');
   const isTop = position.startsWith('top');
@@ -37,7 +39,7 @@ function getShapeSvg(position, areaPct) {
   if (isFull) {
     const rectH = Math.round(HEIGHT * areaPct);
     const rectY = isTop ? 0 : HEIGHT - rectH;
-    return `<rect x="0" y="${rectY}" width="${WIDTH}" height="${rectH}" fill="white"/>`;
+    return `<rect x="0" y="${rectY}" width="${WIDTH}" height="${rectH}" fill="black"/>`;
   }
 
   // Right triangle for corners. Leg length = sqrt(2 * areaPct) so the white
@@ -52,7 +54,7 @@ function getShapeSvg(position, areaPct) {
   const ay = cy;                              // stays on the corner's row
   const bx = cx;                              // stays on the corner's column
   const by = isTop ? legH : HEIGHT - legH;    // along the left/right edge
-  return `<polygon points="${cx},${cy} ${ax},${ay} ${bx},${by}" fill="white"/>`;
+  return `<polygon points="${cx},${cy} ${ax},${ay} ${bx},${by}" fill="black"/>`;
 }
 
 // Build a single mask using an SVG shape, then Gaussian blur for soft edges
@@ -62,7 +64,7 @@ async function buildMask(position, sizeName, outPath) {
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
-  <rect width="${WIDTH}" height="${HEIGHT}" fill="black"/>
+  <rect width="${WIDTH}" height="${HEIGHT}" fill="white"/>
   ${shapeSvg}
 </svg>`;
 

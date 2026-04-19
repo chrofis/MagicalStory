@@ -9,7 +9,9 @@
  *
  * Algorithm:
  * 1. Convert to greyscale, divide into blocks, compute brightness + variance
- * 2. Calmness = (1 - variance) — low-variance regions, regardless of brightness
+ * 2. Calmness = (1 - variance) × (1 - brightness) weighting — we prefer dark,
+ *    smooth regions because text renders as white glyphs on a dark backdrop.
+ *    Edge density and variance dominate; brightness just tilts ties toward dark.
  * 3. Build a per-pixel alpha mask from calmness (used only for bbox + score)
  * 4. Constrain to the correct side (odd=left, even=right) + target area
  * 5. Return the original image unchanged + position + rect + coverage score
@@ -79,10 +81,13 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     if (vMax === 0) vMax = 1;
 
     for (let i = 0; i < calmness.length; i++) {
-      // Low-variance wins, regardless of brightness — white text with a dark
-      // stroke reads on both light and dark as long as the area isn't busy.
+      // Low-variance wins — the primary signal for "is this spot clean?" —
+      // but dark is preferred when variance is tied, since text renders as
+      // white glyphs on a dark gradient. A bright calm patch still scores,
+      // but a dark calm patch scores higher.
       const vNorm = variances[i] / vMax;
-      calmness[i] = 1 - vNorm;
+      const bNorm = means[i] / 255;
+      calmness[i] = (1 - vNorm) * (0.7 + 0.3 * (1 - bNorm));
     }
 
     // ── Step 3: Build a per-pixel alpha mask from the calmness map ──

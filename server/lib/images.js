@@ -708,23 +708,34 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
 
     const issues = [];
 
-    // Check 1: white box detection — blocks with brightness > 240 AND variance < 5
-    // (artificial white patches have near-zero variance)
+    // Check 1: uniform-patch artifact detection — a flat white OR a flat
+    // black rectangle is an AI glitch regardless of the expected tone. Flag
+    // either if it exceeds the artifact threshold.
     let whiteBoxBlocks = 0;
+    let blackBoxBlocks = 0;
     for (let i = 0; i < rows * cols; i++) {
       if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteBoxBlocks++;
+      if (blockBrightness[i] < 15 && blockVariance[i] < 5) blackBoxBlocks++;
     }
     const whiteBoxPct = whiteBoxBlocks / (rows * cols);
+    const blackBoxPct = blackBoxBlocks / (rows * cols);
     if (whiteBoxPct > 0.08) {
       issues.push(`white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
     }
+    if (blackBoxPct > 0.08) {
+      issues.push(`black box artifact: ${(blackBoxPct * 100).toFixed(0)}% of image is uniform black`);
+    }
 
-    // Check 2: overall too dark (average < 15% brightness) — scene may be black/failed
-    if (avgBrightness < 0.15) {
+    // Check 2: overall too dark — darker scenes are now expected (white text on
+    // dark backdrop), so the floor drops to 8%. Below that the frame is blank
+    // or broken, not an artistic choice.
+    if (avgBrightness < 0.08) {
       issues.push(`too dark: average brightness ${(avgBrightness * 100).toFixed(0)}%`);
     }
 
-    // Check 3: text area calmness — compute calmness at the textPosition region
+    // Check 3: text area calmness — white text needs a DARK and smooth zone.
+    // The calmness metric now rewards darkness (brightness inverted) and low
+    // variance. Anything below 0.15 fails and triggers text-space-repair.
     let textAreaCalm = 0;
     let textAreaCount = 0;
     const isTop = textPosition?.startsWith('top');
@@ -738,7 +749,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
         if (inVertical && inHorizontal) {
           const bNorm = blockBrightness[r * cols + c] / 255;
           const vNorm = blockVariance[r * cols + c] / vMax;
-          textAreaCalm += Math.pow(bNorm, 1.5) * (1 - vNorm);
+          textAreaCalm += Math.pow(1 - bNorm, 1.5) * (1 - vNorm);
           textAreaCount++;
         }
       }
@@ -746,7 +757,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     const calmnessScore = textAreaCount > 0 ? textAreaCalm / textAreaCount : 0;
 
     if (calmnessScore < 0.15 && textPosition) {
-      issues.push(`text area too busy/dark: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
+      issues.push(`text area too busy/bright: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
     }
 
     // ── Phase 2: Gemini Flash-lite vision check ──
@@ -815,7 +826,7 @@ Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "on
     if (!pass) {
       log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} FAILED (calmness ${(calmnessScore * 100).toFixed(0)}%): ${issues.join(', ')}`);
     } else {
-      log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%)`);
+      log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%, black ${(blackBoxPct * 100).toFixed(0)}%)`);
     }
 
     return { pass, issues, calmnessScore, visionFeedback };
@@ -6673,7 +6684,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area will have dark text printed over it. Continue the scene naturally there but keep it SOFT and SIMPLE — lighter tones, gentle gradients, minimal detail. DO NOT paint a white box or blank patch. No characters, no sharp lines in this zone.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `White text will be printed over the ${textPos.replace('-', ' ')} area, so paint this zone DARK and smooth. Continue the scene naturally there but keep it SOFT and SIMPLE — deep/shadowed tones of the scene's own palette (dusk sky, shadowed wall, deep water, dark foliage), gentle gradients, minimal detail. DO NOT paint a flat black rectangle or blank patch. No characters, no sharp lines, no bright highlights in this zone.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

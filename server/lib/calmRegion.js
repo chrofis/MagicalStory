@@ -215,7 +215,11 @@ function computeCalmnessGrid(data, width, height, blockSize, gridW, gridH) {
     const normVar = maxVariance > 0 ? variances[i] / maxVariance : 0;
     const normEdge = maxEdge > 0 ? edgeDensities[i] / maxEdge : 0;
     const brightness = brightnesses[i];
-    calmness[i] = (1 - normVar) * (1 - Math.pow(normEdge, 0.7)) * (0.7 + 0.3 * brightness);
+    // Text renders as white glyphs on a dark gradient, so the calmest region
+    // for text is dark AND smooth. Variance + edge density still dominate —
+    // those catch "is this spot clean?" — but the brightness term now favours
+    // DARK (used to favour light when text was black).
+    calmness[i] = (1 - normVar) * (1 - Math.pow(normEdge, 0.7)) * (0.7 + 0.3 * (1 - brightness));
   }
 
   return calmness;
