@@ -452,9 +452,9 @@ export function GenerationProgress({
       tipHistoric: 'Explore history! Your child can experience the moon landing, meet dinosaurs, or discover local Swiss legends.',
       tipLearning: 'Personalized stories inspire children to read — much better than screen time arguments!',
       tipCredits: `Each page costs ${CREDITS_PER_PAGE} credits. A ${EXAMPLE_STORY_PAGES}-page story uses ${EXAMPLE_STORY_CREDITS} credits — you can create stories up to 25 pages, each with its own illustration!`,
-      coversPreview: 'Cover Preview',
-      frontCover: 'Front',
-      initialPage: 'Inside',
+      coversPreview: 'Your book is taking shape',
+      frontCover: 'Cover',
+      initialPage: 'Dedication',
       backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
@@ -477,10 +477,10 @@ export function GenerationProgress({
       tipHistoric: 'Entdecke Geschichte! Dein Kind kann die Mondlandung erleben, Dinosaurier treffen oder lokale Schweizer Sagen entdecken.',
       tipLearning: 'Personalisierte Geschichten motivieren Kinder zum Lesen — viel besser als Diskussionen über Bildschirmzeit!',
       tipCredits: `Jede Seite kostet ${CREDITS_PER_PAGE} Credits. Eine ${EXAMPLE_STORY_PAGES}-Seiten-Geschichte braucht ${EXAMPLE_STORY_CREDITS} Credits — du kannst Geschichten bis zu 25 Seiten erstellen, jede mit eigener Illustration!`,
-      coversPreview: 'Cover-Vorschau',
-      frontCover: 'Vorne',
-      initialPage: 'Innen',
-      backCover: 'Hinten',
+      coversPreview: 'Dein Buch nimmt Gestalt an',
+      frontCover: 'Cover',
+      initialPage: 'Widmung',
+      backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
       stalled: 'Generierung scheint hängen zu bleiben',
@@ -502,10 +502,10 @@ export function GenerationProgress({
       tipHistoric: 'Explorez l\'histoire ! Votre enfant peut vivre l\'alunissage, rencontrer des dinosaures ou découvrir des légendes locales.',
       tipLearning: 'Les histoires personnalisées inspirent les enfants à lire — bien mieux que les disputes sur le temps d\'écran !',
       tipCredits: `Chaque page coûte ${CREDITS_PER_PAGE} crédits. Une histoire de ${EXAMPLE_STORY_PAGES} pages utilise ${EXAMPLE_STORY_CREDITS} crédits — vous pouvez créer des histoires jusqu'à 25 pages, chacune avec sa propre illustration !`,
-      coversPreview: 'Aperçu des couvertures',
-      frontCover: 'Avant',
-      initialPage: 'Intérieur',
-      backCover: 'Arrière',
+      coversPreview: 'Votre livre prend forme',
+      frontCover: 'Couverture',
+      initialPage: 'Dédicace',
+      backCover: 'Dos',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
       stalled: 'La génération semble bloquée',
@@ -517,32 +517,34 @@ export function GenerationProgress({
 
   const t = translations[language as keyof typeof translations] || translations.en;
 
-  // Helper to render a cover thumbnail
+  // Helper to render a cover thumbnail — no green, no check icon. The
+  // thumbnail itself is the "ready" signal; waiting slots show a spinner.
   const CoverThumbnail = ({ imageData, label, isReady }: { imageData?: string; label: string; isReady: boolean }) => (
     <div className="flex flex-col items-center gap-1">
-      <div className={`w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 ${isReady ? 'border-green-400' : 'border-gray-200'} bg-gray-100 flex items-center justify-center`}>
+      <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
         {isReady && imageData ? (
           <img src={imageData} alt={label} className="w-full h-full object-cover object-top" />
         ) : (
           <Loader2 size={20} className="animate-spin text-gray-400" />
         )}
       </div>
-      <div className="flex items-center gap-1">
-        {isReady && <CheckCircle size={12} className="text-green-500" />}
-        <span className={`text-xs ${isReady ? 'text-green-600 font-medium' : 'text-gray-400'}`}>{label}</span>
-      </div>
+      <span className={`text-xs ${isReady ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
     </div>
   );
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className={`bg-white rounded-2xl shadow-xl w-full p-6 md:p-8 ${hasAnyCovers ? 'max-w-lg' : 'max-w-md'}`}>
-        {/* Header with animation */}
+        {/* Header — big spinner only before the covers start appearing.
+            Once covers are visible they (and their per-slot spinners)
+            carry the "still working" signal on their own. */}
         <div className="text-center mb-6">
-          <div className="relative inline-block mb-3">
-            <Loader2 size={48} className="animate-spin text-indigo-500" />
-            <span className="absolute -top-1 -right-1 text-xl">✨</span>
-          </div>
+          {!hasAnyCovers && (
+            <div className="relative inline-block mb-3">
+              <Loader2 size={48} className="animate-spin text-indigo-500" />
+              <span className="absolute -top-1 -right-1 text-xl">✨</span>
+            </div>
+          )}
           <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.title}</h2>
         </div>
 
@@ -584,8 +586,8 @@ export function GenerationProgress({
 
         {/* Cover preview section */}
         {hasAnyCovers && (
-          <div className="mb-4 bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4">
-            <h3 className="text-sm font-medium text-indigo-700 text-center mb-3">{t.coversPreview}</h3>
+          <div className="mb-4 bg-gray-50 rounded-xl p-4">
+            <h3 className="text-sm font-medium text-gray-700 text-center mb-3">{t.coversPreview}</h3>
             <div className="flex justify-center gap-4">
               <CoverThumbnail
                 imageData={frontCoverData}
@@ -606,16 +608,16 @@ export function GenerationProgress({
           </div>
         )}
 
-        {/* Status message when covers are showing - let user know pages are being generated */}
+        {/* Status message when covers are showing — header already has the
+            primary spinner, so don't duplicate it here. */}
         {hasAnyCovers && (
           <div className="mb-4 text-center">
-            <p className="text-sm text-gray-600 flex items-center justify-center gap-2">
-              <Loader2 size={14} className="animate-spin text-indigo-500" />
+            <p className="text-sm text-gray-600">
               {language === 'de'
-                ? 'Bilder für die Seiten werden jetzt erstellt...'
+                ? 'Jede Seite wird jetzt gemalt ...'
                 : language === 'fr'
-                ? 'Création des images pour les pages en cours...'
-                : 'Now generating images for the pages...'}
+                ? 'Chaque page est maintenant peinte ...'
+                : 'Now painting each page ...'}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {language === 'de'
