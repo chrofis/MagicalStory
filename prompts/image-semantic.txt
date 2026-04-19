@@ -38,7 +38,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
 - Gaze direction matches interaction? (two characters talking but facing away from each other = wrong)
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
-- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope, not standing beside it. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in the wrong place, flag it as a `wrong_interaction` issue. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
+- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in a genuinely different category (held-vs-pocket, on-head-vs-in-hand), flag it as a `wrong_interaction` issue. Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are EQUIVALENT — do NOT flag as wrong_interaction. Pose details that appear in the scene prose but NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked") are descriptive only — do NOT flag them. Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers) are scene-appropriate — do NOT flag. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
 
 **Ignore everything else.** The image prompt contains detailed physical descriptions from reference photos — minor visual differences are expected. Specifically ignore:
 - Character identity, names, recognizability. A separate system with reference photos handles identity.
@@ -61,7 +61,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 Start at 10. Only these deductions exist:
 - Missing foreground character (listed in SCENE_HINT or IMAGE_PROMPT): -3
 - Character merged into or clipped through an object (AI compositing artifact): -3
-- Declared interaction missing or at completely wrong location (e.g. object in pocket drawn as large held plush): -3
+- Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): -3. Left/right mirror differences (left arm vs right arm, etc.) are equivalent and do NOT deduct. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
 - Wrong setting/location: -2
 - Wrong main action: -2
 - Missing key object: -2

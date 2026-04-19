@@ -100,7 +100,10 @@ DECLARED INTERACTIONS (from scene metadata — authoritative):
   1. Is the object visible AT ALL? If missing entirely → CRITICAL `physics_ok: false`.
   2. Is the object at the declared location relative to the character? (pocket vs hand vs floating vs on-back)
   3. Does the size match the description? ("tiny silhouette" must not render as a large held toy.)
-- Any interaction where the object is in the wrong place or missing = CRITICAL, set `physics_ok: false`, and add a `fixable_issues` entry with `type: physics` describing the mismatch (e.g., "Eli is drawn as a large plush held in Lukas's hand, but should be a tiny silhouette in his jacket pocket").
+- Any interaction where the object is in the wrong place or missing = CRITICAL, set `physics_ok: false`, and add a `fixable_issues` entry with `type: physics` describing the mismatch.
+- Interaction checks use ONLY the DECLARED INTERACTIONS block above. Pose details mentioned in the scene prose but NOT listed in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked", "jaw set") are descriptive context only — do NOT deduct for them.
+- Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are equivalent and do NOT count as wrong placement.
+- Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street) are scene-appropriate and do NOT deduct.
 - If DECLARED INTERACTIONS is empty, skip this sub-check entirely.
 
 FACES:
@@ -140,7 +143,7 @@ DO NOT penalize:
 
 Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
 
-- CRITICAL (-3): Missing/wrong character, duplicate character, extra limbs (3 arms/hands), figure floating in air, declared interaction object missing OR in completely wrong location (e.g. declared "in pocket" but drawn floating beside the character)
+- CRITICAL (-3): Missing/wrong character, duplicate character, extra limbs (3 arms/hands), figure floating in air, declared interaction object missing OR in a genuinely different category (e.g. "in pocket" drawn as large held plush, "on head" drawn "in hand"). Left/right mirror differences (left vs right arm/hand/pocket) are equivalent and do NOT trigger CRITICAL.
 - MAJOR (-2):
   - Cross-eyes (eyes looking different directions)
   - Wrong clothing (completely different color/type than reference — e.g. blue shirt shown as red)

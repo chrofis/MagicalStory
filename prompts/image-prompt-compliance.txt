@@ -40,7 +40,9 @@ This is the most important check. For each character:
 For each DECLARED INTERACTION:
 - Is the object present?
 - Is it at the correct location relative to the character (in hand, on head, under arm)?
-- Missing or wrong placement = CRITICAL
+- Missing or genuinely wrong placement (held vs worn vs in-pocket vs on-head) = CRITICAL. Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are EQUIVALENT — do NOT flag as wrong placement.
+- Interaction checks use ONLY the DECLARED INTERACTIONS list. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "jaw set") are descriptive only — do NOT deduct.
+- Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby) are scene-appropriate and do NOT deduct.
 
 ---
 
@@ -55,7 +57,7 @@ For each DECLARED INTERACTION:
 **STEP 4: SCORING (0-10)**
 
 Start at 10:
-- CRITICAL (-3): Missing character, clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or wrong location, extra limbs, floating figure
+- CRITICAL (-3): Missing character, clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure
 - MAJOR (-2): Character facing wrong direction (back when should face forward, or vice versa), 3+ characters facing camera when interaction described, wrong clothing color, wrong age appearance, cross-eyes
 - MODERATE (-1): Character on wrong side, minor clothing detail, key object missing
 - MINOR (-0.5): Small differences
