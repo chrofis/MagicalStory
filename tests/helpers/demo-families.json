@@ -37,7 +37,7 @@
               "shoes": "weisse Turnschuhe"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 5-year-old European girl named Emma standing in a sunlit grassy meadow. She has brown hair in pigtails, warm brown eyes, light/fair skin with a small scatter of freckles across her nose and cheeks, and a cheerful smile. She is wearing a pink t-shirt with a large, clearly visible colorful butterfly printed across the front, blue jeans, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 5-year-old European girl named Emma standing in a sunlit grassy meadow. She has brown hair in two pigtails, warm brown eyes, light/fair skin with a natural scatter of freckles across her nose and cheeks, and a small natural smile (not posed, not glossy). She is wearing a pink t-shirt with a giant graphic print of a colorful orange-and-blue butterfly that fills most of the chest, blue jeans, and white sneakers. The butterfly print is bold, clearly readable, and dominant — it is the focal point of the t-shirt. Real-child appearance: slightly messy hair, casual stance, ordinary kid (not a model, no doll-like polish). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 2,
@@ -59,7 +59,7 @@
             "strengths": ["Mutig", "Kreativ", "Abenteuerlustig"],
             "flaws": ["Stur", "Schlechter Verlierer"],
             "challenges": ["Regeln befolgen", "Gefühle kontrollieren"],
-            "specialDetails": "Liebt Dinosaurier, baut gerne Lego, spielt Fussball"
+            "specialDetails": "Dinosaurier-verrückt — kennt jede Art beim Namen, will Paläontologe werden, baut Dinosaurier-Skelette aus Lego nach, spielt nebenbei Fussball"
           },
           "clothing": {
             "structured": {
@@ -68,7 +68,7 @@
               "shoes": "blaue Sneakers"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 7-year-old European boy named Noah standing on a sunlit park path. He has short slightly wavy blonde hair, bright blue eyes, light/fair skin, and a confident smile. He is wearing a green hoodie with a large, clearly visible white T-Rex dinosaur silhouette printed across the front, dark grey jogger pants, and blue sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 7-year-old European boy named Noah standing on a sunlit park path. He has short slightly wavy blonde hair (a bit unkempt), bright blue eyes, light/fair skin, and a small natural smile (not posed, not glossy). He is wearing a dark forest-green hoodie with a HUGE bright white T-Rex dinosaur silhouette graphic print covering most of the chest — the T-Rex is the dominant visual element, clearly readable, the unmistakable focal point of the hoodie. Dark grey jogger pants and blue-and-white sneakers. Real-child appearance: scuffed shoes, casual stance, ordinary kid (not a model, no glamour). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 3,
@@ -133,6 +133,39 @@
             }
           },
           "portraitPrompt": "Full-body photograph of a 36-year-old European woman named Sarah standing in a casual outdoor setting. She has shoulder-length straight blonde hair, green eyes, light skin, modern rectangular glasses, and a warm kind smile. She is wearing a white blouse, a dark navy-blue knee-length skirt, and black ballerina flats. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+        },
+        {
+          "id": 13,
+          "name": "Werner",
+          "gender": "male",
+          "age": "68",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "white",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "facialHair": "full white walrus mustache",
+            "build": "stocky",
+            "height": "average",
+            "other": "deep weathered face, friendly grandpa eyes"
+          },
+          "traits": {
+            "strengths": ["Geduldig", "Geschichtenerzähler", "Handwerklich"],
+            "flaws": ["Vergisst Namen", "Stur"],
+            "challenges": ["Mit Technik umgehen"],
+            "specialDetails": "Daniels Vater, pensionierter Schreiner, raucht Pfeife, kennt jede Schweizer Wandersaga"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "rotes Karohemd mit braunen Hosenträgern",
+              "lowerBody": "braune Cordhose",
+              "shoes": "abgenutzte braune Lederschuhe"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 68-year-old Swiss grandfather named Werner standing in a sunlit alpine meadow. He has short white hair (a bit thin on top), a FULL bushy white walrus mustache (no chin beard, just the prominent mustache — this is his signature feature), pale blue eyes with deep crow's-feet, light weathered skin with visible age (sun spots, lines, real older skin texture — NOT smoothed, NOT idealized), a stocky working-man build, and a relaxed warm grandfatherly expression. He is wearing a clearly visible red-and-black checkered plaid flannel shirt with brown leather suspenders worn over the shirt (the suspenders are an unmistakable visual element), brown corduroy trousers, and worn-in brown leather shoes. Real elder appearance: slightly stooped posture, casual stance, ordinary working-class grandpa (not a model). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -141,7 +174,10 @@
         "1-4": "parent-child",
         "2-3": "parent-child",
         "2-4": "parent-child",
-        "3-4": "partner"
+        "3-4": "partner",
+        "1-13": "grandparent-grandchild",
+        "2-13": "grandparent-grandchild",
+        "3-13": "parent-child"
       }
     },
     {
@@ -180,7 +216,7 @@
               "shoes": "red rubber boots"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 6-year-old American girl named Lily standing in a sunlit garden. She has medium-length curly red hair, green eyes, light skin with freckles across her nose and cheeks, and a gentle smile. She is wearing a yellow overall pinafore dress over a white t-shirt with a small embroidered horse on the chest, and red rubber rain boots. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 6-year-old American girl named Lily standing in a sunlit garden. She has medium-length curly red hair (a bit windblown), green eyes, light skin with prominent freckles across her nose and cheeks, and a small natural smile (not posed, not glossy). She is wearing a bright sunny-yellow corduroy overall pinafore dress (the dungaree shape clearly visible with shoulder straps and front buckles) over a long-sleeve cream shirt that has a clearly embroidered brown horse silhouette patch on the chest. On her feet: bright fire-engine-red glossy rubber rain boots that pop in contrast with the yellow dress. Real-child appearance: a bit of grass on her boots, casual stance, ordinary kid (not a model, no doll-like polish). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 6,
@@ -190,11 +226,11 @@
           "ageCategory": "young-school-age",
           "storyRole": "main",
           "physical": {
-            "hairColor": "black",
+            "hairColor": "dark brown",
             "hairLength": "short",
             "hairStyle": "curly",
-            "eyeColor": "brown",
-            "skinTone": "medium",
+            "eyeColor": "hazel",
+            "skinTone": "light",
             "build": "athletic",
             "height": "average"
           },
@@ -211,7 +247,7 @@
               "shoes": "white sneakers"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 9-year-old American boy named Ethan standing on a grassy soccer field. He has short curly black hair, warm brown eyes, medium skin tone, athletic build, and a confident smile. He is wearing a blue t-shirt with a large, clearly visible white rocket and stars print across the front, khaki shorts, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 9-year-old American boy named Ethan standing on a grassy soccer field. He has short curly dark brown hair, hazel eyes, light skin (Caucasian), athletic but normal kid build, and a small natural smile (not posed, not glossy). He is wearing a navy-blue t-shirt with a HUGE bold white rocket-ship-and-stars graphic print covering most of the chest — the rocket motif is the dominant visual element, clearly readable, the unmistakable focal point of the t-shirt. Khaki cargo shorts and grass-stained white sneakers. Real-child appearance: scuffed shoes, casual stance, ordinary kid (not a model, no glamour). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 7,
@@ -248,19 +284,20 @@
         },
         {
           "id": 8,
-          "name": "Aisha",
+          "name": "Rachel",
           "gender": "female",
           "age": "40",
           "ageCategory": "adult",
           "storyRole": "in",
           "physical": {
-            "hairColor": "black",
-            "hairLength": "medium",
-            "hairStyle": "natural curls",
-            "eyeColor": "dark brown",
-            "skinTone": "dark",
+            "hairColor": "auburn",
+            "hairLength": "long",
+            "hairStyle": "wavy",
+            "eyeColor": "green",
+            "skinTone": "light",
             "build": "average",
-            "height": "average"
+            "height": "average",
+            "other": "light freckles across the nose and cheeks"
           },
           "traits": {
             "strengths": ["Warm", "Decisive", "Encouraging"],
@@ -275,7 +312,39 @@
               "shoes": "brown ankle boots"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 40-year-old American woman named Aisha standing in a casual outdoor setting. She has medium-length natural black curls, warm dark brown eyes, rich dark brown skin with a radiant complexion, and a warm kind smile. She is wearing a burgundy blouse, black tailored trousers, and brown ankle boots. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid photograph of an ordinary 40-year-old American woman named Rachel standing in a casual outdoor setting. She has long wavy auburn (red-brown) hair, green eyes, light Caucasian skin with a light scatter of freckles across her nose and cheeks, average everyday build, and a relaxed warm expression — not posed. She is wearing a burgundy blouse, black tailored trousers, and brown ankle boots. Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. Looks like a real candid, not a polished headshot. No retouching, no glamour, no text, no watermarks."
+        },
+        {
+          "id": 14,
+          "name": "Margaret",
+          "gender": "female",
+          "age": "70",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "silver-grey",
+            "hairLength": "short",
+            "hairStyle": "bob",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "build": "average",
+            "height": "short",
+            "other": "wears round tortoiseshell reading glasses on a beaded chain around the neck"
+          },
+          "traits": {
+            "strengths": ["Patient", "Wise", "Generous"],
+            "flaws": ["Worries", "Sets the table six hours early"],
+            "challenges": ["Letting the kids be messy"],
+            "specialDetails": "James's mother, retired librarian, bakes apple pie every Sunday, knits constantly"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "soft pastel-pink cardigan over a floral patterned blouse",
+              "lowerBody": "long beige A-line skirt",
+              "shoes": "comfortable beige orthopedic shoes"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 70-year-old American grandmother named Margaret standing in a sunlit garden. She has short silver-grey bobbed hair (neat but natural, not styled), pale blue eyes, light skin with visible age (smile lines, soft folds, age spots, real older skin texture — NOT smoothed, NOT idealized), a small grandmotherly build, and a warm gentle expression. She wears round tortoiseshell reading glasses hanging on a beaded chain around her neck (not on her face — resting on her chest, the beaded chain is a clearly visible accessory). She is wearing a soft pastel-pink chunky knit cardigan worn open over a floral-patterned blouse (the floral pattern is clearly visible), a long beige A-line skirt, and comfortable beige orthopedic shoes. Real elder appearance: slight stoop, casual stance, ordinary grandma (not a model). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -284,7 +353,10 @@
         "5-8": "parent-child",
         "6-7": "parent-child",
         "6-8": "parent-child",
-        "7-8": "partner"
+        "7-8": "partner",
+        "5-14": "grandparent-grandchild",
+        "6-14": "grandparent-grandchild",
+        "7-14": "parent-child"
       }
     },
     {
@@ -301,7 +373,7 @@
           "ageCategory": "preschooler",
           "storyRole": "main",
           "physical": {
-            "hairColor": "black",
+            "hairColor": "chestnut brown",
             "hairLength": "short",
             "hairStyle": "bob",
             "eyeColor": "dark brown",
@@ -322,19 +394,19 @@
               "shoes": "chaussures Mary Jane noires"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 4-year-old French girl named Léa standing in a sunlit Parisian park. She has a short black bob haircut, dark brown eyes, light/fair skin, and a playful smile. She is wearing a red dress with a clearly visible large white polka-dot pattern, white tights, and black Mary Jane shoes. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 4-year-old French toddler named Léa standing in a sunlit Parisian park. She has a short chestnut-brown bob haircut (slightly messy, natural toddler hair, soft warm brown — NOT black, NOT dark), dark brown eyes, light/fair skin with realistic toddler texture (slightly chubby cheeks, soft baby fat, normal skin — NOT porcelain, NOT doll-like, NOT glossy, NOT retouched), and a small neutral expression or shy half-smile (NOT posed, NOT a wide cheerful grin). She is wearing a red sundress with a bold pattern of large evenly-spaced white polka dots covering the entire dress — the polka dots are big, clearly readable, and dominant. White tights and black Mary Jane shoes. Real toddler appearance: a bit awkward stance, ordinary child (not a model, no glamour, no doll quality). Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 10,
-          "name": "Hugo",
+          "name": "Jules",
           "gender": "male",
           "age": "8",
           "ageCategory": "young-school-age",
           "storyRole": "main",
           "physical": {
-            "hairColor": "light brown",
-            "hairLength": "medium",
-            "hairStyle": "wavy",
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "straight",
             "eyeColor": "blue",
             "skinTone": "light",
             "build": "average",
@@ -344,7 +416,7 @@
             "strengths": ["Réfléchi", "Bienveillant", "Débrouillard"],
             "flaws": ["Rêveur", "Dispersé"],
             "challenges": ["Finir ses devoirs", "Parler en public"],
-            "specialDetails": "Passionné d'astronomie, collectionne les cailloux, joue de la flûte"
+            "specialDetails": "Petit naturaliste curieux: observe les oiseaux et les insectes au parc, connaît tous les arbres du Jardin du Luxembourg, collectionne les feuilles et plumes, joue de la flûte"
           },
           "clothing": {
             "structured": {
@@ -353,7 +425,7 @@
               "shoes": "baskets blanches"
             }
           },
-          "portraitPrompt": "Full-body photograph of an 8-year-old French boy named Hugo standing in a sunlit Parisian park. He has medium-length wavy light brown hair, bright blue eyes, light/fair skin, and a thoughtful smile. He is wearing a clearly visible navy and white horizontally striped Breton sweater, beige trousers, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 8-year-old French boy named Jules standing in a sunlit Parisian park. He has plain short black hair (typical boy haircut, no styling, no waves, no fringe — just simple short hair), blue eyes, light/fair skin, and a small natural smile (not posed, not glossy). He is wearing a classic Breton sailor sweater with HIGH-CONTRAST, BOLD horizontal stripes — thick navy blue and white bands, evenly spaced — the striped pattern is the dominant visual element of the outfit. Beige chino trousers and white sneakers. Real-child appearance: scuffed shoes, casual stance, ordinary kid (not a model, no glamour). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 11,
@@ -395,7 +467,7 @@
           "ageCategory": "adult",
           "storyRole": "in",
           "physical": {
-            "hairColor": "dark brown",
+            "hairColor": "blonde",
             "hairLength": "long",
             "hairStyle": "straight",
             "eyeColor": "dark brown",
@@ -416,7 +488,40 @@
               "shoes": "ballerines noires"
             }
           },
-          "portraitPrompt": "Full-body photograph of a 34-year-old French woman named Élodie standing in a casual Parisian outdoor setting. She has long straight dark brown hair, dark brown eyes, light skin, and a warm kind smile. She is wearing a cream blouse with fine stripes, a navy-blue midi skirt, and black ballerina flats. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 34-year-old French woman named Élodie standing in a casual Parisian outdoor setting. She has long straight blonde hair (warm honey blonde, natural — not platinum, not bleached), dark brown eyes (the brown-eyes-with-blonde-hair combination is striking), light skin, and a warm kind smile. She is wearing a cream blouse with fine stripes, a navy-blue midi skirt, and black ballerina flats. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
+        },
+        {
+          "id": 15,
+          "name": "Henri",
+          "gender": "male",
+          "age": "72",
+          "ageCategory": "adult",
+          "storyRole": "in",
+          "physical": {
+            "hairColor": "grey",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "blue",
+            "skinTone": "light",
+            "facialHair": "neat short white beard (full chin and mustache)",
+            "build": "slim",
+            "height": "average",
+            "other": "always wears a black wool beret"
+          },
+          "traits": {
+            "strengths": ["Cultivé", "Drôle", "Élégant"],
+            "flaws": ["Bougon le matin", "Râleur"],
+            "challenges": ["Accepter de prendre sa retraite vraiment"],
+            "specialDetails": "Père de Marc, ancien professeur de littérature, joue aux échecs au café tous les matins"
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "gilet en laine bordeaux boutonné par-dessus une chemise blanche à col",
+              "lowerBody": "pantalon en laine grise",
+              "shoes": "vieilles chaussures de cuir noir cirées"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 72-year-old French grandfather named Henri standing on a sunlit Paris sidewalk near a café. He has short grey hair (visible under his hat), a neat short white beard covering his chin and upper lip (full but trimmed close), pale blue eyes with deep crow's-feet, light weathered skin with visible age (lines, age spots, real older skin texture — NOT smoothed, NOT idealized), a slim wiry build, and a slightly amused intellectual expression. He is wearing a CLEARLY VISIBLE black wool beret tilted on his head (this is his signature accessory, unmistakably French-grandpa), a buttoned burgundy wool waistcoat over a white collared shirt (no jacket), grey wool trousers, and old polished black leather shoes. Real elder appearance: relaxed cane-free stance, ordinary retired professor (not a model). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -425,7 +530,10 @@
         "9-12": "parent-child",
         "10-11": "parent-child",
         "10-12": "parent-child",
-        "11-12": "partner"
+        "11-12": "partner",
+        "9-15": "grandparent-grandchild",
+        "10-15": "grandparent-grandchild",
+        "11-15": "parent-child"
       }
     }
   ]

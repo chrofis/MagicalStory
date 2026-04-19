@@ -1,3 +1,14 @@
+# LEGACY — scene expansion is now handled inside `story-unified.txt`
+#
+# The unified outline prompt (Sonnet) produces both the scene prose and the
+# METADATA JSON directly — no separate Haiku expansion step runs in the primary
+# story pipeline. This file is still loaded as `PROMPT_TEMPLATES.sceneExpansion`
+# and called by a few legacy code paths (cover expansion at server.js:3285, the
+# fallback path at server.js:2808). Those callers will be migrated or removed in
+# a follow-up. Do NOT make this the authoritative source for scene-hint rules;
+# edit `story-unified.txt` instead. Keep this file in sync for the legacy paths
+# until they're retired.
+
 **ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader.
 
 ---
@@ -120,10 +131,10 @@ Then a single-line JSON object:
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
 - No named characters, no tracked animals, no carried or handheld artifacts (swords, books, apples, crossbows — those get composited later with the character).
-- Fixed immobile artifacts that anchor the scene (a pole-with-banner, a throne, a monument, a pedestal, an altar, a signpost) are allowed and, when the page text centers on them, must be described as the focal point — "prominent at the centre, dominating the foreground composition, readable and sharply defined," not "a pole stands somewhere." Name the key visual marker (the hat on top, the inscription, the crown) so the model doesn't substitute a generic building.
+- Scene-anchor artifacts are allowed and, when the page text centers on them, must be described as the focal point — "prominent at the centre, dominating the foreground composition, readable and sharply defined," not "a pole stands somewhere." This covers stationary anchors (pole-with-banner, throne, monument, pedestal, altar, signpost) AND the vehicle or vessel when the scene takes place in or on one (boat, raft, wagon, carriage, cart, train compartment, sled). Name the key visual marker (the hat on top, the inscription, the crown, the boat's stern) so the model doesn't substitute a generic building.
 - Never write hypothetical references like "where children would stand" — image models render those literally.
 - Use "open foreground", "uncluttered centre". Named characters will be composited later, so framing must leave enough physical space for them.
-- When the scene's prose calls for a populated setting (crowd, villagers, market-goers, distant onlookers, busy street), describe those anonymous extras here too — density, rough distance, silhouette only — so the backdrop already feels populated. Keep extras away from the spot reserved for named characters.
+- When the scene's prose calls for a populated setting (crowd, villagers, market-goers, soldiers, guards, onlookers, distant workers, busy street), describe those anonymous extras here too — density, rough distance, silhouette only — so the backdrop already feels populated. Keep extras away from the spot reserved for named characters.
 - The corner that matches the chosen `textPosition` must be described as dark, shadowed, or low-luminance (dusk sky, shadowed wall, deep water, dark foliage) so white text reads against it.
 
 **Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.

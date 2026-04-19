@@ -7,6 +7,7 @@
  * Usage:
  *   node scripts/admin/generate-demo-photos.js                       # All families, upload only
  *   node scripts/admin/generate-demo-photos.js --family=berger       # Single family
+ *   node scripts/admin/generate-demo-photos.js --family=berger --only=Werner  # Single character
  *   node scripts/admin/generate-demo-photos.js --save-to=./demo-photos  # Also save to disk
  *   node scripts/admin/generate-demo-photos.js --save-to=./demo-photos --no-upload  # Disk only
  *
@@ -93,26 +94,35 @@ function bufferToDataUri(buf) {
 }
 
 async function processFamily(apiBase, family, opts) {
-  const { saveDir, doUpload } = opts;
+  const { saveDir, doUpload, only } = opts;
   console.log(`\n── ${family.label} (${family.email}) ──────────────────`);
 
+  // Filter characters when --only=<name> is set (case-insensitive name match).
+  const charsToGenerate = only
+    ? family.characters.filter(c => c.name.toLowerCase() === only.toLowerCase())
+    : family.characters;
+  if (only && charsToGenerate.length === 0) {
+    console.log(`   No character matching "${only}" in family ${family.id} — skipping.`);
+    return;
+  }
+
   // 1. Generate portraits
-  console.log(`1. Generating ${family.characters.length} portraits...`);
+  console.log(`1. Generating ${charsToGenerate.length} portrait(s)...`);
   const portraits = {};  // characterId → Buffer
-  for (const charDef of family.characters) {
+  for (const charDef of charsToGenerate) {
     try {
       portraits[charDef.id] = await generateJpegBuffer(charDef.portraitPrompt, charDef.name);
     } catch (err) {
       console.error(`   Failed to generate ${charDef.name}: ${err.message}`);
     }
   }
-  console.log(`   Generated ${Object.keys(portraits).length}/${family.characters.length}`);
+  console.log(`   Generated ${Object.keys(portraits).length}/${charsToGenerate.length}`);
 
   // 2. Save to disk (optional)
   if (saveDir) {
     const familyDir = path.join(saveDir, family.id);
     fs.mkdirSync(familyDir, { recursive: true });
-    for (const charDef of family.characters) {
+    for (const charDef of charsToGenerate) {
       const buf = portraits[charDef.id];
       if (!buf) continue;
       const filePath = path.join(familyDir, `${charDef.name}.jpg`);
@@ -205,8 +215,11 @@ async function main() {
   if (saveDir) console.log(`Saving JPEGs to: ${saveDir}`);
   console.log(`Families: ${targetFamilies.map(f => f.id).join(', ')}`);
 
+  const only = args.only || null;
+  if (only) console.log(`Filter: only character "${only}"`);
+
   for (const family of targetFamilies) {
-    await processFamily(apiBase, family, { saveDir, doUpload });
+    await processFamily(apiBase, family, { saveDir, doUpload, only });
   }
 
   console.log('\n════════════════════════════════════════════════════');
