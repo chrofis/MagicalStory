@@ -5235,7 +5235,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   textAreaMask: img.textAreaMask,
                   pageNumber: img.pageNumber,
                   skipCache: true,
-                  aspectRatio: MODEL_DEFAULTS.pageAspect,
+                  aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                 });
                 if (!repairResult?.imageData) {
                   log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: no image returned`);
@@ -5775,6 +5775,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
       languageLevel: inputData.languageLevel || '1st-grade',
+      // Persist layout on storyData so PDF / shared-viewer / re-iteration code
+      // doesn't need to re-derive it from languageLevel. Computed upfront in
+      // processStoryJob and carried through the pipeline via inputData.
+      layout: inputData.layout || null,
       pages: inputData.pages || sceneCount,
       dedication: inputData.dedication || '',
       season: inputData.season || '', // Season when story takes place
@@ -6320,6 +6324,19 @@ async function _processStoryJobImpl(jobId) {
 
     const job = jobResult.rows[0];
     const inputData = job.input_data;
+
+    // Stamp the layout from languageLevel onto inputData so image generation,
+    // scene expansion, and PDF rendering all read from the same source of
+    // truth. Advanced stories → square image + text-below strip; standard
+    // and 1st-grade → A4 image + overlay. Without this, buildImagePrompt
+    // falls through to its default (textInImage=true) regardless of level.
+    try {
+      const { resolveLayout } = require('./server/lib/layout');
+      inputData.layout = resolveLayout(inputData.languageLevel);
+      log.info(`📐 [PROCESS] Layout for level=${inputData.languageLevel}: mode=${inputData.layout.mode}, aspect=${inputData.layout.imageAspect}, textInImage=${inputData.layout.textInImage}`);
+    } catch (e) {
+      log.warn(`📐 [PROCESS] resolveLayout failed: ${e.message} — layout not stamped`);
+    }
 
     // Debug: Log inputData values when job starts processing
     log.debug(`📝 [JOB PROCESS] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
