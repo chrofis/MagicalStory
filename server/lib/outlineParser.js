@@ -1111,12 +1111,18 @@ class UnifiedStoryParser {
   extractTitle() {
     if (this._cache.title !== undefined) return this._cache.title;
 
-    const match = this.response.match(/---TITLE---\s*(?:TITLE:\s*)?(.+?)(?:\n|$)/i);
-    if (match) {
-      this._cache.title = match[1].trim()
-        .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
-        .replace(/^#+\s*/, '')               // Strip heading markers
-        .replace(/^TITLE:\s*/i, '')          // Strip TITLE: prefix (when inside bold markers)
+    // Find the final TITLE: line inside the ---TITLE--- section. Sonnet
+    // outputs a TITLE_CANDIDATES: list followed by "TITLE: <chosen>", so we
+    // must anchor on a TITLE: that is NOT followed by an underscore (which
+    // would match TITLE_CANDIDATES:). Scan only the TITLE section so we don't
+    // accidentally pick up stray lines.
+    const sectionMatch = this.response.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i);
+    const section = sectionMatch ? sectionMatch[1] : '';
+    const titleLineMatch = section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im);
+    if (titleLineMatch) {
+      this._cache.title = titleLineMatch[1].trim()
+        .replace(/^\*{1,2}|\*{1,2}$/g, '')
+        .replace(/^"|"$/g, '')
         .trim();
       log.debug(`[UNIFIED-PARSER] Title: "${this._cache.title}"`);
       return this._cache.title;
@@ -1678,11 +1684,16 @@ class ProgressiveUnifiedParser {
     if (!this._hasMarker('TITLE')) return;
     if (!this._hasMarker('CLOTHING REQUIREMENTS') && !this._hasMarker('VISUAL BIBLE')) return;
 
-    const match = this.fullText.match(/---\s*TITLE\s*---\s*(?:TITLE:\s*)?(.+?)(?:\n|---\s*(?:CLOTHING|VISUAL))/i);
-    if (match) {
-      const title = match[1].trim()
-        .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
-        .replace(/^TITLE:\s*/i, '')          // Strip TITLE: prefix (when inside bold markers)
+    // Scan only the TITLE section so we can pick the FINAL TITLE: line and
+    // ignore the TITLE_CANDIDATES: list header Sonnet emits above it.
+    const sectionMatch = this.fullText.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*(?:CLOTHING|VISUAL))/i);
+    const section = sectionMatch ? sectionMatch[1] : null;
+    // TITLE(?!_) negative-lookahead excludes TITLE_CANDIDATES:.
+    const titleLineMatch = section ? section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im) : null;
+    if (titleLineMatch) {
+      const title = titleLineMatch[1].trim()
+        .replace(/^\*{1,2}|\*{1,2}$/g, '')
+        .replace(/^"|"$/g, '')
         .trim();
       this.emitted.title = true;
       log.debug(`🌊 [STREAM-UNIFIED] Title detected: "${title}"`);
