@@ -4790,9 +4790,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const fixHint = qc.visionFeedback
                     ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
                     : '';
-                  // Soften the text area instruction instead of removing it entirely
+                  // Soften the text area instruction instead of removing it entirely.
+                  // White text will be overlaid, so the zone must be DARK and smooth —
+                  // deep shadowed tones of the scene's own palette, never a flat
+                  // black rectangle.
                   const softerTextInstr = textPos
-                    ? `Keep the ${textPos.replace('-', ' ')} area slightly calmer than the rest of the scene — lighter tones, less detail. But do NOT paint a white box or blank patch there.`
+                    ? `Keep the ${textPos.replace('-', ' ')} area DARK and smooth — deep/shadowed tones of the scene's own palette (dusk sky, shadowed wall, deep water, dark foliage), slightly less detail than the rest of the scene. White text will be printed here. Do NOT paint a flat black rectangle or blank patch.`
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
                   const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
