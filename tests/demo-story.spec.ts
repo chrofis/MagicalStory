@@ -179,9 +179,12 @@ test.describe('Demo Story Generation', () => {
     page.on('pageerror', err => jsErrors.push(err.message));
 
     // ── Step 0: Pre-seed language, then login ──
-    console.log('Step 0: Setting language + logging in...');
+    // DEMO_EMAIL env var overrides the family's default account — used by the
+    // showcase orchestrator to log in as the freshly-provisioned per-run account.
+    const loginEmail = process.env.DEMO_EMAIL || family.email;
+    console.log(`Step 0: Setting language + logging in as ${loginEmail}...`);
     await preSeedLanguage(page, entry.language, baseURL || 'https://magicalstory.ch');
-    await loginAs(page, family.email, DEMO_PASSWORD);
+    await loginAs(page, loginEmail, DEMO_PASSWORD);
 
     // ── Step 0b: Navigate to a fresh story (lang param keeps language sticky) ──
     console.log('Step 0b: Starting new story...');

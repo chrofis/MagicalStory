@@ -31,7 +31,9 @@
     "test:avatar:all": "npm run test:unit && npm run test:api && npm run test:e2e:avatar",
     "test:demo": "npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
     "test:demo:local": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
-    "test:demo:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1 --headed"
+    "test:demo:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1 --headed",
+    "showcase": "node scripts/admin/showcase.js",
+    "showcase:local": "cross-env TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js"
   },
   "keywords": [
     "storytelling",

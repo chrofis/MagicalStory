@@ -21,7 +21,8 @@
             "eyeColor": "brown",
             "skinTone": "light",
             "build": "average",
-            "height": "short"
+            "height": "short",
+            "other": "small scatter of freckles across the nose and cheeks"
           },
           "traits": {
             "strengths": ["Neugierig", "Fröhlich", "Fantasievoll"],
@@ -31,12 +32,12 @@
           },
           "clothing": {
             "structured": {
-              "upperBody": "rosa T-Shirt mit Schmetterlings-Aufdruck",
+              "upperBody": "rosa T-Shirt mit grossem Schmetterlings-Aufdruck",
               "lowerBody": "blaue Jeans",
               "shoes": "weisse Turnschuhe"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 5-year-old European girl named Emma. She has brown hair in pigtails, warm brown eyes, light/fair skin, and a cheerful smile. She is wearing a pink t-shirt with a butterfly print. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 5-year-old European girl named Emma standing in a sunlit grassy meadow. She has brown hair in pigtails, warm brown eyes, light/fair skin with a small scatter of freckles across her nose and cheeks, and a cheerful smile. She is wearing a pink t-shirt with a large, clearly visible colorful butterfly printed across the front, blue jeans, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 2,
@@ -48,7 +49,7 @@
           "physical": {
             "hairColor": "blonde",
             "hairLength": "short",
-            "hairStyle": "straight",
+            "hairStyle": "wavy",
             "eyeColor": "blue",
             "skinTone": "light",
             "build": "average",
@@ -62,12 +63,12 @@
           },
           "clothing": {
             "structured": {
-              "upperBody": "grünes Kapuzenpullover",
+              "upperBody": "grünes Kapuzenpullover mit grossem T-Rex-Dinosaurier-Aufdruck",
               "lowerBody": "dunkelgraue Jogginghose",
               "shoes": "blaue Sneakers"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 7-year-old European boy named Noah. He has short straight blonde hair, bright blue eyes, light/fair skin, and a confident smile. He is wearing a green hoodie. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 7-year-old European boy named Noah standing on a sunlit park path. He has short slightly wavy blonde hair, bright blue eyes, light/fair skin, and a confident smile. He is wearing a green hoodie with a large, clearly visible white T-Rex dinosaur silhouette printed across the front, dark grey jogger pants, and blue sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 3,
@@ -99,7 +100,7 @@
               "shoes": "braune Lederschuhe"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 38-year-old European man named Daniel. He has short dark brown hair, a neatly trimmed beard, brown eyes, light skin, tall build. He is wearing a dark blue button-up shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+          "portraitPrompt": "Full-body candid photograph of an ordinary 38-year-old European man named Daniel standing in a casual outdoor setting. He has short dark brown hair (slightly messy, not styled), a short trimmed beard with a few visible grey hairs, brown eyes with mild crow's-feet, light skin with natural texture (visible pores, faint smile lines, not retouched), an average everyday build (not athletic, slight middle-age softness), and a relaxed neutral expression — not posed. He is wearing a slightly wrinkled dark blue button-up shirt, beige chinos, and brown leather shoes. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. Looks like a real snapshot, not a professional headshot. No retouching, no glamour, no text, no watermarks."
         },
         {
           "id": 4,
@@ -131,7 +132,7 @@
               "shoes": "schwarze Ballerinas"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 36-year-old European woman named Sarah. She has shoulder-length straight blonde hair, green eyes, light skin, and she wears modern rectangular glasses. She is wearing a white blouse. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 36-year-old European woman named Sarah standing in a casual outdoor setting. She has shoulder-length straight blonde hair, green eyes, light skin, modern rectangular glasses, and a warm kind smile. She is wearing a white blouse, a dark navy-blue knee-length skirt, and black ballerina flats. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -179,7 +180,7 @@
               "shoes": "red rubber boots"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 6-year-old American girl named Lily. She has medium-length curly red hair, green eyes, light skin with freckles across her nose and cheeks, and a gentle smile. She is wearing a yellow overall dress. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 6-year-old American girl named Lily standing in a sunlit garden. She has medium-length curly red hair, green eyes, light skin with freckles across her nose and cheeks, and a gentle smile. She is wearing a yellow overall pinafore dress over a white t-shirt with a small embroidered horse on the chest, and red rubber rain boots. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 6,
@@ -205,12 +206,12 @@
           },
           "clothing": {
             "structured": {
-              "upperBody": "blue striped t-shirt",
+              "upperBody": "blue t-shirt with a large white rocket and stars print",
               "lowerBody": "khaki shorts",
               "shoes": "white sneakers"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 9-year-old American boy named Ethan. He has short curly black hair, warm brown eyes, medium skin tone, and a confident smile. He is wearing a blue striped t-shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 9-year-old American boy named Ethan standing on a grassy soccer field. He has short curly black hair, warm brown eyes, medium skin tone, athletic build, and a confident smile. He is wearing a blue t-shirt with a large, clearly visible white rocket and stars print across the front, khaki shorts, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 7,
@@ -243,7 +244,7 @@
               "shoes": "brown leather boots"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 42-year-old American man named James. He has short salt-and-pepper hair, hazel eyes, light skin, and thin-framed glasses. He is clean-shaven and wearing a grey henley shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 42-year-old American man named James standing in a casual outdoor setting. He has short salt-and-pepper hair, hazel eyes, light skin, thin-framed glasses, clean-shaven, tall build, warm and approachable expression. He is wearing a grey henley shirt, dark jeans, and brown leather boots. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 8,
@@ -274,7 +275,7 @@
               "shoes": "brown ankle boots"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 40-year-old American woman named Aisha. She has medium-length natural black curls, warm dark brown eyes, and rich dark brown skin with a radiant complexion. She is wearing a burgundy blouse. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 40-year-old American woman named Aisha standing in a casual outdoor setting. She has medium-length natural black curls, warm dark brown eyes, rich dark brown skin with a radiant complexion, and a warm kind smile. She is wearing a burgundy blouse, black tailored trousers, and brown ankle boots. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -316,12 +317,12 @@
           },
           "clothing": {
             "structured": {
-              "upperBody": "robe rouge à pois blancs",
+              "upperBody": "robe rouge avec gros pois blancs",
               "lowerBody": "collants blancs",
               "shoes": "chaussures Mary Jane noires"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 4-year-old French girl named Léa. She has a short black bob haircut, dark brown eyes, light/fair skin, and a playful smile. She is wearing a red polka-dot dress. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 4-year-old French girl named Léa standing in a sunlit Parisian park. She has a short black bob haircut, dark brown eyes, light/fair skin, and a playful smile. She is wearing a red dress with a clearly visible large white polka-dot pattern, white tights, and black Mary Jane shoes. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 10,
@@ -352,7 +353,7 @@
               "shoes": "baskets blanches"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of an 8-year-old French boy named Hugo. He has medium-length wavy light brown hair, bright blue eyes, light/fair skin, and a thoughtful smile. He is wearing a navy and white striped sweater. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a family portrait session. Upper body shot showing face clearly. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of an 8-year-old French boy named Hugo standing in a sunlit Parisian park. He has medium-length wavy light brown hair, bright blue eyes, light/fair skin, and a thoughtful smile. He is wearing a clearly visible navy and white horizontally striped Breton sweater, beige trousers, and white sneakers. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 11,
@@ -384,7 +385,7 @@
               "shoes": "derbies marron"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 36-year-old French man named Marc. He has short neatly side-parted dark brown hair, blue eyes, and light skin. He is clean-shaven and wearing a sky-blue button-up shirt. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, approachable expression. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 36-year-old French man named Marc standing in a casual Parisian outdoor setting. He has short neatly side-parted dark brown hair, blue eyes, light skin, clean-shaven, tall build, warm and approachable expression. He is wearing a sky-blue button-up shirt, brown corduroy trousers, and brown derby shoes. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         },
         {
           "id": 12,
@@ -415,7 +416,7 @@
               "shoes": "ballerines noires"
             }
           },
-          "portraitPrompt": "Professional portrait photograph of a 34-year-old French woman named Élodie. She has long straight dark brown hair, dark brown eyes, and light skin. She is wearing a cream blouse with fine stripes. The photo is taken in natural daylight, slightly blurred background (bokeh), sharp focus on the face. Photo-realistic, high quality, like a professional headshot. Upper body shot showing face clearly. Warm, kind smile. No text, no watermarks."
+          "portraitPrompt": "Full-body photograph of a 34-year-old French woman named Élodie standing in a casual Parisian outdoor setting. She has long straight dark brown hair, dark brown eyes, light skin, and a warm kind smile. She is wearing a cream blouse with fine stripes, a navy-blue midi skirt, and black ballerina flats. Photo-realistic, natural daylight, slightly blurred background (bokeh), sharp focus, full figure framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {

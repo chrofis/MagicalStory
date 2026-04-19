@@ -1,9 +1,28 @@
-# Demo Story Generation
+# Demo Story Generation (Showcase)
 
-Playwright-driven generator that creates real, diverse demo stories for the homepage. Each test run picks the next entry from a rotation list and drives the full UI wizard end-to-end. Use it for two purposes:
+Playwright-driven generator that creates real, diverse demo stories for the homepage. Each run picks the next entry from a rotation list, **provisions a fresh timestamped account**, uploads curated character photos, and drives the full UI wizard end-to-end. Use it for two purposes:
 
 1. **Smoke-test the wizard** — every run walks Step 1 → Step 5 in a real browser against a real backend.
-2. **Generate gallery content** — the resulting stories sit in the demo accounts and can be surfaced on the homepage.
+2. **Generate gallery content** — the resulting stories sit in their own dedicated accounts and can be surfaced on the homepage.
+
+## Quick start
+
+```bash
+# Default: prod, next rotation entry, fresh account
+npm run showcase
+
+# Pick a specific rotation entry (e.g. Miller/EN/Space, index 7)
+npm run showcase -- --entry=7
+
+# Local backend
+npm run showcase:local
+
+# Provision the account but skip Playwright (useful for manual UI testing)
+node scripts/admin/showcase.js --upload-only
+```
+
+Each run creates `demo-{family}-{YYYYMMDD-HHmm}@magicalstory.ch` so runs never collide.
+Old stories stay accessible on their original accounts.
 
 ## What rotates
 
