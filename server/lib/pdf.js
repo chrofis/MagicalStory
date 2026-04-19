@@ -342,7 +342,10 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 
-    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio);
+    // textInImage === true means the scene was generated with a reserved calm
+    // zone for text → bake the text into the image (same renderer as Print
+    // Preview). textInImage === false keeps the legacy text-below-image strip.
+    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio, textInImage);
   } else {
     // Standard 2-page layout (square format only). Text page on left, image on right.
     const marginOuter = 20;
@@ -440,7 +443,9 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
     doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
     if (textOverlay && image?.imageData && cleanText) {
-      // Text overlay mode: render composited image (text baked in) — same renderer as browser
+      // Text overlay mode: render composited image (text baked in) — same renderer as browser.
+      // Image fills the whole interior page INCLUDING top and bottom bleed so the print
+      // PDF has no uncovered strip at the bottom edge.
       let overlayDrawn = false;
       try {
         const { enforceSpreadTextPosition } = require('./storyHelpers');
@@ -451,7 +456,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos);
 
-        await drawImageCovering(doc, compositedImage, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
+        await drawImageCovering(doc, compositedImage, 0, 0, interiorW, interiorH, { valign: 'top' });
         overlayDrawn = true;
       } catch (overlayErr) {
         log.warn(`⚠️ [PDF] Text overlay rendering failed for page ${pageNumber}: ${overlayErr.message} — falling back`);
@@ -590,7 +595,16 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
   let totalStoryPages = 0;
 
-  // Helper: Add story content pages (picture-book layout, adaptive ratio per language level)
+  const OVERLAY_POSITIONS = [
+    'top-left', 'bottom-full', 'top-right', 'bottom-left', 'top-full', 'bottom-right'
+  ];
+  const { resolveLayout } = require('./layout');
+  const { enforceSpreadTextPosition } = require('./storyHelpers');
+
+  // Helper: Add story content pages (picture-book layout, adaptive ratio per language level).
+  // When the story was generated with textInImage=true (calm-zone reserved),
+  // text is baked into the image using the same renderer as Print Preview —
+  // no text strip below. textInImage=false keeps the legacy layout.
   const addStoryContentPages = async (storyData, storyPages) => {
     const textMarginMm = mmToPoints(3);
     const textRatio = getPictureBookTextRatio(storyData.languageLevel);
@@ -601,6 +615,10 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const lineGap = -2;
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
 
+    const layoutFromLevel = resolveLayout(storyData.languageLevel);
+    const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
+    const textInImage = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
+
     for (let index = 0; index < storyPages.length; index++) {
       const pageText = storyPages[index];
       const pageNumber = index + 1;
@@ -609,6 +627,25 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
+
+      let overlayDrawn = false;
+      if (textInImage && image?.imageData && cleanText) {
+        try {
+          const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
+          const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
+          const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
+
+          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos);
+          // Fill the full interior page incl. top AND bottom bleed.
+          await drawImageCovering(doc, compositedImage, 0, 0, interiorPageWidth, interiorPageHeight, { valign: 'top' });
+          overlayDrawn = true;
+        } catch (overlayErr) {
+          log.warn(`⚠️ [COMBINED PDF] Text overlay failed for page ${pageNumber}: ${overlayErr.message} — falling back`);
+        }
+      }
+
+      if (overlayDrawn) continue;
 
       if (image && image.imageData) {
         try {
