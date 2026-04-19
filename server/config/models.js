@@ -119,6 +119,13 @@ const MODEL_DEFAULTS = {
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
   generateEmptyScenes: true,           // Pre-generate empty scene backgrounds for style anchoring
+  // Unified scene prose: Sonnet writes the ~300-word scene paragraph directly
+  // in the unified story pass (instead of emitting a tight JSON hint that Haiku
+  // then expands). Eliminates the Haiku scene-expansion call for initial gen.
+  // Haiku keeps its classifier roles (iterate repair, feedback consolidator).
+  // false = legacy Haiku-expansion path. Flip to true once the new parser
+  // path is validated on a test story.
+  unifiedSceneProse: true,
 
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages

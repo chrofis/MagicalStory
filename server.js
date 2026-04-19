@@ -2782,35 +2782,59 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`[SCENE EXPANSION] Could not pre-resolve photos for page ${page.pageNumber}: ${photoErr.message}`);
         }
 
-        const expansionPrompt = buildSceneExpansionPrompt(
-          page.pageNumber,
-          page.text,
-          sceneCharacters,
-          lang,
-          streamingVisualBible,
-          availableAvatars,
-          rawOutlineContext, // pass raw outline blocks directly
-          {
-            maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-            artStyleId: inputData.artStyle,
-            imageBackend: imgModelConfig?.backend,
-            referencePhotos: expansionPagePhotos
-          }
-        );
+        // Unified-scene-prose path: Sonnet wrote the ~300-word scene paragraph
+        // directly in the unified pass (emitted as page.sceneProse alongside
+        // page.sceneHint). When that field is present AND the feature flag is
+        // on, skip the Haiku expansion call entirely — the prose goes straight
+        // into sceneDescription. Haiku stays in its classifier roles (iterate
+        // repair, feedback consolidator).
+        const useUnifiedProse = MODEL_DEFAULTS.unifiedSceneProse === true && page.sceneProse && page.sceneProse.length > 50;
 
-        // Heartbeat keeps story_jobs.updated_at fresh during scene expansion streaming.
-        // 24 parallel scene expansions can each take 30-60s; without heartbeating,
-        // the row would only get updated when the first one finishes.
-        const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel);
-        const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
-        addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
+        let expansionPrompt = null;
+        let expansionResult = null;
+        let finalSceneDescription;
 
-        log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded`);
-        genLog.info('scene_expanded', `Page ${page.pageNumber} scene expanded`, null, { pageNumber: page.pageNumber, model: expansionResult.modelId });
+        if (useUnifiedProse) {
+          // Build the "expansion prompt" only for dev-panel traceability — never call the model.
+          // The sceneDescription we emit is Sonnet's prose concatenated with the METADATA JSON
+          // block so downstream extractors (characters[], objects[], textPosition, interactions[])
+          // still work via extractSceneMetadata().
+          const metadataBlock = page.sceneHint ? `\n\n---METADATA---\n${page.sceneHint}` : '';
+          finalSceneDescription = `${page.sceneProse}${metadataBlock}`;
+          log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene prose from unified pass (${page.sceneProse.length} chars) — Haiku expansion skipped`);
+          genLog.info('scene_expanded', `Page ${page.pageNumber} scene prose from Sonnet unified pass`, null, { pageNumber: page.pageNumber, source: 'unified' });
+        } else {
+          // Legacy path: Haiku scene-expansion.
+          expansionPrompt = buildSceneExpansionPrompt(
+            page.pageNumber,
+            page.text,
+            sceneCharacters,
+            lang,
+            streamingVisualBible,
+            availableAvatars,
+            rawOutlineContext, // pass raw outline blocks directly
+            {
+              maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+              artStyleId: inputData.artStyle,
+              imageBackend: imgModelConfig?.backend,
+              referencePhotos: expansionPagePhotos
+            }
+          );
+
+          // Heartbeat keeps story_jobs.updated_at fresh during scene expansion streaming.
+          // 24 parallel scene expansions can each take 30-60s; without heartbeating,
+          // the row would only get updated when the first one finishes.
+          const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
+          expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel);
+          const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+          addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
+          finalSceneDescription = expansionResult.text;
+
+          log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded (Haiku)`);
+          genLog.info('scene_expanded', `Page ${page.pageNumber} scene expanded`, null, { pageNumber: page.pageNumber, model: expansionResult.modelId });
+        }
 
         // Post-expansion validation: validate and repair scene composition (disabled — was enableSceneValidation)
-        let finalSceneDescription = expansionResult.text;
         if (false) {
           try {
             const { validateAndRepairScene, isValidationAvailable } = require('./server/lib/sceneValidator');
@@ -2858,7 +2882,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneHint: page.sceneHint,
           sceneDescription: finalSceneDescription,
           sceneDescriptionPrompt: expansionPrompt,
-          sceneDescriptionModelId: expansionResult.modelId,
+          sceneDescriptionModelId: expansionResult ? expansionResult.modelId : 'claude-sonnet:unified',
           characterClothing: page.characterClothing,
           characters: page.characters,
           // Store outline's intended character list — eval uses this to distinguish

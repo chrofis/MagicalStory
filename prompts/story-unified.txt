@@ -99,19 +99,37 @@ When they reached the tree, both children stopped to catch their breath. The vie
 
 You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above.
 
-# Scene Hint Format
+# Scene Output Format (SCENE + METADATA per page)
 
-Every page needs a scene hint for illustration. Output as JSON after `SCENE HINT:`:
+Every page outputs TWO blocks after its `TEXT:` block: a `SCENE:` paragraph (prose, 250–350 words, consumed directly by the image model) and a `METADATA:` JSON block (structured fields consumed by the pipeline). The SCENE prose is the image prompt — there is no Haiku expansion step downstream.
+
+## SCENE prose rules
+
+Write one continuous paragraph, 250–350 words. Open with the main subject and the main action. Weave each named character's physical description (age look, build, hair, eyes, distinctive features, clothing) in on first mention — flowing language, not a labeled list. Name recurring Visual Bible elements as they appear and interleave their identifying detail.
+
+- **Plain concrete verbs only.** Prefer `holds`, `sits on`, `reaches for`, `walks toward`, `gazes at`. BANNED: `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
+- **Positions + depth explicit for every character.** Name which corner or band of the frame (left foreground, center midground, far right background). Include depth words (near, close, distant, small) so the image model can stage properly.
+- **Honor `perspective` and `shot` fields from the hint you write.** For `perspective: over-the-shoulder`, the camera sits behind that character's shoulder: the OTS character fills the near foreground (large, back view, shoulder + head + held object visible), the subject they watch goes in midground or background (smaller, distant). Never invert — an OTS character in the background reads as a different shot entirely. For `perspective: back view`, shoulders/head/hips/both feet turned away, heels visible, toes pointing away. For `shot: ultra-wide` or "small silhouette in the distance" compositions, describe the character as explicitly tiny — "roughly a sixth the frame height", "a small silhouette in the wave-trough".
+- **Text zone off-limits.** The `textPosition` you set names a corner where printed text covers the image. No character may be placed there. Derive the forbidden side (`bottom-right`/`top-right` → right, `bottom-left`/`top-left` → left, `*-full` → that half). Stage characters on the opposite side.
+- **One moment, one focal point.** Single instant. One main action draws the eye. No time-lapse ("opens door, walks in, sits").
+- **Characters are active.** Every character does something specific. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
+- **Physically possible.** Two hands = max two items.
+- **No age collectives** — never "the children", "the kids". Use names or "all three", "the group".
+- **Never describe** weapons touching a character's body, characters bound or held by another, or wounds / blood.
+
+## METADATA JSON schema
 
 ```
-SCENE HINT:
+METADATA:
 {
-  "description": "1-2 sentences — a specific ACTION happening. Characters DOING something, not posing. What a camera would catch mid-moment.",
   "characters": [
-    { "name": "Name", "position": "left|center|right", "clothing": "standard|winter|summer|costumed:type" },
-    { "name": "Name", "position": "right", "clothing": "standard", "depth": "background", "perspective": "back view" }
+    { "name": "Name", "position": "left foreground|center background|...", "clothing": "standard|winter|summer|costumed:type" },
+    { "name": "Name", "position": "right background", "clothing": "standard", "depth": "background", "perspective": "back view" }
   ],
   "objects": ["LOC001", "ANI001"],
+  "interactions": [
+    { "character": "Name", "object": "wooden ladder", "where": "climbing, both hands on rungs, feet on third rung" }
+  ],
   "background": "busy crowd in hats and coats",
   "setting": "indoor|outdoor",
   "time": "morning|midday|afternoon|sunset|night",
@@ -119,22 +137,21 @@ SCENE HINT:
   "shot": "close-up|medium|wide|ultra-wide",
   "framingPattern": "solo-before|solo-after|over-the-shoulder",
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
-  "emptyScenePrompt": "2-4 sentences describing ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. NEVER write hypothetical references like 'where children would stand' or 'where figures would walk' — image models render those literally."
+  "emptyScenePrompt": "2–4 sentences describing the background environment only."
 }
 ```
 
 **Character fields:**
-- `position` (required): `left`, `center`, or `right`
-- `clothing` (required): must match an available avatar category
-- `depth` (optional, default `foreground`): `foreground`, `midground`, or `background` — how far from the camera
-- `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder` — how the camera sees THIS character
+- `position` (required): combined horizontal + depth phrase — `left foreground`, `center background`, `right midground`, etc.
+- `clothing` (required): must match an available avatar category exactly.
+- `depth` (optional, default `foreground`): `foreground`, `midground`, `background`.
+- `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder`.
 
-**emptyScenePrompt** (required): Describe ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. This is used to generate a pure background image as a style anchor. Include ONLY:
-- Location, architecture, natural landscape details
-- Lighting, weather, camera angle from the scene
-- Open and uncluttered foreground areas
-- Do NOT include any objects, animals, or artifacts — those are added separately via reference images
-- NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people
+**objects[]** — Visual Bible IDs. **When a landmark has numbered photo variants** (e.g. `LOC003.1`, `LOC003.2`, `LOC003.3`), emit the specific variant whose description matches the scene's `shot` and perspective — not the bare `LOC003`. Default to `.1` only if no variant is a clear match.
+
+**interactions[]** — one entry per character-to-object contact visible in the scene (held, worn, gripped, climbed, stood on, passed through, touched). `character` + `object` + short `where` describing exact placement. OMIT entries for characters who aren't touching anything. This is authoritative — evaluators check that the image matches these interactions exactly.
+
+**emptyScenePrompt** (required): Describe ONLY the background environment — no named main or secondary characters, no tracked animals, no carried/handheld artifacts. Fixed immobile artifacts that anchor the scene (a pole-with-banner, a throne, a monument, a pedestal, an altar, a signpost) ARE allowed and, when the page text centers on them, MUST be described as the focal point — "prominent at the center, dominating the foreground composition," not "a pole stands somewhere." Name the artifact's key visual marker (the hat on top, the inscription). Location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. Anonymous extras (crowd, villagers, vendors) ARE allowed when the scene calls for a populated setting — paint them as atmospheric density, silhouettes. The corner matching `textPosition` MUST be described as dark/shadowed/low-luminance (dusk sky, shadowed wall, deep water, dark foliage) — white text will be printed there. NEVER write hypothetical references like "where children would stand" — image models render those literally.
 
 **Rules:**
 - **CHARACTER COUNT** - Aim for 1-3 characters per scene. Use 4-5 only for gathering moments (reunion, group discovery, classroom). Never exceed {MAX_CHARACTERS_PER_SCENE}. Never pad.
@@ -295,13 +312,13 @@ For EACH **primary character** ({PRIMARY_CHARACTER_NAMES}):
 
 
 ---STORY DRAFT---
-Draft the story with scene hints. Focus on creativity first.
+Draft the story with scene output. Focus on creativity first.
 For EACH of the {PAGES} pages:
 
 **Draft [Page number]**
 [Story text]
 *(Word count: X)*
-[Scene hint - use format from "Scene Hint Format" section above]
+[SCENE prose paragraph + METADATA JSON — use format from "Scene Output Format" section above]
 
 ... continue for ALL {PAGES} pages ...
 
@@ -409,15 +426,17 @@ Based on the story draft, determine which clothing variants each character needs
 ```
 ---STORY DRAFT---
 **Draft 1**
-Sophie ran to the window. Snow was falling!
+The main character ran to the window. Snow was falling!
 *(Word count: 8)*
-SCENE HINT:
-{"description":"Sophie presses both hands against the frosty window, breath fogging the glass.","characters":[{"name":"Sophie","position":"right","clothing":"standard"}],"setting":"indoor","time":"morning","weather":"snowy","shot":"close-up"}
+SCENE:
+The main character — a slim grade-school girl with shoulder-length brown hair and freckles, wearing her striped sweater and dark leggings — stands at the right side of the frame in a softly lit bedroom, both hands pressed flat against a cold winter window, her breath fogging a patch on the glass as she leans close. Beyond the pane, large snowflakes drift past the pale grey dawn sky over the neighbouring rooftops. A pale wooden desk sits behind her in the shadowed left-background corner, quiet and simple. Close-up shot, warm soft morning light from inside the room, quiet wondering atmosphere.
+METADATA:
+{"characters":[{"name":"MainCharacter","position":"right foreground","clothing":"standard"}],"objects":[],"interactions":[{"character":"MainCharacter","object":"window","where":"both palms flat on the cold glass, face inches from the pane"}],"background":"empty bedroom, falling snow visible through window","setting":"indoor","time":"morning","weather":"snowy","shot":"close-up","textPosition":"top-left","emptyScenePrompt":"Simple bedroom interior at dawn, a tall frosted window on the right looking out onto falling snow against a pale grey sky, pale wooden desk in the shadowed left background, soft warm morning light. Top-left corner in shadowed wall tone for text."}
 
 ---ANALYSIS---
 **Plot:** No plot holes, cause/effect clear, pacing fine, stakes clear, resolution satisfying.
-**Sophie**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓. Issues: none.
-**Scene hints:** All within character limit, match plan, clothing correct, no banned patterns.
+**Main character**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓. Issues: none.
+**Scene output:** All within character limit, match plan, clothing correct, no banned patterns.
 **Cliché:** No repeated gestures, no cliché phrases.
 Fixes: None needed
 
@@ -599,14 +618,20 @@ For EACH of the {PAGES} pages:
 TEXT:
 [Story text]
 
-SCENE HINT:
-[Use format from "Scene Hint Format" section above]
+SCENE:
+[250–350 word prose paragraph — use rules from "Scene Output Format" section above]
+
+METADATA:
+[Single-line JSON — use schema from "Scene Output Format" section above]
 
 --- Page 2 ---
 TEXT:
 [Story continues...]
 
-SCENE HINT:
+SCENE:
+[...]
+
+METADATA:
 [...]
 
 ... continue for ALL {PAGES} pages ...
@@ -616,7 +641,7 @@ SCENE HINT:
 # FINAL CHECKLIST
 
 - [ ] ALL sections complete (don't skip any)
-- [ ] ALL {PAGES} pages written with TEXT and SCENE HINT
+- [ ] ALL {PAGES} pages written with TEXT, SCENE, and METADATA blocks
 - [ ] Visual Bible has specific colors for all elements
 - [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed:superhero`)
 

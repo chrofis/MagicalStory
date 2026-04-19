@@ -1435,22 +1435,42 @@ class UnifiedStoryParser {
       const content = match[2];
       lastPageNumber = Math.max(lastPageNumber, pageNumber);
 
-      // Extract TEXT section
-      const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
+      // Extract TEXT section — stops at SCENE:, METADATA:, or SCENE HINT:
+      const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|METADATA:|SCENE HINT:|$)/i);
       // Strip any trailing metadata like "*(Word count: 331)*" or similar
       const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
-      // Extract SCENE HINT section
-      // Try JSON format first: handles both bare JSON and ```json fenced JSON
-      // Then fall back to text format: stops at line-start Characters: or next page
+      // NEW FORMAT (unifiedSceneProse): SCENE: <prose> + METADATA: <json>
+      // Both blocks are emitted by Sonnet directly — no Haiku expansion step.
+      // The prose becomes sceneDescription (fed to Grok), the JSON becomes
+      // sceneHint (parsed for characters/objects/textPosition/etc).
+      //
+      // OLD FORMAT (legacy): SCENE HINT: <json>
+      // The parser still accepts this for backward compatibility.
+      let sceneProse = '';
       let sceneHint = '';
-      // Match: SCENE HINT:\n```json\n{...}\n``` OR SCENE HINT:\n{...}
-      const jsonHintMatch = content.match(/SCENE HINT:\s*(?:```json\s*\n?)?\s*(\{[\s\S]*?\})\s*(?:```\s*)?(?=---\s*(?:Page|Seite|Página|Pagina)|$)/i);
-      if (jsonHintMatch) {
-        sceneHint = jsonHintMatch[1].trim();
+      const nextPageBoundary = /(?=---\s*(?:Page|Seite|Página|Pagina)|$)/;
+
+      // Try new format: SCENE: prose block
+      const sceneProseMatch = content.match(/SCENE:\s*([\s\S]*?)(?=METADATA:|SCENE HINT:|---\s*(?:Page|Seite|Página|Pagina)|$)/i);
+      if (sceneProseMatch && sceneProseMatch[1].trim().length > 0) {
+        sceneProse = sceneProseMatch[1].trim().replace(/```[\s\S]*?```/g, '').trim();
+      }
+
+      // Try new format: METADATA: JSON block
+      const metadataMatch = content.match(/METADATA:\s*(?:```json\s*\n?)?\s*(\{[\s\S]*?\})\s*(?:```\s*)?(?=---\s*(?:Page|Seite|Página|Pagina)|SCENE HINT:|$)/i);
+      if (metadataMatch) {
+        sceneHint = metadataMatch[1].trim();
       } else {
-        const textHintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina))/im);
-        sceneHint = textHintMatch ? textHintMatch[1].trim() : '';
+        // Legacy fallback: SCENE HINT: JSON
+        const jsonHintMatch = content.match(/SCENE HINT:\s*(?:```json\s*\n?)?\s*(\{[\s\S]*?\})\s*(?:```\s*)?(?=---\s*(?:Page|Seite|Página|Pagina)|$)/i);
+        if (jsonHintMatch) {
+          sceneHint = jsonHintMatch[1].trim();
+        } else {
+          // Legacy text-format SCENE HINT (pre-JSON era)
+          const textHintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina))/im);
+          sceneHint = textHintMatch ? textHintMatch[1].trim() : '';
+        }
       }
 
       // Extract per-character clothing + perspective annotations from text-based format:
@@ -1510,12 +1530,13 @@ class UnifiedStoryParser {
         pageNumber,
         text,
         sceneHint,
+        sceneProse,  // new: Sonnet-authored prose (unifiedSceneProse path)
         characterClothing,
         characterPerspectives,
         characters
       });
 
-      log.debug(`[UNIFIED-PARSER] Page ${pageNumber}: text=${text.length} chars, hint=${sceneHint.length} chars, clothing=${Object.keys(characterClothing).join(',') || 'none'}`);
+      log.debug(`[UNIFIED-PARSER] Page ${pageNumber}: text=${text.length} chars, prose=${sceneProse.length} chars, hint=${sceneHint.length} chars, clothing=${Object.keys(characterClothing).join(',') || 'none'}`);
     }
 
     // Sort by page number
@@ -1953,9 +1974,11 @@ class ProgressiveUnifiedParser {
       // Skip if already emitted
       if (this.emitted.pages.has(pageNum)) continue;
 
-      // A page is complete when we have TEXT and SCENE HINT
+      // A page is complete when we have TEXT and either:
+      //   - METADATA: (new unified-scene-prose format), or
+      //   - SCENE HINT: (legacy format)
       const hasText = /TEXT:\s*\S/.test(content);
-      const hasHint = /SCENE HINT:\s*\S/.test(content);
+      const hasHint = /SCENE HINT:\s*\S/.test(content) || /METADATA:\s*\S/.test(content);
 
       // Check if there's a next page (means this one is complete) or end of content
       // Check for next page marker in any language (Page/Seite/Página)
@@ -1988,12 +2011,24 @@ class ProgressiveUnifiedParser {
 
       if (isNonLastComplete || isLastComplete) {
         // Extract page data
-        const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
+        // TEXT: stops at SCENE:, METADATA:, or SCENE HINT:
+        const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|METADATA:|SCENE HINT:|$)/i);
         // Strip any trailing metadata like "*(Word count: 331)*" or similar
         const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
-        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina)|$)/i);
-        const sceneHint = hintMatch ? hintMatch[1].trim() : '';
+        // New format: SCENE: prose (Sonnet-authored)
+        const sceneProseMatch = content.match(/SCENE:\s*([\s\S]*?)(?=METADATA:|SCENE HINT:|---\s*(?:Page|Seite|Página|Pagina)|$)/i);
+        const sceneProse = sceneProseMatch ? sceneProseMatch[1].trim().replace(/```[\s\S]*?```/g, '').trim() : '';
+
+        // New format: METADATA: JSON. Legacy fallback: SCENE HINT: JSON.
+        const metadataMatch = content.match(/METADATA:\s*(?:```json\s*\n?)?\s*(\{[\s\S]*?\})\s*(?:```\s*)?(?=---\s*(?:Page|Seite|Página|Pagina)|SCENE HINT:|$)/i);
+        let sceneHint = '';
+        if (metadataMatch) {
+          sceneHint = metadataMatch[1].trim();
+        } else {
+          const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina)|$)/i);
+          sceneHint = hintMatch ? hintMatch[1].trim() : '';
+        }
 
         // Extract per-character clothing from the page content (JSON scene hint format
         // or legacy bullet list). parseCharacterClothingBlock handles both.
@@ -2006,13 +2041,14 @@ class ProgressiveUnifiedParser {
         const perspectiveStr = Object.keys(characterPerspectives).length > 0
           ? ` perspectives: ${Object.entries(characterPerspectives).map(([n, a]) => `${n}:${a.perspective || a.depth}`).join(', ')}`
           : '';
-        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete (clothing: ${clothingStr}${perspectiveStr})`);
+        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete (prose: ${sceneProse.length} chars, clothing: ${clothingStr}${perspectiveStr})`);
 
         if (this.callbacks.onPageComplete) {
           this.callbacks.onPageComplete({
             pageNumber: pageNum,
             text,
             sceneHint,
+            sceneProse,
             characterClothing,
             characterPerspectives,
             characters
