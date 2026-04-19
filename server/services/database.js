@@ -453,7 +453,7 @@ async function initializeDatabase() {
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS consolidator_calls (
         id SERIAL PRIMARY KEY,
-        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        story_id VARCHAR(255) NOT NULL,
         page_number INT,
         round INT,
         full_prompt TEXT,
@@ -463,6 +463,10 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Drop the FK if it exists from an earlier version of the schema.
+    // Consolidator runs mid-pipeline before the story row is persisted to the
+    // stories table — an FK to stories(id) made every INSERT fail.
+    await dbPool.query(`ALTER TABLE consolidator_calls DROP CONSTRAINT IF EXISTS consolidator_calls_story_id_fkey`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story ON consolidator_calls(story_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story_page ON consolidator_calls(story_id, page_number, round)`);
 
