@@ -5149,7 +5149,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const finalPct = winner.coverage * 100;
           const passed = finalPct >= requiredPct;
 
-          img.imageData = winner.washedImage; // wash already baked in by detectAndLightenTextRegion
+          img.imageData = winner.washedImage; // textRegion no longer bakes anything — this is just the raw winner image
           // Keep every candidate so the repair pipeline can expand them into
           // separate versions. Without this, the retry attempts AND the
           // truly-original image are discarded — the viewer then shows the
