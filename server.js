@@ -2019,6 +2019,51 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_style_lab_story ON style_lab_images(story_id)`);
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
 
+    // Referral system — separate from the legacy DDL block so it always runs on
+    // startup and can be added to existing prod databases. Previously these
+    // were only in server/services/database.js which isn't on the startup path,
+    // so prod was throwing `relation "referral_events/payouts" does not exist`
+    // on the account page.
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20)`);
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(20)`);
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (referral_balance_cents >= 0)`);
+    await dbPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_pending_cents INTEGER NOT NULL DEFAULT 0 CHECK (referral_pending_cents >= 0)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code) WHERE referral_code IS NOT NULL`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code_lower ON users(LOWER(referral_code)) WHERE referral_code IS NOT NULL`);
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS referral_code_used VARCHAR(20)`);
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_cents INT DEFAULT 0`);
+    await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_mode VARCHAR(8)`);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS referral_events (
+        id SERIAL PRIMARY KEY,
+        referrer_user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        buyer_user_id VARCHAR(255) NOT NULL,
+        order_stripe_session_id VARCHAR(255) NOT NULL UNIQUE,
+        discount_cents INT NOT NULL,
+        credits_granted INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_referral_events_referrer ON referral_events(referrer_user_id)`);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS referral_payouts (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount_cents INTEGER NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        balance_after_cents INTEGER NOT NULL,
+        pending_after_cents INTEGER NOT NULL,
+        order_stripe_session_id VARCHAR(255),
+        stripe_refund_id VARCHAR(255),
+        source_user_id VARCHAR(255),
+        description TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_referral_payouts_user_id ON referral_payouts(user_id, created_at DESC)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_payouts_earned_session ON referral_payouts(order_stripe_session_id) WHERE type = 'earned'`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_payouts_pending_session ON referral_payouts(order_stripe_session_id) WHERE type = 'pending_checkout'`);
+
     log.info('✓ Database tables initialized');
 
   } catch (err) {
