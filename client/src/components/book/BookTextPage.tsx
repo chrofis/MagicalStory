@@ -13,7 +13,10 @@ const BookTextPage = React.forwardRef<HTMLDivElement, BookTextPageProps>(
   ({ text, pageNumber }, ref) => (
     <div
       ref={ref}
-      className="w-full h-full bg-amber-50 overflow-y-auto overscroll-contain px-6 py-8 md:px-10 md:py-12"
+      className="w-full h-full bg-white overflow-y-auto overscroll-contain px-6 py-8 md:px-10 md:py-12"
+      // Subtle spine shading on the inner (right) edge so the reader can tell
+      // where the page ends in a spread. No tinted background, no border.
+      style={{ boxShadow: 'inset -8px 0 14px -10px rgba(0,0,0,0.12)' }}
     >
       <div className="max-w-md w-full mx-auto">
         <p
