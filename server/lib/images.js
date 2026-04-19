@@ -2092,7 +2092,13 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     }
 
     if (!parsedResult) {
-      log.warn(`⚠️  [BBOX-DETECT] No JSON found in response: ${responseText.substring(0, 100)}`);
+      // Dump the full response (head + tail + total length) so we can see
+      // whether the model truncated inside a long label, hit a repetition
+      // loop, or produced something entirely different from JSON.
+      const total = responseText.length;
+      const head = responseText.slice(0, 400);
+      const tail = total > 800 ? responseText.slice(-400) : '';
+      log.warn(`⚠️  [BBOX-DETECT] No JSON found in response (${total} chars). HEAD: ${head}${tail ? `\n...TAIL: ${tail}` : ''}`);
       return null;
     }
 

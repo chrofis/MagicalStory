@@ -11,7 +11,12 @@ COORDINATE SYSTEM:
 - Origin is top-left corner
 - Format: [y_min, x_min, y_max, x_max]
 
-FOR EACH FIGURE (include ALL figures, even partially visible ones at edges):
+FIGURE COUNT LIMIT:
+- Return AT MOST 10 figures total. If the scene has a crowd in the background, do NOT enumerate each crowd member as a separate figure — the crowd is backdrop, not a list.
+- Only include a figure if its face OR body occupies at least ~5% of the frame width or height. Tiny silhouettes in the distance are backdrop, skip them.
+- If you cannot distinguish between several figures (e.g. multiple blurred robes in the background), return ONE figure representing the group and set `name: "UNKNOWN"`, `label: "background crowd"` — never duplicate the same label across many entries.
+
+FOR EACH FIGURE (up to 10, including partially visible ones near the edges of main subjects):
 - If you can identify it as an expected character, set "name" to the character name (EXACTLY as listed above)
 - Use CLOTHING + POSITION to distinguish figures (two figures with similar build are distinguished by what they wear and where they stand)
 - If not identifiable as any expected character, set "name" to "UNKNOWN"
