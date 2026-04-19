@@ -34,17 +34,25 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     fontFamily = 'Georgia'
   } = options;
 
-  const baseFontSize = fontSizeOverride || Math.round(height * 0.018);
-  const minFontSize = Math.max(10, Math.round(baseFontSize * 0.6));
+  // Print-book target: ~12pt on A4. At our A4-normalized canvas (height 1365
+  // ≈ 297 mm × ~4.6 px/mm), 12 pt ≈ 4.2 mm ≈ ~19 px. Going a touch lower
+  // (0.012 * height ≈ 16 px ≈ 10 pt) so the preview matches what the printed
+  // book actually looks like.
+  const baseFontSize = fontSizeOverride || Math.round(height * 0.012);
+  const minFontSize = Math.max(8, Math.round(baseFontSize * 0.6));
   const font = `${fontFamily}, serif`;
 
-  // Escalation stages — if text doesn't fit in the current region, grow the
-  // region anchored to the text corner and try again. Stage 0 is the detected
-  // calm region (or default fallback rect). Later stages are progressively
-  // larger rectangles so the full text always has somewhere to go.
-  const stages = [polygon || buildFallbackRect(width, height, textPosition)];
-  for (let i = 1; i <= 4; i++) {
-    stages.push(buildExpandedRect(width, height, textPosition, i));
+  // Escalation stages — if text doesn't fit, *grow the polygon* instead of
+  // switching to a corner box. Stage 0 = the detected calm polygon (or a
+  // shape-appropriate fallback: a band for top-full/bottom-full, a triangle
+  // for corners). Stages 1-4 scale that same shape outward from its centroid
+  // so the text area always follows the calm-region contour.
+  const baseShape = (polygon && polygon.length >= 3)
+    ? polygon
+    : buildFallbackShape(width, height, textPosition);
+  const stages = [baseShape];
+  for (const scale of [1.15, 1.3, 1.55, 1.85]) {
+    stages.push(scalePolygon(baseShape, scale, width, height));
   }
 
   let lastResult = null;
@@ -95,47 +103,6 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   const fits = tryRenderText(ctx, text, scanlines, baseFontSize, font, align, polyTop, polyBottom, isTop, width, !!forceOnFinal);
 
   return { buffer: canvas.toBuffer('image/png'), fits, fontSize: baseFontSize };
-}
-
-/**
- * Progressive rectangle expansion anchored to the text corner.
- * Stage N grows wider and taller so longer text always has somewhere to fit.
- */
-function buildExpandedRect(width, height, textPosition, stage) {
-  const isTop = textPosition.startsWith('top');
-  const isLeft = textPosition.includes('left');
-  const isFull = textPosition.includes('full');
-
-  // Stage 1..4 — progressively larger. Stage 4 covers most of the image as
-  // last-resort so extra-long text has room.
-  const heightRatios = [0.38, 0.50, 0.62, 0.75];
-  const widthRatios = [0.60, 0.72, 0.85, 0.95];
-  const fullRatios = [0.30, 0.42, 0.55, 0.70];
-
-  const idx = Math.min(Math.max(stage - 1, 0), 3);
-  const hr = heightRatios[idx];
-  const wr = widthRatios[idx];
-  const fr = fullRatios[idx];
-
-  let rw, rh, rx, ry;
-  if (isFull) {
-    rw = width;
-    rh = Math.round(height * fr);
-    rx = 0;
-    ry = isTop ? 0 : height - rh;
-  } else {
-    rw = Math.round(width * wr);
-    rh = Math.round(height * hr);
-    rx = isLeft ? 0 : width - rw;
-    ry = isTop ? 0 : height - rh;
-  }
-
-  return [
-    [rx, ry],
-    [rx + rw, ry],
-    [rx + rw, ry + rh],
-    [rx, ry + rh]
-  ];
 }
 
 /**
@@ -318,34 +285,48 @@ async function buildBlurLayer(imageBuffer, textPng, width, height) {
 // ─── Clipping & gradient ───────────────────────────────────────────────────────
 
 /**
- * Build a fallback rectangle when no polygon is detected.
- * Returns array of [x, y] corner points.
+ * Fallback shape when no calm polygon was detected. Matches the requested
+ * textPosition semantics:
+ *   - top-full / bottom-full  → a horizontal band across that half
+ *   - corner positions        → a right triangle hugging that corner
+ * Never a box in the corner — corners are always triangular so the diagonal
+ * flows with the scene's negative space.
  */
-function buildFallbackRect(width, height, textPosition) {
+function buildFallbackShape(width, height, textPosition) {
   const isTop = textPosition.startsWith('top');
   const isLeft = textPosition.includes('left');
   const isFull = textPosition.includes('full');
 
-  let rw, rh, rx, ry;
-
   if (isFull) {
-    rw = width;
-    rh = Math.round(height * 0.22);
-    rx = 0;
-    ry = isTop ? 0 : height - rh;
-  } else {
-    rw = Math.round(width * 0.52);
-    rh = Math.round(height * 0.28);
-    rx = isLeft ? 0 : width - rw;
-    ry = isTop ? 0 : height - rh;
+    const bandH = Math.round(height * 0.28);
+    if (isTop) return [[0, 0], [width, 0], [width, bandH], [0, bandH]];
+    return [[0, height - bandH], [width, height - bandH], [width, height], [0, height]];
   }
 
-  return [
-    [rx, ry],
-    [rx + rw, ry],
-    [rx + rw, ry + rh],
-    [rx, ry + rh]
-  ];
+  // Right-triangle hugging the chosen corner. "size" is how far the triangle
+  // extends along each edge (fraction of width / height).
+  const size = 0.62;
+  const w = width, h = height;
+  if (isTop && isLeft)   return [[0, 0], [w * size, 0], [0, h * size]];
+  if (isTop && !isLeft)  return [[w, 0], [w * (1 - size), 0], [w, h * size]];
+  if (!isTop && isLeft)  return [[0, h], [w * size, h], [0, h * (1 - size)]];
+  return [[w, h], [w * (1 - size), h], [w, h * (1 - size)]];
+}
+
+/**
+ * Scale a polygon outward from its centroid by `scale`, clamped to image
+ * bounds. Used to grow the calm-region polygon instead of falling back to a
+ * hard-coded rectangle when text doesn't fit.
+ */
+function scalePolygon(polygon, scale, width, height) {
+  let cx = 0, cy = 0;
+  for (const [x, y] of polygon) { cx += x; cy += y; }
+  cx /= polygon.length;
+  cy /= polygon.length;
+  return polygon.map(([x, y]) => [
+    Math.max(0, Math.min(width, cx + scale * (x - cx))),
+    Math.max(0, Math.min(height, cy + scale * (y - cy)))
+  ]);
 }
 
 /**
