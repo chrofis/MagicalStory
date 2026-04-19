@@ -79,7 +79,7 @@ Visual Bible entry with full description (build, hair, face, signature look, clo
 # TEXT LENGTH RULES
 
 **{READING_LEVEL}**
-- Stay within the word and sentence count. Count your words AND sentences. Aim for the middle of the range, not the maximum.
+- Stay within the word and sentence count. Count your words AND sentences. Follow the PACING guidance above — some levels want alternation, some want uniform length, some allow variation. Don't default to the maximum on every page.
 - Write in flowing paragraphs with 2-4 sentences each
 - Maximum 3-4 paragraphs per page
 - **IMPORTANT: Separate paragraphs with a blank line** (not just a newline, a BLANK LINE)
