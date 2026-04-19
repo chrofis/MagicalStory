@@ -4540,6 +4540,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, inputData.artStyle, sceneClothingRequirements);
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
         let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        // over-the-shoulder: the target character is tiny, soft-focused, in the
+        // distance — attaching its reference photo would force Grok to render it
+        // at portrait scale. Keep only the first character (the acting one) as a
+        // reference; the rest ride in prose only.
+        if (sceneMetadata?.framingPattern === 'over-the-shoulder' && pagePhotos.length > 1) {
+          const dropped = pagePhotos.slice(1).map(p => p.name).join(', ');
+          pagePhotos = pagePhotos.slice(0, 1);
+          log.info(`🎯 [FRAMING] Page ${pageNum} over-the-shoulder: kept ${pagePhotos[0]?.name}, dropped refs for ${dropped}`);
+        }
         // Trial mode fallback: scene hints are plain text, so extract LOC IDs manually
         if (!sceneMetadata && scene.sceneDescription) {
           const locMatches = [...scene.sceneDescription.matchAll(/\[LOC(\d+)\]/gi)];

@@ -117,6 +117,7 @@ SCENE HINT:
   "time": "morning|midday|afternoon|sunset|night",
   "weather": "sunny|cloudy|rainy|snowy|n/a",
   "shot": "close-up|medium|wide|ultra-wide",
+  "framingPattern": "solo-before|solo-after|over-the-shoulder",
   "emptyScenePrompt": "2-4 sentences describing ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. NEVER write hypothetical references like 'where children would stand' or 'where figures would walk' — image models render those literally."
 }
 ```
@@ -155,6 +156,7 @@ SCENE HINT:
 - **BACKGROUND** - Add `"background"` to the JSON. Use it for the scene's physical atmosphere AND for any unnamed supporting figures who are essential to the story moment but aren't main characters.
   - Ambient populations: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`
   - Narratively important supporting figures: whenever the page text shows unnamed figures actively doing something to or near a main character (capturing, chasing, guarding, blocking the way, rescuing, watching, reacting), describe them here with count + role + action + placement so the illustrator draws them. Without this, scene expansion will drop them and the image won't match the story.
+- **FRAMING PATTERN** - Set `framingPattern` when the scene involves a weapon in use, combat, capture, restraint, or injury. Aftermath scenes with no people may instead describe a still-life object (split apple, broken arrow, empty chair).
 
 **Scene Variety (IMPORTANT for great illustrations):**
 - **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.

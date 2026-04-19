@@ -917,6 +917,7 @@ function extractSceneMetadata(sceneDescription) {
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
+      framingPattern: metadata.framingPattern || null,
       isJsonFormat: true,
       isProseFormat: true
     };
@@ -1068,6 +1069,7 @@ function extractSceneMetadata(sceneDescription) {
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
       // Text overlay position (where to place story text on the illustration)
       textPosition: parsedData.textPosition || null,
+      framingPattern: parsedData.framingPattern || null,
       isJsonFormat: true
     };
   }
@@ -1615,21 +1617,24 @@ function resolveArtStyleForEmptyScene(artStyleId, backend) {
 const LANGUAGE_LEVELS = {
   '1st-grade': {
     description: 'Simple words and very short sentences for early readers',
-    wordsPerPageMin: 20,
-    wordsPerPageMax: 35,
-    sentencesPerPage: '2-3',
+    wordsPerPageMin: 25,
+    wordsPerPageMax: 50,
+    sentencesPerPage: '2-4',
+    pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count.',
   },
   'standard': {
     description: 'Age-appropriate vocabulary for elementary school children',
-    wordsPerPageMin: 120,
+    wordsPerPageMin: 40,
     wordsPerPageMax: 150,
-    sentencesPerPage: '8-12',
+    sentencesPerPage: '3-12',
+    pacing: '150 words is the UPPER LIMIT, not the target. Alternate rhythm: short pages (40-80 words, a quiet beat) interleaved with longer pages (120-150 words, a fuller scene). Avoid two long pages back-to-back — always give the reader breath between dense pages. Aim for variation like: long, short, medium, long, short.',
   },
   'advanced': {
     description: 'More complex vocabulary and varied sentence structure for advanced readers',
     wordsPerPageMin: 250,
     wordsPerPageMax: 300,
     sentencesPerPage: '15-20',
+    pacing: 'Every page should land at similar length (250-300 words). Do NOT alternate short and long pages at this level — consistent density creates reading momentum for advanced readers. Aim for the middle of the range on every page.',
   }
 };
 
@@ -1643,7 +1648,8 @@ const LANGUAGE_LEVELS = {
 function getReadingLevel(languageLevel) {
   const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const pageLength = `${levelInfo.sentencesPerPage} sentences per page (approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words)`;
-  return `${levelInfo.description}. ${pageLength}`;
+  const pacing = levelInfo.pacing ? ` PACING: ${levelInfo.pacing}` : '';
+  return `${levelInfo.description}. ${pageLength}.${pacing}`;
 }
 
 /**
