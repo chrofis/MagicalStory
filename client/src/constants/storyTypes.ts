@@ -157,7 +157,6 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'sharing', name: { en: 'Learning to Share', de: 'Teilen lernen', fr: 'Apprendre à partager' }, emoji: '🤝', ageGroup: 'preschool' },
   { id: 'waiting-turn', name: { en: 'Waiting Your Turn', de: 'Warten können', fr: 'Attendre son tour' }, emoji: '⏳', ageGroup: 'preschool' },
   { id: 'first-kindergarten', name: { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour de maternelle' }, emoji: '🎒', ageGroup: 'preschool' },
-  { id: 'spelling-name', name: { en: 'Learning to Spell My Name', de: 'Meinen Namen schreiben lernen', fr: 'Apprendre à écrire mon nom' }, emoji: '🔤', ageGroup: 'preschool' },
   { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis' }, emoji: '👫', ageGroup: 'preschool' },
   { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux' }, emoji: '💪', ageGroup: 'preschool' },
   { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille' }, emoji: '👶', ageGroup: 'preschool' },
@@ -237,6 +236,7 @@ export const educationalTopics: EducationalTopic[] = [
   { id: 'alphabet', name: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: 'L\'Alphabet (ABC)' }, emoji: '🔤', group: 'letters' },
   { id: 'vowels', name: { en: 'Vowels (A, E, I, O, U)', de: 'Vokale (A, E, I, O, U)', fr: 'Voyelles (A, E, I, O, U)' }, emoji: '🅰️', group: 'letters' },
   { id: 'rhyming', name: { en: 'Rhyming Words', de: 'Reimwörter', fr: 'Mots qui riment' }, emoji: '🎵', group: 'letters' },
+  { id: 'spelling-name', name: { en: 'Spelling My Name', de: 'Meinen Namen schreiben', fr: 'Écrire mon nom' }, emoji: '✏️', group: 'letters' },
 
   // Numbers & Math
   { id: 'numbers-1-10', name: { en: 'Numbers 1-10', de: 'Zahlen 1-10', fr: 'Nombres 1-10' }, emoji: '🔢', group: 'numbers' },
