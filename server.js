@@ -4717,27 +4717,50 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptySceneDesc = expandedEmptyPrompt
               || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
 
-            // Count characters by depth so the empty scene leaves room in the right band.
-            // Prefer the explicit `depth` field; fall back to parsing the position string so
-            // older scene data still works. "tiny figure" and "far background" both read as bg.
+            // Classify each character by depth AND lateral side so the empty scene leaves
+            // room in the right band. "Leave space for 2 figures in the far background" is
+            // useless when the two figures need to be at opposite edges — Grok will paint
+            // buildings flanking both sides and the characters get jammed together later.
             const characters = sceneMetadata?.fullData?.characters || [];
-            let fgCount = 0, mgCount = 0, bgCount = 0;
+            const buckets = { fgLeft: 0, fgRight: 0, fgCenter: 0, mgLeft: 0, mgRight: 0, mgCenter: 0, bgLeft: 0, bgRight: 0, bgCenter: 0 };
             for (const char of characters) {
               const depth = (char.depth || '').toLowerCase();
               const pos = (char.position || '').toLowerCase();
               const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
               const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
-              if (isBg) bgCount++;
-              else if (isMg) mgCount++;
-              else fgCount++;
+              const depthKey = isBg ? 'bg' : isMg ? 'mg' : 'fg';
+              // Parse lateral side — normalise "center-left"/"left-center" to just "left" etc.
+              const isLeft = /\bfar[-\s]?left|\bleft\b/.test(pos) && !/right/.test(pos);
+              const isRight = /\bfar[-\s]?right|\bright\b/.test(pos) && !/left/.test(pos);
+              const sideKey = isLeft ? 'Left' : isRight ? 'Right' : 'Center';
+              buckets[depthKey + sideKey]++;
             }
+            const total = (depth) => buckets[depth + 'Left'] + buckets[depth + 'Right'] + buckets[depth + 'Center'];
             let characterSpace = '';
-            if (fgCount > 0 || mgCount > 0 || bgCount > 0) {
+            if (total('fg') + total('mg') + total('bg') > 0) {
               const parts = [];
-              if (fgCount > 0) parts.push(`${fgCount} character${fgCount > 1 ? 's' : ''} in the foreground`);
-              if (mgCount > 0) parts.push(`${mgCount} character${mgCount > 1 ? 's' : ''} in the midground`);
-              if (bgCount > 0) parts.push(`${bgCount} tiny figure${bgCount > 1 ? 's' : ''} in the far background`);
+              const describe = (depth, label) => {
+                const L = buckets[depth + 'Left'], R = buckets[depth + 'Right'], C = buckets[depth + 'Center'];
+                const t = L + R + C;
+                if (t === 0) return;
+                const sides = [];
+                if (L > 0) sides.push(`${L} on the left`);
+                if (R > 0) sides.push(`${R} on the right`);
+                if (C > 0) sides.push(`${C} in the center`);
+                parts.push(`${t} character${t > 1 ? 's' : ''} in the ${label}${sides.length > 0 ? ` (${sides.join(', ')})` : ''}`);
+              };
+              describe('fg', 'foreground');
+              describe('mg', 'midground');
+              describe('bg', 'far background');
               characterSpace = `Leave open, uncluttered space for ${parts.join(' and ')}. Don't fill those areas with detail.`;
+
+              // If any depth band needs both-sides placement, spell it out so Grok doesn't
+              // wall the frame with buildings on left and right.
+              const bothSides = ['fg', 'mg', 'bg'].find(d => buckets[d + 'Left'] > 0 && buckets[d + 'Right'] > 0);
+              if (bothSides) {
+                const label = { fg: 'foreground', mg: 'midground', bg: 'far background' }[bothSides];
+                characterSpace += ` Keep the far-left and far-right ${label} open and flat — figures must be placeable at opposite sides of the frame without building walls or props blocking them.`;
+              }
 
               // For close-up/medium shots, add explicit space guidance so the empty scene
               // doesn't fill the frame with just furniture (e.g. table surface only)
