@@ -4755,15 +4755,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { getTextAreaMask } = require('./server/lib/textMasks');
             const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
 
-            // Composition instruction — keep the chosen area DARK and calm.
-            // Deliberately avoids the words "text", "text overlay", "readable",
-            // or any mention of a mask, because Grok/Gemini interpret those as
-            // "paint fake letterforms here" and bake lorem-ipsum gibberish.
-            // The zone must be dark because white text with a dark stroke will
-            // be overlaid on top; a bright zone destroys contrast.
-            const emptyTextAreaInstr = (!layoutTextInImage || !textPos)
-              ? ''
-              : `COMPOSITION — KEEP THIS AREA DARK AND QUIET: The ${textPos.replace('-', ' ')} area of the scene must stay dark, low-luminance, and visually simple. Treat it as intentional negative space in the illustration. Fill it with whatever naturally belongs in this setting in its DARKEST natural form — dusk sky, night sky, deep water, shaded ground, shadowed grass, dark foliage, or soft mist for outdoor scenes; a shadowed wall, dim ceiling, dark floor, or unlit corner for indoor scenes; shadowed cobblestones, dark pavement, or a dark-toned building wall in shade for street scenes. Gentle gradients, minimal texture, no objects, no characters, no sharp contrast, no bright highlights. Painted with the same brush, palette, and style as the rest of the illustration — just darker and quieter in that corner.`;
+            // NOTE: the scene-expansion prompt (story-unified.txt) now requires
+            // Sonnet to end the emptyScenePrompt with a sentence that names
+            // the textPosition corner and describes it as DARK. That sentence
+            // is the single source of truth for the text-zone composition.
+            // We used to inject a second "COMPOSITION — KEEP THIS AREA DARK"
+            // instruction here, but it caused contradictions when Sonnet
+            // described a different corner or luminance than what the code
+            // injected — Grok saw two conflicting instructions and painted
+            // something that honored neither. Dropping the duplicate.
+            const emptyTextAreaInstr = '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
