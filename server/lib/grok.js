@@ -679,13 +679,13 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 
   let composed;
   if (n === 1) {
-    // Single-character slot: skip the name-label bar. With only one
-    // character there's no ambiguity for Grok to resolve, but the label
-    // text ("LUKAS") leaks through to the generated image as stray
-    // text at the bottom — especially visible on covers.
-    composed = parts[0]
+    // Always label — when the slot holds one character but another slot also
+    // has one character, Grok needs the name↔face binding to keep the two
+    // figures distinct. Simpler to always label than branch on sibling slots.
+    const single = parts[0]
       ? await composeBodyFaceHorizontal(parts[0].face, parts[0].body)
       : rawBuffers[0];
+    composed = await labelCharacterImage(single, charNames[0]);
   } else if (n === 2) {
     const stacks = [await buildVertical(0), await buildVertical(1)];
     composed = await composeRow(stacks);
