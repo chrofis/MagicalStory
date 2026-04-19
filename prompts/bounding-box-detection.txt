@@ -31,12 +31,18 @@ FOR EXPECTED OBJECTS:
 - Report "found": true/false for each expected object
 - If found, include body_box bounding box and position
 
+LABEL LENGTH RULE (non-negotiable):
+- Every `label` field MUST be ≤ 10 words.
+- Name ONE defining clothing item + ONE distinguishing feature. Example: "boy in blue hoodie with backpack".
+- DO NOT list everything the figure is wearing. DO NOT describe actions. DO NOT describe expressions.
+- Long labels waste response tokens and cause the JSON to truncate before closing.
+
 Return ONLY valid JSON:
 {
   "figures": [
     {
       "name": "CharacterName or UNKNOWN",
-      "label": "visual description (e.g., 'figure in blue hoodie')",
+      "label": "≤10 words — one defining item + one distinguishing feature",
       "position": "left|center|right",
       "face_box": [y_min, x_min, y_max, x_max] or null,
       "body_box": [y_min, x_min, y_max, x_max],

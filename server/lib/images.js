@@ -1906,7 +1906,9 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
             body: JSON.stringify({
               contents: [{ parts }],
               generationConfig: {
-                maxOutputTokens: 16000,
+                // 32k gives ~2× headroom over the 16k we kept hitting when
+                // Gemini produced verbose labels for multi-figure scenes.
+                maxOutputTokens: 32000,
                 temperature: 0.5,  // Google recommends >0 for bbox to prevent repetition loops
                 responseMimeType: 'application/json',
                 // Disable thinking for bbox — Google says it adds latency without improving spatial accuracy
@@ -2212,7 +2214,7 @@ Respond with ONLY the JSON.`;
                     { text: refinePrompt }
                   ] }],
                   generationConfig: {
-                    maxOutputTokens: 16000,
+                    maxOutputTokens: 32000,
                     temperature: 0.5,
                     responseMimeType: 'application/json',
                     ...(modelSupportsThinking(refineModelId) && { thinkingConfig: { thinkingBudget: 0 } })
