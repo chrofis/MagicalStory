@@ -90,9 +90,10 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
 
   // 1. Biggest font first — find the SMALLEST stage that fits at baseFontSize.
   for (let s = 0; s < stages.length; s++) {
-    if (fitsAtStage(stages[s], baseFontSize).fits) {
+    const check = fitsAtStage(stages[s], baseFontSize);
+    if (check.fits) {
       const result = renderStage(width, height, text, stages[s], textPosition, baseFontSize, minFontSize, font, /*forceOnFinal=*/false);
-      console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${s}/${stages.length - 1}, pos=${textPosition}`);
+      console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${s}/${stages.length - 1}, pos=${textPosition}, page=${pageNumber}, words=${check.placed}/${check.total}, img=${width}x${height}`);
       return result.buffer;
     }
   }
@@ -380,10 +381,15 @@ function applyMarginClamp(polygon, pageNumber, width, height) {
   if (!polygon) return polygon;
   const OUTER = 0.05;
   const GUTTER = 0.10;
+  // Bottom/top margin is 4% — we need at least the bleed (~1% of image) clear
+  // of the text, but we also don't want text hugging the trim edge. 4% puts the
+  // text safely inside the visible page while giving each line an extra couple
+  // of pixels to breathe vs the 5% side margin.
+  const VERTICAL = 0.04;
   let minX = Math.round(width * OUTER);
   let maxX = Math.round(width * (1 - OUTER));
-  const minY = Math.round(height * OUTER);
-  const maxY = Math.round(height * (1 - OUTER));
+  const minY = Math.round(height * VERTICAL);
+  const maxY = Math.round(height * (1 - VERTICAL));
   if (pageNumber) {
     const isLeftPage = pageNumber % 2 === 1;
     if (isLeftPage) {
