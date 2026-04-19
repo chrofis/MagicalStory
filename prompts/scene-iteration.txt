@@ -71,7 +71,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 IMPORTANT CLOTHING RULES:
 - Select clothing for each character ONLY from their available avatars listed above
 - Never assign a costume that isn't in the character's available list
-- If in doubt, use "standard"
+- If a `costumed:...` entry appears in a character's available list, prefer it for every page of this story unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume — the whole story takes place in the same costumed world
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
@@ -273,7 +273,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
 - `reuseEmptyScene`: `true` if the previously generated empty scene background can be reused as style anchor. `false` if the background/setting/location/camera/lighting changed significantly and a fresh empty scene should be generated. Rule of thumb: if only characters changed (pose, expression, position) → `true`. If setting, location, camera angle, or lighting changed → `false`.
 
 **Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of ONLY the background environment — NO people, NO objects, NO animals, NO artifacts, NO vehicles. Include ONLY: location details, architecture, natural landscape, lighting, weather, camera angle, and depth layers. NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people. Use neutral phrases: "open foreground", "uncluttered center", "empty space".
+- `emptyScenePrompt`: A 2-4 sentence description of the background environment. EXCLUDE: named characters, tracked animals, and carried or handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE: location details, architecture, natural landscape, lighting, weather, camera angle, depth layers, AND scene-anchor artifacts when present — both stationary anchors (throne, monument, pedestal, altar, signpost, pole-with-banner) and the vehicle or vessel when the scene takes place in or on one (boat, raft, wagon, carriage, cart, sled, train compartment). When the scene calls for a populated setting (crowd, villagers, soldiers, guards, distant workers, busy street), describe those anonymous extras too — density/distance/silhouette only — kept away from the zones reserved for named characters. NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people. Use neutral phrases: "open foreground", "uncluttered center", "empty space" for the zones reserved for composited characters.
 
 ---
 

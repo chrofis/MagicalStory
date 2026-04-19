@@ -971,19 +971,22 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     });
 
     const { callTextModel } = require('./textModels');
-    const haikuResult = await callTextModel(complianceInput, 4096, 'claude-haiku');
+    // Stage 2 uses Sonnet — Haiku didn't reliably follow the "ignore prose
+    // decoration unless it's a DECLARED INTERACTION" rule and kept flagging
+    // false-positive gaze/facing issues that drove pointless repair rounds.
+    const sonnetResult = await callTextModel(complianceInput, 4096, 'claude-sonnet');
 
     stage2Usage = {
-      input_tokens: haikuResult.usage?.input_tokens || 0,
-      output_tokens: haikuResult.usage?.output_tokens || 0
+      input_tokens: sonnetResult.usage?.input_tokens || 0,
+      output_tokens: sonnetResult.usage?.output_tokens || 0
     };
 
-    // Parse JSON from Haiku response
-    const parsed = getStoryHelpers().extractJsonFromText(haikuResult.text);
+    // Parse JSON from compliance response
+    const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
     if (parsed && typeof parsed.score === 'number') {
       complianceResult = parsed;
     } else {
-      log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 could not parse JSON from Haiku response`);
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 could not parse JSON from Sonnet response`);
       return null;
     }
 
@@ -6651,15 +6654,22 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   let effectiveClothingRequirements = clothingRequirements;
 
   const storedPageClothing = pageClothingData?.pageClothing?.[pageNumber];
-  const storedHasCostumed = (() => {
-    if (!storedPageClothing) return false;
-    if (typeof storedPageClothing === 'string') return storedPageClothing.startsWith('costumed');
-    return Object.values(storedPageClothing).some(v => typeof v === 'string' && v.startsWith('costumed'));
+  // Normalize string form ("costumed:mittelalterlich" applied page-wide) into per-character
+  // map so the override below catches both string and object input shapes.
+  const storedPageClothingMap = (() => {
+    if (!storedPageClothing) return null;
+    if (typeof storedPageClothing === 'object') return storedPageClothing;
+    if (typeof storedPageClothing === 'string') {
+      return Object.fromEntries(sceneCharacters.map(c => [c.name, storedPageClothing]));
+    }
+    return null;
   })();
+  const storedHasCostumed = storedPageClothingMap
+    ? Object.values(storedPageClothingMap).some(v => typeof v === 'string' && v.startsWith('costumed'))
+    : false;
 
-  if (storedHasCostumed && typeof storedPageClothing === 'object') {
-    // Authoritative: use stored pageClothing and ignore Haiku's downgrade
-    const perPageClothing = convertClothingToCurrentFormat(storedPageClothing);
+  if (storedHasCostumed && storedPageClothingMap) {
+    const perPageClothing = convertClothingToCurrentFormat(storedPageClothingMap);
     effectiveClothingRequirements = { ...clothingRequirements };
     for (const [charName, charClothing] of Object.entries(perPageClothing)) {
       effectiveClothingRequirements[charName] = {
@@ -6667,7 +6677,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         ...charClothing
       };
     }
-    const clothingValues = Object.values(storedPageClothing);
+    const clothingValues = Object.values(storedPageClothingMap);
     const firstClothing = clothingValues[0];
     clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
     const iterateCh = newSceneMetadata?.characterClothing || null;
