@@ -18,7 +18,7 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 4. Deduplicate. If three evaluators all say "hair is wrong", consolidate into one entry.
 
-5. Drop contradictory or trivially minor issues AND drop issues that contradict the character profile. Explain each drop in `dropped_issues`.
+5. Never drop a CRITICAL or MAJOR severity issue. These must appear in `per_character_fixes` or `scene_fix.instruction`. Drop only MODERATE and MINOR issues, and only when contradictory, trivially small, duplicated, or in direct conflict with the character profile. Explain each drop in `dropped_issues`.
 
 6. For per_character fixes, cite the character by their original name AND provide a `visual_identifier` that Grok can locate in the image.
 

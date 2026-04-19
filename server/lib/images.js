@@ -5084,6 +5084,28 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     }
 
     log.info(`[INPAINT PAGE] Using consolidated plan: ${consolidatedPlan.per_character_fixes.length} per-char + scene=${consolidatedPlan.scene_fix?.severity || 'NONE'}, ${consolidatedPlan.dropped_issues?.length || 0} dropped`);
+
+    // Audit: which issues did Haiku drop? A dropped CRITICAL/MAJOR is a
+    // pipeline bug — the repair instruction we send to Grok will ignore the
+    // actual problem and the next eval round will re-detect it.
+    const dropped = consolidatedPlan.dropped_issues || [];
+    for (const d of dropped) {
+      const issueText = d.issue || d.description || JSON.stringify(d);
+      const reason = d.reason || '(no reason)';
+      // Cross-check against the original CRITICAL/MAJOR set so we can flag
+      // when a high-severity issue is silently discarded.
+      const originalCritical = (evaluation.fixableIssues || []).some(i => {
+        const sev = String(i.severity || '').toUpperCase();
+        if (sev !== 'CRITICAL' && sev !== 'MAJOR') return false;
+        const orig = (i.description || i.issue || '').toLowerCase();
+        return orig && issueText.toLowerCase().includes(orig.slice(0, 30));
+      });
+      if (originalCritical) {
+        log.error(`🚨 [INPAINT PAGE] P${pageNumber}: CRITICAL/MAJOR issue dropped by consolidator — "${issueText}" (reason: ${reason})`);
+      } else {
+        log.debug(`[INPAINT PAGE] P${pageNumber}: dropped — "${issueText}" (${reason})`);
+      }
+    }
   } else {
     // Fallback: legacy concat
     editInstruction = combinedIssues.map(i => i.description).filter(Boolean).join('. ');

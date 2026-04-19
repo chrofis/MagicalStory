@@ -238,20 +238,58 @@ async function buildBlurLayer(imageBuffer, textPng, width, height) {
     .raw()
     .toBuffer();
 
-  // 4) Slightly blur the image — pixels under the halo show softened detail
-  const blurredRgb = await sharp(imageBuffer)
+  // 4) Compute halo bbox so we only touch pixels that will actually be
+  //    shown. Guarantees no blur can leak outside the halo — the rest of
+  //    the canvas is left fully transparent with zeroed RGB.
+  let minX = width, minY = height, maxX = -1, maxY = -1;
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      if (haloMask[row + x] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  const rgba = Buffer.alloc(width * height * 4); // zero-initialised
+  if (maxX < minX || maxY < minY) {
+    // No halo (no text) — fully transparent overlay
+    for (let i = 0; i < width * height; i++) rgba[i * 4 + 3] = haloMask[i];
+    return await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+  }
+
+  // Pad bbox by imageBlurSigma*2 so the edge pixels of the crop see correct
+  // neighbours when blurred (avoids darkening at the crop border).
+  const pad = Math.ceil(imageBlurSigma * 2);
+  const cropX = Math.max(0, minX - pad);
+  const cropY = Math.max(0, minY - pad);
+  const cropW = Math.min(width - cropX, maxX - minX + 1 + pad * 2);
+  const cropH = Math.min(height - cropY, maxY - minY + 1 + pad * 2);
+
+  // 5) Blur ONLY the bbox crop — not the whole image
+  const blurCrop = await sharp(imageBuffer)
+    .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
     .blur(imageBlurSigma)
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  // 5) Combine blurred RGB with halo mask as alpha
-  const rgba = Buffer.alloc(width * height * 4);
-  for (let i = 0; i < width * height; i++) {
-    rgba[i * 4] = blurredRgb[i * 3];
-    rgba[i * 4 + 1] = blurredRgb[i * 3 + 1];
-    rgba[i * 4 + 2] = blurredRgb[i * 3 + 2];
-    rgba[i * 4 + 3] = haloMask[i];
+  // 6) Stamp blurred crop pixels into the RGBA buffer only where halo > 0
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const idx = y * width + x;
+      const a = haloMask[idx];
+      if (a === 0) continue;
+      const cIdx = ((y - cropY) * cropW + (x - cropX)) * 3;
+      const oIdx = idx * 4;
+      rgba[oIdx] = blurCrop[cIdx];
+      rgba[oIdx + 1] = blurCrop[cIdx + 1];
+      rgba[oIdx + 2] = blurCrop[cIdx + 2];
+      rgba[oIdx + 3] = a;
+    }
   }
   return await sharp(rgba, { raw: { width, height, channels: 4 } })
     .png()
