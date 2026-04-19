@@ -60,8 +60,9 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           <div
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
             style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
+            onTouchStartCapture={(e) => e.stopPropagation()}
+            onTouchMoveCapture={(e) => e.stopPropagation()}
+            onTouchEndCapture={(e) => e.stopPropagation()}
           >
             <p
               className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
