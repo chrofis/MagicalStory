@@ -345,14 +345,25 @@ The ---STORY PAGES--- section below MUST apply ALL these fixes when rewriting th
 
 
 ---TITLE---
-Now that you have written and analyzed the full story, create a title that:
-- Is SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
-- References a unique element: a character name, location, object, or pivotal moment from the story
-- Creates curiosity or intrigue
-- Avoids clichés like "The [Adjective] [Noun]" patterns
-- Works well in {LANGUAGE}
+Now that you have written and analyzed the full story, propose 5 distinct title candidates, then select the 2nd strongest.
 
-TITLE: [Your creative, specific title]
+Each candidate must:
+- Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
+- Reference a unique element: a character name, location, object, or pivotal moment from the story
+- Create curiosity or intrigue
+- Avoid clichés like "The [Adjective] [Noun]" patterns
+- Work well in {LANGUAGE}
+
+Vary angle across the 5 — different characters, locations, objects, or beats.
+
+TITLE_CANDIDATES:
+1. [first candidate]
+2. [second candidate]
+3. [third candidate]
+4. [fourth candidate]
+5. [fifth candidate]
+
+TITLE: [exactly the second candidate from the list above]
 
 
 ---CLOTHING REQUIREMENTS---
