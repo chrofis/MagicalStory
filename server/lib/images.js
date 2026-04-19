@@ -664,7 +664,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null } = options;
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
@@ -773,6 +773,15 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const sceneCtx = sceneDescription
             ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
             : '';
+          // If the outline already declared where each character will land, ask
+          // the vision model to verify the empty scene has flat usable space at
+          // each of those spots — not blocked by walls, props, or scene edges.
+          const placementsBlock = Array.isArray(characterPlacements) && characterPlacements.length > 0
+            ? `\n\nCHARACTER PLACEMENTS TO BE COMPOSITED LATER:\n${characterPlacements.map(p => `- ${p.name || 'character'} at ${p.position || 'unspecified'}${p.depth ? ` (depth: ${p.depth})` : ''}`).join('\n')}`
+            : '';
+          const placementsCheck = placementsBlock
+            ? `\n4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.`
+            : '';
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -781,16 +790,16 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}
+                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${placementsBlock}
 
 Check:
 1. Does the setting/location roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
 2. Are there large artificial-looking patches — white rectangles, solid color blocks, or obvious AI glitches? (FAIL)
-3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
+3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)${placementsCheck}
 
 Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence describing what to fix if failed, or empty if passed"}` }
               ]}],
-              generationConfig: { maxOutputTokens: 200, temperature: 0.1, responseMimeType: 'application/json' },
+              generationConfig: { maxOutputTokens: 250, temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: GEMINI_SAFETY_SETTINGS
             }),
             signal: AbortSignal.timeout(15000),
@@ -12091,6 +12100,7 @@ module.exports = {
   // Core image functions
   validateEmptyScene,
   evaluateImageQuality,
+  evaluateThreeStage,
   callGeminiAPIForImage,
   editImageWithPrompt,
   generateImageWithQualityRetry,

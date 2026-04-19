@@ -4837,8 +4837,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               if (result?.imageData && layoutTextInImage) {
                 const { validateEmptyScene } = require('./server/lib/images');
                 const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
+                // Pass the outline's declared character positions so the vision check
+                // can verify each has usable flat ground in the rendered empty scene.
+                const placements = (sceneMetadata?.fullData?.characters || [])
+                  .filter(c => c?.name && c?.position)
+                  .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
                   sceneDescription: emptySceneDesc,
+                  characterPlacements: placements.length > 0 ? placements : null,
                 });
                 if (!qc.pass) {
                   // Retry with a modified prompt that incorporates Gemini's feedback.
