@@ -744,7 +744,15 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
   const { sanitizeForGemini, callGrokVisionAPI, GEMINI_SAFETY_SETTINGS } = require('./images');
   const { TEXT_MODELS } = require('../config/models');
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL, safetySettings: GEMINI_SAFETY_SETTINGS });
+  // The semantic eval emits JSON with per-scene-action checks, visible entities,
+  // expected entities, and semantic_issues — the default Gemini output limit
+  // (8192) truncated this mid-JSON on pages with many interactions. 24k keeps
+  // complete JSON even for busy scenes after Gemini 2.5 thinking overhead.
+  const model = genAI.getGenerativeModel({
+    model: VISION_MODEL,
+    safetySettings: GEMINI_SAFETY_SETTINGS,
+    generationConfig: { maxOutputTokens: 24000, temperature: 0.3 }
+  });
   const startTime = Date.now();
 
   // Load semantic evaluation template

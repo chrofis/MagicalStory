@@ -546,7 +546,10 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: inventoryParts }],
-            generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
+            // Same rationale as the quality-eval budget bump — inventory (P1)
+            // stage emits detailed per-figure JSON that can run long on
+            // multi-character scenes.
+            generationConfig: { maxOutputTokens: 32000, temperature: 0.3 },
             safetySettings: GEMINI_SAFETY_SETTINGS
           })
         });
@@ -1295,7 +1298,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
-              maxOutputTokens: 16000,  // High limit to accommodate Gemini 2.5 thinking tokens
+              // Gemini 2.5's thinking tokens count against maxOutputTokens. 16k
+              // was too tight for complex scenes (3+ characters + multiple
+              // objects + spatial checks) — the response would hit the cap
+              // mid-JSON and the parse would fail, leaving the page un-scored.
+              // 32k gives ~22-24k for the actual JSON output after thinking,
+              // comfortably above the ~16k the longest responses produced.
+              maxOutputTokens: 32000,
               temperature: 0.3
             },
             safetySettings: GEMINI_SAFETY_SETTINGS
