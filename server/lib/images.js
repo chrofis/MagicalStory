@@ -1799,6 +1799,62 @@ function parseVisualBibleObjects(prompt) {
 }
 
 /**
+ * Translate Visual-Bible entity IDs (e.g. "ART003", "CHR001", "LOC001.2") into
+ * their natural-language names from the visualBible. Entries that don't look
+ * like IDs pass through unchanged. Without this step, `expectedObjects` passed
+ * to the bbox detector contain opaque IDs — the detector has nothing visual to
+ * match against, reports `found:false`, and downstream entity-check generates
+ * fake appearance records with null bboxes.
+ *
+ * @param {string[]} entries - Mix of VB IDs and plain names (order preserved)
+ * @param {Object|null} visualBible - Story visual bible
+ * @returns {string[]} Array of names, deduplicated case-insensitively
+ */
+function resolveExpectedObjectLabels(entries, visualBible) {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  const vb = visualBible || {};
+  const byId = new Map();
+  const addPool = (list) => {
+    for (const e of (list || [])) {
+      if (e && e.id && e.name) byId.set(String(e.id).toUpperCase(), e.name);
+    }
+  };
+  addPool(vb.artifacts);
+  addPool(vb.animals);
+  addPool(vb.vehicles);
+  addPool(vb.secondaryCharacters);
+  // Locations are skipped downstream in parseVisualBibleObjects, but LOC IDs
+  // still appear in scene metadata objects[] — translate them too so the
+  // detector doesn't see "LOC001".
+  addPool(vb.locations);
+
+  const seen = new Set();
+  const out = [];
+  for (const raw of entries) {
+    if (!raw || typeof raw !== 'string') continue;
+    const cleaned = raw.trim();
+    if (!cleaned) continue;
+    // VB ID pattern: three uppercase letters + three digits, optional .N variant
+    const idMatch = cleaned.match(/^([A-Z]{3}\d{3})(?:\.\d+)?$/);
+    let name = cleaned;
+    if (idMatch) {
+      const vbName = byId.get(idMatch[1]);
+      if (vbName) {
+        name = vbName;
+      } else {
+        // Unknown ID — skip rather than send opaque token to the detector
+        continue;
+      }
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
  * Detect bounding boxes for a specific issue using Gemini's native detection
  * This is stage 2 of the two-stage detection approach:
  * Stage 1: Quality evaluation identifies issues (no bboxes needed)
@@ -4544,7 +4600,8 @@ The added character must be:
 async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
-    qualityModelOverride = null
+    qualityModelOverride = null,
+    visualBible = null
   } = options;
 
   if (!images || images.length === 0) {
@@ -4618,7 +4675,12 @@ async function evaluateImageBatch(images, options = {}) {
 
       // Parse Visual Bible objects from prompt
       const vbObjects = parseVisualBibleObjects(img.prompt || '');
-      const allExpectedObjects = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+      // Scene metadata emits VB IDs ("ART003", "LOC001.2"); translate them to
+      // natural-language names from the visualBible before passing to the bbox
+      // detector — opaque IDs have no visual meaning and cause found:false
+      // entries that produce fake appearance records downstream.
+      const mergedExpected = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+      const allExpectedObjects = resolveExpectedObjectLabels(mergedExpected, visualBible);
 
       // Run bounding box detection for all figures/objects
       const fixableIssues = qualityResult?.fixableIssues || [];
@@ -5452,7 +5514,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
-    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride }),
+    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       checkObjects: true,
@@ -5512,7 +5574,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   const baselineEvalsByPage = new Map();
   if (baselineEvalInputs.length > 0) {
-    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
@@ -5930,7 +5992,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
 
       const roundEvalInputs = buildEvalInputs(roundSuccess);
-      const roundEvals = await evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+      const roundEvals = await evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
 
       for (const ev of roundEvals) {
         if (ev.usage && usageTracker) {
@@ -6262,7 +6324,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }));
 
     const charFixEvalInputs = buildEvalInputs(charFixEntries);
-    const charFixEvals = await evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+    const charFixEvals = await evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
 
     for (const ev of charFixEvals) {
       if (ev.usage && usageTracker) {
@@ -8834,8 +8896,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Parse Visual Bible objects from prompt (REQUIRED OBJECTS section)
     const vbObjects = parseVisualBibleObjects(currentPrompt);
-    // Merge VB objects with scene objects
-    const allExpectedObjects = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+    // Merge VB objects with scene objects, then resolve any VB IDs
+    // ("ART003", "LOC001.2") to their natural names so the detector has
+    // something visual to look for.
+    const mergedExpected = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+    const allExpectedObjects = resolveExpectedObjectLabels(mergedExpected, visualBible);
 
     if (Object.keys(expectedCharacterPositions).length > 0) {
       log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected character positions: ${Object.entries(expectedCharacterPositions).map(([n, p]) => `${n}=${p}`).join(', ')}`);
