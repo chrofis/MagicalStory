@@ -141,8 +141,10 @@ const FILE_UPLOAD_CONFIG = {
 // Common validation schemas
 const schemas = {
   register: {
-    username: { required: true, type: 'email' },  // Username is the email address
-    email: { type: 'email' },  // Optional, server uses username as email
+    // The `username` field carries the email (legacy frontend naming).
+    // `email` is accepted as an alias. Handler canonicalizes in auth.js.
+    username: { required: true, type: 'email' },
+    email: { type: 'email' },
     password: passwordRules
   },
   login: {

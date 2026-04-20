@@ -1477,13 +1477,17 @@ router.get('/referral/my-code', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userResult = await getDbPool().query(
-      'SELECT referral_code, credits, referred_by, username FROM users WHERE id = $1', [userId]
+      'SELECT referral_code, credits, referred_by, username, email, shipping_first_name FROM users WHERE id = $1', [userId]
     );
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     let code = userResult.rows[0].referral_code;
     if (!code) {
-      const uname = userResult.rows[0].username;
+      // Prefer a real first name. Fall back to the email local-part so we never
+      // get something dumb like "Magic{fullEmail}123".
+      const row = userResult.rows[0];
+      const emailLocal = (row.email || row.username || '').split('@')[0];
+      const uname = row.shipping_first_name || emailLocal || 'User';
       let generated = false;
       for (let attempt = 0; attempt < 10; attempt++) {
         code = generateReferralCode(uname);

@@ -64,15 +64,20 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       return res.status(429).json({ error: 'Please slow down' });
     }
 
-    const username = sanitizeString(req.body.username, 30);
-    const password = req.body.password; // Don't sanitize password
-    const email = sanitizeString(req.body.email, 254).toLowerCase();
+    // Username and email are treated as the same value here — the schema has always
+    // required the email to be passed as `username` (with an optional alias in
+    // `email`). Canonicalize to a single lowercase 254-char email and store the
+    // same value in both DB columns. No 30-char truncation: long emails now work.
+    const email = sanitizeString(req.body.email || req.body.username, 254).toLowerCase();
+    const username = email;  // DB column holds email until the column is dropped in Phase 2
+    const password = req.body.password;
 
     let newUser;
 
     if (isDatabaseMode()) {
-      // Check if user already exists BEFORE expensive bcrypt hash
-      const existing = await dbQuery('SELECT id FROM users WHERE username = $1', [username]);
+      // Check if user already exists BEFORE expensive bcrypt hash.
+      // Case-insensitive: old rows may have mixed-case emails from the pre-lowercase era.
+      const existing = await dbQuery('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
       if (existing.length > 0) {
         return res.status(400).json({ error: 'This email is already registered' });
       }
@@ -91,7 +96,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
            0,
            CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END)
          RETURNING role, story_quota, credits`,
-        [userId, username, username, hashedPassword]
+        [userId, email, email, hashedPassword]
       );
       const role = insertResult[0].role;
       const storyQuota = insertResult[0].story_quota;
@@ -105,7 +110,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
         );
       }
 
-      newUser = { id: userId, username, email: username, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
+      newUser = { id: userId, username, email, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
 
       // Auto-verify admins, regular users will be prompted to verify when they try to generate a story
       if (role === 'admin') {
@@ -144,16 +149,19 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
 // POST /api/auth/login
 router.post('/login', authLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    // Accept `email` or legacy `username` field — both carry the same email value.
+    const loginEmail = (req.body.email || req.body.username || '').toString().trim().toLowerCase();
+    const { password } = req.body;
 
-    if (!username || !password) {
+    if (!loginEmail || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
     let user;
 
     if (isDatabaseMode()) {
-      const rows = await dbQuery('SELECT * FROM users WHERE username = $1 OR email = $1', [username]);
+      // Case-insensitive lookup — old rows may have mixed-case emails.
+      const rows = await dbQuery('SELECT * FROM users WHERE LOWER(email) = $1', [loginEmail]);
       if (rows.length === 0) {
         // Constant-time: run bcrypt anyway to prevent timing-based email enumeration
         await bcrypt.compare(password, DUMMY_HASH);
@@ -183,7 +191,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    await logActivity(user.id, username, 'USER_LOGIN', {});
+    await logActivity(user.id, user.email, 'USER_LOGIN', {});
     await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     const token = generateToken(user);
@@ -374,7 +382,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, email, preferred_language FROM users WHERE email = $1 OR username = $1',
+      'SELECT id, username, email, preferred_language FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
@@ -773,7 +781,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
     }
 
     const existingEmail = await pool.query(
-      'SELECT id FROM users WHERE (email = $1 OR username = $1) AND id != $2',
+      'SELECT id FROM users WHERE email = $1 AND id != $2',
       [newEmail.toLowerCase(), userId]
     );
 

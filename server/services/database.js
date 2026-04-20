@@ -107,6 +107,17 @@ async function initializeDatabase() {
       await dbPool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${type}`);
     }
 
+    // Normalize email + username columns so login lookups are deterministic.
+    // The pre-fix register path stored the same mixed-case value in both columns
+    // and didn't lowercase `username`; older rows may therefore have mixed-case
+    // emails. Lowercase everything, and realign username = email so code that
+    // still reads the username column keeps returning the canonical email.
+    await dbPool.query(`UPDATE users SET email = LOWER(email) WHERE email IS NOT NULL AND email <> LOWER(email)`);
+    await dbPool.query(`UPDATE users SET username = email WHERE email IS NOT NULL AND username <> email`);
+    // Case-insensitive unique index on email — protects identity going forward
+    // without blocking on the old UNIQUE(username) constraint.
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_ci ON users (LOWER(email))`);
+
     // Update existing users with NULL credits
     await dbPool.query(`UPDATE users SET credits = -1 WHERE credits IS NULL AND role = 'admin'`);
     await dbPool.query(`UPDATE users SET credits = 1000 WHERE credits IS NULL AND role = 'user'`);
@@ -330,10 +341,12 @@ async function initializeDatabase() {
     // Backfill referral codes for existing users who don't have one yet
     {
       const { generateReferralCode: genCode } = require('../lib/referral');
-      const missing = await dbPool.query('SELECT id, username FROM users WHERE referral_code IS NULL');
+      const missing = await dbPool.query('SELECT id, username, email, shipping_first_name FROM users WHERE referral_code IS NULL');
       for (const row of missing.rows) {
+        const emailLocal = (row.email || row.username || '').split('@')[0];
+        const nameSource = row.shipping_first_name || emailLocal || 'User';
         for (let attempt = 0; attempt < 10; attempt++) {
-          const code = genCode(row.username);
+          const code = genCode(nameSource);
           try {
             await dbPool.query('UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [code, row.id]);
             break;
