@@ -106,6 +106,13 @@ DECLARED INTERACTIONS (from scene metadata — authoritative):
 - Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street) are scene-appropriate and do NOT deduct.
 - If DECLARED INTERACTIONS is empty, skip this sub-check entirely.
 
+OBJECT SCALE (everyday objects in the scene):
+- Any scene object that has a known real-world size (apple, cup, book, crossbow, arrow, bowl, hat, lantern, candle, key, coin, loaf of bread, sword) must render at a plausible size relative to the characters and ground around it.
+- Reference scales: apple ≈ fist-sized, cup/coffee mug ≈ palm-sized, book ≈ forearm-length, crossbow ≈ arm-length, arrow ≈ arm-length, lantern ≈ head-sized, bowl ≈ two-palms-wide, loaf ≈ forearm-length.
+- Flag when the rendered object is 2× or more its natural size relative to nearby characters: MAJOR, `type: "scale"`, and `description` naming the object + "rendered at ~Nx natural size".
+- Apply this whether or not the object is in DECLARED INTERACTIONS. Objects only need to be visible in the scene.
+- Skip when the object is explicitly sized in the prose ("a giant apple", "a miniature book") — honor the prose.
+
 FACES:
 - CROSS-EYES: Eyes should look in same direction (not crossed) = MAJOR if crossed
 - Features properly placed (eyes, nose, mouth)

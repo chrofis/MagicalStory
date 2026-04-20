@@ -125,6 +125,7 @@ Write one continuous paragraph, 250–350 words. Open with the main subject and 
 - **Never describe** weapons touching a character's body, characters bound or held by another, or wounds / blood.
 - Every `objects[]` entry with a CHR* ID must appear by name in the prose with a position and one identifying visual detail, even at background depth. No folding into "crowd" or "background blur".
 - When the hint's `background` field names unnamed supporting figures (crowd, villagers, townsfolk, soldiers, onlookers, passersby), render them in the prose with one sentence naming count (or "dense crowd"), rough action (standing, watching, bowing, moving past), and placement (far midground, both flanks, background). Do not drop them.
+- Everyday scene objects on the ground, at a character's feet, in hand, or on a surface need a size anchor in the prose — "a fist-sized apple", "a forearm-length crossbow", "a palm-sized cup", "an arm-length arrow". Without the anchor, image models render objects compositionally prominent and they come out 3-5× natural size.
 
 ## METADATA JSON schema
 
