@@ -123,6 +123,7 @@ Write one continuous paragraph, 250–350 words. Open with the main subject and 
 - **Physically possible.** Two hands = max two items.
 - **No age collectives** — never "the children", "the kids". Use names or "all three", "the group".
 - **Never describe** weapons touching a character's body, characters bound or held by another, or wounds / blood.
+- Every `objects[]` entry with a CHR* ID must appear by name in the prose with a position and one identifying visual detail, even at background depth. No folding into "crowd" or "background blur".
 
 ## METADATA JSON schema
 

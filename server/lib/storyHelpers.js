@@ -4083,6 +4083,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     templateName = 'parallel';
   }
 
+  // Build an EXACT POSES block from the scene's declared interactions. Image
+  // models (Grok Aurora especially) weight the end of the prompt heavily, and
+  // interactions buried mid-paragraph in the prose get dropped — declared props
+  // (crossbows, held objects, barrier arms) go missing even when the reference
+  // image is attached. Terse imperatives at the end re-anchor the pose.
+  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions);
+
+  const appendExactPoses = (s) => exactPosesBlock ? `${s}\n\n${exactPosesBlock}` : s;
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
@@ -4091,13 +4100,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     // descriptions, setting, and Visual Bible elements woven in by scene-expansion.
     // We prepend the art style verbatim (no point making Claude copy it).
     if (isStorybook && isProseFormat) {
-      return fillTemplate(template, {
+      return appendExactPoses(fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
-      });
+      }));
     }
 
     // Storybook mode + legacy JSON format (iteratePage path): the scene description
@@ -4106,7 +4115,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     // previously we ALSO prepended them into SCENE_DESCRIPTION, producing duplicate
     // copies that inflated iterate prompts past Grok's 7500-char limit.
     if (isStorybook && !isProseFormat) {
-      return fillTemplate(template, {
+      return appendExactPoses(fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
         CHARACTER_REFERENCE_LIST: characterReferenceList,
@@ -4114,12 +4123,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
-      });
+      }));
     }
 
     // Non-storybook modes (parallel, sequential): use the existing template
     // structure with all placeholders.
-    return fillTemplate(template, {
+    return appendExactPoses(fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: cleanSceneDescription,
       CHARACTER_REFERENCE_LIST: characterReferenceList,
@@ -4128,11 +4137,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
-    });
+    }));
   }
 
   // Fallback to hardcoded prompt
-  return `Create a cinematic scene in ${styleDescription}.
+  const fallback = `Create a cinematic scene in ${styleDescription}.
 
 ${characterReferenceList}
 Scene Description: ${cleanSceneDescription}
@@ -4144,6 +4153,40 @@ Important:
 - Maintain consistent character appearance across ALL pages
 - Clean, clear composition
 - Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;
+  return appendExactPoses(fallback);
+}
+
+/**
+ * Build a terse "EXACT POSES" imperative block from scene interactions[].
+ * Appended at the END of the image prompt. Image models (Grok Aurora) weight
+ * the tail of the prompt heavily — declared interactions buried mid-paragraph
+ * in the prose drop out, re-anchoring them here preserves held props, barrier
+ * arms, gaze directions, and pose constraints.
+ *
+ * Returns '' when no interactions — caller skips the append.
+ *
+ * @param {Array} interactions - metadata.interactions, array of {character, object, where}
+ * @returns {string}
+ */
+function buildExactPosesBlock(interactions) {
+  if (!Array.isArray(interactions) || interactions.length === 0) return '';
+  const lines = [];
+  for (const i of interactions) {
+    if (!i || typeof i !== 'object') continue;
+    const who = (i.character || '').trim();
+    const where = (i.where || '').trim();
+    if (!who || !where) continue;
+    // Prefix with object name only when it adds info. Skip bare VB IDs (ART001,
+    // CHR002 …) — they look like noise next to natural-language `where` text.
+    const obj = (i.object || '').trim();
+    const isBareId = /^[A-Z]{3}\d{3}$/.test(obj);
+    const prefix = obj && !isBareId && !where.toLowerCase().includes(obj.toLowerCase())
+      ? `${obj}: `
+      : '';
+    lines.push(`- ${who}: ${prefix}${where}`);
+  }
+  if (lines.length === 0) return '';
+  return `EXACT POSES:\n${lines.join('\n')}`;
 }
 
 // ============================================================================
