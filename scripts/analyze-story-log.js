@@ -135,6 +135,7 @@ function extractJobs(lines) {
         job.user = createMatch[2];
         job.startTime = ts;
         job.startIndex = i;
+        job.hasStartMarker = true;
       }
 
       // Starting processing pattern
@@ -142,6 +143,12 @@ function extractJobs(lines) {
       if (startMatch) {
         job.startTime = ts;
         job.startIndex = i;
+        job.hasStartMarker = true;
+      }
+
+      // Unified-pipeline start pattern — fires once per actual generation
+      if (msg.match(/\[UNIFIED\]\s+Starting unified/) || msg.match(/\[STORYBOOK\]\s+Starting storybook/)) {
+        job.hasStartMarker = true;
       }
 
       // Job completion patterns (handle [STORYBOOK], [UNIFIED], or plain)
@@ -177,11 +184,17 @@ function extractJobs(lines) {
       job.lines.push(lines[i]);
     }
 
-    // Only include jobs with meaningful data
+    // Only include jobs that actually RAN in this log window — i.e. they hit
+    // a real start marker ("Creating story job", "Starting processing for
+    // job", or "[UNIFIED] Starting unified") AND produced enough activity to
+    // mean something. Previously a job was included if it had >50 lines,
+    // which swept in any old job ID referenced by admin/dev-panel reads
+    // (each GET /api/stories/:id spams ~50 debug lines), and those phantom
+    // jobs then inherited the most recent story's stats during serialization.
     const hasCostData = job.lines.some(l => l.message.includes('Token usage & cost summary'));
     const hasCompletion = job.status === 'completed' || job.status === 'failed';
 
-    if (hasCostData || hasCompletion || job.lines.length > 50) {
+    if (job.hasStartMarker && (hasCostData || hasCompletion || job.lines.length > 50)) {
       if (job.status === 'unknown') job.status = 'incomplete';
       jobs.push(job);
     }
