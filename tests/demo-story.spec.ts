@@ -241,7 +241,10 @@ async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 180
 
   while (Date.now() < deadline) {
     const status = await page.evaluate(async () => {
-      const res = await fetch('/api/characters?includeAllAvatars=true');
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/characters?includeAllAvatars=true', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) return null;
       const data = await res.json();
       return (data.characters || []).map((c: any) => ({
@@ -274,6 +277,24 @@ async function seedPhotosForFamily(page: Page, family: DemoFamily) {
   // character rows via API, so they should all be visible as cards.
   await page.goto('/create');
   await page.waitForTimeout(3000);
+
+  // Record photo consent once for the whole user — otherwise the PhotoUpload
+  // component's `canUpload` gate stays false and setInputFiles will trigger
+  // handleFileChange but bail before calling onPhotoSelect, silently dropping
+  // the first upload. Idempotent: server stores photo_consent_at timestamp.
+  console.log('  Recording photo consent (one-shot)...');
+  const consentStatus = await page.evaluate(async () => {
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch('/api/auth/photo-consent', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return res.status;
+  });
+  console.log(`  Consent endpoint → ${consentStatus}`);
+  // Reload so AuthContext picks up the new photoConsentAt from /api/auth/me
+  await page.reload();
+  await page.waitForTimeout(2000);
 
   for (const char of family.characters) {
     const photoPath = path.join(PHOTOS_DIR, family.id, `${char.name}.jpg`);
