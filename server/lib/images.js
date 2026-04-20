@@ -6900,7 +6900,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `White text will be printed over the ${textPos.replace('-', ' ')} area, so paint this zone DARK and smooth. Continue the scene naturally there but keep it SOFT and SIMPLE — deep/shadowed tones of the scene's own palette (dusk sky, shadowed wall, deep water, dark foliage), gentle gradients, minimal detail. DO NOT paint a flat black rectangle or blank patch. No characters, no sharp lines, no bright highlights in this zone.` : ''
+          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area must stay calm and uncluttered — a natural continuation of the scene, same sky / wall / water / foliage / ground as the rest of the frame. Saturated colour is fine; what matters is that the area reads as soft and simple. No characters, no sharp edges, no high-contrast detail, no text. Gentle gradients, minimal texture. DO NOT paint a flat rectangle or a hard-edged block of colour.` : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

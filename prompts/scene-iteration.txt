@@ -265,11 +265,11 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `interactions[]`: one entry per character-to-object contact visible in the scene (held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, touched). `{character, object, where}`. Every entry must also be described in the prose — prose and metadata must agree. Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind.
 
-- `textPosition`: read verbatim from the scene hint. Do not change it. Write the prose so the chosen corner naturally contains dark, structureless content (night sky, deep shadow, shadowed wall, dark foliage).
+- `textPosition`: read verbatim from the scene hint. Do not change it. Write the prose so the chosen corner naturally contains calm, uncluttered content (smooth sky, unbroken wall, open water, foliage, ground).
 
 - `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused as style anchor. `false` if the setting / location / camera angle / lighting changed significantly.
 
-- `emptyScenePrompt`: 2-3 sentences describing only the background. EXCLUDE named characters, tracked animals, handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). Describe anonymous extras (crowds, soldiers, villagers) with density/distance/silhouette only, kept away from the zone reserved for named characters. Use "open foreground", "uncluttered centre", "empty space" — never "where children would stand". The corner matching `textPosition` must be dark / shadowed / low-luminance so white text reads against it.
+- `emptyScenePrompt`: 2-3 sentences describing only the background. EXCLUDE named characters, tracked animals, handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). Describe anonymous extras (crowds, soldiers, villagers) with density/distance/silhouette only, kept away from the zone reserved for named characters. Use "open foreground", "uncluttered centre", "empty space" — never "where children would stand". The corner matching `textPosition` should read as calm, uncluttered scene content — saturation is fine, clutter is not.
 
 - `translatedSummary`: one-line translation of the prose summary into the target language below, for frontend display.
 

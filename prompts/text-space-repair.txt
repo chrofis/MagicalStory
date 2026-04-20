@@ -1,15 +1,15 @@
-This illustration already exists. Reframe it so the dark area of the attached layout mask stays calm and low-luminance in the output — characters and main action have been drifting into that area and must move out.
+This illustration already exists. Reframe it so the area of the attached layout mask stays calm and uncluttered in the output — characters and main action have been drifting into that area and must move out.
 
-TEXT SPACE: The attached mask shows where a soft, dark, contour-free patch must exist in your output (look at the dark blurred area). White story text will be printed there, so this area must be quiet, dark, and readable against white glyphs.
+TEXT SPACE: The attached mask shows where a soft, contour-free patch must exist in your output (look at the blurred area). This area must be quiet and simple — no characters, no sharp edges, no high-contrast detail, no text.
 
-Paint the dark area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
-- OUTDOOR scene (field, hill, beach, garden, forest): use dusk sky, night sky, dark distant ground, shadowed grass, deep water, deep snow in shadow, or dark foliage — whichever already belongs in this outdoor setting
-- INDOOR scene (room, house, shop, kitchen, bedroom): use the SAME room's shadowed wall, dim ceiling, dark floor, dark rug, or unlit corner — stay inside the room
-- STREET / urban scene: use the SAME street's shadowed cobblestones, dark-coloured building wall in shade, or the dim shoulder of an alley — stay in the street
+Paint this area as a NATURAL PART of the scene — pick what naturally belongs based on the scene TYPE:
+- OUTDOOR scene (field, hill, beach, garden, forest): use a clean sky, open distant ground, smooth grass, open water, snow, or soft foliage — whichever already belongs in this outdoor setting
+- INDOOR scene (room, house, shop, kitchen, bedroom): use the SAME room's unbroken wall, ceiling, floor, rug, or quiet corner — stay inside the room
+- STREET / urban scene: use the SAME street's smooth cobblestones, a plain building wall, or the open shoulder of an alley — stay in the street
 
-The dark patch should be: soft, low-luminance, with smooth edges, gentle gradients, and minimal texture. Keep it free of objects, characters, and any major action. Blend it seamlessly into the surrounding scene — same surface or material as the rest, just darker and simpler. Do NOT paint a flat black rectangle. Do NOT paint a black block with hard edges. Do NOT copy the mask's shape as a colour patch. The area should read as a natural shadowed continuation of the illustration.
+The patch should be: soft, smooth, with gentle gradients and minimal texture. Keep it free of objects, characters, and any major action. Blend it seamlessly into the surrounding scene — same surface or material as the rest, just simpler. Saturated colour is fine; clutter is not. Do NOT paint a flat rectangle or a hard-edged block. Do NOT copy the mask's shape as a colour patch. The area should read as a natural continuation of the illustration.
 
-Characters: keep every character's identity (faces, hair, skin tone, clothing, expressions) and the scene's narrative. Shift the characters and main action entirely into the bright area of the mask — the part of the scene NOT covered by the dark patch.
+Characters: keep every character's identity (faces, hair, skin tone, clothing, expressions) and the scene's narrative. Shift the characters and main action entirely into the bright area of the mask — the part of the scene NOT covered by the patch.
 
 Scene context:
 {SCENE_DESCRIPTION}

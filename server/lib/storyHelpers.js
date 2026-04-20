@@ -3836,7 +3836,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     'bottom-full': 'lower third',
   };
   const textAreaInstruction = (textInImage && textPosition)
-    ? `**COMPOSITION — DARK QUIET ZONE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) must stay visually simple AND dark — intentional low-luminance negative space where white text will be placed. Continue the scene naturally into this area — same sky, same wall, same ground — but paint it in deep, shadowed tones of the scene's own palette (dusk sky, shadowed wall, deep water, dark foliage, unlit corner). Keep it SOFT and UNCLUTTERED. DO NOT paint a box, a blank patch, or a sharp colour change — keep it a natural, shadowed continuation of the illustration, just darker and quieter than the rest. No characters, no sharp lines, no high-contrast detail, no bright highlights in this zone.`
+    ? `**COMPOSITION — CALM ZONE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) must stay visually calm and uncluttered — a natural continuation of the scene, same sky / wall / water / foliage / ground as the rest of the frame. Saturated colour is fine; what matters is that the area reads as soft and simple. No characters, no sharp edges, no high-contrast detail, no text. Gentle gradients, minimal texture. DO NOT paint a flat rectangle or a hard-edged block of colour.`
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

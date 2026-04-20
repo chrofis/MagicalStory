@@ -135,7 +135,7 @@ Then a single-line JSON object:
 - Never write hypothetical references like "where children would stand" — image models render those literally.
 - Use "open foreground", "uncluttered centre". Named characters will be composited later, so framing must leave enough physical space for them.
 - When the scene's prose calls for a populated setting (crowd, villagers, market-goers, soldiers, guards, onlookers, distant workers, busy street), describe those anonymous extras here too — density, rough distance, silhouette only — so the backdrop already feels populated. Keep extras away from the spot reserved for named characters.
-- The corner that matches the chosen `textPosition` must be described as dark, shadowed, or low-luminance (dusk sky, shadowed wall, deep water, dark foliage) so white text reads against it.
+- The corner that matches the chosen `textPosition` should naturally contain calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground) — saturation is fine, clutter is not.
 
 **Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
 
