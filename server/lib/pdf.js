@@ -456,7 +456,12 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
 
-        await drawImageCovering(doc, compositedImage, 0, 0, interiorW, interiorH, { valign: 'top' });
+        // Crop the opposite side of the text so the text is never in the
+        // cropped zone. Image aspect rarely matches the page aspect exactly —
+        // scale-to-fill always loses some pixels on one axis, and we want
+        // those lost pixels to come from the side WITHOUT text.
+        const cropValign = textPos.startsWith('bottom') ? 'bottom' : 'top';
+        await drawImageCovering(doc, compositedImage, 0, 0, interiorW, interiorH, { valign: cropValign });
         overlayDrawn = true;
       } catch (overlayErr) {
         log.warn(`⚠️ [PDF] Text overlay rendering failed for page ${pageNumber}: ${overlayErr.message} — falling back`);
@@ -651,8 +656,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
           const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
-          // Fill the full interior page incl. top AND bottom bleed.
-          await drawImageCovering(doc, compositedImage, 0, 0, interiorPageWidth, interiorPageHeight, { valign: 'top' });
+          // Fill the full interior page incl. top AND bottom bleed. Crop the
+          // opposite side from the text so the scale-to-fill overflow never
+          // eats into the text zone.
+          const cropValign = textPos.startsWith('bottom') ? 'bottom' : 'top';
+          await drawImageCovering(doc, compositedImage, 0, 0, interiorPageWidth, interiorPageHeight, { valign: cropValign });
           overlayDrawn = true;
         } catch (overlayErr) {
           log.warn(`⚠️ [COMBINED PDF] Text overlay failed for page ${pageNumber}: ${overlayErr.message} — falling back`);
