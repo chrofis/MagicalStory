@@ -4802,6 +4802,7 @@ module.exports = {
   extractSceneMetadata,
   stripSceneMetadata,
   parseSceneHintMetadata,
+  parseProseMetadataFormat,
 
   // Prompt builders
   buildBasePrompt,

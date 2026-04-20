@@ -6526,6 +6526,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     getCharacterPhotoDetails,
     buildAvailableAvatarsForPrompt,
     extractSceneMetadata,
+    parseProseMetadataFormat,
     parseClothingCategory,
     getLandmarkPhotosForScene,
     convertClothingToCurrentFormat
@@ -6631,10 +6632,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     previewFeedback  // The actual image analysis feedback!
   );
 
-  // Step 4: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
+  // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).
+  // Output is prose paragraph + ---METADATA--- + JSON block (same shape as initial expansion,
+  // plus the iterate-specific `previewMismatches`, `checks`, `issues`, `corrections`,
+  // `draftValidation` fields inside the metadata JSON). No JSON prefill — the response starts
+  // with the prose directly.
   const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || CONFIG_DEFAULTS.sceneIteration;
-  log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with ${effectiveSceneModel}...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { prefill: '{"previewMismatches":[' });
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
+  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel);
   const newSceneDescription = sceneResult.text;
 
   // Track usage (Claude Haiku scene re-expansion)
@@ -6642,17 +6647,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
   }
 
-  // Parse the scene JSON to extract previewMismatches and checksRun
+  // Extract previewMismatches + checks from the metadata JSON block. parseProseMetadataFormat
+  // splits on ---METADATA--- and parses the JSON — the fields live alongside scene structure.
   let previewMismatches = [];
   let checksRun = {};
   try {
-    const cleanedScene = newSceneDescription.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '');
-    const sceneJson = JSON.parse(cleanedScene);
-    previewMismatches = sceneJson.previewMismatches || [];
-    checksRun = sceneJson.selfCritique || {};
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
+    const parsed = parseProseMetadataFormat(newSceneDescription);
+    if (parsed?.metadata) {
+      previewMismatches = parsed.metadata.previewMismatches || [];
+      checksRun = parsed.metadata.checks || parsed.metadata.selfCritique || {};
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
+    } else {
+      log.warn(`🔄 [ITERATE] Page ${pageNumber}: Could not parse prose+metadata format — mismatches/checks unavailable`);
+    }
   } catch (parseErr) {
-    log.warn(`🔄 [ITERATE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
+    log.warn(`🔄 [ITERATE] Could not extract mismatches from prose+metadata: ${parseErr.message}`);
   }
 
   // Step 5: Prepare for image generation
@@ -6845,32 +6854,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // Extract clean scene for image generation (strip previewMismatches, checks, corrections)
-  let cleanSceneForImage = newSceneDescription;
-  try {
-    const parsed = JSON.parse(newSceneDescription);
-    const sceneObj = parsed?.previewMismatches?.[0]?.scene || parsed?.scene || parsed;
-    if (sceneObj?.imageSummary || sceneObj?.characters) {
-      cleanSceneForImage = JSON.stringify({ scene: sceneObj });
-    }
-  } catch {
-    const sceneMatch = newSceneDescription.match(/"scene"\s*:\s*\{[\s\S]*"imageSummary"/);
-    if (sceneMatch) {
-      const startIdx = newSceneDescription.indexOf(sceneMatch[0]);
-      let depth = 0;
-      let endIdx = startIdx;
-      for (let i = startIdx + '"scene":'.length; i < newSceneDescription.length; i++) {
-        if (newSceneDescription[i] === '{') depth++;
-        if (newSceneDescription[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
-      }
-      if (endIdx > startIdx) {
-        cleanSceneForImage = newSceneDescription.substring(startIdx, endIdx);
-      }
-    }
-  }
-
-  // Build image prompt
-  let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition });
+  // The iterate output is prose + ---METADATA--- + JSON (same shape as initial
+  // expansion). buildImagePrompt's prose branch strips the metadata block and
+  // uses only the prose for the image prompt — no JSON-scene extraction needed.
+  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition });
 
   // Append evaluation feedback if provided
   if (evaluationFeedback) {

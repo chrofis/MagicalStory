@@ -180,9 +180,25 @@ Common contradiction patterns to catch:
 
 ## OUTPUT FORMAT
 
-Output raw JSON. Start directly with `{` - no markdown, no explanation.
+Output one continuous paragraph of prose, followed by a metadata block. No markdown headers, no code fences, no preamble — start directly with the prose.
 
-```json
+**Step A — prose paragraph:**
+
+Describe the corrected scene as an illustrator would paint it. Open with the main subject and main action. Weave each named character's appearance on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing category — as flowing language, not a labeled list. Include where each character is positioned (left/right/center, foreground/midground/background), what they hold, how they face. Name the setting, time of day, weather, lighting, mood. Name recurring Visual Bible elements with their identifying detail. Note shot type (close-up / medium / wide) if not obvious from the action.
+
+The prose is the scene brief that feeds the image model — text that isn't in the prose doesn't reach the image. Keep it one flowing paragraph, no bullets, no headers.
+
+**Distance rule:** when characters must be far apart, describe the size difference explicitly: "the main character fills the centre foreground while the secondary character is a tiny figure in the far distance on the right, roughly a sixth their size."
+
+**Example prose:**
+
+Sophie — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the bottom-right foreground of a snowy town plaza, her right arm extended up-left toward the ancient clock tower that rises in the top-left background with its blue face glowing faintly against grey clouds. Beside her in the bottom-left foreground walks Manuel, a slim ten-year-old in a navy parka and snow boots, body angled toward Sophie and face tilted upward in curiosity. Light snow falls directly onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
+
+**Step B — metadata block:**
+
+After the prose, emit exactly `---METADATA---` on its own line, then a single JSON object:
+
+```
 {
   "previewMismatches": ["Intent: Sophie pointing LEFT. Preview: arm extended RIGHT."],
   "checks": {
@@ -203,85 +219,66 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
     "check15_holdingInventory": "Sophie L:empty R:pointing. Manuel L:empty R:empty. NO CONFLICTS",
     "check16_backgroundFeasibility": "Outdoor scene, tower visible. FEASIBLE",
     "check17_characterCount": "2 main characters. PASS",
-    "check18_compositionSimplicity": "2 characters, one focal point (tower). No pointing overuse. PASS",
-    "gazeValidation": [
-      "Sophie (bottom-right) looks up-left at tower (top-left). VALID",
-      "Manuel (bottom-left) looks right at Sophie. VALID"
-    ]
+    "check18_compositionSimplicity": "2 characters, one focal point (tower). No pointing overuse. PASS"
   },
   "issues": ["Pointing geometry wrong - arm pointed RIGHT but tower is LEFT"],
   "corrections": ["Fixed Sophie's arm direction to UP-LEFT toward tower"],
   "draftValidation": {
-    "poseActionCheck": "Sophie: standing facing left + pointing left = CONSISTENT. Manuel: walking + looking up = CONSISTENT",
+    "poseActionCheck": "Sophie: standing facing left + pointing left = CONSISTENT",
     "positionGazeCheck": "Sophie bottom-right looks up-left at tower top-left = VALID geometry",
     "contradictionsFound": [],
     "fixesApplied": []
   },
-  "scene": {
-    "sceneComplexity": "simple",
-    "landmarkPlacement": { "tower": "top-left background" },
-    "imageSummary": "Sophie stands in the foreground pointing up-left toward the distant tower while Manuel walks beside her on the left. The snowy plaza stretches between them and the tower. Main characters: Sophie, Manuel.",
-    "setting": {
-      "location": "Stadtturm [LOC001]",
-      "indoorOutdoor": "outdoor",
-      "description": "Snowy town plaza with the ancient clock tower rising in the background",
-      "lighting": "Winter afternoon, golden hour light",
-      "weather": "light snow",
-      "weatherVisibility": "directly on scene",
-      "camera": "Medium wide shot, slightly low angle",
-      "depthLayers": "Characters foreground, empty plaza midground, tower background"
-    },
-    "characters": [
-      {
-        "name": "Sophie",
-        "position": "bottom-right foreground",
-        "pose": "Standing, three-quarter view facing left",
-        "action": "Right arm extended up-left toward the tower, left hand at side",
-        "holding": {"leftHand": "empty", "rightHand": "pointing"},
-        "expression": "Eyes wide, mouth open in wonder",
-        "clothing": "winter"
-      },
-      {
-        "name": "Manuel",
-        "position": "bottom-left foreground",
-        "pose": "Walking, body angled toward Sophie",
-        "action": "Mid-stride, looking toward where Sophie points",
-        "holding": {"leftHand": "empty", "rightHand": "empty"},
-        "expression": "Raised eyebrows, curious gaze upward",
-        "clothing": "winter"
-      }
-    ],
-    "objects": [
-      {"id": "LOC001.1", "name": "Stadtturm", "position": "top-left background, ancient clock tower with blue face"}
-    ],
-    "reuseEmptyScene": true,
-    "emptyScenePrompt": "A snowy town plaza stretches out beneath a winter afternoon sky with golden hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly onto the cobblestone square. Medium wide shot, slightly low angle. The bottom-right and bottom-left foreground areas are open and uncluttered, with the snowy plaza filling the midground.",
-    "translatedSummary": "Sophie steht im Vordergrund und zeigt nach oben links zum entfernten Turm, während Manuel neben ihr auf der linken Seite geht. Der verschneite Platz erstreckt sich zwischen ihnen und dem Turm. Hauptfiguren: Sophie, Manuel."
-  }
+  "characters": [
+    {"name": "Sophie", "clothing": "winter", "position": "bottom-right foreground"},
+    {"name": "Manuel", "clothing": "winter", "position": "bottom-left foreground"}
+  ],
+  "objects": ["LOC001"],
+  "interactions": [
+    {"character": "Sophie", "object": "tower", "where": "right arm extended up-left, pointing toward it"}
+  ],
+  "textPosition": "top-right",
+  "reuseEmptyScene": true,
+  "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
+  "translatedSummary": "Sophie steht im Vordergrund und zeigt auf den entfernten Turm..."
 }
 ```
 
-## FIELD GUIDELINES
+### Field rules
 
-- `sceneComplexity`: `"simple"` or `"complex"`.
-  - **simple**: All characters drawn at NORMAL SIZE on the same depth plane (foreground/midground). Most scenes are simple.
-  - **complex**: Any character positioned as a TINY FIGURE in the far background, OR characters at clearly different size scales due to depth separation.
-  - Rule of thumb: if all character positions are "left"/"center"/"right" → simple. If any position contains "far background" or "(tiny figure)" → complex.
-  - Default to `"simple"` unless depth separation is clearly needed by the story moment.
+**Checks and mismatches — keep them as output:**
+- `previewMismatches`: array of strings, one per real mismatch between intent and preview. Empty array if preview matches intent. Format: `"Intent: X. Preview: Y."`.
+- `checks`: object with all 18 keys (`check1_scaleFeasibility` through `check18_compositionSimplicity`). Each value is a short verdict with reasoning.
+- `issues`: short bullets describing problems found. Empty array if none.
+- `corrections`: short bullets describing the fixes you applied to the prose. Empty array if none.
+- `draftValidation`: the internal consistency check on your draft (see DRAFT-THEN-VALIDATE section above).
 
-**Empty scene reuse (for iterations):**
-- `reuseEmptyScene`: `true` if the previously generated empty scene background can be reused as style anchor. `false` if the background/setting/location/camera/lighting changed significantly and a fresh empty scene should be generated. Rule of thumb: if only characters changed (pose, expression, position) → `true`. If setting, location, camera angle, or lighting changed → `false`.
+**Scene fields (structural descriptors for the image pipeline):**
 
-**Empty scene prompt (for style-anchor generation):**
-- `emptyScenePrompt`: A 2-4 sentence description of the background environment. EXCLUDE: named characters, tracked animals, and carried or handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE: location details, architecture, natural landscape, lighting, weather, camera angle, depth layers, AND scene-anchor artifacts when present — both stationary anchors (throne, monument, pedestal, altar, signpost, pole-with-banner) and the vehicle or vessel when the scene takes place in or on one (boat, raft, wagon, carriage, cart, sled, train compartment). When the scene calls for a populated setting (crowd, villagers, soldiers, guards, distant workers, busy street), describe those anonymous extras too — density/distance/silhouette only — kept away from the zones reserved for named characters. NEVER write hypothetical references like "where children would stand" or "where figures would walk" — image models render them literally as people. Use neutral phrases: "open foreground", "uncluttered center", "empty space" for the zones reserved for composited characters.
+- `characters[]`: one entry per character. Always `name`, `clothing`, `position`.
+  - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
+  - `clothing` must match the outline exactly — if the outline says `costumed:wizard`, write `costumed:wizard`, not `standard`. Also describe the costume in the prose.
+  - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.
+  - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.
+
+- `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible in the scene. For landmarks with photo variants, use `LOC003.2` format — pick the variant matching the scene's perspective.
+
+- `interactions[]`: one entry per character-to-object contact visible in the scene (held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, touched). `{character, object, where}`. Every entry must also be described in the prose — prose and metadata must agree. Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind.
+
+- `textPosition`: read verbatim from the scene hint. Do not change it. Write the prose so the chosen corner naturally contains dark, structureless content (night sky, deep shadow, shadowed wall, dark foliage).
+
+- `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused as style anchor. `false` if the setting / location / camera angle / lighting changed significantly.
+
+- `emptyScenePrompt`: 2-3 sentences describing only the background. EXCLUDE named characters, tracked animals, handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). Describe anonymous extras (crowds, soldiers, villagers) with density/distance/silhouette only, kept away from the zone reserved for named characters. Use "open foreground", "uncluttered centre", "empty space" — never "where children would stand". The corner matching `textPosition` must be dark / shadowed / low-luminance so white text reads against it.
+
+- `translatedSummary`: one-line translation of the prose summary into the target language below, for frontend display.
 
 ---
 
 ## LANGUAGE RULES
 
-**ALL OUTPUT IN ENGLISH** - except `translatedSummary`:
-- `imageSummary`, `setting`, `characters`, `objects` → ALWAYS ENGLISH (for image generation)
-- `translatedSummary` → translate to target language below
+**All prose and metadata fields in English**, except:
+- `translatedSummary` → translate to target language below.
 
 **Target Language for translatedSummary:**
 {LANGUAGE_INSTRUCTION}
@@ -291,4 +288,4 @@ The `translatedSummary` field MUST follow these language rules exactly (dialect,
 
 ---
 
-**OUTPUT:** Return ONLY the raw JSON object. No markdown, no code fences, no explanation. Start directly with `{`.
+**OUTPUT:** the prose paragraph, then `---METADATA---`, then the JSON object. Start directly with the prose — no markdown, no code fences, no explanation.
