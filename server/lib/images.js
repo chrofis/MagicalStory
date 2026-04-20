@@ -2988,7 +2988,36 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       .filter(w => w.length >= 4 && !commonWords.has(w));
   };
 
+  // Only character-targeted issues get bbox enrichment. Object / scene /
+  // composition issues ("wooden crossbow is missing", "extra building in
+  // background", "deep shadow band at bottom") pass through as text only —
+  // they flow downstream through the consolidator (inpaintPage → Haiku →
+  // scene_fix.instruction), which doesn't need a per-issue bbox.
+  //
+  // The bbox detector doesn't reliably localise objects today: expected
+  // objects that aren't found come back as found:false/null-bbox, and even
+  // when they ARE found, the old targeted-magenta inpaint rarely improved
+  // them. Skipping those issues here eliminated a noisy "Could not match"
+  // log spam (~48 warnings per run) without losing real repair capability
+  // — the main pipeline already handles non-character fixes via prose.
+  //
+  // Revive object bbox-enrichment when/if we build a dedicated
+  // object-targeted repair pass. For now, character-only keeps the path
+  // simple and honest about what actually works.
+  const characterTypes = new Set(['face', 'hand', 'clothing', 'limb', 'proportion']);
+  const isCharacterIssue = (issue) => {
+    if (issue.character) return true;
+    if (issue.type && characterTypes.has(String(issue.type).toLowerCase())) return true;
+    // Fallback: issue text mentions a known character name.
+    return extractCharacterNames((issue.description || '') + ' ' + (issue.fix || '')).length > 0;
+  };
+
   for (const issue of fixableIssues) {
+    if (!isCharacterIssue(issue)) {
+      log.verbose(`📦 [BBOX-ENRICH] Skipping non-character issue (passes through as text): ${(issue.description || '').substring(0, 60)}`);
+      continue;
+    }
+
     const issueDesc = (issue.description || '').toLowerCase();
     const issueFix = (issue.fix || '').toLowerCase();
     const issueKeywords = extractKeywords(issueDesc + ' ' + issueFix);
@@ -3023,7 +3052,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       }
     }
 
-    // Fallback: keyword matching or type-based selection
+    // Fallback: character-type issues without an explicit character name or
+    // mention get pinned to the most likely figure (identified character, or
+    // largest figure as a last resort). Object issues are filtered out above
+    // and never reach this block — see the isCharacterIssue gate.
     if (!bestMatch) {
       if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
         // For character-related issues, prefer identified characters or largest figure
@@ -3038,21 +3070,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
           }, allDetections.figures[0]);
           bestMatch = { ...bestMatch, elementType: 'figure' };
         }
-      } else if (issue.type === 'object') {
-        // For object issues, prefer found expected objects or largest object
-        const foundObjs = allDetections.objects.filter(o => o.found !== false);
-        if (foundObjs.length > 0) {
-          bestMatch = { ...foundObjs[0], elementType: 'object', faceBox: null };
-        } else if (allDetections.objects.length > 0) {
-          bestMatch = allDetections.objects.reduce((largest, obj) => {
-            const getArea = (box) => box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
-            return getArea(obj.bodyBox) > getArea(largest?.bodyBox) ? obj : largest;
-          }, allDetections.objects[0]);
-          bestMatch = { ...bestMatch, elementType: 'object', faceBox: null };
-        }
       } else {
-        // No match — skip this issue rather than targeting an unrelated element
-        log.debug(`📦 [BBOX-ENRICH] Issue "${(issue.description || '').substring(0, 60)}" — no matching element, skipping`);
+        // Character-typed issue we couldn't confidently pin to a figure —
+        // leave it text-only. Better than repairing the wrong region.
+        log.debug(`📦 [BBOX-ENRICH] Issue "${(issue.description || '').substring(0, 60)}" — no matching figure, skipping`);
       }
     }
 
