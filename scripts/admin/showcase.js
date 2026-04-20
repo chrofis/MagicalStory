@@ -78,7 +78,7 @@ function pickEntry(args, entries) {
   return entries[state.currentIndex % entries.length];
 }
 
-function loadPhotosForFamily(family) {
+function verifyPhotosOnDisk(family) {
   const dir = path.join(PHOTOS_DIR, family.id);
   if (!fs.existsSync(dir)) {
     throw new Error(
@@ -87,19 +87,16 @@ function loadPhotosForFamily(family) {
       `  node scripts/admin/generate-demo-photos.js --family=${family.id} --save-to=true --no-upload`
     );
   }
-  const photos = {};
   for (const charDef of family.characters) {
     const filePath = path.join(dir, `${charDef.name}.jpg`);
     if (!fs.existsSync(filePath)) {
       throw new Error(`Missing photo for ${charDef.name}: ${filePath}`);
     }
-    const buf = fs.readFileSync(filePath);
-    photos[charDef.id] = `data:image/jpeg;base64,${buf.toString('base64')}`;
   }
-  return photos;
+  console.log(`Verified ${family.characters.length} photos on disk at ${path.relative(process.cwd(), dir)}`);
 }
 
-async function provisionAccount(apiBase, email, family, photos) {
+async function provisionAccount(apiBase, email, family) {
   console.log(`\n── Provisioning ${email} ──────────────────`);
 
   console.log('1. Registering...');
@@ -132,17 +129,23 @@ async function provisionAccount(apiBase, email, family, photos) {
   const { token, user } = await loginRes.json();
   console.log(`   id=${user.id}, credits=${user.credits}`);
 
-  console.log(`3. Saving ${family.characters.length} characters with photos...`);
-  const charactersWithPhotos = family.characters.map(c => ({
-    ...c,
-    photos: { original: photos[c.id], face: photos[c.id] },
-  }));
+  // Save metadata only (names, traits, roles, relationships) — NO photos.
+  // Photos get uploaded later by the Playwright helper via the real UI, which
+  // triggers the client-side avatar generation chain exactly like a user upload.
+  // If we include photos here via the API, the server accepts them but the
+  // avatar generation call never fires because it lives on the client.
+  console.log(`3. Saving ${family.characters.length} characters (metadata only, no photos)...`);
+  const charactersMetadataOnly = family.characters.map(c => {
+    // eslint-disable-next-line no-unused-vars
+    const { portraitPrompt, ...metadata } = c;
+    return metadata;
+  });
 
   const saveRes = await fetch(`${apiBase}/api/characters`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({
-      characters: charactersWithPhotos,
+      characters: charactersMetadataOnly,
       relationships: family.relationships,
       relationshipTexts: {},
       customRelationships: [],
@@ -178,14 +181,16 @@ async function main() {
   console.log(`  Backend:  ${apiBase}`);
   console.log('═══════════════════════════════════════════════════════════');
 
-  const photos = loadPhotosForFamily(family);
-  console.log(`Loaded ${Object.keys(photos).length} photos from disk.`);
+  // Sanity-check that the family's photos exist on disk — Playwright (run below)
+  // will upload them via the real wizard UI, which is what triggers automatic
+  // avatar generation on the client side.
+  verifyPhotosOnDisk(family);
 
   const email = showcaseEmail(family);
   if (email.length > 30) {
     throw new Error(`Generated email exceeds 30-char auth cap: ${email} (${email.length} chars)`);
   }
-  await provisionAccount(apiBase, email, family, photos);
+  await provisionAccount(apiBase, email, family);
 
   console.log('\n── Account ready ──────────────────────────────────────────');
   console.log(`  Email:    ${email}`);
