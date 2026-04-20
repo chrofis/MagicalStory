@@ -42,10 +42,19 @@ function parseArgs() {
   return out;
 }
 
-function timestampSuffix() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+function shortTimeId() {
+  // Base36 minute-counter (~7 chars). Keeps the email under the 30-char username
+  // truncation that auth.js applies on insert. Two showcases in the same minute
+  // would collide — acceptable for manual gallery generation.
+  return Math.floor(Date.now() / 60000).toString(36);
+}
+
+function showcaseEmail(family) {
+  // Format: demo-{family-initial}-{base36-minutes}@magicalstory.ch  (≤ 30 chars)
+  // e.g. "demo-b-djts1k@magicalstory.ch" = 29 chars. The 30-char cap comes from
+  // sanitizeString in server/middleware/validation.js, which truncates the
+  // username field that doubles as the email in auth.js.
+  return `demo-${family.id[0]}-${shortTimeId()}@magicalstory.ch`;
 }
 
 function loadEntries() {
@@ -172,7 +181,10 @@ async function main() {
   const photos = loadPhotosForFamily(family);
   console.log(`Loaded ${Object.keys(photos).length} photos from disk.`);
 
-  const email = `demo-${family.id}-${timestampSuffix()}@magicalstory.ch`;
+  const email = showcaseEmail(family);
+  if (email.length > 30) {
+    throw new Error(`Generated email exceeds 30-char auth cap: ${email} (${email.length} chars)`);
+  }
   await provisionAccount(apiBase, email, family, photos);
 
   console.log('\n── Account ready ──────────────────────────────────────────');

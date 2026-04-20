@@ -2,7 +2,9 @@ import { test, expect, Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { DEMO_ROTATION, DemoRotationEntry } from './helpers/demo-rotation';
-import { getFamily, DemoLanguage } from './helpers/demo-characters';
+import { getFamily, DemoLanguage, DemoFamily } from './helpers/demo-characters';
+
+const PHOTOS_DIR = path.resolve(__dirname, 'fixtures', 'demo-photos');
 
 /**
  * Demo Story Generator Test
@@ -150,6 +152,147 @@ async function preSeedLanguage(page: Page, language: DemoLanguage, baseUrl: stri
   }, language);
 }
 
+// ─── Photo seeding (Playwright-driven) ──────────────────────────────────────
+// Characters are pre-created with full metadata (traits, relationships, roles)
+// via the API in showcase.js before Playwright runs. But photo upload via the
+// API is awkward (nested shape vs server's flat photo_url column), so we drive
+// the real UI instead — it's more robust to schema drift and mirrors what a
+// real user would do.
+
+const PHOTO_LABEL_RE = /foto hochladen|upload photo|neues foto|new photo|foto wechseln|change photo|foto ersetzen/i;
+const SAVE_CHAR_RE = /speichern|save|enregistrer|finish|fertig|done/i;
+
+async function isOnCharacterList(page: Page): Promise<boolean> {
+  // Character list view shows a "Create Another" card OR any character heading
+  const markers = await page.locator('text=/create another|weiteren charakter|personnage suivant/i').count();
+  return markers > 0;
+}
+
+async function findCharacterCard(page: Page, name: string) {
+  // Matches the `div.border.rounded` (or .rounded-lg) card variants observed in CharacterList
+  return page.locator('div.border.rounded-lg, div.border.rounded').filter({ hasText: name }).first();
+}
+
+async function waitForPhotoAnalysis(page: Page) {
+  // Photo analyzer (Python service via server) extracts face/body/bodyNoBg ~5-15s.
+  // We don't have a reliable spinner selector across wizard states, so just sleep.
+  await page.waitForTimeout(15000);
+}
+
+async function uploadPhotoForCharacter(page: Page, charName: string, photoPath: string) {
+  console.log(`  [${charName}] opening edit...`);
+  const card = await findCharacterCard(page, charName);
+  await expect(card).toBeVisible({ timeout: 10000 });
+
+  // Primary selector matches the original character-management.spec.ts pattern
+  const editBtn = card.locator('button.bg-indigo-600').first();
+  if (await editBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await editBtn.click();
+  } else {
+    // Fallback: click the thumbnail
+    await card.locator('img, svg').first().click();
+  }
+  await page.waitForTimeout(2000);
+
+  console.log(`  [${charName}] uploading photo from ${path.relative(process.cwd(), photoPath)}`);
+  const newPhotoLabel = page.locator('label').filter({ hasText: PHOTO_LABEL_RE }).first();
+  let fileInput = newPhotoLabel.locator('input[type="file"]');
+  if (await fileInput.count() === 0) {
+    // Fallback: any file input on the edit screen
+    fileInput = page.locator('input[type="file"]').first();
+  }
+  await fileInput.setInputFiles(photoPath);
+  await waitForPhotoAnalysis(page);
+
+  // Walk any remaining save-path clicks until we land back on the character list.
+  // Cap iterations to avoid runaway loops.
+  console.log(`  [${charName}] walking to save...`);
+  for (let i = 0; i < 8; i++) {
+    if (await isOnCharacterList(page)) break;
+
+    const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
+    if (await saveBtn.isVisible({ timeout: 1500 }).catch(() => false) && await saveBtn.isEnabled().catch(() => false)) {
+      await saveBtn.click();
+      await page.waitForTimeout(2500);
+      continue;
+    }
+
+    const nextBtn = page.getByRole('button', { name: NEXT_BTN_RE }).first();
+    if (await nextBtn.isVisible({ timeout: 1500 }).catch(() => false) && await nextBtn.isEnabled().catch(() => false)) {
+      await nextBtn.click();
+      await page.waitForTimeout(2000);
+      continue;
+    }
+
+    // Nothing to click — stuck. Bail out; the character may have been saved earlier.
+    console.log(`  [${charName}] no next/save button visible after ${i + 1} steps — assuming saved`);
+    break;
+  }
+
+  await page.waitForTimeout(1500);
+  console.log(`  [${charName}] done`);
+}
+
+async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 180000) {
+  // Poll /api/characters (via the page's authenticated session) until every
+  // family character shows a standard avatar (or we hit the timeout).
+  const deadline = Date.now() + timeoutMs;
+  const needed = new Set(family.characters.map(c => c.name));
+
+  while (Date.now() < deadline) {
+    const status = await page.evaluate(async () => {
+      const res = await fetch('/api/characters?includeAllAvatars=true');
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.characters || []).map((c: any) => ({
+        name: c.name,
+        hasAvatar: !!(c.avatars && (c.avatars.standard || c.avatars.winter || c.avatars.summer)),
+        status: c.avatars?.status,
+      }));
+    });
+
+    if (status) {
+      const ready = status.filter((c: any) => needed.has(c.name) && c.hasAvatar).map((c: any) => c.name);
+      const pending = [...needed].filter(n => !ready.includes(n));
+      if (pending.length === 0) {
+        console.log(`  All ${family.characters.length} avatars ready.`);
+        return;
+      }
+      console.log(`  Avatars pending: ${pending.join(', ')} (ready: ${ready.length}/${family.characters.length})`);
+    }
+
+    await page.waitForTimeout(10000);
+  }
+
+  console.log(`  Avatar poll timed out after ${timeoutMs / 1000}s — continuing anyway.`);
+}
+
+async function seedPhotosForFamily(page: Page, family: DemoFamily) {
+  console.log(`\n=== Seeding photos for ${family.label} family ===`);
+
+  // Start on the wizard step 1 (character list) — showcase.js already saved the
+  // character rows via API, so they should all be visible as cards.
+  await page.goto('/create');
+  await page.waitForTimeout(3000);
+
+  for (const char of family.characters) {
+    const photoPath = path.join(PHOTOS_DIR, family.id, `${char.name}.jpg`);
+    if (!fs.existsSync(photoPath)) {
+      throw new Error(`Missing photo on disk: ${photoPath}`);
+    }
+    await uploadPhotoForCharacter(page, char.name, photoPath);
+    // Navigate back to character list before next character (in case the save
+    // path deposited us somewhere else)
+    if (!await isOnCharacterList(page)) {
+      await page.goto('/create');
+      await page.waitForTimeout(2000);
+    }
+  }
+
+  console.log(`\n=== Waiting for avatar generation (up to 3 min) ===`);
+  await waitForAllAvatars(page, family);
+}
+
 // ─── Test ───────────────────────────────────────────────────────────────────
 
 test.describe('Demo Story Generation', () => {
@@ -186,8 +329,11 @@ test.describe('Demo Story Generation', () => {
     await preSeedLanguage(page, entry.language, baseURL || 'https://magicalstory.ch');
     await loginAs(page, loginEmail, DEMO_PASSWORD);
 
-    // ── Step 0b: Navigate to a fresh story (lang param keeps language sticky) ──
-    console.log('Step 0b: Starting new story...');
+    // ── Step 0b: Seed photos + trigger avatar generation (idempotent — skipped if family already has avatars) ──
+    await seedPhotosForFamily(page, family);
+
+    // ── Step 0c: Navigate to a fresh story (lang param keeps language sticky) ──
+    console.log('Step 0c: Starting new story...');
     await page.goto(`/create?new=true&lang=${entry.language}`);
     await page.waitForTimeout(2000);
 
