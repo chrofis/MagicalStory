@@ -16,6 +16,8 @@ interface SharedStoryData {
   id: string;
   title: string;
   language: string;
+  languageLevel?: string;
+  layout?: { imageAspect?: string; textInImage?: boolean; mode?: string } | null;
   pageCount: number;
   pages: SharedStoryPage[];
   dedication?: string;
@@ -74,6 +76,13 @@ BlankPage.displayName = 'BlankPage';
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
   ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+    // Advanced reading level stories (and any future square-layout stories)
+    // flag textInImage=false — the PDF prints image on top + text strip below
+    // on the SAME page. Force that layout in the reader too so Print Preview
+    // matches the actual print. Falls back to languageLevel for older stories
+    // that predate the layout field.
+    const forceTextBelow =
+      story.layout?.textInImage === false || story.languageLevel === 'advanced';
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
@@ -185,7 +194,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
           break;
         case 'storyText': {
           // On mobile, the story page renders text below the image — no separate text page.
-          if (isMobile) break;
+          // Same when forceTextBelow is set (advanced level, square layout):
+          // the text lives on the same physical page as the image.
+          if (isMobile || forceTextBelow) break;
           const storyPage = story.pages[entry.storyPageIdx];
           if (storyPage) {
             bookPages.push(
@@ -209,9 +220,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 text={storyPage.text}
                 pageNumber={storyPage.pageNumber}
                 textPosition={storyPage.textPosition}
-                showTextOverlay={showTextOverlay}
-                textOnSidePage={textOnSidePage && !isMobile}
-                textBelowImage={isMobile && (forceTextBelowOnMobile || textOnSidePage)}
+                showTextOverlay={showTextOverlay && !forceTextBelow}
+                textOnSidePage={textOnSidePage && !isMobile && !forceTextBelow}
+                textBelowImage={forceTextBelow || (isMobile && (forceTextBelowOnMobile || textOnSidePage))}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />

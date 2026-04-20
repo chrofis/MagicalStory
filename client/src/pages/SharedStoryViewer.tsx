@@ -20,6 +20,8 @@ interface SharedStoryData {
   id: string;
   title: string;
   language: string;
+  languageLevel?: string;
+  layout?: { imageAspect?: string; textInImage?: boolean; mode?: string } | null;
   pageCount: number;
   pages: SharedStoryPage[];
   dedication?: string;
@@ -220,6 +222,12 @@ export default function SharedStoryViewer() {
     }
   };
 
+  // Advanced reading level (and any story with layout.textInImage=false)
+  // forces image-top + text-strip-below on the SAME page — matches the
+  // actual print PDF. Reading-mode toggle doesn't apply to those stories.
+  const forceTextBelow =
+    story?.layout?.textInImage === false || story?.languageLevel === 'advanced';
+
   // Build dynamic page list based on which covers exist
   const pageList: PageEntry[] = story ? (() => {
     const list: PageEntry[] = [];
@@ -229,7 +237,8 @@ export default function SharedStoryViewer() {
     for (let i = 0; i < story.pages.length; i++) {
       // sidepage mode on desktop: text on left page, image on right page (book spread).
       // On mobile, text is rendered below the image on the same page — no extra storyText entry.
-      if (readingMode === 'sidepage' && !isMobile) {
+      // Advanced layout (forceTextBelow): text always lives on the image page, no storyText entry.
+      if (readingMode === 'sidepage' && !isMobile && !forceTextBelow) {
         list.push({ type: 'storyText', storyPageIdx: i });
       }
       list.push({ type: 'story', storyPageIdx: i });
@@ -336,7 +345,10 @@ export default function SharedStoryViewer() {
   const inactiveCls = darkHeader
     ? 'text-white/70 hover:text-white'
     : 'text-amber-900/70 hover:text-amber-900';
-  const readingModeToggle = (
+  // Advanced layout: image + text-below on the same page is the only mode —
+  // inline vs sidepage don't apply. Hide the toggle so users aren't offered
+  // modes that wouldn't change anything.
+  const readingModeToggle = forceTextBelow ? null : (
     <div className={`inline-flex rounded-full p-0.5 text-xs font-medium ${toggleBase}`} role="tablist">
       <button
         onClick={() => setReadingMode('inline')}

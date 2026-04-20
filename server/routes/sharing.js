@@ -204,6 +204,12 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       id: story.id,
       title: data.title,
       language: data.language,
+      languageLevel: data.languageLevel || 'standard',
+      // layout.textInImage=false means the scene was NOT generated with a
+      // reserved calm zone — the viewer must render the text in a strip
+      // below the image (square layout, advanced reading level) instead of
+      // overlaying it.
+      layout: data.layout || null,
       pageCount: pages.length,
       pages,
       dedication: data.dedication,
