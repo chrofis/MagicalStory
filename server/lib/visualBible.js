@@ -498,25 +498,28 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
   log.debug(`[VISUAL BIBLE] Initializing ${characters.length} main characters...`);
 
   visualBible.mainCharacters = characters.map(char => {
-    // Build physical description from character data using helper
-    const physical = getPhysical(char);
-    const mainChar = {
+    // Carry the full normalized physical object — not a 7-field subset.
+    // Historically this stripped copy dropped glasses, hairStyle, hairLength,
+    // facialHair, eyeColor, skinTone, causing downstream consumers (image
+    // prompts, evals) to lose identity traits and flag correct renders as bugs.
+    const physical = { ...getPhysical(char) };
+    // Dev-panel back-compat: the frontend reads `physical.hair` as a flat
+    // string. The canonical object uses hairLength/hairStyle/hairColor. Build
+    // a concatenated `hair` so the UI still shows something useful without
+    // requiring a frontend change.
+    if (!physical.hair) {
+      const hairParts = [physical.hairLength, physical.hairStyle, physical.hairColor].filter(Boolean);
+      if (hairParts.length) physical.hair = hairParts.join(' ');
+    }
+    return {
       id: char.id,
       name: char.name,
-      physical: {
-        age: char.age || 'Unknown',
-        gender: char.gender || 'Unknown',
-        height: physical.height || 'Unknown',
-        build: physical.build || 'Unknown',
-        face: physical.other || 'Not analyzed',
-        hair: physical.hairColor || 'Not analyzed',
-        other: physical.other || ''
-      },
+      age: char.age || 'Unknown',
+      gender: char.gender || 'Unknown',
+      physical,
       referenceOutfit: char.referenceOutfit || null,
       generatedOutfits: char.generatedOutfits || {}
     };
-
-    return mainChar;
   });
 
   return visualBible;
@@ -544,34 +547,6 @@ function addVisualBibleChangeLog(visualBible, pageNumber, element, type, change,
 
   visualBible.changeLog.push(entry);
   log.debug(`[VISUAL BIBLE CHANGE] Page ${pageNumber}: ${element} (${type}) - ${change}`);
-}
-
-/**
- * Update main character's generated outfit in Visual Bible
- */
-function updateMainCharacterOutfit(visualBible, characterId, pageNumber, outfit) {
-  if (!visualBible || !characterId) return;
-
-  const mainChar = visualBible.mainCharacters.find(c => c.id === characterId);
-  if (!mainChar) {
-    log.debug(`[VISUAL BIBLE] Main character ${characterId} not found for outfit update`);
-    return;
-  }
-
-  const previousOutfit = mainChar.generatedOutfits[pageNumber]?.outfit || null;
-  mainChar.generatedOutfits[pageNumber] = outfit;
-
-  addVisualBibleChangeLog(
-    visualBible,
-    pageNumber,
-    mainChar.name,
-    'generatedOutfit',
-    previousOutfit ? 'Updated outfit' : 'New outfit extracted',
-    previousOutfit,
-    outfit.outfit
-  );
-
-  log.debug(`[VISUAL BIBLE] Updated outfit for ${mainChar.name} on page ${pageNumber}`);
 }
 
 // ============================================================================
@@ -716,32 +691,43 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
     prompt += '\n\n**MAIN CHARACTERS - Must match reference photos exactly:**\n';
     for (const char of visualBible.mainCharacters) {
       prompt += `**${char.name}:**\n`;
-      if (char.physical) {
-        // Basic traits
-        if (char.physical.age && char.physical.age !== 'Unknown') {
-          prompt += `- Age: ${char.physical.age} years old\n`;
-        }
-        if (char.physical.gender && char.physical.gender !== 'Unknown') {
-          prompt += `- Gender: ${char.physical.gender}\n`;
-        }
-        if (char.physical.height && char.physical.height !== 'Unknown') {
-          prompt += `- Height: ${char.physical.height} cm\n`;
-        }
-        if (char.physical.build && char.physical.build !== 'Unknown' && char.physical.build !== 'Not analyzed') {
-          prompt += `- Build: ${char.physical.build}\n`;
-        }
-        // Detailed features
-        if (char.physical.face && char.physical.face !== 'Not analyzed') {
-          prompt += `- Face: ${char.physical.face}\n`;
-        }
-        if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
-          prompt += `- Hair: ${char.physical.hair}\n`;
-        }
-        // Include other physical traits (glasses, birthmarks, always-present accessories)
-        if (char.physical.other && char.physical.other !== 'Not analyzed' && char.physical.other !== 'none') {
-          prompt += `- Other features: ${char.physical.other}\n`;
-        }
+      const p = char.physical || {};
+      // Image-pipeline consumer: surface VISUAL age category (apparentAge or
+      // numeric→category), not the numeric age. A 45 and 50 look the same
+      // to the model. Numeric age is used elsewhere (reading level, text gen).
+      const numericAge = parseInt(char.age);
+      const visualAge = p.apparentAge
+        || (Number.isFinite(numericAge)
+          ? (numericAge < 5 ? 'toddler'
+            : numericAge < 12 ? 'school-age'
+            : numericAge < 18 ? 'teenager'
+            : numericAge < 65 ? 'adult'
+            : 'elderly')
+          : null);
+      if (visualAge) prompt += `- Looks: ${visualAge}\n`;
+      const topGender = char.gender && char.gender !== 'Unknown' ? char.gender : null;
+      if (topGender) prompt += `- Gender: ${topGender}\n`;
+
+      const meaningful = (v) => v && v !== 'Unknown' && v !== 'Not analyzed' && v !== 'none' && v !== 'nein';
+      if (meaningful(p.height)) prompt += `- Height: ${p.height} cm\n`;
+      if (meaningful(p.build)) prompt += `- Build: ${p.build}\n`;
+      if (meaningful(p.skinTone)) prompt += `- Skin tone: ${p.skinTone}\n`;
+      if (meaningful(p.eyeColor)) prompt += `- Eyes: ${p.eyeColor}\n`;
+      // Hair: prefer detailed trio, fall back to hairColor alone, then legacy 'hair'
+      const hairParts = [];
+      if (meaningful(p.hairLength)) hairParts.push(p.hairLength);
+      if (meaningful(p.hairStyle)) hairParts.push(p.hairStyle);
+      if (meaningful(p.hairColor)) hairParts.push(p.hairColor);
+      const hairCombined = hairParts.join(' ') || (meaningful(p.hair) ? p.hair : null);
+      if (hairCombined) prompt += `- Hair: ${hairCombined}\n`;
+      if (meaningful(p.facialHair)) {
+        prompt += p.facialHair.toLowerCase() === 'clean-shaven'
+          ? '- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face\n'
+          : `- Facial hair: ${p.facialHair}\n`;
       }
+      if (meaningful(p.face)) prompt += `- Face: ${p.face}\n`;
+      if (meaningful(p.glasses)) prompt += `- Glasses: ${p.glasses}\n`;
+      if (meaningful(p.other)) prompt += `- Distinctive marks: ${p.other}\n`;
     }
   }
 
@@ -1952,7 +1938,6 @@ module.exports = {
 
   // Change tracking
   addVisualBibleChangeLog,
-  updateMainCharacterOutfit,
 
   // Query
   getVisualBibleEntriesForPage,

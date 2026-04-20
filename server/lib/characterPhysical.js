@@ -165,37 +165,6 @@ function normalizeAllPhysical(characters) {
   return characters;
 }
 
-/**
- * Build a physical description string from character physical attributes
- * Useful for generating prompts
- * @param {Object} character - Character object
- * @returns {string} Human-readable physical description
- */
-function buildPhysicalDescription(character) {
-  const physical = getPhysical(character);
-  const parts = [];
-
-  if (physical.apparentAge) parts.push(`${physical.apparentAge} years old`);
-  if (physical.build) parts.push(physical.build);
-  if (physical.skinTone) parts.push(`${physical.skinTone} skin`);
-  if (physical.eyeColor) parts.push(`${physical.eyeColor} eyes`);
-
-  // Hair description
-  const hairParts = [];
-  if (physical.hairLength) hairParts.push(physical.hairLength);
-  if (physical.hairStyle) hairParts.push(physical.hairStyle);
-  if (physical.hairColor) hairParts.push(physical.hairColor);
-  if (hairParts.length) parts.push(`${hairParts.join(' ')} hair`);
-
-  if (physical.facialHair && physical.facialHair !== 'none') {
-    parts.push(physical.facialHair);
-  }
-  if (physical.face) parts.push(physical.face);
-  if (physical.other) parts.push(physical.other);
-
-  return parts.join(', ');
-}
-
 module.exports = {
   getPhysical,
   getPhysicalAttr,
@@ -203,7 +172,6 @@ module.exports = {
   normalizePhysical,
   stripLegacyPhysicalFields,
   normalizeAllPhysical,
-  buildPhysicalDescription,
   FIELD_MAPPINGS,
   LEGACY_FIELDS
 };

@@ -17,6 +17,17 @@ Each lesson should include:
 
 <!-- Add lessons below as they occur -->
 
+### 2026-04-20: Field-subset drift — prompt builders that each copy their own subset of character traits
+
+- **Context**: Roger has `physical.glasses = "schwarze Brille"`. Image correctly rendered him with glasses. Quality eval flagged them as "anachronistic", repair loop thrashed for 3 rounds trying to remove them. Unified-pass prose had also hallucinated "short dark beard" although Roger is clean-shaven.
+- **Mistake**: The unified-story prompt (`buildUnifiedStoryPrompt`) built its `characterSummary` with only name, gender, age, personality, traits — it dropped every `physical.*` field. Sonnet was told to "weave physical description into prose" while given no data, so it hallucinated. Additionally, `initializeVisualBibleMainCharacters` copied only 7 coarse fields, dropping glasses/hairStyle/hairLength/facialHair. Five independent builders each had their own field subset; none carried `glasses`.
+- **Rule**:
+  - When writing a prompt that describes a character's physical appearance, the builder MUST receive the full `physical` object (via `getPhysical(char)`) and pass it all the way through to the model. No subsets.
+  - Use the canonical path: `extractCharacterVisualProfile` → `buildLabeledPhysicalParts` → `buildCharacterPromptBlock` (in `storyHelpers.js`). Never hand-roll a field-by-field picker.
+  - When a new physical field is added (e.g. "left-handed", "freckles"), grep for every builder that projects `char.physical` and route them to the canonical path. Five copies of the same picker is a smell — fix it by deleting four of them, not by adding the new field to all five.
+  - For image-pipeline consumers, use VISUAL age (`ageCategory`: "school-age"/"teenager"/"adult") — not the numeric age. A 45-year-old and a 50-year-old look the same to the model. Numeric age is only for reading-level / text-generation decisions.
+
+
 ### 2026-02-05: Semantic Fidelity is the Main Gap
 
 **Context**: Improving image evaluation prompts for story generation

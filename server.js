@@ -164,7 +164,6 @@ const {
   parseVisualBibleEntries,
   initializeVisualBibleMainCharacters,
   addVisualBibleChangeLog,
-  updateMainCharacterOutfit,
   getVisualBibleEntriesForPage,
   buildVisualBiblePrompt,
   buildFullVisualBiblePrompt,

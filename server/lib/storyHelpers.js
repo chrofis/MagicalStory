@@ -403,6 +403,43 @@ function extractJsonFromText(text) {
 }
 
 /**
+ * Drop interactions that reference characters not present in this scene.
+ * Scene expansion sometimes names characters from the story text (but not the
+ * scene's `characters[]`) in the `character` or `object` field — the evaluator
+ * then flags every version as wrong_interaction even though the image is
+ * correct. Removing those entries here makes the downstream metadata honest.
+ *
+ * `object` may be a plain noun (rope, ladder, stairs) — we only drop it when
+ * it looks like a bare proper name not in the scene's character list.
+ */
+function sanitizeInteractions(rawInteractions, characterNames) {
+  if (!Array.isArray(rawInteractions)) return [];
+  const charSet = new Set(characterNames || []);
+  const isBareProperName = (s) => /^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]+$/.test(s);
+  const kept = [];
+  const dropped = [];
+  for (const i of rawInteractions) {
+    if (!i || typeof i !== 'object' || !i.character || !i.object) continue;
+    const character = String(i.character).trim();
+    const object = String(i.object).trim();
+    const where = String(i.where || '').trim();
+    if (!charSet.has(character)) {
+      dropped.push(`${character}→${object} (actor absent)`);
+      continue;
+    }
+    if (isBareProperName(object) && !charSet.has(object)) {
+      dropped.push(`${character}→${object} (target absent)`);
+      continue;
+    }
+    kept.push({ character, object, where });
+  }
+  if (dropped.length > 0) {
+    log.info(`[SCENE META] Dropped ${dropped.length} invalid interaction(s): ${dropped.join(', ')}`);
+  }
+  return kept;
+}
+
+/**
  * Parse prose+metadata format: natural prose followed by ---METADATA--- JSON block.
  * Returns { prose, metadata } if detected, null otherwise.
  */
@@ -889,15 +926,8 @@ function extractSceneMetadata(sceneDescription) {
 
     // Character interactions: structured list of character-to-object contacts
     // (held, worn, in pocket, climbed, stood on, passed through, etc).
-    // Normalize to { character, object, where } entries; skip malformed rows.
-    const rawInteractions = Array.isArray(metadata.interactions) ? metadata.interactions : [];
-    const interactions = rawInteractions
-      .filter(i => i && typeof i === 'object' && i.character && i.object)
-      .map(i => ({
-        character: String(i.character).trim(),
-        object: String(i.object).trim(),
-        where: String(i.where || '').trim(),
-      }));
+    // Normalize + drop entries whose actor/target isn't in this scene.
+    const interactions = sanitizeInteractions(metadata.interactions, characterNames);
 
     return {
       characters: characterNames,
@@ -907,7 +937,7 @@ function extractSceneMetadata(sceneDescription) {
       clothing: null,
       objects: objectIds,
       interactions: interactions.length > 0 ? interactions : null,
-      fullData: { characters: metadata.characters, objects: metadata.objects, interactions: metadata.interactions, imageSummary: prose },
+      fullData: { characters: metadata.characters, objects: metadata.objects, interactions, imageSummary: prose },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
       imageSummary: prose,
@@ -1033,14 +1063,9 @@ function extractSceneMetadata(sceneDescription) {
 
     // Character interactions: structured list of character-to-object contacts
     // (held, worn, in pocket, climbed, stood on, passed through, etc).
-    const rawInteractionsJson = Array.isArray(parsedData.interactions) ? parsedData.interactions : [];
-    const interactionsJson = rawInteractionsJson
-      .filter(i => i && typeof i === 'object' && i.character && i.object)
-      .map(i => ({
-        character: String(i.character).trim(),
-        object: String(i.object).trim(),
-        where: String(i.where || '').trim(),
-      }));
+    // Normalize + drop entries whose actor/target isn't in this scene.
+    const interactionsJson = sanitizeInteractions(parsedData.interactions, characterNames);
+    parsedData.interactions = interactionsJson; // mirror into fullData so downstream readers see the sanitized list
 
     return {
       characters: characterNames,
@@ -2560,11 +2585,69 @@ function estimateHeightFromAgeGender(char) {
  * @returns {string} Formatted line: "1. Lukas, Looks: school-age, boy, Build: slim. Age cues: ..."
  */
 function buildCharacterDescriptionForExpansion(char, clothingDescription, index) {
-  const p = extractCharacterVisualProfile(char, { clothingOverride: clothingDescription });
-  const visualAge = p.ageCategory ? `Looks: ${p.ageCategory.replace(/-/g, ' ')}` : '';
-  const parts = buildLabeledPhysicalParts(p);
-  const brief = [p.name, visualAge, p.genderTerm, parts.join('. ')].filter(Boolean).join(', ');
-  return `${index}. ${brief}`;
+  return buildCharacterPromptBlock(char, {
+    format: 'numbered',
+    numbered: index,
+    includeClothing: true,
+    clothingOverride: clothingDescription,
+  });
+}
+
+/**
+ * Public entry point for rendering a character's identity block into prompts.
+ * Wraps the canonical extractCharacterVisualProfile + buildLabeledPhysicalParts
+ * path so every consumer (unified story prompt, VB section, scene expansion,
+ * image-prompt reference list) sees the same fields — including glasses,
+ * hairStyle, facialHair — and field-subset drift across builders is impossible.
+ *
+ * @param {Object} char - Character object (source of truth, not a VB copy)
+ * @param {Object} [opts]
+ * @param {'bullets'|'numbered'|'prose'} [opts.format='bullets']
+ *   - 'bullets': "**Name:**\n- Age cues: ...\n- Hair: ..." (for image-prompt MAIN CHARACTERS block)
+ *   - 'numbered': "N. Name, Looks: ..., Build: ..." (for scene-expansion input)
+ *   - 'prose': full sentence (for validation / feedback text)
+ * @param {number|null} [opts.numbered=null] - 1-based index for 'numbered' format
+ * @param {boolean} [opts.includeClothing=false] - append clothing/Wearing line
+ * @param {string|null} [opts.clothingOverride=null] - pre-resolved clothing string
+ * @returns {string}
+ */
+function buildCharacterPromptBlock(char, opts = {}) {
+  const {
+    format = 'bullets',
+    numbered = null,
+    includeClothing = false,
+    clothingOverride = null,
+  } = opts;
+
+  const profile = extractCharacterVisualProfile(char, { clothingOverride });
+  const parts = buildLabeledPhysicalParts(profile);
+  const partsFiltered = includeClothing
+    ? parts
+    : parts.filter(p => !p.startsWith('Wearing:') && !p.startsWith('Clothing style:'));
+
+  if (format === 'prose') {
+    return buildCharacterPhysicalDescription(char, clothingOverride);
+  }
+
+  if (format === 'numbered') {
+    const visualAge = profile.ageCategory ? `Looks: ${profile.ageCategory.replace(/-/g, ' ')}` : '';
+    const brief = [profile.name, visualAge, profile.genderTerm, partsFiltered.join('. ')].filter(Boolean).join(', ');
+    const prefix = numbered != null ? `${numbered}. ` : '';
+    return `${prefix}${brief}`;
+  }
+
+  // bullets (default). For image-pipeline consumers we surface the VISUAL age
+  // category ('school-age', 'teenager', 'adult') — not the numeric age. The
+  // numeric age is used elsewhere (story-text generation, reading-level
+  // decisions) but image models respond to visual cues, not numbers. A 45-year-old
+  // and a 50-year-old look the same to the model; what matters is 'adult'.
+  // buildLabeledPhysicalParts already emits 'Age cues: ...' from profile.ageMarkers;
+  // 'Looks' + genderTerm above give the reader a quick identity anchor.
+  const lines = [`**${profile.name}:**`];
+  if (profile.ageCategory) lines.push(`- Looks: ${profile.ageCategory.replace(/-/g, ' ')}`);
+  if (profile.genderTerm) lines.push(`- Gender: ${profile.genderTerm}`);
+  for (const p of partsFiltered) lines.push(`- ${p}`);
+  return lines.join('\n');
 }
 
 function buildRelativeHeightDescription(characters) {
@@ -4279,6 +4362,14 @@ ${adventureGuide}` : ''}`;
   // Build characters JSON with relationships
   const charactersJson = JSON.stringify(characterSummary, null, 2) + relationshipDescriptions;
 
+  // Build the canonical per-character physical block. Sonnet is told to weave
+  // physical description into each scene's prose, so it needs the actual traits.
+  // Without this block it hallucinates — e.g. giving a character a beard when
+  // facialHair is 'clean-shaven', or dropping glasses entirely.
+  const characterPhysicalBlock = (inputData.characters || [])
+    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: false }))
+    .join('\n\n');
+
   // Build available landmarks section if landmarks were pre-discovered
   const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks);
   if (inputData.availableLandmarks?.length > 0) {
@@ -4303,6 +4394,7 @@ ${adventureGuide}` : ''}`;
       STORY_TOPIC: wrapUserInput(storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None')),
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || 'None'),
       CHARACTERS: charactersJson,
+      CHARACTER_PHYSICAL_BLOCK: characterPhysicalBlock,
       CHARACTER_NAMES: characterNames,
       MAIN_CHARACTER_NAMES: mainCharacterNames,
       PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
@@ -4785,6 +4877,7 @@ module.exports = {
   parseCharacterClothing,
   getCharacterPhotoDetails,
   buildCharacterPhysicalDescription,
+  buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
   buildHairDescription,

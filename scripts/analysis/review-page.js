@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 /**
- * Per-page review focused on the hint → expansion → image causal chain.
+ * Per-page review focused on the unified-outline → image causal chain.
  *
- * Primary sections (top of output, what matters most):
- *   1. PAGE TEXT — what the reader sees in the book
- *   2. SCENE HINT — structured output from the unified pass (outlineExtract)
- *   3. SCENE EXPANSION — prose + structured metadata produced from the hint
- *   4. DIFFERENCES — what the expansion added, dropped, or changed vs the hint
+ * In unified mode, Sonnet produces the scene hint AND the prose in ONE call
+ * (no separate Haiku scene-expansion). The "prose" and "hint" shown below
+ * are both from that single pass — they are not independent stages.
  *
- * Secondary sections follow (scores, issues, retries) — skim these after
- * you've identified the starting point of the problem above.
+ * Sections:
+ *   1. PAGE TEXT       — what the reader sees in the book
+ *   2. SCENE HINT      — structured metadata from the unified pass (outlineExtract)
+ *   3. UNIFIED PROSE   — prose portion of the same unified pass
+ *   4. REQUESTED SCENE — checklist of what the image should contain
+ *   4b. CHANGES        — prose vs hint drift (sanity check on the unified pass)
+ *   5. EMPTY SCENE     — background-only prompt (used as [Background] reference, NOT evaluated)
+ *   6. VERSION TIMELINE — for each imageVersions[]: input prompt, what eval found,
+ *                         what fix was requested for the next version
+ *   7. BBOX DETECTION
+ *   8. (--full)        — full image prompt + fix targets for the active version
  *
  * Usage:
  *   node scripts/analysis/review-page.js <storyId|latest> <pageNumber>
@@ -80,13 +87,13 @@ async function main() {
     printHint(hint);
 
     // =========================================================================
-    // 3. SCENE EXPANSION (prose + metadata)
+    // 3. UNIFIED PROSE (prose portion of the same unified pass, + metadata block)
     // =========================================================================
-    hr('-', '3. SCENE EXPANSION  (prose written from the hint)');
-    console.log(prose || '(no expansion prose)');
+    hr('-', '3. UNIFIED PROSE  (prose portion of the unified pass — NOT a separate expansion)');
+    console.log(prose || '(no prose)');
     if (metadata) {
       console.log();
-      console.log('--- expansion metadata ---');
+      console.log('--- METADATA block ---');
       printMetadata(metadata);
     }
 
@@ -103,59 +110,100 @@ async function main() {
     printDifferences(hint, metadata, prose || '');
 
     // =========================================================================
-    // 5. SCORES & REPAIR OUTCOME (short)
+    // 5. EMPTY SCENE (background reference — NOT evaluated)
     // =========================================================================
-    hr('-', '5. SCORES  &  REPAIR');
-    console.log(`quality=${scene.qualityScore ?? '?'}  semantic=${scene.semanticScore ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
-    const rh = scene.retryHistory || [];
-    if (rh.length > 0) {
-      console.log(`repair rounds: ${rh.length}`);
-      for (const [i, r] of rh.entries()) {
-        const score = r.score ?? r.finalScore ?? '?';
-        const src = r.source || r.type || '?';
-        console.log(`  [${i}] ${src} — score ${score}`);
-      }
+    hr('-', '5. EMPTY SCENE  (used as [Background] reference — no evaluation stored)');
+    if (scene.emptyScenePrompt) {
+      console.log(`hasEmptySceneImage: ${scene.hasEmptySceneImage ?? false}`);
+      console.log();
+      console.log('prompt:');
+      console.log(scene.emptyScenePrompt);
+    } else {
+      console.log('(no emptyScenePrompt)');
     }
-    const vs = scene.imageVersions || [];
-    if (vs.length > 1) {
-      console.log(`versions kept: ${vs.length} — ${vs.map(v => `${v.source || v.type}=${v.score ?? '?'}`).join(', ')}`);
-    }
+    console.log();
+    console.log('NOTE: the empty-scene image is not scored. No quality/semantic eval runs on it.');
 
     // =========================================================================
-    // 6. ISSUES (short)
+    // 6. VERSION TIMELINE — per-version input prompt, eval, requested next fix
     // =========================================================================
-    hr('-', '6. ISSUES');
-    if (scene.issuesSummary) {
-      console.log('summary: ' + scene.issuesSummary);
+    hr('-', '6. VERSION TIMELINE');
+    const vs = scene.imageVersions || [];
+    console.log(`active: quality=${scene.qualityScore ?? '?'}  semantic=${scene.semanticScore ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
+    console.log(`versions kept: ${vs.length}`);
+    console.log();
+    if (vs.length === 0) {
+      console.log('(no imageVersions recorded)');
+    }
+    for (const [i, v] of vs.entries()) {
+      console.log('─'.repeat(78));
+      const src = v.source || v.type || '?';
+      const q = v.qualityScore ?? '?';
+      const s = v.semanticScore ?? '?';
+      const ep = v.entityPenalty != null ? `  entityPenalty=${v.entityPenalty}` : '';
+      const rq = v.rawQualityScore != null ? `  raw=${v.rawQualityScore}` : '';
+      console.log(`[v${i}] ${src}   type=${v.type || '?'}   model=${v.modelId || '?'}`);
+      console.log(`     score: quality=${q}  semantic=${s}${ep}${rq}`);
+
+      console.log();
+      console.log('  INPUT ─ what drove this generation:');
+      if (i === 0) {
+        console.log('    (initial generation from unified prose — see section 3)');
+        const p = v.prompt || '';
+        console.log(`    prompt length: ${p.length} chars. First 300:`);
+        console.log(indent(truncate(p, 300), 6));
+      } else {
+        if (v.inpaintInstruction) {
+          console.log('    inpaintInstruction:');
+          console.log(indent(v.inpaintInstruction, 6));
+        } else {
+          console.log('    (no inpaintInstruction — likely iterate pass re-ran the unified prompt)');
+        }
+        const refCount = (v.inpaintReferenceImages || []).length;
+        console.log(`    reference images attached: ${refCount}`);
+        const prev = vs[i - 1];
+        const prevTargets = prev?.fixTargets || [];
+        if (prevTargets.length > 0) {
+          console.log(`    fix targets from v${i - 1} (${prevTargets.length}):`);
+          for (const t of prevTargets) {
+            console.log(`      [${t.severity || '?'}] (${t.type || '?'}) ${t.issue || ''}`);
+            if (t.fix_instruction || t.fixPrompt) {
+              console.log(`        → ${t.fix_instruction || t.fixPrompt}`);
+            }
+          }
+        }
+      }
+
+      console.log();
+      console.log('  OUTPUT ─ what eval found in this version:');
+      if (v.issuesSummary) {
+        console.log('    summary: ' + v.issuesSummary);
+      }
+      const fix = v.fixableIssues || [];
+      if (fix.length === 0) {
+        console.log('    quality: (no fixable issues)');
+      } else {
+        console.log(`    quality: ${fix.length} issue(s)`);
+        for (const iss of fix) {
+          console.log(`      [${iss.severity || '?'}] (${iss.type || ''}) ${iss.description || iss.problem || iss.issue || ''}`);
+        }
+      }
+      const semIssues = (v.semanticResult?.issues) || (v.semanticResult?.semanticIssues) || [];
+      if (semIssues.length === 0) {
+        console.log('    semantic: (no issues)');
+      } else {
+        console.log(`    semantic: ${semIssues.length} issue(s)`);
+        for (const iss of semIssues) {
+          console.log(`      [${iss.severity || '?'}] ${iss.type || ''} ${iss.item ? `(${iss.item})` : ''}: ${iss.problem || iss.description || ''}`);
+        }
+      }
       console.log();
     }
-    const fix = scene.fixableIssues || [];
-    if (fix.length === 0) {
-      console.log('quality: (no fixable issues)');
-    } else {
-      console.log(`quality: ${fix.length} issue(s)`);
-      for (const iss of fix) {
-        const sev = iss.severity || '?';
-        const type = iss.type || '';
-        const desc = iss.description || iss.problem || iss.issue || '';
-        console.log(`  [${sev}] (${type}) ${desc}`);
-      }
-    }
-    const sem = scene.semanticResult || {};
-    const semIssues = sem.issues || sem.semanticIssues || [];
-    if (semIssues.length === 0) {
-      console.log('semantic: (no issues)');
-    } else {
-      console.log(`semantic: ${semIssues.length} issue(s)`);
-      for (const iss of semIssues) {
-        console.log(`  [${iss.severity || '?'}] ${iss.type || ''} ${iss.item ? `(${iss.item})` : ''}: ${iss.problem || iss.description || ''}`);
-      }
-    }
 
     // =========================================================================
-    // 7. BBOX DETECTION (brief)
+    // 7. BBOX DETECTION (brief — active version)
     // =========================================================================
-    hr('-', '7. BBOX DETECTION');
+    hr('-', '7. BBOX DETECTION  (active version)');
     const bb = scene.bboxDetection || {};
     const figs = bb.figures || [];
     const objs = bb.objects || [];
@@ -570,6 +618,7 @@ function norm(s) { return (s || '').trim().toLowerCase(); }
 function normList(list) { return (list || []).filter(Boolean).map(x => String(x).trim()); }
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function truncate(s, n) { s = String(s); return s.length > n ? s.substring(0, n) + '…' : s; }
+function indent(s, n) { const pad = ' '.repeat(n); return String(s).split('\n').map(l => pad + l).join('\n'); }
 
 main().catch((e) => {
   console.error('Error:', e.message);

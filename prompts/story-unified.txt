@@ -37,6 +37,12 @@ Your task is to create a COMPLETE story including:
 - **Characters**:
 {CHARACTERS}
 
+# CHARACTER DETAILS (source of truth for physical description)
+
+The following block lists each character's ACTUAL physical traits. When you describe a character in SCENE prose you MUST use these values verbatim. Do not invent traits, do not drop traits, and do not contradict them. If `Glasses:` is listed, the character wears glasses in every scene. If `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` is listed, the character has no facial hair in any scene. If `Hair:` names a specific style (ponytail, braids, buzz cut), use that style — do not substitute a different one. Age, build, eye color, distinctive marks: same rule.
+
+{CHARACTER_PHYSICAL_BLOCK}
+
 # Character Types
 
 **Main Characters** ({MAIN_CHARACTER_NAMES})
@@ -105,7 +111,7 @@ Every page outputs TWO blocks after its `TEXT:` block: a `SCENE:` paragraph (pro
 
 ## SCENE prose rules
 
-Write one continuous paragraph, 250–350 words. Open with the main subject and the main action. Weave each named character's physical description (age look, build, hair, eyes, distinctive features, clothing) in on first mention — flowing language, not a labeled list. Name recurring Visual Bible elements as they appear and interleave their identifying detail.
+Write one continuous paragraph, 250–350 words. Open with the main subject and the main action. Weave each named character's physical description in on first mention — age look, build, hair, eyes, distinctive features, clothing — taken verbatim from the `CHARACTER DETAILS` block above. Do not invent traits (beards, hairstyles, eye colors) not listed there; do not drop traits listed there (glasses, facial hair, distinctive marks). Flowing language, not a labeled list. Name recurring Visual Bible elements as they appear and interleave their identifying detail.
 
 - **Plain concrete verbs only.** Prefer `holds`, `sits on`, `reaches for`, `walks toward`, `gazes at`. BANNED: `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
 - **Positions + depth explicit for every character.** Name which corner or band of the frame (left foreground, center midground, far right background). Include depth words (near, close, distant, small) so the image model can stage properly.
@@ -150,7 +156,7 @@ METADATA:
 
 **objects[]** — Visual Bible IDs. **When a landmark has numbered photo variants** (e.g. `LOC003.1`, `LOC003.2`, `LOC003.3`), emit the specific variant whose description matches the scene's `shot` and perspective — not the bare `LOC003`. Default to `.1` only if no variant is a clear match.
 
-**interactions[]** — one entry per character-to-object or character-to-character contact the story actively depends on. Include a contact when removing it would change the meaning of the scene: an item being held, worn, or carried because the plot needs it; a weapon being gripped, drawn, or aimed; feet on the specific step or rung the text describes; a character's hand on another character in a pivotal emotional moment; a palm on an artifact the character is reacting to. Omit incidental scene dressing: a hand resting on a stall or table edge, a shoulder leaning against a wall, fingers brushing a cloak, a foot near but not deliberately placed on a prop. Test: could the story be told identically without the contact being visible in the illustration? If yes, leave it out. Evaluators penalise missing declared interactions, so don't declare trivia. `character` + `object` + short `where`.
+**interactions[]** — one entry per character-to-object or character-to-character contact the story actively depends on. Include a contact when removing it would change the meaning of the scene: an item being held, worn, or carried because the plot needs it; a weapon being gripped, drawn, or aimed; feet on the specific step or rung the text describes; a character's hand on another character in a pivotal emotional moment; a palm on an artifact the character is reacting to. Omit incidental scene dressing: a hand resting on a stall or table edge, a shoulder leaning against a wall, fingers brushing a cloak, a foot near but not deliberately placed on a prop. Test: could the story be told identically without the contact being visible in the illustration? If yes, leave it out. Evaluators penalise missing declared interactions, so don't declare trivia. `character` + `object` + short `where`. Every person named in `interactions[]` (in either field) must appear in this scene's `characters[]`.
 
 **emptyScenePrompt** (required): Describe ONLY the background environment — no named main or secondary characters, no tracked animals, no carried/handheld artifacts. Fixed immobile artifacts that anchor the scene (a pole-with-banner, a throne, a monument, a pedestal, an altar, a signpost) ARE allowed and, when the page text centers on them, MUST be described as the focal point — "prominent at the center, dominating the foreground composition," not "a pole stands somewhere." Name the artifact's key visual marker (the hat on top, the inscription). Location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. NEVER write hypothetical references like "where children would stand" — image models render those literally.
 
