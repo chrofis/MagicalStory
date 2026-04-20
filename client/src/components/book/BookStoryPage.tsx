@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Maximize2 } from 'lucide-react';
 import {
   getTextOverlayPosition,
@@ -34,6 +34,25 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
     const isFullWidth = layout.position.includes('full');
     const trimmedText = text.trim();
 
+    // Block page-flip's native touch listeners from seeing drags inside the
+    // scrollable text panel. page-flip attaches `touchstart` on its `.stf__block`
+    // and `touchmove`/`touchend` on window; once `startUserTouch` fires (250ms
+    // after touchstart) it calls preventDefault() on every touchmove, which
+    // kills native scrolling. React synthetic capture handlers are too late —
+    // we need real native listeners, attached directly to the scroll container.
+    const scrollRef = useCallback((el: HTMLDivElement | null) => {
+      if (!el) return;
+      const stop = (e: TouchEvent) => e.stopPropagation();
+      el.addEventListener('touchstart', stop);
+      el.addEventListener('touchmove', stop);
+      el.addEventListener('touchend', stop);
+      return () => {
+        el.removeEventListener('touchstart', stop);
+        el.removeEventListener('touchmove', stop);
+        el.removeEventListener('touchend', stop);
+      };
+    }, []);
+
     // Mobile read mode: image at top, full text below — no overlay or facing page.
     if (textBelowImage) {
       return (
@@ -58,11 +77,9 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
             )}
           </div>
           <div
+            ref={scrollRef}
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
             style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-            onTouchStartCapture={(e) => e.stopPropagation()}
-            onTouchMoveCapture={(e) => e.stopPropagation()}
-            onTouchEndCapture={(e) => e.stopPropagation()}
           >
             <p
               className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
