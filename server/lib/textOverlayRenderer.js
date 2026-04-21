@@ -601,16 +601,17 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
   const allFit = placedWords >= totalWords;
   if (!allFit && !force) return false;
 
-  // Always left-aligned. Use the polygon's minimum left x (constant across
-  // lines) instead of each line's own scan.left — for right-corner triangles
-  // the left edge is the diagonal hypotenuse and scan.left grows with y, so
-  // drawing at line.left made lower lines start farther right and the last
-  // line looked right-aligned.
-  const polyMinLeft = lines.reduce((m, l) => Math.min(m, l.left), Infinity);
-
+  // Always left-align, but anchor each line to its OWN scan.left (the
+  // polygon's left edge at that y) — not a shared polyMinLeft. For left-
+  // corner triangles scan.left is ~0 (vertical leg), so every line starts
+  // at the same x. For right-corner triangles the left edge IS the
+  // hypotenuse, so scan.left grows with y — each successive line indents
+  // further right, and the text column takes the triangle's shape. Wrap
+  // width already uses each line's scan.left/right, so the right edge is
+  // also triangle-respecting.
   ctx.textAlign = 'left';
   for (const line of lines) {
-    const drawX = polyMinLeft;
+    const drawX = line.left;
 
     ctx.save();
     ctx.font = `${fontSize}px ${fontFamily}`;

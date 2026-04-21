@@ -99,25 +99,30 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     const isFull = preferredPosition?.includes('full');
     const isLeft = preferredPosition?.includes('left') || isFull;
 
-    // Build block-level mask: 1.0 for calm blocks in target zone, 0 elsewhere
+    // Build block-level mask: calm blocks INSIDE the intended zone only.
+    // Hard-restrict both axes to the zone the outline chose (bottom-left is
+    // bottom + left, etc). Previously this was a soft weight (0.3 for the
+    // wrong half) which let a very-calm top override a chosen bottom and
+    // swap the stored position from bottom-left → top-left at the bbox
+    // re-derivation step below. Now: blocks outside the zone are excluded
+    // entirely so the detected rect can never leave the intended corner.
     const blockMask = new Float32Array(rows * cols);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const idx = r * cols + c;
-        // Side constraint: block must be on the correct side
         const blockCenterX = (c + 0.5) / cols;
-        if (!isFull) {
-          if (isLeftPage && blockCenterX > 0.65) continue;  // left page: keep left 65%
-          if (!isLeftPage && blockCenterX < 0.35) continue;  // right page: keep right 65%
-        }
-        // Vertical preference: prefer the chosen half but allow spillover
         const blockCenterY = (r + 0.5) / rows;
-        let verticalWeight = 1.0;
-        if (isTop && blockCenterY > 0.6) verticalWeight = 0.3;
-        if (!isTop && blockCenterY < 0.4) verticalWeight = 0.3;
+        // Horizontal zone
+        if (!isFull) {
+          if (isLeft && blockCenterX > 0.5) continue;
+          if (!isLeft && blockCenterX < 0.5) continue;
+        }
+        // Vertical zone — hard split on 0.5. top-* only top, bottom-* only bottom.
+        if (isTop && blockCenterY > 0.5) continue;
+        if (!isTop && blockCenterY < 0.5) continue;
 
         if (calmness[idx] >= calmThreshold) {
-          blockMask[idx] = calmness[idx] * verticalWeight;
+          blockMask[idx] = calmness[idx];
         }
       }
     }
@@ -183,21 +188,13 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       imgHeight: height,
     };
 
-    // Determine position label from rect center
-    const centerX = rect.x + rect.w / 2;
-    const centerY = rect.y + rect.h / 2;
-    const detectedIsTop = centerY < height / 2;
-    const detectedIsLeft = centerX < width / 2;
-    const detectedIsFull = rect.w > width * 0.75;
-    let position;
-    if (detectedIsFull) {
-      position = detectedIsTop ? 'top-full' : 'bottom-full';
-    } else {
-      position = `${detectedIsTop ? 'top' : 'bottom'}-${detectedIsLeft ? 'left' : 'right'}`;
-    }
-
-    const overridden = position !== preferredPosition;
-    log.info(`📝 [TEXT-REGION] P${pageNumber}: ${overridden ? preferredPosition + ' → ' : ''}${position}, wash ${(washCoverage * 100).toFixed(0)}% of image, rect ${rect.x},${rect.y} ${rect.w}×${rect.h}`);
+    // The outline already chose the zone (preferredPosition). We only refine
+    // the RECT inside that zone — never change which quadrant it sits in.
+    // With the hard zone restriction above, the detected bbox is guaranteed
+    // to lie inside the intended half, so preferredPosition is authoritative.
+    const position = preferredPosition;
+    const overridden = false;
+    log.info(`📝 [TEXT-REGION] P${pageNumber}: ${position}, wash ${(washCoverage * 100).toFixed(0)}% of image, rect ${rect.x},${rect.y} ${rect.w}×${rect.h}`);
 
     return {
       imageData: washedDataUri,
