@@ -444,6 +444,7 @@ export const occasions: OccasionData[] = [
       ],
     },
     recommendedThemes: [
+      { id: 'mothers-day', category: 'adventure' },
       { id: 'unicorn', category: 'adventure' },
       { id: 'ocean', category: 'adventure' },
       { id: 'forest', category: 'adventure' },
@@ -508,6 +509,7 @@ export const occasions: OccasionData[] = [
       ],
     },
     recommendedThemes: [
+      { id: 'fathers-day', category: 'adventure' },
       { id: 'pirate', category: 'adventure' },
       { id: 'knight', category: 'adventure' },
       { id: 'space', category: 'adventure' },

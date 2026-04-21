@@ -70,9 +70,11 @@ export const storyCategories: StoryCategory[] = [
 // ADVENTURE THEMES (Setting/Wrapper) - Grouped
 // =============================================================================
 
-// Popular adventure theme IDs (shown in expanded "Popular" section)
+// Popular adventure theme IDs (shown in expanded "Popular" section).
+// Easter removed after the 2026 holiday (no point promoting it until March 2027);
+// mothers-day and fathers-day featured for the May/June window.
 export const popularAdventureThemeIds = [
-  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'easter', 'unicorn', 'mermaid', 'roman'
+  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'mothers-day', 'fathers-day', 'unicorn', 'mermaid', 'roman'
 ];
 
 export const adventureThemeGroups: AdventureThemeGroup[] = [
@@ -120,11 +122,13 @@ export const storyTypes: StoryType[] = [
   { id: 'police', name: { en: 'Police Officer', de: 'Polizist', fr: 'Policier' }, emoji: '👮', group: 'professions' },
   { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère Détective' }, emoji: '🔍', group: 'professions' },
 
-  // Seasonal (christmas, new year, easter, halloween)
+  // Seasonal (christmas, new year, easter, halloween, mother's day, father's day)
   { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël' }, emoji: '🎄', group: 'seasonal' },
   { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆', group: 'seasonal' },
   { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques' }, emoji: '🐰', group: 'seasonal' },
   { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween' }, emoji: '🎃', group: 'seasonal' },
+  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Muttertag-Geschichte', fr: 'Histoire Fête des Mères' }, emoji: '💐', group: 'seasonal' },
+  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Vatertag-Geschichte', fr: 'Histoire Fête des Pères' }, emoji: '🧢', group: 'seasonal' },
 
   // Custom - user creates their own theme
   { id: 'custom', name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre' }, emoji: '✨', group: 'custom' },

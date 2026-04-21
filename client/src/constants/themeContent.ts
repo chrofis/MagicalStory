@@ -220,6 +220,62 @@ export const themeContent: Record<string, ThemeContent> = {
     ageRecommendation: '3-7',
     faq: [{"q":{"en":"Is it religious?","de":"Ist es religiös?","fr":"Est-ce religieux ?"},"a":{"en":"It focuses on the Easter Bunny, egg hunts, and spring. Secular and fun.","de":"Es konzentriert sich auf den Osterhasen und den Frühling. Weltlich und fröhlich.","fr":"L'histoire se concentre sur le lapin de Pâques et le printemps. Laïque et joyeuse."}}],
   },
+  'mothers-day': {
+    description: {
+      en: "Your child sets off on a heartfelt quest to thank their mum — picking a magical gift, writing a secret song, and showing mum just how loved she is.",
+      de: "Dein Kind begibt sich auf eine herzliche Reise, um seiner Mama Danke zu sagen — sammelt ein magisches Geschenk, dichtet ein geheimes Lied und zeigt Mama, wie sehr es sie liebt.",
+      fr: "Votre enfant part dans une quête touchante pour remercier sa maman — cueillir un cadeau magique, écrire une chanson secrète et montrer à maman tout son amour.",
+    },
+    longDescription: {
+      en: "The perfect personalized Mother's Day book. Your child wakes up early on Mother's Day morning with one mission: show mum exactly how much she means. The story follows them on a gentle quest — through a garden of wishes where every flower is a memory of something mum has done, past a kitchen where they secretly bake her favourite treat, and finally to a quiet moment on the sofa where they hand her a handwritten thank-you. Along the way, your child remembers all the small things: the bedtime stories, the scraped-knee hugs, the patient answers to a thousand questions.\n\nWhen mum reads it with your child, the story becomes a keepsake of everything they love about her — in your child's own voice. Dads, grandparents, and older siblings can help the little one create this as a surprise. Add mum as a character and she'll appear in the illustrations alongside your child. The most heartfelt Mother's Day gift you can give, and the one mum will keep forever.",
+      de: "Das perfekte personalisierte Muttertagsbuch. Dein Kind wacht am Muttertagsmorgen mit einer Mission auf: Mama zu zeigen, wie viel sie ihm bedeutet. Die Geschichte begleitet es auf einer liebevollen Reise — durch einen Garten der Wünsche, in dem jede Blume eine Erinnerung an etwas Schönes mit Mama ist, heimlich in die Küche, um ihre Lieblings-Leckerei zu backen, und schliesslich in einen ruhigen Moment auf dem Sofa, wo es ihr ein selbstgeschriebenes Dankeschön überreicht. Unterwegs denkt dein Kind an all die kleinen Dinge: Gute-Nacht-Geschichten, tröstende Umarmungen, geduldige Antworten auf tausend Fragen.\n\nWenn Mama die Geschichte mit deinem Kind liest, wird sie zu einem Andenken an all das, was es an ihr liebt — in der eigenen Stimme deines Kindes. Papas, Grosseltern und ältere Geschwister können dem Kleinen helfen, die Überraschung vorzubereiten. Füge Mama als Figur hinzu und sie erscheint auf jeder Seite neben deinem Kind. Das herzlichste Muttertagsgeschenk — das Mama für immer aufheben wird.",
+      fr: "Le livre de fête des mères personnalisé parfait. Votre enfant se réveille le matin de la fête des mères avec une seule mission : montrer à maman combien elle compte. L'histoire le suit dans une quête tendre — à travers un jardin de souhaits où chaque fleur est un souvenir, dans la cuisine pour préparer en secret la gourmandise préférée de maman, et enfin dans un moment calme sur le canapé où il lui remet un mot de remerciement écrit à la main. En chemin, votre enfant se souvient de tous les petits gestes : les histoires du soir, les câlins après une chute, les réponses patientes à mille questions.\n\nQuand maman lit l'histoire avec votre enfant, elle devient un souvenir durable de tout ce qu'il aime chez elle — dans la voix de votre enfant. Papas, grands-parents et grands frères/soeurs peuvent aider le petit à préparer la surprise. Ajoutez maman comme personnage et elle apparaîtra aux côtés de votre enfant sur chaque page. Le cadeau de fête des mères le plus touchant — celui que maman gardera toujours.",
+    },
+    skills: {
+      en: "Gratitude, expressing love, thoughtfulness, family appreciation.",
+      de: "Dankbarkeit, Liebe ausdrücken, Achtsamkeit, Wertschätzung der Familie.",
+      fr: "Gratitude, expression de l'amour, attention aux autres, appréciation de la famille.",
+    },
+    ageRecommendation: '3-9',
+    faq: [
+      {
+        q: { en: "Can mum be a character in the story?", de: "Kann Mama in der Geschichte vorkommen?", fr: "Maman peut-elle être un personnage ?" },
+        a: { en: "Yes! Add mum as a second character with her name and a short description. She'll appear in the illustrations alongside your child for that personal 'this is us' feel.", de: "Ja! Füge Mama als zweiten Charakter mit Name und kurzer Beschreibung hinzu. Sie erscheint neben deinem Kind auf jeder Seite — für das ganz persönliche 'das sind wir'-Gefühl.", fr: "Oui ! Ajoutez maman comme deuxième personnage avec son nom et une courte description. Elle apparaîtra aux côtés de votre enfant pour un effet 'c'est nous' très personnel." },
+      },
+      {
+        q: { en: "How early should I order the printed book for Mother's Day?", de: "Wie früh sollte ich das gedruckte Buch für den Muttertag bestellen?", fr: "Quand commander le livre imprimé pour la fête des mères ?" },
+        a: { en: "Order 7–10 days before Mother's Day for comfortable delivery. The digital version is ready in minutes if you're short on time.", de: "Bestelle 7–10 Tage vor dem Muttertag, damit das Buch entspannt rechtzeitig ankommt. Die digitale Version ist in wenigen Minuten bereit, falls du spät dran bist.", fr: "Commandez 7–10 jours avant la fête des mères pour une livraison tranquille. La version numérique est prête en quelques minutes si vous êtes pressé." },
+      },
+    ],
+  },
+  'fathers-day': {
+    description: {
+      en: "Your child sets off on a warm adventure to thank their dad — facing a small challenge, remembering everything dad has taught them, and arriving home with a surprise just for him.",
+      de: "Dein Kind begibt sich auf ein herzliches Abenteuer, um seinem Papa Danke zu sagen — meistert eine kleine Herausforderung, erinnert sich an alles, was Papa ihm beigebracht hat, und kommt mit einer Überraschung nur für ihn nach Hause.",
+      fr: "Votre enfant part dans une aventure chaleureuse pour remercier son papa — surmonte un petit défi, se souvient de tout ce que papa lui a appris, et rentre avec une surprise rien que pour lui.",
+    },
+    longDescription: {
+      en: "The perfect personalized Father's Day book. On the morning of Father's Day, your child tiptoes out of the house with a plan: to show dad how much his guidance means. The story follows them on a gentle adventure — paddling a small boat across a calm lake, climbing a hill to see the sunrise, or fixing a secret something in the workshop dad always tinkers in — and on each step they remember what dad taught them: how to tie a knot, how to be brave, how to laugh at a silly joke.\n\nBy the time dad wakes up, there's a handmade gift waiting and a story that tells him everything your child wishes they could say out loud. Mums, grandparents, and older siblings can help prepare the surprise. Add dad as a character to have him appear in the illustrations. A keepsake dad will keep on his desk long after the tie and the socks are forgotten.",
+      de: "Das perfekte personalisierte Vatertagsbuch. Am Vatertagsmorgen schleicht sich dein Kind mit einem Plan aus dem Haus: Papa zu zeigen, wie viel ihm seine Nähe und seine Geduld bedeuten. Die Geschichte begleitet es auf einem liebevollen Abenteuer — eine Runde im kleinen Boot über den ruhigen See, eine Wanderung zu einer Aussicht beim Sonnenaufgang, oder heimlich etwas in Papas Werkstatt reparieren — und auf jedem Schritt erinnert es sich an das, was Papa ihm beigebracht hat: einen Knoten binden, mutig sein, über einen blöden Witz lachen.\n\nWenn Papa aufwacht, wartet ein selbstgemachtes Geschenk und eine Geschichte, die ihm all das sagt, was dein Kind gern laut aussprechen würde. Mamas, Grosseltern und grössere Geschwister können bei der Überraschung helfen. Füge Papa als Figur hinzu — er erscheint mit deinem Kind auf jeder Seite. Ein Andenken, das Papa auf dem Schreibtisch behält, lange nachdem Krawatten und Socken vergessen sind.",
+      fr: "Le livre de fête des pères personnalisé parfait. Le matin de la fête des pères, votre enfant sort sur la pointe des pieds avec un plan : montrer à papa combien ses conseils comptent. L'histoire le suit dans une aventure chaleureuse — pagayer sur un petit lac calme, grimper sur une colline pour voir le lever du soleil, ou réparer en secret quelque chose dans l'atelier de papa — et à chaque étape il se souvient de ce que papa lui a appris : faire un nœud, être courageux, rire d'une blague idiote.\n\nQuand papa se réveille, un cadeau fait main l'attend et une histoire qui lui dit tout ce que votre enfant aimerait dire à voix haute. Mamans, grands-parents et grands frères/soeurs peuvent aider à préparer la surprise. Ajoutez papa comme personnage et il apparaîtra dans les illustrations. Un souvenir que papa gardera longtemps sur son bureau, bien après la cravate oubliée.",
+    },
+    skills: {
+      en: "Gratitude, courage, family bonding, appreciation of guidance.",
+      de: "Dankbarkeit, Mut, Familienbande, Wertschätzung von Vorbildern.",
+      fr: "Gratitude, courage, liens familiaux, appréciation des figures d'autorité.",
+    },
+    ageRecommendation: '3-9',
+    faq: [
+      {
+        q: { en: "Can dad be a character in the story?", de: "Kann Papa in der Geschichte vorkommen?", fr: "Papa peut-il être un personnage ?" },
+        a: { en: "Absolutely! Add dad as a second character and he'll appear in the illustrations alongside your child — a proper adventure partner.", de: "Auf jeden Fall! Füge Papa als zweiten Charakter hinzu und er erscheint neben deinem Kind in den Illustrationen — ein echter Abenteuer-Partner.", fr: "Absolument ! Ajoutez papa comme deuxième personnage et il apparaîtra aux côtés de votre enfant dans les illustrations — un vrai partenaire d'aventure." },
+      },
+      {
+        q: { en: "How early should I order the printed book for Father's Day?", de: "Wie früh sollte ich das gedruckte Buch für den Vatertag bestellen?", fr: "Quand commander le livre imprimé pour la fête des pères ?" },
+        a: { en: "Order 7–10 days ahead for comfortable delivery. The digital version is instant — perfect if you're ordering at the last minute.", de: "Bestelle 7–10 Tage vorher, damit das Buch entspannt rechtzeitig ankommt. Die digitale Version ist sofort bereit — perfekt, wenn es spät wird.", fr: "Commandez 7–10 jours avant pour une livraison sereine. La version numérique est instantanée — parfait en dernière minute." },
+      },
+    ],
+  },
   'halloween': {
     description: {"en":"Your child dons a costume, ventures into a friendly haunted neighbourhood, and solves a spooky mystery before midnight.","de":"Dein Kind zieht sich ein Kostüm an, erkundet eine freundlich-gruselige Nachbarschaft und löst vor Mitternacht ein gespenstisches Geheimnis.","fr":"Votre enfant revêt un costume, s'aventure dans un quartier amicalement hanté et résout un mystère effrayant avant minuit."},
     longDescription: {"en":"Your child puts on an amazing costume and ventures into a friendly-spooky neighborhood on Halloween night. When the town's candy chest vanishes, your child follows silly-spooky clues to find it before midnight.\n\nThe story takes the fear out of Halloween — friendly monsters, giggly ghosts, and a mischievous black cat. Every illustration features your child trick-or-treating under a harvest moon. Perfect for children aged 4 to 8 who want Halloween excitement without real scares.","de":"Dein Kind zieht ein Kostüm an und erkundet eine freundlich-gruselige Nachbarschaft. Als eine Süssigkeitentruhe verschwindet, folgt dein Kind lustigen Hinweisen. Die Geschichte macht Halloween lustig statt gruselig. Perfekt für Kinder von 4 bis 8 Jahren.","fr":"Votre enfant explore un quartier amicalement effrayant. L'histoire rend Halloween amusant, pas effrayant. Parfait pour les enfants de 4 à 8 ans."},
