@@ -24,7 +24,7 @@ const PHOTOS_DIR = path.resolve(__dirname, 'fixtures', 'demo-photos');
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'DemoStory2026!';
 const ROTATION_STATE_FILE = path.join(__dirname, 'demo-rotation-state.json');
 const STORY_PAGES = 14;
-const WIZARD_TIMEOUT = 5 * 60 * 1000;
+const WIZARD_TIMEOUT = 90 * 60 * 1000;  // 90 min — full UI create (5 chars × 6 sub-steps) + avatar wait + story wizard
 
 // ─── Multilingual UI labels ────────────────────────────────────────────────
 
@@ -152,93 +152,314 @@ async function preSeedLanguage(page: Page, language: DemoLanguage, baseUrl: stri
   }, language);
 }
 
-// ─── Photo seeding (Playwright-driven) ──────────────────────────────────────
-// Characters are pre-created with full metadata (traits, relationships, roles)
-// via the API in showcase.js before Playwright runs. But photo upload via the
-// API is awkward (nested shape vs server's flat photo_url column), so we drive
-// the real UI instead — it's more robust to schema drift and mirrors what a
-// real user would do.
+// ─── Family creation via real wizard UI ─────────────────────────────────────
+// showcase.js only registers + logs in the account — it performs no API-side
+// character save. Everything from character creation onward is driven through
+// the actual wizard UI, exactly like a normal user would do it. Slower, but
+// exercises the real client-side flow (photo analysis, trait auto-fill,
+// avatar generation trigger, relationship UX) end-to-end.
 
-const PHOTO_LABEL_RE = /foto hochladen|upload photo|neues foto|new photo|foto wechseln|change photo|foto ersetzen/i;
-const SAVE_CHAR_RE = /speichern|save|enregistrer|finish|fertig|done/i;
+const CREATE_FIRST_RE = /ersten charakter|create first|premier personnage/i;
+const CREATE_ANOTHER_RE = /weiteren charakter|weiterer charakter|create another|autre personnage|personnage suivant|noch einen/i;
+const SAVE_CHAR_RE = /charakter speichern|save character|enregistrer le personnage|speichern|save|enregistrer|finish|fertig|done/i;
+const CONTINUE_TO_TRAITS_RE = /weiter zu.*eigenschaften|continue.*traits|eigenschaften/i;
 
-async function isOnCharacterList(page: Page): Promise<boolean> {
-  // Character list view shows a "Create Another" card OR any character heading
-  const markers = await page.locator('text=/create another|weiteren charakter|personnage suivant/i').count();
-  return markers > 0;
+interface CreatedCharInfo { id: number; name: string; }
+
+function photoPathFor(family: DemoFamily, charName: string): string {
+  return path.join(PHOTOS_DIR, family.id, `${charName}.jpg`);
 }
 
-async function findCharacterCard(page: Page, name: string) {
-  // Matches the `div.border.rounded` (or .rounded-lg) card variants observed in CharacterList
-  return page.locator('div.border.rounded-lg, div.border.rounded').filter({ hasText: name }).first();
-}
-
-async function waitForPhotoAnalysis(page: Page) {
-  // Photo analyzer (Python service via server) extracts face/body/bodyNoBg ~5-15s.
-  // We don't have a reliable spinner selector across wizard states, so just sleep.
-  await page.waitForTimeout(15000);
-}
-
-async function uploadPhotoForCharacter(page: Page, charName: string, photoPath: string) {
-  console.log(`  [${charName}] opening edit...`);
-  const card = await findCharacterCard(page, charName);
-  await expect(card).toBeVisible({ timeout: 10000 });
-
-  // Edit button has title="Charakter bearbeiten"/"Edit character"/"Modifier le personnage"
-  // (CharacterList.tsx:144). Use the title attribute — unambiguous across the
-  // several indigo buttons per card (edit, role-selectors, star).
-  const editBtn = card.locator('button[title*="bearbeiten" i], button[title*="edit" i], button[title*="modifier" i]').first();
-  if (await editBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await editBtn.click();
-  } else {
-    // Fallback: click the thumbnail (also triggers onEdit per CharacterList.tsx:113-125)
-    await card.locator('img').first().click({ timeout: 3000 }).catch(() => {
-      // Last-ditch: click the character name (whole card surfaces aren't always clickable)
-      return card.getByRole('heading', { name: charName }).click();
-    });
+async function acceptPhotoConsentIfShown(page: Page) {
+  // Consent is tracked per user (users.photo_consent_at). Shown on first photo
+  // upload only — subsequent uploads skip the checkboxes. Click both if visible.
+  const consent1 = page.locator('text=/Ich bestätige|I confirm I have|Je confirme/').first();
+  if (await consent1.isVisible({ timeout: 1500 }).catch(() => false)) {
+    console.log('    accepting consent checkboxes...');
+    await consent1.locator('..').click();
+    await page.waitForTimeout(300);
+    const consent2 = page.locator('text=/Ich stimme|I agree to|J\'accepte/').first();
+    if (await consent2.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await consent2.locator('..').click();
+      await page.waitForTimeout(300);
+    }
   }
-  await page.waitForTimeout(2500);
+}
 
-  console.log(`  [${charName}] uploading photo from ${path.relative(process.cwd(), photoPath)}`);
-  const newPhotoLabel = page.locator('label').filter({ hasText: PHOTO_LABEL_RE }).first();
-  let fileInput = newPhotoLabel.locator('input[type="file"]');
-  if (await fileInput.count() === 0) {
-    // Fallback: any file input on the edit screen
-    fileInput = page.locator('input[type="file"]').first();
+async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
+  console.log(`    clicking "${isFirst ? 'Create First' : 'Create Another'}" character...`);
+  if (isFirst) {
+    // Empty-state button (WizardStep2Characters.tsx:250)
+    const btn = page.getByRole('button', { name: CREATE_FIRST_RE }).first();
+    if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(2000);
+      return;
+    }
   }
+  // Dashed "Create Another" card on the list view (seen in the last screenshot)
+  const dashedCard = page.locator('[class*="border-dashed"]').first();
+  if (await dashedCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await dashedCard.click();
+    await page.waitForTimeout(2000);
+    return;
+  }
+  // Fallback: any button with create-another text
+  const anyCreate = page.getByRole('button', { name: CREATE_ANOTHER_RE }).first();
+  if (await anyCreate.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await anyCreate.click();
+    await page.waitForTimeout(2000);
+    return;
+  }
+  throw new Error('Could not find "Create Character" entry point');
+}
+
+async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
+  console.log(`    uploading ${path.basename(photoPath)}...`);
+  await acceptPhotoConsentIfShown(page);
+  // PhotoUpload renders an <input type="file"> inside a hidden label-wrapper.
+  // setInputFiles triggers handleFileChange directly — bypasses the click gate
+  // as long as canUpload is true (consent accepted or already recorded).
+  const fileInput = page.locator('input[type="file"]').first();
   await fileInput.setInputFiles(photoPath);
-  await waitForPhotoAnalysis(page);
+  console.log(`    waiting for photo analysis (up to 30s)...`);
+  // Photo analyzer: face detection (MediaPipe) + body-no-bg (rembg). 5–15s
+  // typical but some photos run longer. Wait generously.
+  await page.waitForTimeout(30000);
+}
 
-  // Walk any remaining save-path clicks until we land back on the character list.
-  // Cap iterations to avoid runaway loops.
-  console.log(`  [${charName}] walking to save...`);
-  for (let i = 0; i < 8; i++) {
-    if (await isOnCharacterList(page)) break;
+async function fillCharacterName(page: Page, name: string) {
+  console.log(`    entering name: ${name}`);
+  const nameSelectors = [
+    'input[placeholder*="Name" i]',
+    'input[placeholder*="name" i]',
+    'input[placeholder*="Nom" i]',
+    'input[type="text"]:not([inputmode])',
+    'input:not([type]):not([inputmode])',
+  ];
+  for (const selector of nameSelectors) {
+    const field = page.locator(selector).first();
+    if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await field.click();
+      await field.fill('');
+      await field.fill(name);
+      return;
+    }
+  }
+  throw new Error(`Could not locate name input for ${name}`);
+}
+
+async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
+  // Try to advance. Returns true if we clicked something, false if no button was
+  // present or enabled. Continue-to-traits buttons can have different labels
+  // than generic Next, so try a few alternatives.
+  const patterns = [CONTINUE_TO_TRAITS_RE, NEXT_BTN_RE];
+  for (const pattern of patterns) {
+    const btn = page.getByRole('button', { name: pattern }).first();
+    if (await btn.isVisible({ timeout: timeoutMs / patterns.length }).catch(() => false)
+        && await btn.isEnabled().catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(2000);
+      return true;
+    }
+  }
+  return false;
+}
+
+async function selectTraitButtons(page: Page, labels: string[], max: number) {
+  let clicked = 0;
+  // First try exact matches from JSON data — these are curated-per-character.
+  for (const label of labels) {
+    if (clicked >= max) break;
+    const chip = page.getByRole('button', { name: label, exact: true });
+    if (await chip.isVisible({ timeout: 500 }).catch(() => false)) {
+      await chip.click();
+      clicked++;
+      await page.waitForTimeout(250);
+    }
+  }
+  // If we didn't find enough, click any other unselected trait buttons in the
+  // current section until the minimum-required count is hit. Fallback avoids
+  // hanging the wizard on "select at least 3" validation gates.
+  if (clicked < max) {
+    const anyTraitBtns = page.locator('button').filter({ hasText: /^[A-Za-zÀ-ÿ\- ]{3,30}$/ });
+    const count = await anyTraitBtns.count();
+    for (let i = 0; i < count && clicked < max; i++) {
+      const btn = anyTraitBtns.nth(i);
+      if (!await btn.isVisible({ timeout: 200 }).catch(() => false)) continue;
+      const classNames = (await btn.getAttribute('class')) || '';
+      // Skip already-selected (indigo background) and save/next buttons
+      if (classNames.includes('bg-indigo') || classNames.includes('bg-green')) continue;
+      await btn.click().catch(() => {});
+      clicked++;
+      await page.waitForTimeout(250);
+    }
+  }
+  return clicked;
+}
+
+async function selectTraits(page: Page, char: DemoCharacter) {
+  console.log(`    selecting traits (${char.traits.strengths.length}S / ${char.traits.flaws.length}F / ${char.traits.challenges.length}C)...`);
+  const s = await selectTraitButtons(page, char.traits.strengths, Math.max(3, char.traits.strengths.length));
+  const f = await selectTraitButtons(page, char.traits.flaws, Math.max(2, char.traits.flaws.length));
+  const c = await selectTraitButtons(page, char.traits.challenges, Math.max(2, char.traits.challenges.length));
+  console.log(`    selected ${s} strengths, ${f} flaws, ${c} challenges`);
+  await page.waitForTimeout(500);
+}
+
+function relationshipLabelFor(char: DemoCharacter, other: DemoCharacter, rawType: string): string | null {
+  // Translate the compact JSON relationship tokens into the exact UI labels
+  // from client/src/constants/relationships.ts. Direction matters: char → other.
+  const charAge = parseInt(char.age, 10) || 0;
+  const otherAge = parseInt(other.age, 10) || 0;
+  switch (rawType) {
+    case 'parent-child':
+      return charAge > otherAge ? 'Parent of' : 'Child of';
+    case 'sibling':
+      return charAge >= otherAge ? 'Older Sibling of' : 'Younger Sibling of';
+    case 'partner':
+      return 'Married to';
+    case 'grandparent-grandchild':
+      // No built-in grandparent label; fall back to Parent/Child chain which the
+      // UI supports. Story generator reads the actual relationships table so
+      // this approximation is only for display.
+      return charAge > otherAge ? 'Parent of' : 'Child of';
+    default:
+      return null;
+  }
+}
+
+function lookupRelationshipType(family: DemoFamily, a: number, b: number): string | null {
+  // relationships keys are stored as "id1-id2"; try both orientations.
+  const rels = family.relationships || {};
+  return rels[`${a}-${b}`] || rels[`${b}-${a}`] || null;
+}
+
+async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, family: DemoFamily, alreadyCreated: DemoCharacter[]) {
+  if (alreadyCreated.length === 0) {
+    console.log('    no prior characters — nothing to set');
+    return;
+  }
+  console.log(`    setting relationships vs ${alreadyCreated.length} prior character(s)...`);
+
+  // The relationships step shows one card per previously-created character.
+  // Each card has a <select>. We pick the right option per pair.
+  const cards = page.locator('div.rounded-lg').filter({ has: page.locator('select') });
+  const cardCount = await cards.count();
+  for (let i = 0; i < cardCount; i++) {
+    const card = cards.nth(i);
+    if (!await card.isVisible({ timeout: 500 }).catch(() => false)) continue;
+    const cardText = (await card.textContent().catch(() => '')) || '';
+
+    // Match the card to one of our alreadyCreated characters by name substring.
+    const other = alreadyCreated.find(c => cardText.includes(c.name));
+    if (!other) continue;
+
+    const rawType = lookupRelationshipType(family, char.id, other.id);
+    if (!rawType) continue;
+
+    const enLabel = relationshipLabelFor(char, other, rawType);
+    if (!enLabel) continue;
+
+    const select = card.locator('select').first();
+    // Try English label first, then German equivalent from relationships.ts.
+    const variants: Record<string, string[]> = {
+      'Parent of': ['Parent of', 'Elternteil von', 'Parent de'],
+      'Child of': ['Child of', 'Kind von', 'Enfant de'],
+      'Older Sibling of': ['Older Sibling of', 'Älteres Geschwister von', 'Frère/Sœur aîné(e) de'],
+      'Younger Sibling of': ['Younger Sibling of', 'Jüngeres Geschwister von', 'Frère/Sœur cadet(te) de'],
+      'Married to': ['Married to', 'Verheiratet mit', 'Marié(e) à'],
+    };
+    const labels = variants[enLabel] || [enLabel];
+    let set = false;
+    for (const label of labels) {
+      try {
+        await select.selectOption({ label });
+        console.log(`      ${char.name} → ${other.name}: "${label}"`);
+        set = true;
+        break;
+      } catch { /* try next variant */ }
+    }
+    if (!set) {
+      console.log(`      ${char.name} → ${other.name}: could not set "${enLabel}" — leaving default`);
+    }
+    await page.waitForTimeout(300);
+  }
+}
+
+async function walkToCharacterList(page: Page, charName: string) {
+  // After relationships, the wizard may have one or more terminal buttons (Save
+  // Character, Finish, Continue). Click whatever advances us until we land back
+  // on the character list view.
+  console.log(`    walking to character list...`);
+  for (let i = 0; i < 12; i++) {
+    // Are we back on the list? Look for the "Create Another" card or the
+    // header "Charaktere & Rollen"/"Characters & Roles".
+    const backOnList = await page.locator('text=/charaktere & rollen|characters & roles|personnages & rôles/i').isVisible({ timeout: 500 }).catch(() => false);
+    const hasCreateAnother = await page.locator('[class*="border-dashed"]').isVisible({ timeout: 500 }).catch(() => false);
+    if (backOnList && hasCreateAnother) {
+      console.log(`      ${charName} saved — back on character list`);
+      return;
+    }
 
     const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
-    if (await saveBtn.isVisible({ timeout: 1500 }).catch(() => false) && await saveBtn.isEnabled().catch(() => false)) {
+    if (await saveBtn.isVisible({ timeout: 1000 }).catch(() => false)
+        && await saveBtn.isEnabled().catch(() => false)) {
       await saveBtn.click();
-      await page.waitForTimeout(2500);
+      await page.waitForTimeout(3000);
       continue;
     }
 
-    const nextBtn = page.getByRole('button', { name: NEXT_BTN_RE }).first();
-    if (await nextBtn.isVisible({ timeout: 1500 }).catch(() => false) && await nextBtn.isEnabled().catch(() => false)) {
-      await nextBtn.click();
-      await page.waitForTimeout(2000);
-      continue;
-    }
+    if (await clickAnyNext(page, 2000)) continue;
 
-    // Nothing to click — stuck. Bail out; the character may have been saved earlier.
-    console.log(`  [${charName}] no next/save button visible after ${i + 1} steps — assuming saved`);
+    console.log(`      ${charName}: no button to advance after step ${i + 1} — assuming done`);
     break;
   }
-
-  await page.waitForTimeout(1500);
-  console.log(`  [${charName}] done`);
+  await page.waitForTimeout(2000);
 }
 
-async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 180000) {
+async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, family: DemoFamily, alreadyCreated: DemoCharacter[]) {
+  console.log(`\n  === Creating ${char.name} (id ${char.id}) ===`);
+  await clickCreateCharacterButton(page, alreadyCreated.length === 0);
+  await uploadPhotoInCreateFlow(page, photoPathFor(family, char.name));
+  await fillCharacterName(page, char.name);
+  // Navigate name → traits. The wizard exposes an "onContinueToTraits" button
+  // which either matches NEXT_BTN_RE or a bespoke "Continue to traits" label.
+  await clickAnyNext(page, 5000);
+  await selectTraits(page, char);
+  await clickAnyNext(page, 5000);
+  // Characteristics/hobbies step — skip (not required, photo analysis may fill).
+  await clickAnyNext(page, 5000);
+  // Relationships step.
+  await setRelationshipsForCharacter(page, char, family, alreadyCreated);
+  await clickAnyNext(page, 5000);
+  // Final save path.
+  await walkToCharacterList(page, char.name);
+}
+
+async function setMainRoles(page: Page, family: DemoFamily) {
+  const mains = family.characters.filter(c => c.storyRole === 'main').map(c => c.name);
+  if (mains.length === 0) return;
+  console.log(`\n  Setting main roles: ${mains.join(', ')}`);
+  for (const name of mains) {
+    const card = page.locator('div.border.rounded-lg, div.border.rounded').filter({ hasText: name }).first();
+    // Hauptrolle button — has a star icon and label, indigo when selected.
+    const roleBtn = card.getByRole('button', { name: /hauptrolle|main|principal/i }).first();
+    if (await roleBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const classes = (await roleBtn.getAttribute('class')) || '';
+      if (!classes.includes('bg-indigo')) {
+        await roleBtn.click();
+        console.log(`    → ${name} set as main`);
+        await page.waitForTimeout(500);
+      } else {
+        console.log(`    → ${name} already main`);
+      }
+    }
+  }
+  await page.waitForTimeout(1000);
+}
+
+async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 600000) {
   // Poll /api/characters (via the page's authenticated session) until every
   // family character shows a standard avatar (or we hit the timeout).
   const deadline = Date.now() + timeoutMs;
@@ -275,47 +496,27 @@ async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 180
   console.log(`  Avatar poll timed out after ${timeoutMs / 1000}s — continuing anyway.`);
 }
 
-async function seedPhotosForFamily(page: Page, family: DemoFamily) {
-  console.log(`\n=== Seeding photos for ${family.label} family ===`);
+async function createFamilyViaWizard(page: Page, family: DemoFamily) {
+  console.log(`\n=== Creating ${family.label} family via wizard UI ===`);
 
-  // Start on the wizard step 1 (character list) — showcase.js already saved the
-  // character rows via API, so they should all be visible as cards.
+  // Verify all photos are on disk up-front so we fail fast, not mid-run.
+  for (const char of family.characters) {
+    const photoPath = photoPathFor(family, char.name);
+    if (!fs.existsSync(photoPath)) throw new Error(`Missing photo on disk: ${photoPath}`);
+  }
+
   await page.goto('/create');
   await page.waitForTimeout(3000);
 
-  // Record photo consent once for the whole user — otherwise the PhotoUpload
-  // component's `canUpload` gate stays false and setInputFiles will trigger
-  // handleFileChange but bail before calling onPhotoSelect, silently dropping
-  // the first upload. Idempotent: server stores photo_consent_at timestamp.
-  console.log('  Recording photo consent (one-shot)...');
-  const consentStatus = await page.evaluate(async () => {
-    const token = localStorage.getItem('auth_token');
-    const res = await fetch('/api/auth/photo-consent', {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    return res.status;
-  });
-  console.log(`  Consent endpoint → ${consentStatus}`);
-  // Reload so AuthContext picks up the new photoConsentAt from /api/auth/me
-  await page.reload();
-  await page.waitForTimeout(2000);
-
+  const alreadyCreated: DemoCharacter[] = [];
   for (const char of family.characters) {
-    const photoPath = path.join(PHOTOS_DIR, family.id, `${char.name}.jpg`);
-    if (!fs.existsSync(photoPath)) {
-      throw new Error(`Missing photo on disk: ${photoPath}`);
-    }
-    await uploadPhotoForCharacter(page, char.name, photoPath);
-    // Navigate back to character list before next character (in case the save
-    // path deposited us somewhere else)
-    if (!await isOnCharacterList(page)) {
-      await page.goto('/create');
-      await page.waitForTimeout(2000);
-    }
+    await createOneCharacterViaWizard(page, char, family, alreadyCreated);
+    alreadyCreated.push(char);
   }
 
-  console.log(`\n=== Waiting for avatar generation (up to 3 min) ===`);
+  await setMainRoles(page, family);
+
+  console.log(`\n=== Waiting for avatar generation (up to 10 min) ===`);
   await waitForAllAvatars(page, family);
 }
 
@@ -355,8 +556,11 @@ test.describe('Demo Story Generation', () => {
     await preSeedLanguage(page, entry.language, baseURL || 'https://magicalstory.ch');
     await loginAs(page, loginEmail, DEMO_PASSWORD);
 
-    // ── Step 0b: Seed photos + trigger avatar generation (idempotent — skipped if family already has avatars) ──
-    await seedPhotosForFamily(page, family);
+    // ── Step 0b: Create the full family via the wizard UI — photo upload, name,
+    //            traits, characteristics, relationships, save — exactly like a real user.
+    //            showcase.js only registered + logged in the account; everything
+    //            beyond that is pure UI clicking.
+    await createFamilyViaWizard(page, family);
 
     // ── Step 0c: Navigate to a fresh story (lang param keeps language sticky) ──
     console.log('Step 0c: Starting new story...');

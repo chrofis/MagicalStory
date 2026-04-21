@@ -126,38 +126,14 @@ async function provisionAccount(apiBase, email, family) {
     body: JSON.stringify({ username: email, password: DEMO_PASSWORD }),
   });
   if (!loginRes.ok) throw new Error(`Login failed: ${loginRes.status} ${await loginRes.text()}`);
-  const { token, user } = await loginRes.json();
+  const { user } = await loginRes.json();
   console.log(`   id=${user.id}, credits=${user.credits}`);
 
-  // Save metadata only (names, traits, roles, relationships) — NO photos.
-  // Photos get uploaded later by the Playwright helper via the real UI, which
-  // triggers the client-side avatar generation chain exactly like a user upload.
-  // If we include photos here via the API, the server accepts them but the
-  // avatar generation call never fires because it lives on the client.
-  console.log(`3. Saving ${family.characters.length} characters (metadata only, no photos)...`);
-  const charactersMetadataOnly = family.characters.map(c => {
-    // eslint-disable-next-line no-unused-vars
-    const { portraitPrompt, ...metadata } = c;
-    return metadata;
-  });
-
-  const saveRes = await fetch(`${apiBase}/api/characters`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({
-      characters: charactersMetadataOnly,
-      relationships: family.relationships,
-      relationshipTexts: {},
-      customRelationships: [],
-      customStrengths: [],
-      customWeaknesses: [],
-      customFears: [],
-    }),
-  });
-  if (!saveRes.ok) throw new Error(`Save failed: ${saveRes.status} ${await saveRes.text()}`);
-  const result = await saveRes.json();
-  console.log(`   Saved ${result.count} characters.`);
-
+  // Register + login is the ONLY API use. Everything else — character creation,
+  // photo upload, traits, relationships, role assignment, story wizard — runs
+  // through the actual wizard UI via Playwright. This matches a normal user's
+  // path to first story and keeps the showcase faithful as an end-to-end smoke
+  // test rather than a back-door setup.
   return { userId: user.id, credits: user.credits };
 }
 
