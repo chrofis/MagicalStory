@@ -187,6 +187,16 @@ async function acceptPhotoConsentIfShown(page: Page) {
 }
 
 async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
+  // Are we already in the photo-upload sub-step? On a brand-new empty account
+  // the wizard sometimes skips the empty-state card and auto-opens photo upload
+  // for the first character. If so, nothing to click — we're already there.
+  const alreadyOnPhotoStep = await page.locator('text=/Foto hochladen|Upload photo|Télécharger/i').first()
+    .isVisible({ timeout: 1500 }).catch(() => false);
+  if (alreadyOnPhotoStep) {
+    console.log(`    already on photo upload step — skipping entry button`);
+    return;
+  }
+
   console.log(`    clicking "${isFirst ? 'Create First' : 'Create Another'}" character...`);
   if (isFirst) {
     // Empty-state button (WizardStep2Characters.tsx:250)
