@@ -667,7 +667,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null } = options;
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
@@ -785,6 +785,23 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const placementsCheck = placementsBlock
             ? `\n4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.`
             : '';
+          // Composition geometry fidelity — the main scene will composite characters,
+          // aim lines, and distant targets onto this empty scene. If the path
+          // direction, vanishing point, or reserved distant-target spot in the
+          // empty scene doesn't match what the main scene prose describes, the
+          // composite will be broken (e.g. character aims toward a target corner
+          // where the empty scene has a wall instead of an opening).
+          const mainSceneBlock = mainScenePrompt
+            ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
+            : '';
+          const geometryCheck = mainScenePrompt
+            ? `\n5. Composition geometry — does this empty scene support the main scene's geometry? Check:
+   a. Any path, river, road, corridor, shoreline, horizon, or major perspective line — does it run in the same direction the main scene prose describes (e.g. "stretches to the right background", "diagonal from lower-left to upper-right")?
+   b. Vanishing point / opening location — is it at the frame position the main scene implies (e.g. main scene says "sliver of light at far right background" → empty scene must have that opening/light at the upper-right, not centered or on the left)?
+   c. Reserved open space for distant composited targets — if the main scene places a "tiny figure" or small object at a specific corner, the empty scene must have open, uncluttered sky/ground/path there, not a wall or tree trunk.
+   d. Lighting direction — consistent with the main scene's time of day and declared light source.
+   FAIL with a specific fix instruction if any of (a)–(d) disagree. The issue description must name WHAT geometry is wrong AND the corrected direction/position. Example: "path runs front-to-center instead of diagonally to the upper-right; regenerate with the path angled toward the upper-right corner where the target will be composited".`
+            : '';
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -793,12 +810,12 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${placementsBlock}
+                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${placementsBlock}${mainSceneBlock}
 
 Check:
 1. Does the setting/location roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
 2. Are there large artificial-looking patches — white rectangles, solid color blocks, or obvious AI glitches? (FAIL)
-3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)${placementsCheck}
+3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)${placementsCheck}${geometryCheck}
 
 Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence describing what to fix if failed, or empty if passed"}` }
               ]}],
@@ -863,7 +880,7 @@ Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "on
  * @returns {Promise<Object|null>} Three-stage result or null on failure
  */
 async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {}) {
-  const { qualityModelOverride = null, pageContext = '' } = options;
+  const { qualityModelOverride = null, pageContext = '', storyText = null } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   const visionPrompt = PROMPT_TEMPLATES.imageVisionInventory;
@@ -970,7 +987,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const complianceInput = fillTemplate(complianceTemplate, {
       ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
       VISUAL_INVENTORY: visionText,
-      INTERACTIONS_BLOCK: interactionsBlock
+      INTERACTIONS_BLOCK: interactionsBlock,
+      STORY_TEXT: (storyText || '(not provided)').substring(0, 2000)
     });
 
     const { callTextModel } = require('./textModels');
@@ -1135,7 +1153,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Start three-stage eval in parallel for scene evaluations
     let threeStagePromise = null;
     if (evaluationType === 'scene') {
-      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, { qualityModelOverride, pageContext });
+      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, { qualityModelOverride, pageContext, storyText });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }
 

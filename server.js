@@ -4889,6 +4889,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
                   sceneDescription: emptySceneDesc,
                   characterPlacements: placements.length > 0 ? placements : null,
+                  mainScenePrompt: pageData.scene?.sceneDescription || null,
                 });
                 if (!qc.pass) {
                   // Retry with a modified prompt that incorporates Gemini's feedback.
