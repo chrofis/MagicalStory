@@ -201,6 +201,39 @@ async function main() {
     }
 
     // =========================================================================
+    // 6b. DUMP IMAGES TO DISK (empty scene + every version, so reviewer can
+    //     inspect what the pipeline actually produced rather than guessing)
+    // =========================================================================
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const outDir = path.join(process.cwd(), 'tmp', `review-${row.id}-p${pageNum}`);
+      fs.mkdirSync(outDir, { recursive: true });
+      const imgRows = await pool.query(
+        `SELECT image_type, version_index, image_data
+           FROM story_images
+          WHERE story_id = $1 AND page_number = $2
+          ORDER BY image_type, version_index`,
+        [row.id, pageNum]
+      );
+      hr('-', '6b. DUMPED IMAGES');
+      if (imgRows.rows.length === 0) {
+        console.log('(no story_images rows for this page)');
+      } else {
+        console.log(`Output dir: ${outDir}`);
+        for (const r2 of imgRows.rows) {
+          const data = (r2.image_data || '').replace(/^data:image\/\w+;base64,/, '');
+          if (!data) continue;
+          const fname = `${r2.image_type}-v${r2.version_index}.png`;
+          fs.writeFileSync(path.join(outDir, fname), Buffer.from(data, 'base64'));
+          console.log(`  ${fname} (${Math.round(data.length / 1024)} KB)`);
+        }
+      }
+    } catch (e) {
+      console.log(`(image dump failed: ${e.message})`);
+    }
+
+    // =========================================================================
     // 7. BBOX DETECTION (brief — active version)
     // =========================================================================
     hr('-', '7. BBOX DETECTION  (active version)');
