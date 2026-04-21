@@ -523,7 +523,6 @@ export function CharacterForm({
   onAddCustomRelationship,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
-  const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1365,7 +1364,7 @@ export function CharacterForm({
                       src={avatarToShow}
                       alt={`${character.name} avatar`}
                       className={`w-full max-w-[180px] lg:max-w-full aspect-[3/4] object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
-                      onClick={() => setEnlargedAvatar(true)}
+                      onClick={() => setLightboxImage(avatarToShow)}
                       title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                     />
                     {isGenerating && (
@@ -1394,27 +1393,6 @@ export function CharacterForm({
                 </div>
               );
             })()}
-            {/* Enlarged avatar modal - show full avatar */}
-            {enlargedAvatar && (character.avatars?.standard || character.avatars?.faceThumbnails?.standard) && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
-                onClick={() => setEnlargedAvatar(false)}
-              >
-                <img
-                    draggable={false}
-                  src={character.avatars?.standard || character.avatars?.faceThumbnails?.standard}
-                  alt={`${character.name} avatar`}
-                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <button
-                  className="absolute top-4 right-4 text-white text-3xl hover:text-gray-300"
-                  onClick={() => setEnlargedAvatar(false)}
-                >
-                  ×
-                </button>
-              </div>
-            )}
             {/* Avatar action buttons - full width on mobile, side by side on desktop */}
             <div className="mt-3 flex flex-col sm:flex-row gap-2 w-full">
               {/* Change Photo button */}

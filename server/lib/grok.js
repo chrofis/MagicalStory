@@ -868,7 +868,11 @@ async function packReferences(refs = {}, options = {}) {
       slotBuf = await composeCharWithVbRow(composed, rawVbElements, aspectRatio);
       vbCount = Math.min(rawVbElements.length, 6);
     }
-    const resized = await sharp(slotBuf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    // quality 92 not 85: the input avatars were already encoded at 90, so a
+    // second pass at 85 stacked visible artefacts on top. Matching the other
+    // slots (and nudging a touch above the source) keeps the composite visually
+    // close to the originals.
+    const resized = await sharp(slotBuf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
     const rm = await sharp(resized).metadata();
     const vbLabel = vbCount > 0 ? ` + ${vbCount} VB cell(s)` : '';
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
@@ -896,7 +900,7 @@ async function packReferences(refs = {}, options = {}) {
   // Landmark: only when there's no scene background (rare — scene bg already
   // has the landmark baked in).
   if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
-    const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
     log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
   } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
