@@ -102,12 +102,20 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       if (!containerRef.current) return;
       const cw = containerRef.current.clientWidth;
       const ch = containerRef.current.clientHeight;
-      setIsMobile(window.innerWidth < 768);
-      // In landscape (desktop), 2 pages fit side by side → each page ≤ half the width
-      // In portrait (mobile), 1 page fills the width
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        // Fill the mobile container entirely — image+text-below layout uses
+        // every available pixel. Locking to A4 aspect here left a visible
+        // dead strip between the page bottom and the prev/next buttons.
+        const pw = Math.min(cw, 460);
+        const ph = Math.max(0, ch - 4);
+        setDimensions({ width: Math.round(pw), height: Math.round(ph) });
+        return;
+      }
+      // Desktop: keep A4 aspect so the book spread matches the printed book.
       const maxPageWidth = Math.min(cw / 2, 460);
       const maxPageHeight = Math.min(ch - 10, 650);
-      // A4 portrait: width / height = 210 / 297
       const A4_W = 210, A4_H = 297;
       let pw = maxPageWidth;
       let ph = pw * (A4_H / A4_W);

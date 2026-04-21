@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { Maximize2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Maximize2, ChevronDown } from 'lucide-react';
 import {
   getTextOverlayPosition,
   getOverlayClasses,
@@ -34,61 +34,17 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
     const isFullWidth = layout.position.includes('full');
     const trimmedText = text.trim();
 
-    // Block page-flip's native touch listeners from seeing drags inside the
-    // scrollable text panel. page-flip attaches `touchstart` on its `.stf__block`
-    // and `touchmove`/`touchend` on window; once `startUserTouch` fires (250ms
-    // after touchstart) it calls preventDefault() on every touchmove, which
-    // kills native scrolling. React synthetic capture handlers are too late —
-    // we need real native listeners, attached directly to the scroll container.
-    const scrollRef = useCallback((el: HTMLDivElement | null) => {
-      if (!el) return;
-      const stop = (e: TouchEvent) => e.stopPropagation();
-      el.addEventListener('touchstart', stop);
-      el.addEventListener('touchmove', stop);
-      el.addEventListener('touchend', stop);
-      return () => {
-        el.removeEventListener('touchstart', stop);
-        el.removeEventListener('touchmove', stop);
-        el.removeEventListener('touchend', stop);
-      };
-    }, []);
-
-    // Mobile read mode: image at top, full text below — no overlay or facing page.
+    // Mobile read mode: image at top, scrollable text panel below. Extracted
+    // into a subcomponent so we can use hooks for the scroll-indicator state.
     if (textBelowImage) {
       return (
-        <div ref={ref} className="w-full h-full relative bg-white overflow-hidden group flex flex-col">
-          <div className="relative flex-shrink-0" style={{ height: '60%' }}>
-            <img
-              src={imageUrl}
-              alt={`Page ${pageNumber}`}
-              className="w-full h-full object-contain"
-              draggable={false}
-            />
-            {onImageClick && (
-              <button
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
-                className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
-                aria-label="Fullscreen"
-              >
-                <Maximize2 size={14} />
-              </button>
-            )}
-          </div>
-          <div
-            ref={scrollRef}
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-          >
-            <p
-              className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
-              style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
-            >
-              {trimmedText}
-            </p>
-          </div>
-        </div>
+        <TextBelowImagePage
+          imageUrl={imageUrl}
+          trimmedText={trimmedText}
+          pageNumber={pageNumber}
+          onImageClick={onImageClick}
+          forwardedRef={ref}
+        />
       );
     }
 
@@ -155,3 +111,124 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
 
 BookStoryPage.displayName = 'BookStoryPage';
 export default BookStoryPage;
+
+// ─── Mobile text-below-image layout ────────────────────────────────────────────
+// Handles its own scrolling because react-pageflip registers a window-level
+// touchmove listener with preventDefault(), which kills native scrolling the
+// moment a touchstart fires inside the book. stopPropagation on the child can't
+// block window-level listeners. Instead we drive scrollTop manually from
+// touch events and let page-flip's preventDefault silently no-op our intent.
+// Also exposes a scroll-hint chevron + fade while there's still content below
+// the visible area — without it users don't realise the text is scrollable.
+
+interface TextBelowPageProps {
+  imageUrl: string;
+  trimmedText: string;
+  pageNumber: number;
+  onImageClick?: (url: string) => void;
+  forwardedRef: React.ForwardedRef<HTMLDivElement>;
+}
+
+const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
+  const scrollEl = useRef<HTMLDivElement | null>(null);
+  const [showHint, setShowHint] = useState(false);
+
+  // Touch-driven scroll — bypasses page-flip's window-level preventDefault.
+  const bindScroll = useCallback((el: HTMLDivElement | null) => {
+    scrollEl.current = el;
+    if (!el) return;
+    let lastY: number | null = null;
+    const onStart = (e: TouchEvent) => {
+      e.stopPropagation();
+      lastY = e.touches[0]?.clientY ?? null;
+    };
+    const onMove = (e: TouchEvent) => {
+      e.stopPropagation();
+      const y = e.touches[0]?.clientY;
+      if (y == null || lastY == null) return;
+      const delta = lastY - y;
+      const atTop = el.scrollTop <= 0;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      const wantsDown = delta > 0;
+      // Only consume the gesture if there's room to scroll in that direction —
+      // otherwise let page-flip use it (in practice page-flip has preventDefault
+      // on already, so this is mostly informational).
+      if ((wantsDown && !atBottom) || (!wantsDown && !atTop)) {
+        el.scrollTop += delta;
+      }
+      lastY = y;
+    };
+    const onEnd = (e: TouchEvent) => {
+      e.stopPropagation();
+      lastY = null;
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onEnd, { passive: true });
+  }, []);
+
+  // Show the hint while there's content below the visible area.
+  useEffect(() => {
+    const el = scrollEl.current;
+    if (!el) return;
+    const update = () => {
+      const overflow = el.scrollHeight - el.clientHeight > 1;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+      setShowHint(overflow && !atBottom);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [trimmedText]);
+
+  return (
+    <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group flex flex-col">
+      <div className="relative flex-shrink-0" style={{ height: '60%' }}>
+        <img
+          src={imageUrl}
+          alt={`Page ${pageNumber}`}
+          className="w-full h-full object-contain"
+          draggable={false}
+        />
+        {onImageClick && (
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
+            className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
+            aria-label="Fullscreen"
+          >
+            <Maximize2 size={14} />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 relative">
+        <div
+          ref={bindScroll}
+          className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
+          <p
+            className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
+            style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
+          >
+            {trimmedText}
+          </p>
+        </div>
+        {/* Scroll hint — fade + chevron, hidden at the bottom of the text */}
+        {showHint && (
+          <div className="pointer-events-none absolute left-0 right-0 bottom-0 flex flex-col items-center pb-1">
+            <div className="h-6 w-full bg-gradient-to-t from-white to-white/0" />
+            <ChevronDown className="w-4 h-4 text-gray-500 animate-bounce -mt-1" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
