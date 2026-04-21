@@ -184,15 +184,20 @@ async function uploadPhotoForCharacter(page: Page, charName: string, photoPath: 
   const card = await findCharacterCard(page, charName);
   await expect(card).toBeVisible({ timeout: 10000 });
 
-  // Primary selector matches the original character-management.spec.ts pattern
-  const editBtn = card.locator('button.bg-indigo-600').first();
-  if (await editBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+  // Edit button has title="Charakter bearbeiten"/"Edit character"/"Modifier le personnage"
+  // (CharacterList.tsx:144). Use the title attribute — unambiguous across the
+  // several indigo buttons per card (edit, role-selectors, star).
+  const editBtn = card.locator('button[title*="bearbeiten" i], button[title*="edit" i], button[title*="modifier" i]').first();
+  if (await editBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await editBtn.click();
   } else {
-    // Fallback: click the thumbnail
-    await card.locator('img, svg').first().click();
+    // Fallback: click the thumbnail (also triggers onEdit per CharacterList.tsx:113-125)
+    await card.locator('img').first().click({ timeout: 3000 }).catch(() => {
+      // Last-ditch: click the character name (whole card surfaces aren't always clickable)
+      return card.getByRole('heading', { name: charName }).click();
+    });
   }
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(2500);
 
   console.log(`  [${charName}] uploading photo from ${path.relative(process.cwd(), photoPath)}`);
   const newPhotoLabel = page.locator('label').filter({ hasText: PHOTO_LABEL_RE }).first();
