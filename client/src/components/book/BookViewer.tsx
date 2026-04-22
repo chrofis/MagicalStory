@@ -54,6 +54,8 @@ interface BookViewerProps {
   showTextOverlay: boolean;
   /** True when text is on a separate facing page (sidepage mode) — image pages should not show any text. */
   textOnSidePage?: boolean;
+  /** When true, on mobile the text is always rendered below the image (scrollable), regardless of reading mode. */
+  forceTextBelowOnMobile?: boolean;
   /** Optional logical page to open on — used to preserve position when parent remounts the book (e.g. on reading-mode switch). */
   initialLogicalPage?: number;
   onImageClick: (url: string) => void;
@@ -73,7 +75,7 @@ BlankPage.displayName = 'BlankPage';
  * and maps PageEntry[] to the appropriate book page components.
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
-  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
     // Advanced reading level stories (and any future square-layout stories)
     // flag textInImage=false — the PDF prints image on top + text strip below
     // on the SAME page. Force that layout in the reader too so Print Preview
@@ -228,12 +230,22 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay && !forceTextBelow}
                 textOnSidePage={textOnSidePage && !isMobile && !forceTextBelow}
-                textBelowImage={forceTextBelow || (isMobile && textOnSidePage)}
+                textBelowImage={forceTextBelow || (isMobile && (forceTextBelowOnMobile || textOnSidePage))}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
             );
             physicalToLogical.push(i);
+            // forceTextBelow stories are self-contained per page (image +
+            // text on the same page). Pairing two of them into a spread makes
+            // the reader look at two different scenes at once, which isn't
+            // the intended reading experience. On desktop we insert a blank
+            // companion so each story page occupies its own spread and is
+            // read one at a time. Mobile is already single-page.
+            if (forceTextBelow && !isMobile) {
+              bookPages.push(<BlankPage key={`story-${storyPage.pageNumber}-blank`} />);
+              physicalToLogical.push(i);
+            }
           }
           break;
         }
@@ -292,7 +304,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             minWidth={250}
             maxWidth={460}
             minHeight={333}
-            maxHeight={650}
+            maxHeight={isMobile ? 1400 : 650}
             showCover={true}
             flippingTime={800}
             usePortrait={true}

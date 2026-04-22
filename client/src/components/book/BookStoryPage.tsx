@@ -36,18 +36,12 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
 
     // Mobile read mode: image at top, scrollable text panel below. Extracted
     // into a subcomponent so we can use hooks for the scroll-indicator state.
-    // We always pass the overlay PNG when available: the stored scene image has
-    // the text-zone white-wash baked in, which reads as a strange lightened bar
-    // without text on top. Painting the overlay PNG covers the wash. The user
-    // reads from the scrollable text panel below either way; the on-image text
-    // matches the printed book and hides the artefact.
     if (textBelowImage) {
       return (
         <TextBelowImagePage
           imageUrl={imageUrl}
           trimmedText={trimmedText}
           pageNumber={pageNumber}
-          overlayImage={overlayImage}
           onImageClick={onImageClick}
           forwardedRef={ref}
         />
@@ -131,15 +125,11 @@ interface TextBelowPageProps {
   imageUrl: string;
   trimmedText: string;
   pageNumber: number;
-  /** Server-rendered text overlay PNG. When provided, painted over the scene
-   *  image so the baked-in white-wash calm region is covered by readable
-   *  text — otherwise the wash shows up as a strange lightened bar. */
-  overlayImage?: string | null;
   onImageClick?: (url: string) => void;
   forwardedRef: React.ForwardedRef<HTMLDivElement>;
 }
 
-const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, overlayImage, onImageClick, forwardedRef }) => {
+const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
   const scrollEl = useRef<HTMLDivElement | null>(null);
   const [showHint, setShowHint] = useState(false);
 
@@ -199,23 +189,13 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
 
   return (
     <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group flex flex-col">
-      <div className="relative flex-shrink-0" style={{ height: '55%' }}>
+      <div className="relative flex-shrink-0" style={{ height: '60%' }}>
         <img
           src={imageUrl}
           alt={`Page ${pageNumber}`}
           className="w-full h-full object-contain"
           draggable={false}
         />
-        {/* Overlay PNG (server-rendered text). Covers the baked-in white-wash
-            calm region so it doesn't read as a random lightened bar. */}
-        {overlayImage && (
-          <img
-            src={overlayImage}
-            alt=""
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-            draggable={false}
-          />
-        )}
         {onImageClick && (
           <button
             onMouseDown={(e) => e.stopPropagation()}
@@ -228,7 +208,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
           </button>
         )}
       </div>
-      <div className="flex-1 min-h-0 relative border-t border-gray-200">
+      <div className="flex-1 min-h-0 relative">
         <div
           ref={bindScroll}
           className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
@@ -236,7 +216,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
         >
           <p
             className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
-            style={{ fontSize: 'clamp(0.95rem, 2.6vw, 1.05rem)', lineHeight: 1.6 }}
+            style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
           >
             {trimmedText}
           </p>
