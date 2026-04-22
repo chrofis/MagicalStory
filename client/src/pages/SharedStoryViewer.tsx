@@ -376,7 +376,7 @@ export default function SharedStoryViewer() {
   );
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header — single dark surface with a thin gold underline tying it to the
           book-cover accent used throughout the product. Ghost action buttons,
           one white primary (Share). */}

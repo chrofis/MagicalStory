@@ -237,12 +237,13 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             );
             physicalToLogical.push(i);
             // forceTextBelow stories are self-contained per page (image +
-            // text on the same page). Pairing two of them into a spread makes
-            // the reader look at two different scenes at once, which isn't
-            // the intended reading experience. On desktop we insert a blank
-            // companion so each story page occupies its own spread and is
-            // read one at a time. Mobile is already single-page.
-            if (forceTextBelow && !isMobile) {
+            // text on the same page). Pairing two of them into a spread
+            // shows two different scenes at once, which isn't the intended
+            // reading experience. Insert a blank companion after every
+            // story page so each occupies its own spread regardless of
+            // viewport — relying on HTMLFlipBook's portrait-mode detection
+            // wasn't reliable (mobile viewports still rendered spreads).
+            if (forceTextBelow) {
               bookPages.push(<BlankPage key={`story-${storyPage.pageNumber}-blank`} />);
               physicalToLogical.push(i);
             }
