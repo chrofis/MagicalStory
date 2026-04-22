@@ -188,8 +188,13 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
   }, [trimmedText]);
 
   return (
-    <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group flex flex-col">
-      <div className="relative flex-shrink-0" style={{ height: '60%' }}>
+    // Absolute-positioned split instead of flex: HTMLFlipBook wraps each page
+    // in its own div and applies inline styles, which was collapsing the
+    // flex-1 text zone unpredictably on narrow viewports. Absolute top/bottom
+    // with percentage heights gives us deterministic image + text zones that
+    // don't depend on flex-basis resolution through the flipbook wrapper.
+    <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group">
+      <div className="absolute inset-x-0 top-0" style={{ height: '60%' }}>
         <img
           src={imageUrl}
           alt={`Page ${pageNumber}`}
@@ -208,7 +213,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
           </button>
         )}
       </div>
-      <div className="flex-1 min-h-0 relative">
+      <div className="absolute inset-x-0 bottom-0 border-t border-gray-200" style={{ height: '40%' }}>
         <div
           ref={bindScroll}
           className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
@@ -216,7 +221,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
         >
           <p
             className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
-            style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1rem)', lineHeight: 1.55 }}
+            style={{ fontSize: 'clamp(0.95rem, 2.4vw, 1.05rem)', lineHeight: 1.55 }}
           >
             {trimmedText}
           </p>
