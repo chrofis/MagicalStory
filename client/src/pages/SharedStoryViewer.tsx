@@ -503,7 +503,7 @@ export default function SharedStoryViewer() {
       )}
 
       {/* Book with side navigation arrows */}
-      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-2 md:py-4">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-1 md:py-4">
         {/* Left arrow - desktop only */}
         <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
           <button
@@ -576,7 +576,7 @@ export default function SharedStoryViewer() {
       </main>
 
       {/* Text overlay toggle + page counter */}
-      <div className="flex items-center justify-center gap-4 pb-3">
+      <div className="flex items-center justify-center gap-4 pb-1">
         {/* Mobile: first page button */}
         <div className="md:hidden">
           {currentPage > 1 && (

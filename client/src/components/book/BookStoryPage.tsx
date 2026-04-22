@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Maximize2, ChevronDown } from 'lucide-react';
+import React, { useCallback, useRef } from 'react';
+import { Maximize2 } from 'lucide-react';
 import {
   getTextOverlayPosition,
   getOverlayClasses,
@@ -131,7 +131,6 @@ interface TextBelowPageProps {
 
 const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
   const scrollEl = useRef<HTMLDivElement | null>(null);
-  const [showHint, setShowHint] = useState(false);
 
   // Touch-driven scroll — bypasses page-flip's window-level preventDefault.
   const bindScroll = useCallback((el: HTMLDivElement | null) => {
@@ -150,9 +149,6 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
       const atTop = el.scrollTop <= 0;
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
       const wantsDown = delta > 0;
-      // Only consume the gesture if there's room to scroll in that direction —
-      // otherwise let page-flip use it (in practice page-flip has preventDefault
-      // on already, so this is mostly informational).
       if ((wantsDown && !atBottom) || (!wantsDown && !atTop)) {
         el.scrollTop += delta;
       }
@@ -167,25 +163,6 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
     el.addEventListener('touchend', onEnd, { passive: true });
     el.addEventListener('touchcancel', onEnd, { passive: true });
   }, []);
-
-  // Show the hint while there's content below the visible area.
-  useEffect(() => {
-    const el = scrollEl.current;
-    if (!el) return;
-    const update = () => {
-      const overflow = el.scrollHeight - el.clientHeight > 1;
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-      setShowHint(overflow && !atBottom);
-    };
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
-    };
-  }, [trimmedText]);
 
   return (
     // Absolute-positioned split instead of flex: HTMLFlipBook wraps each page
@@ -226,13 +203,6 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
             {trimmedText}
           </p>
         </div>
-        {/* Scroll hint — fade + chevron, hidden at the bottom of the text */}
-        {showHint && (
-          <div className="pointer-events-none absolute left-0 right-0 bottom-0 flex flex-col items-center pb-1">
-            <div className="h-6 w-full bg-gradient-to-t from-white to-white/0" />
-            <ChevronDown className="w-4 h-4 text-gray-500 animate-bounce -mt-1" />
-          </div>
-        )}
       </div>
     </div>
   );
