@@ -86,7 +86,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
-    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+    // Mobile breakpoint 1024: iPads in portrait (820), large phones in
+    // landscape, and narrow desktops all need the single-page layout. The
+    // old 768 threshold let iPads and rotated phones through to the
+    // two-page spread even though they can't comfortably show one.
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
 
     // Expose navigation methods
     useImperativeHandle(ref, () => ({
@@ -102,13 +106,17 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       if (!containerRef.current) return;
       const cw = containerRef.current.clientWidth;
       const ch = containerRef.current.clientHeight;
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (mobile) {
         // Fill the mobile container entirely — image+text-below layout uses
-        // every available pixel. Locking to A4 aspect here left a visible
-        // dead strip between the page bottom and the prev/next buttons.
-        const pw = Math.min(cw, 460);
+        // every available pixel. Using the full container width (no 460 cap)
+        // also forces HTMLFlipBook into portrait/single-page mode — the
+        // flipbook only goes landscape when 2×pageWidth fits in innerWidth.
+        // With pageWidth = containerWidth, 2×pageWidth > innerWidth is always
+        // true, so we never see a two-up spread on mobile regardless of
+        // orientation or device.
+        const pw = cw;
         const ph = Math.max(0, ch - 4);
         setDimensions({ width: Math.round(pw), height: Math.round(ph) });
         return;
@@ -239,11 +247,13 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             // forceTextBelow stories are self-contained per page (image +
             // text on the same page). Pairing two of them into a spread
             // shows two different scenes at once, which isn't the intended
-            // reading experience. Insert a blank companion after every
-            // story page so each occupies its own spread regardless of
-            // viewport — relying on HTMLFlipBook's portrait-mode detection
-            // wasn't reliable (mobile viewports still rendered spreads).
-            if (forceTextBelow) {
+            // reading experience. On desktop we insert a blank companion
+            // so each story page occupies its own spread. On mobile the
+            // flipbook is already locked to portrait/single-page mode
+            // (pageWidth = containerWidth forces it), so a blank companion
+            // would just show up as an empty page between scenes as the
+            // user flips — worse UX. Desktop only.
+            if (forceTextBelow && !isMobile) {
               bookPages.push(<BlankPage key={`story-${storyPage.pageNumber}-blank`} />);
               physicalToLogical.push(i);
             }
