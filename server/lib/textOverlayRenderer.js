@@ -12,6 +12,16 @@ const { getTextZonePolygon } = require('./textMasks');
 
 const VALID_POSITIONS = ['top-left', 'top-right', 'top-full', 'bottom-left', 'bottom-right', 'bottom-full'];
 
+// Inside-polygon inset applied before building the scanline map. The
+// applyMarginClamp (5% outer / 10% gutter) already puts the polygon at the
+// correct visual outer margin — this inset is ONLY to keep the text stroke
+// (~2.5px per side at 15pt) from kissing the polygon's hypotenuse. 8px is
+// enough for that buffer. 20px (the old value) compounded with the margin
+// clamp and pulled the right leg from 95% back to ~94%, making the visible
+// right edge of right-corner text sit at ~90% after greedy wrap — hence the
+// asymmetry with left-corner text where the inset effect was less noticed.
+const TEXT_POLY_INSET = 8;
+
 // ─── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -67,7 +77,7 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   const isTop = textPosition.startsWith('top');
 
   const fitsAtStage = (stage, fontSize) => {
-    const insetPoly = insetPolygon(stage, 20);
+    const insetPoly = insetPolygon(stage, TEXT_POLY_INSET);
     const scanlines = buildScanlineMap(insetPoly, height);
     const ys = insetPoly.map(p => p[1]);
     const polyTop = Math.max(0, Math.min(...ys));
@@ -137,8 +147,7 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   const isFull = textPosition.includes('full');
   const isRight = textPosition.includes('right');
 
-  const textPadding = 20;
-  const insetPoly = insetPolygon(clipPath, textPadding);
+  const insetPoly = insetPolygon(clipPath, TEXT_POLY_INSET);
   const scanlines = buildScanlineMap(insetPoly, height);
 
   let align = 'left';
@@ -601,14 +610,13 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
   const allFit = placedWords >= totalWords;
   if (!allFit && !force) return false;
 
-  // Always left-align, but anchor each line to its OWN scan.left (the
-  // polygon's left edge at that y) — not a shared polyMinLeft. For left-
-  // corner triangles scan.left is ~0 (vertical leg), so every line starts
-  // at the same x. For right-corner triangles the left edge IS the
-  // hypotenuse, so scan.left grows with y — each successive line indents
-  // further right, and the text column takes the triangle's shape. Wrap
-  // width already uses each line's scan.left/right, so the right edge is
-  // also triangle-respecting.
+  // Always left-align — draw each line at its own scan.left (the
+  // polygon's left edge at that y). Left-corner triangles have a
+  // vertical left leg (scan.left stays ~constant → clean left margin).
+  // Right-corner triangles have a diagonal hypotenuse as the left edge
+  // (scan.left increases with y → text indents inward following the
+  // triangle shape). Right-edge wrap is ragged because greedy word wrap
+  // can't always end exactly at scan.right.
   ctx.textAlign = 'left';
   for (const line of lines) {
     const drawX = line.left;
