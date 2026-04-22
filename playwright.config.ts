@@ -94,6 +94,17 @@ export default defineConfig({
       testMatch: /trial-to-full\.spec\.ts/,
     },
 
+    // Responsive screenshot harness — drives the site at a matrix of viewport
+    // sizes and writes screenshots to test-output/responsive/. No auth, no
+    // assertions. Viewport is set per-test inside the spec.
+    {
+      name: 'responsive',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /responsive-screenshots\.spec\.ts/,
+    },
+
     {
       name: 'firefox',
       use: {

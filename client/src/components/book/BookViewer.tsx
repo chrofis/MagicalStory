@@ -122,8 +122,10 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
         return;
       }
       // Desktop: keep A4 aspect so the book spread matches the printed book.
-      const maxPageWidth = Math.min(cw / 2, 460);
-      const maxPageHeight = Math.min(ch - 10, 650);
+      // Let pages grow with the viewport — capping at 460×650 left the book
+      // as a tiny card in a sea of white on large monitors.
+      const maxPageWidth = Math.min(cw / 2, 600);
+      const maxPageHeight = Math.min(ch - 10, 900);
       const A4_W = 210, A4_H = 297;
       let pw = maxPageWidth;
       let ph = pw * (A4_H / A4_W);
@@ -313,9 +315,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             height={dimensions.height}
             size="stretch"
             minWidth={250}
-            maxWidth={460}
+            maxWidth={isMobile ? 1400 : 600}
             minHeight={333}
-            maxHeight={isMobile ? 1400 : 650}
+            maxHeight={isMobile ? 1800 : 900}
             showCover={true}
             flippingTime={800}
             usePortrait={true}
