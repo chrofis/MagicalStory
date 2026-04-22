@@ -238,8 +238,11 @@ async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
   await page.waitForTimeout(30000);
 }
 
-async function fillCharacterName(page: Page, name: string) {
-  console.log(`    entering name: ${name}`);
+async function fillCharacterBasics(page: Page, char: DemoCharacter) {
+  // Required fields on the name sub-step (Geschlecht + Alter); Next is disabled
+  // until both are filled. Photo analyzer SOMETIMES auto-fills these from the
+  // photo, but we can't rely on it (network issues, ambiguous photos).
+  console.log(`    entering name: ${char.name}`);
   const nameSelectors = [
     'input[placeholder*="Name" i]',
     'input[placeholder*="name" i]',
@@ -247,16 +250,48 @@ async function fillCharacterName(page: Page, name: string) {
     'input[type="text"]:not([inputmode])',
     'input:not([type]):not([inputmode])',
   ];
+  let nameSet = false;
   for (const selector of nameSelectors) {
     const field = page.locator(selector).first();
     if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
       await field.click();
       await field.fill('');
-      await field.fill(name);
-      return;
+      await field.fill(char.name);
+      nameSet = true;
+      break;
     }
   }
-  throw new Error(`Could not locate name input for ${name}`);
+  if (!nameSet) throw new Error(`Could not locate name input for ${char.name}`);
+
+  // Gender select — option values are "male" / "female" / "other" per
+  // CharacterForm.tsx:783-784. Set even if photo analyzer already filled it
+  // (selectOption is idempotent).
+  console.log(`    setting gender: ${char.gender}`);
+  const genderSelect = page.locator('select').filter({ hasText: /wählen|select|choisir|männlich|weiblich|male|female/i }).first();
+  if (await genderSelect.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await genderSelect.selectOption(char.gender).catch(async () => {
+      // Fallback: try by visible label
+      const opt = char.gender === 'male' ? /männlich|male|garçon/i :
+                  char.gender === 'female' ? /weiblich|female|fille/i :
+                  /other|andere|autre/i;
+      await genderSelect.selectOption({ label: opt as any });
+    });
+  } else {
+    console.log(`    WARN: gender select not found`);
+  }
+
+  // Age — number input. May already be set by photo analysis; overwrite anyway.
+  console.log(`    setting age: ${char.age}`);
+  const ageInput = page.locator('input[type="number"], input[inputmode="numeric"]').first();
+  if (await ageInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await ageInput.click();
+    await ageInput.fill('');
+    await ageInput.fill(String(char.age));
+  } else {
+    console.log(`    WARN: age input not found`);
+  }
+
+  await page.waitForTimeout(500);
 }
 
 async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
@@ -474,7 +509,7 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
   await uploadPhotoInCreateFlow(page, photoPathFor(family, char.name));
 
   // Photo analyzer auto-advances to 'name' step — no click needed.
-  await fillCharacterName(page, char.name);
+  await fillCharacterBasics(page, char);
 
   // From here on, each click might auto-fulfil several sub-steps. Re-check
   // list state after every action. Stop the moment we're back on the list.
