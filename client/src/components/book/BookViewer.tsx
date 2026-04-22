@@ -228,7 +228,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 textPosition={storyPage.textPosition}
                 showTextOverlay={showTextOverlay && !forceTextBelow}
                 textOnSidePage={textOnSidePage && !isMobile && !forceTextBelow}
-                textBelowImage={forceTextBelow || isMobile}
+                textBelowImage={forceTextBelow || (isMobile && textOnSidePage)}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
               />
