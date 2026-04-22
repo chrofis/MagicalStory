@@ -428,23 +428,73 @@ async function walkToCharacterList(page: Page, charName: string) {
   await page.waitForTimeout(2000);
 }
 
+async function isOnCharacterListNow(page: Page): Promise<boolean> {
+  // Character list = wizard Step 1 "Charaktere & Rollen" WITH a dashed
+  // "Create Another" card. Those two signals together uniquely identify the
+  // list view (not the edit sub-steps, not Step 2+).
+  const listHeader = await page.locator('text=/Charaktere & Rollen|Characters & Roles|Personnages & Rôles/i').first()
+    .isVisible({ timeout: 500 }).catch(() => false);
+  if (!listHeader) return false;
+  const dashedCard = await page.locator('[class*="border-dashed"]').first()
+    .isVisible({ timeout: 500 }).catch(() => false);
+  return dashedCard;
+}
+
+async function advanceSubStep(page: Page, label: string): Promise<boolean> {
+  // After every sub-step click we check: are we already back on the character
+  // list? If yes, the wizard auto-saved and we must NOT click again (would
+  // advance past Step 1 into Buch/Story/etc.). Returns true if still in
+  // character-edit flow, false if we've landed on the list.
+  if (await isOnCharacterListNow(page)) {
+    console.log(`      already on list after ${label} — skipping remaining sub-step advances`);
+    return false;
+  }
+  // Prefer Save button over Next — terminal step shows "Charakter speichern"/
+  // "Save Character", not generic Next. Clicking a still-visible Next when
+  // Save was waiting would be a no-op or a wrong-step-advance.
+  const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
+  if (await saveBtn.isVisible({ timeout: 1500 }).catch(() => false)
+      && await saveBtn.isEnabled().catch(() => false)) {
+    console.log(`      → save after ${label}`);
+    await saveBtn.click();
+    await page.waitForTimeout(3000);
+    return true;
+  }
+  if (await clickAnyNext(page, 3000)) {
+    console.log(`      → next after ${label}`);
+    return true;
+  }
+  console.log(`      no button after ${label} — stopping`);
+  return false;
+}
+
 async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, family: DemoFamily, alreadyCreated: DemoCharacter[]) {
   console.log(`\n  === Creating ${char.name} (id ${char.id}) ===`);
   await clickCreateCharacterButton(page, alreadyCreated.length === 0);
   await uploadPhotoInCreateFlow(page, photoPathFor(family, char.name));
+
+  // Photo analyzer auto-advances to 'name' step — no click needed.
   await fillCharacterName(page, char.name);
-  // Navigate name → traits. The wizard exposes an "onContinueToTraits" button
-  // which either matches NEXT_BTN_RE or a bespoke "Continue to traits" label.
-  await clickAnyNext(page, 5000);
+
+  // From here on, each click might auto-fulfil several sub-steps. Re-check
+  // list state after every action. Stop the moment we're back on the list.
+  if (!await advanceSubStep(page, 'name')) return;
   await selectTraits(page, char);
-  await clickAnyNext(page, 5000);
-  // Characteristics/hobbies step — skip (not required, photo analysis may fill).
-  await clickAnyNext(page, 5000);
-  // Relationships step.
+  if (!await advanceSubStep(page, 'traits')) return;
+  // Characteristics (hobbies) — no selection, just advance.
+  if (!await advanceSubStep(page, 'characteristics')) return;
   await setRelationshipsForCharacter(page, char, family, alreadyCreated);
-  await clickAnyNext(page, 5000);
-  // Final save path.
-  await walkToCharacterList(page, char.name);
+  if (!await advanceSubStep(page, 'relationships')) return;
+  // Final save / avatar auto-step. Cap at 3 clicks to be safe.
+  for (let i = 0; i < 3; i++) {
+    if (!await advanceSubStep(page, `final-${i + 1}`)) break;
+  }
+  await page.waitForTimeout(1500);
+  if (!await isOnCharacterListNow(page)) {
+    console.log(`      WARN: did not land on list after ${char.name} — navigating to /create`);
+    await page.goto('/create');
+    await page.waitForTimeout(3000);
+  }
 }
 
 async function setMainRoles(page: Page, family: DemoFamily) {
