@@ -94,10 +94,17 @@ function getTextZonePolygon(textPosition, langLevel, width, height) {
 
   // Right-triangle with the right angle at the corner of the frame and the
   // hypotenuse pointing into the scene. Area = 0.5 × legW × legH; legs
-  // scaled by sqrt(2 * areaPct) so the white-text area matches the
-  // rectangular size (same legX / legY spread as build-text-masks.js).
+  // scaled by sqrt(2 * areaPct) so the total area matches the rectangular
+  // size at the same SIZE_FRACTION.
+  //
+  // The horizontal leg gets an extra 0.75× factor so the triangle occupies
+  // less of the image's width. Without it the bottom corner vertex sat at
+  // ~29% of image width — too far into the scene. 0.75× moves it out to
+  // ~47%, matching the "text hugs the outer corner" design intent and
+  // leaving a clear swath of image uncluttered by text.
   const scale = Math.sqrt(2 * areaPct);
-  const legW = Math.round(width * scale);
+  const CORNER_WIDTH_FACTOR = 0.75;
+  const legW = Math.round(width * scale * CORNER_WIDTH_FACTOR);
   const legH = Math.round(height * scale);
   const cx = isLeft ? 0 : width;
   const cy = isTop ? 0 : height;

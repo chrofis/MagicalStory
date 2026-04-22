@@ -680,12 +680,40 @@ function wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, line
   const topLines = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily);
   if (topLines.length === 0) return topLines;
 
-  // Find the last y inside the polygon with usable width; shift every line
-  // down so the last drawn line sits at that y, preserving paragraph gaps.
+  // insetPolygon moves every vertex toward the centroid, which produces
+  // a slanted bottom edge over a few pixels when the two bottom vertices
+  // are displaced by different amounts. If we pick lastUsableY right at
+  // polyBottom, findScanlineWidth's ±lineHeight*0.3 window ends up
+  // straddling that tapered band — bestLeft = MAX(scan.left) then picks
+  // the taper's inner x, not the polygon's true left leg. The last line
+  // renders far right instead of left-aligned.
+  //
+  // Find the stable left (minimum scan.left across ALL scanlines in the
+  // polygon — the hypotenuse tip for right-anchored triangles, the
+  // vertical leg for left-anchored) and only pick y's whose scan.left is
+  // close to it. That skips the tapered corner and anchors the last line
+  // where the polygon's geometry is regular.
+  let stableLeft = Infinity;
+  for (const s of scanlines.values()) {
+    if (s.left < stableLeft) stableLeft = s.left;
+  }
+  const STABLE_TOLERANCE = 6;
+
   let lastUsableY = -1;
   for (let y = polyBottom; y >= polyTop; y -= 1) {
+    const exact = scanlines.get(y);
+    if (!exact) continue;
+    if (exact.left > stableLeft + STABLE_TOLERANCE) continue; // still in taper
     const s = findScanlineWidth(scanlines, y, lineHeight);
     if (s && (s.right - s.left) >= minLineWidth) { lastUsableY = y; break; }
+  }
+  // Fallback: if we never found a stable-left y (shouldn't happen with the
+  // 4%/10% margin clamp, but be defensive), accept any usable y.
+  if (lastUsableY < 0) {
+    for (let y = polyBottom; y >= polyTop; y -= 1) {
+      const s = findScanlineWidth(scanlines, y, lineHeight);
+      if (s && (s.right - s.left) >= minLineWidth) { lastUsableY = y; break; }
+    }
   }
   if (lastUsableY < 0) return topLines;
 
@@ -695,7 +723,12 @@ function wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, line
 
   return topLines.map(l => {
     const newY = l.y + delta;
-    const scan = findScanlineWidth(scanlines, newY, lineHeight);
+    // Prefer the EXACT scan at newY over findScanlineWidth's windowed max —
+    // the window-MAX pulls the left into the tapered bottom corner when
+    // insetPolygon left a slanted bottom edge. Fall back to the windowed
+    // lookup only when the exact-y scan isn't available.
+    const exact = scanlines.get(Math.round(newY));
+    const scan = exact || findScanlineWidth(scanlines, newY, lineHeight);
     return scan
       ? { ...l, y: newY, left: scan.left, right: scan.right }
       : { ...l, y: newY };
