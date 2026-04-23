@@ -721,22 +721,44 @@ function wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, line
   }
   if (lastUsableY < 0) return topLines;
 
-  const lastDrawnY = topLines[topLines.length - 1].y;
-  const delta = lastUsableY - lastDrawnY;
-  if (delta <= 0) return topLines;
-
-  // Re-wrap from the shifted starting y. The scanline widths inside a
-  // right-triangle polygon change dramatically with y (hypotenuse pulls
-  // scan.left inward near the top, scan.right stays ~constant). The first
-  // top-down pass packs each line against the NARROW widths near polyTop,
-  // then we shift the whole block down — so every line ends up drawn where
-  // the polygon is WIDER than what it was wrapped for, leaving a 60-260 px
-  // gap on the right edge. Re-wrapping from the shifted start-y makes each
-  // line fill the width at its FINAL drawn y.
-  const newStartY = Math.round(topLines[0].y + delta);
-  const rewrapped = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily, newStartY);
-  if (rewrapped.length === 0) return topLines;
-  return rewrapped;
+  // Pin the last line at lastUsableY. Two coupled unknowns:
+  //   N  = final line count after wrap at the bottom widths
+  //   sY = startY such that lastLine.y ≈ lastUsableY
+  // Iterate: given an N guess, place startY = lastUsableY - (N-1)*lineHeight,
+  // re-wrap, observe the resulting line count. If it fits all words in ≤ N
+  // lines, converge on the smallest N that fits. If it overflows, grow N.
+  //
+  // This replaces the old "pack from polyTop then rigid-shift down" which
+  // left every line 60-260 px shy of scan.right for right-corner triangles,
+  // because lines were packed against the narrow widths near the triangle
+  // apex but drawn where the polygon is wide.
+  const totalWords = paragraphs.reduce((s, w) => s + w.length, 0);
+  let N = topLines.length;
+  let lines = topLines;
+  for (let iter = 0; iter < 8; iter++) {
+    const startY = Math.max(
+      Math.round(polyTop + fontSize),
+      Math.round(lastUsableY - (N - 1) * lineHeight)
+    );
+    const rewrapped = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily, startY);
+    if (rewrapped.length === 0) break;
+    const placed = rewrapped.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
+    lines = rewrapped;
+    if (placed < totalWords) {
+      // Overflow: need more room — grow N (start higher, more lines available).
+      N = N + 1;
+      continue;
+    }
+    if (rewrapped.length < N) {
+      // Wider widths let text pack into fewer lines. Pin to that count so
+      // the last line lands exactly at lastUsableY next iteration.
+      N = rewrapped.length;
+      continue;
+    }
+    // Converged: all words placed in exactly N lines, last line at lastUsableY.
+    break;
+  }
+  return lines;
 }
 
 /**
