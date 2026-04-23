@@ -1154,6 +1154,15 @@ const isBlockedResponse = (responseData) => {
 };
 
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null) {
+  // Hoisted outside try so the catch/finally below can reference them.
+  // `let` is block-scoped to the try body — without these declarations here,
+  // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
+  // call, taking down all 10 page evaluations + cover gen with it.
+  let semanticPromise = null;
+  let threeStagePromise = null;
+  let qualityFiguresPromise = null;
+  let qualityFiguresResolve = null;
+  let p1Promise = null;
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -1180,7 +1189,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Start semantic evaluation in parallel if story text provided (for scene evaluations)
-    let semanticPromise = null;
     if (storyText && evaluationType === 'scene') {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
       semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt, sceneHint);
@@ -1191,9 +1199,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
     // can pair each named character with the blind vision inventory by zone. We expose
     // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
-    let threeStagePromise = null;
-    let qualityFiguresResolve = null;
-    let qualityFiguresPromise = null;
     if (evaluationType === 'scene') {
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
       threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
@@ -1335,7 +1340,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
-    let p1Promise = null;
     if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory) {
       log.debug(`📊 [EVAL P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
       p1Promise = runVisualInventory(parts, modelId, apiKey, pageContext);
@@ -10708,12 +10712,9 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
       // Physical traits
       const physical = char.physical || {};
       const physicalParts = [];
-      if (physical.hairColor) {
-        let hair = physical.hairColor + ' hair';
-        if (physical.hairLength) hair = `${physical.hairLength} ${hair}`;
-        if (physical.hairStyle) hair += ` (${physical.hairStyle})`;
-        physicalParts.push(hair);
-      }
+      const { buildHairDescription } = getStoryHelpers();
+      const hairDesc = buildHairDescription(physical, char.physicalTraitsSource);
+      if (hairDesc) physicalParts.push(`${hairDesc} hair`);
       if (physical.eyeColor) physicalParts.push(`${physical.eyeColor} eyes`);
       if (physical.skinTone) physicalParts.push(`${physical.skinTone} skin`);
       if (physical.build) physicalParts.push(physical.build);
