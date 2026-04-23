@@ -232,19 +232,32 @@ async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
     loc: () => page.locator('button[class*="border-dashed"][class*="indigo"]').first(),
   });
 
-  for (const c of candidates) {
-    const el = c.loc();
-    if (!await el.isVisible({ timeout: 2000 }).catch(() => false)) continue;
-    await el.scrollIntoViewIfNeeded().catch(() => {});
-    await el.click().catch(() => {});
-    // After clicking, wait up to 10s for the photo step to appear.
-    if (await waitForPhotoStep(page, 10000)) {
-      console.log(`    landed on photo step via ${c.label}`);
-      return;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (const c of candidates) {
+      const el = c.loc();
+      if (!await el.isVisible({ timeout: 2000 }).catch(() => false)) continue;
+      await el.scrollIntoViewIfNeeded().catch(() => {});
+      await el.click().catch(() => {});
+      if (await waitForPhotoStep(page, 10000)) {
+        console.log(`    landed on photo step via ${c.label}`);
+        return;
+      }
+      console.log(`    clicked ${c.label} but photo step did not appear — trying next candidate`);
     }
-    console.log(`    clicked ${c.label} but photo step did not appear — trying next candidate`);
+    if (attempt === 0) {
+      // Last-ditch: the wizard may be stuck on a prior character's avatar step
+      // with no visible button. Force a reload to reset to the list view.
+      console.log(`    no candidate worked — reloading /create and retrying`);
+      await page.goto('/create');
+      await page.waitForTimeout(3000);
+      // If the photo step is auto-opened (e.g. no chars yet), we're done.
+      if (await waitForPhotoStep(page, 2000)) {
+        console.log(`    landed on photo step after /create reload`);
+        return;
+      }
+    }
   }
-  throw new Error('Could not navigate to photo-upload step (tried all candidates)');
+  throw new Error('Could not navigate to photo-upload step (tried all candidates + reload)');
 }
 
 async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
@@ -547,7 +560,21 @@ async function advanceSubStep(page: Page, label: string): Promise<boolean> {
     console.log(`      → next after ${label}`);
     return true;
   }
-  console.log(`      no button after ${label} — stopping`);
+  // No Save/Next visible. We might be stuck on the "Kein Bild" avatar state
+  // (avatar never started generating, no action buttons rendered). Try
+  // clicking the wizard step-1 button to bounce back to the list.
+  const step1Btn = page.locator('nav button').filter({ hasText: /^1$/ }).first();
+  if (await step1Btn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    console.log(`      → clicking step-1 nav button after ${label}`);
+    await step1Btn.click();
+    await page.waitForTimeout(2000);
+    if (await isOnCharacterListNow(page)) return false;
+  }
+  // Last resort: force a reload to /create. If we're still in edit view after
+  // reload, return false — caller handles the recovery.
+  console.log(`      no button after ${label} — reloading /create`);
+  await page.goto('/create');
+  await page.waitForTimeout(3000);
   return false;
 }
 
