@@ -368,14 +368,17 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
       await page.waitForTimeout(250);
     }
   }
-  // If we didn't find enough, click any other unselected trait chips to hit
-  // the minimum-required count. Trait chips render with `rounded-full` —
-  // constrain the fallback to those so we never click the "Magical Story"
-  // nav logo (which navigates to the homepage and killed earlier runs).
+  // If we didn't find enough, click unselected trait chips. Hard 10s budget
+  // per call: previous run hung 90 min in this loop because rounded-full
+  // matches more than chips and clicks-toggle, so `clicked < max` never
+  // closed. Trait minimums are 3 strengths + 2 flaws — partial selections
+  // fail validation but the next character will retry.
   if (clicked < max) {
+    const deadline = Date.now() + 10000;
     const chips = page.locator('button.rounded-full');
-    const count = await chips.count();
+    const count = await chips.count().catch(() => 0);
     for (let i = 0; i < count && clicked < max; i++) {
+      if (Date.now() > deadline) break;
       const btn = chips.nth(i);
       if (!await btn.isVisible({ timeout: 200 }).catch(() => false)) continue;
       const classNames = (await btn.getAttribute('class')) || '';
@@ -383,7 +386,7 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
       if (classNames.includes('bg-indigo')) continue;
       await btn.click().catch(() => {});
       clicked++;
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(150);
     }
   }
   return clicked;
