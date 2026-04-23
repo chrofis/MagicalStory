@@ -101,7 +101,7 @@ DECLARED INTERACTIONS (from scene metadata — authoritative):
   2. Is the object at the declared location relative to the character? (pocket vs hand vs floating vs on-back)
   3. Does the size match the description? ("tiny silhouette" must not render as a large held toy.)
 - Any interaction where the object is in the wrong place or missing = CRITICAL, set `physics_ok: false`, and add a `fixable_issues` entry with `type: physics` describing the mismatch.
-- Interaction checks use ONLY the DECLARED INTERACTIONS block above. Pose details mentioned in the scene prose but NOT listed in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked", "jaw set") are descriptive context only — do NOT deduct for them.
+- Interaction checks cover ONLY the object placement portion of DECLARED INTERACTIONS — where the object sits relative to the character (pocket vs hand vs floating, on-back, around-neck, etc.). Gaze direction, eye direction, head/neck angle, and other pose details ("neck tilted back", "looking up at", "face inches from the pane", "hands drawn in tight", "chin tucked") are descriptive context only — do NOT deduct for them.
 - Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are equivalent and do NOT count as wrong placement.
 - Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street) are scene-appropriate and do NOT deduct.
 - If DECLARED INTERACTIONS is empty, skip this sub-check entirely.
@@ -142,6 +142,7 @@ Check these issues:
 DO NOT penalize:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
 - Precise hand positions or gestures
+- Gaze direction, eye direction, or head/neck angle (image generators cannot reliably steer where eyes look or how a head tilts)
 - Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
 
 ---
@@ -166,6 +167,7 @@ Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
 DO NOT deduct for:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
 - Precise hand positions or gestures
+- Gaze direction, eye direction, or head/neck angle (image generators cannot reliably steer where eyes look or how a head tilts)
 - Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
