@@ -122,6 +122,7 @@ Then a single-line JSON object:
 - Omit entries for characters who aren't touching anything.
 - Every entry must also be described in the prose as the same physical contact. When the prose disagrees with the interaction list, the image follows the prose — so the two must agree.
 - Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side. Never hold objects against the chest or front when the camera sees the back.
+- Distance rule: when the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly at the named separation, and the prose must place each figure at the correct end of the frame.
 
 **`textPosition`**
 - Read verbatim from the scene hint above — do not change it, do not pick a different corner.
