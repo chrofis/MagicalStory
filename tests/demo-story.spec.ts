@@ -426,16 +426,24 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
   }
   console.log(`    setting relationships vs ${alreadyCreated.length} prior character(s)...`);
 
-  // The relationships step shows one card per previously-created character.
-  // Each card has a <select>. We pick the right option per pair.
+  // Hard budget: relationships are nice-to-have for the demo but the accurate
+  // story generator reads them from the DB. If the DOM dance gets stuck
+  // (selectOption on a card that was re-rendered mid-loop), bail after 15s
+  // total rather than burning the 90-min test timeout.
+  const budgetMs = 15000;
+  const deadline = Date.now() + budgetMs;
+
   const cards = page.locator('div.rounded-lg').filter({ has: page.locator('select') });
-  const cardCount = await cards.count();
+  const cardCount = await cards.count().catch(() => 0);
   for (let i = 0; i < cardCount; i++) {
+    if (Date.now() > deadline) {
+      console.log(`    relationship-setting budget exceeded — leaving defaults for remaining cards`);
+      break;
+    }
     const card = cards.nth(i);
     if (!await card.isVisible({ timeout: 500 }).catch(() => false)) continue;
     const cardText = (await card.textContent().catch(() => '')) || '';
 
-    // Match the card to one of our alreadyCreated characters by name substring.
     const other = alreadyCreated.find(c => cardText.includes(c.name));
     if (!other) continue;
 
@@ -446,7 +454,6 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
     if (!enLabel) continue;
 
     const select = card.locator('select').first();
-    // Try English label first, then German equivalent from relationships.ts.
     const variants: Record<string, string[]> = {
       'Parent of': ['Parent of', 'Elternteil von', 'Parent de'],
       'Child of': ['Child of', 'Kind von', 'Enfant de'],
@@ -457,8 +464,11 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
     const labels = variants[enLabel] || [enLabel];
     let set = false;
     for (const label of labels) {
+      if (Date.now() > deadline) break;
       try {
-        await select.selectOption({ label });
+        // Explicit short timeout — default 30s × 3 variants could by itself
+        // eat the entire per-char budget.
+        await select.selectOption({ label }, { timeout: 3000 });
         console.log(`      ${char.name} → ${other.name}: "${label}"`);
         set = true;
         break;
@@ -467,7 +477,6 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
     if (!set) {
       console.log(`      ${char.name} → ${other.name}: could not set "${enLabel}" — leaving default`);
     }
-    await page.waitForTimeout(300);
   }
 }
 
