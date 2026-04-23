@@ -361,53 +361,85 @@ For EACH of the {PAGES} pages:
 
 
 ---ANALYSIS---
-Analyze the draft above. Be honest and specific. Pretend you are editing
-someone else's work. Cover BOTH story quality AND scene hints.
+Analyze the draft above. Be harsh and critical — pretend you are editing someone else's work. A green checklist is not an analysis; if your section verdict is "all fine", you didn't probe hard enough. Every probe below must name a specific page, line, or beat — never a blanket "✓".
 
-**Story & narrative:**
-1. Plot holes — Logical gaps? Events that happen "just because"? Anything left unexplained?
-2. Cause and effect — Does each event follow naturally from the previous?
-3. Pacing — Setup too long? Climax rushed? Ending earned or abrupt?
-4. Stakes — Clear what characters stand to gain/lose? Does the reader care?
-5. Resolution — Does the ending feel satisfying and complete?
+**PRIORITY ORDER**: Fix story-breaking issues first, formatting issues last:
+1. **HIGH** — Sections A (narrative/plot) and B (character): plot holes, out-of-character behaviour, missing arcs, flat dialogue. Spend most analysis here.
+2. **MEDIUM** — Sections C (prose) and E (clichés): repetition, passive voice, banned gestures.
+3. **LOW** — Section D (scene hints mechanics): formatting and metadata. Fix them, but don't over-analyse if the story itself has bigger problems.
 
-**Characters & dialogue (analyze EACH character by name):**
-For EACH character in the story, write one line:
-- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [...]
+---
 
-6. Consistency — Acts according to their established traits? Out-of-character moments?
-7. Voice — Distinct way of speaking? Or do all characters sound the same?
-8. Show vs tell — Emotions SHOWN through actions/dialogue? Or just TOLD ("she was sad")?
-9. Motivation — Clear WHY each character does what they do?
-10. Growth — Main characters: do they learn or change? Believable arc?
+**A. NARRATIVE & PLOT**
 
-**Scene hints:**
-11. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
-12. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
-13. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
-14. **Banned patterns** — Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders"? Any character "smiling" on more than 2-3 pages?
-15. **Action match** — Does each scene hint's action match what the page text narrates?
-16. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
-17. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
+1. **Plot holes** — Name the weakest causal link in the draft. What event happens because the plot needs it to, not because the prior events forced it? If genuinely none, name the closest candidate and explain why it survives scrutiny.
+2. **Cause and effect** — For each page, does the event follow from the previous page? Name the transition that feels most arbitrary.
+3. **Pacing** — Name the slowest page and the most rushed page. Justify with word counts or beat density. Suggest what to cut from the slow one and what to expand in the rushed one.
+4. **Stakes** — Name the beat where the stakes feel weakest. What would raise it? If stakes are stated but not felt, mark it a SHOW-VS-TELL failure and fix in Section B.
+5. **Resolution** — Is the ending earned by the arc that preceded it, or does it feel pasted on? Name one element of the ending that could be strengthened.
+
+---
+
+**B. CHARACTER & DIALOGUE (per-character, by name)**
+
+For EACH character in {CHARACTER_NAMES} output exactly one line in this format — no character may be skipped:
+
+- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Weakest moment: Page X, "[quote a specific line or beat]" — [one-sentence why]. Fix: [concrete change].
+
+Probes (apply to every character):
+6. **Consistency** — Any out-of-character moment? Any trait established on page 1 that is contradicted later? Any location/ability violation (fear of heights on a cliff, shy character leading a crowd without prior setup)?
+7. **Voice** — Does [Name] sound different from the other characters in dialogue? If two characters could swap lines without the reader noticing, that's a voice fail — name the two and the page.
+8. **Show vs tell** — Find one emotion in the draft stated as a label ("she was scared", "he felt proud") for this character. Rewrite it as a shown action. If none exist, note "none found" and move on.
+9. **Motivation** — Is it clear WHY [Name] does what they do on their busiest page? Any unmotivated action? If motivation is assumed from the character brief but not shown in the draft, mark it a fail.
+10. **Growth** (main characters only) — Does [Name] end the story in a different emotional or knowledge state than they started? Name the page where the shift becomes visible. If the shift is told not shown, mark a growth-told fail.
+
+---
+
+**C. PROSE QUALITY**
+
+11. **Reading level** — Is the vocabulary appropriate for the target level? Name one word or sentence that feels off-register (too simple, too complex, jargon) and propose a replacement.
+12. **Repetition** — List any word (excluding names, articles, pronouns) used 4+ times across the draft. List any sentence structure (e.g. "Subject verbed, and subject verbed") used on 3+ pages in a row. Name replacements.
+13. **Flow** — Name the most awkward sentence in the draft and rewrite it.
+14. **Passive voice** — List any passive construction in narration ("was given", "was seen", "was felt"). Rewrite to active. Dialogue exempt.
+
+---
+
+**D. SCENE HINTS (mechanical checks)**
+
+15. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
+16. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
+17. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
+18. **Action match** — Does each scene hint's action match what the page text narrates?
+19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
+20. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
     - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
     - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
     - **Top/bottom balance:** at least 30% of pages must be `top-*` and at least 30% `bottom-*`.
     - **Streak:** never more than 3 consecutive pages in the same half.
     - Emit a fix line for each violation, e.g. `Page 3: textPosition bottom-right on odd page → bottom-left` or `Only 0% full-width — flip Page 9 (ultra-wide storm) to bottom-full`.
-18. **Text zone description** — For each page, `textZoneDescription` must be 5–15 words and name a physical surface (sky / wall / foliage / ground / water / fabric). Reject any that contain `rectangle`, `negative space`, `text box`, `blank`, `reserved`, `for text`, or describe what the area is *for* instead of what it *is*. Emit a fix line rewriting each offender.
-19. **Forbidden-side intrusion** — Derive the forbidden side from `textPosition` (corner → that half; `*-full` → that row). Scan `background`, every `objects[].where` and object prose, and every `characters[].position` / `depth`. Flag any mention of the forbidden side (e.g. `right flank`, `center-right midground`, `bottom-right`, `far right`) and emit a fix line moving that content to the allowed side.
-20. **Empty scene alignment** — `emptyScenePrompt` must name the same reserved surface as `textZoneDescription`. If they disagree, emit a fix line updating `emptyScenePrompt`.
+21. **Text zone description** — For each page, `textZoneDescription` must be 5–15 words and name a physical surface (sky / wall / foliage / ground / water / fabric). Reject any that contain `rectangle`, `negative space`, `text box`, `blank`, `reserved`, `for text`, or describe what the area is *for* instead of what it *is*. Emit a fix line rewriting each offender.
+22. **Forbidden-side intrusion** — Derive the forbidden side from `textPosition` (corner → that half; `*-full` → that row). Scan `background`, every `objects[].where` and object prose, and every `characters[].position` / `depth`. Flag any mention of the forbidden side (e.g. `right flank`, `center-right midground`, `bottom-right`, `far right`) and emit a fix line moving that content to the allowed side.
+23. **Empty scene alignment** — `emptyScenePrompt` must name the same reserved surface as `textZoneDescription`. If they disagree, emit a fix line updating `emptyScenePrompt`.
+24. **Character coverage** — List the pages each primary character appears in. Any character with fewer than 2 appearances gets added to a relevant scene.
 
-**Cliché check:**
-15. Repeated gestures — Same gesture (hug, smile, wink) used more than once? Vary them.
-16. Cliché phrases — Any "little did they know", "suddenly", "it was a dark and stormy night"? Remove.
+---
 
-**Output:**
-List your character analysis lines (point 6-10, one per character), then list ALL fixes needed:
-- Page X: [issue] → [fix]
-- Page Y: [issue] → [fix]
+**E. CLICHÉ CHECK**
 
-The ---STORY PAGES--- section below MUST apply ALL these fixes when rewriting the final clean version.
+25. **Banned gestures** — Search the draft for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". Any hit is FORBIDDEN. Replace with a physical action with character-specific flavour (fist-bump, high-five, playful elbow nudge, head-butt for a pet, leaning shoulder-to-shoulder while walking).
+26. **Repeated gestures** — Any gesture (hug, smile, wink, shrug, nod) used more than once in the draft? Vary them. Name the duplicates.
+27. **Cliché phrases** — Any "little did they know", "suddenly", "plötzlich", "it was a dark and stormy night", "and then", "without warning"? Remove or replace with a concrete action.
+
+---
+
+**FIXES REQUIRED**
+
+For EACH issue found above, emit a fix line:
+- Page X: [specific issue] → [specific fix]
+
+If sections A/B/C genuinely produce zero fix lines, that almost certainly means you didn't probe hard enough — go back and name the weakest beat/line/gesture in each section even if the story is otherwise strong. A 10-page first-draft story should realistically produce at least 5-8 fix lines across A/B/C/E combined.
+
+The ---STORY PAGES--- section below MUST apply every fix when rewriting the final clean version.
 
 
 ---TITLE---
@@ -481,11 +513,39 @@ METADATA:
 {"characters":[{"name":"MainCharacter","position":"right foreground","clothing":"standard"}],"objects":[],"interactions":[{"character":"MainCharacter","object":"window","where":"presses hands on"}],"background":"empty bedroom, falling snow visible through window","setting":"indoor","time":"morning","weather":"snowy","shot":"close-up","textPosition":"top-left","emptyScenePrompt":"Simple bedroom interior at dawn, a tall frosted window on the right looking out onto falling snow against a pale grey sky, pale wooden desk in the shadowed left background, soft warm morning light. Top-left corner in shadowed wall tone for text."}
 
 ---ANALYSIS---
-**Plot:** No plot holes, cause/effect clear, pacing fine, stakes clear, resolution satisfying.
-**Main character**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓. Issues: none.
-**Scene output:** All within character limit, match plan, clothing correct, no banned patterns.
-**Cliché:** No repeated gestures, no cliché phrases.
-Fixes: None needed
+**A. NARRATIVE:**
+1. Plot holes: weakest link is the jump from page 3 to 4 — the main character's decision to follow the cat has no trigger on page 3. Fix: plant a sound or a flash of movement at the end of page 3.
+2. Cause and effect: the page 6 → 7 transition leans on "and then" — rework as a direct consequence.
+3. Pacing: slowest page is page 2 (68 words, mostly description). Rushed page is page 8 (climax in 3 sentences). Move 15 words of page 2 description into page 8's reaction beat.
+4. Stakes: weakest on page 5 — the reader doesn't know what the character loses if they fail. Add one line of internal stakes.
+5. Resolution: the ending is earned, but the final image (page 10) tells not shows. Rewrite last line as a small physical action.
+
+**B. CHARACTERS:**
+- **MainCharacter**: consistency ✓, voice ✓, show-not-tell ✗, motivation ✓, growth ✓. Weakest moment: Page 7, "Sie fühlte sich mutig" — stated not shown. Fix: replace with a physical action that shows courage.
+
+**C. PROSE:**
+11. Reading level: "melancholic" on page 4 is a register break for a 7-year-old — replace with "traurig".
+12. Repetition: "schaute" used 5 times across pages 2-6. Replace two instances with "blickte" and "sah".
+13. Flow: most awkward sentence is on page 5: "Da, wo der Weg endete, wo der Fluss begann, dort fand sie den Hut." — rewrite shorter.
+14. Passive: page 3 "wurde gesehen" → "Sie sah".
+
+**D. SCENE HINTS:** all within limit ✓, plan compliance ✓, clothing ✓, action match ✓, depth ✓. Text-position parity ✓. No forbidden-side intrusion.
+
+**E. CLICHÉ:** banned gestures: none. Repeated gestures: "lächelte" on pages 2 and 9 — vary the second to a different expression. Cliché phrases: "plötzlich" on page 6 → replace.
+
+FIXES REQUIRED:
+- Page 3: no trigger for page 4's decision → add a rustling sound at the end.
+- Page 6 → 7: "and then" transition → make it a direct consequence.
+- Page 2: trim 15 words of description → move to page 8 reaction beat.
+- Page 5: add one line of internal stakes for the main character.
+- Page 10: rewrite final line as a small physical action instead of a statement.
+- Page 7: "Sie fühlte sich mutig" → show courage through a physical action.
+- Page 4: "melancholic" → "traurig".
+- Pages 2-6: "schaute" used 5× → vary two instances.
+- Page 5: rewrite the "Da, wo ... dort ..." sentence shorter.
+- Page 3: "wurde gesehen" → "Sie sah".
+- Page 9: "lächelte" repeat → different expression.
+- Page 6: "plötzlich" → replace.
 
 ---TITLE---
 TITLE: Sophie's Snowy Surprise
