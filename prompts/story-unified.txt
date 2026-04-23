@@ -441,7 +441,7 @@ Based on the story draft, determine which clothing variants each character needs
 - **Costumed is PREFERRED** — when in doubt, use `costumed:type` over `standard`. Characters in costume look better and are more immersive.
 - **COVER IMAGES MUST use costumed** — title page, initial page, and back cover should ALWAYS use the costumed variant (not standard) so the book cover matches the story's theme.
 - **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
-- **Costumed**: Full outfit description. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
+- **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
 - **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
 - **Distinct Styles — two tests every costumed description must pass:**
