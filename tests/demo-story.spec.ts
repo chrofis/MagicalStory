@@ -186,51 +186,77 @@ async function acceptPhotoConsentIfShown(page: Page) {
   }
 }
 
+async function waitForPhotoStep(page: Page, timeoutMs: number): Promise<boolean> {
+  // Photo step is unique: PhotoUpload renders an always-present <input type="file">
+  // AND an <h2> with the charactersStepTitle. We wait for the file input since
+  // that's what the next step (setInputFiles) actually needs.
+  return page.locator('input[type="file"]').first()
+    .waitFor({ state: 'attached', timeout: timeoutMs })
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
-  // Are we already in the photo-upload sub-step? On a brand-new empty account
-  // the wizard sometimes skips the empty-state card and auto-opens photo upload
-  // for the first character. If so, nothing to click — we're already there.
-  const alreadyOnPhotoStep = await page.locator('text=/Foto hochladen|Upload photo|Télécharger/i').first()
-    .isVisible({ timeout: 1500 }).catch(() => false);
-  if (alreadyOnPhotoStep) {
+  // Already in the photo-upload sub-step? On a brand-new empty account the
+  // wizard sometimes skips the empty-state card and auto-opens photo upload
+  // for the first character.
+  if (await waitForPhotoStep(page, 1500)) {
     console.log(`    already on photo upload step — skipping entry button`);
     return;
   }
 
   console.log(`    clicking "${isFirst ? 'Create First' : 'Create Another'}" character...`);
+
+  const candidates: Array<{ label: string; loc: () => any }> = [];
   if (isFirst) {
     // Empty-state button (WizardStep2Characters.tsx:250)
-    const btn = page.getByRole('button', { name: CREATE_FIRST_RE }).first();
-    if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await btn.click();
-      await page.waitForTimeout(2000);
+    candidates.push({
+      label: 'role-first',
+      loc: () => page.getByRole('button', { name: CREATE_FIRST_RE }).first(),
+    });
+  }
+  // Dashed "Create Another" card in CharacterList.tsx:210 — a <button> element
+  // with both border-dashed classes AND the create-another text. Target the
+  // button specifically (not any dashed element) to avoid hitting skeleton
+  // placeholders or out-of-story character cards which are also dashed.
+  candidates.push({
+    label: 'button-create-another-text',
+    loc: () => page.locator('button').filter({ hasText: CREATE_ANOTHER_RE }).first(),
+  });
+  candidates.push({
+    label: 'role-create-another',
+    loc: () => page.getByRole('button', { name: CREATE_ANOTHER_RE }).first(),
+  });
+  candidates.push({
+    label: 'button-dashed-indigo',
+    loc: () => page.locator('button[class*="border-dashed"][class*="indigo"]').first(),
+  });
+
+  for (const c of candidates) {
+    const el = c.loc();
+    if (!await el.isVisible({ timeout: 2000 }).catch(() => false)) continue;
+    await el.scrollIntoViewIfNeeded().catch(() => {});
+    await el.click().catch(() => {});
+    // After clicking, wait up to 10s for the photo step to appear.
+    if (await waitForPhotoStep(page, 10000)) {
+      console.log(`    landed on photo step via ${c.label}`);
       return;
     }
+    console.log(`    clicked ${c.label} but photo step did not appear — trying next candidate`);
   }
-  // Dashed "Create Another" card on the list view (seen in the last screenshot)
-  const dashedCard = page.locator('[class*="border-dashed"]').first();
-  if (await dashedCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await dashedCard.click();
-    await page.waitForTimeout(2000);
-    return;
-  }
-  // Fallback: any button with create-another text
-  const anyCreate = page.getByRole('button', { name: CREATE_ANOTHER_RE }).first();
-  if (await anyCreate.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await anyCreate.click();
-    await page.waitForTimeout(2000);
-    return;
-  }
-  throw new Error('Could not find "Create Character" entry point');
+  throw new Error('Could not navigate to photo-upload step (tried all candidates)');
 }
 
 async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
   console.log(`    uploading ${path.basename(photoPath)}...`);
   await acceptPhotoConsentIfShown(page);
-  // PhotoUpload renders an <input type="file"> inside a hidden label-wrapper.
-  // setInputFiles triggers handleFileChange directly — bypasses the click gate
-  // as long as canUpload is true (consent accepted or already recorded).
+  // PhotoUpload renders <input type="file" className="hidden"> at all times
+  // (attached even while disabled). setInputFiles targets it directly.
   const fileInput = page.locator('input[type="file"]').first();
+  // Short wait — clickCreateCharacterButton already waited for this element.
+  // If it's still missing here, fail fast instead of burning the 90-min test
+  // timeout on a silent locator wait.
+  await fileInput.waitFor({ state: 'attached', timeout: 15000 });
   await fileInput.setInputFiles(photoPath);
   console.log(`    waiting for photo analysis (up to 30s)...`);
   // Photo analyzer: face detection (MediaPipe) + body-no-bg (rembg). 5–15s
