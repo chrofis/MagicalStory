@@ -5333,22 +5333,27 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
     const sceneInstr = stripNames(sceneInstrRaw, null);
-    const perCharInstrs = (consolidatedPlan.per_character_fixes || [])
+    const perCharItems = (consolidatedPlan.per_character_fixes || [])
       .map(p => {
         const visualId = p.visual_identifier || 'this character';
         const fixRaw = p.fix_instruction || (p.issues || []).join('; ');
         const fix = stripNames(fixRaw, visualId);
-        return `- For ${visualId}: ${fix}`;
+        return { severity: p.severity, text: `For ${visualId}: ${fix}` };
       })
-      .filter(Boolean);
+      .filter(x => x.text);
 
-    const parts = [];
-    if (sceneInstr) parts.push(sceneInstr);
-    if (perCharInstrs.length > 0) {
-      parts.push('Character adjustments:');
-      parts.push(...perCharInstrs);
-    }
-    editInstruction = parts.join('\n');
+    // Merge scene fix + per-char fixes, order by severity (highest first), and
+    // emit as a numbered list. Grok prioritises top items; putting the most
+    // critical change first makes the instruction harder to ignore.
+    const SEV_RANK = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    const sevRank = (s) => SEV_RANK[String(s || 'MODERATE').toUpperCase()] ?? 2;
+    const items = [];
+    if (sceneInstr) items.push({ severity: consolidatedPlan.scene_fix?.severity, text: sceneInstr });
+    for (const c of perCharItems) items.push(c);
+    items.sort((a, b) => sevRank(b.severity) - sevRank(a.severity));
+    editInstruction = items
+      .map((it, i) => `${i + 1}. ${it.text}`)
+      .join('\n');
 
     // Attach avatars for every character referenced in per_character_fixes
     // — Grok needs a visual reference for appearance fixes. The avatar must

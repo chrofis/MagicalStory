@@ -259,6 +259,33 @@ async function consolidateFeedback({
     }
     if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
 
+    // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
+    // When Grok is handed more than 3 fixes, it usually executes none of them —
+    // empirically a 6-fix inpaint often changes nothing. Cap severity-first and
+    // move the overflow into dropped_issues so the next round picks them up.
+    const SEVERITY_RANK = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    const rank = (s) => SEVERITY_RANK[String(s || 'MODERATE').toUpperCase()] ?? 2;
+    const sceneSev = plan.scene_fix.instruction ? rank(plan.scene_fix.severity) : 0;
+    // Sort per-char fixes by severity (highest first) so the cap preserves the
+    // worst issues.
+    plan.per_character_fixes.sort((a, b) => rank(b.severity) - rank(a.severity));
+    const MAX_TOTAL_FIXES = 3;
+    const sceneCount = sceneSev > 0 ? 1 : 0;
+    const perCharBudget = Math.max(0, MAX_TOTAL_FIXES - sceneCount);
+    if (plan.per_character_fixes.length > perCharBudget) {
+      const keep = plan.per_character_fixes.slice(0, perCharBudget);
+      const drop = plan.per_character_fixes.slice(perCharBudget);
+      plan.per_character_fixes = keep;
+      for (const d of drop) {
+        plan.dropped_issues.push({
+          issue: `${d.characterName || 'character'}: ${(d.issues || []).join('; ') || d.fix_instruction || ''}`,
+          severity: d.severity,
+          reason: 'capped at 3, defer to next round',
+        });
+      }
+      log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: capped per-char fixes ${drop.length + keep.length} → ${keep.length} (scene=${sceneCount})`);
+    }
+
     log.info(
       `🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${plan.per_character_fixes.length} per-char fixes, scene=${plan.scene_fix.severity || 'NONE'}, dropped=${plan.dropped_issues.length}`
     );

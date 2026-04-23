@@ -38,6 +38,13 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 14. **Fix instructions are short imperatives.** Each `fix_instruction` sentence is ≤15 words and starts with the verb (Rotate, Move, Replace, Tilt, Open, Close, Add, Remove). Banned: "to show X", "as if X", "with focus on X", "not engaged in X", "rather than X", "while maintaining X", any "-ing" descriptive clause hanging off the end. Grok cannot execute negations — write only the target state, not what to avoid. Adjectives like "slightly", "subtly", "gently" add no information; drop them.
 
+15. **Cap at 3 total fixes, hardest-hitting first.** Combined count of `per_character_fixes[]` entries plus `scene_fix.instruction` sentences must not exceed 3. When Grok is asked to fix more than 3 things, it typically fixes none of them — it fixates on one and leaves the rest. So pick the top 3 by severity and drop the rest.
+   - Sort all issues by severity: CRITICAL > MAJOR > MODERATE > MINOR.
+   - Keep the top 3. Anything below goes into `dropped_issues` with reason `"capped at 3, defer to next round"`.
+   - `scene_fix.instruction` is ONE sentence for ONE scene change. If multiple scene changes are needed, pick the highest-severity one; the rest belong in the next iteration.
+   - Never exceed 3, even if every issue is CRITICAL. A fourth CRITICAL goes into `dropped_issues` — the next pass will catch it once the first three are fixed.
+   - CRITICAL/MAJOR issues that DON'T make the top 3 are still dropped with the "capped" reason — this is the one case where rule 5 (never drop CRITICAL/MAJOR) is overridden, because asking Grok to fix 4+ things makes the repair effectively useless.
+
 ## Output format (strict JSON, no prose)
 
 ```json
