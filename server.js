@@ -2755,7 +2755,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // 2. Characters mentioned in outline's background text (secondary — visible but background)
+        // Claude occasionally names a character in the background prose without
+        // listing them in characters[]; pick them up here, and log a warning
+        // so we can see how often the hint diverges from itself.
         const hintJson = page.sceneHint || '';
+        const backgroundMentionAdded = [];
         try {
           const hintParsed = JSON.parse(hintJson.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim());
           const bgText = (hintParsed.background || '').toLowerCase();
@@ -2763,10 +2767,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             for (const char of allChars) {
               if (char.name && bgText.includes(char.name.toLowerCase()) && !sceneCharacters.some(sc => sc.name === char.name)) {
                 sceneCharacters.push(char);
+                backgroundMentionAdded.push(char.name);
               }
             }
           }
         } catch { /* not valid JSON — skip background parsing */ }
+        if (backgroundMentionAdded.length > 0) {
+          const missing = backgroundMentionAdded.filter(n => !(page.characterClothing && page.characterClothing[n]));
+          if (missing.length > 0) {
+            log.warn(`[SCENE HINT] Page ${page.pageNumber}: characters named in background but missing from characters[]: ${missing.join(', ')} — falling back to global clothing requirements`);
+          }
+        }
 
         // 3. Fallback: if outline parsing found nothing, scan scene hint text only (not page text)
         if (sceneCharacters.length === 0) {
@@ -2818,6 +2829,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 _currentClothing: clothingCat
               };
             }
+          }
+          // Fill gaps for background-mention characters (in sceneCharacters but
+          // absent from page.characterClothing — Claude forgot to list them in
+          // the hint's characters[] array). Mirrors the page-render path at
+          // ~line 4596 so both paths resolve clothing the same way and the
+          // safety net in getCharacterPhotoDetails never has to fire.
+          for (const char of sceneCharacters) {
+            if (pageClothingReqs[char.name]?._currentClothing) continue;
+            const globalReqs = pageClothingReqs[char.name];
+            const fallback = (globalReqs?.costumed?.used && globalReqs.costumed.costume)
+              ? `costumed:${globalReqs.costumed.costume}`
+              : 'standard';
+            pageClothingReqs[char.name] = {
+              ...(globalReqs || {}),
+              _currentClothing: fallback
+            };
           }
           expansionPagePhotos = getCharacterPhotoDetails(
             sceneCharacters,

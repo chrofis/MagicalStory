@@ -154,6 +154,7 @@ METADATA:
 ```
 
 **Character fields:**
+- Every named character visible in the scene — foreground, midground, or background — belongs in `characters[]`, even if the prose or `background` field only names them once. If you mention a character by name anywhere in the prose or metadata, include them here with `clothing`.
 - `position` (required): combined horizontal + depth phrase — `left foreground`, `center background`, `right midground`, etc.
 - `clothing` (required): must match an available avatar category exactly.
 - `depth` (optional, default `foreground`): camera distance, NOT frame position. `foreground` = large and close, filling ~1/3+ of frame height. `midground` = head and torso visible, middle band. `background` = small/distant; a tiny silhouette roughly 1/6 of frame height or less. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size, `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is named as a single distant figure, `depth` MUST be `background`.
