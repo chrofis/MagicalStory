@@ -381,11 +381,11 @@ export default function SharedStoryViewer() {
           book-cover accent used throughout the product. Ghost action buttons,
           one white primary (Share). */}
       {isAuthenticated ? (
-        <header className="bg-zinc-900 text-white px-3 py-2.5 sticky top-0 z-10 border-b border-amber-400/60">
+        <header className="bg-zinc-900 text-white px-3 py-1.5 md:py-2.5 sticky top-0 z-10 border-b border-amber-400/60">
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + optional title */}
             <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
-              <img src="/images/logo-book.png" alt="" className="h-9 md:h-10 -my-2 w-auto" />
+              <img src="/images/logo-book.png" alt="" className="h-7 md:h-10 -my-1 md:-my-2 w-auto" />
               <span className="hidden md:inline">{t.title}</span>
             </button>
 
@@ -576,16 +576,16 @@ export default function SharedStoryViewer() {
       </main>
 
       {/* Text overlay toggle + page counter */}
-      <div className="flex items-center justify-center gap-4 pb-1">
+      <div className="flex items-center justify-center gap-3 md:gap-4 pb-0.5">
         {/* Mobile: first page button */}
         <div className="md:hidden">
           {currentPage > 1 && (
             <button
               onClick={() => bookRef.current?.flipTo(0)}
-              className="p-2.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
+              className="p-1.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
               aria-label="Go to first page"
             >
-              <ChevronsLeft className="w-5 h-5" />
+              <ChevronsLeft className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -594,10 +594,10 @@ export default function SharedStoryViewer() {
         <button
           onClick={flipPrev}
           disabled={currentPage === 0}
-          className="md:hidden p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Previous page"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="w-5 h-5" />
         </button>
 
         {/* Page counter */}
@@ -609,10 +609,10 @@ export default function SharedStoryViewer() {
         <button
           onClick={flipNext}
           disabled={currentPage >= totalPages - 1}
-          className="md:hidden p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Next page"
         >
-          <ChevronRight className="w-6 h-6" />
+          <ChevronRight className="w-5 h-5" />
         </button>
       </div>
 

@@ -109,22 +109,14 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (mobile) {
-        // Fit the image's natural aspect inside the available container.
-        // Using an explicit page-aspect calculation (instead of passing raw
-        // container dims and trusting HTMLFlipBook's stretch math) keeps the
-        // rendered book sensibly sized on every phone + tablet. Page aspect
-        // matches A4 portrait (the printed book). The book fills whichever
-        // dimension is the binding constraint, centred by the surrounding
-        // flex container.
-        const A4_W = 210, A4_H = 297;
+        // Fill the container completely. Previously locked to A4 aspect so
+        // the printed book matched 1:1, but on phones taller than A4 that
+        // left 20%+ of the viewport as dead whitespace. On mobile we always
+        // render text-below-image (readingMode=sidepage default, or advanced
+        // forceTextBelow) — the image uses object-contain to keep its natural
+        // aspect and the remaining height is text. No A4 lock needed.
         const available = Math.max(0, ch - 4);
-        let pw = cw;
-        let ph = pw * (A4_H / A4_W);
-        if (ph > available) {
-          ph = available;
-          pw = ph * (A4_W / A4_H);
-        }
-        setDimensions({ width: Math.round(pw), height: Math.round(ph) });
+        setDimensions({ width: cw, height: available });
         return;
       }
       // Desktop: keep A4 aspect so the book spread matches the printed book.
@@ -145,8 +137,21 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
 
     useEffect(() => {
       updateDimensions();
+      // Re-measure after layout has settled. On very short viewports (iPhone SE
+      // 375×667), the first pass reads container height before the surrounding
+      // flex layout + safe-area insets have resolved, producing a near-zero
+      // available height and collapsing the book to a sliver. A RAF-delayed
+      // second measure catches the post-layout size.
+      const raf1 = requestAnimationFrame(() => {
+        const raf2 = requestAnimationFrame(updateDimensions);
+        (window as any).__bookViewerRaf2 = raf2;
+      });
       window.addEventListener('resize', updateDimensions);
-      return () => window.removeEventListener('resize', updateDimensions);
+      return () => {
+        cancelAnimationFrame(raf1);
+        if ((window as any).__bookViewerRaf2) cancelAnimationFrame((window as any).__bookViewerRaf2);
+        window.removeEventListener('resize', updateDimensions);
+      };
     }, [updateDimensions]);
 
     // Server-rendered text overlay images

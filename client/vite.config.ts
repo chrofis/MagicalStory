@@ -62,12 +62,14 @@ export default defineConfig((env) => {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.DEV_API_TARGET || 'http://localhost:3000',
         changeOrigin: true,
+        secure: false,
       },
       '/images': {
-        target: 'http://localhost:3000',
+        target: process.env.DEV_API_TARGET || 'http://localhost:3000',
         changeOrigin: true,
+        secure: false,
       },
     },
   },
