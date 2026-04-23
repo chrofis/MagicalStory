@@ -368,18 +368,19 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
       await page.waitForTimeout(250);
     }
   }
-  // If we didn't find enough, click any other unselected trait buttons in the
-  // current section until the minimum-required count is hit. Fallback avoids
-  // hanging the wizard on "select at least 3" validation gates.
+  // If we didn't find enough, click any other unselected trait chips to hit
+  // the minimum-required count. Trait chips render with `rounded-full` —
+  // constrain the fallback to those so we never click the "Magical Story"
+  // nav logo (which navigates to the homepage and killed earlier runs).
   if (clicked < max) {
-    const anyTraitBtns = page.locator('button').filter({ hasText: /^[A-Za-zÀ-ÿ\- ]{3,30}$/ });
-    const count = await anyTraitBtns.count();
+    const chips = page.locator('button.rounded-full');
+    const count = await chips.count();
     for (let i = 0; i < count && clicked < max; i++) {
-      const btn = anyTraitBtns.nth(i);
+      const btn = chips.nth(i);
       if (!await btn.isVisible({ timeout: 200 }).catch(() => false)) continue;
       const classNames = (await btn.getAttribute('class')) || '';
-      // Skip already-selected (indigo background) and save/next buttons
-      if (classNames.includes('bg-indigo') || classNames.includes('bg-green')) continue;
+      // Skip already-selected (indigo background)
+      if (classNames.includes('bg-indigo')) continue;
       await btn.click().catch(() => {});
       clicked++;
       await page.waitForTimeout(250);
