@@ -490,18 +490,40 @@ async function walkToCharacterList(page: Page, charName: string) {
 }
 
 async function isOnCharacterListNow(page: Page): Promise<boolean> {
-  // Character list = wizard Step 1 "Charaktere & Rollen" WITH a dashed
-  // "Create Another" card. Those two signals together uniquely identify the
-  // list view (not the edit sub-steps, not Step 2+).
+  // Character list = wizard Step 1 "Charaktere & Rollen" WITH the Create
+  // Another button (has create-another text). The avatar-waiting screen ALSO
+  // uses the "Charaktere & Rollen" header and a dashed placeholder, so we
+  // must key off the text of the add-another button specifically — not just
+  // "any dashed element".
   const listHeader = await page.locator('text=/Charaktere & Rollen|Characters & Roles|Personnages & Rôles/i').first()
     .isVisible({ timeout: 500 }).catch(() => false);
   if (!listHeader) return false;
-  const dashedCard = await page.locator('[class*="border-dashed"]').first()
+  const createAnother = await page.locator('button').filter({ hasText: CREATE_ANOTHER_RE }).first()
     .isVisible({ timeout: 500 }).catch(() => false);
-  return dashedCard;
+  return createAnother;
+}
+
+async function dismissAvatarWaitIfShown(page: Page): Promise<boolean> {
+  // After the final Save, the wizard shows an avatar-generation waiting screen
+  // with a single "Weiter ohne zu warten" / "Continue without waiting" button.
+  // Click it to skip to the character list. Returns true if the button was
+  // found and clicked.
+  const skipBtn = page.getByRole('button', { name: /weiter ohne zu warten|continue without waiting|continuer sans attendre/i }).first();
+  if (await skipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    console.log(`      → skipping avatar wait`);
+    await skipBtn.click();
+    await page.waitForTimeout(2000);
+    return true;
+  }
+  return false;
 }
 
 async function advanceSubStep(page: Page, label: string): Promise<boolean> {
+  // Avatar-wait screen comes right after the final Save. Dismiss it first so
+  // the next checks see the true character list, not the transient wait UI.
+  if (await dismissAvatarWaitIfShown(page)) {
+    // After dismiss we should be on the list. Re-check.
+  }
   // After every sub-step click we check: are we already back on the character
   // list? If yes, the wizard auto-saved and we must NOT click again (would
   // advance past Step 1 into Buch/Story/etc.). Returns true if still in
@@ -551,6 +573,8 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
     if (!await advanceSubStep(page, `final-${i + 1}`)) break;
   }
   await page.waitForTimeout(1500);
+  // The wizard commonly ends with the avatar-wait screen. Skip it explicitly.
+  await dismissAvatarWaitIfShown(page);
   if (!await isOnCharacterListNow(page)) {
     console.log(`      WARN: did not land on list after ${char.name} — navigating to /create`);
     await page.goto('/create');
