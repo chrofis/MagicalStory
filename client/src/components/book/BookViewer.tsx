@@ -109,23 +109,25 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (mobile) {
-        // Fill the mobile container entirely — image+text-below layout uses
-        // every available pixel. Using the full container width (no 460 cap)
-        // also forces HTMLFlipBook into portrait/single-page mode — the
-        // flipbook only goes landscape when 2×pageWidth fits in innerWidth.
-        // With pageWidth = containerWidth, 2×pageWidth > innerWidth is always
-        // true, so we never see a two-up spread on mobile regardless of
-        // orientation or device.
-        const pw = cw;
-        const ph = Math.max(0, ch - 4);
+        // Fill the mobile container. Keep pageWidth at the full container
+        // width (not capped) so HTMLFlipBook is forced into portrait mode —
+        // it only goes landscape when 2×pageWidth fits in innerWidth, and
+        // 2×cw > cw is always true. The flipbook's own maxWidth={600} then
+        // clamps down so the page doesn't render absurdly wide on tablets.
+        // Height: use what the container gives us but cap at a sane value
+        // for portrait-oriented viewports — raw ch can exceed page aspect
+        // and cause HTMLFlipBook's stretch to render off-screen.
+        const pw = Math.min(cw, 600);
+        const ph = Math.min(Math.max(0, ch - 4), 1000);
         setDimensions({ width: Math.round(pw), height: Math.round(ph) });
         return;
       }
       // Desktop: keep A4 aspect so the book spread matches the printed book.
-      // Let pages grow with the viewport — capping at 460×650 left the book
-      // as a tiny card in a sea of white on large monitors.
-      const maxPageWidth = Math.min(cw / 2, 600);
-      const maxPageHeight = Math.min(ch - 10, 900);
+      // Modest cap increase over the old 460×650 — big enough to fill wide
+      // monitors decently without the book blowing up past sensible book-
+      // spread dimensions.
+      const maxPageWidth = Math.min(cw / 2, 550);
+      const maxPageHeight = Math.min(ch - 10, 800);
       const A4_W = 210, A4_H = 297;
       let pw = maxPageWidth;
       let ph = pw * (A4_H / A4_W);
@@ -315,9 +317,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             height={dimensions.height}
             size="stretch"
             minWidth={250}
-            maxWidth={isMobile ? 1400 : 600}
+            maxWidth={600}
             minHeight={333}
-            maxHeight={isMobile ? 1800 : 900}
+            maxHeight={1200}
             showCover={true}
             flippingTime={800}
             usePortrait={true}
