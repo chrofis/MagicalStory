@@ -92,8 +92,8 @@ Then a single-line JSON object:
   ],
   "objects": ["LOC001", "ART002"],
   "interactions": [
-    {"character": "CharacterA", "object": "an item", "where": "in left jacket pocket, only tiny silhouette visible"},
-    {"character": "CharacterB", "object": "wooden ladder", "where": "climbing, both hands gripping rungs, feet on third rung"}
+    {"character": "CharacterA", "object": "an item", "where": "in pocket"},
+    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs"}
   ],
   "textPosition": "top-left",
   "emptyScenePrompt": "..."
@@ -116,8 +116,9 @@ Then a single-line JSON object:
 - For landmarks with photo variants, use `LOC003.2` format. Default to `.1` if unsure. Pick the variant matching the scene's perspective.
 
 **`interactions[]`**
-- One entry per character-to-object contact visible in the scene: held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, touched.
-- Include `character`, `object` (the recurring-element name or a plain noun like "rope", "ladder", "stairs", "doorway"), and a short `where` string.
+- One entry per character-to-object contact visible in the scene. Each entry is a simple A-verb-B form.
+- `character` (subject), `object` (target — VB ID, character name, or plain noun like "rope", "ladder", "stairs"), `where` (a short verb phrase, 1-4 words: 'climbs', 'gazes at', 'holds', 'sits on', 'in pocket', 'around neck', 'leans against').
+- Pose details — neck angle, gaze direction, body-part positioning ('arms at sides', 'fingers curled', 'feet on third rung') — do NOT belong in `where`; leave them in the prose.
 - Omit entries for characters who aren't touching anything.
 - Every entry must also be described in the prose as the same physical contact. When the prose disagrees with the interaction list, the image follows the prose — so the two must agree.
 - Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side. Never hold objects against the chest or front when the camera sees the back.
