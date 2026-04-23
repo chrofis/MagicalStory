@@ -577,6 +577,11 @@ async function advanceSubStep(page: Page, label: string): Promise<boolean> {
     console.log(`      → next after ${label}`);
     return true;
   }
+  // Dump a screenshot before the /create recovery so we can see what's on
+  // screen. Useful for diagnosing stuck sub-steps.
+  const shotPath = `test-results/debug-no-button-${label}-${Date.now()}.png`;
+  await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+  console.log(`      [debug] screenshot at ${shotPath}`);
   // No Save/Next visible. We might be stuck on the "Kein Bild" avatar state
   // (avatar never started generating, no action buttons rendered). Try
   // clicking the wizard step-1 button to bounce back to the list.
@@ -678,11 +683,36 @@ async function triggerMissingAvatars(page: Page, family: DemoFamily) {
       const hasPhoto = !!(fullChar.photos?.original || fullChar.photos?.face || fullChar.photos?.body || fullChar.photos?.bodyNoBg);
       if (!hasPhoto) { results.push({ name: c.name, status: 'no-photo' }); continue; }
 
-      // Kick off async avatar generation (same endpoint the UI uses).
+      // Build payload matching characterService.generateClothingAvatars shape.
+      const age = parseInt(fullChar.age) || 10;
+      const gender = fullChar.gender || 'child';
+      const genderLabel = gender === 'male' ? (age >= 18 ? 'man' : 'boy')
+                         : gender === 'female' ? (age >= 18 ? 'woman' : 'girl')
+                         : (age >= 18 ? 'person' : 'child');
+      const nameOrGeneric = fullChar.name?.trim() || `This ${genderLabel}`;
+      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
+      if (fullChar.physical) {
+        if (fullChar.physical.hair) physicalDescription += `, ${fullChar.physical.hair}`;
+        if (fullChar.physical.face) physicalDescription += `, ${fullChar.physical.face}`;
+        if (fullChar.physical.build) physicalDescription += `, ${fullChar.physical.build}`;
+        if (fullChar.physical.other) physicalDescription += `, ${fullChar.physical.other}`;
+      }
+      const inputPhoto = fullChar.photos?.bodyNoBg || fullChar.photos?.body || fullChar.photos?.face || fullChar.photos?.original;
+
       const genRes = await fetch('/api/generate-clothing-avatars?async=true', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ character: fullChar }),
+        body: JSON.stringify({
+          characterId: fullChar.id,
+          facePhoto: inputPhoto,
+          physicalDescription,
+          name: fullChar.name,
+          age: fullChar.age,
+          apparentAge: fullChar.physical?.apparentAge,
+          gender: fullChar.gender,
+          build: fullChar.physical?.build,
+          clothing: fullChar.clothing?.structured,
+        }),
       });
       if (!genRes.ok) {
         const body = await genRes.text().catch(() => '');
