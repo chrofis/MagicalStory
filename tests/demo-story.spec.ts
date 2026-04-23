@@ -334,18 +334,24 @@ async function fillCharacterBasics(page: Page, char: DemoCharacter) {
 }
 
 async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
-  // Try to advance. Returns true if we clicked something, false if no button was
-  // present or enabled. Continue-to-traits buttons can have different labels
-  // than generic Next, so try a few alternatives.
+  // Try to advance. Returns true if we clicked something, false if no enabled
+  // Next button appears within timeoutMs. The Next button is often VISIBLE but
+  // DISABLED while validation settles (photo analysis, trait minimums), so we
+  // poll for ~timeoutMs until it becomes enabled rather than returning false
+  // on first check.
   const patterns = [CONTINUE_TO_TRAITS_RE, NEXT_BTN_RE];
-  for (const pattern of patterns) {
-    const btn = page.getByRole('button', { name: pattern }).first();
-    if (await btn.isVisible({ timeout: timeoutMs / patterns.length }).catch(() => false)
-        && await btn.isEnabled().catch(() => false)) {
-      await btn.click();
-      await page.waitForTimeout(2000);
-      return true;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const pattern of patterns) {
+      const btn = page.getByRole('button', { name: pattern }).first();
+      if (await btn.isVisible({ timeout: 300 }).catch(() => false)
+          && await btn.isEnabled().catch(() => false)) {
+        await btn.click();
+        await page.waitForTimeout(2000);
+        return true;
+      }
     }
+    await page.waitForTimeout(500);
   }
   return false;
 }
@@ -565,7 +571,9 @@ async function advanceSubStep(page: Page, label: string): Promise<boolean> {
     await page.waitForTimeout(3000);
     return true;
   }
-  if (await clickAnyNext(page, 3000)) {
+  // Allow 15s for disabled Next buttons to become enabled (traits validation
+  // waits for photo-analyzer to populate a few fields before it settles).
+  if (await clickAnyNext(page, 15000)) {
     console.log(`      → next after ${label}`);
     return true;
   }
@@ -664,7 +672,9 @@ async function triggerMissingAvatars(page: Page, family: DemoFamily) {
       // Fetch full character to get photos (list strips them).
       const fullRes = await fetch(`/api/characters/${c.id}/full`, { headers });
       if (!fullRes.ok) { results.push({ name: c.name, status: `full-fetch-${fullRes.status}` }); continue; }
-      const fullChar = await fullRes.json();
+      const fullBody = await fullRes.json();
+      // /full returns { character: {...} }
+      const fullChar = fullBody.character || fullBody;
       const hasPhoto = !!(fullChar.photos?.original || fullChar.photos?.face || fullChar.photos?.body || fullChar.photos?.bodyNoBg);
       if (!hasPhoto) { results.push({ name: c.name, status: 'no-photo' }); continue; }
 
