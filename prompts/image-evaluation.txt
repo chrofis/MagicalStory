@@ -142,7 +142,7 @@ Check these issues:
 DO NOT penalize:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
 - Precise hand positions or gestures
-- Minor positional differences (doorway vs room entrance = same thing)
+- Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
 
 ---
 
@@ -160,13 +160,13 @@ Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
   - Declared interaction object drawn at wrong size (e.g. "tiny silhouette" rendered as a large held plush)
   - 3+ characters face the camera like a group photo when prompt describes them interacting with each other or the scene
   - Character shown front-facing when prompt says "back view" or "seen from behind", or vice versa
-- MODERATE (-1): Minor clothing difference, character on wrong side of scene, key object missing
-- MINOR (-0.5): Small differences, minor finger issues
+- MODERATE (-1): Minor clothing difference, key object missing
+- MINOR (-0.5): Small differences, minor finger issues, character placed in the wrong half of the frame (left↔right swap)
 
 DO NOT deduct for:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
 - Precise hand positions or gestures
-- Character not in exact position described (doorway vs room entrance = same thing)
+- Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
 
