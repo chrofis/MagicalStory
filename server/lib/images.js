@@ -667,7 +667,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null } = options;
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(base64, 'base64');
@@ -736,9 +736,11 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
       issues.push(`too dark: average brightness ${(avgBrightness * 100).toFixed(0)}%`);
     }
 
-    // Check 3: text area calmness — white text needs a DARK and smooth zone.
-    // The calmness metric now rewards darkness (brightness inverted) and low
-    // variance. Anything below 0.15 fails and triggers text-space-repair.
+    // Check 3: text area calmness — smooth (low-variance) zone for text placement.
+    // Previously this also rewarded darkness, but the prompt/text-overlay design
+    // no longer requires a dark zone — the white-wash composited at render time
+    // handles contrast. Pure smoothness is what matters: a bright clear sky or
+    // a saturated flat wall are both fine, as long as they're not cluttered.
     let textAreaCalm = 0;
     let textAreaCount = 0;
     const isTop = textPosition?.startsWith('top');
@@ -750,17 +752,19 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
         const inVertical = isTop ? r < rows * 0.4 : r > rows * 0.6;
         const inHorizontal = isFull || (isLeft ? c < cols * 0.6 : c > cols * 0.4);
         if (inVertical && inHorizontal) {
-          const bNorm = blockBrightness[r * cols + c] / 255;
           const vNorm = blockVariance[r * cols + c] / vMax;
-          textAreaCalm += Math.pow(1 - bNorm, 1.5) * (1 - vNorm);
+          textAreaCalm += (1 - vNorm);
           textAreaCount++;
         }
       }
     }
     const calmnessScore = textAreaCount > 0 ? textAreaCalm / textAreaCount : 0;
 
-    if (calmnessScore < 0.15 && textPosition) {
-      issues.push(`text area too busy/bright: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
+    // 0.55 threshold tuned for pure-smoothness scoring — a cluttered zone with
+    // edges/detail lands ~0.3-0.5, a calm surface ~0.6-0.9. (Previous 0.15
+    // threshold was for the dark-rewarding formula and is too lax here.)
+    if (calmnessScore < 0.55 && textPosition) {
+      issues.push(`text area too busy: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
     }
 
     // ── Phase 2: Gemini Flash-lite vision check ──
@@ -775,6 +779,12 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
 
           const sceneCtx = sceneDescription
             ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
+            : '';
+          // Era context — explicit period so the vision model doesn't have to
+          // infer it. Caller derives this from storyType + costumed clothing.
+          // "present-day" (or null) disables the anachronism check.
+          const eraBlock = storyEra
+            ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
             : '';
           // If the outline already declared where each character will land, ask
           // the vision model to verify the empty scene has flat usable space at
@@ -810,16 +820,18 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${placementsBlock}${mainSceneBlock}
+                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${eraBlock}${placementsBlock}${mainSceneBlock}
 
 Check:
 1. Does the setting/location roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
 2. Are there large artificial-looking patches — white rectangles, solid color blocks, or obvious AI glitches? (FAIL)
-3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)${placementsCheck}${geometryCheck}
+3. Is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
+4. Unrequested text or signage: does the image contain readable text, letters, numbers, shop signs, banners, posters, logos, labels, or written inscriptions that are NOT named in the expected scene? (FAIL — name where the text appears. A pub sign, street sign, poster text, or any inscription not explicitly requested counts. Distant painted banners with no readable text are OK.)${storyEra ? `
+5. Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. Skip this check only if the story era is "present-day" or "modern".)` : ''}${placementsCheck}${geometryCheck}
 
-Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence describing what to fix if failed, or empty if passed"}` }
+Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}` }
               ]}],
-              generationConfig: { maxOutputTokens: 250, temperature: 0.1, responseMimeType: 'application/json' },
+              generationConfig: { maxOutputTokens: 350, temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: GEMINI_SAFETY_SETTINGS
             }),
             signal: AbortSignal.timeout(15000),
@@ -5103,6 +5115,31 @@ function lastRepairRegressed(versions) {
 }
 
 /**
+ * True when the page has already been through at least one inpaint AND at least
+ * one iterate, and neither produced a better score than the pre-repair best.
+ * Once both strategies have failed to improve, a third round is almost certain
+ * to reproduce an earlier attempt — bail instead of spending the round budget.
+ */
+function bothStrategiesTriedAndRegressed(versions) {
+  if (!Array.isArray(versions) || versions.length < 3) return false;
+  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  let hasInpaint = false;
+  let hasIterate = false;
+  let repairBest = -Infinity;
+  let preRepairBest = -Infinity;
+  for (const v of versions) {
+    const src = v?.source || '';
+    const s = scoreOf(v);
+    if (src.startsWith('inpaint-')) { hasInpaint = true; if (s != null && s > repairBest) repairBest = s; }
+    else if (src.startsWith('iterate-')) { hasIterate = true; if (s != null && s > repairBest) repairBest = s; }
+    else if (s != null && s > preRepairBest) preRepairBest = s;
+  }
+  if (!hasInpaint || !hasIterate) return false;
+  if (!isFinite(preRepairBest)) return false;
+  return repairBest <= preRepairBest;
+}
+
+/**
  * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
  * and applies it via editImageWithPrompt().
  *
@@ -5918,10 +5955,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Choose strategy for each bad page. If the last two repair rounds on
     // this page both used the same approach and didn't fix it, force a flip
     // — doing inpaint a third time rarely succeeds where two already failed.
+    // If BOTH strategies have already been tried and neither improved on the
+    // pre-repair best, skip the page entirely — we're just duplicating earlier
+    // attempts on the same bestSoFar canvas.
     const pageStrategies = badPages.map(img => {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
+
+      if (bothStrategiesTriedAndRegressed(versions)) {
+        log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
+        return { img, strategy: null, latestEval, skipped: true };
+      }
 
       const regressedFlip = lastRepairRegressed(versions);
       const forced = forcedStrategyAfterFailures(versions);
@@ -5945,15 +5990,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     const inpaintCount = pageStrategies.filter(p => p.strategy === 'inpaint').length;
     const iterateCount = pageStrategies.filter(p => p.strategy === 'iterate').length;
-    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${inpaintCount} inpaint, ${iterateCount} iterate`);
+    const skippedCount = pageStrategies.filter(p => p.skipped).length;
+    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${inpaintCount} inpaint, ${iterateCount} iterate${skippedCount ? `, ${skippedCount} skipped` : ''}`);
+
+    if (inpaintCount + iterateCount === 0) {
+      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: all remaining bad pages have exhausted both strategies, stopping repair loop`);
+      break;
+    }
 
     const roundStart = Date.now();
     const repairLimit = pLimit(50);
 
     // Execute all repairs in parallel
     const roundResults = await Promise.all(
-      pageStrategies.map(({ img, strategy, latestEval }) => repairLimit(async () => {
+      pageStrategies.map(({ img, strategy, latestEval, skipped }) => repairLimit(async () => {
         const pageNumber = img.pageNumber;
+        if (skipped) return { pageNumber, imageData: null, skipped: true };
         try {
           if (strategy === 'inpaint') {
             const inpaintResult = await executeInpaintAction(img, latestEval, round);

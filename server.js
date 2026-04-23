@@ -4926,10 +4926,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const placements = (sceneMetadata?.fullData?.characters || [])
                   .filter(c => c?.name && c?.position)
                   .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
+                // Derive story era for the anachronism check. Any character marked
+                // as costumed with a specific costume type is a strong period signal
+                // (e.g. "mittelalterlich" → medieval, "1920s" → early 20th century).
+                // Fallback to storyTheme/Topic/Type. If nothing indicates an era,
+                // leave null — the vision check will then skip the anachronism gate
+                // rather than false-flag a legitimate present-day scene.
+                let storyEra = null;
+                const costumedTypes = Object.values(streamingClothingRequirements || {})
+                  .map(r => r?.costumed?.used && r?.costumed?.costume)
+                  .filter(Boolean);
+                if (costumedTypes.length > 0) {
+                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
+                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
+                }
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
                   sceneDescription: emptySceneDesc,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: pageData.scene?.sceneDescription || null,
+                  storyEra,
                 });
                 if (!qc.pass) {
                   // Retry with a modified prompt that incorporates Gemini's feedback.
