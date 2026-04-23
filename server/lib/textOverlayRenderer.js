@@ -631,12 +631,16 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
 /**
  * Wrap paragraphs top-down. Uses a continuous y cursor so paragraph breaks
  * can be half a line instead of a full one.
+ *
+ * `startY` lets the bottom-up wrapper restart wrap at a lower y so each line
+ * is packed against the scan width at its FINAL drawn y, not the narrow
+ * scan widths at the top of the triangle.
  */
-function wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily) {
+function wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily, startY) {
   ctx.font = `${fontSize}px ${fontFamily}`;
   const paragraphGap = Math.round(lineHeight * 0.25);
   const lines = [];
-  let y = Math.round(polyTop + fontSize);
+  let y = Math.round(startY != null ? startY : polyTop + fontSize);
 
   for (let p = 0; p < paragraphs.length; p++) {
     const words = paragraphs[p];
@@ -721,18 +725,18 @@ function wrapLinesBottomUp(ctx, paragraphs, polyTop, polyBottom, scanlines, line
   const delta = lastUsableY - lastDrawnY;
   if (delta <= 0) return topLines;
 
-  return topLines.map(l => {
-    const newY = l.y + delta;
-    // Prefer the EXACT scan at newY over findScanlineWidth's windowed max —
-    // the window-MAX pulls the left into the tapered bottom corner when
-    // insetPolygon left a slanted bottom edge. Fall back to the windowed
-    // lookup only when the exact-y scan isn't available.
-    const exact = scanlines.get(Math.round(newY));
-    const scan = exact || findScanlineWidth(scanlines, newY, lineHeight);
-    return scan
-      ? { ...l, y: newY, left: scan.left, right: scan.right }
-      : { ...l, y: newY };
-  });
+  // Re-wrap from the shifted starting y. The scanline widths inside a
+  // right-triangle polygon change dramatically with y (hypotenuse pulls
+  // scan.left inward near the top, scan.right stays ~constant). The first
+  // top-down pass packs each line against the NARROW widths near polyTop,
+  // then we shift the whole block down — so every line ends up drawn where
+  // the polygon is WIDER than what it was wrapped for, leaving a 60-260 px
+  // gap on the right edge. Re-wrapping from the shifted start-y makes each
+  // line fill the width at its FINAL drawn y.
+  const newStartY = Math.round(topLines[0].y + delta);
+  const rewrapped = wrapLinesTopDown(ctx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, fontFamily, newStartY);
+  if (rewrapped.length === 0) return topLines;
+  return rewrapped;
 }
 
 /**
