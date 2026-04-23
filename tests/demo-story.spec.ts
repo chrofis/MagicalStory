@@ -640,6 +640,60 @@ async function setMainRoles(page: Page, family: DemoFamily) {
   await page.waitForTimeout(1000);
 }
 
+async function triggerMissingAvatars(page: Page, family: DemoFamily) {
+  // After /create-reload recovery paths, some characters may have been saved
+  // WITHOUT StoryWizard.tsx:3220's client-side avatar trigger firing. Mimic
+  // that call server-side for each character that has no avatar.
+  console.log(`\n=== Triggering avatar generation for characters missing it ===`);
+
+  const triggered = await page.evaluate(async (familyNames) => {
+    const token = localStorage.getItem('auth_token');
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const listRes = await fetch('/api/characters?includeAllAvatars=true', { headers });
+    if (!listRes.ok) return { error: `list ${listRes.status}` };
+    const { characters = [] } = await listRes.json();
+
+    const results: any[] = [];
+    for (const c of characters) {
+      if (!familyNames.includes(c.name)) continue;
+      const hasAvatar = !!(c.avatars && (c.avatars.standard || c.avatars.winter || c.avatars.summer));
+      if (hasAvatar) { results.push({ name: c.name, status: 'already-has-avatar' }); continue; }
+
+      // Fetch full character to get photos (list strips them).
+      const fullRes = await fetch(`/api/characters/${c.id}/full`, { headers });
+      if (!fullRes.ok) { results.push({ name: c.name, status: `full-fetch-${fullRes.status}` }); continue; }
+      const fullChar = await fullRes.json();
+      const hasPhoto = !!(fullChar.photos?.original || fullChar.photos?.face || fullChar.photos?.body || fullChar.photos?.bodyNoBg);
+      if (!hasPhoto) { results.push({ name: c.name, status: 'no-photo' }); continue; }
+
+      // Kick off async avatar generation (same endpoint the UI uses).
+      const genRes = await fetch('/api/generate-clothing-avatars?async=true', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ character: fullChar }),
+      });
+      if (!genRes.ok) {
+        const body = await genRes.text().catch(() => '');
+        results.push({ name: c.name, status: `trigger-${genRes.status}`, body: body.slice(0, 200) });
+        continue;
+      }
+      const genJson = await genRes.json().catch(() => ({}));
+      results.push({ name: c.name, status: 'triggered', jobId: genJson.jobId });
+    }
+    return { results };
+  }, family.characters.map(c => c.name));
+
+  if (triggered.error) {
+    console.log(`  avatar-trigger list fetch failed: ${triggered.error}`);
+    return;
+  }
+  for (const r of triggered.results || []) {
+    console.log(`  ${r.name}: ${r.status}${r.jobId ? ` (job ${r.jobId})` : ''}${r.body ? ` — ${r.body}` : ''}`);
+  }
+}
+
 async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 600000) {
   // Poll /api/characters (via the page's authenticated session) until every
   // family character shows a standard avatar (or we hit the timeout).
@@ -696,6 +750,13 @@ async function createFamilyViaWizard(page: Page, family: DemoFamily) {
   }
 
   await setMainRoles(page, family);
+
+  // The /create-reload recovery path used inside createOneCharacterViaWizard
+  // can bypass the client-side onSaveCharacter handler that triggers avatar
+  // generation (StoryWizard.tsx:3220). Trigger any missing ones explicitly
+  // before polling so we don't burn 10 minutes on avatars that were never
+  // started.
+  await triggerMissingAvatars(page, family);
 
   console.log(`\n=== Waiting for avatar generation (up to 10 min) ===`);
   await waitForAllAvatars(page, family);
