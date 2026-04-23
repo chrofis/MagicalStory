@@ -109,16 +109,21 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (mobile) {
-        // Fill the mobile container. Keep pageWidth at the full container
-        // width (not capped) so HTMLFlipBook is forced into portrait mode —
-        // it only goes landscape when 2×pageWidth fits in innerWidth, and
-        // 2×cw > cw is always true. The flipbook's own maxWidth={600} then
-        // clamps down so the page doesn't render absurdly wide on tablets.
-        // Height: use what the container gives us but cap at a sane value
-        // for portrait-oriented viewports — raw ch can exceed page aspect
-        // and cause HTMLFlipBook's stretch to render off-screen.
-        const pw = Math.min(cw, 600);
-        const ph = Math.min(Math.max(0, ch - 4), 1000);
+        // Fit the image's natural aspect inside the available container.
+        // Using an explicit page-aspect calculation (instead of passing raw
+        // container dims and trusting HTMLFlipBook's stretch math) keeps the
+        // rendered book sensibly sized on every phone + tablet. Page aspect
+        // matches A4 portrait (the printed book). The book fills whichever
+        // dimension is the binding constraint, centred by the surrounding
+        // flex container.
+        const A4_W = 210, A4_H = 297;
+        const available = Math.max(0, ch - 4);
+        let pw = cw;
+        let ph = pw * (A4_H / A4_W);
+        if (ph > available) {
+          ph = available;
+          pw = ph * (A4_W / A4_H);
+        }
         setDimensions({ width: Math.round(pw), height: Math.round(ph) });
         return;
       }
@@ -315,9 +320,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             ref={bookRef}
             width={dimensions.width}
             height={dimensions.height}
-            size="stretch"
+            size="fixed"
             minWidth={250}
-            maxWidth={600}
+            maxWidth={900}
             minHeight={333}
             maxHeight={1200}
             showCover={true}
