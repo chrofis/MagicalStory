@@ -10,6 +10,20 @@ You are an Illustration QA Analyst for publishing. Evaluate the generated artwor
 
 ---
 
+**WHAT COUNTS AS A DEFECT**
+
+Only deduct when the image fails on one of these axes:
+- **Character presence** — a declared character is absent, duplicated, or unrecognisable (face/hair/build clearly different from reference, or identities swapped between figures).
+- **Object presence** — a declared Visual Bible object or landmark is missing.
+- **Anachronism** — an element appears that contradicts the setting era (clock tower in a medieval scene, smartphone in an 1800s scene, modern signage on a period building).
+- **Anatomy** — extra limbs, fused or melted fingers, missing hand, figure floating, body fused into furniture, eyes pointing different directions.
+- **Face direction** — front-facing when prompt says back view, or vice versa.
+- **Half-frame placement** — character described "left" rendered in the right half (or vice versa).
+
+Everything else is stylistic flavor — descriptive intent for the image generator, not a contract for the evaluator. Never deduct for it.
+
+---
+
 **STEP 1: FIGURE INVENTORY**
 
 For EACH figure in the generated image, note:
