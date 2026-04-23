@@ -394,6 +394,9 @@ For EACH character in the story, write one line:
     - **Top/bottom balance:** at least 30% of pages must be `top-*` and at least 30% `bottom-*`.
     - **Streak:** never more than 3 consecutive pages in the same half.
     - Emit a fix line for each violation, e.g. `Page 3: textPosition bottom-right on odd page → bottom-left` or `Only 0% full-width — flip Page 9 (ultra-wide storm) to bottom-full`.
+18. **Text zone description** — For each page, `textZoneDescription` must be 5–15 words and name a physical surface (sky / wall / foliage / ground / water / fabric). Reject any that contain `rectangle`, `negative space`, `text box`, `blank`, `reserved`, `for text`, or describe what the area is *for* instead of what it *is*. Emit a fix line rewriting each offender.
+19. **Forbidden-side intrusion** — Derive the forbidden side from `textPosition` (corner → that half; `*-full` → that row). Scan `background`, every `objects[].where` and object prose, and every `characters[].position` / `depth`. Flag any mention of the forbidden side (e.g. `right flank`, `center-right midground`, `bottom-right`, `far right`) and emit a fix line moving that content to the allowed side.
+20. **Empty scene alignment** — `emptyScenePrompt` must name the same reserved surface as `textZoneDescription`. If they disagree, emit a fix line updating `emptyScenePrompt`.
 
 **Cliché check:**
 15. Repeated gestures — Same gesture (hug, smile, wink) used more than once? Vary them.
