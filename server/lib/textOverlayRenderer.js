@@ -67,9 +67,12 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   const isTop = textPosition.startsWith('top');
 
   const fitsAtStage = (stage, fontSize) => {
-    const insetPoly = insetPolygon(stage, 20);
-    const scanlines = buildScanlineMap(insetPoly, height);
-    const ys = insetPoly.map(p => p[1]);
+    // No additional inset — applyMarginClamp already sits the polygon at
+    // 5% outer / 4% top-bottom / 10% gutter. Further insetPolygon(stage, 20)
+    // pulled text another ~5 mm inward for no good reason; stroke bleed past
+    // the polygon edge stays inside the 5% image margin anyway.
+    const scanlines = buildScanlineMap(stage, height);
+    const ys = stage.map(p => p[1]);
     const polyTop = Math.max(0, Math.min(...ys));
     const polyBottom = Math.min(height, Math.max(...ys));
     const lineHeight = Math.round(fontSize * 1.45);
@@ -137,15 +140,16 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   const isFull = textPosition.includes('full');
   const isRight = textPosition.includes('right');
 
-  const textPadding = 20;
-  const insetPoly = insetPolygon(clipPath, textPadding);
-  const scanlines = buildScanlineMap(insetPoly, height);
+  // No textPadding inset — the margin clamp (5%/4%/10%) already keeps the
+  // polygon well inside the image edge; an extra 20 px centroid inset just
+  // pulled text another ~5 mm away from the outer edge for no benefit.
+  const scanlines = buildScanlineMap(clipPath, height);
 
   let align = 'left';
   if (isFull) align = 'center';
   else if (isRight) align = 'right';
 
-  const ys = insetPoly.map(p => p[1]);
+  const ys = clipPath.map(p => p[1]);
   const polyTop = Math.max(0, Math.min(...ys));
   const polyBottom = Math.min(height, Math.max(...ys));
 
@@ -473,37 +477,6 @@ function drawGradient(ctx, polygon, width, height, isTop, isLeft, isRight, isFul
   ctx.fillStyle = grad;
   // Fill a large rect — the clip will constrain it to the polygon
   ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
-}
-
-// ─── Polygon inset ─────────────────────────────────────────────────────────────
-
-/**
- * Shrink a polygon inward by `inset` pixels.
- * Uses simple vertex offset toward the polygon centroid.
- */
-function insetPolygon(polygon, inset) {
-  if (polygon.length < 3) return polygon;
-
-  // Compute centroid
-  let cx = 0, cy = 0;
-  for (const [x, y] of polygon) {
-    cx += x;
-    cy += y;
-  }
-  cx /= polygon.length;
-  cy /= polygon.length;
-
-  return polygon.map(([x, y]) => {
-    const dx = cx - x;
-    const dy = cy - y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 1) return [x, y];
-    const ratio = inset / dist;
-    return [
-      Math.round(x + dx * ratio),
-      Math.round(y + dy * ratio)
-    ];
-  });
 }
 
 // ─── Scanline map ──────────────────────────────────────────────────────────────
