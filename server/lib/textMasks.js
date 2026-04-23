@@ -2,10 +2,12 @@
  * Text area mask loader — pre-built PNGs from assets/masks/
  *
  * Masks are generated once by scripts/build-text-masks.js and loaded into memory
- * at module import. Each mask is a white PNG with a black (blurred) region
- * showing where story text will be placed. The dark region is the reserved text
- * zone — image models should keep it dark and smooth so the white text glyphs
- * stay readable.
+ * at module import. Each mask is a white-background PNG with a black (blurred)
+ * region marking the reserved text zone (~20% of the frame; white story text
+ * overlays on top). The model is told (via the prompt) to treat the black region
+ * as a POSITION guide only: render that area as a natural, saturated, high-
+ * contrast surface (deep sky, dark foliage, rich wall) — NOT as a literal black
+ * box, panel, or frame. Calmness matters more than colour.
  */
 
 const path = require('path');

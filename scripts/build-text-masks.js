@@ -2,10 +2,13 @@
  * Generate pre-built text area masks for empty scene generation.
  *
  * The mask is passed as a reference image to Grok/Gemini:
- * - WHITE area = where story text will be placed (keep calm, light, minimal detail)
- * - BLACK area = where the scene can have full detail
+ * - BLACK area = reserved text zone (~20% of frame) where white story text overlays
+ * - WHITE area = rest of the scene (~80%)
  *
  * Uses soft Gaussian-blurred edges so there's no hard rectangle boundary.
+ * The model is told to treat the black region as a POSITION hint only — render
+ * that area as a natural, saturated, high-contrast surface for white text, not
+ * as a literal black box.
  *
  * Run: node scripts/build-text-masks.js
  * Output: assets/masks/text-mask-{position}-{size}.png

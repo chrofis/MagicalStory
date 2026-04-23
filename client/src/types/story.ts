@@ -750,7 +750,8 @@ export interface SceneImage {
     visionFeedback?: string;
     retryPrompt?: string;
   } | null;
-  textAreaMask?: string | null;  // Base64 data URL — black/white reference mask sent to Grok showing where text-overlay calm zone must exist (white = calm patch)
+  textAreaMask?: string | null;  // Base64 data URL — B/W mask sent to Grok marking the text zone (black ~20% = text zone, white ~80% = rest of scene)
+  emptySceneVbGrid?: string | null;  // Base64 data URL — filtered VB grid (vehicles + non-landmark locations) actually sent to the empty-scene call
   textCoverageReport?: {  // Text-space repair outcome (dev mode)
     words: number;
     fontPt: number;

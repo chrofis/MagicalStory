@@ -6522,6 +6522,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       emptyScenePrompt: img.emptyScenePrompt || null,
       emptySceneQc: img.emptySceneQc || null,
       textAreaMask: img.textAreaMask || null,
+      emptySceneVbGrid: img.emptySceneVbGrid || null,
       textCoverageReport: img.textCoverageReport || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
@@ -6914,11 +6915,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
           || '';
         const textPos = lockedTextPosition || iterateSceneMetadata?.textPosition || null;
+        const { buildTextZoneInstruction } = getStoryHelpers();
+        const iterateTextZoneDesc = iterateSceneMetadata?.textZoneDescription || null;
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
-          TEXT_AREA_INSTRUCTION: textPos ? `The ${textPos.replace('-', ' ')} area must stay calm and uncluttered — a natural continuation of the scene, same sky / wall / water / foliage / ground as the rest of the frame. Saturated colour is fine; what matters is that the area reads as soft and simple. No characters, no sharp edges, no high-contrast detail, no text. Gentle gradients, minimal texture. DO NOT paint a flat rectangle or a hard-edged block of colour.` : ''
+          CHARACTER_SPACE: '',
+          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, '25%') : ''
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

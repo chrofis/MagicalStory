@@ -769,6 +769,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         emptyScenePrompt: img.emptyScenePrompt || null,
         emptySceneQc: img.emptySceneQc || null,
         textAreaMask: img.textAreaMask || null,
+        emptySceneVbGrid: img.emptySceneVbGrid || null,
         textCoverageReport: img.textCoverageReport || null,
         hasEmptySceneImage: pagesWithEmptyScene.has(img.pageNumber) || undefined,
         // Consistency regeneration - flags only, images lazy loaded

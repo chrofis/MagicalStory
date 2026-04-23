@@ -309,6 +309,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
       STYLE_DESCRIPTION: artStyleDesc,
       EMPTY_SCENE_DESCRIPTION: emptyDesc,
+      CHARACTER_SPACE: '',
       REQUIRED_OBJECTS: '',
       TEXT_AREA_INSTRUCTION: ''
     });

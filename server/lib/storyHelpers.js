@@ -863,6 +863,33 @@ function enforceSpreadTextPosition(textPosition, pageNumber) {
   return textPosition;
 }
 
+/**
+ * Build the calm-zone paragraph that gets injected into image prompts.
+ * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
+ * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
+ * when available; falls back to a generic surface list otherwise.
+ *
+ * @param {string} textPosition - e.g. 'top-right', 'bottom-full'
+ * @param {string|null} textZoneDescription - Sonnet's 5–15 word description
+ * @param {string} areaPct - e.g. '30%'
+ * @returns {string} Instruction paragraph for the image model
+ */
+function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct) {
+  const cornerDesc = {
+    'top-left': 'upper-left corner',
+    'top-right': 'upper-right corner',
+    'bottom-left': 'lower-left corner',
+    'bottom-right': 'lower-right corner',
+    'top-full': 'upper third',
+    'bottom-full': 'lower third',
+  };
+  const corner = cornerDesc[textPosition] || textPosition.replace('-', ' ');
+  const surface = textZoneDescription && String(textZoneDescription).trim()
+    ? String(textZoneDescription).trim()
+    : 'a deep, saturated surface — dark sky, deep foliage, rich wall, saturated water, or dark ground';
+  return `**COMPOSITION — CALM TEXT ZONE:** The ${corner} of the image (roughly ${areaPct}) is reserved for white story text overlay. Render that area as: ${surface}. The zone must read as visually calm and continuous with the rest of the scene — same surface, gentle gradient, minimal texture, no characters, no sharp edges, no high-contrast detail. Saturated colour is fine and preferred (deep blue, dark green, rich brown, saturated cobblestone) — what matters is that white text would sit on it with good contrast. Do NOT paint a flat rectangle, a hard-edged colour block, a frame, a box, or pure-black/pure-white fill. No text, no labels, no placeholder.`;
+}
+
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -947,6 +974,7 @@ function extractSceneMetadata(sceneDescription) {
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
+      textZoneDescription: metadata.textZoneDescription || null,
       framingPattern: metadata.framingPattern || null,
       isJsonFormat: true,
       isProseFormat: true
@@ -1094,6 +1122,9 @@ function extractSceneMetadata(sceneDescription) {
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
       // Text overlay position (where to place story text on the illustration)
       textPosition: parsedData.textPosition || null,
+      // Short description of the saturated/high-contrast surface at textPosition
+      // (for white text legibility) — used to steer empty-scene + main-scene prompts.
+      textZoneDescription: parsedData.textZoneDescription || null,
       framingPattern: parsedData.framingPattern || null,
       isJsonFormat: true
     };
@@ -3813,10 +3844,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // options.textPositionOverride takes priority — used by iteratePageCore to carry
   // the locked first-generation textPosition through re-generation, since
   // scene-iteration.txt doesn't emit textPosition in its JSON.
-  const textPosition = enforceSpreadTextPosition(
-    options.textPositionOverride || metadata?.textPosition || null,
-    pageNumber
-  );
+  const rawTextPosition = options.textPositionOverride || metadata?.textPosition || null;
+  const textPosition = enforceSpreadTextPosition(rawTextPosition, pageNumber);
+  // If spread-rule enforcement flipped Sonnet's side, Sonnet's textZoneDescription
+  // was written for the wrong side. Discard it and let the generic fallback drive
+  // wording.
+  const textZoneDescForPrompt = (rawTextPosition && textPosition && rawTextPosition !== textPosition)
+    ? null
+    : (metadata?.textZoneDescription || null);
   const langLevel = inputData?.languageLevel || 'standard';
   // textInImage: false ⇒ text is rendered in a separate strip below the image
   // (advanced reading level / square layout). The image has no text overlay,
@@ -3836,7 +3871,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     'bottom-full': 'lower third',
   };
   const textAreaInstruction = (textInImage && textPosition)
-    ? `**COMPOSITION — CALM ZONE:** The ${cornerDesc[textPosition] || textPosition.replace('-', ' ')} of the image (roughly ${areaPct}) must stay visually calm and uncluttered — a natural continuation of the scene, same sky / wall / water / foliage / ground as the rest of the frame. Saturated colour is fine; what matters is that the area reads as soft and simple. No characters, no sharp edges, no high-contrast detail, no text. Gentle gradients, minimal texture. DO NOT paint a flat rectangle or a hard-edged block of colour.`
+    ? buildTextZoneInstruction(textPosition, textZoneDescForPrompt, areaPct)
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)
@@ -4928,6 +4963,7 @@ module.exports = {
 
   // Text position
   enforceSpreadTextPosition,
+  buildTextZoneInstruction,
 
   // Parsers
   parseStoryPages,

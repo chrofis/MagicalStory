@@ -6,6 +6,8 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {TEXT_AREA_INSTRUCTION}
 
+**ABOUT THE BLACK-AND-WHITE REFERENCE IMAGE:** One of the reference images is a black-and-white guide marking the reserved text zone. The BLACK region (~20% of the frame, soft blurred edges) shows where the calm, saturated zone belongs. The WHITE region (~80%) is the rest of the scene. DO NOT copy the mask literally into the output — do not paint a black rectangle, a black box, a framed panel, or a flat black fill. Do not pull the scene's colours toward black in that corner. Treat the mask as a position indicator only: the zone there must still be a natural, continuous part of the scene (sky, wall, water, foliage, ground) — just rendered as the saturated, high-contrast surface described above.
+
 Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not add any text, labels, or watermarks.
 Lighting must come from a consistent direction — all shadows point the same way.
 The ground, floor, or surface where characters would stand or sit must be clearly visible.

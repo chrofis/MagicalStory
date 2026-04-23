@@ -4816,29 +4816,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
             // Enforce spread rule: odd pages = left side, even = right side
-            const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
-            const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
+            const { enforceSpreadTextPosition, buildTextZoneInstruction } = require('./server/lib/storyHelpers');
+            const sonnetTextPos = sceneMetadata?.textPosition || null;
+            const textPos = enforceSpreadTextPosition(sonnetTextPos, pageData.pageNumber);
+            // If spread rule flipped Sonnet's left/right, Sonnet's textZoneDescription
+            // was written for the wrong side — discard it and let the code-generated
+            // fallback (generic saturated-surface wording) drive the instruction.
+            const sideFlipped = sonnetTextPos && textPos && sonnetTextPos !== textPos;
+            const textZoneDesc = sideFlipped ? null : (sceneMetadata?.textZoneDescription || null);
+            if (sideFlipped) {
+              log.warn(`⚠️ [UNIFIED] Page ${pageData.pageNumber}: Sonnet picked ${sonnetTextPos} against spread rule → flipped to ${textPos}, discarding textZoneDescription`);
+            }
             const langLevel = inputData.languageLevel || 'standard';
             // textInImage drives whether we ask the model to keep a calm zone for
             // text overlay AND whether we attach the visual mask reference. When
             // text is rendered below the image (advanced layout), neither is needed.
             const layoutTextInImage = inputData?.layout?.textInImage !== false;
             const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
-            // Load pre-built text area mask (white=text zone, black=full detail).
-            // The model uses this as a visual reference — much more reliable than prompt text.
+            // Load pre-built text area mask (black=text zone ~20%, white=scene ~80%).
+            // Sent as a reference slot so the model sees the shape directly.
             const { getTextAreaMask } = require('./server/lib/textMasks');
             const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
 
-            // NOTE: the scene-expansion prompt (story-unified.txt) now requires
-            // Sonnet to end the emptyScenePrompt with a sentence that names
-            // the textPosition corner and describes it as DARK. That sentence
-            // is the single source of truth for the text-zone composition.
-            // We used to inject a second "COMPOSITION — KEEP THIS AREA DARK"
-            // instruction here, but it caused contradictions when Sonnet
-            // described a different corner or luminance than what the code
-            // injected — Grok saw two conflicting instructions and painted
-            // something that honored neither. Dropping the duplicate.
-            const emptyTextAreaInstr = '';
+            // Calm-zone instruction for the empty-scene generator. Story text is
+            // WHITE and overlaid at textPos, so the zone must render as a saturated,
+            // high-contrast surface. Sonnet picks the corner + surface; the code
+            // owns wording + spread-rule enforcement.
+            const emptyAreaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '25%';
+            const emptyTextAreaInstr = (layoutTextInImage && textPos)
+              ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct)
+              : '';
 
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
@@ -4854,6 +4861,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // doubling (e.g. an artifact rendered both in the empty scene and in the
               // character's hand on the page).
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || []);
+              // Persist the filtered grid as a data URL so the dev UI can show what
+              // was actually attached to the empty-scene call (main-scene VB grid is
+              // different; before this, the UI was displaying the wrong one).
+              const emptySceneVbGridDataUrl = emptySceneVbGrid
+                ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
+                : null;
 
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -4897,12 +4910,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const fixHint = qc.visionFeedback
                     ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
                     : '';
-                  // Soften the text area instruction instead of removing it entirely.
-                  // White text will be overlaid, so the zone must be DARK and smooth —
-                  // deep shadowed tones of the scene's own palette, never a flat
-                  // black rectangle.
+                  // Soften the text area instruction using the shared builder. White
+                  // text will be overlaid, so the zone must be a saturated, high-
+                  // contrast surface — never a flat black rectangle or blank patch.
                   const softerTextInstr = textPos
-                    ? `Keep the ${textPos.replace('-', ' ')} area DARK and smooth — deep/shadowed tones of the scene's own palette (dusk sky, shadowed wall, deep water, dark foliage), slightly less detail than the rest of the scene. White text will be printed here. Do NOT paint a flat black rectangle or blank patch.`
+                    ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct)
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
                   const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
@@ -4926,17 +4938,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask };
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                     }
                     log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask };
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                   }
                 }
               }
 
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask };
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
             } catch (err) {
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
               return null;
@@ -4950,6 +4962,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: bg.imageData,
               prompt: bg.prompt,
               textAreaMask: bg.textAreaMask || null,
+              emptySceneVbGrid: bg.emptySceneVbGrid || null,
               // Store QC data for dev mode comparison (v1 failed, v2 retry)
               ...(bg.v1ImageData ? {
                 v1ImageData: bg.v1ImageData,
@@ -5077,6 +5090,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               emptySceneImage: emptySceneData?.imageData || null,
               emptyScenePrompt: emptySceneData?.prompt || null,
               textAreaMask: emptySceneData?.textAreaMask || null,
+              emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
               emptySceneQc: emptySceneData?.v1Issues ? {
                 v1ImageData: emptySceneData.v1ImageData,
                 v1Issues: emptySceneData.v1Issues,
