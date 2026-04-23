@@ -358,14 +358,17 @@ async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
 
 async function selectTraitButtons(page: Page, labels: string[], max: number) {
   let clicked = 0;
+  const overallDeadline = Date.now() + 15000;
   // First try exact matches from JSON data — these are curated-per-character.
   for (const label of labels) {
-    if (clicked >= max) break;
+    if (clicked >= max || Date.now() > overallDeadline) break;
     const chip = page.getByRole('button', { name: label, exact: true });
     if (await chip.isVisible({ timeout: 500 }).catch(() => false)) {
-      await chip.click();
+      // Explicit 2s click timeout — Playwright default is 30s and a stuck
+      // click could otherwise stack across labels.
+      await chip.click({ timeout: 2000 }).catch(() => {});
       clicked++;
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(150);
     }
   }
   // If we didn't find enough, click unselected trait chips. Hard 10s budget
@@ -384,9 +387,9 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
       const classNames = (await btn.getAttribute('class')) || '';
       // Skip already-selected (indigo background)
       if (classNames.includes('bg-indigo')) continue;
-      await btn.click().catch(() => {});
+      await btn.click({ timeout: 2000 }).catch(() => {});
       clicked++;
-      await page.waitForTimeout(150);
+      await page.waitForTimeout(100);
     }
   }
   return clicked;
@@ -394,10 +397,16 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
 
 async function selectTraits(page: Page, char: DemoCharacter) {
   console.log(`    selecting traits (${char.traits.strengths.length}S / ${char.traits.flaws.length}F / ${char.traits.challenges.length}C)...`);
+  const t0 = Date.now();
   const s = await selectTraitButtons(page, char.traits.strengths, Math.max(3, char.traits.strengths.length));
+  const t1 = Date.now();
+  console.log(`      strengths: ${s} clicked in ${t1 - t0}ms`);
   const f = await selectTraitButtons(page, char.traits.flaws, Math.max(2, char.traits.flaws.length));
+  const t2 = Date.now();
+  console.log(`      flaws: ${f} clicked in ${t2 - t1}ms`);
   const c = await selectTraitButtons(page, char.traits.challenges, Math.max(2, char.traits.challenges.length));
-  console.log(`    selected ${s} strengths, ${f} flaws, ${c} challenges`);
+  const t3 = Date.now();
+  console.log(`      challenges: ${c} clicked in ${t3 - t2}ms`);
   await page.waitForTimeout(500);
 }
 
