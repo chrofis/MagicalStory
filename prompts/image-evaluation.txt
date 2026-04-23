@@ -13,7 +13,7 @@ You are an Illustration QA Analyst for publishing. Evaluate the generated artwor
 **STEP 1: FIGURE INVENTORY**
 
 For EACH figure in the generated image, note:
-- Position: (Foreground/Background, Left/Center/Right)
+- Zone: one of `left-foreground`, `center-foreground`, `right-foreground`, `left-midground`, `center-midground`, `right-midground`, `left-background`, `center-background`, `right-background`
 - Hair: (color, length, style)
 - Clothing: (items and colors — be specific)
 - Action: (what they're doing)
@@ -181,7 +181,7 @@ Return JSON only (no other text):
   "figures": [
     {
       "id": 1,
-      "position": "Foreground, Center",
+      "zone": "center-foreground",
       "hair": "blonde, short",
       "clothing": "blue hoodie, dark pants",
       "action": "holding stuffed toy",

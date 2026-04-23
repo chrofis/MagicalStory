@@ -892,7 +892,12 @@ Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "on
  * @returns {Promise<Object|null>} Three-stage result or null on failure
  */
 async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {}) {
-  const { qualityModelOverride = null, pageContext = '', storyText = null } = options;
+  const {
+    qualityModelOverride = null,
+    pageContext = '',
+    storyText = null,
+    qualityFiguresPromise = null,
+  } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   const visionPrompt = PROMPT_TEMPLATES.imageVisionInventory;
@@ -992,13 +997,33 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     return null;
   }
 
-  // --- Stage 2: Prompt compliance with Haiku (text only, NO image) ---
+  // --- Stage 2: Prompt compliance with Sonnet (text only, NO image) ---
   let complianceResult = null;
   let stage2Usage = { input_tokens: 0, output_tokens: 0 };
   try {
+    // If quality eval is producing its own figures[] + matches[], wait for those
+    // so Stage 2 can pair named figures (quality) with independent descriptions (vision)
+    // using the shared 9-zone vocabulary. If quality eval isn't running or fails,
+    // pass an empty block and Stage 2 falls back to vision-only reasoning.
+    let qualityFiguresBlock = '(not available)';
+    if (qualityFiguresPromise) {
+      try {
+        const qf = await qualityFiguresPromise;
+        if (qf && (qf.figures?.length || qf.matches?.length)) {
+          qualityFiguresBlock = JSON.stringify({
+            figures: qf.figures || [],
+            matches: qf.matches || [],
+          }, null, 2);
+        }
+      } catch (e) {
+        log.debug(`[THREE-STAGE] ${pageLabel}quality figures unavailable: ${e.message}`);
+      }
+    }
+
     const complianceInput = fillTemplate(complianceTemplate, {
       ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
       VISUAL_INVENTORY: visionText,
+      QUALITY_FIGURES: qualityFiguresBlock,
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000)
     });
@@ -1162,10 +1187,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
-    // Start three-stage eval in parallel for scene evaluations
+    // Start three-stage eval in parallel for scene evaluations.
+    // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
+    // can pair each named character with the blind vision inventory by zone. We expose
+    // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
     let threeStagePromise = null;
+    let qualityFiguresResolve = null;
+    let qualityFiguresPromise = null;
     if (evaluationType === 'scene') {
-      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, { qualityModelOverride, pageContext, storyText });
+      qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
+      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
+        qualityModelOverride,
+        pageContext,
+        storyText,
+        qualityFiguresPromise,
+      });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }
 
@@ -1583,6 +1619,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // Release quality figures/matches to three-stage Stage 2
+      if (qualityFiguresResolve) {
+        qualityFiguresResolve({ figures, matches });
+      }
+
       // Await semantic evaluation if running in parallel
       let semanticResult = null;
       let finalScore = score;
@@ -1802,6 +1843,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     if (semanticPromise) await semanticPromise.catch(() => {});
     if (threeStagePromise) await threeStagePromise.catch(() => {});
     return null;
+  } finally {
+    // Always release three-stage Stage 2 so it doesn't hang on any early return.
+    // Safe to call twice — promises ignore subsequent resolve() calls.
+    if (qualityFiguresResolve) qualityFiguresResolve(null);
   }
 }
 

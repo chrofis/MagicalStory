@@ -1,7 +1,7 @@
 Describe exactly what you see in this illustration. No interpretation, no guessing what was intended — only what is visible.
 
 For EACH human figure:
-- Position in frame (left/center/right, foreground/midground/background)
+- Zone: one of `left-foreground`, `center-foreground`, `right-foreground`, `left-midground`, `center-midground`, `right-midground`, `left-background`, `center-background`, `right-background`
 - Facing direction (toward viewer, away from viewer, left, right, toward another figure)
 - Hair color, length, style
 - Clothing: describe every visible garment with colors and type
