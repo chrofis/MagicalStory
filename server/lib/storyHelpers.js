@@ -217,73 +217,75 @@ function getGenderTerm(gender, apparentAge) {
 function buildHairDescription(physical, physicalTraitsSource = null) {
   if (!physical) return '';
 
-  const parts = [];
   const detailed = physical.detailedHairAnalysis;
+  if (!detailed) {
+    // Truly legacy record (no detailed analysis). Use whatever prose is
+    // stored in the free-form `hair` field as a last resort.
+    return physical.hair || '';
+  }
 
-  // Color (always use if available)
+  const parts = [];
+
+  // Color — the one non-hair-shape field that stays at top level. Describes
+  // the hair colour even when the person is bald (greying temples etc.).
   if (physical.hairColor) parts.push(physical.hairColor);
 
-  // Type/texture: User-edited hairStyle takes priority over detailed analysis
-  // This allows users to correct "wavy" -> "ponytail" even if AI extracted "wavy" from photo
-  if (physicalTraitsSource?.hairStyle === 'user' && physical.hairStyle) {
-    // User explicitly set hairStyle - use it
-    parts.push(physical.hairStyle);
-  } else if (detailed?.type) {
-    // Use detailed analysis type (wavy, curly, straight)
-    parts.push(detailed.type);
-  } else if (physical.hairStyle && !['messy', 'natural', 'tousled', 'styled'].includes(physical.hairStyle?.toLowerCase())) {
-    // Only use simple hairStyle if it's specific (ponytail, braids, etc), not vague (messy)
-    parts.push(physical.hairStyle);
+  // Bald / near-bald takes priority — don't add texture/length/styling that
+  // make no sense on bald hair. ("white, bald" beats "white, straight".)
+  const lengthTop = detailed.lengthTop?.toLowerCase();
+  const density = detailed.density?.toLowerCase();
+  const isBald = lengthTop === 'bald' || density === 'bald';
+  const isBalding = density === 'balding';
+  if (isBald) {
+    parts.push('bald');
+    return parts.join(', ');
+  }
+  if (isBalding) {
+    parts.push('balding');
+    // Fall through so we still describe whatever hair remains (e.g. "balding, short on sides").
   }
 
-  // Length - use detailed analysis with descriptive terms (short, ear-length, shoulder-length, etc.)
-  // Length scale: bald < buzz cut < short < ear-length < chin-length < neck-length < shoulder-length < mid-back < waist-length
+  // Type/texture. User-edited override wins so users can correct the
+  // analyser. Accepts the same enum the detailed analyser uses.
+  if (physicalTraitsSource?.hairType === 'user' && detailed.type) {
+    parts.push(detailed.type);
+  } else if (detailed.type) {
+    parts.push(detailed.type);
+  }
+
+  // Length — scale for picking the more informative description.
   const lengthOrder = ['bald', 'buzz cut', 'shaved', 'fade', 'tapered', 'short', 'ear-length', 'chin-length', 'neck-length', 'shoulder-length', 'mid-back', 'waist-length'];
 
-  if (detailed?.lengthTop) {
-    const topLength = detailed.lengthTop?.toLowerCase();
+  if (lengthTop) {
     const sidesLength = detailed.lengthSides?.toLowerCase();
-
-    // Check if sides are different from top (fade/tapered/undercut)
     if (sidesLength && sidesLength !== 'same as top') {
-      const topIdx = lengthOrder.indexOf(topLength);
+      const topIdx = lengthOrder.indexOf(lengthTop);
       const sidesIdx = lengthOrder.indexOf(sidesLength);
-
-      // If sides are at least 2 steps shorter than top, describe the difference
       if (topIdx >= 0 && sidesIdx >= 0 && topIdx - sidesIdx >= 2) {
-        parts.push(`${sidesLength} on sides, ${topLength} on top`);
-      } else if (topLength && topLength !== 'bald') {
-        parts.push(topLength);
+        parts.push(`${sidesLength} on sides, ${lengthTop} on top`);
+      } else {
+        parts.push(lengthTop);
       }
-    } else if (topLength && topLength !== 'bald') {
-      // Uniform length - just use the top length
-      parts.push(topLength);
+    } else {
+      parts.push(lengthTop);
     }
-  } else if (physical.hairLength) {
-    // Fall back to simple hairLength field
-    parts.push(physical.hairLength);
   }
 
-  // Styling from detailed analysis (if descriptive)
-  const styling = detailed?.styling?.toLowerCase();
+  // Styling from detailed analysis (if descriptive).
+  const styling = detailed.styling?.toLowerCase();
   if (styling && !['natural', 'textured'].includes(styling)) {
     parts.push(styling);
   }
 
-  // Bangs from detailed analysis
-  if (detailed?.bangsEndAt && detailed.bangsEndAt !== 'no bangs') {
+  // Bangs.
+  if (detailed.bangsEndAt && detailed.bangsEndAt !== 'no bangs') {
     parts.push(`bangs ${detailed.bangsEndAt}`);
   }
 
-  // Parting from detailed analysis (supports both new 'parting' and legacy 'direction' field)
-  const parting = detailed?.parting || detailed?.direction;
+  // Parting — supports legacy `direction` alias.
+  const parting = detailed.parting || detailed.direction;
   if (parting && !['none', 'natural', 'back', 'forward'].includes(parting)) {
     parts.push(parting);
-  }
-
-  // If no detailed parts, fall back to legacy hair field
-  if (parts.length === 0 && physical.hair) {
-    return physical.hair;
   }
 
   return parts.join(', ');
@@ -2443,6 +2445,10 @@ function extractCharacterVisualProfile(char, options = {}) {
     height: char.height || char.physical?.height || null,
     build: physical.build || char.physical?.build || null,
     eyeColor: physical.eyeColor || null,
+    // Hair description is derived from detailedHairAnalysis only (see
+    // buildHairDescription). The legacy simple fields hairStyle/hairLength/
+    // hairDensity are no longer read — they drifted from detailedHairAnalysis
+    // and produced wrong prose (e.g. calling a bald character "white, straight").
     hair: buildHairDescription(physical, char.physicalTraitsSource) || null,
     facialHair: physical.facialHair || char.physical?.facialHair || null,
     face: physical.face || char.physical?.face || char.otherFeatures || null,

@@ -569,9 +569,6 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
               if (extractedTraits) {
                 const physical = charData.characters[0].physical || {};
                 if (extractedTraits.hairColor) physical.hairColor = extractedTraits.hairColor;
-                if (extractedTraits.hairLength) physical.hairLength = extractedTraits.hairLength;
-                if (extractedTraits.hairStyle) physical.hairStyle = extractedTraits.hairStyle;
-                if (extractedTraits.hairDensity) physical.hairDensity = extractedTraits.hairDensity;
                 if (extractedTraits.eyeColor) physical.eyeColor = extractedTraits.eyeColor;
                 if (extractedTraits.skinTone) physical.skinTone = extractedTraits.skinTone;
                 if (extractedTraits.apparentAge) physical.apparentAge = extractedTraits.apparentAge;
@@ -695,9 +692,6 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
                 const physical = charData.characters[0].physical || {};
                 const t = traitsResult.traits;
                 if (t.hairColor) physical.hairColor = t.hairColor;
-                if (t.hairLength) physical.hairLength = t.hairLength;
-                if (t.hairStyle) physical.hairStyle = t.hairStyle;
-                if (t.hairDensity) physical.hairDensity = t.hairDensity;
                 if (t.eyeColor) physical.eyeColor = t.eyeColor;
                 if (t.skinTone) physical.skinTone = t.skinTone;
                 if (t.apparentAge) physical.apparentAge = t.apparentAge;

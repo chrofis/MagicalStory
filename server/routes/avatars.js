@@ -539,10 +539,12 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
  * @returns {{ traits: Object, sources: Object }} Merged traits + per-field source info
  */
 function consensusTraits(photoTraits, avatarTraitsArray) {
-  // Face-related fields that use consensus voting
+  // Face-related fields that use consensus voting.
+  // Hair shape/length/density/styling consolidated into detailedHairAnalysis
+  // (a photo-only field), so they don't participate in consensus voting.
   const CONSENSUS_FIELDS = [
     'apparentAge', 'build', 'skinTone', 'eyeColor',
-    'hairColor', 'hairDensity', 'hairLength', 'hairStyle', 'facialHair'
+    'hairColor', 'facialHair'
   ];
 
   // Fields that just copy from photo (no avatar equivalent or photo is definitive)
@@ -2302,8 +2304,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       const traitLines = [];
       if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
       if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
-      if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
-      if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
+      // Hair shape/length from detailedHairAnalysis (single source of truth).
+      const hairDesc = buildHairDescription(physicalTraits);
+      if (hairDesc) traitLines.push(`- Hair: ${hairDesc}`);
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
       if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
       if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
@@ -2971,9 +2974,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               setTrait('build', t.build);
               setTrait('eyeColor', t.eyeColor);
               setTrait('hairColor', t.hairColor);
-              setTrait('hairLength', t.hairLength);
-              setTrait('hairStyle', t.hairStyle);
-              setTrait('hairDensity', t.hairDensity);
               setTrait('skinTone', t.skinTone);
               setTrait('skinToneHex', t.skinToneHex);
               setTrait('facialHair', t.facialHair);
@@ -2982,7 +2982,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               setTrait('glasses', t.glasses);
               setTrait('eyeColorHex', t.eyeColorHex);
               setTrait('hairColorHex', t.hairColorHex);
-              if (t.detailedHairAnalysis && existingSources['hairStyle'] !== 'user') {
+              // Hair shape / length / density / styling — single source of truth.
+              // The old simple fields hairLength/hairStyle/hairDensity have been
+              // removed; buildHairDescription reads only detailedHairAnalysis.
+              if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
                 physical.detailedHairAnalysis = t.detailedHairAnalysis;
               }
 
@@ -3238,8 +3241,9 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       const traitLines = [];
       if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
       if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
-      if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
-      if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
+      // Hair shape/length from detailedHairAnalysis (single source of truth).
+      const hairDesc = buildHairDescription(physicalTraits);
+      if (hairDesc) traitLines.push(`- Hair: ${hairDesc}`);
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
       if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
       if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
@@ -4033,9 +4037,6 @@ These corrections OVERRIDE what is visible in the reference photo.
               setTrait('build', t.build);
               setTrait('eyeColor', t.eyeColor);
               setTrait('hairColor', t.hairColor);
-              setTrait('hairLength', t.hairLength);
-              setTrait('hairStyle', t.hairStyle);
-              setTrait('hairDensity', t.hairDensity);
               setTrait('skinTone', t.skinTone);
               setTrait('skinToneHex', t.skinToneHex);
               setTrait('facialHair', t.facialHair);
@@ -4044,7 +4045,10 @@ These corrections OVERRIDE what is visible in the reference photo.
               setTrait('glasses', t.glasses);
               setTrait('eyeColorHex', t.eyeColorHex);
               setTrait('hairColorHex', t.hairColorHex);
-              if (t.detailedHairAnalysis && existingSources['hairStyle'] !== 'user') {
+              // Hair shape / length / density / styling — single source of truth.
+              // The old simple fields hairLength/hairStyle/hairDensity have been
+              // removed; buildHairDescription reads only detailedHairAnalysis.
+              if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
                 physical.detailedHairAnalysis = t.detailedHairAnalysis;
               }
 

@@ -15,7 +15,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
-const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene } = require('./storyHelpers');
+const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription } = require('./storyHelpers');
 const { getFacePhoto } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 
@@ -2489,16 +2489,9 @@ function buildPhysicalTraitsDescription(character) {
   if (character.age) parts.push(`${character.age} year old`);
   if (character.gender) parts.push(character.gender);
 
-  // Hair
-  const hairParts = [];
-  if (p.hairColor) hairParts.push(p.hairColor);
-  if (p.hairLength) hairParts.push(p.hairLength);
-  if (p.hairStyle) hairParts.push(p.hairStyle);
-  if (hairParts.length > 0) {
-    parts.push(`${hairParts.join(' ')} hair`);
-  } else if (p.hair) {
-    parts.push(`${p.hair} hair`);
-  }
+  // Hair — derived from detailedHairAnalysis + hairColor (single source of truth).
+  const hairDesc = buildHairDescription(p) || p.hair;
+  if (hairDesc) parts.push(`${hairDesc} hair`);
 
   // Eyes
   if (p.eyeColor) parts.push(`${p.eyeColor} eyes`);
@@ -2655,7 +2648,9 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     // Build physical traits description
     const physicalTraits = buildPhysicalTraitsDescription(character);
     const hairColor = character.physical?.hairColor || 'as shown in reference';
-    const hairStyle = character.physical?.hairStyle || character.physical?.hairLength || 'as shown in reference';
+    // Derive the hair-style slot from detailedHairAnalysis (styling + length/texture).
+    const builtHair = buildHairDescription(character.physical || {}, character.physicalTraitsSource);
+    const hairStyle = builtHair || 'as shown in reference';
 
     // Build clothing description for this scene
     const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle);

@@ -29,8 +29,10 @@ Score 1-10 (10 = perfect age match, proportions look natural for this age).
 Common AI failures: making children look too old (adult body proportions), making adults look too young, wrong head-to-body ratio for age.
 
 TASK 5: DETAILED HAIR ANALYSIS (from IMAGE 2 - the generated avatar)
-Extract detailed hair characteristics for better consistency across scenes.
-This provides more precise hair descriptions than the simple hairStyle field.
+Extract detailed hair characteristics for consistency across scenes. This is the
+single source of hair shape/length/density/styling — there is no separate simple
+hair field. If the character is bald, set `lengthTop` to "bald" and still return
+this block (styling/bangs/parting can be "natural"/"no bangs"/"none").
 
 IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed.
 
@@ -61,9 +63,6 @@ Return a JSON object with this EXACT structure:
     "eyeColorHex": "<iris color as HEX code, e.g. '#6B4423'>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
-    "hairDensity": "<MUST be one of: full | thinning | balding | bald>",
-    "hairLength": "<MUST be one of: bald | balding | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
-    "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
     "face": "<brief description of face shape, distinguishing features>",
     "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses'). Use 'none' if no glasses>",

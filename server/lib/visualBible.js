@@ -11,6 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
+const { buildHairDescription } = require('./storyHelpers');
 
 // ============================================================================
 // PARSING FUNCTIONS
@@ -504,12 +505,11 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
     // prompts, evals) to lose identity traits and flag correct renders as bugs.
     const physical = { ...getPhysical(char) };
     // Dev-panel back-compat: the frontend reads `physical.hair` as a flat
-    // string. The canonical object uses hairLength/hairStyle/hairColor. Build
-    // a concatenated `hair` so the UI still shows something useful without
-    // requiring a frontend change.
+    // string. Build it from detailedHairAnalysis + hairColor (the single
+    // source of truth for hair shape/length/density/styling).
     if (!physical.hair) {
-      const hairParts = [physical.hairLength, physical.hairStyle, physical.hairColor].filter(Boolean);
-      if (hairParts.length) physical.hair = hairParts.join(' ');
+      const built = buildHairDescription(physical, char.physicalTraitsSource);
+      if (built) physical.hair = built;
     }
     return {
       id: char.id,
@@ -713,13 +713,9 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
       if (meaningful(p.build)) prompt += `- Build: ${p.build}\n`;
       if (meaningful(p.skinTone)) prompt += `- Skin tone: ${p.skinTone}\n`;
       if (meaningful(p.eyeColor)) prompt += `- Eyes: ${p.eyeColor}\n`;
-      // Hair: prefer detailed trio, fall back to hairColor alone, then legacy 'hair'
-      const hairParts = [];
-      if (meaningful(p.hairLength)) hairParts.push(p.hairLength);
-      if (meaningful(p.hairStyle)) hairParts.push(p.hairStyle);
-      if (meaningful(p.hairColor)) hairParts.push(p.hairColor);
-      const hairCombined = hairParts.join(' ') || (meaningful(p.hair) ? p.hair : null);
-      if (hairCombined) prompt += `- Hair: ${hairCombined}\n`;
+      // Hair: derived from detailedHairAnalysis + hairColor (single source of truth).
+      const hairCombined = buildHairDescription(p) || (meaningful(p.hair) ? p.hair : null);
+      if (meaningful(hairCombined)) prompt += `- Hair: ${hairCombined}\n`;
       if (meaningful(p.facialHair)) {
         prompt += p.facialHair.toLowerCase() === 'clean-shaven'
           ? '- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face\n'

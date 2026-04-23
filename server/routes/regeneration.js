@@ -44,6 +44,7 @@ const {
   extractJsonFromText,
   stripSceneMetadata,
   extractCoverScenes,
+  buildHairDescription,
   ART_STYLES
 } = require('../lib/storyHelpers');
 const {
@@ -4246,7 +4247,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 const bbox = appearance.faceBox || appearance.bodyBox;
                 const hairConfig = {
                   color: character.physical?.hairColor,
-                  style: character.physical?.hairStyle || character.physical?.hairLength,
+                  style: buildHairDescription(character.physical || {}, character.physicalTraitsSource) || null,
                   property: 'textured'
                 };
 

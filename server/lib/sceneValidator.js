@@ -18,7 +18,7 @@ const { generateWithRunware, RUNWARE_MODELS, isRunwareConfigured } = require('./
 const { callTextModel } = require('./textModels');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
-const { expandPositionAbbreviations, stripEntityIds } = require('./storyHelpers');
+const { expandPositionAbbreviations, stripEntityIds, buildHairDescription } = require('./storyHelpers');
 const { getPhysical } = require('./characterPhysical');
 
 // Initialize Gemini
@@ -302,8 +302,8 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
     const physical = getPhysical(char);
 
     const traits = [];
-    if (physical.hairColor) traits.push(`${physical.hairColor} hair`);
-    if (physical.hairStyle) traits.push(`(${physical.hairStyle})`);
+    const hairDesc = buildHairDescription(physical, char.physicalTraitsSource);
+    if (hairDesc) traits.push(`${hairDesc} hair`);
     if (physical.eyeColor) traits.push(`${physical.eyeColor} eyes`);
     if (physical.build) traits.push(`${physical.build} build`);
     if (char.age) traits.push(`age: ${char.age}`);
