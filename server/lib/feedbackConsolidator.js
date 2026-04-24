@@ -114,29 +114,27 @@ function buildFeedbackInput({
 }
 
 /**
- * Flatten entity report characters[name].byClothing[cat].issues[] into a flat list.
+ * Flatten entity report characters[name].issues[] into a flat list.
+ *
+ * Read only from the TOP-LEVEL char.issues array — entityConsistency.js stores
+ * every issue in two places (byClothing[cat].issues AND top-level .issues),
+ * but only the top-level version gets pageNumbers stamped on it. Reading both
+ * causes: (1) "duplicated x2" drops in the consolidator, and (2) worse — the
+ * byClothing copies have no pageNumbers, so the per-page filter downstream
+ * lets them through on every page, not just the ones where the character
+ * actually appears. That's how Werner's "bald/glasses" findings from page 4
+ * leaked into every other page's repair plan.
  */
 function flattenEntityIssues(entityReport) {
   const out = [];
   if (!entityReport?.characters) return out;
   for (const [charName, charData] of Object.entries(entityReport.characters)) {
-    const byClothing = charData.byClothing || {};
-    for (const clothingData of Object.values(byClothing)) {
-      for (const iss of clothingData.issues || []) {
-        out.push({
-          characterName: charName,
-          description: iss.description || iss.issue || '',
-          severity: iss.severity || 'MODERATE',
-          pageNumbers: iss.pageNumbers,
-        });
-      }
-    }
-    // Also top-level character-wide issues
     for (const iss of charData.issues || []) {
       out.push({
         characterName: charName,
         description: iss.description || iss.issue || '',
         severity: iss.severity || 'MODERATE',
+        pageNumbers: iss.pageNumbers,
       });
     }
   }

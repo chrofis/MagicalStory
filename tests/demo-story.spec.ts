@@ -359,10 +359,12 @@ async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
 async function selectTraitButtons(page: Page, labels: string[], max: number, sectionLabelRe: RegExp) {
   let clicked = 0;
   const overallDeadline = Date.now() + 15000;
-  // Scope chips to the section identified by sectionLabelRe (Stärken/Schwächen/
-  // Konflikte). All three TraitSelector instances render `button.rounded-full`
-  // so an unscoped match would let strength-fallbacks click flaws/challenges.
-  const section = page.locator('div', { has: page.getByRole('button', { name: sectionLabelRe }) }).first();
+  // Scope chips to ONE TraitSelector section. Locator: the immediate parent
+  // <div> of the section's header <button>. `page.locator('div', { has: ... }).first()`
+  // is too loose — it matches the outermost wrapper that contains all three
+  // sections, defeating the scoping. xpath=.. gives us the direct parent only.
+  const headerBtn = page.getByRole('button', { name: sectionLabelRe }).first();
+  const section = headerBtn.locator('xpath=..');
 
   // Exact matches from JSON data first.
   for (const label of labels) {
