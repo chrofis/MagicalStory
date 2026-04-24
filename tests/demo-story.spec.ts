@@ -356,37 +356,35 @@ async function clickAnyNext(page: Page, timeoutMs = 5000): Promise<boolean> {
   return false;
 }
 
-async function selectTraitButtons(page: Page, labels: string[], max: number) {
+async function selectTraitButtons(page: Page, labels: string[], max: number, sectionLabelRe: RegExp) {
   let clicked = 0;
   const overallDeadline = Date.now() + 15000;
-  // First try exact matches from JSON data — these are curated-per-character.
+  // Scope chips to the section identified by sectionLabelRe (Stärken/Schwächen/
+  // Konflikte). All three TraitSelector instances render `button.rounded-full`
+  // so an unscoped match would let strength-fallbacks click flaws/challenges.
+  const section = page.locator('div', { has: page.getByRole('button', { name: sectionLabelRe }) }).first();
+
+  // Exact matches from JSON data first.
   for (const label of labels) {
     if (clicked >= max || Date.now() > overallDeadline) break;
-    const chip = page.getByRole('button', { name: label, exact: true });
+    const chip = section.getByRole('button', { name: label, exact: true });
     if (await chip.isVisible({ timeout: 500 }).catch(() => false)) {
-      // Explicit 2s click timeout — Playwright default is 30s and a stuck
-      // click could otherwise stack across labels.
       await chip.click({ timeout: 2000 }).catch(() => {});
       clicked++;
       await page.waitForTimeout(150);
     }
   }
-  // If we didn't find enough, click unselected trait chips. Hard 10s budget
-  // per call: previous run hung 90 min in this loop because rounded-full
-  // matches more than chips and clicks-toggle, so `clicked < max` never
-  // closed. Trait minimums are 3 strengths + 2 flaws — partial selections
-  // fail validation but the next character will retry.
+  // Fallback: click any unselected chip in this section (10s budget).
   if (clicked < max) {
-    const deadline = Date.now() + 10000;
-    const chips = page.locator('button.rounded-full');
+    const deadline = Math.min(Date.now() + 10000, overallDeadline);
+    const chips = section.locator('button.rounded-full');
     const count = await chips.count().catch(() => 0);
     for (let i = 0; i < count && clicked < max; i++) {
       if (Date.now() > deadline) break;
       const btn = chips.nth(i);
       if (!await btn.isVisible({ timeout: 200 }).catch(() => false)) continue;
       const classNames = (await btn.getAttribute('class')) || '';
-      // Skip already-selected (indigo background)
-      if (classNames.includes('bg-indigo')) continue;
+      if (classNames.includes('bg-indigo')) continue;  // already selected
       await btn.click({ timeout: 2000 }).catch(() => {});
       clicked++;
       await page.waitForTimeout(100);
@@ -397,14 +395,17 @@ async function selectTraitButtons(page: Page, labels: string[], max: number) {
 
 async function selectTraits(page: Page, char: DemoCharacter) {
   console.log(`    selecting traits (${char.traits.strengths.length}S / ${char.traits.flaws.length}F / ${char.traits.challenges.length}C)...`);
+  const STRENGTHS_RE = /^Stärken|^Strengths|^Forces/i;
+  const FLAWS_RE = /^Schwächen|^Flaws|^Défauts/i;
+  const CHALLENGES_RE = /^Konflikte|^Challenges|^Conflits/i;
   const t0 = Date.now();
-  const s = await selectTraitButtons(page, char.traits.strengths, Math.max(3, char.traits.strengths.length));
+  const s = await selectTraitButtons(page, char.traits.strengths, Math.max(3, char.traits.strengths.length), STRENGTHS_RE);
   const t1 = Date.now();
   console.log(`      strengths: ${s} clicked in ${t1 - t0}ms`);
-  const f = await selectTraitButtons(page, char.traits.flaws, Math.max(2, char.traits.flaws.length));
+  const f = await selectTraitButtons(page, char.traits.flaws, Math.max(2, char.traits.flaws.length), FLAWS_RE);
   const t2 = Date.now();
   console.log(`      flaws: ${f} clicked in ${t2 - t1}ms`);
-  const c = await selectTraitButtons(page, char.traits.challenges, Math.max(2, char.traits.challenges.length));
+  const c = await selectTraitButtons(page, char.traits.challenges, Math.max(2, char.traits.challenges.length), CHALLENGES_RE);
   const t3 = Date.now();
   console.log(`      challenges: ${c} clicked in ${t3 - t2}ms`);
   await page.waitForTimeout(500);
