@@ -132,7 +132,19 @@ async function loginAs(page: Page, email: string, password: string) {
   await modal.locator('input[type="password"]').fill(password);
   await modal.getByRole('button', { name: /sign in|anmelden|connexion|se connecter/i }).click();
 
-  await page.waitForURL(/\/(create|welcome|stories)/, { timeout: 15000 });
+  // Login is successful when the modal closes — the post-login redirect
+  // can land on /, /create, /welcome, or /stories depending on existing
+  // user state. Wait for modal close, then navigate to /create explicitly.
+  await page.waitForSelector('.fixed.inset-0', { state: 'detached', timeout: 15000 })
+    .catch(async () => {
+      // Fallback: maybe the URL already changed but the modal selector lingers.
+      // Give a short window for URL change before failing hard.
+      await page.waitForURL(/\/(create|welcome|stories|\?|#|$)/, { timeout: 5000 });
+    });
+  if (!/\/create(\?|#|$)/.test(page.url())) {
+    await page.goto('/create');
+  }
+  await page.waitForLoadState('domcontentloaded');
 }
 
 async function clickNext(page: Page) {
