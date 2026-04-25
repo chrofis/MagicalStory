@@ -1344,7 +1344,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Lazy-loaded so the route module isn't hot-required on every request.
+  const r2 = require('./server/lib/r2');
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    r2: r2.isConfigured() ? 'configured' : 'not configured',
+  });
 });
 
 // Serve static files
@@ -6945,6 +6951,10 @@ app.get('*', (req, res, next) => {
 });
 
 initialize().then(() => {
+  // Force R2 init at boot so the [R2] config line appears in deploy logs
+  // without waiting for the first image-save call.
+  require('./server/lib/r2').isConfigured();
+
   const server = app.listen(PORT, () => {
     log.info(`🚀 MagicalStory Server Running`);
     log.info(`📍 URL: http://localhost:${PORT}`);
