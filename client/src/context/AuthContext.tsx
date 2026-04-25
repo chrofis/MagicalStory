@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
 import storage, { STORAGE_KEYS } from '@/services/storage';
-import { signInWithGoogle, googleSignOut } from '@/services/googleAuth';
+import { signInWithGoogle, googleSignOut, consumeAuthHash } from '@/services/googleAuth';
 import { isNavigationAbort } from '@/utils/fetchErrors';
 
 interface BotProtectionData {
@@ -329,67 +329,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await login(username, password);
   }, [login]);
 
-  // Exchange a Google ID token for a server JWT and a populated user record.
-  const handleGoogleAuth = useCallback(async (idToken: string) => {
-    let response: Response;
-    try {
-      response = await fetch(`${API_URL}/api/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-    } catch (networkErr) {
-      console.warn('Google auth backend call failed, retrying in 1s...', networkErr);
-      await new Promise(r => setTimeout(r, 1000));
-      response = await fetch(`${API_URL}/api/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Google authentication failed' }));
-      try { await googleSignOut(); } catch { /* ignore */ }
-      throw new Error(error.error || 'Google authentication failed');
-    }
-
-    const data = await response.json();
-    const user: User = {
-      id: data.user.id,
-      username: data.user.username,
-      email: data.user.email,
-      role: data.user.role,
-      credits: data.user.credits,
-      preferredLanguage: data.user.preferredLanguage,
-      emailVerified: data.user.emailVerified,
-      photoConsentAt: data.user.photoConsentAt,
-    };
-
-    saveAuthData(data.token, user);
-
-    setState({
-      isAuthenticated: true,
-      user,
-      token: data.token,
-      isImpersonating: false,
-      originalAdmin: null,
-    });
-
-    logger.configure({ isAdmin: user.role === 'admin' });
-    logger.success(`Logged in with Google as ${user.username}`);
-
-    return user;
-  }, [saveAuthData]);
+  // (handleGoogleAuth removed — popup-based ID-token exchange is no longer
+  //  used for primary sign-in. Trial-link / claim-account flows have their
+  //  own server endpoints and call signInWithGooglePopup directly.)
 
   const loginWithGoogle = useCallback(async (redirectUrl?: string) => {
+    // Auth-code redirect flow: navigate to server's start endpoint, server
+    // redirects to Google, Google redirects to server callback, server
+    // redirects back to us with #auth=token=...&user=...
     const targetUrl = redirectUrl || window.location.pathname || '/create';
-    storage.setItem(STORAGE_KEYS.AUTH_REDIRECT_URL, targetUrl);
-
-    const { idToken } = await signInWithGoogle();
-    await handleGoogleAuth(idToken);
-    storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
-  }, [handleGoogleAuth]);
+    signInWithGoogle(targetUrl);
+    // Returning a never-resolving promise so callers' loading spinners stay on
+    // until the page navigates away. The await contract for this function is
+    // historical — kept for ABI compatibility with consumers.
+    await new Promise(() => {});
+  }, []);
 
   const resetPassword = useCallback(async (email: string) => {
     const response = await fetch(`${API_URL}/api/auth/reset-password`, {
@@ -561,8 +515,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info(`Stopped impersonating, back to ${user.username}`);
   }, [state.token]);
 
-  // Google Identity Services uses a popup flow that resolves in-page —
-  // no redirect handler needed. Sign-in completes inside loginWithGoogle().
+  // Auth-code flow returns the JWT in the URL hash (#auth=token=...&user=...).
+  // Consume it on first mount, persist, and clean the URL.
+  useEffect(() => {
+    const result = consumeAuthHash();
+    if (!result) return;
+    const user: User = {
+      id: result.user.id,
+      username: result.user.username,
+      email: result.user.email,
+      role: (result.user.role === 'admin' ? 'admin' : 'user') as User['role'],
+      credits: result.user.credits,
+      preferredLanguage: result.user.preferredLanguage as User['preferredLanguage'],
+      emailVerified: result.user.emailVerified,
+      photoConsentAt: result.user.photoConsentAt,
+    };
+    saveAuthData(result.token, user);
+    setState({
+      isAuthenticated: true,
+      user,
+      token: result.token,
+      isImpersonating: false,
+      originalAdmin: null,
+    });
+    logger.configure({ isAdmin: user.role === 'admin' });
+    logger.success(`Logged in with Google as ${user.username}`);
+  }, [saveAuthData]);
 
   const updateCredits = useCallback((credits: number) => {
     setState(prev => {

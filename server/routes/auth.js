@@ -368,6 +368,209 @@ router.post('/google', authLimiter, async (req, res) => {
   }
 });
 
+// =====================================================================
+// Google OAuth — Authorization Code flow (full-page redirect)
+// =====================================================================
+// Replaces the popup-based Google Identity Services flow for primary
+// sign-in. The popup flow stalls on iOS Safari when the user has
+// device-prompt 2FA enabled — Safari ITP silently drops the postMessage
+// from the popup back to the parent. The auth-code flow uses a normal
+// browser redirect instead, which works on every browser regardless of
+// 2FA method.
+//
+// Flow:
+//   1. Client → GET /api/auth/google/start?return=<path>
+//   2. Server stores CSRF state in HttpOnly cookie, redirects to Google
+//   3. User signs in on Google (with whatever 2FA method)
+//   4. Google → GET /api/auth/google/callback?code=...&state=...
+//   5. Server verifies state cookie, exchanges code for tokens, verifies
+//      ID token, upserts user (same logic as POST /api/auth/google),
+//      issues server JWT, redirects to frontend with #token=JWT&return=PATH
+//   6. Client AuthContext picks up token from hash, persists, cleans URL
+//
+// Trial-link and claim-account still use the popup-based POST endpoint
+// because their flows are tied to a session-token bearer header.
+// =====================================================================
+
+const GOOGLE_OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+const STATE_COOKIE_NAME = 'g_oauth_state';
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 min
+
+function getCallbackUrl(req) {
+  // Prefer the request's host so localhost dev works without env tweaks.
+  // Production should set FRONTEND_URL — but the host header is safe
+  // because Google validates the redirect_uri against the registered list.
+  if (process.env.FRONTEND_URL) {
+    return `${process.env.FRONTEND_URL.replace(/\/$/, '')}/api/auth/google/callback`;
+  }
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}/api/auth/google/callback`;
+}
+
+function getFrontendOrigin(req) {
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+// GET /api/auth/google/start
+router.get('/google/start', authLimiter, (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
+    return res.status(500).send('Google OAuth not configured on server');
+  }
+
+  // Sanitize the return URL — must be a same-origin path, not an absolute URL,
+  // to prevent open-redirect after sign-in.
+  const rawReturn = typeof req.query.return === 'string' ? req.query.return : '/';
+  const returnPath = (rawReturn.startsWith('/') && !rawReturn.startsWith('//'))
+    ? rawReturn.slice(0, 200)
+    : '/';
+
+  // CSRF state — random 32 bytes, store in HttpOnly cookie, also include
+  // returnPath in the cookie payload so we can recover it on callback.
+  const stateRandom = crypto.randomBytes(24).toString('base64url');
+  const stateCookie = JSON.stringify({ s: stateRandom, r: returnPath });
+  res.cookie(STATE_COOKIE_NAME, stateCookie, {
+    httpOnly: true,
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    sameSite: 'lax', // 'lax' so the cookie comes back on the redirect from google.com
+    maxAge: STATE_TTL_MS,
+    path: '/',
+  });
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: getCallbackUrl(req),
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: stateRandom,
+    prompt: 'select_account',
+    access_type: 'online',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+// GET /api/auth/google/callback
+router.get('/google/callback', authLimiter, async (req, res) => {
+  const frontendOrigin = getFrontendOrigin(req);
+  const failRedirect = (errCode) =>
+    res.redirect(`${frontendOrigin}/?auth_error=${encodeURIComponent(errCode)}`);
+
+  try {
+    const { code, state, error: googleError } = req.query;
+
+    if (googleError) return failRedirect(`google:${googleError}`);
+    if (!code || !state) return failRedirect('missing_code_or_state');
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) return failRedirect('server_misconfigured');
+
+    // Verify state cookie
+    const stateCookieRaw = req.cookies?.[STATE_COOKIE_NAME];
+    if (!stateCookieRaw) return failRedirect('state_missing');
+    res.clearCookie(STATE_COOKIE_NAME, { path: '/' });
+
+    let stateCookie;
+    try { stateCookie = JSON.parse(stateCookieRaw); }
+    catch { return failRedirect('state_corrupt'); }
+
+    if (stateCookie.s !== state) return failRedirect('state_mismatch');
+    const returnPath = stateCookie.r && stateCookie.r.startsWith('/') ? stateCookie.r : '/';
+
+    // Exchange code for tokens
+    const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: String(code),
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_OAUTH_CLIENT_SECRET,
+        redirect_uri: getCallbackUrl(req),
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+    if (!tokenResp.ok) {
+      const body = await tokenResp.text();
+      log.error(`Google code exchange failed: ${tokenResp.status} ${body.slice(0, 200)}`);
+      return failRedirect('token_exchange_failed');
+    }
+    const tokens = await tokenResp.json();
+    const idToken = tokens.id_token;
+    if (!idToken) return failRedirect('no_id_token');
+
+    // Verify the ID token using the same library/audience as POST /google
+    const ticket = await googleAuthClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const { sub, email: googleEmail } = payload;
+
+    if (!googleEmail || typeof googleEmail !== 'string' || !googleEmail.includes('@') || googleEmail.length > 254) {
+      return failRedirect('invalid_email');
+    }
+    const username = sanitizeString(googleEmail, 254).toLowerCase();
+    if (!isDatabaseMode()) return failRedirect('database_required');
+
+    // Same upsert as POST /google
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+    const userId = crypto.randomUUID();
+
+    const result = await dbQuery(
+      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
+       VALUES ($1, $2, $3, $4,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
+         0,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END,
+         TRUE)
+       ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
+       RETURNING *, (xmax = 0) AS is_new_user`,
+      [userId, username, googleEmail, hashedPassword]
+    );
+    const user = result[0];
+    const isNewUser = user.is_new_user;
+
+    if (isNewUser) {
+      if (user.credits > 0) {
+        await dbQuery(
+          'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+          [user.id, user.credits, user.credits, 'initial', 'Welcome credits for new account']
+        );
+      }
+      await logActivity(user.id, username, 'USER_REGISTERED_GOOGLE', { sub, flow: 'code' });
+      log.info(`New Google user registered (code flow): ${username} (role: ${user.role})`);
+    } else {
+      await logActivity(user.id, username, 'USER_LOGIN_GOOGLE', { sub, flow: 'code' });
+    }
+
+    const token = generateToken(user);
+
+    // Encode user payload + token into the URL fragment (fragments don't go to
+    // the server in subsequent requests, don't appear in referer headers).
+    // The client at returnPath reads the hash, persists, and replaces history.
+    const userPayload = {
+      id: user.id,
+      username: user.username,
+      email: user.email || googleEmail,
+      role: user.role,
+      storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
+      storiesGenerated: user.stories_generated || 0,
+      credits: user.credits != null ? user.credits : 500,
+      preferredLanguage: user.preferred_language || 'English',
+      emailVerified: true,
+      photoConsentAt: user.photo_consent_at || null
+    };
+    const fragment = new URLSearchParams({
+      token,
+      user: Buffer.from(JSON.stringify(userPayload)).toString('base64url'),
+    }).toString();
+
+    res.redirect(`${frontendOrigin}${returnPath}#auth=${encodeURIComponent(fragment)}`);
+  } catch (err) {
+    log.error('Google callback error:', { code: err.code, message: err.message });
+    return failRedirect('callback_exception');
+  }
+});
+
 // POST /api/auth/reset-password - Request password reset
 router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {

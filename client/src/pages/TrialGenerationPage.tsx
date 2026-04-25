@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, FormEvent, useCallback } from 're
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
-import { signInWithGoogle } from '@/services/googleAuth';
+import { signInWithGooglePopup } from '@/services/googleAuth';
 import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
@@ -505,7 +505,7 @@ export default function TrialGenerationPage() {
     if (state.characterName) storage.setItem('trial_gen_character_name', state.characterName);
 
     try {
-      const { idToken } = await signInWithGoogle();
+      const { idToken } = await signInWithGooglePopup();
       await completeGoogleLink(idToken);
     } catch (err) {
       console.error('Google sign-in failed:', err);

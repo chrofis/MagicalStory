@@ -558,6 +558,7 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+app.use(require('cookie-parser')());
 app.use(cors(corsOptions));
 
 // Gzip compression for all responses (reduces 33MB avatar data to ~5MB)
