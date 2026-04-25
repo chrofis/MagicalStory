@@ -381,6 +381,7 @@ Analyze the draft above. Be harsh and critical — pretend you are editing someo
 3. **Pacing** — Name the slowest page and the most rushed page. Justify with word counts or beat density. Suggest what to cut from the slow one and what to expand in the rushed one.
 4. **Stakes** — Name the beat where the stakes feel weakest. What would raise it? If stakes are stated but not felt, mark it a SHOW-VS-TELL failure and fix in Section B.
 5. **Resolution** — Is the ending earned by the arc that preceded it, or does it feel pasted on? Name one element of the ending that could be strengthened.
+6. **Antagonist on the page** — For every page where a coerced action happens (a punishment, a forced choice, an enforced silence, an arrest, a sentence being carried out), the page's TEXT must name the character forcing it OR make their pressure unmistakable through on-page dialogue or quoted command. The reader of THIS page alone must be able to tell who is making this happen — not having to remember it from a previous page. Visual presence in the scene metadata does NOT count for this check; only the printed words. Flag every page where a forced action happens but the antagonist isn't on the page in words. Emit a fix line per violation (e.g. "Page 4: apple shot is happening but text never names Gessler — add one sentence or remembered command, e.g. 'Gesslers Stimme schnitt durch den Platz: Schiess.'").
 
 ---
 
