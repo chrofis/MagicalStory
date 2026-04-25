@@ -16,7 +16,7 @@ Create a back cover illustration for a children's book.
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact text: "magicalstory.ch"
-- Position it in the bottom left corner
+- Position it inset from the bottom-left corner — roughly 5% in from both the left edge and the bottom edge, so the text sits clearly inside the frame, not flush against the border
 - Use elegant, readable letters
 - Do NOT add any other text besides "magicalstory.ch" — no title, no names, no labels
 
