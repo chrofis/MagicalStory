@@ -39,34 +39,18 @@ For each paired row from STEP 1 with a non-null `vision_description`:
 
 ---
 
-**STEP 3: FACING DIRECTION & INTERACTION**
+**STEP 3: INTERACTION CHECK**
 
-This is the most important check. For each character:
-- **Facing**: Only flag facing/gaze when a DECLARED INTERACTION is violated. If two characters are listed in DECLARED INTERACTIONS as interacting with each other and one faces away, flag MAJOR. If a character is listed in DECLARED INTERACTIONS as watching a specific named object and is looking elsewhere, flag MAJOR. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "eyes on the horizon" are NOT declared interactions — do NOT flag.
-- **Actions**: Is each character doing what was described in DECLARED INTERACTIONS (holding, reaching, kneeling, aiming)?
+For each declared interaction, ask: could the inventory figure plausibly be doing this action? Don't judge pose precision, angles, or gesture nuance.
 
----
+Only flag a contradiction:
+- Declared "holds X" / wears X / X in hand, inventory says hands empty or X missing → CRITICAL
+- Declared "sits / kneels", inventory says standing → MAJOR
+- Declared action toward Y, inventory shows the figure turned the opposite way with no matching gesture → MAJOR
+- Declared object entirely missing from inventory → CRITICAL
+- Object placement in a genuinely different category (declared "in pocket", drawn as large held object; declared "on head", drawn "in hand") → CRITICAL. Left/right mirror differences are equivalent and do NOT flag.
 
-**STEP 3B: MAIN ACTION vs STORY BEAT**
-
-Compare the inventory's `scene_summary` / `main_action` (pure observables — e.g. *aims*, *shoulders*, *extends with palms up*) against what ORIGINAL_PROMPT and STORY_TEXT narrate as the main beat. Intent words from the prompt and story text (*offers*, *hands over*, *gives*, *presents*, *surrenders*, *threatens*) MUST match the observable action in the inventory.
-
-Mapping rules:
-- *offers / hands over / gives / presents* require: extended arms with palms upward or butt-first, weapon barrel NOT pointed at the recipient, no trigger grip.
-- *aims / threatens / points* require: weapon shouldered or raised, barrel pointed at a figure, finger near trigger.
-- *attacks / strikes* require: weapon raised or swung, body weight committed.
-- *kneels* requires: knees on the ground. *sits* requires: bent knees on a surface. *stands* requires: legs under body.
-
-If ORIGINAL_PROMPT and STORY_TEXT agree on the main beat's intent, and the inventory's observable action contradicts that intent (e.g. prompt = *offers*, inventory = *shoulders + barrel pointed at* ), flag a CRITICAL `wrong_action` issue.
-
-If ORIGINAL_PROMPT and STORY_TEXT disagree with each other, trust STORY_TEXT — it is the printed narrative the reader sees.
-
-For each DECLARED INTERACTION:
-- Is the object present?
-- Is it at the correct location relative to the character (in hand, on head, under arm)?
-- Missing or genuinely wrong placement (held vs worn vs in-pocket vs on-head) = CRITICAL. Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are EQUIVALENT — do NOT flag as wrong placement.
-- Interaction checks use ONLY the DECLARED INTERACTIONS list. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "jaw set") are descriptive only — do NOT deduct.
-- Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby) are scene-appropriate and do NOT deduct.
+If the inventory is roughly compatible with the declared action, do not deduct. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS (hands drawn in tight, fingers curled, jaw set) are descriptive only — do NOT deduct. Extra background figures in populated scenes (crowd, vendors, villagers, passersby) do NOT deduct.
 
 ---
 
