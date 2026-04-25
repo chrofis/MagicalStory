@@ -907,37 +907,23 @@ async function packReferences(refs = {}, options = {}) {
     log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already in scene background`);
   }
 
-  // Attach the text-area mask as a reference slot ONLY for empty-scene calls
-  // (no sceneBackground). For populated-page calls the scene plate already
-  // encodes the reserved zone, and sending the mask there makes Grok copy the
-  // abstract black/white shapes into the output.
+  // Attach the text-area mask as a reference slot for empty-scene calls only.
+  // For populated-page calls the scene plate already encodes the reserved zone,
+  // and sending the mask there makes Grok copy the abstract shapes into the output.
   //
   // Mask convention: ~20% BLACK = reserved text zone, ~80% WHITE = rest of scene.
-  // We overlay a short label strip so the model reads the mask's intent from
-  // the slot image. The full explanation still rides in the text prompt.
+  // The full explanation rides in the text prompt — DO NOT composite a label
+  // strip onto the mask, Grok bakes that strip's text verbatim into the output.
   if (textAreaMask && !hasSceneBackground && slots.length < 3) {
     try {
       const base64 = textAreaMask.replace(/^data:image\/\w+;base64,/, '');
       const maskBuf = Buffer.from(base64, 'base64');
       const resized = await sharp(maskBuf)
         .resize({ height: 768, withoutEnlargement: true })
-        .toBuffer({ resolveWithObject: true });
-      const labelH = 28;
-      const labelSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${resized.info.width}" height="${labelH}">
-        <rect width="${resized.info.width}" height="${labelH}" fill="#222"/>
-        <text x="${resized.info.width / 2}" y="19" font-family="Arial, sans-serif" font-size="14" fill="white" text-anchor="middle">TEXT-ZONE GUIDE — black=calm saturated zone, NOT a box</text>
-      </svg>`;
-      const labelled = await sharp({
-        create: { width: resized.info.width, height: resized.info.height + labelH, channels: 3, background: { r: 255, g: 255, b: 255 } }
-      })
-        .composite([
-          { input: Buffer.from(labelSvg), left: 0, top: 0 },
-          { input: resized.data, left: 0, top: labelH },
-        ])
         .jpeg({ quality: 88 })
         .toBuffer();
-      slots.push(`data:image/jpeg;base64,${labelled.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: text-zone mask (guide, not literal)`);
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: text-zone mask (no label)`);
     } catch (e) {
       log.warn(`⚠️ ${tag} Failed to attach text-zone mask: ${e.message}`);
     }

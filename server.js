@@ -5377,6 +5377,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
           emptyScenePrompt: img.emptyScenePrompt || null,
+          // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
+          // dev-mode references panel can show the thumbnail of what was actually sent.
+          textAreaMask: img.textAreaMask || sceneBackgrounds[img.pageNumber]?.textAreaMask || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
@@ -5515,6 +5518,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
           emptyScenePrompt: img.emptyScenePrompt || null,
+          // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
+          // dev-mode references panel can show the thumbnail of what was actually sent.
+          textAreaMask: img.textAreaMask || sceneBackgrounds[img.pageNumber]?.textAreaMask || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           bboxDetection: img.bboxDetection,
