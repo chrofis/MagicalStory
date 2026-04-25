@@ -5326,9 +5326,10 @@ export function StoryDisplay({
                     )}
 
                     {/* Text below — shown when overlay is off, when no image, or when this scene
-                        is a square+text-below layout (image.textInImage === false). The latter is
-                        the new "advanced" reading level layout where text is never on the image. */}
-                    {(!textOverlay || isGenerating || !hasPageImage || image?.textInImage === false) && (
+                        is a square+text-below layout (image.textInImage === false). Also always
+                        shown in edit mode so the editor is visible alongside the overlay (the
+                        previous collapsed-details editor was easy to miss). */}
+                    {(!textOverlay || isGenerating || !hasPageImage || image?.textInImage === false || isEditMode) && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea
@@ -5344,23 +5345,8 @@ export function StoryDisplay({
                       )}
                     </div>
                     )}
-                    {/* Collapsible text editor — when overlay is on and editing */}
-                    {textOverlay && isEditMode && !isGenerating && hasPageImage && (
-                    <details className="w-full mt-2 bg-amber-50 rounded-lg border border-amber-200">
-                      <summary className="p-2 cursor-pointer text-sm font-medium text-amber-700 flex items-center gap-1.5">
-                        <Edit3 size={14} />
-                        {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit text'}
-                      </summary>
-                      <div className="p-3">
-                        <textarea
-                          value={pageText.trim()}
-                          onChange={(e) => handlePageTextChange(index, e.target.value)}
-                          className="w-full min-h-[120px] p-3 text-gray-800 leading-snug font-serif text-base bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
-                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
-                        />
-                      </div>
-                    </details>
-                    )}
+                    {/* (removed) collapsible text editor — superseded by always-visible
+                        textarea above in edit mode */}
                   </div>
                 ) : (
                   /* Standard Layout: Image on left, text on right (side-by-side) */
