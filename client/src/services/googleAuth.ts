@@ -24,6 +24,7 @@ declare global {
             cancel_on_tap_outside?: boolean;
             context?: 'signin' | 'signup' | 'use';
             ux_mode?: 'popup' | 'redirect';
+            use_fedcm_for_prompt?: boolean;
           }) => void;
           prompt: (cb?: (notification: unknown) => void) => void;
           renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
@@ -104,6 +105,7 @@ export async function signInWithGoogle(): Promise<{ idToken: string }> {
         auto_select: false,
         cancel_on_tap_outside: false,
         ux_mode: 'popup',
+        use_fedcm_for_prompt: true,
       });
 
       // Render an invisible button into a temporary host and programmatically click it.
