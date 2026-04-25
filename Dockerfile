@@ -37,6 +37,7 @@ COPY . .
 # check=skip=SecretsUsedInArgOrEnv
 ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
+ARG VITE_GOOGLE_OAUTH_CLIENT_ID
 
 # Build the React client + SSR bundle, then pre-render all SEO routes.
 # `cd client && npm run build` runs: tsc -b && vite build && vite build --ssr ...
