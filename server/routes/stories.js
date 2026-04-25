@@ -16,6 +16,7 @@ const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/his
 const { dbToArrayIndex } = require('../lib/versionManager');
 const { generateTextOverlay } = require('../lib/textOverlayRenderer');
 const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
+const { getTextAreaMask } = require('../lib/textMasks');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -652,7 +653,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       data->'sceneImages' as "sceneImages", data->'coverImages' as "coverImages",
       data->'sceneDescriptions' as "sceneDescriptions", data->'visualBible' as "visualBible",
       data->'generationLog' as "generationLog", data->'styledAvatarGeneration' as "styledAvatarGeneration",
-      data->'costumedAvatarGeneration' as "costumedAvatarGeneration", data->'finalChecksReport' as "finalChecksReport"`;
+      data->'costumedAvatarGeneration' as "costumedAvatarGeneration", data->'finalChecksReport' as "finalChecksReport",
+      data->>'languageLevel' as "languageLevel"`;
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
       rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
@@ -778,7 +780,12 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         grokRefImages: img.grokRefImages || null,
         emptyScenePrompt: img.emptyScenePrompt || null,
         emptySceneQc: img.emptySceneQc || null,
-        textAreaMask: img.textAreaMask || null,
+        // Fall back to the deterministic static mask when not stored on the
+        // page record (older stories, regen paths). The mask is keyed by
+        // textPosition + reading level — both are derivable here.
+        textAreaMask: img.textAreaMask
+          || getTextAreaMask(img.textPosition, story?.languageLevel || story?.langLevel || 'standard')
+          || null,
         emptySceneVbGrid: img.emptySceneVbGrid || null,
         textCoverageReport: img.textCoverageReport || null,
         hasEmptySceneImage: pagesWithEmptyScene.has(img.pageNumber) || undefined,

@@ -383,12 +383,25 @@ export function ReferencePhotosDisplay({
               <img src={displayEmptySceneImage} alt="Scene bg" className="h-16 rounded border-2 border-emerald-400 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(displayEmptySceneImage)} />
               <span className="absolute -top-1 -left-1 text-[8px] bg-emerald-500 text-white px-1 rounded">BG</span>
             </div>
-            {displayRefPhotos?.map((photo, i) => photo.photoUrl && (
-              <div key={i} className="relative">
-                <img src={photo.photoUrl} alt={photo.name} className="h-16 rounded border border-pink-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(photo.photoUrl)} />
-                <span className="absolute -top-1 -left-1 text-[8px] bg-pink-500 text-white px-1 rounded">{photo.name}</span>
-              </div>
-            ))}
+            {(() => {
+              // Dedupe: a character can have multiple photo entries (face + body)
+              // — only label the first thumbnail per name so the name doesn't
+              // appear twice under the same character.
+              const seen = new Set<string>();
+              return displayRefPhotos?.map((photo, i) => {
+                if (!photo.photoUrl) return null;
+                const showName = !seen.has(photo.name);
+                seen.add(photo.name);
+                return (
+                  <div key={i} className="relative">
+                    <img src={photo.photoUrl} alt={photo.name} className="h-16 rounded border border-pink-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(photo.photoUrl)} />
+                    {showName && (
+                      <span className="absolute -top-1 -left-1 text-[8px] bg-pink-500 text-white px-1 rounded">{photo.name}</span>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
@@ -398,10 +411,17 @@ export function ReferencePhotosDisplay({
       {/* Character photos */}
       {!displayEmptySceneImage && hasCharacterPhotos && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {displayRefPhotos!.map((photo, idx) => (
-            <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
+          {(() => {
+            // Dedupe name header: a character can have face + body entries; only
+            // label the first card per character.
+            const seenFlat = new Set<string>();
+            return displayRefPhotos!.map((photo, idx) => {
+              const showName = !seenFlat.has(photo.name);
+              seenFlat.add(photo.name);
+              return (
+                <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-xs text-gray-800 truncate">{showName ? photo.name : ' '}</span>
                 {photo.photoType && (
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
                     {getPhotoTypeLabel(photo.photoType)}
@@ -435,8 +455,10 @@ export function ReferencePhotosDisplay({
                   {language === 'de' ? 'Foto nicht geladen' : 'Photo not loaded'}
                 </div>
               )}
-            </div>
-          ))}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
