@@ -21,6 +21,16 @@ const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
  * Normalize image data to ensure it has the correct data URI prefix.
  * Some images were saved without the prefix, causing rendering failures.
  */
+// When R2 has the bytes (image_url is populated) and image_data is null,
+// callers want a single src-able value. Return the URL — browsers' <img src>
+// accepts both data: URLs and https: URLs identically. Used by every batch
+// image endpoint so that clearing image_data doesn't break frontend rendering.
+function pickImageSrc(imageData, imageUrl) {
+  if (imageData) return normalizeImageData(imageData);
+  if (imageUrl) return imageUrl;
+  return null;
+}
+
 function normalizeImageData(imageData) {
   if (!imageData) return imageData;
 
@@ -1793,7 +1803,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             // Fast path: one image per page, no versions array
             sceneImagesMap.set(pageNum, {
               pageNumber: pageNum,
-              imageData: normalizeImageData(row.image_data),
+              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               versionCount: row.version_count || 1,
@@ -1818,7 +1829,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             // Add ALL versions to imageVersions array (including version 0)
             scene.imageVersions.push({
               versionIndex: row.version_index,
-              imageData: normalizeImageData(row.image_data),
+              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               createdAt: row.generated_at, // Alias for frontend compatibility
@@ -1827,7 +1839,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             // Set main imageData to the ACTIVE version (not always version 0)
             // This ensures full load returns the same image as fast load
             if (row.version_index === activeIdx) {
-              scene.imageData = normalizeImageData(row.image_data);
+              scene.imageData = pickImageSrc(row.image_data, row.image_url);
+              scene.imageUrl = row.image_url || null;
               scene.qualityScore = row.quality_score;
               scene.generatedAt = row.generated_at;
             }
@@ -1839,7 +1852,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           if (activeOnly) {
             // Fast path: one image per cover, no versions array
             covers[coverType] = {
-              imageData: normalizeImageData(row.image_data),
+              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               versionCount: row.version_count || 1,
@@ -1863,7 +1877,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             // Add to imageVersions array (include versionIndex for consistent version selection)
             coverData.imageVersions.push({
               versionIndex: row.version_index,
-              imageData: normalizeImageData(row.image_data),
+              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               createdAt: row.generated_at, // Alias for frontend compatibility
@@ -1871,7 +1886,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
             // If this is the active version, set as main imageData
             if (row.version_index === activeCoverVersion) {
-              coverData.imageData = normalizeImageData(row.image_data);
+              coverData.imageData = pickImageSrc(row.image_data, row.image_url);
+              coverData.imageUrl = row.image_url || null;
               coverData.qualityScore = row.quality_score;
               coverData.generatedAt = row.generated_at;
             }
@@ -2173,10 +2189,12 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       const versionsCount = allVersions.length;
       console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, active=${activeVersion}, ${Date.now() - startTime}ms`);
 
-      // Return active version's imageData as the main imageData
+      // Return active version's imageData as the main imageData. Falls back
+      // to imageUrl when bytes have been cleared (R2-migrated rows).
       const activeEntry = allVersions[activeVersion] || allVersions[0];
-      const activeImageData = activeEntry?.imageData || normalizeImageData(separateImage.imageData);
       const activeImageUrl = activeEntry?.imageUrl ?? separateImage.imageUrl ?? null;
+      const activeImageData = activeEntry?.imageData
+        || pickImageSrc(separateImage.imageData, activeImageUrl);
 
       return res.json({
         pageNumber: pageNum,

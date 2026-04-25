@@ -634,6 +634,14 @@ function isDatabaseMode() {
   return process.env.STORAGE_MODE === 'database' && getPool();
 }
 
+// Pick the best src value for an image row: bytes if present, otherwise R2 URL.
+// Browsers' <img src> accepts both data: URLs and https: URLs identically, so
+// callers can keep treating the result as a single string.
+function imgSrc(row) {
+  if (!row) return null;
+  return row.image_data || row.image_url || null;
+}
+
 // Helper to log activity
 async function logActivity(userId, username, action, details) {
   try {
@@ -1306,7 +1314,7 @@ async function getAllStoryImages(storyId) {
   }
 
   return await dbQuery(
-    `SELECT image_type, page_number, version_index, image_data, quality_score, generated_at
+    `SELECT image_type, page_number, version_index, image_data, image_url, quality_score, generated_at
      FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
     [storyId]
   );
@@ -1365,7 +1373,7 @@ async function getActiveStoryImages(storyId) {
         (si.image_type != 'scene' AND av.page_key = si.image_type)
       )
     )
-    SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.quality_score, si.generated_at,
+    SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.image_url, si.quality_score, si.generated_at,
            COALESCE(vc.version_count, 1) as version_count
     FROM story_images si
     JOIN target_versions tv ON (
@@ -1548,7 +1556,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
       for (const scene of storyData.sceneImages) {
         if (!scene.imageData) {
           const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
-          if (img) scene.imageData = img.image_data;
+          if (img) scene.imageData = imgSrc(img);
         }
         // Load active version's bboxDetection onto scene
         const activeV = scene.imageVersions?.find(v => v.isActive);
@@ -1565,7 +1573,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
         const cover = storyData.coverImages[coverType];
         if (cover && !getCoverData(cover)) {
           const img = activeImages.find(i => i.image_type === coverType);
-          if (img) cover.imageData = img.image_data;
+          if (img) cover.imageData = imgSrc(img);
         }
       }
     }
@@ -1575,7 +1583,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
 
   // Full path: load ALL versions (for version picker / full rehydration)
   const allVersionImages = await dbQuery(
-    `SELECT image_type, page_number, version_index, image_data
+    `SELECT image_type, page_number, version_index, image_data, image_url
      FROM story_images WHERE story_id = $1
      ORDER BY page_number, version_index`,
     [storyId]
@@ -1598,7 +1606,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
         : allVersionImages.find(i => i.image_type === 'scene' && i.page_number === parseInt(key) && i.version_index === meta.activeVersion);
       if (activeImg) {
         const overrideKey = isCover ? `${key}:null` : `scene:${parseInt(key)}`;
-        activeOverrides[overrideKey] = activeImg.image_data;
+        activeOverrides[overrideKey] = imgSrc(activeImg);
       }
     }
   }
@@ -1613,7 +1621,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
           scene.imageData = activeOverrides[overrideKey];
         } else {
           const img = allVersionImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === 0);
-          if (img) scene.imageData = img.image_data;
+          if (img) scene.imageData = imgSrc(img);
         }
       }
 
@@ -1627,7 +1635,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
               i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
             if (versionImg) {
-              version.imageData = versionImg.image_data;
+              version.imageData = imgSrc(versionImg);
               version._rehydrated = true;
             }
           }
@@ -1654,7 +1662,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
           cover.imageData = activeOverrides[overrideKey];
         } else {
           const img = allVersionImages.find(i => i.image_type === coverType && i.version_index === 0);
-          if (img) cover.imageData = img.image_data;
+          if (img) cover.imageData = imgSrc(img);
         }
       }
 
@@ -1667,7 +1675,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
               i => i.image_type === coverType && i.version_index === dbVersionIndex
             );
             if (versionImg) {
-              version.imageData = versionImg.image_data;
+              version.imageData = imgSrc(versionImg);
               version._rehydrated = true;
             }
           }
