@@ -11,7 +11,17 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
-const { buildHairDescription } = require('./storyHelpers');
+
+// Lazy-load storyHelpers to break circular dependency
+// (storyHelpers.js imports buildVisualBiblePrompt from this file at top level —
+// both top-level imports would race; whichever loads second sees an empty
+// partial export from the first. Resolving inside the function bodies that
+// actually need it dodges the load-order race.)
+let _storyHelpersModule = null;
+function buildHairDescription(...args) {
+  if (!_storyHelpersModule) _storyHelpersModule = require('./storyHelpers');
+  return _storyHelpersModule.buildHairDescription(...args);
+}
 
 // ============================================================================
 // PARSING FUNCTIONS
