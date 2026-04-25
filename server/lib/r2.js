@@ -132,9 +132,33 @@ async function uploadImage(input, key, contentType = 'image/jpeg') {
   }
 }
 
+/**
+ * Fetch image bytes from a public R2 URL. Used when an endpoint needs the
+ * actual bytes (e.g. text-overlay compositing, PDF rendering) but the row's
+ * image_data column has been cleared post-migration.
+ *
+ * Returns Buffer on success, null on failure.
+ */
+async function fetchImageBytes(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      log.warn(`[R2] fetchImageBytes ${url}: HTTP ${res.status}`);
+      return null;
+    }
+    const arr = await res.arrayBuffer();
+    return Buffer.from(arr);
+  } catch (err) {
+    log.warn(`[R2] fetchImageBytes ${url}: ${err.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   isConfigured,
   uploadImage,
+  fetchImageBytes,
   publicUrlForKey,
   keyForStoryImage,
   keyForRetryImage,

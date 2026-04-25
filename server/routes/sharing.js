@@ -319,10 +319,10 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     // Get the page image
     const activeVersion = await getActiveVersion(storyId, pageNum);
     let separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
-    if (!separateImage?.imageData && activeVersion !== 0) {
+    if (!separateImage?.imageData && !separateImage?.imageUrl && activeVersion !== 0) {
       separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
     }
-    if (!separateImage?.imageData) {
+    if (!separateImage?.imageData && !separateImage?.imageUrl) {
       return res.status(404).json({ error: 'Page image not found' });
     }
 
@@ -366,9 +366,20 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
 
     // Generate the overlay — normalize the image to the same 3:4 aspect we serve
     // so the overlay polygon and the displayed image line up pixel-for-pixel.
+    // After R2 migration image_data may be NULL — fetch from imageUrl as fallback.
     const { generateTextOverlay } = require('../lib/textOverlayRenderer');
-    const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imgBuffer = await normalizeToPortrait(Buffer.from(imgBase64, 'base64'));
+    let rawBuf;
+    if (separateImage.imageData) {
+      const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      rawBuf = Buffer.from(imgBase64, 'base64');
+    } else if (separateImage.imageUrl) {
+      const { fetchImageBytes } = require('../lib/r2');
+      rawBuf = await fetchImageBytes(separateImage.imageUrl);
+      if (!rawBuf) return res.status(502).json({ error: 'Failed to fetch image bytes from storage' });
+    } else {
+      return res.status(404).json({ error: 'Page image not found' });
+    }
+    const imgBuffer = await normalizeToPortrait(rawBuf);
 
     // Pick the mask size the page was generated with (so the polygon matches
     // the dark area the image model was asked to paint).

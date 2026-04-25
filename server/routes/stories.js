@@ -3191,7 +3191,7 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
     // Get the page image
     const activeVersion = await getActiveVersion(id, pageNumber);
     const imageRow = await getStoryImage(id, 'scene', pageNumber, activeVersion);
-    if (!imageRow?.imageData) {
+    if (!imageRow?.imageData && !imageRow?.imageUrl) {
       return res.status(404).json({ error: 'Page image not found' });
     }
 
@@ -3233,9 +3233,19 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
     // Enforce spread position rule
     textPosition = enforceSpreadTextPosition(textPosition, pageNumber);
 
-    // Generate the overlay
-    const imgBase64 = imageRow.imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imgBuffer = Buffer.from(imgBase64, 'base64');
+    // Generate the overlay. If image_data has been cleared post-R2-migration,
+    // fetch the bytes from R2.
+    let imgBuffer;
+    if (imageRow.imageData) {
+      const imgBase64 = imageRow.imageData.replace(/^data:image\/\w+;base64,/, '');
+      imgBuffer = Buffer.from(imgBase64, 'base64');
+    } else if (imageRow.imageUrl) {
+      const { fetchImageBytes } = require('../lib/r2');
+      imgBuffer = await fetchImageBytes(imageRow.imageUrl);
+      if (!imgBuffer) return res.status(502).json({ error: 'Failed to fetch image bytes from storage' });
+    } else {
+      return res.status(404).json({ error: 'Page image not found' });
+    }
 
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { pageNumber });
 
