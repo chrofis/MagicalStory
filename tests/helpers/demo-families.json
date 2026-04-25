@@ -136,7 +136,7 @@
         },
         {
           "id": 13,
-          "name": "Werner",
+          "name": "Hans",
           "gender": "male",
           "age": "68",
           "ageCategory": "adult",
@@ -165,7 +165,7 @@
               "shoes": "abgenutzte braune Lederschuhe"
             }
           },
-          "portraitPrompt": "Full-body candid snapshot of an ordinary 68-year-old Swiss grandfather named Werner standing in a sunlit alpine meadow. He has short white hair (a bit thin on top), a FULL bushy white walrus mustache (no chin beard, just the prominent mustache — this is his signature feature), pale blue eyes with deep crow's-feet, light weathered skin with visible age (sun spots, lines, real older skin texture — NOT smoothed, NOT idealized), a stocky working-man build, and a relaxed warm grandfatherly expression. He is wearing a clearly visible red-and-black checkered plaid flannel shirt with brown leather suspenders worn over the shirt (the suspenders are an unmistakable visual element), brown corduroy trousers, and worn-in brown leather shoes. Real elder appearance: slightly stooped posture, casual stance, ordinary working-class grandpa (not a model). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 68-year-old Swiss grandfather named Hans standing in a sunlit alpine meadow. He has short white hair (a bit thin on top), a FULL bushy white walrus mustache (no chin beard, just the prominent mustache — this is his signature feature), pale blue eyes with deep crow's-feet, light weathered skin with visible age (sun spots, lines, real older skin texture — NOT smoothed, NOT idealized), a stocky working-man build, and a relaxed warm grandfatherly expression. He is wearing a clearly visible red-and-black checkered plaid flannel shirt with brown leather suspenders worn over the shirt (the suspenders are an unmistakable visual element), brown corduroy trousers, and worn-in brown leather shoes. Real elder appearance: slightly stooped posture, casual stance, ordinary working-class grandpa (not a model). Photo-realistic snapshot, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. No text, no watermarks."
         }
       ],
       "relationships": {
@@ -177,7 +177,8 @@
         "3-4": "partner",
         "1-13": "grandparent-grandchild",
         "2-13": "grandparent-grandchild",
-        "3-13": "parent-child"
+        "3-13": "parent-child",
+        "4-13": "parent-child"
       }
     },
     {
