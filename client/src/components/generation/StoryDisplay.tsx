@@ -5325,11 +5325,11 @@ export function StoryDisplay({
                       </div>
                     )}
 
-                    {/* Text below — shown when overlay is off, when no image, or when this scene
-                        is a square+text-below layout (image.textInImage === false). Also always
-                        shown in edit mode so the editor is visible alongside the overlay (the
-                        previous collapsed-details editor was easy to miss). */}
-                    {(!textOverlay || isGenerating || !hasPageImage || image?.textInImage === false || isEditMode) && (
+                    {/* Text below image — always visible when there's text and we're not still
+                        generating. Used to be conditional on overlay-off / edit-mode but the
+                        overlay-only path made the editable text effectively invisible to users.
+                        Now overlay is purely a preview enhancement on top; the box always shows. */}
+                    {!isGenerating && pageText.trim() && (
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
                       {isEditMode ? (
                         <textarea
