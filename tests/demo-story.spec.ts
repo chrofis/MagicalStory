@@ -109,28 +109,17 @@ function getCurrentEntry(): DemoRotationEntry {
 }
 
 async function loginAs(page: Page, email: string, password: string) {
+  // ?login=true makes the homepage auto-open the auth modal. Just wait for
+  // it. The previous click-the-menu fallback could hang for hours when the
+  // modal raced into view and intercepted retried clicks.
   await page.goto('/?login=true');
+  await page.waitForSelector('.fixed.inset-0', { timeout: 15000 });
 
-  const authModal = page.locator('.fixed.inset-0');
-  if (!await authModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-    const loginLink = page.getByRole('link', { name: SIGN_IN_RE }).first();
-    if (await loginLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await loginLink.click();
-    } else {
-      const menuBtn = page.getByRole('button', { name: /menu/i }).first();
-      if (await menuBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await menuBtn.click();
-        await page.waitForTimeout(500);
-        await page.getByText(SIGN_IN_RE).first().click();
-      }
-    }
-  }
-
-  await page.waitForSelector('.fixed.inset-0', { timeout: 10000 });
   const modal = page.locator('.fixed.inset-0');
-  await modal.getByPlaceholder(/email/i).fill(email);
-  await modal.locator('input[type="password"]').fill(password);
-  await modal.getByRole('button', { name: /sign in|anmelden|connexion|se connecter/i }).click();
+  await modal.getByPlaceholder(/email/i).fill(email, { timeout: 5000 });
+  await modal.locator('input[type="password"]').fill(password, { timeout: 5000 });
+  await modal.getByRole('button', { name: /sign in|anmelden|connexion|se connecter/i })
+    .click({ timeout: 5000 });
 
   // Login is successful when the modal closes — the post-login redirect
   // can land on /, /create, /welcome, or /stories depending on existing
