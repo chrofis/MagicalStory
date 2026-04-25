@@ -5491,7 +5491,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
-    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages);
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, artStyle);
     if (editResult?.imageData) {
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
@@ -8531,7 +8531,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = []) {
+async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null) {
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
@@ -8539,9 +8539,18 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
 
   log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length}, aspect: ${aspectRatio})`);
 
+  // Resolve the art-style description so the edit prompt can anchor it.
+  // Without this, Grok's edit endpoint defaults to its house cartoon/anime
+  // style when repainting faces, even when the source image is realistic.
+  const { resolveArtStyle } = getStoryHelpers();
+  const styleText = (artStyle && resolveArtStyle)
+    ? (resolveArtStyle(artStyle, backend) || '')
+    : '';
+
   // Build the editing prompt from template
   const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
-    EDIT_INSTRUCTION: editInstruction
+    EDIT_INSTRUCTION: editInstruction,
+    ART_STYLE: styleText || 'Match the source image\'s artistic style.',
   });
   log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
@@ -8737,6 +8746,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // sceneCharacters. Without this, e.g. a dragon "Floh" registered as ANI001
     // gets sent to the bbox detector with no traits and is reported as UNKNOWN.
     visualBible = null,
+    artStyle = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -9249,7 +9259,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           if (allRepairIssues.length > 0) {
             const editInstruction = allRepairIssues.join('. ');
             log.info(`🔧 [QUALITY RETRY] ${pageLabel}Using Grok text edit with ${allRepairIssues.length} issues: ${editInstruction.substring(0, 200)}`);
-            const editResult = await editImageWithPrompt(result.imageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
+            const editResult = await editImageWithPrompt(result.imageData, `Fix these issues in this children's book illustration: ${editInstruction}`, undefined, [], artStyle);
             repairResult = editResult?.imageData ? {
               repaired: true, imageData: editResult.imageData,
               repairHistory: allRepairIssues.map(i => ({ issue: i, method: 'grok-text-edit', success: true })),
