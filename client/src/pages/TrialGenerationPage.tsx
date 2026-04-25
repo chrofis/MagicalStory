@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, FormEvent, useCallback } from 're
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
-import { signInWithGoogle, getIdToken, handleRedirectResult } from '@/services/firebase';
+import { signInWithGoogle } from '@/services/googleAuth';
 import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
@@ -451,9 +451,8 @@ export default function TrialGenerationPage() {
 
   // ── Google linking ─────────────────────────────────────────────────────────
 
-  // Complete Google linking with a Firebase user (shared by popup and redirect flows)
-  const completeGoogleLink = async (firebaseUser: import('@/services/firebase').FirebaseUser) => {
-    const idToken = await getIdToken(firebaseUser);
+  // Complete Google linking — server upgrades the trial account to a full account
+  const completeGoogleLink = async (idToken: string) => {
     const sessionToken = state?.sessionToken;
     if (!sessionToken) return;
 
@@ -491,29 +490,7 @@ export default function TrialGenerationPage() {
     setIsVerified(true);
   };
 
-  // Handle Google redirect result on page load (when popup was blocked → redirect flow)
-  const redirectHandledRef = useRef(false);
-  useEffect(() => {
-    if (redirectHandledRef.current || !state?.sessionToken) return;
-    // Only run if we have saved trial state (meaning we initiated a Google redirect)
-    if (!storage.getItem('trial_gen_session_token')) return;
-    redirectHandledRef.current = true;
-
-    (async () => {
-      try {
-        const firebaseUser = await handleRedirectResult();
-        if (firebaseUser) {
-          setIsAuthLoading(true);
-          await completeGoogleLink(firebaseUser);
-          setIsAuthLoading(false);
-        }
-      } catch (err) {
-        console.error('Google redirect completion failed:', err);
-        setIsAuthLoading(false);
-      }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.sessionToken]);
+  // (Google Identity Services uses an in-page popup — no redirect flow to handle.)
 
   const handleGoogleSignIn = async () => {
     if (isAuthLoading || !state?.sessionToken) return;
@@ -528,13 +505,10 @@ export default function TrialGenerationPage() {
     if (state.characterName) storage.setItem('trial_gen_character_name', state.characterName);
 
     try {
-      const firebaseUser = await signInWithGoogle();
-      await completeGoogleLink(firebaseUser);
+      const { idToken } = await signInWithGoogle();
+      await completeGoogleLink(idToken);
     } catch (err) {
-      // Don't show error for redirect-based auth
-      if (err instanceof Error && err.message === 'Redirecting to Google...') {
-        return;
-      }
+      console.error('Google sign-in failed:', err);
       setAuthError(t.error);
     } finally {
       setIsAuthLoading(false);

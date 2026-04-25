@@ -18,12 +18,12 @@ const { log } = require('../utils/logger');
 // Pre-computed dummy hash for constant-time login (prevents timing-based email enumeration)
 const DUMMY_HASH = bcrypt.hashSync('dummy_password_for_timing', 10);
 
-// Firebase Admin SDK - import if available
-let firebaseAdmin = null;
-try {
-  firebaseAdmin = require('firebase-admin');
-} catch (e) {
-  console.warn('Firebase Admin SDK not available');
+// Google Identity Services — verify ID tokens against Google's public keys.
+const { OAuth2Client } = require('google-auth-library');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+const googleAuthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+if (!GOOGLE_CLIENT_ID) {
+  console.warn('GOOGLE_OAUTH_CLIENT_ID not configured — /api/auth/google will reject all requests');
 }
 
 // Email service
@@ -262,8 +262,8 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/auth/firebase - Firebase authentication (Google, Apple)
-router.post('/firebase', authLimiter, async (req, res) => {
+// POST /api/auth/google — verify Google ID token and upsert user
+router.post('/google', authLimiter, async (req, res) => {
   try {
     const { idToken } = req.body;
 
@@ -271,26 +271,24 @@ router.post('/firebase', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'ID token required' });
     }
 
-    if (!firebaseAdmin || !firebaseAdmin.apps.length) {
-      return res.status(500).json({ error: 'Firebase authentication not configured on server' });
+    if (!googleAuthClient) {
+      return res.status(500).json({ error: 'Google authentication not configured on server' });
     }
 
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
-    const { uid, email: firebaseEmail, name } = decodedToken;
+    const ticket = await googleAuthClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const { sub, email: googleEmail } = payload;
 
-    // Validate Firebase email
-    if (!firebaseEmail || typeof firebaseEmail !== 'string' || !firebaseEmail.includes('@') || firebaseEmail.length > 254) {
-      log.warn(`Firebase auth: invalid email from token (uid: ${uid}, email: ${firebaseEmail})`);
+    if (!googleEmail || typeof googleEmail !== 'string' || !googleEmail.includes('@') || googleEmail.length > 254) {
+      log.warn(`Google auth: invalid email from token (sub: ${sub}, email: ${googleEmail})`);
       return res.status(400).json({ error: 'Invalid email from Google account' });
     }
-    const username = sanitizeString(firebaseEmail, 254).toLowerCase();
+    const username = sanitizeString(googleEmail, 254).toLowerCase();
 
     if (!isDatabaseMode()) {
-      return res.status(400).json({ error: 'Firebase auth requires database mode' });
+      return res.status(400).json({ error: 'Google auth requires database mode' });
     }
 
-    // Atomic upsert: try INSERT with inline role selection, on conflict (existing user) just update last_login
-    // The inline CASE WHEN prevents race conditions where two concurrent requests both see count=0
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
     const userId = crypto.randomUUID();
@@ -305,7 +303,7 @@ router.post('/firebase', authLimiter, async (req, res) => {
          TRUE)
        ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
        RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, firebaseEmail, hashedPassword]
+      [userId, username, googleEmail, hashedPassword]
     );
     const user = result[0];
     const isNewUser = user.is_new_user;
@@ -317,22 +315,22 @@ router.post('/firebase', authLimiter, async (req, res) => {
           [user.id, user.credits, user.credits, 'initial', 'Welcome credits for new account']
         );
       }
-      await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-      log.info(`New Firebase user registered: ${username} (role: ${user.role})`);
+      await logActivity(user.id, username, 'USER_REGISTERED_GOOGLE', { sub });
+      log.info(`New Google user registered: ${username} (role: ${user.role})`);
     } else {
-      await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
+      await logActivity(user.id, username, 'USER_LOGIN_GOOGLE', { sub });
     }
 
     const token = generateToken(user);
 
-    log.info(`Firebase user authenticated: ${username}`);
+    log.info(`Google user authenticated: ${username}`);
 
     res.json({
       token,
       user: {
         id: user.id,
         username: user.username,
-        email: user.email || firebaseEmail,
+        email: user.email || googleEmail,
         role: user.role,
         storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
         storiesGenerated: user.stories_generated || 0,
@@ -343,16 +341,15 @@ router.post('/firebase', authLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    log.error('Firebase auth error:', { code: err.code, message: err.message, constraint: err.constraint });
-    if (err.code === 'auth/id-token-expired') {
+    log.error('Google auth error:', { code: err.code, message: err.message, constraint: err.constraint });
+    if (err.message && /Token used too late|expired/i.test(err.message)) {
       return res.status(401).json({ error: 'Token expired. Please sign in again.' });
     }
-    if (err.code === 'auth/argument-error') {
+    if (err.message && /Wrong recipient|Wrong issuer|invalid/i.test(err.message)) {
       return res.status(400).json({ error: 'Invalid authentication token' });
     }
-    // PostgreSQL constraint violation (shouldn't happen with ON CONFLICT, but defensive)
     if (err.code === '23505') {
-      log.warn('Firebase auth: constraint violation (race condition fallback), retrying login');
+      log.warn('Google auth: constraint violation (race condition fallback), retrying login');
       try {
         const fallbackUser = await dbQuery('SELECT * FROM users WHERE username = $1', [err.detail?.match(/\(([^)]+)\)/)?.[1] || '']);
         if (fallbackUser.length > 0) {
@@ -360,10 +357,10 @@ router.post('/firebase', authLimiter, async (req, res) => {
           return res.json({ token, user: { id: fallbackUser[0].id, username: fallbackUser[0].username, email: fallbackUser[0].email, role: fallbackUser[0].role, credits: fallbackUser[0].credits, emailVerified: true } });
         }
       } catch (retryErr) {
-        log.error('Firebase auth: constraint violation retry also failed:', retryErr.message);
+        log.error('Google auth: constraint violation retry also failed:', retryErr.message);
       }
     }
-    res.status(500).json({ error: 'Firebase authentication failed' });
+    res.status(500).json({ error: 'Google authentication failed' });
   }
 });
 

@@ -1,0 +1,8 @@
+{
+  "customer_id": "1234567890",
+  "developer_token": "PASTE_DEV_TOKEN_HERE",
+  "client_id": "PASTE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+  "client_secret": "PASTE_OAUTH_CLIENT_SECRET",
+  "refresh_token": "",
+  "login_customer_id": ""
+}

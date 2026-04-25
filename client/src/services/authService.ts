@@ -51,8 +51,8 @@ export const authService = {
     }, { skipAuth: true });
   },
 
-  async loginWithFirebase(idToken: string): Promise<{ token: string; user: User }> {
-    const response = await api.post<LoginResponseRaw>('/api/auth/firebase', {
+  async loginWithGoogle(idToken: string): Promise<{ token: string; user: User }> {
+    const response = await api.post<LoginResponseRaw>('/api/auth/google', {
       idToken,
     }, { skipAuth: true });
 

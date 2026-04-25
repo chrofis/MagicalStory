@@ -81,7 +81,8 @@ if (!stripeLive) {
 }
 const sharp = require('sharp');
 const email = require('./email');
-const admin = require('firebase-admin');
+// (firebase-admin removed — Google ID-token verification now uses google-auth-library
+//  inside server/routes/auth.js and server/routes/trial.js)
 
 // Import modular routes and services
 const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion, rehydrateStoryImages } = require('./server/services/database');
@@ -427,49 +428,10 @@ async function detectBboxOnCovers(coverImages, characters) {
   return coverImages;
 }
 
-// Initialize Firebase Admin SDK
-// Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
-let firebaseInitialized = false;
-
-// Try base64 encoded version first (most reliable for complex JSON)
-if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
-  try {
-    const jsonString = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
-    const serviceAccount = JSON.parse(jsonString);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    firebaseInitialized = true;
-  } catch (err) {
-    log.warn('⚠️  Firebase Admin SDK initialization from base64 failed:', err.message);
-  }
-} else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    let serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    // Fix newlines in private key if they got escaped
-    if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    firebaseInitialized = true;
-  } catch (err) {
-    log.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
-  }
-} else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-  try {
-    const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    firebaseInitialized = true;
-  } catch (err) {
-    log.warn('⚠️  Firebase Admin SDK initialization from file failed:', err.message);
-  }
-} else {
-  log.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');
-  log.warn('⚠️  Available env vars with FIREBASE:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
+// (Firebase Admin SDK removed — Google sign-in now uses google-auth-library directly,
+//  see server/routes/auth.js POST /api/auth/google and server/routes/trial.js claim flows.)
+if (!process.env.GOOGLE_OAUTH_CLIENT_ID) {
+  log.warn('⚠️  GOOGLE_OAUTH_CLIENT_ID not configured — Google sign-in will reject all requests');
 }
 
 // NOTE: imageCache moved to server/lib/images.js

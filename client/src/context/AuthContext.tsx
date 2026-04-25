@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
 import storage, { STORAGE_KEYS } from '@/services/storage';
-import { signInWithGoogle, getIdToken, firebaseSignOut, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
+import { signInWithGoogle, googleSignOut } from '@/services/googleAuth';
 import { isNavigationAbort } from '@/utils/fetchErrors';
 
 interface BotProtectionData {
@@ -44,8 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
-  const redirectCheckedRef = useRef(false);
-  const authInProgressRef = useRef(false);
+  // (redirect-flow refs removed — Google Identity Services uses a popup, not a redirect)
   const tokenRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check storage availability and warn user if limited
@@ -330,23 +329,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await login(username, password);
   }, [login]);
 
-  // Handle Firebase user authentication with our backend
-  const handleFirebaseAuth = useCallback(async (firebaseUser: FirebaseUser) => {
-    const idToken = await getIdToken(firebaseUser);
-
-    // Try backend token exchange with one retry on failure
+  // Exchange a Google ID token for a server JWT and a populated user record.
+  const handleGoogleAuth = useCallback(async (idToken: string) => {
     let response: Response;
     try {
-      response = await fetch(`${API_URL}/api/auth/firebase`, {
+      response = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
     } catch (networkErr) {
-      // Network error — retry once after 1s
-      console.warn('Firebase auth backend call failed, retrying in 1s...', networkErr);
+      console.warn('Google auth backend call failed, retrying in 1s...', networkErr);
       await new Promise(r => setTimeout(r, 1000));
-      response = await fetch(`${API_URL}/api/auth/firebase`, {
+      response = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
@@ -354,10 +349,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Firebase authentication failed' }));
-      // Sign out of Firebase to avoid partial auth state
-      try { await firebaseSignOut(); } catch { /* ignore */ }
-      throw new Error(error.error || 'Firebase authentication failed');
+      const error = await response.json().catch(() => ({ error: 'Google authentication failed' }));
+      try { await googleSignOut(); } catch { /* ignore */ }
+      throw new Error(error.error || 'Google authentication failed');
     }
 
     const data = await response.json();
@@ -389,25 +383,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveAuthData]);
 
   const loginWithGoogle = useCallback(async (redirectUrl?: string) => {
-    // Store intended redirect URL (use localStorage for persistence across redirects)
     const targetUrl = redirectUrl || window.location.pathname || '/create';
     storage.setItem(STORAGE_KEYS.AUTH_REDIRECT_URL, targetUrl);
 
-    try {
-      const firebaseUser = await signInWithGoogle();
-      await handleFirebaseAuth(firebaseUser);
-      // Clear redirect URL since we completed login without full page redirect
-      storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
-    } catch (error) {
-      // If this was a redirect (not popup), the error is expected
-      // The redirect will complete and handleRedirectResult will be called
-      if (error instanceof Error && error.message.includes('Redirecting')) {
-        logger.info('Google sign-in redirecting...');
-        return;
-      }
-      throw error;
-    }
-  }, [handleFirebaseAuth]);
+    const { idToken } = await signInWithGoogle();
+    await handleGoogleAuth(idToken);
+    storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
+  }, [handleGoogleAuth]);
 
   const resetPassword = useCallback(async (email: string) => {
     const response = await fetch(`${API_URL}/api/auth/reset-password`, {
@@ -472,9 +454,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear all auth storage
     storage.clearAuthStorage();
 
-    // Also sign out from Firebase
-    firebaseSignOut().catch(err => {
-      console.warn('Firebase sign out error:', err);
+    // Disable Google Identity Services auto-select so the next sign-in shows chooser
+    googleSignOut().catch(err => {
+      console.warn('Google sign out error:', err);
     });
 
     setState({
@@ -579,66 +561,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info(`Stopped impersonating, back to ${user.username}`);
   }, [state.token]);
 
-  // Handle redirect result on page load (for mobile Google sign-in)
-  // This is the ONLY mechanism for handling OAuth redirects - no auth state listener
-  useEffect(() => {
-    const checkRedirectResult = async () => {
-      // Only check once - getRedirectResult returns null on subsequent calls
-      if (redirectCheckedRef.current) {
-        return;
-      }
-      redirectCheckedRef.current = true;
-
-      // Skip if already authenticated
-      if (state.isAuthenticated || state.token) {
-        logger.info('Already authenticated, skipping redirect check');
-        return;
-      }
-
-      // Skip if on trial generation page — it handles its own Google redirect
-      if (localStorage.getItem('trial_gen_session_token')) {
-        logger.info('Trial generation in progress, skipping redirect check (trial page handles it)');
-        return;
-      }
-
-      try {
-        logger.info('Checking for Google redirect result...');
-        const firebaseUser = await handleRedirectResult();
-        if (firebaseUser) {
-          if (authInProgressRef.current) {
-            logger.info('Auth already in progress, skipping');
-            return;
-          }
-          authInProgressRef.current = true;
-          logger.info('Firebase user from redirect detected, completing login...');
-
-          try {
-            await handleFirebaseAuth(firebaseUser);
-
-            // Check if we have a stored redirect URL and navigate there
-            const redirectUrl = storage.getItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
-            if (redirectUrl && redirectUrl !== window.location.pathname) {
-              storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
-              logger.info('Navigating to stored redirect URL:', redirectUrl);
-              // Use replace to avoid back button issues
-              window.location.replace(redirectUrl);
-            }
-          } finally {
-            authInProgressRef.current = false;
-          }
-        } else {
-          logger.info('No pending Google redirect');
-        }
-      } catch (err) {
-        authInProgressRef.current = false;
-        console.error('Redirect result error:', err);
-      }
-    };
-    checkRedirectResult();
-  }, [state.isAuthenticated, state.token, handleFirebaseAuth]);
-
-  // NOTE: Removed Firebase onAuthStateChanged listener to prevent race conditions
-  // All Firebase auth is now handled through explicit loginWithGoogle() or handleRedirectResult()
+  // Google Identity Services uses a popup flow that resolves in-page —
+  // no redirect handler needed. Sign-in completes inside loginWithGoogle().
 
   const updateCredits = useCallback((credits: number) => {
     setState(prev => {

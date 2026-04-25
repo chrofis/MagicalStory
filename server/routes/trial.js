@@ -1170,13 +1170,15 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
       return res.status(400).json({ error: 'Google token is required' });
     }
 
-    // Verify Firebase token
-    const admin = require('firebase-admin');
-    if (!admin.apps.length) {
+    // Verify Google ID token
+    const { OAuth2Client } = require('google-auth-library');
+    const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    if (!GOOGLE_CLIENT_ID) {
       return res.status(503).json({ error: 'Google authentication not configured' });
     }
-
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const decodedToken = ticket.getPayload();
     const googleEmail = decodedToken.email;
 
     if (!googleEmail) {
@@ -1225,7 +1227,7 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
          credits = $2,
          firebase_uid = $3
        WHERE id = $4`,
-      [normalizedEmail, fullCredits, decodedToken.uid, userId]
+      [normalizedEmail, fullCredits, decodedToken.sub, userId]
     );
 
     // Log credit transaction
@@ -2250,22 +2252,18 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
       return res.status(400).json({ error: 'ID token and claim token are required' });
     }
 
-    // Verify Firebase token
-    let firebaseAdmin = null;
-    try {
-      firebaseAdmin = require('firebase-admin');
-    } catch (e) {
-      // Firebase not available
+    // Verify Google ID token
+    const { OAuth2Client } = require('google-auth-library');
+    const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Google authentication not configured on server' });
     }
+    const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const decodedToken = ticket.getPayload();
+    const { sub: googleSub, email: googleEmail } = decodedToken;
 
-    if (!firebaseAdmin || !firebaseAdmin.apps.length) {
-      return res.status(500).json({ error: 'Firebase authentication not configured on server' });
-    }
-
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
-    const { uid: firebaseUid, email: firebaseEmail } = decodedToken;
-
-    if (!firebaseEmail) {
+    if (!googleEmail) {
       return res.status(400).json({ error: 'Google account must have an email address' });
     }
 
@@ -2286,7 +2284,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
     const user = result.rows[0];
 
     // Verify the Google email matches the trial account email
-    if (user.email.toLowerCase() !== firebaseEmail.toLowerCase()) {
+    if (user.email.toLowerCase() !== googleEmail.toLowerCase()) {
       return res.status(400).json({
         error: 'Google account email does not match the trial account email',
       });
@@ -2303,7 +2301,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
          claim_token = NULL,
          claim_token_expires = NULL
        WHERE id = $3`,
-      [firebaseUid, fullCredits, user.id]
+      [googleSub, fullCredits, user.id]
     );
 
     // Create credit transaction for the upgrade

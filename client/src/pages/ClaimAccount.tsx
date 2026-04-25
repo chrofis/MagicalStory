@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import storage from '@/services/storage';
 import { KeyRound, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
-import { signInWithGoogle, getIdToken } from '@/services/firebase';
+import { signInWithGoogle } from '@/services/googleAuth';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -179,8 +179,7 @@ export default function ClaimAccount() {
     setIsLoading(true);
 
     try {
-      const firebaseUser = await signInWithGoogle();
-      const idToken = await getIdToken(firebaseUser);
+      const { idToken } = await signInWithGoogle();
 
       const response = await fetch(`${API_URL}/api/trial/claim-google`, {
         method: 'POST',
