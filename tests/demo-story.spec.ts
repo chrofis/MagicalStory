@@ -427,10 +427,9 @@ function relationshipLabelFor(char: DemoCharacter, other: DemoCharacter, rawType
     case 'partner':
       return 'Married to';
     case 'grandparent-grandchild':
-      // No built-in grandparent label; fall back to Parent/Child chain which the
-      // UI supports. Story generator reads the actual relationships table so
-      // this approximation is only for display.
-      return charAge > otherAge ? 'Parent of' : 'Child of';
+      return charAge > otherAge ? 'Grandparent of' : 'Grandchild of';
+    case 'parent-in-law':
+      return charAge > otherAge ? 'Parent-in-law of' : 'Child-in-law of';
     default:
       return null;
   }
@@ -480,6 +479,10 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
     const variants: Record<string, string[]> = {
       'Parent of': ['Parent of', 'Elternteil von', 'Parent de'],
       'Child of': ['Child of', 'Kind von', 'Enfant de'],
+      'Grandparent of': ['Grandparent of', 'Grosselternteil von', 'Grand-parent de'],
+      'Grandchild of': ['Grandchild of', 'Enkelkind von', 'Petit-enfant de'],
+      'Parent-in-law of': ['Parent-in-law of', 'Schwiegerelternteil von', 'Beau-parent de'],
+      'Child-in-law of': ['Child-in-law of', 'Schwiegerkind von', 'Bel-enfant de'],
       'Older Sibling of': ['Older Sibling of', 'Älteres Geschwister von', 'Frère/Sœur aîné(e) de'],
       'Younger Sibling of': ['Younger Sibling of', 'Jüngeres Geschwister von', 'Frère/Sœur cadet(te) de'],
       'Married to': ['Married to', 'Verheiratet mit', 'Marié(e) à'],
@@ -740,8 +743,9 @@ async function createFamilyViaWizard(page: Page, family: DemoFamily) {
 
   await setMainRoles(page, family);
 
-  console.log(`\n=== Waiting for avatar generation (up to 10 min) ===`);
-  await waitForAllAvatars(page, family);
+  // Don't wait for avatars — the wizard accepts moving forward without all
+  // avatars complete; the server uses whatever's ready when story generation
+  // starts and lazily fills the rest. Polling here just stalls the test.
 }
 
 // ─── Test ───────────────────────────────────────────────────────────────────
