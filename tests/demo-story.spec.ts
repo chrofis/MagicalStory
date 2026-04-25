@@ -835,17 +835,23 @@ test.describe('Demo Story Generation', () => {
     await clickNext(page);
 
     // ── Step 4: Art Style ──
+    // If a default style is preselected (localStorage from a prior run, or
+    // server default), Step 4 can auto-advance to Step 5 before we get a
+    // chance to click. Treat the art-style button as optional.
     console.log(`Step 4: Selecting art style: ${artStyleLabel}...`);
     const artBtn = page.locator('button').filter({ hasText: artStyleLabel }).first();
-    await expect(artBtn).toBeVisible({ timeout: 5000 });
-    await artBtn.click();
-    await page.waitForTimeout(1000);
-    const nextBtnAfterArt = page.getByRole('button', { name: NEXT_BTN_RE }).first();
-    if (await nextBtnAfterArt.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await clickNext(page);
-    } else {
-      console.log('  Art style auto-advanced.');
+    if (await artBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await artBtn.click();
       await page.waitForTimeout(1000);
+      const nextBtnAfterArt = page.getByRole('button', { name: NEXT_BTN_RE }).first();
+      if (await nextBtnAfterArt.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await clickNext(page);
+      } else {
+        console.log('  Art style auto-advanced.');
+        await page.waitForTimeout(1000);
+      }
+    } else {
+      console.log(`  Art style picker not visible — already on Step 5 (preselected).`);
     }
 
     // ── Step 5: Summary & Generate ──
