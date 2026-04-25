@@ -109,10 +109,15 @@ function getCurrentEntry(): DemoRotationEntry {
 }
 
 async function loginAs(page: Page, email: string, password: string) {
-  // ?login=true makes the homepage auto-open the auth modal. Just wait for
-  // it. The previous click-the-menu fallback could hang for hours when the
-  // modal raced into view and intercepted retried clicks.
+  // ?login=true used to auto-open the modal but no longer does. The
+  // homepage shows a visible "Bereits ein Konto? Anmelden" button — click
+  // it to open the modal.
   await page.goto('/?login=true');
+  // Try modal-already-open first (auto-open may return at any time).
+  if (!await page.locator('.fixed.inset-0').isVisible({ timeout: 1500 }).catch(() => false)) {
+    const trigger = page.getByRole('button', { name: /bereits ein konto|already have an account|déjà un compte|anmelden|sign in|connexion/i }).first();
+    await trigger.click({ timeout: 5000 });
+  }
   await page.waitForSelector('.fixed.inset-0', { timeout: 15000 });
 
   const modal = page.locator('.fixed.inset-0');
