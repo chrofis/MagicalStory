@@ -239,32 +239,18 @@ async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
     loc: () => page.locator('button[class*="border-dashed"][class*="indigo"]').first(),
   });
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    for (const c of candidates) {
-      const el = c.loc();
-      if (!await el.isVisible({ timeout: 2000 }).catch(() => false)) continue;
-      await el.scrollIntoViewIfNeeded().catch(() => {});
-      await el.click().catch(() => {});
-      if (await waitForPhotoStep(page, 10000)) {
-        console.log(`    landed on photo step via ${c.label}`);
-        return;
-      }
-      console.log(`    clicked ${c.label} but photo step did not appear — trying next candidate`);
+  for (const c of candidates) {
+    const el = c.loc();
+    if (!await el.isVisible({ timeout: 2000 }).catch(() => false)) continue;
+    await el.scrollIntoViewIfNeeded().catch(() => {});
+    await el.click().catch(() => {});
+    if (await waitForPhotoStep(page, 10000)) {
+      console.log(`    landed on photo step via ${c.label}`);
+      return;
     }
-    if (attempt === 0) {
-      // Last-ditch: the wizard may be stuck on a prior character's avatar step
-      // with no visible button. Force a reload to reset to the list view.
-      console.log(`    no candidate worked — reloading /create and retrying`);
-      await page.goto('/create');
-      await page.waitForTimeout(3000);
-      // If the photo step is auto-opened (e.g. no chars yet), we're done.
-      if (await waitForPhotoStep(page, 2000)) {
-        console.log(`    landed on photo step after /create reload`);
-        return;
-      }
-    }
+    console.log(`    clicked ${c.label} but photo step did not appear — trying next candidate`);
   }
-  throw new Error('Could not navigate to photo-upload step (tried all candidates + reload)');
+  throw new Error('Could not navigate to photo-upload step (no candidate worked)');
 }
 
 async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
@@ -278,10 +264,18 @@ async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
   // timeout on a silent locator wait.
   await fileInput.waitFor({ state: 'attached', timeout: 15000 });
   await fileInput.setInputFiles(photoPath);
-  console.log(`    waiting for photo analysis (up to 30s)...`);
-  // Photo analyzer: face detection (MediaPipe) + body-no-bg (rembg). 5–15s
-  // typical but some photos run longer. Wait generously.
-  await page.waitForTimeout(30000);
+  console.log(`    waiting for photo analysis to complete...`);
+  // The wizard auto-advances to the NAME step when photo analysis returns
+  // (MediaPipe face detection + rembg + Gemini traits). Critically, this is
+  // also when avatars.status='pending' is set on the character, which is
+  // what makes the eventual 'Continue to traits' click trigger
+  // onSaveAndGenerateAvatar (StoryWizard.tsx:3220 path). If we proceed
+  // BEFORE analysis completes, status stays undefined → no avatar trigger
+  // → 'Kein Bild' dead state at the avatar sub-step. Wait up to 90s.
+  const nameInput = page.locator('input[placeholder*="Name" i], input[placeholder*="Nom" i]').first();
+  await nameInput.waitFor({ state: 'visible', timeout: 90000 });
+  // Small settle so the avatars.status='pending' state-update commits.
+  await page.waitForTimeout(500);
 }
 
 async function fillCharacterBasics(page: Page, char: DemoCharacter) {
@@ -600,27 +594,15 @@ async function advanceSubStep(page: Page, label: string): Promise<boolean> {
     console.log(`      → next after ${label}`);
     return true;
   }
-  // Dump a screenshot before the /create recovery so we can see what's on
-  // screen. Useful for diagnosing stuck sub-steps.
+  // No Save/Next visible. Dump a screenshot and FAIL HARD — earlier we used
+  // a /create reload here, but that bypasses StoryWizard's onSaveCharacter
+  // which fires the client-side avatar trigger (StoryWizard.tsx:3220).
+  // Skipping the save means the character has no avatar pipeline started,
+  // and the showcase is dead in the water. Better to fail loudly so we
+  // can diagnose the wizard state.
   const shotPath = `test-results/debug-no-button-${label}-${Date.now()}.png`;
   await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
-  console.log(`      [debug] screenshot at ${shotPath}`);
-  // No Save/Next visible. We might be stuck on the "Kein Bild" avatar state
-  // (avatar never started generating, no action buttons rendered). Try
-  // clicking the wizard step-1 button to bounce back to the list.
-  const step1Btn = page.locator('nav button').filter({ hasText: /^1$/ }).first();
-  if (await step1Btn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    console.log(`      → clicking step-1 nav button after ${label}`);
-    await step1Btn.click();
-    await page.waitForTimeout(2000);
-    if (await isOnCharacterListNow(page)) return false;
-  }
-  // Last resort: force a reload to /create. If we're still in edit view after
-  // reload, return false — caller handles the recovery.
-  console.log(`      no button after ${label} — reloading /create`);
-  await page.goto('/create');
-  await page.waitForTimeout(3000);
-  return false;
+  throw new Error(`No Save/Next button after ${label} — wizard stuck. Screenshot: ${shotPath}`);
 }
 
 async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, family: DemoFamily, alreadyCreated: DemoCharacter[]) {
@@ -645,12 +627,14 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
     if (!await advanceSubStep(page, `final-${i + 1}`)) break;
   }
   await page.waitForTimeout(1500);
-  // The wizard commonly ends with the avatar-wait screen. Skip it explicitly.
+  // Final cleanup: dismiss the avatar-wait screen if still showing. We do
+  // NOT navigate to /create as a fallback — that bypasses the save handler
+  // and leaves avatars un-triggered.
   await dismissAvatarWaitIfShown(page);
   if (!await isOnCharacterListNow(page)) {
-    console.log(`      WARN: did not land on list after ${char.name} — navigating to /create`);
-    await page.goto('/create');
-    await page.waitForTimeout(3000);
+    const shotPath = `test-results/debug-not-on-list-${char.name}-${Date.now()}.png`;
+    await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+    throw new Error(`Did not land on character list after ${char.name}. Screenshot: ${shotPath}`);
   }
 }
 
@@ -674,87 +658,6 @@ async function setMainRoles(page: Page, family: DemoFamily) {
     }
   }
   await page.waitForTimeout(1000);
-}
-
-async function triggerMissingAvatars(page: Page, family: DemoFamily) {
-  // After /create-reload recovery paths, some characters may have been saved
-  // WITHOUT StoryWizard.tsx:3220's client-side avatar trigger firing. Mimic
-  // that call server-side for each character that has no avatar.
-  console.log(`\n=== Triggering avatar generation for characters missing it ===`);
-
-  const triggered = await page.evaluate(async (familyNames) => {
-    const token = localStorage.getItem('auth_token');
-    const headers: any = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const listRes = await fetch('/api/characters?includeAllAvatars=true', { headers });
-    if (!listRes.ok) return { error: `list ${listRes.status}` };
-    const { characters = [] } = await listRes.json();
-
-    const results: any[] = [];
-    for (const c of characters) {
-      if (!familyNames.includes(c.name)) continue;
-      const hasAvatar = !!(c.avatars && (c.avatars.standard || c.avatars.winter || c.avatars.summer));
-      if (hasAvatar) { results.push({ name: c.name, status: 'already-has-avatar' }); continue; }
-
-      // Fetch full character to get photos (list strips them).
-      const fullRes = await fetch(`/api/characters/${c.id}/full`, { headers });
-      if (!fullRes.ok) { results.push({ name: c.name, status: `full-fetch-${fullRes.status}` }); continue; }
-      const fullBody = await fullRes.json();
-      // /full returns { character: {...} }
-      const fullChar = fullBody.character || fullBody;
-      const hasPhoto = !!(fullChar.photos?.original || fullChar.photos?.face || fullChar.photos?.body || fullChar.photos?.bodyNoBg);
-      if (!hasPhoto) { results.push({ name: c.name, status: 'no-photo' }); continue; }
-
-      // Build payload matching characterService.generateClothingAvatars shape.
-      const age = parseInt(fullChar.age) || 10;
-      const gender = fullChar.gender || 'child';
-      const genderLabel = gender === 'male' ? (age >= 18 ? 'man' : 'boy')
-                         : gender === 'female' ? (age >= 18 ? 'woman' : 'girl')
-                         : (age >= 18 ? 'person' : 'child');
-      const nameOrGeneric = fullChar.name?.trim() || `This ${genderLabel}`;
-      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
-      if (fullChar.physical) {
-        if (fullChar.physical.hair) physicalDescription += `, ${fullChar.physical.hair}`;
-        if (fullChar.physical.face) physicalDescription += `, ${fullChar.physical.face}`;
-        if (fullChar.physical.build) physicalDescription += `, ${fullChar.physical.build}`;
-        if (fullChar.physical.other) physicalDescription += `, ${fullChar.physical.other}`;
-      }
-      const inputPhoto = fullChar.photos?.bodyNoBg || fullChar.photos?.body || fullChar.photos?.face || fullChar.photos?.original;
-
-      const genRes = await fetch('/api/generate-clothing-avatars?async=true', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          characterId: fullChar.id,
-          facePhoto: inputPhoto,
-          physicalDescription,
-          name: fullChar.name,
-          age: fullChar.age,
-          apparentAge: fullChar.physical?.apparentAge,
-          gender: fullChar.gender,
-          build: fullChar.physical?.build,
-          clothing: fullChar.clothing?.structured,
-        }),
-      });
-      if (!genRes.ok) {
-        const body = await genRes.text().catch(() => '');
-        results.push({ name: c.name, status: `trigger-${genRes.status}`, body: body.slice(0, 200) });
-        continue;
-      }
-      const genJson = await genRes.json().catch(() => ({}));
-      results.push({ name: c.name, status: 'triggered', jobId: genJson.jobId });
-    }
-    return { results };
-  }, family.characters.map(c => c.name));
-
-  if (triggered.error) {
-    console.log(`  avatar-trigger list fetch failed: ${triggered.error}`);
-    return;
-  }
-  for (const r of triggered.results || []) {
-    console.log(`  ${r.name}: ${r.status}${r.jobId ? ` (job ${r.jobId})` : ''}${r.body ? ` — ${r.body}` : ''}`);
-  }
 }
 
 async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 600000) {
@@ -813,13 +716,6 @@ async function createFamilyViaWizard(page: Page, family: DemoFamily) {
   }
 
   await setMainRoles(page, family);
-
-  // The /create-reload recovery path used inside createOneCharacterViaWizard
-  // can bypass the client-side onSaveCharacter handler that triggers avatar
-  // generation (StoryWizard.tsx:3220). Trigger any missing ones explicitly
-  // before polling so we don't burn 10 minutes on avatars that were never
-  // started.
-  await triggerMissingAvatars(page, family);
 
   console.log(`\n=== Waiting for avatar generation (up to 10 min) ===`);
   await waitForAllAvatars(page, family);
