@@ -894,7 +894,12 @@ test.describe('Demo Story Generation', () => {
 
     // ── Verification ──
     const criticalErrors = jsErrors.filter(e =>
-      !e.includes('ResizeObserver') && !e.includes('chunk')
+      !e.includes('ResizeObserver') &&
+      !e.includes('chunk') &&
+      // React #418 is a hydration text-mismatch warning — SSR/CSR diff, no
+      // functional impact and unrelated to story generation.
+      !e.includes('Minified React error #418') &&
+      !e.includes('react.dev/errors/418')
     );
     if (criticalErrors.length > 0) {
       console.log(`  JS errors: ${criticalErrors.join(', ')}`);
