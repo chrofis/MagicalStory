@@ -622,25 +622,34 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
   if (!await advanceSubStep(page, 'characteristics')) return;
   await setRelationshipsForCharacter(page, char, family, alreadyCreated);
   if (!await advanceSubStep(page, 'relationships')) return;
-  // Final auto-step: from relationships, the wizard typically shows either
-  // the avatar-wait screen ("Weiter ohne zu warten") or directly returns to
-  // the list. Click Save if visible, otherwise dismiss the avatar wait. Do
-  // NOT keep clicking generic "Weiter" — that advances the wizard past
-  // Step 1 (Figuren) into Buch/Story, which makes us lose the list.
+  // Final auto-step: from relationships, the wizard typically shows the
+  // avatar step (avatar ready → "Weiter" calls onSave) or the avatar-wait
+  // screen ("Weiter ohne zu warten"). Click whichever is present. Re-check
+  // isOnCharacterListNow each iteration so we never click a wizard-level
+  // Weiter (Step 2/3 advance) by mistake.
   for (let i = 0; i < 3; i++) {
     if (await isOnCharacterListNow(page)) break;
-    // Try Save first.
+    // Save button (label: "Speichern", "Charakter trotzdem speichern").
     const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
-    if (await saveBtn.isVisible({ timeout: 1000 }).catch(() => false)
+    if (await saveBtn.isVisible({ timeout: 800 }).catch(() => false)
         && await saveBtn.isEnabled().catch(() => false)) {
       console.log(`      → save (final-${i + 1})`);
       await saveBtn.click();
       await page.waitForTimeout(2500);
       continue;
     }
-    // Then the avatar-wait dismiss.
+    // Avatar-step "Weiter" (calls onSave) — only fire when we're confidently
+    // INSIDE character edit (not on the list — already checked above).
+    const weiterBtn = page.getByRole('button', { name: /^(weiter|next|suivant)$/i }).first();
+    if (await weiterBtn.isVisible({ timeout: 800 }).catch(() => false)
+        && await weiterBtn.isEnabled().catch(() => false)) {
+      console.log(`      → weiter/save on avatar step (final-${i + 1})`);
+      await weiterBtn.click();
+      await page.waitForTimeout(2500);
+      continue;
+    }
+    // Avatar-wait screen.
     if (await dismissAvatarWaitIfShown(page)) continue;
-    // Nothing to do — break out.
     break;
   }
   await page.waitForTimeout(1000);
