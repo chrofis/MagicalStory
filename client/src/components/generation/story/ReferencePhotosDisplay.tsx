@@ -254,21 +254,14 @@ export function ReferencePhotosDisplay({
             </div>
           )}
 
-          {/* Pass 1 output: generated empty scene with prompt overlay */}
+          {/* Pass 1 output: generated empty scene (prompt already shown above as <pre>) */}
           <div className="text-[10px] text-emerald-600 font-medium">{language === 'de' ? 'Ausgabe ↓' : 'Output ↓'}</div>
-          <div className="relative group">
-            <img
-              src={displayEmptySceneImage}
-              alt="Empty scene background"
-              className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setLightboxImage(displayEmptySceneImage)}
-            />
-            {displayEmptyScenePrompt && (
-              <div className="absolute inset-x-0 bottom-0 bg-black/70 text-white text-[9px] p-1.5 rounded-b max-h-20 overflow-auto whitespace-pre-wrap pointer-events-none">
-                {displayEmptyScenePrompt}
-              </div>
-            )}
-          </div>
+          <img
+            src={displayEmptySceneImage}
+            alt="Empty scene background"
+            className="w-full max-h-48 object-contain rounded border border-emerald-300 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setLightboxImage(displayEmptySceneImage)}
+          />
 
           {/* QC comparison: V1 (failed) vs V2 (retry) */}
           {emptySceneQc && (
