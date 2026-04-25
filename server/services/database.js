@@ -1227,7 +1227,7 @@ async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
   }
 
   const rows = await dbQuery(
-    `SELECT image_data, quality_score, generated_at FROM story_images
+    `SELECT image_data, image_url, quality_score, generated_at FROM story_images
      WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3 AND version_index = $4`,
     [storyId, imageType, pageNumber, versionIndex]
   );
@@ -1237,9 +1237,10 @@ async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
     return null;
   }
 
-  console.log(`🔍 [GET_IMAGE] Found image: storyId=${storyId}, type=${imageType}, dataLength=${rows[0].image_data?.length || 0}`);
+  console.log(`🔍 [GET_IMAGE] Found image: storyId=${storyId}, type=${imageType}, dataLength=${rows[0].image_data?.length || 0}, hasUrl=${!!rows[0].image_url}`);
   return {
     imageData: rows[0].image_data,
+    imageUrl: rows[0].image_url,
     qualityScore: rows[0].quality_score,
     generatedAt: rows[0].generated_at
   };
@@ -1258,7 +1259,7 @@ async function getStoryImageWithVersions(storyId, imageType, pageNumber) {
   }
 
   const rows = await dbQuery(
-    `SELECT version_index, image_data, quality_score, generated_at FROM story_images
+    `SELECT version_index, image_data, image_url, quality_score, generated_at FROM story_images
      WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3
      ORDER BY version_index`,
     [storyId, imageType, pageNumber]
@@ -1280,12 +1281,14 @@ async function getStoryImageWithVersions(storyId, imageType, pageNumber) {
     .map(r => ({
       versionIndex: r.version_index,
       imageData: r.image_data,
+      imageUrl: r.image_url,
       qualityScore: r.quality_score,
       generatedAt: r.generated_at
     }));
 
   return {
     imageData: mainImage.image_data,
+    imageUrl: mainImage.image_url,
     qualityScore: mainImage.quality_score,
     generatedAt: mainImage.generated_at,
     versions: versions.length > 0 ? versions : undefined

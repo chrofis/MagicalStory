@@ -267,8 +267,13 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     // Try active version first, fall back to version 0 if not found
     const activeVersion = await getActiveVersion(storyId, pageNum);
     let separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
-    if (!separateImage?.imageData && activeVersion !== 0) {
+    if (!separateImage?.imageData && !separateImage?.imageUrl && activeVersion !== 0) {
       separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
+    }
+    // Prefer R2 URL (free egress, CDN-cached) when available; fall back to bytes.
+    if (separateImage?.imageUrl) {
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.redirect(302, separateImage.imageUrl);
     }
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -403,6 +408,11 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     // Use the active version (selected by user), not always version 0
     const activeVersionIdx = await getActiveVersion(storyId, coverType);
     const separateImage = await getStoryImage(storyId, coverType, null, activeVersionIdx);
+    // Prefer R2 URL when available.
+    if (separateImage?.imageUrl) {
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.redirect(302, separateImage.imageUrl);
+    }
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));

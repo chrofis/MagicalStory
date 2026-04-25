@@ -2176,10 +2176,12 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       // Return active version's imageData as the main imageData
       const activeEntry = allVersions[activeVersion] || allVersions[0];
       const activeImageData = activeEntry?.imageData || normalizeImageData(separateImage.imageData);
+      const activeImageUrl = activeEntry?.imageUrl ?? separateImage.imageUrl ?? null;
 
       return res.json({
         pageNumber: pageNum,
         imageData: activeImageData,
+        imageUrl: activeImageUrl,
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
         activeVersion,
