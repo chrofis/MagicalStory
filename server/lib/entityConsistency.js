@@ -107,75 +107,227 @@ function ensureFaceInsideBody(figures) {
   }
 }
 
+// Depth-tier face-height envelopes (face height as fraction of frame height).
+// Face boxes are placed at the cascade detection's CENTER (reliable position),
+// and sized using these envelopes — neither Gemini nor cascade dimensions are
+// reliable, so we use a fixed-per-depth ideal size. Bumped 2026-04-25 after
+// dry-run interview showed previous envelopes were systematically too small.
+const DEPTH_FACE_HEIGHT = {
+  foreground: { min: 0.15, ideal: 0.25, max: 0.42 },
+  midground:  { min: 0.08, ideal: 0.13, max: 0.22 },
+  background: { min: 0.04, ideal: 0.07, max: 0.12 },
+};
+const DEFAULT_FACE_HEIGHT = DEPTH_FACE_HEIGHT.midground;
+// Face aspect ratio (width / height) — anime/illustration faces sit around 0.85.
+const FACE_ASPECT = 0.85;
+
+function depthEnvelopeFor(depth) {
+  const key = String(depth || '').toLowerCase().trim();
+  return DEPTH_FACE_HEIGHT[key] || DEFAULT_FACE_HEIGHT;
+}
+
+function clampFaceHeight(h, env) {
+  return Math.max(env.min, Math.min(env.max, h));
+}
+
+/**
+ * Build a face box of given dimensions centred on (cx, cy), all in 0-1
+ * normalised frame coordinates. Returns [ymin, xmin, ymax, xmax].
+ */
+function makeFaceBox(cx, cy, faceHeight, faceWidth) {
+  const halfH = faceHeight / 2;
+  const halfW = faceWidth / 2;
+  return [
+    Math.max(0, cy - halfH),
+    Math.max(0, cx - halfW),
+    Math.min(1, cy + halfH),
+    Math.min(1, cx + halfW),
+  ];
+}
+
 /**
  * Merge cascade-detected faces into Gemini bbox figures.
- * Replaces Gemini's unreliable faceBox with cascade face locations.
+ *
+ * Strategy (after the 2026-04-25 dry-run interview across art styles):
+ *
+ *   - Cascade detection CENTERS are reliable; cascade BOX SIZES are not (the
+ *     classifier sometimes fires on just an eye or the mouth).
+ *   - Gemini identifies characters by name well, and gives roughly the right
+ *     face SIZE, but its bbox positions are 50–100% off across every style.
+ *   - The depth tier of each character (from scene metadata, passed in as
+ *     `expectedCharacters`) is the most reliable size signal we have.
+ *
+ * For each named Gemini figure:
+ *   1. Find the cascade detection nearest the figure's expected location.
+ *   2. If matched, place a face box at the CASCADE CENTER, sized using the
+ *      depth envelope (or Gemini's face height clamped to that envelope).
+ *      Cascade `faceBox` (tight) is used for the center; `paddedBox` is
+ *      ignored — its 60% padding drags the rectangle into the chest.
+ *   3. If no cascade match but Gemini has a faceBox, keep Gemini's box but
+ *      clamp its height to the depth envelope.
+ *   4. If neither, leave the figure as-is (back-turned characters live here).
+ *
  * @param {Array} geminiFigures - figures from detectAllBoundingBoxes
- * @param {Array} cascadeFaces - faces from detectIllustrationFaces
- * @param {number} imgWidth - image width for normalization
- * @param {number} imgHeight - image height for normalization
- * @returns {Array} merged figures with improved faceBox coordinates
+ * @param {Array} cascadeFaces  - faces from detectIllustrationFaces
+ * @param {number} imgWidth     - source image width (px)
+ * @param {number} imgHeight    - source image height (px)
+ * @param {Array}  [expectedCharacters] - the list passed into the bbox
+ *                  detection prompt; each element may have { name, depth }
+ *                  or a `position` string ending in foreground/midground/
+ *                  background. Used to pick the per-character depth envelope.
+ * @returns {Array} merged figures with refined faceBox coordinates
  */
-async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth, imgHeight) {
-  if (!cascadeFaces || cascadeFaces.length === 0) return geminiFigures;
+async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth, imgHeight, expectedCharacters = []) {
+  // Build a name → depth lookup. depth may be on a top-level field or embedded
+  // in `position` (e.g. "left foreground", "center background").
+  const depthByName = new Map();
+  const extractDepth = (c) => {
+    if (!c) return 'midground';
+    if (c.depth) return c.depth;
+    const p = String(c.position || '').toLowerCase();
+    if (p.includes('foreground')) return 'foreground';
+    if (p.includes('background')) return 'background';
+    if (p.includes('midground')) return 'midground';
+    return 'midground';
+  };
+  for (const c of (expectedCharacters || [])) {
+    if (c?.name) depthByName.set(c.name.toLowerCase(), extractDepth(c));
+  }
+
+  // Depth detection uses multiple signals and picks the DEEPEST tier any
+  // signal voted for (so foreground beats midground beats background).
+  // Biases toward larger face boxes — undersizing was the user's main
+  // complaint after the dry-run interview.
+  const RANK = { foreground: 3, midground: 2, background: 1 };
+  const tierFromString = (s) => {
+    const t = String(s || '').toLowerCase();
+    if (t.includes('foreground')) return 'foreground';
+    if (t.includes('background')) return 'background';
+    if (t.includes('midground')) return 'midground';
+    return null;
+  };
+  const lookupDepth = (fig) => {
+    const votes = [];
+    // Signal A: explicit depth from scene metadata, by character name.
+    if (fig?.name && depthByName.has(fig.name.toLowerCase())) {
+      votes.push(depthByName.get(fig.name.toLowerCase()));
+    }
+    // Signal B: Gemini's position field (sometimes contains "foreground"/etc).
+    const fromGeminiPos = tierFromString(fig?.position);
+    if (fromGeminiPos) votes.push(fromGeminiPos);
+    // Signal C: body-bbox height — wider thresholds so close-up portraits and
+    // partially-visible foreground figures (head + torso, ~25-35% of frame)
+    // get classed as foreground, not midground.
+    const bb = fig?.bodyBox;
+    if (Array.isArray(bb) && bb.length === 4) {
+      const bodyH = bb[2] - bb[0];
+      if (bodyH > 0.20) votes.push('foreground');
+      else if (bodyH > 0.08) votes.push('midground');
+      else votes.push('background');
+    }
+    // Signal D: Gemini's face height itself. If the face already takes up
+    // more than 12% of the frame, the figure is foreground regardless of
+    // what the body box says.
+    const fb = fig?.faceBox;
+    if (Array.isArray(fb) && fb.length === 4) {
+      const faceH = fb[2] - fb[0];
+      if (faceH > 0.12) votes.push('foreground');
+      else if (faceH > 0.06) votes.push('midground');
+    }
+    if (votes.length === 0) return 'midground';
+    // Pick the deepest tier (highest rank).
+    return votes.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+  };
+
+  if (!cascadeFaces || cascadeFaces.length === 0) {
+    // No cascade help — size each face to max(Gemini, ideal) capped at max.
+    // Same max(Gemini, ideal) policy as the matched-cascade path.
+    for (const fig of geminiFigures) {
+      const fb = fig.faceBox;
+      if (!Array.isArray(fb) || fb.length !== 4) continue;
+      const env = depthEnvelopeFor(lookupDepth(fig));
+      const h = fb[2] - fb[0];
+      const newH = Math.min(env.max, Math.max(h, env.ideal));
+      if (Math.abs(newH - h) > 0.005) {
+        const cx = (fb[1] + fb[3]) / 2;
+        const cy = (fb[0] + fb[2]) / 2;
+        fig._geminiFaceBox = fb;
+        fig.faceBox = makeFaceBox(cx, cy, newH, newH * FACE_ASPECT);
+        fig._sizeAdjusted = true;
+      }
+    }
+    ensureFaceInsideBody(geminiFigures);
+    return geminiFigures;
+  }
 
   const matchedCascade = new Set();
 
-  // For each Gemini figure, find the closest cascade face near its bodyBox.
-  // Gemini bodyBox/faceBox are [ymin, xmin, ymax, xmax] normalized 0-1.
-  // Cascade faceBox/paddedBox are {x, y, width, height} in pixels (from Python service).
-  // All comparisons normalize cascade pixel coords to 0-1 by dividing by imgWidth/imgHeight.
   for (const fig of geminiFigures) {
-    const bb = fig.bodyBox; // [ymin, xmin, ymax, xmax] normalized 0-1
+    const bb = fig.bodyBox;
     if (!bb || !Array.isArray(bb)) continue;
 
-    const bodyCenterX = (bb[1] + bb[3]) / 2; // (xmin + xmax) / 2
-    const bodyCenterY = bb[0]; // ymin = top of body = near head
-    const bodyW = bb[3] - bb[1]; // xmax - xmin
+    const bodyCenterX = (bb[1] + bb[3]) / 2;
+    const bodyTopY = bb[0];
+    const bodyW = bb[3] - bb[1];
+    const bodyH = bb[2] - bb[0];
+
+    // Cascade match — anchor on Gemini's FACE center when present, fall
+    // back to body top otherwise. Hard distance cap (15% of frame in
+    // either axis) so a cascade detection on a different figure can't
+    // claim this one. Earlier dry-run runs showed body-top anchoring
+    // matched cascade faces 30% away on multi-figure scenes.
+    const fbCur = fig.faceBox;
+    const useFaceAnchor = Array.isArray(fbCur) && fbCur.length === 4;
+    const anchorX = useFaceAnchor ? (fbCur[1] + fbCur[3]) / 2 : bodyCenterX;
+    const anchorY = useFaceAnchor ? (fbCur[0] + fbCur[2]) / 2 : bodyTopY;
+    const MAX_MATCH_DIST = 0.15; // fraction of frame
 
     let bestDist = Infinity;
     let bestIdx = -1;
-
     for (let i = 0; i < cascadeFaces.length; i++) {
       if (matchedCascade.has(i)) continue;
       const cf = cascadeFaces[i];
-      // Normalize cascade pixel coords to 0-1
-      const faceCenterX = (cf.faceBox.x + cf.faceBox.width / 2) / imgWidth;
-      const faceCenterY = (cf.faceBox.y + cf.faceBox.height / 2) / imgHeight;
-
-      // Face should be within ~1.5x body width horizontally and above body center.
-      // Both dx and dy normalized to body dimensions for consistent scale.
-      const bodyH = bb[2] - bb[0]; // ymax - ymin
-      const dx = Math.abs(faceCenterX - bodyCenterX) / (bodyW || 0.1);
-      const dy = (faceCenterY - bodyCenterY) / (bodyH || 0.1); // normalize to body heights
-
-      // Distance metric: horizontal offset + penalty for face below body top
-      const dist = dx + (dy > 0.3 ? dy * 3 : 0);
-
-      if (dist < bestDist && dx < 1.5) {
+      const cx = (cf.faceBox.x + cf.faceBox.width / 2) / imgWidth;
+      const cy = (cf.faceBox.y + cf.faceBox.height / 2) / imgHeight;
+      const dx = Math.abs(cx - anchorX);
+      const dy = Math.abs(cy - anchorY);
+      // Reject if cascade is too far from anchor in either axis.
+      if (dx > MAX_MATCH_DIST || dy > MAX_MATCH_DIST) continue;
+      const dist = Math.hypot(dx, dy);
+      if (dist < bestDist) {
         bestDist = dist;
         bestIdx = i;
       }
     }
 
+    const env = depthEnvelopeFor(lookupDepth(fig));
+    const oldFace = fig.faceBox;
+    const oldHeight = (Array.isArray(oldFace) && oldFace.length === 4) ? (oldFace[2] - oldFace[0]) : null;
+
     if (bestIdx >= 0) {
+      // Cascade matched — use cascade CENTER + depth-envelope SIZE.
+      // Use Gemini's face height as a hint when it falls inside the envelope;
+      // otherwise fall back to the envelope's ideal value.
       const cf = cascadeFaces[bestIdx];
       matchedCascade.add(bestIdx);
-      // Replace Gemini's faceBox with cascade's more accurate coordinates.
-      // Normalize cascade paddedBox from pixels to [ymin, xmin, ymax, xmax] 0-1
-      // to match the Gemini coordinate format used everywhere.
-      const oldFace = fig.faceBox;
-      const newFace = [
-        cf.paddedBox.y / imgHeight,                          // ymin
-        cf.paddedBox.x / imgWidth,                           // xmin
-        (cf.paddedBox.y + cf.paddedBox.height) / imgHeight,  // ymax
-        (cf.paddedBox.x + cf.paddedBox.width) / imgWidth,    // xmax
-      ];
+      const cx = (cf.faceBox.x + cf.faceBox.width / 2) / imgWidth;
+      const cy = (cf.faceBox.y + cf.faceBox.height / 2) / imgHeight;
+
+      // Face height = max(Gemini face height, depth-tier ideal), clamped
+      // to depth-tier max. Use whichever is bigger so we never undersize:
+      // when Gemini's box is wide enough, trust it; when Gemini's box is
+      // small or absent, fall back to the depth ideal. Cap at depth-max
+      // so a wildly oversized Gemini box doesn't paint the whole figure.
+      const faceH = Math.min(env.max, Math.max(oldHeight || 0, env.ideal));
+      const faceW = faceH * FACE_ASPECT;
+      const newFace = makeFaceBox(cx, cy, faceH, faceW);
+
       fig._geminiFaceBox = oldFace;
       fig.faceBox = newFace;
       fig._cascadeFace = cf.source;
+      fig._depthTier = lookupDepth(fig);
 
-      // Expand bodyBox to include cascade face if it falls outside
+      // Body box should still contain the face. Expand if needed.
       if (bb.length >= 4) {
         const [bymin, bxmin, bymax, bxmax] = bb;
         const [fymin, fxmin, fymax, fxmax] = newFace;
@@ -184,28 +336,39 @@ async function mergeCascadeFacesWithGemini(geminiFigures, cascadeFaces, imgWidth
             Math.min(bymin, fymin),
             Math.min(bxmin, fxmin),
             Math.max(bymax, fymax),
-            Math.max(bxmax, fxmax)
+            Math.max(bxmax, fxmax),
           ];
-          log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: expanded bodyBox to include face`);
         }
       }
 
-      log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: replaced faceBox [${oldFace?.map(v => v?.toFixed(3)).join(',')}] with cascade ${cf.source} [${fig.faceBox.map(v => v.toFixed(3)).join(',')}]`);
+      log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: cascade ${cf.source} center + ${fig._depthTier} envelope (h=${faceH.toFixed(3)})`);
+      continue;
+    }
+
+    // No cascade match. Keep Gemini's center but force the height to be
+    // at least the depth-tier ideal (and cap at the max). Same max(Gemini,
+    // ideal) policy as the matched-cascade path. Back-turned figures land
+    // here too — they keep Gemini's center, just sized properly.
+    if (Array.isArray(oldFace) && oldFace.length === 4) {
+      const cx = (oldFace[1] + oldFace[3]) / 2;
+      const cy = (oldFace[0] + oldFace[2]) / 2;
+      const newH = Math.min(env.max, Math.max(oldHeight || 0, env.ideal));
+      if (Math.abs(newH - (oldHeight || 0)) > 0.005) {
+        fig._geminiFaceBox = oldFace;
+        fig.faceBox = makeFaceBox(cx, cy, newH, newH * FACE_ASPECT);
+        fig._sizeAdjusted = true;
+        log.debug(`[CASCADE-MERGE] ${fig.name || fig.label}: no cascade match — sized Gemini face to ${newH.toFixed(3)} (${lookupDepth(fig)})`);
+      }
     }
   }
 
-  // Don't add unmatched cascade faces as new figures — they create noise.
-  // Cascade is only used to IMPROVE existing Gemini-detected figures, not to add new ones.
-  // Unmatched detections are likely false positives from haar or faces in the background.
+  // Unmatched cascade faces are not added as new figures (they're noise).
   const unmatchedCount = cascadeFaces.length - matchedCascade.size;
   if (unmatchedCount > 0) {
     log.debug(`[CASCADE-MERGE] ${unmatchedCount} unmatched cascade faces ignored (not adding as new figures)`);
   }
 
-  // Even for figures NOT improved by cascade, ensure bodyBox contains faceBox.
-  // Gemini often returns a faceBox above/outside the bodyBox for illustrations.
   ensureFaceInsideBody(geminiFigures);
-
   return geminiFigures;
 }
 

@@ -2475,7 +2475,7 @@ Respond with ONLY the JSON.`;
           imgW = meta.width || 1024;
           imgH = meta.height || 1024;
         } catch { /* use defaults */ }
-        finalFigures = await mergeCascadeFacesWithGemini(finalFigures, cascadeFaces, imgW, imgH);
+        finalFigures = await mergeCascadeFacesWithGemini(finalFigures, cascadeFaces, imgW, imgH, expectedCharacters);
         const improved = finalFigures.filter(f => f._cascadeFace).length;
         if (improved > 0) {
           log.info(`🎯 [BBOX-DETECT] ${pageLabel}Cascade improved ${improved}/${finalFigures.length} face boxes`);
