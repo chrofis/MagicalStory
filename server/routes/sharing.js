@@ -192,7 +192,9 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     for (const coverType of coverTypes) {
       const activeIdx = await getActiveVersion(story.id, coverType);
       const img = await getStoryImage(story.id, coverType, null, activeIdx);
-      if (img?.imageData) {
+      // After R2 migration image_data may be NULL but image_url is set —
+      // either is enough to consider the cover available.
+      if (img?.imageData || img?.imageUrl) {
         covers[coverType] = true;
       } else {
         // Fallback: check legacy coverImages in story data
