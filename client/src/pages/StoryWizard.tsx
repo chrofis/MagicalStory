@@ -4178,6 +4178,20 @@ export default function StoryWizard() {
       log.error('Generation failed:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
 
+      // Email-not-verified gate (server returns 403 EMAIL_NOT_VERIFIED). The
+      // server already (re)sends the verification email on this code path —
+      // surface it loudly so the user knows what to do, rather than letting
+      // them sit on MyStories polling an empty list forever.
+      if (errorMessage.includes('EMAIL_NOT_VERIFIED') || errorMessage.includes('Email verification required')) {
+        showError(language === 'de'
+          ? 'Bitte bestätige deine E-Mail-Adresse — wir haben dir gerade einen Verifizierungslink geschickt. Sobald du klickst, wird die Geschichte automatisch generiert.'
+          : language === 'fr'
+          ? 'Veuillez confirmer votre adresse e-mail — nous venons de vous envoyer un lien de vérification. La génération démarrera dès que vous cliquerez.'
+          : 'Please verify your email — we just sent you a verification link. Generation will start automatically once you click it.');
+        setIsGenerating(false);
+        return;
+      }
+
       // Check for "already in progress" error (409)
       if (errorMessage.includes('already in progress')) {
         // Extract the active job ID if present (format: job_<timestamp>_<random>)

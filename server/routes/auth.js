@@ -113,7 +113,11 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       newUser = { id: userId, username, email, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
 
       // Auto-verify admins, regular users will be prompted to verify when they try to generate a story
-      if (role === 'admin') {
+      // Also auto-verify @magicalstory.ch demo accounts (showcase orchestrator
+      // creates demo-{family}-{ts}@magicalstory.ch — there's no inbox for these,
+      // so the verification gate would silently block story generation).
+      const isDemoAccount = typeof email === 'string' && /@magicalstory\.ch$/i.test(email);
+      if (role === 'admin' || isDemoAccount) {
         await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
       }
       // Note: Verification email is NOT sent on registration - it will be sent when user tries to generate a story
