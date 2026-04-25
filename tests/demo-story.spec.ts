@@ -588,9 +588,10 @@ async function advanceSubStep(page: Page, label: string): Promise<boolean> {
     await page.waitForTimeout(3000);
     return true;
   }
-  // Allow 15s for disabled Next buttons to become enabled (traits validation
-  // waits for photo-analyzer to populate a few fields before it settles).
-  if (await clickAnyNext(page, 15000)) {
+  // Allow up to 90s for disabled Next to enable. Photo analysis can run
+  // long on prod (Gemini + face detection + rembg) — Next on the name step
+  // stays disabled until it completes.
+  if (await clickAnyNext(page, 90000)) {
     console.log(`      → next after ${label}`);
     return true;
   }
