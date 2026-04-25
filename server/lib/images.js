@@ -14,6 +14,33 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
+const { MODEL_PRICING } = require('../config/models');
+const { getCurrentLogger } = require('./generationLogger');
+
+// Maps callGeminiAPIForImage's evaluationType to a stable function-name tag
+// for the analyze-story-log cost rollup.
+const EVAL_TYPE_TO_FUNC_NAME = {
+  scene: 'page_image',
+  page: 'page_image',
+  cover: 'cover_image',
+  avatar: 'avatar',
+  iterate: 'page_image_iterate',
+  empty: 'empty_scene',
+  repair: 'character_repair'
+};
+
+function recordImageApiUsage(modelId, evaluationType, imageUsage) {
+  const genLog = getCurrentLogger();
+  if (!genLog) return;  // Not in a generation context (e.g. ad-hoc avatar request)
+  const perImage = MODEL_PRICING[modelId]?.perImage ?? 0.04;
+  const funcName = EVAL_TYPE_TO_FUNC_NAME[evaluationType] || evaluationType || 'image';
+  genLog.apiUsage(funcName, modelId, {
+    inputTokens: imageUsage.input_tokens || 0,
+    outputTokens: imageUsage.output_tokens || 0,
+    thinkingTokens: imageUsage.thinking_tokens || 0,
+    calls: 1
+  }, perImage);
+}
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 
@@ -3859,6 +3886,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
     log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
   }
+  // Structured cost log so analyze-story-log.js can attribute Nano Banana spend.
+  // models.js: gemini-2.5-flash-image is $0.04/image regardless of token count.
+  recordImageApiUsage(modelId, evaluationType, imageUsage);
 
   if (!data.candidates || data.candidates.length === 0) {
     log.error('❌ [IMAGE GEN] No candidates in response');

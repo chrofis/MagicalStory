@@ -18,6 +18,7 @@ const { log } = require('../utils/logger');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription } = require('./storyHelpers');
 const { getFacePhoto } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
+const { getCurrentLogger } = require('./generationLogger');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -1820,6 +1821,16 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
         totalUsage.promptTokenCount += response.usageMetadata.promptTokenCount || 0;
         totalUsage.candidatesTokenCount += response.usageMetadata.candidatesTokenCount || 0;
         totalUsage.totalTokenCount += response.usageMetadata.totalTokenCount || 0;
+        // Structured cost log so analyze-story-log can attribute Nano Banana
+        // spend on entity-repair calls.
+        const genLog = getCurrentLogger();
+        if (genLog) {
+          genLog.apiUsage('entity_repair', REPAIR_MODEL, {
+            inputTokens: response.usageMetadata.promptTokenCount || 0,
+            outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+            calls: 1
+          }, 0.04);
+        }
       }
 
       // Extract repaired regions from grid

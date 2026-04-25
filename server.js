@@ -258,7 +258,7 @@ const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require(
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const legacyPipelines = require('./server/lib/legacyPipelines');
-const { GenerationLogger } = require('./server/lib/generationLogger');
+const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
 const { generateSitemap } = require('./server/lib/seoMeta');
 const configRoutes = require('./server/routes/config');
@@ -2450,6 +2450,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
   // Generation logger for debugging
   const genLog = new GenerationLogger();
+  // Register so deep helpers (images.js, entityConsistency.js) can record
+  // apiUsage without threading genLog through every signature.
+  setCurrentLogger(genLog);
   genLog.setStage('outline');
 
   // Token usage tracker - same structure as other modes
@@ -5760,6 +5763,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       runwareCost: tokenUsage.runware?.direct_cost || 0
     });
     genLog.finalize();
+    clearCurrentLogger();
     log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries (including API usage)`);
 
     // Compute quality aggregates for analytics

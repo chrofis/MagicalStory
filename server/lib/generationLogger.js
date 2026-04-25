@@ -276,4 +276,14 @@ class GenerationLogger {
   }
 }
 
-module.exports = { GenerationLogger };
+// Module-level current logger so deep helpers (images.js, entityConsistency.js)
+// can call apiUsage without threading genLog through every signature. Single
+// global is fine for now — concurrent stories on one node mix metrics, but
+// model+function tagging keeps the breakdown usable. Move to AsyncLocalStorage
+// if that ever becomes a real problem.
+let _currentLogger = null;
+function setCurrentLogger(logger) { _currentLogger = logger; }
+function clearCurrentLogger() { _currentLogger = null; }
+function getCurrentLogger() { return _currentLogger; }
+
+module.exports = { GenerationLogger, setCurrentLogger, clearCurrentLogger, getCurrentLogger };
