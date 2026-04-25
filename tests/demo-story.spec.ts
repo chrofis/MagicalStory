@@ -622,15 +622,28 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
   if (!await advanceSubStep(page, 'characteristics')) return;
   await setRelationshipsForCharacter(page, char, family, alreadyCreated);
   if (!await advanceSubStep(page, 'relationships')) return;
-  // Final save / avatar auto-step. Cap at 3 clicks to be safe.
+  // Final auto-step: from relationships, the wizard typically shows either
+  // the avatar-wait screen ("Weiter ohne zu warten") or directly returns to
+  // the list. Click Save if visible, otherwise dismiss the avatar wait. Do
+  // NOT keep clicking generic "Weiter" — that advances the wizard past
+  // Step 1 (Figuren) into Buch/Story, which makes us lose the list.
   for (let i = 0; i < 3; i++) {
-    if (!await advanceSubStep(page, `final-${i + 1}`)) break;
+    if (await isOnCharacterListNow(page)) break;
+    // Try Save first.
+    const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
+    if (await saveBtn.isVisible({ timeout: 1000 }).catch(() => false)
+        && await saveBtn.isEnabled().catch(() => false)) {
+      console.log(`      → save (final-${i + 1})`);
+      await saveBtn.click();
+      await page.waitForTimeout(2500);
+      continue;
+    }
+    // Then the avatar-wait dismiss.
+    if (await dismissAvatarWaitIfShown(page)) continue;
+    // Nothing to do — break out.
+    break;
   }
-  await page.waitForTimeout(1500);
-  // Final cleanup: dismiss the avatar-wait screen if still showing. We do
-  // NOT navigate to /create as a fallback — that bypasses the save handler
-  // and leaves avatars un-triggered.
-  await dismissAvatarWaitIfShown(page);
+  await page.waitForTimeout(1000);
   if (!await isOnCharacterListNow(page)) {
     const shotPath = `test-results/debug-not-on-list-${char.name}-${Date.now()}.png`;
     await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
