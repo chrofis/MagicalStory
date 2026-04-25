@@ -6,7 +6,7 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {TEXT_AREA_INSTRUCTION}
 
-**ABOUT THE LAYOUT REFERENCE IMAGE:** The black region in the reference image marks the position of the text zone, nothing more. Paint that area as continuous scene material — sky, wall, water, foliage, or ground — never as a flat panel, coloured block, rectangle, or framed strip.
+**ABOUT THE LAYOUT REFERENCE IMAGE:** The slightly darker grey region in the reference image marks the position of the text zone, nothing more. Paint that area as continuous scene material — sky, wall, water, foliage, or ground — never as a flat panel, coloured block, rectangle, or framed strip.
 
 **ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Use it for the landmark's shape, proportions, architecture, and camera angle only. Exclude any modern elements visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront windows with price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Match the era of the story setting — if the scene is medieval, fantasy, or historical, render the landmark as it would have looked then, without anachronisms.
 
