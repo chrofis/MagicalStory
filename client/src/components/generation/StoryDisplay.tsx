@@ -4686,9 +4686,10 @@ export function StoryDisplay({
                           label={`Page ${pageNumber}`}
                         />
                         {/* Text overlay on image — server-rendered with calm region detection.
-                            Skipped when scene has textInImage=false (square layout, advanced level):
-                            text is rendered in the dedicated white block below the image instead. */}
-                        {textOverlay && !isGenerating && pageText.trim() && image?.textInImage !== false && (
+                            Skipped when scene has textInImage=false (square layout, advanced level)
+                            OR while in edit mode (the editor below is the source of truth there;
+                            the overlay PNG can be stale and is just visual noise during editing). */}
+                        {textOverlay && !isGenerating && !isEditMode && pageText.trim() && image?.textInImage !== false && (
                           overlayImages[pageNumber] ? (
                             <img
                               src={overlayImages[pageNumber]}
