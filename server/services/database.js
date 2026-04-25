@@ -584,6 +584,13 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_id ON story_images(story_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_version ON story_images(story_id, version_index)`);
 
+    // R2 migration (Phase 1): nullable URL columns alongside existing image_data.
+    // Writers populate both when R2 is configured; readers continue to use image_data
+    // until Phase 2. Backfill copies legacy bytes into R2 and fills image_url.
+    await dbPool.query(`ALTER TABLE story_images       ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await dbPool.query(`ALTER TABLE story_retry_images ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await dbPool.query(`ALTER TABLE style_lab_images   ADD COLUMN IF NOT EXISTS image_url TEXT`);
+
     // Historical locations table (pre-fetched photos for historical stories)
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS historical_locations (
@@ -1171,23 +1178,37 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
     imageData = await normalizeImageToA4(imageData);
   }
 
+  // R2 dual-write (Phase 1). isConfigured() guards: if R2 env vars are missing,
+  // imageUrl stays null and we continue with the legacy bytes-only path.
+  let imageUrl = null;
+  try {
+    const r2 = require('../lib/r2');
+    if (r2.isConfigured() && imageData) {
+      const key = r2.keyForStoryImage(storyId, imageType, pageNumber, versionIndex);
+      imageUrl = await r2.uploadImage(imageData, key);
+    }
+  } catch (err) {
+    // R2 failure is non-fatal — fall back to bytes-only.
+    console.warn(`[R2] saveStoryImage upload skipped: ${err.message}`);
+  }
+
   if (pageNumber == null) {
     // Covers: use partial index ON CONFLICT for NULL page_number
     await dbQuery(
-      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
-       VALUES ($1, $2, NULL, $3, $4, $5, $6)
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at)
+       VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)
        ON CONFLICT (story_id, image_type, version_index) WHERE page_number IS NULL
-       DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, versionIndex, imageData, qualityScore, generatedAt]
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
+      [storyId, imageType, versionIndex, imageData, imageUrl, qualityScore, generatedAt]
     );
   } else {
     // Scenes: use partial index ON CONFLICT for non-NULL page_number
     await dbQuery(
-      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL
-       DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, pageNumber, versionIndex, imageData, qualityScore, generatedAt]
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
+      [storyId, imageType, pageNumber, versionIndex, imageData, imageUrl, qualityScore, generatedAt]
     );
   }
 }
@@ -1685,72 +1706,44 @@ function normalizeCoverValue(cover) {
 async function saveRetryHistoryImages(storyId, pageNumber, retryHistory) {
   if (!isDatabaseMode() || !retryHistory?.length) return;
 
+  // Single insert helper: handles R2 dual-write + DB upsert. R2 upload is best-
+  // effort (logs and returns null on failure); inline bytes always get stored.
+  const r2 = require('./../lib/r2');
+  const insertOne = async (retryIdx, imageType, data, gridIdx = null) => {
+    if (!data) return;
+    let imageUrl = null;
+    if (r2.isConfigured()) {
+      try {
+        const key = r2.keyForRetryImage(storyId, pageNumber, retryIdx, imageType, gridIdx);
+        imageUrl = await r2.uploadImage(data, key);
+      } catch (err) {
+        console.warn(`[R2] retry-image upload skipped: ${err.message}`);
+      }
+    }
+    await dbQuery(
+      `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url`,
+      [storyId, pageNumber, retryIdx, imageType, gridIdx, data, imageUrl]
+    );
+  };
+
   for (let retryIdx = 0; retryIdx < retryHistory.length; retryIdx++) {
     const entry = retryHistory[retryIdx];
+    await insertOne(retryIdx, 'attempt',          entry.imageData);
+    await insertOne(retryIdx, 'bboxOverlay',      entry.bboxOverlayImage);
+    await insertOne(retryIdx, 'original',         entry.originalImage);
+    await insertOne(retryIdx, 'annotatedOriginal',entry.annotatedOriginal);
 
-    // Save main attempt image
-    if (entry.imageData) {
-      await dbQuery(
-        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
-         VALUES ($1, $2, $3, 'attempt', $4)
-         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-        [storyId, pageNumber, retryIdx, entry.imageData]
-      );
-    }
-
-    // Save bbox overlay
-    if (entry.bboxOverlayImage) {
-      await dbQuery(
-        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
-         VALUES ($1, $2, $3, 'bboxOverlay', $4)
-         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-        [storyId, pageNumber, retryIdx, entry.bboxOverlayImage]
-      );
-    }
-
-    // Save original image
-    if (entry.originalImage) {
-      await dbQuery(
-        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
-         VALUES ($1, $2, $3, 'original', $4)
-         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-        [storyId, pageNumber, retryIdx, entry.originalImage]
-      );
-    }
-
-    // Save annotated original
-    if (entry.annotatedOriginal) {
-      await dbQuery(
-        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
-         VALUES ($1, $2, $3, 'annotatedOriginal', $4)
-         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-        [storyId, pageNumber, retryIdx, entry.annotatedOriginal]
-      );
-    }
-
-    // Save grid images (backend uses 'original' and 'repaired' property names)
     if (entry.grids?.length) {
       for (let gridIdx = 0; gridIdx < entry.grids.length; gridIdx++) {
         const grid = entry.grids[gridIdx];
         // Handle both naming conventions: original/repaired (backend) and imageData/repairedImageData
         const originalData = grid.original || grid.imageData;
         const repairedData = grid.repaired || grid.repairedImageData;
-        if (originalData) {
-          await dbQuery(
-            `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
-             VALUES ($1, $2, $3, 'grid', $4, $5)
-             ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-            [storyId, pageNumber, retryIdx, gridIdx, originalData]
-          );
-        }
-        if (repairedData) {
-          await dbQuery(
-            `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
-             VALUES ($1, $2, $3, 'gridRepaired', $4, $5)
-             ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-            [storyId, pageNumber, retryIdx, gridIdx, repairedData]
-          );
-        }
+        await insertOne(retryIdx, 'grid',         originalData, gridIdx);
+        await insertOne(retryIdx, 'gridRepaired', repairedData, gridIdx);
       }
     }
   }
@@ -1819,14 +1812,28 @@ async function getRetryHistoryImages(storyId, pageNumber) {
  */
 async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData, thumbnail, stylePrompt, elapsedMs) {
   if (!isDatabaseMode()) return;
+
+  // R2 dual-write — best effort, falls back to bytes-only on any failure.
+  let imageUrl = null;
+  try {
+    const r2 = require('../lib/r2');
+    if (r2.isConfigured() && imageData) {
+      const key = r2.keyForStyleLabImage(storyId, pageNumber, runId, modelId);
+      imageUrl = await r2.uploadImage(imageData, key);
+    }
+  } catch (err) {
+    console.warn(`[R2] style-lab upload skipped: ${err.message}`);
+  }
+
   await dbQuery(
-    `INSERT INTO style_lab_images (story_id, page_number, run_id, model_id, image_data, thumbnail, style_prompt, elapsed_ms)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO style_lab_images (story_id, page_number, run_id, model_id, image_data, image_url, thumbnail, style_prompt, elapsed_ms)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (story_id, page_number, run_id, model_id)
-     DO UPDATE SET image_data = EXCLUDED.image_data, thumbnail = EXCLUDED.thumbnail,
+     DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url,
+                   thumbnail = EXCLUDED.thumbnail,
                    style_prompt = EXCLUDED.style_prompt, elapsed_ms = EXCLUDED.elapsed_ms,
                    created_at = CURRENT_TIMESTAMP`,
-    [storyId, pageNumber, runId, modelId, imageData, thumbnail, stylePrompt, elapsedMs]
+    [storyId, pageNumber, runId, modelId, imageData, imageUrl, thumbnail, stylePrompt, elapsedMs]
   );
 }
 
