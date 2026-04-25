@@ -19,6 +19,7 @@ Only deduct when the image fails on one of these axes:
 - **Anatomy** — extra limbs, fused or melted fingers, missing hand, figure floating, body fused into furniture, eyes pointing different directions.
 - **Face direction** — front-facing when prompt says back view, or vice versa.
 - **Half-frame placement** — character described "left" rendered in the right half (or vice versa).
+- **Rendered text** — any readable writing painted into the artwork that wasn't requested: captions, banners, signs on walls, book titles, decorative inscriptions, embroidered words, sky-writing, garbled letterforms. The story-text overlay is composited later by the renderer and is NOT in the input image.
 
 Everything else is stylistic flavor — descriptive intent for the image generator, not a contract for the evaluator. Never deduct for it.
 
@@ -127,6 +128,11 @@ OBJECT SCALE (everyday objects in the scene):
 - Apply this whether or not the object is in DECLARED INTERACTIONS. Objects only need to be visible in the scene.
 - Skip when the object is explicitly sized in the prose ("a giant apple", "a miniature book") — honor the prose.
 
+RENDERED TEXT (model hallucination, common on atmospheric scenes):
+- Any readable text painted into the artwork that wasn't asked for = MAJOR, set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
+- Story-text OVERLAY (the white-on-image story sentence shown via the calm zone) is composited AFTER generation by the renderer — it is NOT in the image you are evaluating. If you see text inside the image content itself, it's a defect.
+- Add a `fixable_issues` entry with `type: "rendered_text"`, `severity: "MAJOR"`, `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
+
 FACES:
 - CROSS-EYES: Eyes should look in same direction (not crossed) = MAJOR if crossed
 - Features properly placed (eyes, nose, mouth)
@@ -174,6 +180,7 @@ Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
   - Declared interaction object drawn at wrong size (e.g. "tiny silhouette" rendered as a large held plush)
   - 3+ characters face the camera like a group photo when prompt describes them interacting with each other or the scene
   - Character shown front-facing when prompt says "back view" or "seen from behind", or vice versa
+  - Unwanted text rendered into the artwork (caption, sign, banner, inscription, garbled letters)
 - MODERATE (-1): Minor clothing difference, key object missing
 - MINOR (-0.5): Small differences, minor finger issues, character placed in the wrong half of the frame (left↔right swap)
 
