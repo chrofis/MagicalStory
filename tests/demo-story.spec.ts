@@ -76,7 +76,8 @@ const TOPIC_PATTERNS: Record<string, RegExp> = {
   'wilhelm-tell': /wilhelm tell/i,
 };
 
-const NEXT_BTN_RE = /weiter|next|suivant/i;
+// Anchored: must match the EXACT button label, not "Weiteren Charakter erstellen".
+const NEXT_BTN_RE = /^(weiter|next|suivant)$/i;
 const SIGN_IN_RE = /log in|sign in|anmelden|connexion|se connecter/i;
 const MAIN_BTN_RE = /^main$|hauptrolle|principal/i;
 const USE_THIS_RE = /diese verwenden|use this|utiliser|select this|choisir/i;
