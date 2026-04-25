@@ -893,8 +893,26 @@ test.describe('Demo Story Generation', () => {
     await expect(generateBtn).toBeEnabled({ timeout: 10000 });
     console.log('Step 5: Triggering generation...');
     await generateBtn.click();
-    await page.waitForTimeout(5000);
-    console.log('  Generation triggered.');
+
+    // Critical: a click on Generate alone proves nothing — if the server
+    // rejects (e.g. 403 EMAIL_NOT_VERIFIED), the wizard surfaces a toast and
+    // the test would otherwise pass while no story job ever ran. Assert the
+    // progress modal "Geschichte wird erstellt" appears within 30s. If the
+    // toast fires instead, this fails loud.
+    const progressHeading = page.getByRole('heading', {
+      name: /geschichte wird erstellt|story is being created|histoire en cours/i,
+    }).first();
+    try {
+      await expect(progressHeading).toBeVisible({ timeout: 30000 });
+      console.log('  Generation modal visible — server accepted the job.');
+    } catch (err) {
+      // Look for any visible toast/error so the failure message is useful.
+      const errToast = await page.locator('[role="alert"], .toast, [class*="error"]').first()
+        .textContent({ timeout: 1500 }).catch(() => null);
+      throw new Error(
+        `Generate clicked but no progress modal appeared within 30s — likely server rejected the job. ${errToast ? `Toast: "${errToast.trim()}"` : ''}`
+      );
+    }
 
     // ── Verification ──
     const criticalErrors = jsErrors.filter(e =>
