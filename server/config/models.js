@@ -108,9 +108,12 @@ const MODEL_DEFAULTS = {
   inpaintBackend: 'grok',              // 'gemini', 'runware', or 'grok' ($0.02/repair via Grok edit)
 
   // Image generation backend (can be overridden in dev mode)
-  // 'gemini' = Gemini API (default, best quality)
-  // 'runware' = Runware FLUX Schnell (super cheap, good for testing)
-  imageBackend: 'gemini',              // Default: Gemini for production quality
+  // 'grok' = Grok Imagine (default — $0.02/image, half of Gemini)
+  // 'gemini' = Gemini 2.5 Flash Image ($0.04/image, better cross-page style consistency)
+  // 'runware' = Runware FLUX Schnell (super cheap, testing only)
+  // Tradeoff with grok: weaker style consistency across pages — auto-repair
+  // and character-repair passes catch most of it.
+  imageBackend: 'grok',
 
   // Feature flags for generation pipeline
   enableAutoRepair: false,             // Auto-repair: inpaint fixable issues (Runware SDXL/FLUX)
