@@ -2143,8 +2143,15 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
                 maxOutputTokens: 2500,
                 temperature: 0.5,  // Google recommends >0 for bbox to prevent repetition loops
                 responseMimeType: 'application/json',
-                // Disable thinking for bbox — Google says it adds latency without improving spatial accuracy
-                ...(modelSupportsThinking(modelId) && { thinkingConfig: { thinkingBudget: 0 } })
+                // Disable thinking unconditionally — Google's image-understanding docs
+                // explicitly recommend thinkingBudget=0 for object detection (thinking
+                // adds latency without improving spatial accuracy). Without this,
+                // gemini-2.5-flash burns ~3-4k thinking tokens before output and trips
+                // MAX_TOKENS before producing the JSON. The previous gate
+                // `modelSupportsThinking(modelId)` checks IMAGE_MODELS, but gemini-2.5-flash
+                // is a TEXT_MODELS entry — the gate was always false for bbox detection.
+                // The field is silently ignored on non-thinking models.
+                thinkingConfig: { thinkingBudget: 0 },
               },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })
