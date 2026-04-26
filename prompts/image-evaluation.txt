@@ -327,6 +327,7 @@ Return JSON only (no other text):
 
 **RULES:**
 - Output ONLY JSON - no explanation.
+- `fixable_issues[]` is the single source of truth for the score. The downstream pipeline computes the final score deterministically from your fixable_issues[] severities using the §2 rubric (CRITICAL -3, MAJOR -2, MODERATE -1, MINOR -0.5, starting from 10). Your `score` field is kept for audit only — emit it, but the pipeline ignores it. So: list every defect you actually find as a fixable_issues entry, with the correct severity. Do not pad fixable_issues with non-issues to "explain" a low score; do not omit real issues to "justify" a high score.
 - `matches.clothing_match`: false if clothing color/type differs from reference.
 - `matches.hair_match`: false if hair color/style differs from reference.
 - `matches.eyes_ok`: false if cross-eyed.

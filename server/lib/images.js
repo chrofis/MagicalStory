@@ -1582,8 +1582,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     if (parsedJson && typeof parsedJson.score === 'number') {
       // Full JSON format with 0-10 scale and detailed analysis
-      const rawScore = parsedJson.score;
-      const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
+      const modelRawScore = parsedJson.score; // What the model claimed (kept for logging only)
       const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
       // Support both old 'issues' and new 'issues_summary' field
       // Handle case where issues might be an array (convert to string)
@@ -1592,12 +1591,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         issuesSummary = issuesSummary.join('. ');
       } else if (typeof issuesSummary !== 'string') {
         issuesSummary = String(issuesSummary);
-      }
-
-      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
-      const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
-      if (hasRealIssues) {
-        log.info(`📊 [EVAL] Issues: ${issuesSummary}`);
       }
 
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
@@ -1621,6 +1614,31 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             log.info(`📊 [EVAL] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
           }
         }
+      }
+
+      // DETERMINISTIC SCORING: compute from fixable_issues[] severities using the
+      // §2 rubric (the eval prompt's single source of truth). The model's own
+      // `score` field is unreliable — the same image rerendered through eval
+      // gets different scores because the model recomputes its own arithmetic.
+      // fixable_issues[] is the structured contract; this function turns it
+      // into a number by the published rubric and ignores the model's claim.
+      // Model score is logged for visibility (audits when the two diverge).
+      const SEVERITY_PENALTY = { CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
+      const totalPenalty = fixableIssues.reduce(
+        (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
+        0
+      );
+      const rawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
+      const score = rawScore * 10; // 0-100 for compatibility
+
+      const scoreDelta = Math.abs(modelRawScore - rawScore);
+      if (scoreDelta >= 1) {
+        log.warn(`📊 [EVAL] Score divergence: model=${modelRawScore}/10, computed-from-issues=${rawScore}/10 (Δ=${scoreDelta}). Using computed.`);
+      }
+      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100) [computed from ${fixableIssues.length} issues; model said ${modelRawScore}/10], Verdict: ${verdict}`);
+      const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
+      if (hasRealIssues) {
+        log.info(`📊 [EVAL] Issues: ${issuesSummary}`);
       }
 
       // Also parse legacy fix_targets for backwards compatibility
