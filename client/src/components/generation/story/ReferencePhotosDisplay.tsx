@@ -401,53 +401,67 @@ export function ReferencePhotosDisplay({
 
       {/* ═══ Flat layout (no empty scene) ═══ */}
 
-      {/* Character photos */}
+      {/* Character photos — ONE card per character (face + body grouped together) */}
       {!displayEmptySceneImage && hasCharacterPhotos && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
           {(() => {
-            // Dedupe name header: a character can have face + body entries; only
-            // label the first card per character.
-            const seenFlat = new Set<string>();
-            return displayRefPhotos!.map((photo, idx) => {
-              const showName = !seenFlat.has(photo.name);
-              seenFlat.add(photo.name);
+            // Group photo entries by character name so two photos for the same
+            // character (face + body) render inside ONE card with a single
+            // header — not two cards each with their own name + photoType label.
+            const groups = new Map<string, ReferencePhoto[]>();
+            for (const p of displayRefPhotos!) {
+              if (!groups.has(p.name)) groups.set(p.name, []);
+              groups.get(p.name)!.push(p);
+            }
+            return Array.from(groups.entries()).map(([name, photos]) => {
+              const types = photos.map(p => p.photoType).filter(Boolean) as string[];
+              const photoHash = photos.find(p => p.photoHash)?.photoHash;
+              const visiblePhotos = photos.filter(p => p.photoUrl);
               return (
-                <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-xs text-gray-800 truncate">{showName ? photo.name : ' '}</span>
-                {photo.photoType && (
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
-                    {getPhotoTypeLabel(photo.photoType)}
-                  </span>
-                )}
-              </div>
-              {photo.photoUrl ? (
-                <>
-                  <div className="relative">
-                    <img
-                      src={photo.photoUrl}
-                      alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType || 'unknown')}`}
-                      className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'}`}
-                      onClick={() => setLightboxImage(photo.photoUrl)}
-                      title="Click to enlarge"
-                    />
-                    {photo.isStyled && (
-                      <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-indigo-500 text-white rounded">
-                        🎨 STYLED
-                      </span>
+                <div key={name} className="bg-white rounded-lg p-2 border border-pink-200">
+                  <div className="flex items-center justify-between mb-2 gap-1">
+                    <span className="font-semibold text-xs text-gray-800 truncate">{name}</span>
+                    {types.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {types.map((t, ti) => (
+                          <span key={ti} className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(t)}`}>
+                            {getPhotoTypeLabel(t)}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {photo.photoHash && (
-                    <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
-                      🔐 {photo.photoHash}
+                  {visiblePhotos.length > 0 ? (
+                    <>
+                      <div className="flex gap-1">
+                        {visiblePhotos.map((photo, pi) => (
+                          <div key={pi} className="relative flex-1 min-w-0">
+                            <img
+                              src={photo.photoUrl!}
+                              alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType || 'unknown')}`}
+                              className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'}`}
+                              onClick={() => setLightboxImage(photo.photoUrl!)}
+                              title="Click to enlarge"
+                            />
+                            {photo.isStyled && (
+                              <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-indigo-500 text-white rounded">
+                                🎨 STYLED
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {photoHash && (
+                        <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
+                          🔐 {photoHash}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-gray-500 italic py-2 text-center bg-gray-100 rounded">
+                      {language === 'de' ? 'Foto nicht geladen' : 'Photo not loaded'}
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-xs text-gray-500 italic py-2 text-center bg-gray-100 rounded">
-                  {language === 'de' ? 'Foto nicht geladen' : 'Photo not loaded'}
-                </div>
-              )}
                 </div>
               );
             });
