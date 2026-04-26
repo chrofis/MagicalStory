@@ -187,36 +187,39 @@ async function main() {
       console.log(`     score: quality=${q}  semantic=${s}${ep}${rq}`);
 
       console.log();
-      console.log('  INPUT ─ what drove this generation:');
       if (i === 0) {
-        console.log('    (initial generation from unified prose — see section 3)');
+        console.log('  >>> WHAT GROK RECEIVED  (full unified-prose image prompt)');
         const p = v.prompt || '';
-        console.log(`    prompt length: ${p.length} chars. First 300:`);
-        console.log(indent(truncate(p, 300), 6));
+        console.log(`      prompt length: ${p.length} chars. First 300:`);
+        console.log(indent(truncate(p, 300), 8));
       } else {
-        if (v.inpaintInstruction) {
-          console.log('    inpaintInstruction:');
-          console.log(indent(v.inpaintInstruction, 6));
-        } else {
-          console.log('    (no inpaintInstruction — likely iterate pass re-ran the unified prompt)');
-        }
-        const refCount = (v.inpaintReferenceImages || []).length;
-        console.log(`    reference images attached: ${refCount}`);
+        // Step 1: the EVAL output of the previous version (the cause).
         const prev = vs[i - 1];
         const prevTargets = prev?.fixTargets || [];
         if (prevTargets.length > 0) {
-          console.log(`    fix targets from v${i - 1} (${prevTargets.length}):`);
+          console.log(`  >>> WHY THIS REPAIR RAN  (eval flagged on v${i - 1}, with proposed fix)`);
           for (const t of prevTargets) {
             console.log(`      [${t.severity || '?'}] (${t.type || '?'}) ${t.issue || ''}`);
             if (t.fix_instruction || t.fixPrompt) {
-              console.log(`        → ${t.fix_instruction || t.fixPrompt}`);
+              console.log(`        proposed fix → ${t.fix_instruction || t.fixPrompt}`);
             }
           }
+          console.log();
         }
+        // Step 2: what the inpaint generator actually wrote (frequently shorter
+        // than the proposed fix above — and what Grok actually saw).
+        console.log(`  >>> WHAT GROK RECEIVED  (inpaint prompt — sent verbatim to Grok)`);
+        if (v.inpaintInstruction) {
+          console.log(indent(v.inpaintInstruction, 8));
+        } else {
+          console.log('      (no inpaintInstruction — likely an iterate pass re-ran the full unified prompt)');
+        }
+        const refCount = (v.inpaintReferenceImages || []).length;
+        console.log(`      reference images attached: ${refCount}`);
       }
 
       console.log();
-      console.log('  OUTPUT ─ what eval found in this version:');
+      console.log(`  >>> WHAT EVAL FOUND IN v${i}  (after Grok produced this version)`);
       if (v.issuesSummary) {
         console.log('    summary: ' + v.issuesSummary);
       }
