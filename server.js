@@ -3351,9 +3351,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           );
           const coverExpansionProvider = coverExpansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
           addUsage(coverExpansionProvider, coverExpansionResult.usage, 'cover_expansion', coverExpansionResult.modelId);
-          coverExpandedDescription = coverExpansionResult.text || sceneDescription;
-          coverExpandedMetadata = extractSceneMetadata(coverExpandedDescription);
-          log.debug(`✅ [STREAM-COVER] ${coverType} scene expanded`);
+          const expandedText = coverExpansionResult.text || '';
+          // Reject expansion outputs that aren't real scene prose (refusal text, "I cannot…", empty-hint analysis).
+          // A valid expansion always contains the ---METADATA--- block.
+          const looksLikeRefusal = !expandedText.includes('---METADATA---')
+            || /Empty scene hint|I cannot generate|I appreciate the detailed|Please provide the actual/i.test(expandedText);
+          if (looksLikeRefusal) {
+            log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion returned non-prose / refusal — falling back to raw hint`);
+            coverExpandedDescription = sceneDescription;
+            coverExpandedMetadata = null;
+          } else {
+            coverExpandedDescription = expandedText;
+            coverExpandedMetadata = extractSceneMetadata(coverExpandedDescription);
+            log.debug(`✅ [STREAM-COVER] ${coverType} scene expanded`);
+          }
         } catch (expansionErr) {
           log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion failed: ${expansionErr.message} — using raw hint`);
         }

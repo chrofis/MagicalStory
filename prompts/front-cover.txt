@@ -1,3 +1,5 @@
+Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.
+
 Create a front cover illustration for a children's book.
 
 **SCENE:**
@@ -5,7 +7,7 @@ Create a front cover illustration for a children's book.
 
 {CHARACTER_REFERENCE_LIST}
 
-**ART STYLE (secondary):** {STYLE_DESCRIPTION}
+**ART STYLE:** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
 - ALL MAIN CHARACTERS should be prominently featured and clearly recognizable
