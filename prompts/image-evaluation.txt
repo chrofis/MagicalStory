@@ -96,7 +96,7 @@ ANATOMY (Critical):
 PHYSICS & GRAVITY:
 - People/objects grounded (not floating in air unless flying)
 - Characters stand on the surface the prompt specifies (on island, not in water; on ground, not in lava). Wrong substrate = MAJOR, set `physics_ok: false`.
-- Vertical structures (pole, post, mast, signpost, lamppost, banner-pole, gallows, hat-on-pole, fence-post, totem) are rooted at ground level with the base visible on the ground/cobblestones/floor — NOT mounted on a roof, balcony, wall-top, or floating in mid-air. Wrong attachment = MAJOR, set `physics_ok: false`, add `fixable_issues` entry with `type: "physics"` describing the misplacement.
+- A scene-anchor prop (pole, banner-stand, fountain, statue, market stall, signpost) declared separately from a landmark must NOT be mounted on, attached to, or overlapping the landmark's structure. The prop sits in the open space in front of, beside, or away from the landmark — even when both share the same depth (e.g. "center background"). Wrong attachment (e.g. hat-on-pole rendered on the tower roof instead of standing in the square) = MAJOR, set `physics_ok: false`, add `fixable_issues` entry with `type: "physics"` describing the misplacement.
 - Weight and balance look natural
 - Objects held properly (not phasing through hands)
 - Shadows and lighting consistent
