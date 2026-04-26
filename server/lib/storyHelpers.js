@@ -2752,18 +2752,14 @@ function buildRelativeHeightDescription(characters) {
 function buildCharacterReferenceList(photos, characters = null) {
   if (!photos || photos.length === 0) return '';
 
-  const charDescriptions = photos.map(photo => {
-    const char = characters?.find(c => c.name === photo.name) || { name: photo.name };
-    const p = extractCharacterVisualProfile(char, { clothingOverride: photo.clothingDescription });
-    const visualAge = p.ageCategory ? `Looks: ${p.ageCategory.replace(/-/g, ' ')}` : '';
-    const parts = buildLabeledPhysicalParts(p);
-    // Format: [Name] to match the label we put before each image in parts array.
-    // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation.
-    const description = [visualAge, p.genderTerm, parts.join('. ')].filter(Boolean).join(', ');
-    return `[${photo.name}]: ${description}`;
-  });
-
-  let result = `\n**CHARACTER REFERENCE PHOTOS (match each name to the labeled image below):**\n${charDescriptions.join('\n')}\n`;
+  // Each character is already named with their physical description in the
+  // SCENE prose (per story-unified.txt: "Name each character explicitly on
+  // first mention, THEN weave the physical description in"), and each
+  // attached image carries a `[Name]:` label in the parts array. Repeating
+  // the description here was triple-binding the same info — drop it.
+  // Just list the names so the model knows which images to expect.
+  const names = photos.map(p => `[${p.name}]`).join(', ');
+  let result = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below):** ${names}\n`;
 
   if (characters && characters.length >= 2) {
     const sceneCharacters = characters.filter(c => photos.some(ph => ph.name === c.name));

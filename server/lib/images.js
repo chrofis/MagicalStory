@@ -4195,7 +4195,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   if (sceneBackground && sceneBackground.startsWith('data:image')) {
     const bgBase64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
     const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-    parts.push({ text: `[Background — copy composition, lighting, camera angle, colors, and depth. Add characters onto this background, do not redraw the environment. Preserve any calm, low-detail areas — they are reserved for text overlay]:` });
+    parts.push({ text: `[Background]:` });
     parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
     currentImageIndex++;
     log.debug(`🖼️ [IMAGE GEN-ONLY] Added scene background reference`);
