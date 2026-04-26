@@ -8642,7 +8642,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       comparison: {
         before: originalSceneDataUri,
         after: finalImageData,
-        sentToGrok: sentToGrokDataUri,
+        // The UI thumbnail strip (RepairWorkflowPanel.tsx + StoryDisplay.tsx)
+        // reads this field as `blackoutImage` for both blended and inpaint
+        // modes — keep one canonical name so the masked input shows up.
+        blackoutImage: sentToGrokDataUri,
         grokRawResult: grokResult.imageData,
       },
       croppedAvatar: croppedAvatarDataUri,
