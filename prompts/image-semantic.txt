@@ -27,18 +27,20 @@ Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are t
 
 **STEP 3: CHECK THE STORY BEAT**
 
-Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth):
-- Correct number of foreground characters? (count from SCENE_HINT/IMAGE_PROMPT, not STORY_TEXT)
-- Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual)
-- Key objects present?
-- Correct setting/location?
-- Correct surface? (on island, not in water; on path, not in river)
-- Correct weather/lighting? (night = dark, snow = snow)
-- Correct main action? (giving ≠ receiving, hugging ≠ fighting)
-- Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong)
-- Gaze direction matches a DECLARED INTERACTION? Only flag when two characters listed in DECLARED INTERACTIONS as interacting face away from each other, or a character listed as watching a specific named object is looking elsewhere. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "scanning sideways" are NOT declared interactions — do NOT flag.
-- Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it)
-- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in a genuinely different category (held-vs-pocket, on-head-vs-in-hand), flag it as a `wrong_interaction` issue. Pose details that appear in the scene prose but NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked") are descriptive only — do NOT flag them. Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers) are scene-appropriate — do NOT flag. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
+Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `semantic_issues` entry when the check fails. The tag drives a separate quality penalty (CRITICAL = −30, MAJOR = −20, MODERATE = −10). Be conservative — if unsure between two levels, pick the lower.
+
+- Correct main action? (giving ≠ receiving, hugging ≠ fighting) — **[CRITICAL]** if the rendered action is the wrong beat
+- Correct number of foreground characters? (count from SCENE_HINT/IMAGE_PROMPT, not STORY_TEXT) — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
+- Correct setting/location? — **[CRITICAL]** if completely wrong location; **[MAJOR]** if wrong sub-area within the right location
+- Correct surface? (on island, not in water; on path, not in river) — **[MAJOR]**
+- Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual) — **[MAJOR]**
+- Correct proportions / age band? When the SCENE_HINT or IMAGE_PROMPT explicitly names a band — "grade-school", "teenage", "adult", "senior" — or describes proportions ("clearly taller and leaner than grade-schoolers", "rounded grade-school proportions", "adult bone structure"), flag if the rendered figure's proportions clearly belong to a different band (e.g. prose says "teenage" but figure has grade-school proportions, or "adult" but figure has teenage proportions). This is a narrative-consistency check on body proportions only — within-band variation does not count, and you are NOT judging the character's own attributes, just whether the prose-named band matches the rendered band. — **[MAJOR]**
+- Key objects present? (an object named in DECLARED INTERACTIONS, or named ≥ 2 times in SCENE_HINT/IMAGE_PROMPT prose, is "key") — **[MAJOR]** per missing key object
+- Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it) — **[MAJOR]**
+- Correct weather/lighting? (night = dark, snow = snow) — **[MODERATE]**
+- Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong) — **[MODERATE]**
+- Gaze direction matches a DECLARED INTERACTION? Only flag when two characters listed in DECLARED INTERACTIONS as interacting face away from each other, or a character listed as watching a specific named object is looking elsewhere. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "scanning sideways" are NOT declared interactions — do NOT flag. — **[MODERATE]** when flagged
+- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in a genuinely different category (held-vs-pocket, on-head-vs-in-hand), flag it as a `wrong_interaction` issue — **[MAJOR]**. Pose details that appear in the scene prose but NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked") are descriptive only — do NOT flag them. Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers) are scene-appropriate — do NOT flag. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
 - **Left/right mirror is always equivalent — never flag.** Any body-part swap between left and right (left arm vs right arm, left hand vs right hand, left foot vs right foot, left pocket vs right pocket, left shoulder vs right shoulder) is a mirror, not a defect. Compound mirrors count too — if the declared interaction says "right foot forward, left arm swept back" and the image shows "left foot forward, right arm swept back", that is the same pose reflected. Do NOT raise a `wrong_interaction` issue for any mirror case.
 
 **Ignore everything else.** The image prompt contains detailed physical descriptions from reference photos — minor visual differences are expected. Specifically ignore:
@@ -62,7 +64,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 **SCORING**
 
 Start at 10. Only these deductions exist:
-- Missing foreground character (listed in SCENE_HINT or IMAGE_PROMPT): -3
+- Missing character (listed in SCENE_HINT or IMAGE_PROMPT — depth label "foreground/midground/background" is not part of the requirement): -3
 - Character merged into or clipped through an object (AI compositing artifact): -3
 - Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): -3. Any left/right mirror (arm, hand, foot, shoulder, pocket, or compound body-part swap) is equivalent and does NOT deduct — score as if the interaction matched. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
 - Wrong setting/location: -2
@@ -71,6 +73,7 @@ Start at 10. Only these deductions exist:
 - Wrong emotion (happy in danger, scared in calm scene): -1
 - Wrong gaze (two characters listed in DECLARED INTERACTIONS facing away from each other, OR character listed as watching a specific named object looking elsewhere): -1
 - Wrong clothing type on a character: -1
+- Wrong proportions / age band for a named character (grade-school / teenage / adult / senior mismatch): -2
 
 No other deductions. Extra objects, background people, non-declared spatial arrangement, characters from STORY_TEXT not in SCENE_HINT — all score 10.
 
@@ -80,7 +83,7 @@ VERDICT: PASS (7+), FAIL (0-6)
 
 **OUTPUT FORMAT**
 
-Return JSON only. Use one issues list (not two).
+Return JSON only. Put every issue you find in the `semantic_issues` array. Do not use any other field name for issues — the parser reads `semantic_issues` and discards anything else.
 
 ```json
 {
@@ -97,17 +100,9 @@ Return JSON only. Use one issues list (not two).
     "setting": "forest",
     "action": "girl gives map to boy"
   },
-  "issues": [
-    {
-      "type": "missing_object",
-      "item": "map",
-      "severity": "MAJOR",
-      "problem": "Map not visible — girl should be giving it to boy"
-    }
-  ],
   "semantic_issues": [
     {
-      "problem": "Map not visible in scene",
+      "problem": "Map not visible — girl should be giving it to boy",
       "severity": "MAJOR"
     }
   ],

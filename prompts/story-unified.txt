@@ -395,9 +395,15 @@ Analyze the draft above. Be harsh and critical — pretend you are editing someo
 
 **B. CHARACTER & DIALOGUE (per-character, by name)**
 
-For EACH character in {CHARACTER_NAMES} output exactly one line in this format — no character may be skipped:
+For EACH character in {CHARACTER_NAMES} output one line — no character may be skipped. If all 5 axes pass, write `none found` instead of inventing a weakness.
 
+Format A (clean character — all 5 axes ✓):
+- **[Name]**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓ — none found.
+
+Format B (at least one axis ✗):
 - **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Weakest moment: Page X, "[quote a specific line or beat]" — [one-sentence why]. Fix: [concrete change].
+
+Mark an axis ✗ only when you can name the specific page/line that fails it — never as a placeholder to justify a fix you wanted to suggest anyway.
 
 Probes (apply to every character):
 6. **Consistency** — Any out-of-character moment? Any trait established on page 1 that is contradicted later? Any location/ability violation (fear of heights on a cliff, shy character leading a crowd without prior setup)?
@@ -462,7 +468,7 @@ The ---STORY PAGES--- section below MUST apply every fix when rewriting the fina
 
 
 ---TITLE---
-Now that you have written and analyzed the full story, propose 5 distinct title candidates, then select the 2nd strongest.
+Now that you have written and analyzed the full story, propose 5 distinct title candidates and select the strongest.
 
 Each candidate must:
 - Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
@@ -480,7 +486,7 @@ TITLE_CANDIDATES:
 4. [fourth candidate]
 5. [fifth candidate]
 
-TITLE: [exactly the second candidate from the list above]
+TITLE: [the strongest candidate — copy verbatim from the list above]
 
 
 ---CLOTHING REQUIREMENTS---
@@ -494,7 +500,7 @@ Based on the story draft, determine which clothing variants each character needs
   - Swiss historical stories → `costumed:mittelalterliche`, `costumed:1800s`, etc.
   - ONLY use `standard` when the story is set in the present day with normal everyday clothing.
 - **Costumed is PREFERRED** — when in doubt, use `costumed:type` over `standard`. Characters in costume look better and are more immersive.
-- **COVER IMAGES MUST use costumed** — title page, initial page, and back cover should ALWAYS use the costumed variant (not standard) so the book cover matches the story's theme.
+- **COVER IMAGES MUST use costumed when the story has costumes** — if `costumed.used: true` for any character, every cover (title page, initial page, back cover) MUST use that costumed variant for them, not `standard`. If the story is present-day with no costumes, covers use `standard` like the rest of the pages — do not invent a costume just for the cover.
 - **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
 - **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.

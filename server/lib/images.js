@@ -2208,13 +2208,24 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Empty response: candidates=${candidateCount}, finishReason=${finishReason || 'none'}, blockReason=${blockReason || 'none'}, model=${modelId}`);
         log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
-        // PROHIBITED_CONTENT is a system-level block — retrying won't help, go straight to fallback
-        if (blockReason === 'PROHIBITED_CONTENT') {
-          log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Image blocked by Gemini safety (PROHIBITED_CONTENT), skipping retry`);
-          break;
+        // PROHIBITED_CONTENT is most often triggered by prompt TEXT (German
+        // story vocabulary like "stumble", "fall into water", combined with
+        // child references), not the image. Sanitize the text portion of the
+        // prompt and retry — same approach SEMANTIC eval uses. Only fall
+        // through to Grok if sanitization-retry also fails.
+        if (blockReason === 'PROHIBITED_CONTENT' && bboxAttempt < 2) {
+          const sanitized = sanitizeForGemini(prompt, 'full');
+          if (sanitized !== prompt) {
+            log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Blocked (PROHIBITED_CONTENT), retrying with full text sanitization...`);
+            parts[parts.length - 1] = { text: sanitized };
+            prompt = sanitized;
+            continue;
+          }
+          // Sanitization produced no change — go to Grok fallback below.
+          log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}PROHIBITED_CONTENT and sanitization is no-op, routing to Grok fallback`);
         }
 
-        if (bboxAttempt < 2) {
+        if (bboxAttempt < 2 && blockReason !== 'PROHIBITED_CONTENT') {
           log.warn(`⚠️  [BBOX-DETECT] ${pageLabel}Empty response (0 output tokens), retrying in 2s...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
