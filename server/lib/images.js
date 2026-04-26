@@ -8602,13 +8602,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Step 8 — Grok returned at the same aspect, but its raster size may
-    // differ slightly from our scene dims. Normalize to the original
-    // scene dimensions (typically a sub-percent resize, no crop needed).
+    // Step 8 — keep Grok's native output dims. No rescale.
+    //
+    // Why: Grok's edit endpoint always outputs at its standard ~1k raster
+    // for the requested aspect (e.g. 896×1280 for 3:4, 1024×1024 for 1:1).
+    // If the source happens to be smaller than Grok's native (legacy
+    // A4-normalised stories pre-963e3bbd were saved at 880×1168 for 3:4),
+    // resizing the Grok output back to source dims would silently downsample
+    // the cleanest pixels we ever get. Just keep Grok's bytes; storage and
+    // downstream code already handle varying page dims.
     const rawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const finalBuf = await sharp(rawBuf)
-      .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' })
-      .jpeg({ quality: 95 }).toBuffer();
+    const finalBuf = await sharp(rawBuf).jpeg({ quality: 95 }).toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
     const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
