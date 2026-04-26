@@ -217,9 +217,9 @@ const STATIC_ROUTES = {
       fr: 'Magical Story – Votre enfant héros de son propre livre',
     },
     description: {
-      en: 'Your child becomes the hero of a beautifully illustrated story. Upload a photo, pick a theme, and hold a finished book in your hands. First story free.',
-      de: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten. Erste Geschichte gratis.',
-      fr: 'Votre enfant devient le héros d\'une histoire magnifiquement illustrée. Téléchargez une photo, choisissez un thème et tenez un vrai livre entre vos mains. Première histoire gratuite.',
+      en: 'Make your child the hero of their own story. Upload a photo, pick a theme, create your first story free.',
+      de: 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
+      fr: 'Faites de votre enfant le héros de sa propre histoire. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.',
     },
   },
   '/pricing': {
@@ -997,7 +997,7 @@ function getMetaForRoute(routePath, lang) {
   // 10. Fallback — unknown route
   return {
     title: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
-    description: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten.',
+    description: 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
     canonical: canonicalUrl,
     path: cleanPath,
     noindex: false,
