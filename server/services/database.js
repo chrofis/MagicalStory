@@ -1137,7 +1137,7 @@ async function upsertStory(storyId, userId, storyData) {
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
       const imageData = coverData.imageData;
-      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}`);
+      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}, versions=${coverData.imageVersions?.length || 0}`);
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
           qualityScore: coverData.qualityScore ?? null,
@@ -1147,6 +1147,25 @@ async function upsertStory(storyId, userId, storyData) {
         imagesSaved++;
         console.log(`✅ [UPSERT] Saved ${coverType} to story_images (${imageData.length} chars)`);
         delete coverData.imageData;
+      }
+      // Also save imageVersions (so the version picker can load every variant —
+      // original + character-fix + iterate). Order matters: imageVersions[0] is
+      // the original, so saving it after the top-level (best) image overwrites
+      // v=0 with the original, putting the canonical history into the DB.
+      if (coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
+        for (let i = 0; i < coverData.imageVersions.length; i++) {
+          const version = coverData.imageVersions[i];
+          if (version.imageData && !version._rehydrated) {
+            await saveStoryImage(storyId, coverType, null, version.imageData, {
+              qualityScore: version.qualityScore ?? version.score ?? null,
+              generatedAt: version.generatedAt || null,
+              versionIndex: arrayToDbIndex(i, coverType)
+            });
+            imagesSaved++;
+          }
+          delete version.imageData;
+          delete version._rehydrated;
+        }
       }
     }
   }
@@ -1178,10 +1197,14 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
 
   const { qualityScore = null, generatedAt = null, versionIndex = 0 } = options;
 
-  // Normalize every book-facing image to exact A4 aspect at write time.
-  // Means every serve path reads an A4 image from DB — preview matches print 1:1.
-  const A4_TYPES = new Set(['scene', 'empty_scene', 'frontCover', 'initialPage', 'backCover']);
-  if (imageData && A4_TYPES.has(imageType)) {
+  // Normalize covers to exact A4 aspect at write time — every cover render
+  // is the full bleed page, so a 1% Grok drift would show as a misaligned
+  // strip in print. Scenes and empty_scenes are NOT normalized: their
+  // aspect is owned by the story's layout (advanced/Jugendbuch wants 1:1
+  // square + text below; standard wants 3:4 with text overlay). Forcing
+  // every scene to A4 here was cropping square scenes into portrait.
+  const COVER_A4_TYPES = new Set(['frontCover', 'initialPage', 'backCover']);
+  if (imageData && COVER_A4_TYPES.has(imageType)) {
     const { normalizeImageToA4 } = require('../lib/aspectNormalize');
     imageData = await normalizeImageToA4(imageData);
   }
