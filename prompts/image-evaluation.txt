@@ -115,26 +115,31 @@ If the prompt mentions animals, landmarks, vehicles, or notable objects:
 
 ---
 
-## STEP 2C: FIGURE PROPORTION CHECK
+## STEP 2C: FIGURE AGE / PROPORTION CHECK
 
 {FIGURE_PROPORTIONS}
 
-For each figure, compare the rendered head-to-body ratio to the expected ratio above (head height divided by total visible body height).
+Look at each figure next to its reference photo. Does the rendered figure read as the right age and body type for that character? Children should look like children, teenagers like teenagers, adults like adults — judged the same way a casual reader would, not by counting pixels.
 
-Use §2 thresholds: >50% off → CRITICAL; 25–50% off → MAJOR; otherwise `proportion_ok: true`.
+Flag a defect when:
+- An adult character reads as a teenager or child (face proportions juvenile, body too small or too narrow for an adult).
+- A child reads as a teenager or adult (face too long, body too tall, features too mature).
+- A teenager reads as a young child (head too large vs body, features too rounded).
+- Severity per §2: a clear age-bucket swap (adult ↔ child, child ↔ teen) is CRITICAL. A subtle drift that still reads as the correct age bucket but feels off is MAJOR.
 
 **Skip this check** and set `proportion_ok: true, proportion_issue: "n/a — pose"` if the figure is:
 - sitting, kneeling, crouching, lying down
 - cropped so the body below the waist is not visible
 - partially occluded by furniture, other figures, or scene elements
+- in the deep background and too small to judge
 
 For every figure in `figures[]` add:
   `"proportion_ok": true | false`
-  `"proportion_issue": null | "head too large" | "head too small" | "n/a — pose"`
+  `"proportion_issue": null | "reads too young" | "reads too old" | "n/a — pose"`
 
-If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, severity per §2, and `description` including the character name and whether head is too large or too small.
+If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, severity per §2, and `description` naming the character and whether they read too young or too old.
 
-If the EXPECTED FIGURE PROPORTIONS block above is empty (no ratios provided), set `proportion_ok: true, proportion_issue: null` for every figure and skip the check entirely.
+If the EXPECTED FIGURE PROPORTIONS block above is empty, set `proportion_ok: true, proportion_issue: null` for every figure and skip the check entirely.
 
 ---
 
