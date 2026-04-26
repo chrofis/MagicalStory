@@ -285,30 +285,29 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // Build reference photos array
     // Image 1: Face photo (for identity) - if available
     // Image 2: Original avatar (for body/clothing)
+    //
+    // `name` is omitted on purpose. The character name only matters when the
+    // model has to bind a name↔face across multiple distinct people. Avatar
+    // generation has ONE person, so any label there is wasted text that the
+    // model bakes into the rendered 2x2 grid (Gemini renders "[Name]:" text
+    // before each image; Grok's packReferences stamps the name onto the slot
+    // via labelCharacterImage). Both surfaced as the character's name written
+    // twice across the avatar quadrants. Without `name`, Gemini falls back to
+    // a generic "[Character N]:" label and labelCharacterImage no-ops.
     const referencePhotos = [];
 
     if (hasMultipleRefs) {
-      // Pass face photo first (Image 1 - identity reference)
-      referencePhotos.push({
-        name: `${characterName}_face`,
-        photoUrl: facePhoto
-      });
+      referencePhotos.push({ photoUrl: facePhoto });
     }
 
-    // Pass original avatar (Image 2 - body/clothing reference, or Image 1 if no face photo)
-    referencePhotos.push({
-      name: hasMultipleRefs ? `${characterName}_avatar` : characterName,
-      photoUrl: originalAvatar
-    });
+    referencePhotos.push({ photoUrl: originalAvatar });
 
     // Image 3: Art style sample (for style reference)
     styleSample = loadStyleSampleImage(artStyle);
     if (styleSample) {
-      referencePhotos.push({
-        name: 'style_sample',
-        photoUrl: styleSample
-      });
-      // Append style sample instruction to prompt
+      // No `name` — same reasoning as the references above. The text prompt
+      // already explains which slot is the style sample.
+      referencePhotos.push({ photoUrl: styleSample });
       fullPrompt += `\n\nImage ${referencePhotos.length} is a STYLE SAMPLE - match this exact art style for the output.`;
       log.debug(`🎨 [STYLED AVATAR] Added style sample as Image ${referencePhotos.length}`);
     }
