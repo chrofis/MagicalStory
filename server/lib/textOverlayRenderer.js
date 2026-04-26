@@ -35,49 +35,56 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     pageNumber = null,
   } = options;
 
-  // Print-book target: ~12pt on A4. At our A4-normalized canvas (height 1365
-  // ≈ 297 mm × ~4.6 px/mm), 12 pt ≈ 4.2 mm ≈ ~19 px. Going a touch lower
-  // (0.012 * height ≈ 16 px ≈ 10 pt) so the preview matches what the printed
-  // book actually looks like.
-  const baseFontSize = fontSizeOverride || Math.round(height * 0.012);
-  const minFontSize = Math.max(8, Math.round(baseFontSize * 0.6));
+  // FIXED font size — the printed book must be visually consistent across
+  // pages. Same px on every page, regardless of image dimensions or text
+  // length. Text never shrinks; only the polygon area grows or contracts.
+  const FIXED_FONT_PX = 11;
+  const baseFontSize = fontSizeOverride || FIXED_FONT_PX;
   const font = `${fontFamily}, serif`;
 
-  // Escalation stages — grow the polygon instead of switching to a corner box.
-  // Stage 0 = the polygon for this textPosition (or a shape-appropriate
-  // fallback). Stages 1-4 scale that same shape outward from its centroid so
-  // the text area keeps the original contour. Every stage is margin-clamped
-  // (5% from outer edges, 10% from the spine) so growth can't run into the
-  // gutter or the bleed.
+  // Polygon-area stages, smallest → largest. Same shape (rectangle for
+  // top/bottom-full, right triangle for corners) at increasing scale.
+  // Algorithm: find the SMALLEST stage that fits at the fixed font.
+  //   - If the text is short, a small contracted polygon hugs it tightly.
+  //   - If the text is long, the polygon grows until it fits.
+  //   - If even the largest scale won't hold the text, force-render at
+  //     the largest with overflow logged (we never reduce the font).
+  // 0.65 / 0.8 / 1.0 = "contract" stages. The base (1.0) is the original
+  // calm-zone polygon shipped with the empty-scene mask. Anything below 1.0
+  // is just the same shape scaled toward its centroid — visually invisible
+  // (the polygon isn't drawn), but the text gets packed into a tighter
+  // column so short lines don't span the full triangle.
+  // 1.15 → 2.5 = "expand" stages. Each is margin-clamped to the safe text
+  // box, so we can keep growing without ever crossing into the gutter,
+  // bleed, or trim margin.
   const rawBase = (polygon && polygon.length >= 3)
     ? polygon
     : buildFallbackShape(width, height, textPosition);
-  const baseShape = applyMarginClamp(rawBase, pageNumber, width, height);
-  const stages = [baseShape];
-  for (const scale of [1.15, 1.3, 1.55, 1.85]) {
-    const scaled = scalePolygon(rawBase, scale, width, height);
-    stages.push(applyMarginClamp(scaled, pageNumber, width, height));
+  const stages = [];
+  for (const scale of [0.65, 0.8, 1.0, 1.15, 1.3, 1.55, 1.85, 2.2, 2.5]) {
+    const scaled = scale === 1.0 ? rawBase : scalePolygon(rawBase, scale, width, height);
+    stages.push({ scale, shape: applyMarginClamp(scaled, pageNumber, width, height) });
   }
 
-  // Measure-only canvas — used to check whether a (stage, fontSize) combo
-  // fits without paying for a full-page render each attempt.
+  // Measure-only canvas — used to check whether a polygon stage fits the
+  // text at our fixed font size, without paying for a full-page render
+  // attempt.
   const measureCanvas = createCanvas(10, 10);
   const measureCtx = measureCanvas.getContext('2d');
 
   const isTop = textPosition.startsWith('top');
 
-  const fitsAtStage = (stage, fontSize) => {
+  const fitsAtStage = (stage) => {
     // No additional inset — applyMarginClamp already sits the polygon at
-    // 5% outer / 4% top-bottom / 10% gutter. Further insetPolygon(stage, 20)
-    // pulled text another ~5 mm inward for no good reason; stroke bleed past
-    // the polygon edge stays inside the 5% image margin anyway.
+    // 5% outer / 4% top-bottom / 10% gutter. Stroke bleed past the polygon
+    // edge stays inside the 5% image margin anyway.
     const scanlines = buildScanlineMap(stage, height);
     const ys = stage.map(p => p[1]);
     const polyTop = Math.max(0, Math.min(...ys));
     const polyBottom = Math.min(height, Math.max(...ys));
-    const lineHeight = Math.round(fontSize * 1.45);
+    const lineHeight = Math.round(baseFontSize * 1.45);
     const minLineWidth = 60;
-    measureCtx.font = `${fontSize}px ${font}`;
+    measureCtx.font = `${baseFontSize}px ${font}`;
     const paragraphs = text
       .split(/\n+/)
       .map(p => p.trim().split(/\s+/).filter(w => w.length > 0))
@@ -85,44 +92,34 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     if (paragraphs.length === 0) return { fits: true, placed: 0, total: 0 };
     const total = paragraphs.reduce((s, w) => s + w.length, 0);
     const lines = isTop
-      ? wrapLinesTopDown(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, font)
-      : wrapLinesBottomUp(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, fontSize, font);
+      ? wrapLinesTopDown(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, baseFontSize, font)
+      : wrapLinesBottomUp(measureCtx, paragraphs, polyTop, polyBottom, scanlines, lineHeight, minLineWidth, baseFontSize, font);
     const placed = lines.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
     return { fits: placed >= total, placed, total };
   };
 
-  // 1. Biggest font first — find the SMALLEST stage that fits at baseFontSize.
-  for (let s = 0; s < stages.length; s++) {
-    const check = fitsAtStage(stages[s], baseFontSize);
+  // 1. Find the smallest polygon stage that holds the text at the fixed
+  //    font. Smallest-first so contraction kicks in for short text and
+  //    expansion only triggers when actually needed.
+  for (const { scale, shape } of stages) {
+    const check = fitsAtStage(shape);
     if (check.fits) {
-      const result = renderStage(width, height, text, stages[s], textPosition, baseFontSize, minFontSize, font, /*forceOnFinal=*/false);
-      console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${s}/${stages.length - 1}, pos=${textPosition}, page=${pageNumber}, words=${check.placed}/${check.total}, img=${width}x${height}`);
+      const result = renderStage(width, height, text, shape, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/false);
+      console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${scale.toFixed(2)}×, pos=${textPosition}, page=${pageNumber}, words=${check.placed}/${check.total}, img=${width}x${height}`);
       return result.buffer;
     }
   }
 
-  // 2. Font shrink at max stage — only if no stage held the text at baseFontSize.
-  const maxStage = stages[stages.length - 1];
-  const fontCandidates = [];
-  for (const pct of [0.92, 0.85, 0.78, 0.7]) {
-    const f = Math.max(minFontSize, Math.round(baseFontSize * pct));
-    if (f < baseFontSize && !fontCandidates.includes(f)) fontCandidates.push(f);
-  }
-  if (!fontCandidates.includes(minFontSize)) fontCandidates.push(minFontSize);
-  for (const fontSize of fontCandidates) {
-    if (fitsAtStage(maxStage, fontSize).fits) {
-      const result = renderStage(width, height, text, maxStage, textPosition, fontSize, minFontSize, font, /*forceOnFinal=*/false);
-      console.log(`[TEXT-OVERLAY] Rendered at ${fontSize}px (shrunk from ${baseFontSize}), max stage, pos=${textPosition}`);
-      return result.buffer;
-    }
-  }
-
-  // 3. Loud fail — nothing fit. Force render at min font so the PDF pipeline
-  //    doesn't break, but log a concrete error the caller can grep for.
-  const overflow = fitsAtStage(maxStage, minFontSize);
+  // 2. Loud fail — even the 2.5× expanded polygon couldn't hold the text
+  //    at the fixed font. Force-render so the PDF pipeline doesn't break,
+  //    but log a concrete OVERFLOW so the caller can shorten the page text.
+  //    We deliberately never shrink the font here — visual consistency
+  //    across pages is the goal.
+  const maxStage = stages[stages.length - 1].shape;
+  const overflow = fitsAtStage(maxStage);
   const preview = text.replace(/\s+/g, ' ').trim().slice(0, 80);
-  console.error(`[TEXT-OVERLAY] OVERFLOW: position=${textPosition}, page=${pageNumber}, placed=${overflow.placed}/${overflow.total} words at minFont=${minFontSize}px on max stage (1.85×). Preview: "${preview}"`);
-  const result = renderStage(width, height, text, maxStage, textPosition, minFontSize, minFontSize, font, /*forceOnFinal=*/true);
+  console.error(`[TEXT-OVERLAY] OVERFLOW: position=${textPosition}, page=${pageNumber}, placed=${overflow.placed}/${overflow.total} words at fixed=${baseFontSize}px on max stage (2.5×). Shorten the text. Preview: "${preview}"`);
+  const result = renderStage(width, height, text, maxStage, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/true);
   return result.buffer;
 }
 
