@@ -5251,6 +5251,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Audit trail: when provided, consolidator calls get persisted to DB
     storyId = null,
     round = null,
+    // Per-page aspect (e.g. '1:1' for advanced/Jugendbuch, '3:4' for standard).
+    // Without this, inpaint produces 3:4 images for square pages — which then
+    // become the active version after the round-1 score, silently changing the
+    // book's layout. Falls through to editImageWithPrompt → Grok/Gemini.
+    aspectRatio = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -5501,7 +5506,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
-    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, artStyle);
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, artStyle, aspectRatio);
     if (editResult?.imageData) {
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
@@ -5917,6 +5922,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // reference for the current costume/style.
     const { parseCharacterClothing } = getStoryHelpers();
     const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
+    // Same aspect resolution as iteratePage above — the page's stored
+    // imageAspect is the source of truth. Without this, inpaint silently
+    // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
+    const sceneAspect = img.imageAspect
+      || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
+      || null;
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
@@ -5928,6 +5939,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Thread storyId + round so consolidator calls get persisted
       storyId: storyData?.id || jobId || null,
       round: roundNum,
+      aspectRatio: sceneAspect,
     });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
@@ -8544,7 +8556,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const prompt = `Fix the character at the ${regionDesc} of this illustration. Their face does not match the reference photo of ${charName}. Change their face, hair, and skin tone to match the reference exactly. The character is at approximately ${centerX}% from left, ${centerY}% from top, ${regionWidth}% wide, ${regionHeight}% tall. Keep the pose, background, art style, and all other characters unchanged.${issueContext}`;
 
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, imageData], { aspectRatio: CONFIG_DEFAULTS.pageAspect });
+    // Honour the input scene's aspect — without this, square (advanced /
+    // Jugendbuch) pages get re-output as 3:4 and the scene's framing changes.
+    const sceneMeta = await sharp(sceneBuffer).metadata();
+    const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, imageData], { aspectRatio: sceneAspectStr });
 
     log.info(`✅ [CHAR REPAIR GROK] Full-scene repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
 
@@ -8567,11 +8583,14 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null) {
+async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null) {
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
-  const aspectRatio = CONFIG_DEFAULTS.pageAspect;
+  // Honour the page's actual aspect when the caller passes one (e.g. '1:1' for
+  // advanced/Jugendbuch). Falling back to the global page default crops square
+  // pages to 3:4 on every inpaint, silently rewriting the book's layout.
+  const aspectRatio = aspectRatioOverride || CONFIG_DEFAULTS.pageAspect;
 
   log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length}, aspect: ${aspectRatio})`);
 
@@ -8679,7 +8698,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
           temperature: 0.6,
           ...(modelSupportsThinking(geminiModelId) && { thinkingConfig: { includeThoughts: true } }),
           imageConfig: {
-            aspectRatio: CONFIG_DEFAULTS.pageAspect
+            aspectRatio
           }
         }
       })

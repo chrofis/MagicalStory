@@ -593,11 +593,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // Use quality retry to regenerate if score is below threshold
     // Use same model as initial generation for consistency
     const imageModelId = MODEL_DEFAULTS.pageImage;
+    // Preserve the page's saved aspect (e.g. 1:1 for advanced/Jugendbuch);
+    // without this, regen falls through to the global 3:4 default and crops
+    // square pages to portrait.
+    const sceneAspect = currentImage?.imageAspect || null;
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
       `PAGE ${pageNumber}`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata }
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, aspectRatio: sceneAspect }
     );
 
     // Log API costs for this regeneration
