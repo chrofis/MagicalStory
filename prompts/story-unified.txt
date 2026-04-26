@@ -668,7 +668,8 @@ For famous buildings, monuments, or locations that exist in reality:
 - **No `perspective` or `depth` on covers** — every cover character faces the viewer and is fully visible. If you can't fit everyone, drop them, don't hide them.
 - **`holds` per character (max 2 items)** — each cover character entry must include `holds: ...`. Each character has 2 hands → max 2 items. Pick the 1-2 most iconic items, or `holds: nothing`. Never list 3+ items for one character.
 
-**Title Page** (Front Cover)
+**Title Page**
+(Front cover — what readers see first.)
 ONLY main characters: {MAIN_CHARACTER_NAMES}
 NO primary characters on title page - keep focus on protagonist(s).
 
@@ -679,7 +680,8 @@ Characters:
 - [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]
 (List EVERY main character by name with position, clothing, and what they hold. Max 2 items per character — they have 2 hands.)
 
-**Initial Page** (Dedication)
+**Initial Page**
+(Dedication page — facing the title page, group portrait of who's in the story.)
 Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}.
 Always include main characters. If total characters exceed 5, DROP the least important primary characters entirely — do NOT put them in the background, do NOT reference them as a group ("the children", "the others"). They simply don't appear in this cover.
 Place 2-3 characters in the foreground with positions, rest in background.

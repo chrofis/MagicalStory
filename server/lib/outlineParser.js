@@ -504,7 +504,15 @@ class OutlineParser {
       backCover: { scene: '', clothing: null }
     };
 
-    // Try storybook format first (---TITLE PAGE---, ---BACK COVER---)
+    // Try unified-outline format FIRST (---COVER SCENE HINTS--- with
+    // **Title Page** / **Initial Page** / **Back Cover** markers). This is
+    // the format `prompts/story-unified.txt` produces today. Must run before
+    // _extractStoryModeCoverScenes because the latter's inline regex
+    // (\*{0,2}Title Page\*{0,2}[:\s]+ ...) over-eagerly matches `**Title Page`
+    // and captures `(Front Cover)**` as the prose.
+    this._extractUnifiedCoverScenes(coverScenes);
+
+    // Try storybook format (---TITLE PAGE---, ---BACK COVER---)
     this._extractStorybookCoverScenes(coverScenes);
 
     // Try story mode format (Title Page Scene:, Back Cover Scene:)
@@ -517,7 +525,81 @@ class OutlineParser {
     log.debug(`  Initial Page: ${coverScenes.initialPage.scene.substring(0, 50) || 'none'}...`);
     log.debug(`  Back Cover: ${coverScenes.backCover.scene.substring(0, 50) || 'none'}...`);
 
+    // Loud failure: if outline is non-empty but ALL covers came back empty,
+    // the parser failed to recognise the format. Don't fail silently —
+    // downstream cover-expansion fills in chat-style preamble that becomes
+    // the SCENE prose. Log ERROR so format drift gets caught immediately.
+    const allEmpty = !coverScenes.titlePage.scene && !coverScenes.initialPage.scene && !coverScenes.backCover.scene;
+    if (allEmpty && this.outline && this.outline.length > 100) {
+      const idx = this.outline.search(/cover\s+scene\s+hints|title\s+page|back\s+cover/i);
+      const excerpt = idx >= 0 ? this.outline.slice(idx, idx + 400) : this.outline.slice(0, 400);
+      log.error(`[OUTLINE-PARSER] Cover scene extraction returned EMPTY for all 3 covers despite a ${this.outline.length}-char outline. Format may have drifted. Excerpt:\n${excerpt}`);
+    }
+
     return coverScenes;
+  }
+
+  /**
+   * Extract cover scenes from the unified-outline format used by
+   * `prompts/story-unified.txt`:
+   *
+   *   ---COVER SCENE HINTS---
+   *
+   *   **Title Page**
+   *   Hint: prose paragraph here.
+   *   Objects: LOC001, ART002
+   *   Characters:
+   *   - Name (position): clothing, holds: items
+   *
+   * The `Hint:` label is optional — Sonnet sometimes drops it. Either form
+   * is accepted. Tolerates legacy `**Title Page (Front Cover)**` parenthetical.
+   */
+  _extractUnifiedCoverScenes(coverScenes) {
+    const headerToKey = {
+      'title page': 'titlePage',
+      'initial page': 'initialPage',
+      'back cover': 'backCover',
+    };
+    const headerRe = /\*\*\s*(Title Page|Initial Page|Back Cover)(?:\s*\([^)]*\))?\s*\*\*/gi;
+    const matches = [];
+    let m;
+    while ((m = headerRe.exec(this.outline)) !== null) {
+      matches.push({ key: headerToKey[m[1].toLowerCase()], start: m.index + m[0].length, headerEnd: m.index });
+    }
+    if (matches.length === 0) return;
+
+    for (let i = 0; i < matches.length; i++) {
+      const { key, start } = matches[i];
+      if (!key) continue;
+      const end = i + 1 < matches.length ? matches[i + 1].headerEnd : this.outline.length;
+      const blockRaw = this.outline.slice(start, end);
+      // Stop the block at the next major section divider.
+      const stopMatch = blockRaw.match(/\n---[A-Z][A-Z\s]+---/);
+      const block = stopMatch ? blockRaw.slice(0, stopMatch.index) : blockRaw;
+      // Pull the scene prose: optional `Hint:` line then the paragraph(s)
+      // before `Objects:` / `Characters:` / a bullet list / parenthetical
+      // documentation lines.
+      const lines = block.split('\n');
+      const proseLines = [];
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) {
+          if (proseLines.length > 0) break;  // blank line ends prose once we have some
+          continue;
+        }
+        if (/^(ONLY|NO|Pick|Place|Always|\(.*\)$)/i.test(line)) continue;
+        if (/^Objects\s*:/i.test(line)) break;
+        if (/^Characters?\s*:/i.test(line)) break;
+        if (/^[-*]\s/.test(line)) break;
+        const stripped = line.replace(/^Hint\s*:\s*/i, '').trim();
+        if (stripped) proseLines.push(stripped);
+      }
+      const scene = proseLines.join(' ').trim();
+      if (scene && !coverScenes[key].scene) {
+        coverScenes[key].scene = scene;
+        coverScenes[key].clothing = this._extractClothingFromBlock(block);
+      }
+    }
   }
 
   /**
