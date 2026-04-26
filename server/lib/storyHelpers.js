@@ -456,14 +456,29 @@ function parseProseMetadataFormat(text) {
   if (!prose || !jsonPart) return null;
 
   try {
-    // Try direct parse first, fall back to robust extraction
+    // Try direct parse first, fall back to robust extraction (handles ```json
+    // code fences and trailing prose).
     let metadata;
     try {
       metadata = JSON.parse(jsonPart);
     } catch {
       metadata = extractJsonFromText(jsonPart);
     }
-    if (!metadata || !metadata.characters) return null;
+    if (!metadata) return null;
+    // Unwrap any of the wrapper shapes Sonnet sometimes emits when the model
+    // adds critique blocks alongside the scene metadata. Without this, pages
+    // whose metadata looks like
+    //   { "previewMismatches": [...], "checks": {...}, "scene": { "characters": [...] } }
+    // fall through to the legacy JSON-format path (which DOES unwrap) and
+    // lose the prose+metadata semantics — EXACT POSES never get extracted.
+    if (!metadata.characters) {
+      const inner = metadata.scene || metadata.output || metadata.draft
+        || metadata.previewMismatches?.[0]?.scene;
+      if (inner && inner.characters) {
+        metadata = inner;
+      }
+    }
+    if (!metadata.characters) return null;
     return { prose, metadata };
   } catch {
     return null;
@@ -915,6 +930,12 @@ function buildEraGuard(era) {
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
+  // Detect intent BEFORE trying the parsers — if the description carries the
+  // ---METADATA--- delimiter we'll know any failure is a broken-metadata bug,
+  // not "this is a different format". Used at the bottom for loud logging
+  // and for the prose-recovery fallback.
+  const hasProseDelim = sceneDescription.includes('---METADATA---');
+
   // Try prose+metadata format first (natural prose + ---METADATA--- JSON block)
   const proseFormat = parseProseMetadataFormat(sceneDescription);
   if (proseFormat) {
@@ -1156,30 +1177,70 @@ function extractSceneMetadata(sceneDescription) {
 
   // LEGACY: Look for ```json block in markdown
   const jsonBlockMatch = sceneDescription.match(/```json\s*([\s\S]*?)```/i);
-  if (!jsonBlockMatch || !jsonBlockMatch[1]) {
-    return null;
+  if (jsonBlockMatch && jsonBlockMatch[1]) {
+    try {
+      const jsonStr = jsonBlockMatch[1].trim();
+      const metadata = JSON.parse(jsonStr);
+
+      // Validate expected fields
+      if (metadata.characters && Array.isArray(metadata.characters)) {
+        return {
+          characters: metadata.characters || [],
+          // Support both new per-character format and legacy single-value format
+          characterClothing: metadata.characterClothing || null,
+          clothing: metadata.clothing || null, // Legacy support
+          objects: metadata.objects || [],
+          isJsonFormat: false
+        };
+      }
+    } catch (e) { /* fall through to recovery below */ }
   }
 
-  try {
-    const jsonStr = jsonBlockMatch[1].trim();
-    const metadata = JSON.parse(jsonStr);
-
-    // Validate expected fields
-    if (!metadata.characters || !Array.isArray(metadata.characters)) {
-      return null;
+  // Recovery path: the description carries the ---METADATA--- delimiter (we
+  // intended structured metadata to be there) but every parser failed. This
+  // means Sonnet emitted malformed JSON — usually extra wrapper keys it
+  // hallucinated (previewMismatches / checks / issues) with broken syntax.
+  // Loud-log a snippet so the failure is visible in Railway logs instead of
+  // silently degrading downstream image generation; then return a degraded
+  // metadata object that preserves the prose so image prompts still have
+  // something to render from. Structured features (EXACT POSES, character
+  // positions) are lost on these pages — but the page still produces an image
+  // rather than crashing the pipeline.
+  if (hasProseDelim) {
+    const idx = sceneDescription.indexOf('---METADATA---');
+    const prose = sceneDescription.substring(0, idx).trim();
+    const tail = sceneDescription.substring(idx + '---METADATA---'.length).trim();
+    log.error(`[SCENE META] ---METADATA--- delimiter present but JSON parse failed in BOTH prose+JSON and legacy paths. Sonnet emitted malformed metadata; returning prose-only fallback. Tail snippet (first 200 chars): ${tail.slice(0, 200).replace(/\n/g, ' ')}`);
+    if (prose && prose.length > 50) {
+      return {
+        characters: [],
+        characterClothing: null,
+        characterPositions: null,
+        characterPerspectives: null,
+        clothing: null,
+        objects: [],
+        interactions: null,
+        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose },
+        thinking: null,
+        translatedSummary: null,
+        imageSummary: prose,
+        landmarkVariants: null,
+        setting: null,
+        sceneComplexity: 'simple',
+        emptyScenePrompt: null,
+        reuseEmptyScene: null,
+        textPosition: null,
+        textZoneDescription: null,
+        era: null,
+        framingPattern: null,
+        isJsonFormat: true,
+        isProseFormat: true,
+        isRecovered: true
+      };
     }
-
-    return {
-      characters: metadata.characters || [],
-      // Support both new per-character format and legacy single-value format
-      characterClothing: metadata.characterClothing || null,
-      clothing: metadata.clothing || null, // Legacy support
-      objects: metadata.objects || [],
-      isJsonFormat: false
-    };
-  } catch (e) {
-    return null;
   }
+
+  return null;
 }
 
 // ============================================================================

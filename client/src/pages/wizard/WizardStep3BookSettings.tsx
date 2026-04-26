@@ -540,9 +540,6 @@ export function WizardStep3BookSettings({
                 <p className="text-base font-medium text-gray-700">
                   {getPageLabel(pages, pages === 4)}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below'}
-                </p>
               </div>
             </div>
           )}
