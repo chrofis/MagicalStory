@@ -8446,42 +8446,21 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       } : null,
     };
   } else if (useFullScene) {
-    // ── Full-scene inpaint: pad scene to Grok's 2:3 preset with mirror,
+    // ── Full-scene inpaint: send the scene at its native aspect (Grok
+    //    accepts 1:1, 3:4, 4:3, 2:3, 3:2, etc. via closestGrokAspect),
     //    paint magenta crosshatch on the body bbox + solid magenta block
-    //    on the face area, send full padded scene to Grok. Grok edits the
-    //    whole scene; we crop the mirror padding off and we're done.
-    //    No paste-back → no seam artifacts. Aspect padding → no zoom drift
-    //    on repeated iterations. ──
+    //    on the face area. Grok repaints inside the magenta and returns
+    //    at the same aspect — same dimensions in, same dimensions out,
+    //    no padding round-trip, no resize drift. ──
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
-    // Step 1 — pad scene to exact 2:3 aspect (Grok's standard preset).
-    // Mirror extension keeps the padding visually plausible so Grok doesn't
-    // try to "fix" the padding region. After Grok responds we crop it off
-    // exactly, losing zero scene pixels per iteration.
-    const GROK_ASPECT_W = 2;
-    const GROK_ASPECT_H = 3;
-    const targetAspect = GROK_ASPECT_W / GROK_ASPECT_H;
-    const sceneAspect = sceneMeta.width / sceneMeta.height;
-    let padTop = 0, padBottom = 0, padLeft = 0, padRight = 0;
-    let paddedW = sceneMeta.width, paddedH = sceneMeta.height;
-    if (Math.abs(sceneAspect - targetAspect) > 0.005) {
-      if (sceneAspect > targetAspect) {
-        paddedH = Math.round(sceneMeta.width / targetAspect);
-        const total = paddedH - sceneMeta.height;
-        padTop = Math.floor(total / 2);
-        padBottom = total - padTop;
-      } else {
-        paddedW = Math.round(sceneMeta.height * targetAspect);
-        const total = paddedW - sceneMeta.width;
-        padLeft = Math.floor(total / 2);
-        padRight = total - padLeft;
-      }
-    }
-    const paddedScene = (padTop || padBottom || padLeft || padRight)
-      ? await sharp(sceneBuffer)
-          .extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, extendWith: 'mirror' })
-          .jpeg({ quality: 95 }).toBuffer()
-      : sceneBuffer;
+    // No mirror padding — pick the Grok preset that matches the scene's
+    // own aspect and let Grok return at the same dims. Earlier code
+    // hardcoded 2:3 and round-tripped via mirror-pad → unpad, which was
+    // unnecessary once Grok's API accepted multiple aspect presets.
+    const padTop = 0, padBottom = 0, padLeft = 0, padRight = 0;
+    const paddedW = sceneMeta.width, paddedH = sceneMeta.height;
+    const paddedScene = sceneBuffer;
 
     // Step 2 — figure & face rectangles in padded-canvas pixel coords.
     const figLeft   = Math.floor(xmin * sceneMeta.width) + padLeft;
@@ -8610,10 +8589,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with one ${charName} from the reference photo.${actionContext}\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
 
-    // Step 7 — send to Grok at 2:3 (already matches our padded canvas).
-    log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok`);
+    // Step 7 — send to Grok at the scene's native aspect.
+    const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
+    log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok (aspect=${sceneAspectStr})`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, `data:image/jpeg;base64,${masked.toString('base64')}`], {
-      aspectRatio: '2:3',
+      aspectRatio: sceneAspectStr,
       skipOutputPadding: true,
     });
 
@@ -8622,14 +8602,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Step 8 — resize Grok output to padded dims (aspects match → fill is safe),
-    // then crop the mirror padding off → exact original scene dims, zero loss.
+    // Step 8 — Grok returned at the same aspect, but its raster size may
+    // differ slightly from our scene dims. Normalize to the original
+    // scene dimensions (typically a sub-percent resize, no crop needed).
     const rawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const resizedToPadded = await sharp(rawBuf)
-      .resize(paddedW, paddedH, { fit: 'fill' })
-      .toBuffer();
-    const finalBuf = await sharp(resizedToPadded)
-      .extract({ left: padLeft, top: padTop, width: sceneMeta.width, height: sceneMeta.height })
+    const finalBuf = await sharp(rawBuf)
+      .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' })
       .jpeg({ quality: 95 }).toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
