@@ -142,7 +142,7 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 |---|-------|------|
 | 2 | Object Placement | Every object needs explicit position: horizontal (left/center/right) + depth (fore/mid/back) |
 | 3 | Action Compatibility | Actions must match object orientation (pulling vertical door ≠ lifting floor hatch) |
-| 5 | Camera View | Back view = no expressions; front/three-quarter = expressions OK |
+| 5 | Camera View | Back view = no expressions; facing camera / facing left / facing right = expressions OK. Use those four discrete facings only — never `three-quarter`, `two-thirds`, or fractional turns. |
 | 7 | Physics | Ropes taut, heavy objects = straining posture, distinct materials where objects touch |
 | 9 | Distance Separation | CRITICAL: Image models draw all characters the same size. When characters must be far apart: (1) set distant character position to "far background (tiny figure, 1/5 size)" — NEVER both "foreground", (2) in imageSummary write "Roger appears tiny in the far distance", (3) in depthLayers describe the gap "wide empty plaza fills center between them". If both characters say "foreground" they WILL be drawn side by side. |
 | 10 | Location Continuity | Same location as previous scene unless story explicitly says they moved |

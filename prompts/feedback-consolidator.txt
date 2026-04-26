@@ -51,6 +51,7 @@ Critique against:
 5. **No purposive / hypothetical clauses.** "to show X", "as if X", "so that Y", "while maintaining Z", "with focus on…" — strip them.
 6. **No negations.** Grok cannot execute "not facing camera". Write the desired direction.
 7. **No -ing hanger clauses.** "…, looking ahead and reaching forward" — drop them.
+8. **Discrete facing vocabulary only.** Use `facing the camera`, `facing left`, `facing right`, `back view`. Never `three-quarters`, `two-thirds`, `45 degrees`, `angled toward`. Grok renders fractional turns as front-facing or random; discrete directions land. For glance-back, write `back view, head turned over the [left|right] shoulder` — pick the shoulder closer to the target.
 
 Examples of the full draft → critique → final cycle:
 

@@ -543,6 +543,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // Include covers in entity checks (covers often show multiple characters)
     const coverEntries = [];
     const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
+    // coverImages keys → coverHints keys (frontCover↔titlePage, others identical)
+    const COVER_HINT_KEY = { frontCover: 'titlePage', initialPage: 'initialPage', backCover: 'backCover' };
     if (storyData.coverImages) {
       for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
         if (cover && (cover.imageData || cover.hasImage)) {
@@ -559,12 +561,22 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               const activeVersion = cover.imageVersions.find(v => v.isActive);
               if (activeVersion?.bboxDetection) coverBbox = activeVersion.bboxDetection;
             }
+            // Pull per-cover characterClothing from outline coverHints so the entity
+            // collector can drive bbox detection with the actual cover cast instead
+            // of falling back to the full story roster (too noisy for Gemini to ID).
+            const hintKey = COVER_HINT_KEY[coverType];
+            const coverHint = hintKey ? storyData.coverHints?.[hintKey] : null;
+            const characterClothing = coverHint?.characterClothing
+              && Object.keys(coverHint.characterClothing).length > 0
+              ? coverHint.characterClothing
+              : null;
             coverEntries.push({
               pageNumber: COVER_PAGE_MAP[coverType],
               imageData,
               description: cover.description || cover.translatedDescription || '',
               text: '',
               bboxDetection: coverBbox,
+              ...(characterClothing && { characterClothing }),
               _coverType: coverType,
             });
           }
@@ -590,6 +602,19 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     const pagesWithNewBbox = entityAppearances._pagesWithNewBbox || [];
     delete entityAppearances._pagesWithNewBbox;
     report.pagesWithNewBbox = pagesWithNewBbox;
+
+    // Expose freshly-detected cover bboxes so callers can cache them on coverImages.
+    // (Cover entries live locally in this function; without surfacing the detections,
+    // every consistency-check pass re-runs Gemini bbox detection on the covers.)
+    const coverBboxDetections = {};
+    for (const cover of coverEntries) {
+      if (pagesWithNewBbox.includes(cover.pageNumber) && cover.bboxDetection) {
+        coverBboxDetections[cover._coverType] = cover.bboxDetection;
+      }
+    }
+    if (Object.keys(coverBboxDetections).length > 0) {
+      report.coverBboxDetections = coverBboxDetections;
+    }
 
     if (entityAppearances.size === 0) {
       report.summary = 'No entity appearances found with bounding boxes';
@@ -1361,6 +1386,12 @@ function collectObjectAppearances(sceneImages, visualBible = null) {
 
     // Match objects via objectMatches or use labels directly
     for (const obj of bboxDetection.objects) {
+      // Skip objects the detector flagged as not found, or that have no usable bbox.
+      // Without this guard they pass the appearance-count threshold and then fail
+      // crop extraction every entity-check pass ("0 valid crops" warning spam).
+      if (obj.found === false) continue;
+      if (!obj.bodyBox || !Array.isArray(obj.bodyBox) || obj.bodyBox.length !== 4) continue;
+
       const match = bboxDetection.objectMatches?.find(m =>
         m.label === obj.label
       );

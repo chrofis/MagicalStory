@@ -3829,7 +3829,22 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     // so it's cached in retryHistory for next time (avoids redundant API calls)
     if (report.pagesWithNewBbox?.length > 0) {
       log.info(`🔍 [REPAIR-WORKFLOW] Saving fallback bboxDetection for pages: ${report.pagesWithNewBbox.join(', ')}`);
+      // Persist cover bbox detections to coverImages (cover entries live in-memory inside
+      // runEntityConsistencyChecks and would otherwise be re-detected every pass).
+      if (report.coverBboxDetections && storyData.coverImages) {
+        for (const [coverType, bbox] of Object.entries(report.coverBboxDetections)) {
+          const cover = storyData.coverImages[coverType];
+          if (!cover) continue;
+          cover.bboxDetection = bbox;
+          if (cover.imageVersions?.length > 0) {
+            const activeVer = cover.imageVersions.find(v => v.isActive);
+            if (activeVer) activeVer.bboxDetection = bbox;
+          }
+          log.info(`🔍 [REPAIR-WORKFLOW] Cached cover bbox for ${coverType} (${bbox.figures?.length || 0} figures)`);
+        }
+      }
       for (const pageNumber of report.pagesWithNewBbox) {
+        if (pageNumber < 0) continue; // covers handled above
         const rehydratedScene = rehydratedData.sceneImages?.find(s => s.pageNumber === pageNumber);
         const originalScene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
         if (rehydratedScene?.bboxDetection && originalScene) {

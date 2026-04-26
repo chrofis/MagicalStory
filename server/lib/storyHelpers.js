@@ -2531,15 +2531,20 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  */
 function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   const p = extractCharacterVisualProfile(char, { clothingOverride });
+  // Prefer the apparent-age categorical label (genderTerm derived from apparentAge)
+  // over the numeric age. The avatar photo and the eval are both anchored to the
+  // apparent-age bucket — leading the prose with a number lets Claude paraphrase
+  // into the wrong bucket (e.g. "12-year-old" → "grade-school" when the photo
+  // looks school-age and the eval will judge against that). Falls back to a
+  // numeric description only when no category is available.
+  const ageLabel = p.ageCategory || null;
+  const genderLabel = p.genderTerm
+    || (p.gender === 'male' ? 'boy' : p.gender === 'female' ? 'girl' : 'child');
   const age = p.numericAge ?? 10;
-  const gender = p.gender || 'child';
-  const genderLabel = gender === 'male'
-    ? (age >= 18 ? 'man' : 'boy')
-    : gender === 'female'
-      ? (age >= 18 ? 'woman' : 'girl')
-      : (age >= 18 ? 'person' : 'child');
 
-  let s = `${p.name} is a ${age}-year-old ${genderLabel}`;
+  let s = ageLabel
+    ? `${p.name} is a ${ageLabel} ${genderLabel} (Looks: ${ageLabel})`
+    : `${p.name} is a ${age}-year-old ${genderLabel}`;
   if (p.height) s += `, ${p.height} cm tall`;
   if (p.build) s += `, ${p.build} build`;
   if (p.hair) s += `. Hair: ${p.hair}`;
