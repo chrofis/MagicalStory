@@ -367,6 +367,18 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
   let gelatoPageCount = 1 + storyContentPages; // dedication + story content
 
+  // Pad up to the orderable Gelato page count (e.g. A4 softcover only ships
+  // in 24/30/40/...). The caller passes targetGelatoPageCount snapped to the
+  // next available size; we add blanks until gelatoPageCount matches.
+  const targetGelatoPageCount = options.targetGelatoPageCount || 0;
+  while (gelatoPageCount < targetGelatoPageCount) {
+    doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    gelatoPageCount++;
+  }
+  if (targetGelatoPageCount && gelatoPageCount > storyContentPages + 1) {
+    log.debug(`📄 [PRINT PDF] Padded to ${gelatoPageCount} pages (target ${targetGelatoPageCount})`);
+  }
+
   // Gelato requires even page count for double-sided printing
   if (gelatoPageCount % 2 !== 0) {
     doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -804,6 +816,19 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   // Does NOT count: cover spread, inside front cover blank, inside back cover blank.
   // Gelato expects total PDF pages = pageCount + 3.
   let gelatoPageCount = 1 + totalStoryPages; // dedication + story content
+
+  // Pad up to the orderable Gelato page count (e.g. A4 softcover only ships
+  // in 24/30/40/...). Caller passes targetGelatoPageCount snapped to the next
+  // available SKU size; we add blanks here so the submitted pageCount matches.
+  const targetGelatoPageCount = options.targetGelatoPageCount || 0;
+  const beforePadding = gelatoPageCount;
+  while (gelatoPageCount < targetGelatoPageCount) {
+    doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    gelatoPageCount++;
+  }
+  if (gelatoPageCount > beforePadding) {
+    log.debug(`📚 [COMBINED PDF] Padded ${gelatoPageCount - beforePadding} blank pages to reach target ${targetGelatoPageCount}`);
+  }
 
   // Gelato requires even page count for double-sided printing
   if (gelatoPageCount % 2 !== 0) {

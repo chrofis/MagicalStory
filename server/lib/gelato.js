@@ -196,19 +196,40 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
     log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${storyContentPages} story content pages)`);
 
-    // Step 3a: Select product based on estimated page count
+    // Step 3a: Select product based on estimated page count.
+    // Gelato photobooks ship in discrete page counts (e.g. 24, 30, 40, ...).
+    // If the estimate is below the minimum or between two valid counts, snap
+    // up to the next allowed count and pad the PDF with blank pages so the
+    // submitted printPageCount matches an actually-orderable SKU.
     const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
     let printProductUid = null;
+    let snappedPageCount = estimatedPageCount;
     const productsResult = await dbPool.query(
-      'SELECT product_uid, product_name, min_pages, max_pages FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
+      'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
       [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
     );
     if (productsResult.rows.length > 0) {
       const matchingProduct = productsResult.rows.find(p =>
-        estimatedPageCount >= (p.min_pages || 0) && estimatedPageCount <= (p.max_pages || 999)
+        estimatedPageCount <= (p.max_pages || 999)
       );
       if (matchingProduct) {
         printProductUid = matchingProduct.product_uid;
+        // Snap to the next available discrete count for this product.
+        let counts = matchingProduct.available_page_counts;
+        if (typeof counts === 'string') {
+          try { counts = JSON.parse(counts); } catch { counts = null; }
+        }
+        if (Array.isArray(counts) && counts.length > 0) {
+          const sorted = [...counts].map(Number).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
+          const snapped = sorted.find(n => n >= estimatedPageCount);
+          snappedPageCount = snapped || sorted[sorted.length - 1];
+        } else if (matchingProduct.min_pages && estimatedPageCount < matchingProduct.min_pages) {
+          snappedPageCount = matchingProduct.min_pages;
+        }
+        if (snappedPageCount % 2 !== 0) snappedPageCount++;
+        if (snappedPageCount !== estimatedPageCount) {
+          log.info(`📐 [BACKGROUND] Padding to ${snappedPageCount} pages (estimated ${estimatedPageCount}) for product ${matchingProduct.product_name}`);
+        }
         log.debug(`📦 [BACKGROUND] Selected product: ${matchingProduct.product_name}`);
       }
     }
@@ -220,7 +241,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Step 3b: Get cover dimensions from Gelato API
     let coverDims = null;
     if (printProductUid) {
-      coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
+      coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
       if (coverDims) {
         log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
       }
@@ -232,14 +253,18 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     if (stories.length === 1) {
       log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
       const result = await generatePrintPdf(stories[0].data, bookFormat, {
-        gelatoCoverDims: coverDims
+        gelatoCoverDims: coverDims,
+        targetGelatoPageCount: snappedPageCount,
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
       // Multiple stories - generate combined book PDF
       log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
-      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims });
+      const result = await generateCombinedBookPdf(stories, bookFormat, {
+        gelatoCoverDims: coverDims,
+        targetGelatoPageCount: snappedPageCount,
+      });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     }
