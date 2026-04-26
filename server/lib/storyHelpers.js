@@ -3948,21 +3948,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       });
     }
 
-    // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING.
-    // Uses the shared expansion helper so the format matches CHARACTER_DESCRIPTIONS in scene
-    // expansion exactly — one definition, one place to change.
-    const charDescriptions = sceneCharacters.map((char, index) => {
-      const avatarClothing = clothingMap[char.name?.toLowerCase()] || null;
-      if (avatarClothing) {
-        log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
-      }
-      return buildCharacterDescriptionForExpansion(char, avatarClothing, index + 1);
-    });
+    // Each character is already named with their physical description in the
+    // SCENE prose, and each attached image carries a `[Name]:` label in the
+    // parts array. Verbose per-character description blocks here was a third
+    // mention of the same info — model overload + token waste. Just list the
+    // names so the model knows which images to expect (and how many).
+    if (clothingMap) { /* clothing already in prose; map kept for debug only */ }
+    const nameLine = sceneCharacters.map(c => `[${c.name}]`).join(', ');
 
     // Build relative height description (AI understands this better than cm values)
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
 
-    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order) — EXACTLY ${sceneCharacters.length} characters, no more:**\n${charDescriptions.join('\n')}\nINCLUDE ALL ${sceneCharacters.length} characters above AND NO OTHERS. Every person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.\n`;
+    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below) — EXACTLY ${sceneCharacters.length} characters, no more:** ${nameLine}\nEvery person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.\n`;
 
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;
