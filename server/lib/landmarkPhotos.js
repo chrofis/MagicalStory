@@ -877,13 +877,11 @@ async function analyzeLandmarkPhoto(photoData, landmarkName, landmarkType) {
 
     const prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
 
-Focus on:
-- The main architectural/natural features visible
-- Colors, materials, textures
-- Distinctive elements that make it recognizable
-- The setting/surroundings visible in the photo
+Cover BOTH of:
+1. APPEARANCE — main architectural/natural features, colors, materials, textures, distinctive recognizable elements.
+2. LAYOUT IN FRAME — where the landmark sits and where the open space is. Use rough percentages or zones: "tower fills the right 60% of the frame from foreground to sky", "square dominates the lower two-thirds with the tower centered", "open plaza stretches across the foreground; landmark in the upper-right background", "open sky fills the upper third above the landmark roofline". Name which thirds/halves/corners are EMPTY GROUND, EMPTY SKY, or OPEN SQUARE — downstream prompts use this to decide where to place separate props (poles, fountains, signposts) without mounting them on the landmark.
 
-Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
+Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -903,7 +901,10 @@ Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or 
           ]
         }],
         generationConfig: {
-          maxOutputTokens: 200,
+          // 3-5 sentences (appearance + layout) needs more headroom than the
+          // old 2-3 sentence appearance-only prompt — 400 tokens covers it
+          // with margin and still costs ~$0.0002 per landmark variant.
+          maxOutputTokens: 400,
           temperature: 0.3
         }
       }),
