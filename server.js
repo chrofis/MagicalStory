@@ -3495,7 +3495,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptyDesc,
               CHARACTER_SPACE: '',
-              TEXT_AREA_INSTRUCTION: ''
+              TEXT_AREA_INSTRUCTION: '',
+              ERA_GUARD: '',
             });
             // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
             // (chars/animals/artifacts excluded — they belong on the populated cover).
@@ -3715,7 +3716,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     STYLE_DESCRIPTION: artStyleDesc,
                     EMPTY_SCENE_DESCRIPTION: bg.description,
                     REQUIRED_OBJECTS: '',
-                    TEXT_AREA_INSTRUCTION: ''
+                    TEXT_AREA_INSTRUCTION: '',
+                    ERA_GUARD: '',
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: [],
@@ -4815,7 +4817,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
             // Enforce spread rule: odd pages = left side, even = right side
-            const { enforceSpreadTextPosition, buildTextZoneInstruction } = require('./server/lib/storyHelpers');
+            const { enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
             const sonnetTextPos = sceneMetadata?.textPosition || null;
             const textPos = enforceSpreadTextPosition(sonnetTextPos, pageData.pageNumber);
             // If spread rule flipped Sonnet's left/right, Sonnet's textZoneDescription
@@ -4846,11 +4848,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct)
               : '';
 
+            const eraGuard = buildEraGuard(sceneMetadata?.era || null);
+
             const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
               STYLE_DESCRIPTION: artStyleDesc,
               EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
               CHARACTER_SPACE: characterSpace,
               TEXT_AREA_INSTRUCTION: emptyTextAreaInstr,
+              ERA_GUARD: eraGuard,
             });
 
             try {
@@ -4936,6 +4941,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     EMPTY_SCENE_DESCRIPTION: emptySceneDesc + fixHint,
                     CHARACTER_SPACE: characterSpace,
                     TEXT_AREA_INSTRUCTION: softerTextInstr,
+                    ERA_GUARD: eraGuard,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

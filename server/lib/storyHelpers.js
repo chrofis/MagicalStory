@@ -892,6 +892,26 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct) {
   return `**COMPOSITION — CALM ZONE:** The ${corner} of the image (roughly ${areaPct}) must read as visually calm and continuous with the rest of the scene. Render it as: ${surface} — same surface as its surroundings, gentle gradient, minimal texture, no characters, no sharp edges, no high-contrast detail. Saturated colour is preferred (deep blue, dark green, rich brown, saturated cobblestone). If a layout reference image is attached, the slightly darker grey region marks where this calm zone goes — paint that area as continuous scene material (sky, wall, water, foliage, ground), never as a flat panel, coloured block, rectangle, frame, or framed strip. No text, no labels, no placeholders, no pure-black or pure-white fill.`;
 }
 
+/**
+ * Build the era-guard paragraph injected into empty-scene + page prompts.
+ * Era is free-text inferred by Sonnet (e.g. "medieval Switzerland, ~1300",
+ * "1920s New York", "present day"). The guard tells the image model to
+ * render every architectural and street element consistent with that era,
+ * which catches anachronisms (traffic signs in 1300s scenes, etc.) much
+ * more reliably than the previous negative-only enumeration.
+ *
+ * Returns an empty string when era is missing or "present day"-ish — no
+ * guard needed for contemporary scenes.
+ */
+function buildEraGuard(era) {
+  if (!era || typeof era !== 'string') return '';
+  const trimmed = era.trim();
+  if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('present day') || lower.includes('contemporary') || lower.includes('modern day')) return '';
+  return `**STORY ERA:** ${trimmed}. Every architectural and street element in the frame must match this era. No vehicles, traffic signs, road markings, street lamps, utility poles, power lines, billboards, modern signage, plastic objects, satellite dishes, air conditioners, or modern pedestrians — anywhere in the frame.`;
+}
+
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -977,6 +997,7 @@ function extractSceneMetadata(sceneDescription) {
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
       textZoneDescription: metadata.textZoneDescription || null,
+      era: metadata.era || null,
       framingPattern: metadata.framingPattern || null,
       isJsonFormat: true,
       isProseFormat: true
@@ -1127,6 +1148,7 @@ function extractSceneMetadata(sceneDescription) {
       // Short description of the saturated/high-contrast surface at textPosition
       // (for white text legibility) — used to steer empty-scene + main-scene prompts.
       textZoneDescription: parsedData.textZoneDescription || null,
+      era: parsedData.era || null,
       framingPattern: parsedData.framingPattern || null,
       isJsonFormat: true
     };
@@ -4965,6 +4987,7 @@ module.exports = {
   // Text position
   enforceSpreadTextPosition,
   buildTextZoneInstruction,
+  buildEraGuard,
 
   // Parsers
   parseStoryPages,

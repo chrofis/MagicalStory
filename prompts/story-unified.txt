@@ -151,6 +151,7 @@ METADATA:
   "framingPattern": "solo-before|solo-after|over-the-shoulder",
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner (e.g. 'deep evening sky in rich indigo', 'dark green pine foliage', 'saturated wet cobblestones')",
+  "era": "free-text era for THIS scene (e.g. 'medieval Switzerland, ~1300', 'present day Zurich', '1920s New York'). Same value for every page UNLESS the page is a flashback/dream/flash-forward — then write the page's own era and the rest of the metadata stays consistent with that override.",
   "emptyScenePrompt": "2–4 sentences describing the background environment only."
 }
 ```
@@ -169,7 +170,7 @@ METADATA:
 
 **Interactions at a distance.** When the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'runs toward across', 'gestures across', 'looks at' over distance), `where` must include an explicit separation phrase: 'across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley', 'from one rooftop to another'. Without it the image renders the two figures inside touching distance and the dramatic moment collapses. For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly in the frame at the named separation, and the prose must place each figure at the correct end of the frame.
 
-**emptyScenePrompt** (required): Describe ONLY the background environment — no named main or secondary characters, no tracked animals, no carried/handheld artifacts. Fixed immobile artifacts that anchor the scene (a pole-with-banner, a throne, a monument, a pedestal, an altar, a signpost) ARE allowed and, when the page text centers on them, MUST be described as the focal point — "prominent at the center, dominating the foreground composition," not "a pole stands somewhere." Name the artifact's key visual marker (the hat on top, the inscription). Location, architecture, natural landscape, lighting, weather, camera angle. Leave the foreground open and uncluttered. NEVER write hypothetical references like "where children would stand" — image models render those literally.
+**emptyScenePrompt** (required): Background only — location, architecture, landscape, ground, lighting, weather, sky, camera angle. No figures, characters, animals, creatures (named or generic). Reserved space must be phrased as a property of the scene material, not as a slot for a figure: "open dark cobblestone in the right foreground" ✓, "open for two figures facing each other" ✗. Fixed anchor artifacts (throne, pole-with-banner, monument, signpost) are allowed and, when the page text centers on them, must be the focal point with their key visual marker named. Atmospheric crowd silhouettes are allowed only for inherently populated settings (market, square, festival).
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with a real landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot. SCENE prose and `emptyScenePrompt` use the same relative phrasing.
 

@@ -7051,14 +7051,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
           || '';
         const textPos = lockedTextPosition || iterateSceneMetadata?.textPosition || null;
-        const { buildTextZoneInstruction } = getStoryHelpers();
+        const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
         const iterateTextZoneDesc = iterateSceneMetadata?.textZoneDescription || null;
+        const iterateEra = iterateSceneMetadata?.era || null;
         const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
           STYLE_DESCRIPTION: artStyleDesc,
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
           CHARACTER_SPACE: '',
-          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, '25%') : ''
+          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, '25%') : '',
+          ERA_GUARD: buildEraGuard(iterateEra),
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;
