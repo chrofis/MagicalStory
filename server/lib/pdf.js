@@ -52,6 +52,47 @@ const MIN_FONT_SIZE_WARNING = 10;
 const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
 
 /**
+ * Resolve any image-data string into a Buffer. Handles:
+ *   - data URI base64 ("data:image/png;base64,...")
+ *   - https/http URL (fetched, post-R2-migration covers)
+ *   - raw base64 string (no prefix)
+ *   - empty / null / unrecognised → returns null (caller should skip)
+ *
+ * The combined-PDF code used to assume base64 data URIs only and crashed on
+ * URL strings with "Input buffer contains unsupported image format" once the
+ * R2 migration started returning image_url instead of image_data.
+ */
+async function resolveImageBuffer(source) {
+  if (!source || typeof source !== 'string') return null;
+  // HTTP(S) URL — fetch and return the bytes
+  if (/^https?:\/\//i.test(source)) {
+    try {
+      const res = await fetch(source);
+      if (!res.ok) {
+        log.warn(`⚠️ [PDF] Image fetch failed: ${res.status} ${source.substring(0, 80)}`);
+        return null;
+      }
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      log.warn(`⚠️ [PDF] Image fetch error: ${err.message} (${source.substring(0, 80)})`);
+      return null;
+    }
+  }
+  // data URI — strip the prefix, decode base64
+  const dataMatch = source.match(/^data:[^;]+;base64,(.*)$/);
+  if (dataMatch) return Buffer.from(dataMatch[1], 'base64');
+  // Bare base64 (legacy) — must be plausibly base64 (length, charset)
+  if (/^[A-Za-z0-9+/=\s]+$/.test(source) && source.length > 100) {
+    try {
+      const buf = Buffer.from(source, 'base64');
+      if (buf.length > 0) return buf;
+    } catch { /* fall through */ }
+  }
+  log.warn(`⚠️ [PDF] Unrecognised image source format (${source.substring(0, 60)}...)`);
+  return null;
+}
+
+/**
  * Render an image so it FILLS the entire box, cropping any overflow.
  * This is the equivalent of CSS `object-fit: cover` for PDFKit.
  *
@@ -252,8 +293,11 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
 
   if (backCoverImageData && frontCoverImageData) {
-    const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
+    const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
+    if (!backCoverBuffer || !frontCoverBuffer) {
+      log.warn(`⚠️ [PRINT PDF] Missing cover image buffer (back=${!!backCoverBuffer}, front=${!!frontCoverBuffer}); skipping cover spread`);
+    } else {
 
     // Extend cover images into the bleed area (outer edge + top + bottom).
     // Stop at the spine edge so back/front don't bleed into each other.
@@ -277,8 +321,9 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // a small symmetric crop is acceptable. The previous `fit:` mode produced
     // visible white bars whenever the image's aspect didn't exactly match the
     // page area (always true after bleed math).
-    await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
-    await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
+      await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
+      await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
+    }
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
@@ -289,9 +334,14 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   if (initialPageImageData) {
-    const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
-    const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+    const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
+    if (initialPageBuffer) {
+      try {
+        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+      } catch (err) {
+        log.warn(`⚠️ [PRINT PDF] Initial page render failed: ${err.message}`);
+      }
+    }
   }
 
   // Parse story pages
@@ -465,7 +515,8 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
         const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
 
-        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
         const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
 
         // Crop the opposite side of the text so the text is never in the
@@ -482,7 +533,8 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       if (!overlayDrawn) {
         // Fallback: draw image without overlay + text below
         try {
-          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
           await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
         } catch (imgErr) {
           log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
@@ -495,7 +547,8 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
     } else if (image && image.imageData) {
       // Draw image (no text overlay)
       try {
-        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
         await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
       } catch (imgErr) {
         log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
@@ -544,7 +597,8 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
     if (image && image.imageData) {
       doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
-        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
         doc.image(imageBuffer, 0, 0, { fit: [interiorW, interiorH], align: 'center', valign: 'center' });
       } catch (imgErr) {
         log.error('Error adding image to PDF:', imgErr);
@@ -666,7 +720,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
           const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
           const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
 
-          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
           const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
           // Fill the full interior page incl. top AND bottom bleed. Crop the
           // opposite side from the text so the scale-to-fill overflow never
@@ -683,7 +738,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       if (image && image.imageData) {
         try {
-          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
           // Scale-to-fill, pinned to the top edge so the image reaches y=0 with
           // no white bar above it. Vertical overflow (if the source aspect doesn't
           // match the box) is cropped from the bottom only — keeps heads intact.
@@ -731,8 +787,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
 
       if (backCoverImageData && frontCoverImageData) {
-        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
+        const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
 
         // Extend cover images into outer + top + bottom bleed; stop at the spine edge
         const backImgX = 0;
@@ -747,8 +803,14 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
         // Scale-to-fill so covers reach the page edges (no white bars). The
         // small symmetric crop on the long axis is acceptable for cover art.
-        await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
-        await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
+        if (backCoverBuffer) {
+          try { await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 back cover render failed: ${err.message}`); }
+        }
+        if (frontCoverBuffer) {
+          try { await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 front cover render failed: ${err.message}`); }
+        }
       }
 
       // Blank left page (required by Gelato - left side of first spread)
@@ -759,8 +821,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
-        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+        const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
+        if (initialPageBuffer) {
+          try { await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 initial page render failed: ${err.message}`); }
+        }
       }
 
       await addStoryContentPages(storyData, storyPages);
@@ -778,8 +843,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       totalStoryPages++;
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
-        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+        const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
+        if (frontCoverBuffer) {
+          try { await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} front cover render failed: ${err.message}`); }
+        }
       }
 
       // Dedication/initial page (RIGHT) — same side as story 1's dedication
@@ -787,8 +855,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       totalStoryPages++;
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       if (initialPageImageData) {
-        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+        const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
+        if (initialPageBuffer) {
+          try { await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} initial page render failed: ${err.message}`); }
+        }
       }
 
       await addStoryContentPages(storyData, storyPages);
@@ -800,8 +871,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (backCoverImageData) {
         doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
-        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
+        const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
+        if (backCoverBuffer) {
+          try { await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} back cover render failed: ${err.message}`); }
+        }
 
         // Blank separator after back cover (if not last story)
         if (storyIndex < stories.length - 1) {
@@ -885,7 +959,8 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   if (frontCoverImageData) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
-      const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
+      if (!frontCoverBuffer) throw new Error('front cover unresolvable');
       // Scale-to-fill so the cover reaches the page edges with no white bars.
       await drawImageCovering(doc, frontCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
@@ -898,7 +973,8 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   if (initialPageImageData) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
-      const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
+      if (!initialPageBuffer) throw new Error('initial page unresolvable');
       await drawImageCovering(doc, initialPageBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding initial page:', err.message);
@@ -940,7 +1016,8 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   if (backCoverImageData) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
-      const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
+      if (!backCoverBuffer) throw new Error('back cover unresolvable');
       await drawImageCovering(doc, backCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding back cover:', err.message);
