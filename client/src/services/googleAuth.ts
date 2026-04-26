@@ -102,14 +102,19 @@ export async function googleSignOut(): Promise<void> {
 }
 
 // =====================================================================
-// Legacy popup-based sign-in — Google Identity Services
+// Popup-mode auth-code sign-in — for trial-link / claim-account
 // =====================================================================
-// Kept for the trial-link / claim-account flows which bundle the idToken
-// with another bearer token in a single API call. Not used for primary
-// sign-in (which uses the redirect flow above to avoid iOS Safari issues).
+// These two flows need an idToken bundled with another bearer token in a
+// single server POST, so they can't use the full-page redirect flow.
 //
-// Migrate trial flows to the redirect flow when iOS Safari sign-in
-// failures show up in support reports.
+// We use `accounts.oauth2.initCodeClient({ ux_mode: 'popup' })`: opens a
+// real OS popup (not an iframe), Google posts an auth code back via
+// postMessage with redirect_uri='postmessage'. Immune to Safari ITP and
+// device-prompt 2FA — there's no cross-window iframe storage involved.
+//
+// The client posts the code to /api/auth/google/exchange-code; the server
+// exchanges it for an id_token (using GOOGLE_OAUTH_CLIENT_SECRET) and
+// returns it. The trial endpoints continue to accept idToken unchanged.
 // =====================================================================
 
 const POPUP_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
@@ -118,18 +123,14 @@ declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (config: {
+        oauth2: {
+          initCodeClient: (config: {
             client_id: string;
-            callback: (response: { credential: string }) => void;
-            auto_select?: boolean;
-            cancel_on_tap_outside?: boolean;
+            scope: string;
             ux_mode?: 'popup' | 'redirect';
-            use_fedcm_for_prompt?: boolean;
-          }) => void;
-          prompt: () => void;
-          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
-          disableAutoSelect: () => void;
+            redirect_uri?: string;
+            callback: (response: { code?: string; error?: string }) => void;
+          }) => { requestCode: () => void };
         };
       };
     };
@@ -140,7 +141,7 @@ let gisScriptLoaded: Promise<void> | null = null;
 
 function loadGisScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('SSR'));
-  if (window.google?.accounts?.id) return Promise.resolve();
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
   if (gisScriptLoaded) return gisScriptLoaded;
   gisScriptLoaded = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
@@ -161,52 +162,52 @@ function loadGisScript(): Promise<void> {
 }
 
 /**
- * Popup-based Google sign-in — returns an ID token directly.
- * Used by trial-link and claim-account flows that need to bundle the
- * idToken with another bearer token in a single server call.
- *
- * Caveat: stalls on iOS Safari with device-prompt 2FA. Fine for the
- * trial flows because trial users are usually new accounts without
- * 2FA enrolled, but consider migrating these flows to the redirect
- * flow if iOS Safari failures surface.
+ * Popup-mode Google sign-in for trial-link / claim-account.
+ * Returns an ID token after a server-side code exchange.
  */
 export async function signInWithGooglePopup(): Promise<{ idToken: string }> {
   if (!POPUP_CLIENT_ID) {
     throw new Error('VITE_GOOGLE_OAUTH_CLIENT_ID is not set — Google sign-in cannot work.');
   }
   await loadGisScript();
-  if (!window.google?.accounts?.id) {
+  if (!window.google?.accounts?.oauth2) {
     throw new Error('Google Identity Services failed to initialise.');
   }
 
-  return new Promise<{ idToken: string }>((resolve, reject) => {
+  const code = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Sign-in cancelled or timed out')), 5 * 60 * 1000);
     try {
-      window.google!.accounts.id.initialize({
+      const client = window.google!.accounts.oauth2.initCodeClient({
         client_id: POPUP_CLIENT_ID,
+        scope: 'openid email profile',
+        ux_mode: 'popup',
+        redirect_uri: 'postmessage',
         callback: (response) => {
           clearTimeout(timeout);
-          if (!response.credential) { reject(new Error('No credential returned from Google')); return; }
-          resolve({ idToken: response.credential });
+          if (response.error || !response.code) {
+            reject(new Error(response.error || 'No code returned from Google'));
+            return;
+          }
+          resolve(response.code);
         },
-        auto_select: false,
-        cancel_on_tap_outside: false,
-        ux_mode: 'popup',
-        use_fedcm_for_prompt: true,
       });
-      const host = document.createElement('div');
-      host.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-1000px;left:-1000px';
-      document.body.appendChild(host);
-      window.google!.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large' });
-      requestAnimationFrame(() => {
-        const clickable = host.querySelector<HTMLElement>('div[role="button"], iframe');
-        if (clickable && 'click' in clickable) (clickable as HTMLElement).click();
-        else window.google!.accounts.id.prompt();
-        setTimeout(() => host.remove(), 30 * 1000);
-      });
+      client.requestCode();
     } catch (err) {
       clearTimeout(timeout);
       reject(err instanceof Error ? err : new Error('Google sign-in failed'));
     }
   });
+
+  const resp = await fetch(`${API_URL}/api/auth/google/exchange-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.error || `Code exchange failed (${resp.status})`);
+  }
+  const { idToken } = await resp.json();
+  if (!idToken) throw new Error('Server returned no idToken');
+  return { idToken };
 }

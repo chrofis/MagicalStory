@@ -571,6 +571,56 @@ router.get('/google/callback', authLimiter, async (req, res) => {
   }
 });
 
+// POST /api/auth/google/exchange-code
+//
+// Popup-mode auth-code exchange for the trial-link / claim-account flows.
+// The client opens a real popup via `accounts.oauth2.initCodeClient({ ux_mode: 'popup' })`
+// (no iframe, no third-party cookies — immune to Safari ITP and device-prompt 2FA).
+// Google posts an auth code back to the parent window via postMessage with
+// redirect_uri='postmessage'. The client POSTs that code here; we exchange it
+// server-side using GOOGLE_OAUTH_CLIENT_SECRET and return the verified id_token.
+// The trial endpoints continue to accept idToken unchanged.
+router.post('/google/exchange-code', authLimiter, async (req, res) => {
+  try {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
+      return res.status(503).json({ error: 'Google OAuth not configured on server' });
+    }
+    const { code } = req.body || {};
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ error: 'code required' });
+    }
+
+    const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_OAUTH_CLIENT_SECRET,
+        redirect_uri: 'postmessage',
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+    if (!tokenResp.ok) {
+      const body = await tokenResp.text();
+      log.error(`Google popup code exchange failed: ${tokenResp.status} ${body.slice(0, 200)}`);
+      return res.status(400).json({ error: 'token_exchange_failed' });
+    }
+    const tokens = await tokenResp.json();
+    const idToken = tokens.id_token;
+    if (!idToken) return res.status(400).json({ error: 'no_id_token' });
+
+    // Verify so the caller can trust the idToken before bundling it into
+    // the trial-link / claim-account POST.
+    await googleAuthClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+
+    return res.json({ idToken });
+  } catch (err) {
+    log.error('Google popup code exchange error:', { code: err.code, message: err.message });
+    return res.status(500).json({ error: 'exchange_exception' });
+  }
+});
+
 // POST /api/auth/reset-password - Request password reset
 router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {
