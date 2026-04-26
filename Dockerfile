@@ -1,3 +1,10 @@
+# BuildKit parser directive — silence the SecretsUsedInArgOrEnv warning for
+# the VITE_* ARGs below. They are public frontend keys (Turnstile site key,
+# API URL, Google OAuth client ID), not secrets — safe to bake into the
+# client bundle. This directive must sit before any instruction; an inline
+# `# check=skip=` next to the ARG itself doesn't work.
+# check=skip=SecretsUsedInArgOrEnv
+
 # Use Node.js 18 base image with Python pre-installed
 FROM node:18
 
@@ -31,10 +38,11 @@ RUN cd client && npm install
 # Copy all application files
 COPY . .
 
-# Pass VITE_ env vars as build args so they're baked into the frontend bundle
-# (these are public frontend keys, not secrets — safe to use in ARG)
+# Pass VITE_ env vars as build args so they're baked into the frontend bundle.
+# These are public frontend keys (Turnstile site key, API URL, Google OAuth
+# client ID) — not secrets. The `# check=skip=SecretsUsedInArgOrEnv` parser
+# directive at the top of this file silences BuildKit's warning about them.
 # hadolint ignore=DL3028
-# check=skip=SecretsUsedInArgOrEnv
 ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
 ARG VITE_GOOGLE_OAUTH_CLIENT_ID
