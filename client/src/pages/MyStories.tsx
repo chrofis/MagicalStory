@@ -356,7 +356,13 @@ export default function MyStories() {
     }
   }, [stories]);
 
-  // Check for Stripe payment callback on page load
+  // Check for Stripe payment callback on page load.
+  // Stripe says "paid" the moment the customer's card is charged, but the
+  // actual book order goes to Gelato in a background webhook handler that
+  // can fail (PDF errors, invalid page count, etc.). We poll the order
+  // status until it settles to `completed` or `failed` so the user sees
+  // an honest message — not a green "will be printed" toast for an order
+  // that silently failed.
   useEffect(() => {
     const checkPaymentStatus = async () => {
       const paymentStatus = searchParams.get('payment');
@@ -365,58 +371,110 @@ export default function MyStories() {
       if (paymentStatus === 'success' && sessionId) {
         log.info('Payment successful! Checking order status...');
 
-        try {
-          const data = await storyService.getOrderStatus(sessionId);
-          log.info('Order Status:', data);
-
-          if (data.order) {
-            // Clear selection after successful purchase
-            setSelectedIds(new Set());
-            sessionStorage.removeItem('mystories_selected');
-
-            const amount = `CHF ${(data.order.amount_total / 100).toFixed(2)}`;
-            const tokensCredited = data.order.tokens_credited || 0;
-            const titles = {
-              en: 'Payment Successful!',
-              de: 'Zahlung erfolgreich!',
-              fr: 'Paiement réussi!',
-            };
-            const messages = {
-              en: tokensCredited > 0
-                ? `Your book order has been received and will be printed soon. You earned ${tokensCredited} tokens!`
-                : 'Your book order has been received and will be printed soon.',
-              de: tokensCredited > 0
-                ? `Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt. Sie haben ${tokensCredited} Tokens erhalten!`
-                : 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
-              fr: tokensCredited > 0
-                ? `Votre commande de livre a été reçue et sera bientôt imprimée. Vous avez gagné ${tokensCredited} jetons!`
-                : 'Votre commande de livre a été reçue et sera bientôt imprimée.',
-            };
-            const details = [
-              `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : 'Customer'}: ${data.order.customer_name}`,
-              `Email: ${data.order.customer_email}`,
-              `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : 'Amount'}: ${amount}`,
-              ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : 'Tokens earned'}: ${tokensCredited}`] : []),
-              `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : 'Shipping to'}: ${data.order.shipping_name}`,
-              `${data.order.shipping_address_line1}`,
-              `${data.order.shipping_postal_code} ${data.order.shipping_city}`,
-              `${data.order.shipping_country}`,
-            ];
-            showSuccess(
-              messages[language as keyof typeof messages] || messages.en,
-              titles[language as keyof typeof titles] || titles.en,
-              details
-            );
-          }
-        } catch (error) {
-          log.error('Error checking order status:', error);
-        }
-
-        // Clean up URL parameters
+        // Clean up URL params right away so a refresh doesn't re-trigger.
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('payment');
         newParams.delete('session_id');
         setSearchParams(newParams, { replace: true });
+
+        // Initial honest message: payment received, processing.
+        const processingTitles = {
+          en: 'Payment received', de: 'Zahlung erhalten', fr: 'Paiement reçu',
+        };
+        const processingMessages = {
+          en: 'We received your payment and are processing your book order. You will get an email confirmation as soon as it is sent to print.',
+          de: 'Wir haben Ihre Zahlung erhalten und bearbeiten Ihre Buchbestellung. Sobald sie in den Druck geht, erhalten Sie eine Bestätigung per E-Mail.',
+          fr: 'Nous avons reçu votre paiement et traitons votre commande de livre. Vous recevrez un e-mail de confirmation dès qu’elle sera envoyée à l’impression.',
+        };
+        showInfo(
+          processingMessages[language as keyof typeof processingMessages] || processingMessages.en,
+          processingTitles[language as keyof typeof processingTitles] || processingTitles.en,
+        );
+
+        // Clear selection after successful purchase.
+        setSelectedIds(new Set());
+        sessionStorage.removeItem('mystories_selected');
+
+        // Poll: every 5s for up to 2 minutes (24 attempts).
+        const POLL_INTERVAL_MS = 5000;
+        const MAX_ATTEMPTS = 24;
+        let attempt = 0;
+        let finalData: Awaited<ReturnType<typeof storyService.getOrderStatus>> | null = null;
+        while (attempt < MAX_ATTEMPTS) {
+          attempt++;
+          try {
+            const data = await storyService.getOrderStatus(sessionId);
+            log.info(`Order Status (attempt ${attempt}/${MAX_ATTEMPTS}):`, data?.status);
+            const status = (data as any)?.status;
+            if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+              finalData = data;
+              break;
+            }
+          } catch (error) {
+            log.error('Error checking order status:', error);
+          }
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        }
+
+        if (!finalData) {
+          // Polled out — keep the processing message in place; the user will
+          // also receive an email when the background job settles.
+          log.warn('Order status did not settle within poll window; leaving processing message.');
+          return;
+        }
+
+        const status = (finalData as any)?.status;
+        if (status === 'failed' || status === 'cancelled') {
+          const failedTitles = {
+            en: 'Order could not be placed',
+            de: 'Bestellung konnte nicht aufgegeben werden',
+            fr: 'La commande n’a pas pu être passée',
+          };
+          const failedMessages = {
+            en: 'Your payment went through but we could not finalize the print order. Our team has been alerted and will refund or retry on your behalf — you will receive an email shortly. If you do not hear from us within a day, reply to your payment receipt.',
+            de: 'Ihre Zahlung ging durch, aber wir konnten den Druckauftrag nicht abschliessen. Unser Team wurde benachrichtigt und wird Ihnen das Geld zurückerstatten oder es erneut versuchen — Sie erhalten in Kürze eine E-Mail. Falls Sie innerhalb eines Tages nichts von uns hören, antworten Sie bitte auf Ihre Zahlungsquittung.',
+            fr: 'Votre paiement a abouti mais nous n’avons pas pu finaliser la commande d’impression. Notre équipe a été alertée et procédera à un remboursement ou réessayera — vous recevrez un e-mail sous peu. Si vous n’avez pas de nouvelles dans la journée, répondez à votre reçu de paiement.',
+          };
+          showError(
+            failedMessages[language as keyof typeof failedMessages] || failedMessages.en,
+            failedTitles[language as keyof typeof failedTitles] || failedTitles.en,
+          );
+          return;
+        }
+
+        if (status === 'completed' && finalData.order) {
+          const amount = `CHF ${(finalData.order.amount_total / 100).toFixed(2)}`;
+          const tokensCredited = finalData.order.tokens_credited || 0;
+          const titles = {
+            en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée!',
+          };
+          const messages = {
+            en: tokensCredited > 0
+              ? `Your book has been sent to print. You earned ${tokensCredited} tokens!`
+              : 'Your book has been sent to print.',
+            de: tokensCredited > 0
+              ? `Ihr Buch wurde zum Druck geschickt. Sie haben ${tokensCredited} Tokens erhalten!`
+              : 'Ihr Buch wurde zum Druck geschickt.',
+            fr: tokensCredited > 0
+              ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} jetons!`
+              : 'Votre livre a été envoyé à l’impression.',
+          };
+          const details = [
+            `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : 'Customer'}: ${finalData.order.customer_name}`,
+            `Email: ${finalData.order.customer_email}`,
+            `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : 'Amount'}: ${amount}`,
+            ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : 'Tokens earned'}: ${tokensCredited}`] : []),
+            `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : 'Shipping to'}: ${finalData.order.shipping_name}`,
+            `${finalData.order.shipping_address_line1}`,
+            `${finalData.order.shipping_postal_code} ${finalData.order.shipping_city}`,
+            `${finalData.order.shipping_country}`,
+          ];
+          showSuccess(
+            messages[language as keyof typeof messages] || messages.en,
+            titles[language as keyof typeof titles] || titles.en,
+            details
+          );
+        }
       } else if (paymentStatus === 'cancelled') {
         log.info('Payment cancelled by user');
         const messages = {
@@ -437,7 +495,7 @@ export default function MyStories() {
     };
 
     checkPaymentStatus();
-  }, [searchParams, setSearchParams, language, showSuccess, showInfo]);
+  }, [searchParams, setSearchParams, language, showSuccess, showInfo, showError]);
 
   const translations = {
     en: {

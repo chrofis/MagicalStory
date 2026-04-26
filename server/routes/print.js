@@ -1957,11 +1957,18 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
         );
 
         if (order.rows.length > 0) {
-          console.log(`✅ Order found in database (attempt ${attempt}):`, order.rows[0].id);
-          return res.json({
-            status: 'completed',
-            order: order.rows[0]
-          });
+          // Map the order row's payment_status into a UI status the frontend
+          // can branch on. Without this, a failed background Gelato call
+          // still presented as "completed" because we used to hardcode that
+          // string regardless of the row's actual state.
+          const row = order.rows[0];
+          const ps = (row.payment_status || '').toLowerCase();
+          let status = 'processing';
+          if (ps === 'completed' || ps === 'paid') status = 'completed';
+          else if (ps === 'failed' || ps === 'cancelled') status = ps;
+          else if (ps === 'pending' || ps === 'processing' || ps === '') status = 'processing';
+          console.log(`✅ Order found in database (attempt ${attempt}): id=${row.id}, payment_status=${ps}, ui_status=${status}`);
+          return res.json({ status, order: row });
         }
 
         if (attempt < maxRetries) {
