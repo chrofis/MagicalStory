@@ -889,7 +889,7 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct) {
   const surface = textZoneDescription && String(textZoneDescription).trim()
     ? String(textZoneDescription).trim()
     : 'a deep, saturated surface — dark sky, deep foliage, rich wall, saturated water, or dark ground';
-  return `**COMPOSITION — CALM TEXT ZONE:** The ${corner} of the image (roughly ${areaPct}) is reserved for white story text overlay. Render that area as: ${surface}. The zone must read as visually calm and continuous with the rest of the scene — same surface, gentle gradient, minimal texture, no characters, no sharp edges, no high-contrast detail. Saturated colour is fine and preferred (deep blue, dark green, rich brown, saturated cobblestone) — what matters is that white text would sit on it with good contrast. Do NOT paint a flat rectangle, a hard-edged colour block, a frame, a box, or pure-black/pure-white fill. No text, no labels, no placeholder.`;
+  return `**COMPOSITION — CALM ZONE:** The ${corner} of the image (roughly ${areaPct}) must read as visually calm and continuous with the rest of the scene. Render it as: ${surface} — same surface as its surroundings, gentle gradient, minimal texture, no characters, no sharp edges, no high-contrast detail. Saturated colour is preferred (deep blue, dark green, rich brown, saturated cobblestone). If a layout reference image is attached, the slightly darker grey region marks where this calm zone goes — paint that area as continuous scene material (sky, wall, water, foliage, ground), never as a flat panel, coloured block, rectangle, frame, or framed strip. No text, no labels, no placeholders, no pure-black or pure-white fill.`;
 }
 
 function extractSceneMetadata(sceneDescription) {

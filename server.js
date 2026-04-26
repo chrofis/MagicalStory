@@ -5378,6 +5378,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
           emptyScenePrompt: img.emptyScenePrompt || null,
+          emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
+            v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
+            v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
+            visionFeedback: sceneBackgrounds[img.pageNumber]?.visionFeedback || null,
+            retryPrompt: sceneBackgrounds[img.pageNumber]?.retryPrompt || null,
+          } : null),
+          emptySceneVbGrid: img.emptySceneVbGrid || sceneBackgrounds[img.pageNumber]?.emptySceneVbGrid || null,
           // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
           // dev-mode references panel can show the thumbnail of what was actually sent.
           textAreaMask: img.textAreaMask || sceneBackgrounds[img.pageNumber]?.textAreaMask || null,
@@ -5519,6 +5526,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
           emptyScenePrompt: img.emptyScenePrompt || null,
+          emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
+            v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
+            v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
+            visionFeedback: sceneBackgrounds[img.pageNumber]?.visionFeedback || null,
+            retryPrompt: sceneBackgrounds[img.pageNumber]?.retryPrompt || null,
+          } : null),
+          emptySceneVbGrid: img.emptySceneVbGrid || sceneBackgrounds[img.pageNumber]?.emptySceneVbGrid || null,
           // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
           // dev-mode references panel can show the thumbnail of what was actually sent.
           textAreaMask: img.textAreaMask || sceneBackgrounds[img.pageNumber]?.textAreaMask || null,

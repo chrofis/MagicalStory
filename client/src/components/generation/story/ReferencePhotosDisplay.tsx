@@ -263,9 +263,9 @@ export function ReferencePhotosDisplay({
             onClick={() => setLightboxImage(displayEmptySceneImage)}
           />
 
-          {/* QC comparison: V1 (failed) vs V2 (retry) */}
+          {/* QC comparison: V1 (failed) vs V2 (retry) — open by default since the retry is high-signal */}
           {emptySceneQc && (
-            <details className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <details open className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
               <summary className="cursor-pointer text-sm font-semibold text-amber-800 flex items-center gap-1.5">
                 ⚠️ {language === 'de' ? 'Szene-QC' : 'Scene QC'} — {emptySceneQc.v1Issues?.length || 0} {language === 'de' ? 'Probleme gefunden, neu generiert' : 'issues found, retried'}
               </summary>

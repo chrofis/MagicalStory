@@ -520,6 +520,10 @@ export default function StoryWizard() {
             grokRefImages: (devData as any).grokRefImages ?? (img as any).grokRefImages,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
             emptyScenePrompt: (devData as any).emptyScenePrompt ?? (img as any).emptyScenePrompt,
+            emptySceneQc: (devData as any).emptySceneQc ?? (img as any).emptySceneQc,
+            textAreaMask: (devData as any).textAreaMask ?? (img as any).textAreaMask,
+            emptySceneVbGrid: (devData as any).emptySceneVbGrid ?? (img as any).emptySceneVbGrid,
+            textCoverageReport: (devData as any).textCoverageReport ?? (img as any).textCoverageReport,
             hasEmptySceneImage: (devData as any).hasEmptySceneImage ?? (img as any).hasEmptySceneImage,
             // Merge per-version metadata into imageVersions
             // Match by versionIndex (DB version_index) instead of array position
