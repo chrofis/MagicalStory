@@ -17,6 +17,7 @@ Only deduct when the image fails on one of these axes:
 - **Object presence** — a declared Visual Bible object or landmark is missing.
 - **Anachronism** — an element appears that contradicts the setting era (clock tower in a medieval scene, smartphone in an 1800s scene, modern signage on a period building).
 - **Anatomy** — extra limbs, fused or melted fingers, missing hand, figure floating, body fused into furniture, eyes pointing different directions.
+- **Figure completeness** — a character drawn as a partial figure when the prompt expects the whole body in frame: floating head with no torso, body with no head, missing torso, transparent or ghostly limbs, half the figure fading into the background. Crops at the frame edge are fine; missing parts inside the frame are not.
 - **Face direction** — front-facing when prompt says back view, or vice versa.
 - **Half-frame placement** — character described "left" rendered in the right half (or vice versa).
 - **Rendered text** — any readable writing painted into the artwork that wasn't requested: captions, banners, signs on walls, book titles, decorative inscriptions, embroidered words, sky-writing, garbled letterforms. The story-text overlay is composited later by the renderer and is NOT in the input image.
@@ -80,6 +81,33 @@ For every figure in `figures[]` add:
 If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, matching severity (CRITICAL or MAJOR), and `description` including the character name and whether head is too large or too small.
 
 If the EXPECTED FIGURE PROPORTIONS block above is empty (no ratios provided), set `proportion_ok: true, proportion_issue: null` for every figure and skip the check entirely.
+
+---
+
+**STEP 2D: FIGURE COMPLETENESS CHECK**
+
+For every figure in `figures[]`, look at the actual rendering and judge whether the entire figure is present and cleanly drawn — not whether the framing crops it. Ask yourself: "If a real person were standing where this figure is, would the painting show all the parts that should be visible, painted as a coherent body?"
+
+Flag as a defect when you see:
+- A floating head with no torso underneath (cabinets, walls, or floor visible where the body should be).
+- A body / torso with no head (headless figure, head fades into background).
+- Missing torso, missing arm, missing leg inside the frame (not just cropped at the edge).
+- Ghostly, transparent, or half-erased body parts where you can see the background through them.
+- Body fused or melted into background (cabinets, walls, furniture continuing through where flesh should be).
+- Two overlapping versions of the same figure stacked on top of each other (double-exposure artifact).
+- Smudged or smeared region where a body part should be (clear blur defect, not stylistic softness).
+
+Do NOT flag when:
+- The figure is legitimately cropped by the frame edge (head visible, body extends below frame).
+- The figure is occluded by another character, furniture, or a held object (the hidden parts are behind something solid).
+- Back-view characters (no face is expected).
+- Stylistic loose brushwork that's clearly intentional and consistent with the rest of the artwork.
+
+For every figure in `figures[]` add:
+  `"figure_complete": true | false`
+  `"completeness_issue": null | "missing_head" | "missing_body" | "missing_torso" | "missing_limb" | "ghostly" | "fused_background" | "double_exposure" | "smeared_artifact"`
+
+If `figure_complete: false`, also add a `fixable_issues` entry with `type: "incomplete_figure"`, severity CRITICAL when a major part (head, torso) is missing or transparent and MAJOR for smaller artifacts (one missing limb, partial smear), and `description` naming the character and what's missing or wrong.
 
 ---
 
@@ -153,7 +181,7 @@ Note: Flag hands with 6+ fingers, fused/melted fingers, or missing hands as MAJO
 **STEP 5: SPATIAL & COMPOSITION VALIDATION**
 
 Check these issues:
-- Is a character completely facing the wrong direction? (back to camera when should face forward, or vice versa) = MAJOR
+- Is a character completely facing the wrong direction along the camera axis? (back to camera when should face forward, or vice versa — front/back only) = MAJOR. Do NOT flag left↔right body orientation here; that does not deduct.
 - Is a character on the wrong side of the scene? (prompt says left, rendered on right) = MODERATE
 - Is a key object/landmark entirely missing? = MAJOR
 - **CAMERA FACING**: If the prompt describes characters interacting with each other or with objects, but 3+ characters face the camera directly like a group photo instead = MAJOR (-2). Characters should face what they interact with, not the viewer.
@@ -163,6 +191,7 @@ DO NOT penalize:
 - Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
 - Precise hand positions or gestures
 - Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
+- Left↔right body facing direction. A character described as "facing left" but rendered facing right (or vice versa) is a mirror equivalent — both directions render the face and convey the same emotional beat. Do NOT deduct, even when this contradicts the declared interaction's direction.
 
 ---
 
@@ -209,7 +238,9 @@ Return JSON only (no other text):
       "view": "front",
       "items_held": ["stuffed toy"],
       "proportion_ok": true,
-      "proportion_issue": null
+      "proportion_issue": null,
+      "figure_complete": true,
+      "completeness_issue": null
     }
   ],
   "matches": [
