@@ -219,20 +219,28 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
         //   2. min == max — only that single count is valid.
         //   3. min < max — any EVEN count in [min, max] is valid (Gelato's
         //      A4 softcover ships every even number from 30 to 200, etc.).
+        // Hardcoded floor: Gelato's photobook SKUs never accept fewer than
+        //   30 interior pages (24-only is a separate inactive SKU). If the
+        //   DB row's min_pages is null or under 30, treat it as 30 — submitting
+        //   <30 always returns "Page count is invalid".
         let counts = matchingProduct.available_page_counts;
         if (typeof counts === 'string') {
           try { counts = JSON.parse(counts); } catch { counts = null; }
         }
-        const min = matchingProduct.min_pages || 0;
-        const max = matchingProduct.max_pages || 999;
+        const rawMin = matchingProduct.min_pages || 0;
+        const rawMax = matchingProduct.max_pages || 999;
+        const HARD_MIN = 30;  // any active photobook SKU min_pages should be >=30 (24-only is rare)
+        const min = Math.max(rawMin, HARD_MIN);
+        const max = rawMax >= HARD_MIN ? rawMax : 200;
+        log.info(`📦 [BACKGROUND] Product row: name=${matchingProduct.product_name}, raw_min=${rawMin}, raw_max=${rawMax}, counts=${JSON.stringify(counts)}, effective_min=${min}, effective_max=${max}, estimated=${estimatedPageCount}`);
         if (Array.isArray(counts) && counts.length > 0) {
           const sorted = counts.map(Number).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
           const snapped = sorted.find(n => n >= estimatedPageCount);
           snappedPageCount = snapped || sorted[sorted.length - 1];
-        } else if (min === max && min > 0) {
-          snappedPageCount = min;
+        } else if (rawMin > 0 && rawMin === rawMax) {
+          snappedPageCount = rawMin;
         } else {
-          // Any even count between min and max.
+          // Any even count in [min, max].
           snappedPageCount = Math.max(min, estimatedPageCount);
           if (snappedPageCount % 2 !== 0) snappedPageCount++;
           if (snappedPageCount > max) snappedPageCount = max;
