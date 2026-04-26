@@ -30,7 +30,11 @@ const { rehydrateStoryImages } = require('../services/database');
  * @returns {number} Page count that Gelato will accept.
  */
 function snapToValidPageCount(estimated, product) {
-  // 1. Discrete list wins.
+  // 1. Discrete list wins — but ONLY if it's compatible with the row's
+  //    range. If the list's max < min_pages or < estimated, the list is
+  //    inconsistent with the rest of the row (seen in production: a row
+  //    with min=30/max=200 had available_page_counts=[24] from a stale
+  //    sync). Ignore the list in that case and fall through to range rules.
   let counts = product.available_page_counts;
   if (typeof counts === 'string') {
     try { counts = JSON.parse(counts); } catch { counts = null; }
@@ -40,8 +44,13 @@ function snapToValidPageCount(estimated, product) {
       .map(Number)
       .filter((n) => Number.isFinite(n) && n > 0)
       .sort((a, b) => a - b);
-    if (sorted.length > 0) {
-      return sorted.find((n) => n >= estimated) ?? sorted[sorted.length - 1];
+    const listMax = sorted[sorted.length - 1];
+    const rowMin = product.min_pages || 0;
+    const listInconsistent = sorted.length === 0
+      || (listMax < estimated)
+      || (rowMin && listMax < rowMin);
+    if (!listInconsistent) {
+      return sorted.find((n) => n >= estimated) ?? listMax;
     }
   }
   // 2 & 3. Range rules.
@@ -49,7 +58,7 @@ function snapToValidPageCount(estimated, product) {
   const max = product.max_pages;
   if (!min || !max) {
     throw new Error(
-      `Product ${product.product_uid || '?'} has no available_page_counts and missing min/max (min=${min}, max=${max}); cannot determine a valid page count`
+      `Product ${product.product_uid || '?'} has no usable available_page_counts and missing min/max (min=${min}, max=${max}); cannot determine a valid page count`
     );
   }
   if (min === max) return min;

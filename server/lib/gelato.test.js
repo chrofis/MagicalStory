@@ -99,6 +99,32 @@ test('empty available_page_counts falls through to min/max', () => {
   assert.strictEqual(snapToValidPageCount(26, product), 30);
 });
 
+// Real production case: row has min=30 max=200 but available_page_counts=[24]
+// (corrupt sync). The list's max is below the row's min — should be ignored
+// and the range rules used instead.
+test('inconsistent list (max < row min): falls through to range rules', () => {
+  const product = {
+    product_uid: 'softcover-corrupt-list',
+    min_pages: 30,
+    max_pages: 200,
+    available_page_counts: [24],
+  };
+  assert.strictEqual(snapToValidPageCount(26, product), 30, 'ignores [24], falls to range, lifts 26 → 30');
+  assert.strictEqual(snapToValidPageCount(31, product), 32);
+  assert.strictEqual(snapToValidPageCount(60, product), 60);
+});
+
+// Same as above but list's max is also below estimated (still inconsistent).
+test('inconsistent list (max < estimated): falls through to range rules', () => {
+  const product = {
+    product_uid: 'softcover-corrupt-list-2',
+    min_pages: 30,
+    max_pages: 200,
+    available_page_counts: [24, 26, 28],
+  };
+  assert.strictEqual(snapToValidPageCount(50, product), 50, 'list capped below estimated, range used');
+});
+
 // Garbage in discrete list filtered out.
 test('discrete list with non-numeric entries filters them', () => {
   const product = {
