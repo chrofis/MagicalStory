@@ -96,6 +96,20 @@ test-*.jpg
 test_*.png
 test-scene*.jpg
 
+# Per-page debug images dropped in repo root by analysis scripts
+# (e.g. p2-v3.jpg, p10-debug.jpg, page3-debug.jpg, etc.)
+/p[0-9]*.jpg
+/p[0-9]*.png
+/page[0-9]*-debug*.jpg
+/page[0-9]*-debug*.png
+
+# Local scratchpad — analysis scripts, dump files, ad-hoc PDFs
+tmp/
+
+# Manual test artifacts (screenshots etc. dumped during testing)
+tests/manual/*.png
+tests/manual/*.jpg
+
 # Temp photos (debug/testing)
 temp_photos/
 
