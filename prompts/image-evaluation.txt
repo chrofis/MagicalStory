@@ -36,9 +36,9 @@ Start at 10. For each defect you find in the inspection steps below, deduct from
   - Smaller completeness defect (one missing limb inside frame, partial smear)
   - Proportion error 25-50% off
   - Character body overlaps/blends into a foreground object (table/desk/counter) as an obvious AI compositing artifact
+  - Key object or landmark named in the prompt entirely missing from the image
 - **MODERATE (-1)**:
-  - Minor clothing difference vs reference
-  - Key object missing (non-interaction object the prompt names but doesn't bind to a character)
+  - Minor clothing difference vs reference (small accent/trim difference, not full colour swap)
 - **MINOR (-0.5)**:
   - Small differences, minor finger anomalies
   - Character placed in the wrong half of the frame (left↔right swap)
