@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Mail, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
@@ -50,9 +50,7 @@ interface GenerationProgressProps {
   onCancel?: () => void;  // Callback when job is cancelled
   onMinimize?: () => void;  // Callback to minimize and continue in background
   characters?: Character[];  // Characters to show avatars from
-  isStalled?: boolean;  // Whether progress appears stalled
   pageCount?: number;  // Number of story pages (affects progress timing)
-  onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
   isImpersonating?: boolean;  // Whether admin is impersonating a user
 }
 
@@ -66,8 +64,6 @@ export function GenerationProgress({
   onCancel,
   onMinimize,
   characters = [],
-  isStalled = false,
-  onDismissStalled,
   isImpersonating = false,
   pageCount = 20,
 }: GenerationProgressProps) {
@@ -76,6 +72,20 @@ export function GenerationProgress({
   const isAdmin = user?.role === 'admin' || isImpersonating;
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
+
+  // After 60s of waiting, surface a persistent reassurance banner with the
+  // close-tab + email-on-completion message. Before 60s the same info still
+  // rotates through the tip carousel; after 60s it pins so the user has
+  // permission to walk away.
+  const [showCloseHint, setShowCloseHint] = useState(false);
+  useEffect(() => {
+    if (!isGenerating) {
+      setShowCloseHint(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowCloseHint(true), 60_000);
+    return () => clearTimeout(timer);
+  }, [isGenerating]);
 
   // 25 funny messages per character - uses {name} placeholder
   const funnyMessageTemplates = [
@@ -458,9 +468,7 @@ export function GenerationProgress({
       backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
-      stalled: 'Generation seems stuck',
-      stalledDesc: 'No progress for a while. This can happen due to high server load.',
-      continueWaiting: 'Keep Waiting',
+      canCloseTitle: 'You can close this tab',
       continueInBackground: 'Continue in Background',
     },
     de: {
@@ -483,9 +491,7 @@ export function GenerationProgress({
       backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
-      stalled: 'Generierung scheint hängen zu bleiben',
-      stalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
-      continueWaiting: 'Weiter warten',
+      canCloseTitle: 'Du kannst diesen Tab schliessen',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
@@ -508,9 +514,7 @@ export function GenerationProgress({
       backCover: 'Dos',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
-      stalled: 'La génération semble bloquée',
-      stalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
-      continueWaiting: 'Continuer à attendre',
+      canCloseTitle: 'Vous pouvez fermer cet onglet',
       continueInBackground: 'Continuer en arrière-plan',
     },
   };
@@ -649,21 +653,17 @@ export function GenerationProgress({
           </button>
         )}
 
-        {/* Stalled notice — muted, informational */}
-        {isStalled && (
-          <div className="mb-4 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+        {/* After 60s — gently surface the email + close-tab reassurance so
+            the user knows they can walk away. Calm, informational, no action
+            required. Replaces the old "stalled" warning which scared users
+            without offering recourse. */}
+        {showCloseHint && (
+          <div className="mb-4 border border-indigo-200 bg-indigo-50 rounded-xl p-4 flex items-start gap-3">
+            <Mail className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h4 className="font-medium text-gray-800 mb-1">{t.stalled}</h4>
-              <p className="text-sm text-gray-600 mb-3">{t.stalledDesc}</p>
-              {onDismissStalled && (
-                <button
-                  onClick={onDismissStalled}
-                  className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-                >
-                  {t.continueWaiting}
-                </button>
-              )}
+              <h4 className="font-medium text-gray-800 mb-1">{t.canCloseTitle}</h4>
+              <p className="text-sm text-gray-700">{t.canClose}</p>
+              <p className="text-sm text-gray-700 mt-1">{t.emailInfo}</p>
             </div>
           </div>
         )}

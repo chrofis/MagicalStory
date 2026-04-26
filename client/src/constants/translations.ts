@@ -166,14 +166,10 @@ export interface TranslationStrings {
   networkError: string;
   operationTimeout: string;
   failedGeneric: string;
-  // Generation timeout
-  generationStalled: string;
-  generationStalledDesc: string;
   // Impersonation
   impersonationViewingAs: string;
   impersonationStopViewing: string;
   impersonationStopping: string;
-  continueWaiting: string;
   cancelGeneration: string;
 }
 
@@ -346,14 +342,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     networkError: 'Network error. Please check your connection and try again.',
     operationTimeout: 'The operation timed out. Please try again.',
     failedGeneric: 'An error occurred. Please try again.',
-    // Generation timeout
-    generationStalled: 'Generation seems stuck',
-    generationStalledDesc: 'No progress for a while. This can happen due to high server load.',
     // Impersonation
     impersonationViewingAs: 'Viewing as',
     impersonationStopViewing: 'Stop viewing',
     impersonationStopping: 'Stopping...',
-    continueWaiting: 'Keep Waiting',
     cancelGeneration: 'Cancel',
   },
   de: {
@@ -524,14 +516,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     networkError: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
     operationTimeout: 'Die Anfrage ist abgelaufen. Bitte erneut versuchen.',
     failedGeneric: 'Ein Fehler ist aufgetreten. Bitte erneut versuchen.',
-    // Generation timeout
-    generationStalled: 'Generierung scheint hängen zu bleiben',
-    generationStalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
     // Impersonation
     impersonationViewingAs: 'Ansicht als',
     impersonationStopViewing: 'Ansicht beenden',
     impersonationStopping: 'Beenden...',
-    continueWaiting: 'Weiter warten',
     cancelGeneration: 'Abbrechen',
   },
   fr: {
@@ -702,14 +690,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     networkError: 'Erreur réseau. Veuillez vérifier votre connexion et réessayer.',
     operationTimeout: "L'opération a expiré. Veuillez réessayer.",
     failedGeneric: 'Une erreur est survenue. Veuillez réessayer.',
-    // Generation timeout
-    generationStalled: 'La génération semble bloquée',
-    generationStalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
     // Impersonation
     impersonationViewingAs: 'Vue en tant que',
     impersonationStopViewing: 'Arreter la vue',
     impersonationStopping: 'Arrêt...',
-    continueWaiting: 'Continuer à attendre',
     cancelGeneration: 'Annuler',
   },
 };
