@@ -418,6 +418,14 @@ function sanitizeInteractions(rawInteractions, characterNames) {
   if (!Array.isArray(rawInteractions)) return [];
   const charSet = new Set(characterNames || []);
   const isBareProperName = (s) => /^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]+$/.test(s);
+  // Composite-character syntax: "Manuel + Roger" means both characters jointly
+  // interact with one shared object (e.g. carrying one basket together).
+  // Without this, the structured interactions[] forced one row per character
+  // with the same object, which Grok rendered as N separate copies of the
+  // object. Splitting on " + " lets the entry stay a single row through to
+  // the EXACT POSES block while still validating that every named character
+  // is in the scene.
+  const splitComposite = (s) => s.split(/\s*\+\s*/).map(p => p.trim()).filter(Boolean);
   const kept = [];
   const dropped = [];
   for (const i of rawInteractions) {
@@ -425,8 +433,10 @@ function sanitizeInteractions(rawInteractions, characterNames) {
     const character = String(i.character).trim();
     const object = String(i.object).trim();
     const where = String(i.where || '').trim();
-    if (!charSet.has(character)) {
-      dropped.push(`${character}→${object} (actor absent)`);
+    const characterParts = splitComposite(character);
+    const missingPart = characterParts.find(p => !charSet.has(p));
+    if (characterParts.length === 0 || missingPart) {
+      dropped.push(`${character}→${object} (${missingPart ? `actor "${missingPart}" absent` : 'no actor'})`);
       continue;
     }
     if (isBareProperName(object) && !charSet.has(object)) {
@@ -1007,7 +1017,20 @@ function extractSceneMetadata(sceneDescription) {
       clothing: null,
       objects: objectIds,
       interactions: interactions.length > 0 ? interactions : null,
-      fullData: { characters: metadata.characters, objects: metadata.objects, interactions, imageSummary: prose },
+      // fullData carries the metadata fields downstream consumers expect.
+      // shot / setting / time / weather are added explicitly because the
+      // empty-scene SHOT prefix in server.js reads `fullData.shot` and was
+      // silently falling back to "wide shot" on every unified-mode page.
+      fullData: {
+        characters: metadata.characters,
+        objects: metadata.objects,
+        interactions,
+        imageSummary: prose,
+        shot: metadata.shot || null,
+        setting: metadata.setting || null,
+        time: metadata.time || null,
+        weather: metadata.weather || null,
+      },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
       imageSummary: prose,
