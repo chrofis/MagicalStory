@@ -284,35 +284,29 @@ Scale proportionally for longer/shorter stories. The plan ensures variety BEFORE
 - Generic dialogue that any character could say
 - Characters who all react the same way
 
-**BANNED GESTURES (AI clichés - NEVER use these):**
-- "Hand on shoulder" - COMPLETELY FORBIDDEN, not even once
-- "Ruffled hair" / "tousled hair"
-- "Patted on the back"
-- "Nodded knowingly" / "nodded wisely"
+## DO-NOT-WRITE LIST (canonical)
 
-**Instead, show support/connection through:**
-- Actions: standing closer, walking side by side, sharing food, helping with a task
-- Expressions: a warm smile, a wink, raised eyebrows, eyes lighting up
-- Fun gestures: fist bump, high five, thumbs up, silly salute, pinky promise
-- Body language: leaning in, sitting next to, making eye contact, a quick nudge
-- Each gesture may appear ONCE in the entire story - then use a different one
+These appear nowhere in the story text or scene prose. Forbidden at write time, not after — the analysis pass does NOT need to re-check them.
 
-**HUMOR (no jokes or puns):**
-- Do NOT include jokes, puns, or wordplay - AI humor isn't funny and puns don't translate
-- Instead create humor through: funny situations, silly reactions, absurd moments, physical comedy
-- Let the story be warm and entertaining without trying to be a comedian
+**Gestures (banned outright):** hand on shoulder, ruffled hair, tousled hair, patted on back, nodded knowingly, nodded wisely, arm around shoulders.
 
-**STORY OPENING (Page 1):**
-- Start in the middle of action or with a character doing something specific
-- NEVER open with weather descriptions ("It was a beautiful sunny day..."), waking up, or narrated backstory
-- The first sentence should hook the reader — something happens, someone speaks, a problem appears
-- Introduce the setting through the action, not before it
+**Phrases (banned outright):** "little did they know", "suddenly" / "plötzlich", "without warning", "it was a [adjective] day", "it was a dark and stormy night".
 
-**PLOT STRUCTURE — AVOID FORMULAS:**
-- Do NOT default to the "try-fail-try-succeed" formula (character tries, fails, tries again, succeeds)
-- Consider varied structures: mystery with clues, journey with discoveries, parallel storylines converging, time pressure, moral dilemma, or unexpected twist
-- The plot should surprise — if you can predict every beat, rewrite it
-- Avoid: gathering-the-team montages, training sequences, "believe in yourself" speeches as the solution
+**Page 1 openings (banned):** weather descriptions ("It was a beautiful sunny day…"), characters waking up, narrated backstory. Start mid-action — something happens, someone speaks, a problem appears.
+
+**Trait labels in story text (banned):** "she was brave", "he was shy", "she felt curious". Show the trait through action, dialogue, body language.
+
+**Aesthetic buzzwords (banned everywhere):** dramatic, ethereal, haunting, cinematic, breathtaking, stunning. They carry no visual or narrative information.
+
+**Humor (banned):** no jokes, puns, or wordplay — they don't translate and AI humor isn't funny. Use funny situations, silly reactions, absurd moments, physical comedy instead.
+
+**Plot formulas (banned):** the "try-fail-try-succeed" loop; gathering-the-team montages; training sequences; "believe in yourself" speeches as the resolution.
+
+**Gesture re-use cap:** every gesture (hug, smile, wink, shrug, nod, fist-bump, high-five, thumbs up, pinky promise, silly salute, leaning shoulder-to-shoulder) appears at most ONCE in the entire story. The second time, vary it.
+
+**Scene prose verbs (banned in SCENE blocks only — see line above on plain concrete verbs):** hovers, cradled, perched upon, rests gently against. Use plain concrete verbs: holds, sits on, reaches for, walks toward, gazes at.
+
+**Use instead — for support, connection, warmth:** standing closer, walking side by side, sharing food, helping with a task; warm smile, wink, raised eyebrows, eyes lighting up; fist bump, high five, thumbs up, silly salute, pinky promise; leaning in, sitting next to, making eye contact, a quick nudge.
 
 **PACING:**
 - Vary the rhythm: slow down for emotional moments, speed up for action
@@ -449,11 +443,9 @@ Probes (apply to every character):
 
 ---
 
-**E. CLICHÉ CHECK**
+**E. DO-NOT-WRITE LIST VERIFICATION**
 
-25. **Banned gestures** — Search the draft for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". Any hit is FORBIDDEN. Replace with a physical action with character-specific flavour (fist-bump, high-five, playful elbow nudge, head-butt for a pet, leaning shoulder-to-shoulder while walking).
-26. **Repeated gestures** — Any gesture (hug, smile, wink, shrug, nod) used more than once in the draft? Vary them. Name the duplicates.
-27. **Cliché phrases** — Any "little did they know", "suddenly", "plötzlich", "it was a dark and stormy night", "and then", "without warning"? Remove or replace with a concrete action.
+25. **Verification** — Confirm the draft honors the DO-NOT-WRITE LIST (banned gestures, banned phrases, banned trait labels, banned aesthetic buzzwords, gesture re-use cap, banned plot formulas, banned page-1 openings). If anything slipped in, name the page + the violating line and emit a fix in FIXES REQUIRED. If everything is clean, write `clean — verified DO-NOT-WRITE LIST honored.`
 
 ---
 
@@ -517,14 +509,19 @@ Based on the story draft, determine which clothing variants each character needs
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[story-theme items: badge, backpack, etc.]" },
-      "winter": { "used": true/false, "signature": "[cold weather additions]" },
-      "summer": { "used": true/false, "signature": "[warm weather items]" },
-      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
+      "standard": { "used": true/false, "signature": "[a worn item like 'red scarf' or 'scout vest with badges'; OMIT this field if no signature]" },
+      "winter": { "used": true/false, "signature": "[cold-weather additions; OMIT if not used]" },
+      "summer": { "used": true/false, "signature": "[warm-weather items; OMIT if not used]" },
+      "costumed": { "used": true/false, "costume": "[real costume name like 'wizard' or 'knight'; OMIT this field and set used:false if no costume]", "description": "[full outfit; OMIT if no costume]" }
     }
   }
 }
 ```
+
+**No placeholder strings.** Never write `"none"`, `"n/a"`, `"tbd"`, or empty `""` as a value. If the field doesn't apply, omit it. Examples:
+- Character has no signature in standard clothing → `"standard": { "used": true }` (omit `signature` entirely)
+- Story has no costumes → `"costumed": { "used": false }` (omit `costume` and `description` entirely)
+- Character doesn't appear in winter → `"winter": { "used": false }` (omit `signature`)
 
 **Brief example:**
 ```
@@ -556,7 +553,7 @@ METADATA:
 
 **D. SCENE HINTS:** all within limit ✓, plan compliance ✓, clothing ✓, action match ✓, depth ✓. Text-position parity ✓. No forbidden-side intrusion.
 
-**E. CLICHÉ:** banned gestures: none. Repeated gestures: "lächelte" on pages 2 and 9 — vary the second to a different expression. Cliché phrases: "plötzlich" on page 6 → replace.
+**E. DO-NOT-WRITE LIST VERIFICATION:** "lächelte" repeated on pages 2 and 9 (gesture re-use cap broken); "plötzlich" on page 6 (banned phrase). Banned gestures: none. Banned aesthetic buzzwords: none. Page-1 opening: clean.
 
 FIXES REQUIRED:
 - Page 3: no trigger for page 4's decision → add a rustling sound at the end.
@@ -576,7 +573,7 @@ FIXES REQUIRED:
 TITLE: Sophie's Snowy Surprise
 
 ---CLOTHING REQUIREMENTS---
-{ "clothingRequirements": { "Sophie": { "standard": { "used": true, "signature": "none" }, "winter": { "used": true, "signature": "red scarf" } } } }
+{ "clothingRequirements": { "Sophie": { "standard": { "used": true }, "winter": { "used": true, "signature": "red scarf" }, "costumed": { "used": false } } } }
 ```
 
 
