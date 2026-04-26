@@ -129,7 +129,7 @@ Then a single-line JSON object:
 
 **Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
 
-**Prop placement vs landmark:** when the scene includes a real landmark, every separate prop or scene-anchor object (pole, banner-pole, fountain, monument, signpost, market stall) is positioned RELATIVE to the landmark — "standing on the cobblestones in front of the tower's base", "in the open square ten paces left of the gate" — never an unanchored absolute like "pole at center background". Read the chosen variant's description to find the open zone (open square, open sky, open ground beside the structure) and place the prop there. Otherwise the image model resolves the collision by mounting the prop on the landmark's roof/wall.
+**Prop placement vs landmark.** When a separate prop shares a depth band with the landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot.
 
 ---
 

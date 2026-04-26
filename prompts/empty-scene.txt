@@ -11,7 +11,7 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
 Lighting must come from a consistent direction — all shadows point the same way.
 The ground, floor, or surface where characters would stand or sit must be clearly visible.
-When a landmark reference photo is provided, every separate prop or scene-anchor object (pole, banner, market stall, fountain, statue, sign) sits in OPEN SPACE in front of, beside, or away from the landmark — never mounted on, attached to, or overlapping the landmark's structure. A prop described as "at center background" goes in the open space at the back of the square/street/scene, NOT on the landmark even if the landmark also occupies the background.
+When a landmark reference photo is provided, separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
 The frame must leave enough physical space for characters to be composited into the scene naturally.
 For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
 Use the exact camera angle and perspective described above.
