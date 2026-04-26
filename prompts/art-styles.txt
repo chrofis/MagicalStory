@@ -19,7 +19,7 @@ comic: Classic American comic book art, heavy black ink lines, dynamic compositi
 
 manga: Traditional manga style, Japanese comic art, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition
 
-watercolor: Traditional watercolor painting, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors
+watercolor: Traditional watercolor painting, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background.
 
 oil: Classic oil painting style, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality art
 
