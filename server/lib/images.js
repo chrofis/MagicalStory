@@ -6450,6 +6450,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 output_tokens: repairResult.usage.outputTokens || 0
               }, 'unified_pipeline_char_fix', repairResult.usage.model);
             }
+
+            // Surface this per-character inpaint as its own version so the
+            // viewer can rewind through L → M → R and see which step degraded
+            // the page. Score is null — the eval only runs on the final
+            // composite (Step 6), and pick-best ignores unscored versions.
+            const versions = pageVersions.get(pageNumber);
+            if (versions) {
+              versions.push({
+                imageData: repairResult.imageData,
+                score: null,
+                source: `character-fix:${fix.charName}`,
+                modelId: `grok-imagine (${repairResult.method || 'unknown'})`,
+                grokRefImages: null,
+                inpaintInstruction: repairResult.debug?.prompt || null,
+                inpaintReferenceImages: [repairResult.debug?.avatarSent].filter(Boolean),
+              });
+            }
           }
         } catch (repairErr) {
           log.error(`❌ [UNIFIED PIPELINE] Character fix failed for ${fix.charName} on page ${pageNumber}: ${repairErr.message}`);
@@ -7608,6 +7625,26 @@ async function detectAddedBorder(inputBuffer, outputBuffer) {
   return outputBorder;
 }
 
+// Build action context from structured interactions[] for the named character.
+// Replaces the prose-name-slicing fallback that leaked the metadata JSON block
+// and other characters' clauses into per-character inpaint prompts.
+function buildCharActionContextFromInteractions(sceneDescription, charName) {
+  if (!sceneDescription || !charName) return '';
+  try {
+    const meta = getStoryHelpers().extractSceneMetadata(sceneDescription);
+    const interactions = meta?.fullData?.interactions || [];
+    const lower = charName.toLowerCase();
+    const lines = interactions
+      .filter(i => i?.character && i.character.toLowerCase() === lower)
+      .map(i => `- ${String(i.where || '').trim()} ${String(i.object || '').trim()}`.replace(/\s+/g, ' ').trim())
+      .filter(l => l.length > 2);
+    if (lines.length === 0) return '';
+    return `\n\n${charName} in this scene:\n${lines.join('\n')}`;
+  } catch {
+    return '';
+  }
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -7821,13 +7858,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       } catch (err) {
         // Fall back to text-based extraction
       }
-      // Fallback: search for character mentions in plain text if no structured data found
       if (!actionContext) {
-        const charNameLower = charName.toLowerCase();
-        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
-        if (lines.length > 0) {
-          actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
-        }
+        actionContext = buildCharActionContextFromInteractions(sceneDescription, charName);
       }
     }
 
@@ -8150,13 +8182,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
             actionContext = `\n\n${charName}'s state in this scene (preserve in the repaint):\n- ${parts.join('\n- ')}`;
           }
         }
-      } catch { /* fall through to text fallback */ }
+      } catch { /* fall through */ }
       if (!actionContext) {
-        const charNameLower = charName.toLowerCase();
-        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
-        if (lines.length > 0) {
-          actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
-        }
+        actionContext = buildCharActionContextFromInteractions(sceneDescription, charName);
       }
     }
 
@@ -8417,13 +8445,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
             actionContext = `\n\n${charName} in this scene (the repainted figure MUST match this exactly):\n- ${parts.join('\n- ')}`;
           }
         }
-      } catch { /* fall through to text fallback */ }
+      } catch { /* fall through */ }
       if (!actionContext) {
-        const lower = charName.toLowerCase();
-        const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(lower));
-        if (lines.length) {
-          actionContext = `\n\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
-        }
+        actionContext = buildCharActionContextFromInteractions(sceneDescription, charName);
       }
     }
 
