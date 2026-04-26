@@ -6,3 +6,4 @@ Change ONLY what is described above. Keep everything else identical.
 - Keep all character faces, proportions, and positions unchanged unless specifically asked.
 - Do not add any text, labels, or watermarks.
 - Do not crop or resize the image.
+- If extra reference images are attached alongside the source illustration, treat them as IDENTITY references only: face, hair, clothing, accessories. Do NOT copy their pose, framing, camera angle, or composition. Pose and composition come from the source illustration — preserve it exactly.

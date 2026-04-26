@@ -5430,27 +5430,13 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       .map((it, i) => `${i + 1}. ${it.text}`)
       .join('\n');
 
-    // Attach avatars for every character referenced in per_character_fixes
-    // — Grok needs a visual reference for appearance fixes. The avatar must
-    // match the character's CURRENT clothing on this page (e.g. costumed:superhero),
-    // not their unstyled base photo. Uses getStyledAvatarForClothing which
-    // resolves: styled+clothing → styled standard → base → face photo.
-    if (characters && consolidatedPlan.per_character_fixes?.length > 0) {
-      for (const pcf of consolidatedPlan.per_character_fixes) {
-        const charName = (pcf.characterName || '').toLowerCase();
-        if (!charName) continue;
-        const mainChar = characters.find(c => c.name?.toLowerCase() === charName);
-        if (!mainChar) continue;
-        const pageClothing = clothingFor(mainChar.name);
-        const avatar = getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
-        const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
-        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-          referenceImages.push(photoUrl);
-          referenceImageSources.push(`avatar:${mainChar.name}:${pageClothing}`);
-          log.info(`[INPAINT PAGE] Attaching ${pageClothing} avatar for ${mainChar.name} (Grok ref image, style=${artStyle || 'watercolor'})`);
-        }
-      }
-    }
+    // Note: avatars for per_character_fixes are NOT attached here. The figures
+    // are already in the page image — Grok edits in place. Attaching the
+    // standing-portrait avatar dragged Grok's pose toward the portrait
+    // (characters drifted to the wrong positions, gestures mutated). The
+    // page image is the best identity anchor for cosmetic fixes; avatars are
+    // still attached below for "missing" issues where the figure isn't in the
+    // page yet.
 
     log.info(`[INPAINT PAGE] Using consolidated plan: ${consolidatedPlan.per_character_fixes.length} per-char + scene=${consolidatedPlan.scene_fix?.severity || 'NONE'}, ${consolidatedPlan.dropped_issues?.length || 0} dropped`);
 
@@ -5532,7 +5518,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
-    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, artStyle, aspectRatio);
+    // No artStyle here — the source image already carries the style and Grok
+    // matches the surrounding pixels. Passing the resolved style descriptor
+    // duplicates information and, in practice, regressed inpaint quality
+    // versus the manual-repair path (which passes none).
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, null, aspectRatio);
     if (editResult?.imageData) {
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
