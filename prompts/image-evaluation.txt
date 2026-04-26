@@ -10,7 +10,44 @@ You are an Illustration QA Analyst for publishing. Evaluate the generated artwor
 
 ---
 
-**WHAT COUNTS AS A DEFECT**
+# §2 — HOW TO SCORE (single source of truth)
+
+Start at 10. For each defect you find in the inspection steps below, deduct from the table here. Every later section refers back to these severities — do not redefine them.
+
+- **CRITICAL (-3)**:
+  - Missing or wrong character; duplicate character (two figures matching same reference)
+  - Extra limbs (3 arms / 3 hands / extra legs); 3+ items in a single figure's `items_held`
+  - Figure floating in air; declared interaction object missing entirely
+  - Declared interaction object in a genuinely different category (`in pocket` drawn as large held plush; `on head` drawn `in hand`)
+  - Character fused into furniture / sunk into a surface
+  - Major figure part missing inside the frame: missing head, missing torso, transparent body
+  - Proportion error >50% off (head ≈ 1/3 body when expected 1:6)
+- **MAJOR (-2)**:
+  - Wrong clothing colour/type vs reference (blue shirt rendered red)
+  - Wrong hair colour vs reference
+  - Glasses missing when reference wears them, or added when reference doesn't
+  - Cross-eyes (eyes pointing different directions)
+  - Limbs detached, impossible physics, hand with 6+ fingers / fused / missing hand
+  - Held/carried object detached from its declared owner (toy that should be in pocket floats beside the character)
+  - Declared interaction object at wrong size (`tiny silhouette` rendered as a large held plush)
+  - Wrong front/back facing along the camera axis (back-view requested, character faces camera; or vice versa)
+  - 3+ characters facing camera like a group photo when prompt describes them interacting
+  - Unwanted text rendered into the artwork (caption, sign, banner, inscription, garbled letters)
+  - Smaller completeness defect (one missing limb inside frame, partial smear)
+  - Proportion error 25-50% off
+  - Character body overlaps/blends into a foreground object (table/desk/counter) as an obvious AI compositing artifact
+- **MODERATE (-1)**:
+  - Minor clothing difference vs reference
+  - Key object missing (non-interaction object the prompt names but doesn't bind to a character)
+- **MINOR (-0.5)**:
+  - Small differences, minor finger anomalies
+  - Character placed in the wrong half of the frame (left↔right swap)
+
+VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2).
+
+---
+
+# §3 — WHAT COUNTS AS A DEFECT
 
 Only deduct when the image fails on one of these axes:
 - **Character presence** — a declared character is absent, duplicated, or unrecognisable (face/hair/build clearly different from reference, or identities swapped between figures).
@@ -26,7 +63,26 @@ Everything else is stylistic flavor — descriptive intent for the image generat
 
 ---
 
-**STEP 1: FIGURE INVENTORY**
+# §4 — WHAT DOES NOT DEDUCT (single canonical list)
+
+The image is allowed to differ from the prompt in these ways. Do NOT lower the score for any of them.
+
+- Specific facial expressions not matching ("calm surprise" vs "curious" — image generators can't render fine expression deltas).
+- Precise hand positions or gestures.
+- Position correct half — only opposite-half placement is wrong (described left, rendered right, or vice versa).
+- Left↔right body facing direction. A character described as "facing left" but rendered facing right (or vice versa) is a mirror equivalent. The face still reads, the emotional beat survives. Do not deduct, even when this contradicts the declared interaction's direction.
+- Left/right mirror differences in interactions (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) — equivalent.
+- Hidden/occluded parts. Only flag VISIBLE errors.
+- Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street).
+- Stylistic loose brushwork that's clearly intentional and consistent with the rest of the artwork.
+- Pose details from prose not in DECLARED INTERACTIONS — "hands drawn in tight", "fingers curled", "chin tucked", "jaw set". Descriptive context only.
+- Back-view characters (no face is expected).
+
+---
+
+# §5 — INSPECTION STEPS
+
+## STEP 1: FIGURE INVENTORY
 
 For EACH figure in the generated image, note:
 - Zone: one of `left-foreground`, `center-foreground`, `right-foreground`, `left-midground`, `center-midground`, `right-midground`, `left-background`, `center-background`, `right-background`
@@ -38,19 +94,19 @@ For EACH figure in the generated image, note:
 
 ---
 
-**STEP 2: REFERENCE MATCHING**
+## STEP 2: REFERENCE MATCHING
 
 Match each figure to reference photos:
 - Which reference matches? (by name or index)
 - Hair match? Color and style
-- CLOTHING match? Colors, type, and style MUST match reference (MAJOR if wrong)
-- GLASSES: If a figure wears glasses in reference → MUST wear glasses in image (MAJOR if missing). If no glasses in reference → must NOT wear glasses (MAJOR if added).
+- CLOTHING match? Colors, type, and style MUST match reference (severity per §2)
+- GLASSES: If a figure wears glasses in reference → MUST wear glasses in image. If no glasses in reference → must NOT wear glasses. (severity per §2)
 
-Check for DUPLICATES: Two figures matching same reference = CRITICAL error
+Check for DUPLICATES: Two figures matching same reference → CRITICAL per §2.
 
 ---
 
-**STEP 2B: OBJECT/ANIMAL/LANDMARK MATCHING**
+## STEP 2B: OBJECT/ANIMAL/LANDMARK MATCHING
 
 If the prompt mentions animals, landmarks, vehicles, or notable objects:
 - Identify each in the generated image
@@ -59,15 +115,13 @@ If the prompt mentions animals, landmarks, vehicles, or notable objects:
 
 ---
 
-**STEP 2C: FIGURE PROPORTION CHECK**
+## STEP 2C: FIGURE PROPORTION CHECK
 
 {FIGURE_PROPORTIONS}
 
 For each figure, compare the rendered head-to-body ratio to the expected ratio above (head height divided by total visible body height).
 
-- CRITICAL: rendered ratio differs from expected by MORE than 50% (e.g. expected 1:6, rendered head ≈ 1/3 of body, OR expected 1:8, rendered head ≈ 1/4 of body).
-- MAJOR: rendered ratio differs by 25–50%.
-- Otherwise `proportion_ok: true`.
+Use §2 thresholds: >50% off → CRITICAL; 25–50% off → MAJOR; otherwise `proportion_ok: true`.
 
 **Skip this check** and set `proportion_ok: true, proportion_issue: "n/a — pose"` if the figure is:
 - sitting, kneeling, crouching, lying down
@@ -78,13 +132,13 @@ For every figure in `figures[]` add:
   `"proportion_ok": true | false`
   `"proportion_issue": null | "head too large" | "head too small" | "n/a — pose"`
 
-If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, matching severity (CRITICAL or MAJOR), and `description` including the character name and whether head is too large or too small.
+If `proportion_ok: false`, also add a `fixable_issues` entry with `type: "proportion"`, severity per §2, and `description` including the character name and whether head is too large or too small.
 
 If the EXPECTED FIGURE PROPORTIONS block above is empty (no ratios provided), set `proportion_ok: true, proportion_issue: null` for every figure and skip the check entirely.
 
 ---
 
-**STEP 2D: FIGURE COMPLETENESS CHECK**
+## STEP 2D: FIGURE COMPLETENESS CHECK
 
 For every figure in `figures[]`, look at the actual rendering and judge whether the entire figure is present and cleanly drawn — not whether the framing crops it. Ask yourself: "If a real person were standing where this figure is, would the painting show all the parts that should be visible, painted as a coherent body?"
 
@@ -107,122 +161,89 @@ For every figure in `figures[]` add:
   `"figure_complete": true | false`
   `"completeness_issue": null | "missing_head" | "missing_body" | "missing_torso" | "missing_limb" | "ghostly" | "fused_background" | "double_exposure" | "smeared_artifact"`
 
-If `figure_complete: false`, also add a `fixable_issues` entry with `type: "incomplete_figure"`, severity CRITICAL when a major part (head, torso) is missing or transparent and MAJOR for smaller artifacts (one missing limb, partial smear), and `description` naming the character and what's missing or wrong.
+If `figure_complete: false`, also add a `fixable_issues` entry with `type: "incomplete_figure"`, severity per §2 (CRITICAL when a major part — head, torso — is missing or transparent; MAJOR for smaller artifacts), and `description` naming the character and what's missing or wrong.
 
 ---
 
-**STEP 3: RENDERING & PHYSICS CHECK**
+## STEP 3: RENDERING & PHYSICS CHECK
 
-Check for AI artifacts and physics violations:
+Check for AI artifacts and physics violations.
 
-ANATOMY (Critical):
-- Extra limbs: THREE arms, third hand, extra legs = CRITICAL
-- 3+ items in `items_held` from STEP 1 = extra hand = CRITICAL
-- Limb attachment: Arms/legs properly connected to body
-- Head and body proportions: scored separately in STEP 2C (do not duplicate here)
+**ANATOMY:**
+- Extra limbs: THREE arms, third hand, extra legs (severity per §2).
+- 3+ items in `items_held` from STEP 1 = extra hand (severity per §2).
+- Limb attachment: Arms/legs properly connected to body.
+- Head and body proportions: scored separately in STEP 2C (do not duplicate here).
+- Hands with 6+ fingers, fused/melted fingers, or missing hands (severity per §2).
 
-PHYSICS & GRAVITY:
-- People/objects grounded (not floating in air unless flying)
-- Characters stand on the surface the prompt specifies (on island, not in water; on ground, not in lava). Wrong substrate = MAJOR, set `physics_ok: false`.
-- Weight and balance look natural
-- Objects held properly (not phasing through hands)
-- Shadows and lighting consistent
+**PHYSICS & GRAVITY:**
+- People/objects grounded (not floating in air unless flying).
+- Characters stand on the surface the prompt specifies (on island, not in water; on ground, not in lava). Wrong substrate (severity per §2), set `physics_ok: false`.
+- Weight and balance look natural.
+- Objects held properly (not phasing through hands).
+- Shadows and lighting consistent.
 
-CHARACTER-OBJECT SEPARATION:
-- Characters must be visually distinct from furniture and objects — never merged, sunk into, or clipped through surfaces. A character "at a table" must sit beside it with clear separation, not appear embedded inside or fused with the table surface = CRITICAL, set `physics_ok: false`.
-- If a character's body overlaps or blends into a foreground object (table, desk, counter) in a way that looks like an AI compositing artifact = MAJOR, set `physics_ok: false`.
+**CHARACTER-OBJECT SEPARATION:**
+- Characters must be visually distinct from furniture and objects — never merged, sunk into, or clipped through surfaces. A character "at a table" must sit beside it with clear separation, not appear embedded inside or fused with the table surface (severity per §2), set `physics_ok: false`.
+- If a character's body overlaps or blends into a foreground object (table, desk, counter) in a way that looks like an AI compositing artifact (severity per §2), set `physics_ok: false`.
 
-HELD & ATTACHED OBJECTS:
+**HELD & ATTACHED OBJECTS:**
 - If a character bullet says `holding: X` OR the Objects line binds an item to a character (`in X's pocket`, `in X's arms`, `held by X`, `on X's back`, `around X's neck`, `carried by X`), that item must be physically in contact with the named character in the image.
-- An item that should be held/carried/worn but appears floating separately from its declared owner = MAJOR, set `physics_ok: false`.
+- An item that should be held/carried/worn but appears floating separately from its declared owner (severity per §2), set `physics_ok: false`.
 - List every such mismatch in `rendering.issues` as `"<item> should be <held/in pocket/etc> with <character> but is detached/floating"` and add a `fixable_issues` entry with `type: physics`.
 
-DECLARED INTERACTIONS (from scene metadata — authoritative):
-- The DECLARED INTERACTIONS block above lists each character-to-object contact the scene requires: what, with whom, and where. Examples: "Eli in left jacket pocket as tiny silhouette", "rope gripped in both hands while climbing", "feet on third rung of ladder", "standing on the top step".
+**DECLARED INTERACTIONS** (from scene metadata — authoritative):
+- The DECLARED INTERACTIONS block at the top lists each character-to-object contact the scene requires: what, with whom, and where. Examples: "Eli in left jacket pocket as tiny silhouette", "rope gripped in both hands while climbing", "feet on third rung of ladder", "standing on the top step".
 - For EACH declared interaction, check the image:
-  1. Is the object visible AT ALL? If missing entirely → CRITICAL `physics_ok: false`.
+  1. Is the object visible AT ALL? If missing entirely → CRITICAL per §2, `physics_ok: false`.
   2. Is the object at the declared location relative to the character? (pocket vs hand vs floating vs on-back)
   3. Does the size match the description? ("tiny silhouette" must not render as a large held toy.)
-- Any interaction where the object is in the wrong place or missing = CRITICAL, set `physics_ok: false`, and add a `fixable_issues` entry with `type: physics` describing the mismatch.
-- Interaction checks use ONLY the DECLARED INTERACTIONS block above. Pose details mentioned in the scene prose but NOT listed in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked", "jaw set") are descriptive context only — do NOT deduct for them.
-- Left/right mirror differences (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) are equivalent and do NOT count as wrong placement.
-- Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street) are scene-appropriate and do NOT deduct.
+- Any interaction where the object is in the wrong place or missing → severity per §2, set `physics_ok: false`, and add a `fixable_issues` entry with `type: physics` describing the mismatch.
+- Interaction checks use ONLY the DECLARED INTERACTIONS block. See §4 for what NOT to deduct (prose pose details, mirror differences, populated-setting extras).
 - If DECLARED INTERACTIONS is empty, skip this sub-check entirely.
 
-OBJECT SCALE (everyday objects in the scene):
+**OBJECT SCALE** (everyday objects in the scene):
 - Any scene object that has a known real-world size (apple, cup, book, crossbow, arrow, bowl, hat, lantern, candle, key, coin, loaf of bread, sword) must render at a plausible size relative to the characters and ground around it.
 - Reference scales: apple ≈ fist-sized, cup/coffee mug ≈ palm-sized, book ≈ forearm-length, crossbow ≈ arm-length, arrow ≈ arm-length, lantern ≈ head-sized, bowl ≈ two-palms-wide, loaf ≈ forearm-length.
-- Flag when the rendered object is 2× or more its natural size relative to nearby characters: MAJOR, `type: "scale"`, and `description` naming the object + "rendered at ~Nx natural size".
+- Flag when the rendered object is 2× or more its natural size relative to nearby characters: severity per §2 (MAJOR), `type: "scale"`, and `description` naming the object + "rendered at ~Nx natural size".
 - Apply this whether or not the object is in DECLARED INTERACTIONS. Objects only need to be visible in the scene.
 - Skip when the object is explicitly sized in the prose ("a giant apple", "a miniature book") — honor the prose.
 
-RENDERED TEXT (model hallucination, common on atmospheric scenes):
-- Any readable text painted into the artwork that wasn't asked for = MAJOR, set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
+**RENDERED TEXT** (model hallucination, common on atmospheric scenes):
+- Any readable text painted into the artwork that wasn't asked for (severity per §2), set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
 - Story-text OVERLAY (the white-on-image story sentence shown via the calm zone) is composited AFTER generation by the renderer — it is NOT in the image you are evaluating. If you see text inside the image content itself, it's a defect.
-- Add a `fixable_issues` entry with `type: "rendered_text"`, `severity: "MAJOR"`, `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
+- Add a `fixable_issues` entry with `type: "rendered_text"`, severity per §2, `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
 
-FACES:
-- CROSS-EYES: Eyes should look in same direction (not crossed) = MAJOR if crossed
-- Features properly placed (eyes, nose, mouth)
-- No merged or duplicated faces
-- Expression appropriate for scene
+**FACES:**
+- CROSS-EYES: Eyes should look in same direction (not crossed) — severity per §2.
+- Features properly placed (eyes, nose, mouth).
+- No merged or duplicated faces.
+- Expression appropriate for scene.
 
-Note: Hidden/occluded parts are OK - only flag VISIBLE errors.
-Note: Flag hands with 6+ fingers, fused/melted fingers, or missing hands as MAJOR.
+Note: Hidden/occluded parts are OK — only flag VISIBLE errors (see §4).
 
 ---
 
-**STEP 4: SCENE CHECK**
+## STEP 4: SCENE CHECK
 
 - All requested characters present?
 - Style consistent across figures?
 - Scene matches the prompt description?
 
-**STEP 5: SPATIAL & COMPOSITION VALIDATION**
+---
 
-Check these issues:
-- Is a character completely facing the wrong direction along the camera axis? (back to camera when should face forward, or vice versa — front/back only) = MAJOR. Do NOT flag left↔right body orientation here; that does not deduct.
-- Is a character on the wrong side of the scene? (prompt says left, rendered on right) = MODERATE
-- Is a key object/landmark entirely missing? = MAJOR
-- **CAMERA FACING**: If the prompt describes characters interacting with each other or with objects, but 3+ characters face the camera directly like a group photo instead = MAJOR (-2). Characters should face what they interact with, not the viewer.
-- **BACK VIEW IGNORED**: If the prompt says a character is "seen from behind" / "back view" but they face the camera = MAJOR (-2)
+## STEP 5: SPATIAL & COMPOSITION VALIDATION
 
-DO NOT penalize:
-- Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
-- Precise hand positions or gestures
-- Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
-- Left↔right body facing direction. A character described as "facing left" but rendered facing right (or vice versa) is a mirror equivalent — both directions render the face and convey the same emotional beat. Do NOT deduct, even when this contradicts the declared interaction's direction.
+Check these issues (severities per §2):
+- Is a character completely facing the wrong direction along the camera axis? (back to camera when should face forward, or vice versa — front/back only). Do NOT flag left↔right body orientation here (see §4).
+- Is a character on the wrong side of the scene? (prompt says left, rendered on right) — MINOR, "wrong half".
+- Is a key object/landmark entirely missing? — MAJOR.
+- **CAMERA FACING**: If the prompt describes characters interacting with each other or with objects, but 3+ characters face the camera directly like a group photo instead — MAJOR. Characters should face what they interact with, not the viewer.
+- **BACK VIEW IGNORED**: If the prompt says a character is "seen from behind" / "back view" but they face the camera — MAJOR.
 
 ---
 
-**SCORING (0-10)**
-
-Start at 10. Deduct only for VISIBLE, OBJECTIVE errors:
-
-- CRITICAL (-3): Missing/wrong character, duplicate character, extra limbs (3 arms/hands), figure floating in air, declared interaction object missing OR in a genuinely different category (e.g. "in pocket" drawn as large held plush, "on head" drawn "in hand"). Left/right mirror differences (left vs right arm/hand/pocket) are equivalent and do NOT trigger CRITICAL.
-- MAJOR (-2):
-  - Cross-eyes (eyes looking different directions)
-  - Wrong clothing (completely different color/type than reference — e.g. blue shirt shown as red)
-  - Wrong hair (completely different color than reference)
-  - Unrecognizable character, limbs detached, impossible physics
-  - Held/carried object detached from its owner (e.g. toy that should be in pocket is floating beside the character)
-  - Declared interaction object drawn at wrong size (e.g. "tiny silhouette" rendered as a large held plush)
-  - 3+ characters face the camera like a group photo when prompt describes them interacting with each other or the scene
-  - Character shown front-facing when prompt says "back view" or "seen from behind", or vice versa
-  - Unwanted text rendered into the artwork (caption, sign, banner, inscription, garbled letters)
-- MODERATE (-1): Minor clothing difference, key object missing
-- MINOR (-0.5): Small differences, minor finger issues, character placed in the wrong half of the frame (left↔right swap)
-
-DO NOT deduct for:
-- Specific facial expressions not matching (image generators cannot render "calm surprise" vs "curious")
-- Precise hand positions or gestures
-- Position passes whenever the character is in the correct half of the frame. Only opposite-half placement (described left, rendered right or vice versa) is wrong.
-
-VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
-
----
-
-**OUTPUT FORMAT**
+# §6 — OUTPUT FORMAT
 
 Return JSON only (no other text):
 
@@ -305,31 +326,31 @@ Return JSON only (no other text):
 ```
 
 **RULES:**
-- Output ONLY JSON - no explanation
-- `matches.clothing_match`: false if clothing color/type differs from reference
-- `matches.hair_match`: false if hair color/style differs from reference
-- `matches.eyes_ok`: false if cross-eyed
+- Output ONLY JSON - no explanation.
+- `matches.clothing_match`: false if clothing color/type differs from reference.
+- `matches.hair_match`: false if hair color/style differs from reference.
+- `matches.eyes_ok`: false if cross-eyed.
 - `figures.items_held`: list each distinct object the figure holds. If 3+ items, set `rendering.extra_limbs` to true.
-- `rendering.extra_limbs`: true if THREE arms, third hand, extra legs detected, OR any figure has 3+ items in items_held
-- `rendering.cross_eyes`: true if any figure has eyes looking different directions
-- `rendering.physics_ok`: false if floating figures, impossible poses, detached limbs
-- `rendering.issues`: list specific problems (e.g., "figure on left has three arms", "figure in center holds 3 items so has extra hand")
+- `rendering.extra_limbs`: true if THREE arms, third hand, extra legs detected, OR any figure has 3+ items in items_held.
+- `rendering.cross_eyes`: true if any figure has eyes looking different directions.
+- `rendering.physics_ok`: false if floating figures, impossible poses, detached limbs, character-object fusion, or held object detached from declared owner.
+- `rendering.issues`: list specific problems (e.g., "figure on left has three arms", "figure in center holds 3 items so has extra hand").
 - `fixable_issues`: only if score < 9 and issues are fixable by inpainting. ONE entry per issue.
   - `character`: REQUIRED for any character-related issue. Use the EXACT character name from the reference list above (e.g. "Lukas", "Werner"). Only null for non-character issues (environment, background). NEVER leave null when a specific character is affected.
   - `description`: What is WRONG — ALWAYS use the character's name, NEVER describe them by appearance or position alone. GOOD: "Werner has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
-  - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
-  - `type`: face, limb, clothing, object, environment, physics, proportion
-  - `fix`: How to fix THIS EXACT issue described above (visual description only, NO character names — use position and appearance)
+  - `severity`: CRITICAL, MAJOR, MODERATE, MINOR (per §2).
+  - `type`: face, limb, clothing, object, environment, physics, proportion, incomplete_figure, scale, rendered_text.
+  - `fix`: How to fix THIS EXACT issue described above (visual description only, NO character names — use position and appearance).
   - CRITICAL: `description` and `fix` MUST refer to the SAME issue. If pants are wrong, fix the pants. If hair clips are missing, add hair clips. Never mix issues between entries.
-- Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting
-- Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration
-- `confidence`: 0.0-1.0 reference match confidence
-- `position`: left, center, or right (where the figure/object is in the image)
-- `hair`: describe hair color and style as seen in image
-- `clothing`: describe clothing as seen in image
-- `object_matches`: for animals, landmarks, vehicles, artifacts mentioned in prompt
-  - `reference`: name from prompt (e.g., "Fluffy the cat", "Eiffel Tower")
-  - `type`: animal, landmark, vehicle, artifact
-  - `position`: left, center, or right
-  - `appearance`: visual description as seen in image
-- `spatial.checks`: Only include if prompt mentions pointing, looking at, facing, or gesturing toward something
+- Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting.
+- Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration.
+- `confidence`: 0.0-1.0 reference match confidence.
+- `position`: left, center, or right (where the figure/object is in the image).
+- `hair`: describe hair color and style as seen in image.
+- `clothing`: describe clothing as seen in image.
+- `object_matches`: for animals, landmarks, vehicles, artifacts mentioned in prompt.
+  - `reference`: name from prompt (e.g., "Fluffy the cat", "Eiffel Tower").
+  - `type`: animal, landmark, vehicle, artifact.
+  - `position`: left, center, or right.
+  - `appearance`: visual description as seen in image.
+- `spatial.checks`: Only include if prompt mentions pointing, looking at, facing, or gesturing toward something.
