@@ -6155,6 +6155,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 source: `iterate-round-${round}`,
                 modelId: result.modelId,
                 grokRefImages: result.grokRefImages || null,
+                // Capture the iterate's actual image prompt — this is the
+                // feedback-augmented prompt that was sent to Grok (built in
+                // iteratePageCore line ~7250 + appended evaluation feedback at
+                // line ~7253). Without this, the persisted version at
+                // buildVersionEntry falls back to img.prompt (the ORIGINAL
+                // page prompt), which makes the dev panel + audit trail show
+                // the wrong text and hides whether feedback was actually
+                // appended.
+                prompt: result.imagePrompt || null,
+                description: result.newScene || null,
               };
             }
             return { pageNumber, imageData: null, error: 'iterate produced no result' };
@@ -6232,6 +6242,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             grokRefImages: repairResult.grokRefImages || null,
             inpaintInstruction: repairResult.inpaintInstruction || null,
             inpaintReferenceImages: repairResult.inpaintReferenceImages || null,
+            // Per-version prompt/description for iterate results — passes
+            // through to buildVersionEntry so dev panel shows what was
+            // actually sent to Grok, not the stale original page prompt.
+            prompt: repairResult.prompt || null,
+            description: repairResult.description || null,
             entityPenalty: getEntityPenalty(ev.pageNumber, currentEntityReport),
             evaluatedAt: new Date().toISOString(),
           });
@@ -6728,8 +6743,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       qualityReasoning: v.evaluation?.reasoning || null,
       fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
       bboxDetection: v.evaluation?.bboxDetection || null,
-      description: img.sceneDescription || null,
-      prompt: img.prompt || null,
+      // Prefer per-version prompt/description (iterate stores its own
+      // feedback-augmented prompt + new scene). Original generations and
+      // inpaints fall back to the page's prompt/description.
+      description: v.description || img.sceneDescription || null,
+      prompt: v.prompt || img.prompt || null,
       grokRefImages: v.grokRefImages || null,
       inpaintInstruction: v.inpaintInstruction || null,
       inpaintReferenceImages: v.inpaintReferenceImages || null,
