@@ -36,7 +36,35 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
 
 13. **One change per sentence.** If three things need fixing, write three short sentences. Don't merge them into a prose paragraph.
 
-14. **Fix instructions are short imperatives.** Each `fix_instruction` sentence is ≤15 words and starts with the verb (Rotate, Move, Replace, Tilt, Open, Close, Add, Remove). Banned: "to show X", "as if X", "with focus on X", "not engaged in X", "rather than X", "while maintaining X", any "-ing" descriptive clause hanging off the end. Grok cannot execute negations — write only the target state, not what to avoid. Adjectives like "slightly", "subtly", "gently" add no information; drop them.
+14. **Fix instructions go through draft → critique → final on the page.** Grok's inpaint is fragile — give it MORE than one atomic action and it ignores all of them, regenerates the masked region from scratch, and replaces unrelated characters and background. Field-tested: short single-action instructions land; multi-clause prose does not.
+
+For every `per_character_fixes[]` entry AND for `scene_fix.instruction` you MUST emit three fields, in this order:
+- `fix_draft`: your first attempt — full prose, all the detail you'd write naturally.
+- `fix_critique`: a HARSH one-paragraph critique of `fix_draft` against the rules below. Be brutal. Count the actions. Name every adverb. Flag every prepositional phrase that doesn't carry a fact. State which ONE action is highest-impact. If the draft is already minimal, write "Acceptable — already atomic, no critique needed." and skip to final.
+- `fix_instruction`: the FINAL trimmed instruction Grok actually receives. After applying the critique, this is what survives.
+
+Critique against:
+1. **One atomic action.** Body rotation OR hand placement OR gaze direction — never two glued together. If the draft chains actions with commas / "and" / "while", the critique flags this and final keeps only the highest-impact single action.
+2. **≤10 words.** Verb + subject + new state. Count them in the critique.
+3. **Starts with imperative verb.** Rotate, Move, Replace, Tilt, Open, Close, Add, Remove, Angle, Turn.
+4. **No adverbs.** "slightly", "subtly", "gently", "smoothly" — strip them in final.
+5. **No purposive / hypothetical clauses.** "to show X", "as if X", "so that Y", "while maintaining Z", "with focus on…" — strip them.
+6. **No negations.** Grok cannot execute "not facing camera". Write the desired direction.
+7. **No -ing hanger clauses.** "…, looking ahead and reaching forward" — drop them.
+
+Examples of the full draft → critique → final cycle:
+
+Draft: `"Rotate the body to face upper-left, shift weight forward onto the leading foot, place both hands on the iron railing to the right."`
+Critique: `"Three chained actions (rotate / shift weight / place hands), 28 words, contains 'forward' and 'leading' adverbials. Body rotation is the highest-impact change because it determines the figure's facing direction — hand placement and weight shift will follow naturally."`
+Final: `"Rotate the body to face upper-left."`
+
+Draft: `"Repaint Manuel so he faces upward while ascending behind Werner, with eyes looking up the stairs and one hand near the railing."`
+Critique: `"Two actions (face upward, hand on railing) plus an -ing clause and a purposive phrase. Facing direction is the higher-impact fix."`
+Final: `"Turn the boy so he faces upward."`
+
+Draft: `"Open the eyes wide."`
+Critique: `"Acceptable — already atomic, no critique needed."`
+Final: `"Open the eyes wide."`
 
 15. **Cap at 3 total fixes, hardest-hitting first.** Combined count of `per_character_fixes[]` entries plus `scene_fix.instruction` sentences must not exceed 3. When Grok is asked to fix more than 3 things, it typically fixes none of them — it fixates on one and leaves the rest. So pick the top 3 by severity and drop the rest.
    - Sort all issues by severity: CRITICAL > MAJOR > MODERATE > MINOR.
@@ -56,7 +84,9 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
       "issues": ["head facing camera instead of the stone"],
-      "fix_instruction": "Rotate the head and torso downward, eyes looking at the stone in the hands."
+      "fix_draft": "Rotate the head and torso downward, eyes looking at the stone in the hands.",
+      "fix_critique": "Two actions (rotate head/torso, redirect eyes) plus an -ing clause. Head rotation is highest-impact — eyes will follow.",
+      "fix_instruction": "Rotate the head down toward the hands."
     },
     {
       "characterName": "Roger",
@@ -64,12 +94,16 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
       "issues": ["face turned toward camera"],
-      "fix_instruction": "Angle the head over the boy's shoulder, tilting face down toward the stone."
+      "fix_draft": "Angle the head over the boy's shoulder, tilting face down toward the stone.",
+      "fix_critique": "Two actions (angle head, tilt face). Both describe head orientation — the first one already implies the second. Drop the tilt.",
+      "fix_instruction": "Angle the head over the boy's shoulder."
     }
   ],
   "scene_fix": {
     "severity": "MODERATE",
-    "instruction": "Add blue-golden glow to the stone in the boy's hands, casting light on his face and chest.",
+    "fix_draft": "Add blue-golden glow to the stone in the boy's hands, casting light on his face and chest.",
+    "fix_critique": "Two actions (add glow, cast light). The glow alone implies the lit face/chest — keep only the source.",
+    "instruction": "Add blue-golden glow to the stone in the boy's hands.",
     "preserve": ["character positions", "portal location", "cobblestone path"]
   },
   "dropped_issues": [
@@ -77,6 +111,8 @@ Your job: turn the raw feedback into a clean repair plan that an image-editing m
   ]
 }
 ```
+
+The downstream pipeline reads only `fix_instruction` (per-character) and `instruction` (scene_fix). The `fix_draft` and `fix_critique` fields exist purely to FORCE you to do the trimming on the page. If you skip them or leave `fix_instruction` identical to `fix_draft`, you have not done your job.
 
 Return `per_character_fixes: []` if no character-specific issues.
 Return `scene_fix: {"severity": "NONE", "instruction": "", "preserve": []}` if no scene issues.
