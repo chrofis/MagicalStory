@@ -9,6 +9,56 @@ const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
 const { rehydrateStoryImages } = require('../services/database');
 
 /**
+ * Snap an estimated page count to a value the given Gelato SKU accepts.
+ *
+ * Three rules, in priority order:
+ *   1. If the product has `available_page_counts` (discrete list, e.g.
+ *      `[24, 30, 40, ...]`), pick the smallest entry >= estimated. If
+ *      estimated exceeds the list's max, return the max.
+ *   2. If `min_pages === max_pages`, only that exact count is valid.
+ *   3. Otherwise treat the SKU as accepting any EVEN count in
+ *      `[min_pages, max_pages]`. Snap up to the next even number,
+ *      clamped to `max_pages`. If estimated < min, lift to min.
+ *
+ * Pure function — no I/O, no logging. Throws if min/max are missing
+ * and no discrete list is provided (we cannot infer a valid count).
+ *
+ * @param {number} estimated - Pages the PDF would have without padding.
+ * @param {{ min_pages: number|null, max_pages: number|null,
+ *           available_page_counts: number[]|string|null,
+ *           product_uid?: string }} product
+ * @returns {number} Page count that Gelato will accept.
+ */
+function snapToValidPageCount(estimated, product) {
+  // 1. Discrete list wins.
+  let counts = product.available_page_counts;
+  if (typeof counts === 'string') {
+    try { counts = JSON.parse(counts); } catch { counts = null; }
+  }
+  if (Array.isArray(counts) && counts.length > 0) {
+    const sorted = counts
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    if (sorted.length > 0) {
+      return sorted.find((n) => n >= estimated) ?? sorted[sorted.length - 1];
+    }
+  }
+  // 2 & 3. Range rules.
+  const min = product.min_pages;
+  const max = product.max_pages;
+  if (!min || !max) {
+    throw new Error(
+      `Product ${product.product_uid || '?'} has no available_page_counts and missing min/max (min=${min}, max=${max}); cannot determine a valid page count`
+    );
+  }
+  if (min === max) return min;
+  let n = Math.max(min, estimated);
+  if (n % 2 !== 0) n++;
+  return Math.min(n, max);
+}
+
+/**
  * Get cover dimensions from Gelato API including spine width
  *
  * @param {string} productUid - Gelato product UID
@@ -196,76 +246,41 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
     log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${storyContentPages} story content pages)`);
 
-    // Step 3a: Select product based on estimated page count.
-    // Gelato photobooks ship in discrete page counts (e.g. 24, 30, 40, ...).
-    // If the estimate is below the minimum or between two valid counts, snap
-    // up to the next allowed count and pad the PDF with blank pages so the
-    // submitted printPageCount matches an actually-orderable SKU.
+    // Step 3a: Find an active SKU matching format + coverType, then snap
+    // estimatedPageCount to a count that SKU actually accepts.
     const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
     let printProductUid = null;
     let snappedPageCount = estimatedPageCount;
     const productsResult = await dbPool.query(
-      'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
+      `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
+         FROM gelato_products
+        WHERE is_active = true
+          AND LOWER(product_uid) LIKE $1
+          AND LOWER(product_uid) LIKE $2
+        ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
       [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
     );
-    if (productsResult.rows.length > 0) {
-      const matchingProduct = productsResult.rows.find(p =>
-        estimatedPageCount <= (p.max_pages || 999)
-      );
-      if (matchingProduct) {
-        printProductUid = matchingProduct.product_uid;
-        // Snap to a count Gelato accepts. Logic per product type:
-        //   1. available_page_counts (discrete list, e.g. [24, 30, 40, ...]) — pick smallest >= estimated.
-        //   2. min == max — only that single count is valid.
-        //   3. min < max — any EVEN count in [min, max] is valid (Gelato's
-        //      A4 softcover ships every even number from 30 to 200, etc.).
-        // Hardcoded floor: Gelato's photobook SKUs never accept fewer than
-        //   30 interior pages (24-only is a separate inactive SKU). If the
-        //   DB row's min_pages is null or under 30, treat it as 30 — submitting
-        //   <30 always returns "Page count is invalid".
-        let counts = matchingProduct.available_page_counts;
-        if (typeof counts === 'string') {
-          try { counts = JSON.parse(counts); } catch { counts = null; }
-        }
-        const rawMin = matchingProduct.min_pages || 0;
-        const rawMax = matchingProduct.max_pages || 999;
-        const HARD_MIN = 30;  // any active photobook SKU min_pages should be >=30 (24-only is rare)
-        const min = Math.max(rawMin, HARD_MIN);
-        const max = rawMax >= HARD_MIN ? rawMax : 200;
-        log.info(`📦 [BACKGROUND] Product row: name=${matchingProduct.product_name}, raw_min=${rawMin}, raw_max=${rawMax}, counts=${JSON.stringify(counts)}, effective_min=${min}, effective_max=${max}, estimated=${estimatedPageCount}`);
-        if (Array.isArray(counts) && counts.length > 0) {
-          const sorted = counts.map(Number).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
-          const snapped = sorted.find(n => n >= estimatedPageCount);
-          snappedPageCount = snapped || sorted[sorted.length - 1];
-        } else if (rawMin > 0 && rawMin === rawMax) {
-          snappedPageCount = rawMin;
-        } else {
-          // Any even count in [min, max].
-          snappedPageCount = Math.max(min, estimatedPageCount);
-          if (snappedPageCount % 2 !== 0) snappedPageCount++;
-          if (snappedPageCount > max) snappedPageCount = max;
-        }
-        // Unconditional final clamp: regardless of how the snap arrived at a
-        // value, every photobook order must satisfy 30 <= pageCount <= 200
-        // and pageCount % 2 === 0. This catches DB rows with bad/missing
-        // min/max/available_page_counts that would otherwise let an invalid
-        // count through.
-        const beforeClamp = snappedPageCount;
-        if (snappedPageCount < 30) snappedPageCount = 30;
-        if (snappedPageCount > 200) snappedPageCount = 200;
-        if (snappedPageCount % 2 !== 0) snappedPageCount++;
-        if (snappedPageCount !== beforeClamp) {
-          log.warn(`⚠️ [BACKGROUND] Final clamp adjusted page count: ${beforeClamp} → ${snappedPageCount}`);
-        }
-        if (snappedPageCount !== estimatedPageCount) {
-          log.info(`📐 [BACKGROUND] Padding to ${snappedPageCount} pages (estimated ${estimatedPageCount}) for product ${matchingProduct.product_name}`);
-        }
-        log.debug(`📦 [BACKGROUND] Selected product: ${matchingProduct.product_name}`);
+    const matchingProduct = productsResult.rows.find(p =>
+      estimatedPageCount <= (p.max_pages || 999)
+    ) || productsResult.rows[0]; // fall back to any active SKU; snap will lift below min
+    if (matchingProduct) {
+      printProductUid = matchingProduct.product_uid;
+      try {
+        snappedPageCount = snapToValidPageCount(estimatedPageCount, matchingProduct);
+      } catch (err) {
+        // Bad/incomplete row data. Fail loud rather than guessing — Gelato
+        // will reject silently otherwise.
+        throw new Error(
+          `Cannot determine page count for product ${matchingProduct.product_uid}: ${err.message}. ` +
+          `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
+        );
       }
-    }
-    if (!printProductUid) {
+      if (snappedPageCount !== estimatedPageCount) {
+        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${matchingProduct.product_name}`);
+      }
+    } else {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      log.warn(`⚠️ [BACKGROUND] No product found for format=${bookFormat} (${formatPattern}), coverType=${coverType}, pages=${estimatedPageCount}. Using fallback GELATO_PHOTOBOOK_UID=${printProductUid}`);
+      log.warn(`⚠️ [BACKGROUND] No active product matches format=${bookFormat}, coverType=${coverType}. Using GELATO_PHOTOBOOK_UID=${printProductUid}`);
     }
 
     // Step 3b: Get cover dimensions from Gelato API
@@ -447,5 +462,6 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
 module.exports = {
   processBookOrder,
-  getCoverDimensions
+  getCoverDimensions,
+  snapToValidPageCount,
 };
