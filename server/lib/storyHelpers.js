@@ -4217,14 +4217,13 @@ function buildExactPosesBlock(interactions) {
     const who = (i.character || '').trim();
     const where = (i.where || '').trim();
     if (!who || !where) continue;
-    // Prefix with object name only when it adds info. Skip bare VB IDs (ART001,
-    // CHR002 …) — they look like noise next to natural-language `where` text.
-    const obj = (i.object || '').trim();
-    const isBareId = /^[A-Z]{3}\d{3}$/.test(obj);
-    const prefix = obj && !isBareId && !where.toLowerCase().includes(obj.toLowerCase())
-      ? `${obj}: `
-      : '';
-    lines.push(`- ${who}: ${prefix}${where}`);
+    // Per story-unified.txt schema: `where` is now a complete English
+    // sentence with the object's human name already embedded
+    // ("holds the stuffed elephant in lap"). No prefix glue needed.
+    // Older-story metadata may still have bare verb phrases like
+    // "holds in lap" — they pass through unchanged (object lost) but
+    // that's a one-time backward-compat acceptance.
+    lines.push(`- ${who}: ${where}`);
   }
   if (lines.length === 0) return '';
   return `EXACT POSES:\n${lines.join('\n')}`;
