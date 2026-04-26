@@ -408,7 +408,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 
-    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed);
+    await addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed);
   }
 
   // Gelato pageCount = interior pages only (dedication + story content).
@@ -569,7 +569,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
  * Add standard 2-page layout (text page + separate image page).
  * Used by the square format only — A4 portrait uses picture-book layout.
  */
-function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13, bleed = 0) {
+async function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13, bleed = 0) {
   const interiorW = pageWidth + 2 * bleed;
   const interiorH = pageHeight + 2 * bleed;
   // Text pages live on the LEFT of a spread, so the right edge is the gutter
@@ -581,7 +581,8 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
   const lineGap = -2;
   const paragraphGap = fontSize * 0.5;
 
-  storyPages.forEach((pageText, index) => {
+  for (let index = 0; index < storyPages.length; index++) {
+    const pageText = storyPages[index];
     const pageNumber = index + 1;
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
@@ -604,7 +605,7 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
         log.error('Error adding image to PDF:', imgErr);
       }
     }
-  });
+  }
 }
 
 /**
@@ -1008,7 +1009,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     const availableWidth = pageWidth - marginOuter - marginGutter;
     const availableHeight = (pageHeight - (marginY * 2)) * 0.9;
     const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 10, 'left');
-    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize);
+    await addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize);
   }
 
   // 4. BACK COVER (last page)
