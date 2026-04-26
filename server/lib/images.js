@@ -1623,7 +1623,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // fixable_issues[] is the structured contract; this function turns it
       // into a number by the published rubric and ignores the model's claim.
       // Model score is logged for visibility (audits when the two diverge).
-      const SEVERITY_PENALTY = { CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
+      const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
       const totalPenalty = fixableIssues.reduce(
         (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
         0
