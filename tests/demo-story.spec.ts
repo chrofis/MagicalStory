@@ -212,6 +212,21 @@ async function clickCreateCharacterButton(page: Page, isFirst: boolean) {
     return;
   }
 
+  // "Nur ein Charakter" / "Only one character" warning modal can appear if
+  // a stray Weiter click advanced the wizard with one character. Its
+  // "Weiteren Charakter erstellen" button both dismisses the modal AND
+  // opens the create flow — prefer it over the dashed card behind the modal.
+  const modalHeading = page.locator('text=/Nur ein Charakter|Only one character|Un seul personnage/i').first();
+  if (await modalHeading.isVisible({ timeout: 500 }).catch(() => false)) {
+    console.log(`    "Only one character" modal is up — clicking its Create Another`);
+    const modalCreate = page.locator('button').filter({ hasText: CREATE_ANOTHER_RE }).last();
+    await modalCreate.click().catch(() => {});
+    if (await waitForPhotoStep(page, 10000)) {
+      console.log(`    landed on photo step via modal-create-another`);
+      return;
+    }
+  }
+
   console.log(`    clicking "${isFirst ? 'Create First' : 'Create Another'}" character...`);
 
   const candidates: Array<{ label: string; loc: () => any }> = [];
@@ -542,12 +557,16 @@ async function isOnCharacterListNow(page: Page): Promise<boolean> {
   // Another button (has create-another text). The avatar-waiting screen ALSO
   // uses the "Charaktere & Rollen" header and a dashed placeholder, so we
   // must key off the text of the add-another button specifically — not just
-  // "any dashed element".
+  // "any dashed element". Timeouts at 3000ms (not 500ms): immediately after
+  // dismissing the avatar-wait screen the list re-renders asynchronously,
+  // and a 500ms race here causes the caller to fall through to clickAnyNext,
+  // which then clicks the wizard step-advance Weiter and triggers the
+  // "Nur ein Charakter" modal — blocking subsequent character creation.
   const listHeader = await page.locator('text=/Charaktere & Rollen|Characters & Roles|Personnages & Rôles/i').first()
-    .isVisible({ timeout: 500 }).catch(() => false);
+    .isVisible({ timeout: 3000 }).catch(() => false);
   if (!listHeader) return false;
   const createAnother = await page.locator('button').filter({ hasText: CREATE_ANOTHER_RE }).first()
-    .isVisible({ timeout: 500 }).catch(() => false);
+    .isVisible({ timeout: 3000 }).catch(() => false);
   return createAnother;
 }
 

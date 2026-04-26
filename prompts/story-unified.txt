@@ -235,7 +235,8 @@ A reader comparing SCENE and `emptyScenePrompt` side by side must see the same g
 - **BACK VIEW** — Character walking away from camera into a landscape. Use `"perspective": "back view"`.
 - **BIRD'S EYE** — Looking down at tiny characters in a large space. Use `"shot": "ultra-wide"`.
 - **REACTION CLOSE-UP** — Just the face filling the frame, strong emotion. 1 character only.
-- **DISTANCE SHOT** — Two characters far apart with empty space between them. One `"depth": "foreground"`, other `"depth": "background"`.
+- **DISTANCE SHOT** — Two characters far apart with empty space between them. Either pairing works: one `foreground` + one `background`, OR both `background` (tiny figures across an open square / field / hall — preferred for aiming, shooting, throwing, calling, watching across distance).
+- **For any beat where two characters interact across open distance (aim, shoot, throw, call, watch from afar), use DISTANCE SHOT — never two `foreground` characters left/right.**
 
 **Scene Types That DON'T WORK (avoid):**
 - 4+ named characters all facing the camera (group photo effect — AI makes them identical)
@@ -418,6 +419,7 @@ Probes (apply to every character):
 17. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
 18. **Action match** — Does each scene hint's action match what the page text narrates?
 19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
+19a. **Position phrase matches depth** — The depth word inside `position` (`foreground` / `midground` / `background`) MUST equal the separate `depth` field. Flag any character where they disagree, e.g. `Page 4: Roger position='far left foreground' but depth='background' → position='far left background'`.
 20. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
     - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
     - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
