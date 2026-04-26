@@ -6,13 +6,12 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {TEXT_AREA_INSTRUCTION}
 
-**ABOUT THE LAYOUT REFERENCE IMAGE:** The slightly darker grey region in the reference image marks the position of the text zone, nothing more. Paint that area as continuous scene material — sky, wall, water, foliage, or ground — never as a flat panel, coloured block, rectangle, or framed strip.
-
 **ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Use it for the landmark's shape, proportions, architecture, and camera angle only. Exclude any modern elements visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront windows with price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Match the era of the story setting — if the scene is medieval, fantasy, or historical, render the landmark as it would have looked then, without anachronisms.
 
 Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
 Lighting must come from a consistent direction — all shadows point the same way.
 The ground, floor, or surface where characters would stand or sit must be clearly visible.
+Any pole, post, mast, signpost, lamppost, banner-pole, gallows, or hat-on-pole stands rooted on the ground / cobblestones / floor with its base visible at ground level — never attached to a roof, balcony, wall-top, or floating in mid-air.
 The frame must leave enough physical space for characters to be composited into the scene naturally.
 For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
 Use the exact camera angle and perspective described above.
