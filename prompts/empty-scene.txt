@@ -15,6 +15,6 @@ Lighting must come from a consistent direction — all shadows point the same wa
 The ground, floor, or surface where characters would stand or sit must be clearly visible.
 The frame must leave enough physical space for characters to be composited into the scene naturally.
 For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
-Use the exact camera angle and perspective described above.
+Use the camera angle named in the **SHOT** line above. Do not change the framing.
 
 **ART STYLE:** {STYLE_DESCRIPTION}

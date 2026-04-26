@@ -4769,9 +4769,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const lighting = sceneMetadata?.setting?.lighting || '';
             const weather = sceneMetadata?.setting?.weather || '';
 
-            // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields
-            const emptySceneDesc = expandedEmptyPrompt
-              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`;
+            // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields.
+            // Prepend a **SHOT:** line — the template ends with "Use the exact camera angle and
+            // perspective described above" but Sonnet's emptyScenePrompt prose usually omits shot,
+            // so without this prefix the "above" reference is dead text and Grok picks its own
+            // angle (often disagreeing with the populated-page angle that uses the same background).
+            const shotForCamera = (sceneMetadata?.fullData?.shot || camera || '').trim();
+            const shotPrefix = shotForCamera ? `**SHOT:** ${shotForCamera}\n\n` : '';
+            const emptySceneDesc = shotPrefix + (expandedEmptyPrompt
+              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`);
 
             // Classify each character by depth AND lateral side so the empty scene leaves
             // room in the right band. "Leave space for 2 figures in the far background" is
@@ -4808,14 +4814,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               describe('fg', 'foreground');
               describe('mg', 'midground');
               describe('bg', 'far background');
-              characterSpace = `Leave open, uncluttered space for ${parts.join(' and ')}. Don't fill those areas with detail.`;
+              // Frame these bands as scene material that continues unbroken — NOT as
+              // "open space" or "leave room", which Grok reads as render-less and
+              // resolves with blank patches or half-finished building fragments.
+              // The figure will be composited on top later; until then the band must
+              // render as the scene's natural ground (cobblestones, grass, road,
+              // floor, sand — whichever the setting calls for).
+              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Render those bands as the scene's natural ground surface (cobblestones, grass, road, floor, sand — whatever the setting calls for) continuing through unbroken. Lighting and ground texture must continue across them. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
 
               // If any depth band needs both-sides placement, spell it out so Grok doesn't
               // wall the frame with buildings on left and right.
               const bothSides = ['fg', 'mg', 'bg'].find(d => buckets[d + 'Left'] > 0 && buckets[d + 'Right'] > 0);
               if (bothSides) {
                 const label = { fg: 'foreground', mg: 'midground', bg: 'far background' }[bothSides];
-                characterSpace += ` Keep the far-left and far-right ${label} open and flat — figures must be placeable at opposite sides of the frame without building walls or props blocking them.`;
+                characterSpace += ` Both the far-left and far-right ${label} render as flat continuous ground — no building walls, props, or barriers between the two sides.`;
               }
 
               // For close-up/medium shots, add explicit space guidance so the empty scene
