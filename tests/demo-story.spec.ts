@@ -911,27 +911,49 @@ test.describe('Demo Story Generation', () => {
     await expect(generateBtn).toBeVisible({ timeout: 10000 });
     await expect(generateBtn).toBeEnabled({ timeout: 10000 });
     console.log('Step 5: Triggering generation...');
+
+    // The wizard sets step=6 + isGenerating=true SYNCHRONOUSLY on click — the
+    // "Geschichte wird erstellt" heading appears before the POST even fires.
+    // So the heading alone is not proof the server got the request. We must
+    // actually wait for the create-story POST to come back successfully —
+    // otherwise the test exits, the browser closes, and the multi-MB request
+    // gets aborted in flight. (That's exactly what was happening: across
+    // 2026-04-24 → today, 13/14 demo runs left a registered user with zero
+    // story_jobs and zero stories.)
+    const createStoryResponse = page.waitForResponse(
+      (r) => r.url().includes('/api/jobs/create-story') && r.request().method() === 'POST',
+      { timeout: 60000 }
+    );
     await generateBtn.click();
 
-    // Critical: a click on Generate alone proves nothing — if the server
-    // rejects (e.g. 403 EMAIL_NOT_VERIFIED), the wizard surfaces a toast and
-    // the test would otherwise pass while no story job ever ran. Assert the
-    // progress modal "Geschichte wird erstellt" appears within 30s. If the
-    // toast fires instead, this fails loud.
-    const progressHeading = page.getByRole('heading', {
-      name: /geschichte wird erstellt|story is being created|histoire en cours/i,
-    }).first();
+    let resp;
     try {
-      await expect(progressHeading).toBeVisible({ timeout: 30000 });
-      console.log('  Generation modal visible — server accepted the job.');
+      resp = await createStoryResponse;
     } catch (err) {
-      // Look for any visible toast/error so the failure message is useful.
       const errToast = await page.locator('[role="alert"], .toast, [class*="error"]').first()
         .textContent({ timeout: 1500 }).catch(() => null);
       throw new Error(
-        `Generate clicked but no progress modal appeared within 30s — likely server rejected the job. ${errToast ? `Toast: "${errToast.trim()}"` : ''}`
+        `POST /api/jobs/create-story did not complete within 60s. ${errToast ? `Toast: "${errToast.trim()}"` : ''}`
       );
     }
+
+    if (!resp.ok()) {
+      const body = await resp.text().catch(() => '');
+      throw new Error(`POST /api/jobs/create-story → ${resp.status()}. Body: ${body.slice(0, 500)}`);
+    }
+    const respBody = await resp.json().catch(() => ({}));
+    if (!respBody.jobId) {
+      throw new Error(`Server accepted the request but did not return a jobId. Body: ${JSON.stringify(respBody).slice(0, 300)}`);
+    }
+    console.log(`  Server accepted job: ${respBody.jobId} (credits remaining: ${respBody.creditsRemaining ?? 'n/a'})`);
+
+    // Belt-and-braces: the modal heading should also be visible at this point.
+    const progressHeading = page.getByRole('heading', {
+      name: /geschichte wird erstellt|story is being created|histoire en cours/i,
+    }).first();
+    await expect(progressHeading).toBeVisible({ timeout: 5000 }).catch(() => {
+      console.log('  (note: progress modal not visible — UI may have moved on, but job is queued)');
+    });
 
     // ── Verification ──
     const criticalErrors = jsErrors.filter(e =>
