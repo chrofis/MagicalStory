@@ -214,18 +214,26 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       );
       if (matchingProduct) {
         printProductUid = matchingProduct.product_uid;
-        // Snap to the next available discrete count for this product.
+        // Snap to the next discrete count Gelato actually accepts. Source of
+        // truth (in priority order):
+        //   1. matchingProduct.available_page_counts (if synced)
+        //   2. hardcoded GELATO_PHOTOBOOK_PAGE_COUNTS (Gelato's standard
+        //      photobook discretization — same across A4/square/etc. SKUs)
+        // Without the hardcoded fallback, a row with min_pages=24 but no
+        // available_page_counts array would let 26 through, and Gelato
+        // rejects with "Page count is invalid".
+        const GELATO_PHOTOBOOK_PAGE_COUNTS = [24, 30, 40, 50, 60, 80, 100, 120, 150, 200];
         let counts = matchingProduct.available_page_counts;
         if (typeof counts === 'string') {
           try { counts = JSON.parse(counts); } catch { counts = null; }
         }
-        if (Array.isArray(counts) && counts.length > 0) {
-          const sorted = [...counts].map(Number).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
-          const snapped = sorted.find(n => n >= estimatedPageCount);
-          snappedPageCount = snapped || sorted[sorted.length - 1];
-        } else if (matchingProduct.min_pages && estimatedPageCount < matchingProduct.min_pages) {
-          snappedPageCount = matchingProduct.min_pages;
+        if (!Array.isArray(counts) || counts.length === 0) {
+          counts = GELATO_PHOTOBOOK_PAGE_COUNTS;
+          log.debug(`📦 [BACKGROUND] No available_page_counts on row; using hardcoded Gelato photobook list`);
         }
+        const sorted = counts.map(Number).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
+        const snapped = sorted.find(n => n >= estimatedPageCount);
+        snappedPageCount = snapped || sorted[sorted.length - 1];
         if (snappedPageCount % 2 !== 0) snappedPageCount++;
         if (snappedPageCount !== estimatedPageCount) {
           log.info(`📐 [BACKGROUND] Padding to ${snappedPageCount} pages (estimated ${estimatedPageCount}) for product ${matchingProduct.product_name}`);
