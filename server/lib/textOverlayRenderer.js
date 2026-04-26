@@ -200,17 +200,13 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
     pageNumber: options.pageNumber,
   });
 
-  // Step 4: Build a tight frosted-glass halo AROUND the glyphs (not the whole
-  // calm polygon). Blurred image pixels show through only where the glyph
-  // mask dilated by ~2% of the image extends — so the halo is local to the
-  // text, not a big washed area.
-  const blurLayer = await buildBlurLayer(imageBuffer, textLayer, width, height);
-
-  // Step 5: Stack halo → text into a single overlay PNG.
-  const overlayImage = await sharp(blurLayer)
-    .composite([{ input: textLayer }])
-    .png()
-    .toBuffer();
+  // No frosted-glass halo — the text already carries a 0.85-alpha black stroke
+  // (~32% of font size in width) drawn underneath the white fill, which
+  // gives more legibility on busy backgrounds than a tiny blurred halo
+  // ever did. The halo was visibly smudging the image around each letter
+  // and adding a "blurry sticker" feel that the printed/shared book
+  // shouldn't have.
+  const overlayImage = textLayer;
 
   // Step 6: Provide a fully-composited image for the PDF path.
   const compositedImage = await sharp(imageBuffer)

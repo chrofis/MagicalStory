@@ -279,7 +279,13 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     }
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-      const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
+      // Serve the image at its stored dims. Old code ran normalizeToPortrait
+      // here (cover-cropping every scene to A4 on the fly), which silently
+      // sliced ~6% off the sides of new 3:4 / 1:1 stories whose layout
+      // explicitly asked for non-A4 aspects. The image is already at the
+      // aspect the generator was asked for — don't second-guess it at serve
+      // time.
+      const imageBuffer = Buffer.from(base64, 'base64');
       res.set('Content-Type', sniffImageMime(imageBuffer));
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
@@ -381,7 +387,10 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     } else {
       return res.status(404).json({ error: 'Page image not found' });
     }
-    const imgBuffer = await normalizeToPortrait(rawBuf);
+    // No A4 normalize here — overlay must align pixel-for-pixel with the
+    // image served from /shared/.../image/:pageNumber, which now keeps the
+    // stored dims. Build the overlay against the same buffer the user sees.
+    const imgBuffer = rawBuf;
 
     // Pick the mask size the page was generated with (so the polygon matches
     // the dark area the image model was asked to paint).
