@@ -6979,6 +6979,7 @@ initialize().then(() => {
   const server = app.listen(PORT, () => {
     log.info(`🚀 MagicalStory Server Running`);
     log.info(`📍 URL: http://localhost:${PORT}`);
+    log.info(`🔖 Build: gelato-snap-clamp ${new Date().toISOString()}`);
   });
 
   // Configure server timeouts to prevent premature connection closures

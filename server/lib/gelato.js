@@ -245,6 +245,18 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
           if (snappedPageCount % 2 !== 0) snappedPageCount++;
           if (snappedPageCount > max) snappedPageCount = max;
         }
+        // Unconditional final clamp: regardless of how the snap arrived at a
+        // value, every photobook order must satisfy 30 <= pageCount <= 200
+        // and pageCount % 2 === 0. This catches DB rows with bad/missing
+        // min/max/available_page_counts that would otherwise let an invalid
+        // count through.
+        const beforeClamp = snappedPageCount;
+        if (snappedPageCount < 30) snappedPageCount = 30;
+        if (snappedPageCount > 200) snappedPageCount = 200;
+        if (snappedPageCount % 2 !== 0) snappedPageCount++;
+        if (snappedPageCount !== beforeClamp) {
+          log.warn(`⚠️ [BACKGROUND] Final clamp adjusted page count: ${beforeClamp} → ${snappedPageCount}`);
+        }
         if (snappedPageCount !== estimatedPageCount) {
           log.info(`📐 [BACKGROUND] Padding to ${snappedPageCount} pages (estimated ${estimatedPageCount}) for product ${matchingProduct.product_name}`);
         }
