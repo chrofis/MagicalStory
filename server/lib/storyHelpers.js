@@ -4863,13 +4863,21 @@ function convertClothingToCurrentFormat(clothingRequirements) {
       if (charData._currentClothing) {
         // Already has _currentClothing, copy as-is
         converted[charName] = { ...charData };
-      } else if (charData.costumed && charData.costumed.costume) {
+      } else if (charData.costumed && charData.costumed.used === true && charData.costumed.costume) {
         // Nested format: { costumed: { costume: "1889 belle epoque", used: true } }
-        const costume = charData.costumed.costume;
-        converted[charName] = {
-          ...charData,
-          _currentClothing: `costumed:${costume}`
-        };
+        // Both `used: true` AND a real costume name required — Claude sometimes writes
+        // `{ used: false, costume: "none" }` for stories without costumes; without the
+        // `used` check we'd emit `_currentClothing: "costumed:none"` and the cover lookup
+        // would warn-and-fall-back on a bogus key.
+        const costume = String(charData.costumed.costume).trim().toLowerCase();
+        if (costume && costume !== 'none' && costume !== '[type]' && costume !== 'n/a') {
+          converted[charName] = {
+            ...charData,
+            _currentClothing: `costumed:${charData.costumed.costume}`
+          };
+        } else {
+          converted[charName] = { ...charData };
+        }
       } else {
         // No costume found, copy as-is
         converted[charName] = { ...charData };
