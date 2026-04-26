@@ -3522,7 +3522,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {string} availableAvatars - Pre-built string of available avatars per character
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
+  const { freeIterate = false } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -3695,8 +3696,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     }
   }
 
-  // Use template from file if available
-  if (PROMPT_TEMPLATES.sceneDescriptions) {
+  // Use template from file if available. freeIterate switches to the looser
+  // template (cast can change, scene can be reframed) — see scene-iteration-free.txt.
+  const activeTemplate = freeIterate
+    ? (PROMPT_TEMPLATES.sceneIterationFree || PROMPT_TEMPLATES.sceneDescriptions)
+    : PROMPT_TEMPLATES.sceneDescriptions;
+  if (activeTemplate) {
     // Get the full language instruction with spelling rules (e.g., 'Write in German with Swiss spelling. Use ä,ö,ü...')
     const languageInstruction = getLanguageInstruction(language);
     const languageName = getLanguageNameEnglish(language);
@@ -3793,7 +3798,7 @@ Compare this against the scene hint above. Your job is to:
     const iterImageModelKey = MODEL_DEFAULTS.pageImage;
     const iterImageModelConfig = IMAGE_MODELS[iterImageModelKey];
 
-    return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
+    return fillTemplate(activeTemplate, {
       DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
       PREVIOUS_SCENES: previousScenesText,
       PREVIEW_FEEDBACK: previewFeedbackText,

@@ -1319,7 +1319,7 @@ router.get('/:id/style-lab/:pageNum/history/:runId', authenticateToken, async (r
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement, previewOnly, customImagePrompt } = req.body;
+    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement, previewOnly, customImagePrompt, freeIterate } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) {
       return res.status(400).json({ error: 'Invalid page number' });
@@ -1653,6 +1653,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       iterativePlacement: !!iterativePlacement,
       previewOnly: !!previewOnly,
       customImagePrompt,
+      freeIterate: !!freeIterate,
       // Provide DB-backed empty scene callbacks
       emptySceneCallbacks: {
         load: async (pn) => {

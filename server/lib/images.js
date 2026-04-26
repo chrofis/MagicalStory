@@ -585,8 +585,33 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
 
     if (!p1Response.ok) {
       const errText = await p1Response.text();
-      log.warn(`⚠️ [QUALITY P1] API error: ${errText.substring(0, 200)}`);
-      return null;
+      const pageLabel = pageContext ? `[${pageContext}] ` : '';
+      log.warn(`⚠️ [QUALITY P1] ${pageLabel}API error: ${errText.substring(0, 200)}`);
+      // Persistent HTTP failure (after withRetry already burned its 2 retries).
+      // Fall back to Grok vision so a transient Gemini outage doesn't degrade
+      // the page's eval. Same fallback path as the safety-block branch below.
+      if (modelConfig?.provider !== 'xai') {
+        const grokFallbackId = 'grok-4-fast';
+        const grokFallbackModel = TEXT_MODELS[grokFallbackId];
+        if (grokFallbackModel?.provider === 'xai') {
+          log.info(`🔄 [QUALITY P1] ${pageLabel}Falling back to Grok vision (${grokFallbackId}) after HTTP error...`);
+          try {
+            const grokResp = await callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, PROMPT_TEMPLATES.imageVisualInventory);
+            if (grokResp.ok) {
+              p1Response = grokResp;
+            } else {
+              return null;
+            }
+          } catch (grokErr) {
+            log.warn(`⚠️ [QUALITY P1] ${pageLabel}Grok fallback failed: ${grokErr.message}`);
+            return null;
+          }
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
     }
 
     let p1Data = await p1Response.json();
@@ -6536,6 +6561,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // =========================================================================
   // Step 6: Evaluate character-repaired pages
+  //   - quality + semantic eval (evaluateImageBatch)
+  //   - entity consistency RE-RUN on the repaired images (was previously
+  //     skipped — meant a character-fix that regressed clothing/identity got
+  //     a clean entityPenalty=0 and could win pick-best, propagating the
+  //     regression. Now the penalty is recomputed against the new image.)
   // =========================================================================
   if (charFixResults.size > 0) {
     await updateProgress(70, `Evaluating ${charFixResults.size} character-repaired pages...`);
@@ -6546,8 +6576,35 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageNumber,
     }));
 
+    // Run quality+semantic eval and a fresh entity check in parallel — the
+    // pages aren't related, so there's no ordering benefit and the entity
+    // grid call dominates wall time.
     const charFixEvalInputs = buildEvalInputs(charFixEntries);
-    const charFixEvals = await evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
+    const charFixEntityCheckData = buildEntityCheckData(charFixEntries);
+
+    const [charFixEvals, charFixEntityReport] = await Promise.all([
+      evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
+      (async () => {
+        try {
+          const report = await runEntityConsistencyChecks(charFixEntityCheckData, characters, {
+            checkCharacters: true,
+            checkObjects: true,
+            saveGrids: false
+          });
+          if (report?.tokenUsage && usageTracker) {
+            usageTracker('gemini_quality', {
+              input_tokens: report.tokenUsage.inputTokens || 0,
+              output_tokens: report.tokenUsage.outputTokens || 0
+            }, 'entity_consistency_charfix', report.tokenUsage.model || 'gemini-2.5-flash');
+          }
+          log.info(`✅ [UNIFIED PIPELINE] Step 6: Entity consistency on char-fix: ${report?.totalIssues ?? 0} issues`);
+          return report;
+        } catch (entityErr) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] Step 6: Entity consistency on char-fix failed: ${entityErr.message}`);
+          return null;
+        }
+      })(),
+    ]);
 
     for (const ev of charFixEvals) {
       if (ev.usage && usageTracker) {
@@ -6556,9 +6613,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const versions = pageVersions.get(ev.pageNumber);
       const fix = charFixResults.get(ev.pageNumber);
       if (versions && fix) {
+        // Apply the fresh entity penalty so a char-fix that regressed clothing
+        // or identity gets a worse final score than the pre-fix best — and
+        // pick-best correctly rejects it. Without this, char-fix regressions
+        // silently win.
+        const entityPenalty = charFixEntityReport
+          ? getEntityPenalty(ev.pageNumber, charFixEntityReport)
+          : 0;
+        const visualScore = ev.score ?? ev.qualityScore ?? null;
+        const finalScore = visualScore != null ? Math.max(0, visualScore - entityPenalty) : null;
+
         versions.push({
           imageData: fix.imageData,
-          score: ev.score ?? ev.qualityScore ?? null,
+          score: finalScore,
           source: 'character-fix',
           evaluation: ev,
           modelId: fix.modelId || null,
@@ -6567,9 +6634,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // prompt and avatar(s) sent as references for the character-fix step.
           inpaintInstruction: fix.repairPrompt || null,
           inpaintReferenceImages: fix.repairAvatars || null,
+          entityPenalty,
+          entityReport: charFixEntityReport || null,
+          evaluatedAt: new Date().toISOString(),
         });
-        fix.afterScore = ev.score ?? ev.qualityScore ?? null;
+        fix.afterScore = finalScore;
+        fix.entityPenalty = entityPenalty;
       }
+    }
+
+    // Update the running entity report so Step 4's "final" report (already
+    // run on pre-charfix picks) gets superseded for the pages we touched.
+    // Other pages keep their existing entity status.
+    if (charFixEntityReport) {
+      currentEntityReport = charFixEntityReport;
     }
   }
 
@@ -6797,6 +6875,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // passes the scene's saved imageAspect so the regenerated image matches the
     // shape the layout expects. null/undefined falls back to the global default.
     aspectRatio: aspectRatioIn = null,
+    // freeIterate: opt into the looser scene-iteration-free.txt template.
+    // Default (false) keeps the cast locked to the original scene and uses the
+    // strict template (outline authoritative). When true, iterate may drop/swap
+    // characters and reframe the scene to escape an impossible composition.
+    freeIterate = false,
   } = options;
   const sceneAspect = aspectRatioIn || CONFIG_DEFAULTS.pageAspect;
 
@@ -6900,13 +6983,37 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     shortSceneDesc = sceneDescText.substring(0, 500);
   }
 
-  log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback (mode=${freeIterate ? 'free' : 'strict'})...`);
+
+  // Strict mode: lock cast to the original scene's characters so iterate can't
+  // drop/swap them. Free mode: pass the full roster so iterate can reframe.
+  let promptCharacters = characters;
+  if (!freeIterate) {
+    const originalSceneCharNames = (() => {
+      try {
+        const meta = sceneMetadata?.characters;
+        if (Array.isArray(meta) && meta.length > 0) {
+          return meta.map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+        }
+      } catch { /* fall through */ }
+      return null;
+    })();
+    const lockedCast = originalSceneCharNames
+      ? characters.filter(c => originalSceneCharNames.includes(String(c.name || '').trim().toLowerCase()))
+      : characters;
+    if (originalSceneCharNames && lockedCast.length !== originalSceneCharNames.length) {
+      log.warn(`🔄 [ITERATE] Page ${pageNumber}: Locked cast resolved ${lockedCast.length}/${originalSceneCharNames.length} from original scene metadata`);
+    } else if (originalSceneCharNames) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Locked cast to original scene (${lockedCast.length} chars: ${lockedCast.map(c => c.name).join(', ')})`);
+    }
+    promptCharacters = lockedCast;
+  }
 
   // Step 3: Build the scene description prompt with preview feedback
   const scenePrompt = buildSceneDescriptionPrompt(
     pageNumber,
     pageText,
-    characters,
+    promptCharacters,
     shortSceneDesc,
     language,
     visualBible,
@@ -6915,7 +7022,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     '',  // No correction notes for iteration
     availableAvatars,
     null,  // rawOutlineContext
-    previewFeedback  // The actual image analysis feedback!
+    previewFeedback,  // The actual image analysis feedback!
+    { freeIterate }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).

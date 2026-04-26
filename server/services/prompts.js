@@ -18,6 +18,10 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.storyText = await fs.readFile(path.join(promptsDir, 'story-text.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneIteration = await fs.readFile(path.join(promptsDir, 'scene-iteration.txt'), 'utf-8');
+    // Free-mode iteration: looser rules — iterate may drop/swap characters or
+    // reframe the scene to escape an impossible composition. Used when the
+    // caller explicitly opts in via iteratePageCore({ freeIterate: true }).
+    PROMPT_TEMPLATES.sceneIterationFree = await fs.readFile(path.join(promptsDir, 'scene-iteration-free.txt'), 'utf-8');
     // Backwards compat alias - points to iteration (full prompt with all checks)
     PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
