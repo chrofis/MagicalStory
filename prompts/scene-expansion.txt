@@ -1,13 +1,11 @@
-# LEGACY — scene expansion is now handled inside `story-unified.txt`
-#
-# The unified outline prompt (Sonnet) produces both the scene prose and the
-# METADATA JSON directly — no separate Haiku expansion step runs in the primary
-# story pipeline. This file is still loaded as `PROMPT_TEMPLATES.sceneExpansion`
-# and called by a few legacy code paths (cover expansion at server.js:3285, the
-# fallback path at server.js:2808). Those callers will be migrated or removed in
-# a follow-up. Do NOT make this the authoritative source for scene-hint rules;
-# edit `story-unified.txt` instead. Keep this file in sync for the legacy paths
-# until they're retired.
+# COVER EXPANSION ONLY — used at server.js:3331 to expand front-cover, initial-
+# page, and back-cover hints into prose. The primary story pipeline uses the
+# unified outline prompt (`story-unified.txt`) which generates page prose and
+# METADATA inline; that path no longer touches this file (server.js:2843
+# always takes the unified branch). Do NOT add page-only rules here (text
+# overlays, calm zones, textPosition) — covers don't have text overlays and
+# the model would just bake unwanted "open and darkening" empty space into
+# the cover composition. Edit `story-unified.txt` for page-related rules.
 
 **ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader.
 
@@ -17,20 +15,19 @@
 
 1. **Simplify, don't elaborate.** The scene hint is already good. Flesh it into prose; don't add complexity. If the hint says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
-3. **Text zone off-limits — overrides outline.** The `textPosition` in the scene hint names a corner where printed text covers the image. No character may appear there. Derive the forbidden side: `bottom-right` or `top-right` → right. `bottom-left` or `top-left` → left. `bottom-full` → lower half. `top-full` → upper half. If any character's outline position contains the forbidden side, move them to the opposite side in your prose and metadata. Check every `position` field: none may include the forbidden side word.
-4. **Only characters from the hint.** The scene hint's `characters` array and `background` field define who is visible. Do not add characters from the story text that are not in the hint. If the hint's `background` field describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
-5. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Up to {MAX_CHARACTERS_PER_SCENE} when the hint genuinely needs more. Preserve every character the hint lists — don't drop characters silently.
-6. **One moment, one focal point.** Single instant. One main action draws the eye. When the page text chains physical actions, depict the one with the most motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
-7. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
-8. **Physically possible.** Two hands = max two items. If a character holds a book and a flashlight and waves — that's three hands. Fix it.
-9. **Honor perspectives.** If the hint lists `perspective: back view` for a character, describe them as seen from behind: shoulders, head, hips, and both feet all turned away; heels visible, toes pointing away. Do not describe a back-view character if their face or front would logically face the viewer. `depth: background` → small and distant. For `perspective: over-the-shoulder`, the camera sits behind that character's shoulder: the OTS character fills the near foreground (large, back view, shoulder + head + held object visible), the subject they watch goes in midground or background (smaller, distant). Never invert — an OTS character in the background, or the watched subject in the foreground, reads as a different shot entirely.
-10. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
-11. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
-12. **Framing pattern.** If the scene hint sets `framingPattern`, compose the prose as:
+3. **Only characters from the hint.** The scene hint's `characters` array and `background` field define who is visible. Do not add characters from the story text that are not in the hint. If the hint's `background` field describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
+4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Up to {MAX_CHARACTERS_PER_SCENE} when the hint genuinely needs more. Preserve every character the hint lists — don't drop characters silently.
+5. **One moment, one focal point.** Single instant. One main action draws the eye. When the page text chains physical actions, depict the one with the most motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
+6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
+7. **Physically possible.** Two hands = max two items. If a character holds a book and a flashlight and waves — that's three hands. Fix it.
+8. **Honor perspectives.** If the hint lists `perspective: back view` for a character, describe them as seen from behind: shoulders, head, hips, and both feet all turned away; heels visible, toes pointing away. Do not describe a back-view character if their face or front would logically face the viewer. `depth: background` → small and distant. For `perspective: over-the-shoulder`, the camera sits behind that character's shoulder: the OTS character fills the near foreground (large, back view, shoulder + head + held object visible), the subject they watch goes in midground or background (smaller, distant). Never invert — an OTS character in the background, or the watched subject in the foreground, reads as a different shot entirely.
+9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
+10. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
+11. **Framing pattern.** If the scene hint sets `framingPattern`, compose the prose as:
     - `solo-before`: close-up on the acting character, weapon drawn and aimed forward if applicable, gaze following the weapon's direction. No opponent or target in the frame.
     - `solo-after`: close-up on the character after the moment, no opponent, strong emotion.
     - `over-the-shoulder`: the acting character's back in one front corner (front-left or front-right), target small and soft in the opposite back corner (diagonal composition), 5–10% image height, weapon aim line runs diagonally from foreground to target.
-13. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood on a character.
+12. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood on a character.
 
 ---
 
@@ -39,7 +36,6 @@
 **SCENE HINT (Page {PAGE_NUMBER} — your starting point):**
 {DRAFT_SCENE_DESCRIPTION}
 
-{TEXT_ZONE_OVERRIDE}
 **Story Text (for emotional context — do not add characters from here that are not in the hint):**
 {PAGE_CONTENT}
 
@@ -95,7 +91,6 @@ Then a single-line JSON object:
     {"character": "CharacterA", "object": "an item", "where": "in pocket"},
     {"character": "CharacterB", "object": "wooden ladder", "where": "climbs"}
   ],
-  "textPosition": "top-left",
   "emptyScenePrompt": "..."
 }
 ```
@@ -124,12 +119,6 @@ Then a single-line JSON object:
 - Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side. Never hold objects against the chest or front when the camera sees the back.
 - Distance rule: when the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly at the named separation, and the prose must place each figure at the correct end of the frame.
 
-**`textPosition`**
-- Read verbatim from the scene hint above — do not change it, do not pick a different corner.
-- The outline has already chosen the position based on global story balance.
-- Write the prose so the chosen corner naturally contains dark, structureless content: night sky, dusk sky, deep shadow, shadowed wall, deep water, shaded ground, dark foliage.
-- Text renders in white. No bright highlights, no sharp edges, no characters in the chosen corner.
-
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
 - No named characters, no tracked animals, no carried or handheld artifacts (swords, books, apples, crossbows — those get composited later with the character).
@@ -137,7 +126,6 @@ Then a single-line JSON object:
 - Never write hypothetical references like "where children would stand" — image models render those literally.
 - Use "open foreground", "uncluttered centre". Named characters will be composited later, so framing must leave enough physical space for them.
 - When the scene's prose calls for a populated setting (crowd, villagers, market-goers, soldiers, guards, onlookers, distant workers, busy street), describe those anonymous extras here too — density, rough distance, silhouette only — so the backdrop already feels populated. Name a colour mix (at least 3 garment colours) and at least two garment shapes so the crowd reads as varied, not a uniform robed mass. Keep extras away from the spot reserved for named characters.
-- The corner that matches the chosen `textPosition` should naturally contain calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground) — saturation is fine, clutter is not.
 
 **Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
 
