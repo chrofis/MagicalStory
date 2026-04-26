@@ -2485,10 +2485,12 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     }
 
     // FAST PATH: Try to get cover from separate images table first (active version, not always 0)
+    // After R2 migration, image_data was NULLed for rows that have image_url, so fall
+    // back to imageUrl when imageData is missing — both work as <img src=…>.
     const activeFrontVersion = await getActiveVersion(id, 'frontCover');
     const separateImage = await getStoryImage(id, 'frontCover', null, activeFrontVersion);
-    if (separateImage) {
-      return res.json({ coverImage: separateImage.imageData });
+    if (separateImage && (separateImage.imageData || separateImage.imageUrl)) {
+      return res.json({ coverImage: separateImage.imageData || separateImage.imageUrl });
     }
 
     // SLOW PATH: Fall back to loading from data blob
@@ -2506,8 +2508,8 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
 
     // FALLBACK: Use first page scene image if no cover exists
     const firstPageImage = await getStoryImage(id, 'scene', 1, 0);
-    if (firstPageImage) {
-      return res.json({ coverImage: firstPageImage.imageData });
+    if (firstPageImage && (firstPageImage.imageData || firstPageImage.imageUrl)) {
+      return res.json({ coverImage: firstPageImage.imageData || firstPageImage.imageUrl });
     }
 
     // No cover available — return null instead of 404 to avoid console noise
