@@ -3379,7 +3379,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
-    const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+    // Honour the caller's model selection (imageModelOverride / MODEL_DEFAULTS.coverImage / pageImage).
+    // Previously this branch hardcoded Pro for covers regardless of routing — and because
+    // it returned `usage:` instead of `imageUsage:`, the cost tracker at
+    // generateImageWithQualityRetry never saw it, so 3× $0.07 cover gens silently
+    // disappeared from the per-story cost report.
+    const grokModel = imageModelOverride === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
     // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
     // (pageAspect / coverAspect / avatarAspect — all configured in one place).
     const grokAspect = aspectRatioOverride
@@ -3455,6 +3460,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
         verdict: qualityResult?.verdict || null,
+        // `imageUsage` is the field generateImageWithQualityRetry's tracker reads.
+        // The legacy `usage:` field stays for any direct callers of this function.
+        imageUsage: result.usage,
+        qualityUsage: qualityResult?.usage ?? null,
+        qualityModelId: qualityResult?.qualityModelId ?? null,
         usage: result.usage,
         grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
