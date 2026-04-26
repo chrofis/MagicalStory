@@ -5,7 +5,9 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 **STORY_TEXT (narrative context only — do NOT treat as a checklist):** "{STORY_TEXT}"
 **DECLARED INTERACTIONS (character-to-object placements the scene requires):** {INTERACTIONS_BLOCK}
 
-**CHARACTER AUTHORITY RULE:** The SCENE_HINT and IMAGE_PROMPT define which characters belong in the illustration. The STORY_TEXT is background narrative that often mentions characters who are NOT in this illustration — they may appear on other pages, or be referenced in dialogue without being physically present. A character mentioned in STORY_TEXT but absent from SCENE_HINT and IMAGE_PROMPT is NOT missing — do not penalize.
+**⚠️ CHARACTER AUTHORITY RULE — CRITICAL, READ ONCE, APPLY THROUGHOUT:**
+
+The SCENE_HINT and IMAGE_PROMPT are the ONLY source of truth for which characters belong in the illustration. The STORY_TEXT is background narrative that frequently mentions characters who appear on OTHER pages, or who are referenced in dialogue without being physically present in this scene. A character mentioned in STORY_TEXT but absent from SCENE_HINT and IMAGE_PROMPT is NOT missing and MUST NOT be penalized — under any check, in any step, in any scoring decision below. This rule overrides every other rule in this prompt that could be read as conflicting.
 
 ---
 
@@ -21,7 +23,7 @@ List what you see:
 
 **STEP 2: DETERMINE EXPECTED CHARACTERS**
 
-Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are the ONLY characters expected in the illustration. Ignore any additional names from STORY_TEXT.
+Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are the ONLY characters expected in the illustration.
 
 ---
 
@@ -30,7 +32,7 @@ Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are t
 Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `semantic_issues` entry when the check fails. The tag drives a separate quality penalty (CRITICAL = −30, MAJOR = −20, MODERATE = −10). Be conservative — if unsure between two levels, pick the lower.
 
 - Correct main action? (giving ≠ receiving, hugging ≠ fighting) — **[CRITICAL]** if the rendered action is the wrong beat
-- Correct number of foreground characters? (count from SCENE_HINT/IMAGE_PROMPT, not STORY_TEXT) — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
+- Correct number of named characters? — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
 - Correct setting/location? — **[CRITICAL]** if completely wrong location; **[MAJOR]** if wrong sub-area within the right location
 - Correct surface? (on island, not in water; on path, not in river) — **[MAJOR]**
 - Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual) — **[MAJOR]**
@@ -40,7 +42,11 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Correct weather/lighting? (night = dark, snow = snow) — **[MODERATE]**
 - Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong) — **[MODERATE]**
 - Gaze direction matches a DECLARED INTERACTION? Only flag when two characters listed in DECLARED INTERACTIONS as interacting face away from each other, or a character listed as watching a specific named object is looking elsewhere. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "scanning sideways" are NOT declared interactions — do NOT flag. — **[MODERATE]** when flagged
-- **Declared interactions placement?** For each entry in DECLARED INTERACTIONS above, verify the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, NOT a large held plush. "Climbing rope" must show the hands actually gripping the rope. "Standing on stairs" must show feet on the step. If a declared interaction is missing or in a genuinely different category (held-vs-pocket, on-head-vs-in-hand), flag it as a `wrong_interaction` issue — **[MAJOR]**. Pose details that appear in the scene prose but NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked") are descriptive only — do NOT flag them. Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers) are scene-appropriate — do NOT flag. This overrides the "ignore spatial arrangement" rule below — declared interactions are spatial requirements that DO matter.
+- **Declared interactions placement** (overrides the "ignore spatial arrangement" rule below — declared interactions ARE spatial requirements that matter):
+  - Verify each entry: the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, not a held plush. "Climbing rope" must show hands gripping the rope. "Standing on stairs" must show feet on the step.
+  - Categories that count as wrong: held-vs-pocket, on-head-vs-in-hand, gripping-vs-near, on-shoulder-vs-in-hand. Flag as `wrong_interaction` — **[MAJOR]**.
+  - Pose details from the scene prose that are NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked") are descriptive only — do NOT flag.
+  - Extra background figures in scenes whose hint describes a populated setting (crowd, vendors, villagers, marketgoers) are scene-appropriate — do NOT flag.
 - **Left/right mirror is always equivalent — never flag.** Any body-part swap between left and right (left arm vs right arm, left hand vs right hand, left foot vs right foot, left pocket vs right pocket, left shoulder vs right shoulder) is a mirror, not a defect. Compound mirrors count too — if the declared interaction says "right foot forward, left arm swept back" and the image shows "left foot forward, right arm swept back", that is the same pose reflected. Do NOT raise a `wrong_interaction` issue for any mirror case.
 
 **Ignore everything else.** The image prompt contains detailed physical descriptions from reference photos — minor visual differences are expected. Specifically ignore:
@@ -57,7 +63,6 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Motion verbs in the scene prose (walking, running, approaching, scanning). A still image cannot show motion; any frozen pose satisfies them.
 - Internal-state phrases ("appears thoughtful", "looks distracted").
 - Left/right positioning, spatial arrangement, depth labels (foreground/midground/background). Position strings like "left foreground" or "right midground" are metadata hints, not requirements.
-- Characters mentioned in STORY_TEXT but not in SCENE_HINT/IMAGE_PROMPT.
 
 ---
 
@@ -84,6 +89,11 @@ VERDICT: PASS (7+), FAIL (0-6)
 **OUTPUT FORMAT**
 
 Return JSON only. Put every issue you find in the `semantic_issues` array. Do not use any other field name for issues — the parser reads `semantic_issues` and discards anything else.
+
+**Output rules (strict):**
+- The `score` field must be an integer 0–10 — no decimals, no fractions.
+- The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
+- Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
 
 ```json
 {
