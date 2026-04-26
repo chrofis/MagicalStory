@@ -1286,20 +1286,43 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
       console.log(`\n   Result: All pages above threshold, no repairs needed`);
     }
 
-    // Final scores (last evaluation per page)
-    if (rp.pageScores.length > 0) {
+    // Final scores — match the pipeline's actual active version, not just
+    // the last per-pass eval. The per-pass score evaluates whatever attempt
+    // ran in that pass (which pick-best may then reject in favour of an
+    // earlier pass's better version). Use upgradedDetails.toScore as the
+    // source of truth when it exists, falling back to last per-pass eval
+    // for pages that pick-best left as the original.
+    if (rp.pageScores.length > 0 || rp.upgradedDetails.length > 0) {
       const lastScores = new Map();
       for (const s of rp.pageScores) lastScores.set(s.page, s);
-      const sorted = [...lastScores.values()].sort((a, b) => {
-        if (a.page >= 0 && b.page >= 0) return a.page - b.page;
-        if (a.page < 0 && b.page < 0) return a.page - b.page;
-        return a.page >= 0 ? -1 : 1;
+
+      // Overwrite with pick-best toScore where available — that's the score
+      // of the version that actually ended up active.
+      const pickBestScores = new Map();
+      for (const u of rp.upgradedDetails) pickBestScores.set(u.page, u.toScore);
+
+      // Merge: union of all pages we know about.
+      const allPages = new Set([...lastScores.keys(), ...pickBestScores.keys()]);
+      const sorted = [...allPages].sort((a, b) => {
+        if (a >= 0 && b >= 0) return a - b;
+        if (a < 0 && b < 0) return a - b;
+        return a >= 0 ? -1 : 1;
       });
-      const scoreStr = sorted.map(s => {
-        const pl = s.page === -1 ? 'cv' : s.page === -2 ? 'in' : s.page === -3 ? 'bk' : `${s.page}`;
-        return `${pl}:${s.final}`;
+
+      const scoreStr = sorted.map(p => {
+        const pl = p === -1 ? 'cv' : p === -2 ? 'in' : p === -3 ? 'bk' : `${p}`;
+        const pickBest = pickBestScores.get(p);
+        const last = lastScores.get(p);
+        // pick-best wins when present; mark with * so divergence from the
+        // last per-pass eval is visible
+        if (pickBest != null) {
+          const lastFinal = last?.final;
+          const marker = (lastFinal != null && lastFinal !== pickBest) ? '*' : '';
+          return `${pl}:${pickBest}${marker}`;
+        }
+        return `${pl}:${last?.final ?? '?'}`;
       }).join(' ');
-      console.log(`   Final: [${scoreStr}]`);
+      console.log(`   Final: [${scoreStr}]   (* = pick-best chose a different version than the last pass evaluated)`);
     }
   }
 
