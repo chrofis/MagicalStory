@@ -22,12 +22,35 @@
  *   node scripts/analysis/review-page.js <storyId|latest> <pageNumber>
  *   node scripts/analysis/review-page.js latest 3            # most-recent story
  *   node scripts/analysis/review-page.js <id> 3 --full       # also print full prompt + fix targets
+ *
+ * Step-by-step mode (one section at a time, easier to read):
+ *   ... <id> <page> --step header   → header + page text + scene hint + prose
+ *   ... <id> <page> --step empty    → empty-scene prompt + retry QC
+ *   ... <id> <page> --step v0       → version 0 only (input + eval)
+ *   ... <id> <page> --step v1       → version 1 only
+ *   ... <id> <page> --step active   → just active-version summary
+ *   ... <id> <page> --step bbox     → bbox detection
+ *   ... <id> <page> --step versions → all versions, no other sections
  */
 
 require('dotenv').config();
 const { Pool } = require('pg');
 
 const VERBOSE = process.argv.includes('--full');
+const STEP_ARG = (() => {
+  const i = process.argv.indexOf('--step');
+  return i > -1 ? (process.argv[i + 1] || '').toLowerCase() : null;
+})();
+// When no --step given, every section prints (legacy behavior).
+function shouldPrint(step) {
+  if (!STEP_ARG) return true;
+  if (STEP_ARG === step) return true;
+  // 'header' shorthand prints sections 1-4b
+  if (STEP_ARG === 'header' && ['header', 'pagetext', 'hint', 'prose', 'requested', 'changes'].includes(step)) return true;
+  // 'versions' prints all v* + active
+  if (STEP_ARG === 'versions' && (step.startsWith('v') || step === 'active')) return true;
+  return false;
+}
 
 async function main() {
   const storyArg = process.argv[2];
@@ -71,72 +94,90 @@ async function main() {
     // HEADER
     // =========================================================================
     const title = d.title || d.storyTitle || '(untitled)';
+    // Header always prints so user knows what they're looking at.
     hr('=', `${title}  —  Page ${pageNum} of ${scenes.length}`);
     console.log(`Story ID:   ${row.id}`);
 
     // =========================================================================
     // 1. PAGE TEXT
     // =========================================================================
-    hr('-', '1. PAGE TEXT  (printed in the book)');
-    console.log(scene.text || '(no text)');
+    if (shouldPrint('pagetext')) {
+      hr('-', '1. PAGE TEXT  (printed in the book)');
+      console.log(scene.text || '(no text)');
+    }
 
     // =========================================================================
     // 2. SCENE HINT (from outline)
     // =========================================================================
-    hr('-', '2. SCENE HINT  (from unified outline pass)');
-    printHint(hint);
+    if (shouldPrint('hint')) {
+      hr('-', '2. SCENE HINT  (from unified outline pass)');
+      printHint(hint);
+    }
 
     // =========================================================================
     // 3. UNIFIED PROSE (prose portion of the same unified pass, + metadata block)
     // =========================================================================
-    hr('-', '3. UNIFIED PROSE  (prose portion of the unified pass — NOT a separate expansion)');
-    console.log(prose || '(no prose)');
-    if (metadata) {
-      console.log();
-      console.log('--- METADATA block ---');
-      printMetadata(metadata);
+    if (shouldPrint('prose')) {
+      hr('-', '3. UNIFIED PROSE  (prose portion of the unified pass — NOT a separate expansion)');
+      console.log(prose || '(no prose)');
+      if (metadata) {
+        console.log();
+        console.log('--- METADATA block ---');
+        printMetadata(metadata);
+      }
     }
 
     // =========================================================================
     // 4. REQUESTED SCENE (checklist to hold against the image)
     // =========================================================================
-    hr('-', '4. REQUESTED SCENE  (what the image should show)');
-    printRequestedScene(hint, metadata, prose || '', d.visualBible);
+    if (shouldPrint('requested')) {
+      hr('-', '4. REQUESTED SCENE  (what the image should show)');
+      printRequestedScene(hint, metadata, prose || '', d.visualBible);
+    }
 
     // =========================================================================
     // 4b. CHANGES (hint → expansion) — kept as a smaller subsection
     // =========================================================================
-    hr('-', '4b. CHANGES  (what the expansion altered from the hint)');
-    printDifferences(hint, metadata, prose || '');
+    if (shouldPrint('changes')) {
+      hr('-', '4b. CHANGES  (what the expansion altered from the hint)');
+      printDifferences(hint, metadata, prose || '');
+    }
 
     // =========================================================================
     // 5. EMPTY SCENE (background reference — NOT evaluated)
     // =========================================================================
-    hr('-', '5. EMPTY SCENE  (used as [Background] reference — no evaluation stored)');
-    if (scene.emptyScenePrompt) {
-      console.log(`hasEmptySceneImage: ${scene.hasEmptySceneImage ?? false}`);
+    if (shouldPrint('empty')) {
+      hr('-', '5. EMPTY SCENE  (used as [Background] reference — no evaluation stored)');
+      if (scene.emptyScenePrompt) {
+        console.log(`hasEmptySceneImage: ${scene.hasEmptySceneImage ?? false}`);
+        console.log();
+        console.log('prompt:');
+        console.log(scene.emptyScenePrompt);
+      } else {
+        console.log('(no emptyScenePrompt)');
+      }
       console.log();
-      console.log('prompt:');
-      console.log(scene.emptyScenePrompt);
-    } else {
-      console.log('(no emptyScenePrompt)');
+      console.log('NOTE: the empty-scene image is not scored. No quality/semantic eval runs on it.');
     }
-    console.log();
-    console.log('NOTE: the empty-scene image is not scored. No quality/semantic eval runs on it.');
 
     // =========================================================================
     // 6. VERSION TIMELINE — per-version input prompt, eval, requested next fix
     // =========================================================================
-    hr('-', '6. VERSION TIMELINE');
     const vs = scene.imageVersions || [];
-    console.log(`active: quality=${scene.qualityScore ?? '?'}  semantic=${scene.semanticScore ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
-    console.log(`versions kept: ${vs.length}`);
-    console.log();
-    if (vs.length === 0) {
+    // Active-version summary line is always useful — print at top of versions
+    // step OR when caller asked for 'active' specifically.
+    if (shouldPrint('active') || shouldPrint('v0') || shouldPrint('v1') || shouldPrint('v2') || shouldPrint('v3') || shouldPrint('v4') || shouldPrint('v5')) {
+      hr('-', `ACTIVE VERSION SUMMARY`);
+      console.log(`active: quality=${scene.qualityScore ?? '?'}  semantic=${scene.semanticScore ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
+      console.log(`versions kept: ${vs.length}`);
+    }
+    if (vs.length === 0 && shouldPrint('active')) {
       console.log('(no imageVersions recorded)');
     }
     for (const [i, v] of vs.entries()) {
-      console.log('─'.repeat(78));
+      // Per-version step: only print this version if --step v<i>
+      if (!shouldPrint(`v${i}`)) continue;
+      hr('-', `VERSION v${i}`);
       const src = v.source || v.type || '?';
       const q = v.qualityScore ?? '?';
       const s = v.semanticScore ?? '?';
@@ -204,51 +245,55 @@ async function main() {
     // 6b. DUMP IMAGES TO DISK (empty scene + every version, so reviewer can
     //     inspect what the pipeline actually produced rather than guessing)
     // =========================================================================
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const outDir = path.join(process.cwd(), 'tmp', `review-${row.id}-p${pageNum}`);
-      fs.mkdirSync(outDir, { recursive: true });
-      const imgRows = await pool.query(
-        `SELECT image_type, version_index, image_data
-           FROM story_images
-          WHERE story_id = $1 AND page_number = $2
-          ORDER BY image_type, version_index`,
-        [row.id, pageNum]
-      );
-      hr('-', '6b. DUMPED IMAGES');
-      if (imgRows.rows.length === 0) {
-        console.log('(no story_images rows for this page)');
-      } else {
-        console.log(`Output dir: ${outDir}`);
-        for (const r2 of imgRows.rows) {
-          const data = (r2.image_data || '').replace(/^data:image\/\w+;base64,/, '');
-          if (!data) continue;
-          const fname = `${r2.image_type}-v${r2.version_index}.png`;
-          fs.writeFileSync(path.join(outDir, fname), Buffer.from(data, 'base64'));
-          console.log(`  ${fname} (${Math.round(data.length / 1024)} KB)`);
+    if (shouldPrint('dump') || !STEP_ARG) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const outDir = path.join(process.cwd(), 'tmp', `review-${row.id}-p${pageNum}`);
+        fs.mkdirSync(outDir, { recursive: true });
+        const imgRows = await pool.query(
+          `SELECT image_type, version_index, image_data
+             FROM story_images
+            WHERE story_id = $1 AND page_number = $2
+            ORDER BY image_type, version_index`,
+          [row.id, pageNum]
+        );
+        hr('-', '6b. DUMPED IMAGES');
+        if (imgRows.rows.length === 0) {
+          console.log('(no story_images rows for this page)');
+        } else {
+          console.log(`Output dir: ${outDir}`);
+          for (const r2 of imgRows.rows) {
+            const data = (r2.image_data || '').replace(/^data:image\/\w+;base64,/, '');
+            if (!data) continue;
+            const fname = `${r2.image_type}-v${r2.version_index}.png`;
+            fs.writeFileSync(path.join(outDir, fname), Buffer.from(data, 'base64'));
+            console.log(`  ${fname} (${Math.round(data.length / 1024)} KB)`);
+          }
         }
+      } catch (e) {
+        console.log(`(image dump failed: ${e.message})`);
       }
-    } catch (e) {
-      console.log(`(image dump failed: ${e.message})`);
     }
 
     // =========================================================================
     // 7. BBOX DETECTION (brief — active version)
     // =========================================================================
-    hr('-', '7. BBOX DETECTION  (active version)');
-    const bb = scene.bboxDetection || {};
-    const figs = bb.figures || [];
-    const objs = bb.objects || [];
-    console.log(`figures: ${figs.length}   objects: ${objs.length}`);
-    for (const f of figs) {
-      const conf = f.confidence || '?';
-      const name = f.name || 'UNKNOWN';
-      console.log(`  figure: ${name.padEnd(18)} conf=${conf}`);
-    }
-    for (const o of objs) {
-      const found = o.found === false ? 'MISSING' : 'found';
-      console.log(`  object: ${(o.name || o.label || '?').padEnd(18)} ${found}`);
+    if (shouldPrint('bbox')) {
+      hr('-', '7. BBOX DETECTION  (active version)');
+      const bb = scene.bboxDetection || {};
+      const figs = bb.figures || [];
+      const objs = bb.objects || [];
+      console.log(`figures: ${figs.length}   objects: ${objs.length}`);
+      for (const f of figs) {
+        const conf = f.confidence || '?';
+        const name = f.name || 'UNKNOWN';
+        console.log(`  figure: ${name.padEnd(18)} conf=${conf}`);
+      }
+      for (const o of objs) {
+        const found = o.found === false ? 'MISSING' : 'found';
+        console.log(`  object: ${(o.name || o.label || '?').padEnd(18)} ${found}`);
+      }
     }
 
     // =========================================================================
