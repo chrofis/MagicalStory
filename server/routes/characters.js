@@ -10,7 +10,7 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizePhotos, stripLegacyPhotoFields } = require('../lib/characterPhotos');
-const { normalizePhysical, stripLegacyPhysicalFields } = require('../lib/characterPhysical');
+const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
 // GET /api/characters - Get user's characters (lightweight, for list view)
@@ -117,6 +117,11 @@ router.get('/', authenticateToken, async (req, res) => {
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined
           };
         }
+
+        // Expose userHairOverride values back as physical.hairLength /
+        // hairStyle for the CharacterForm UI. The form binds to those top-
+        // level fields; storage keeps the canonical override sub-object.
+        expandUserHairOverrideForDisplay(lightChar);
 
         return lightChar;
       });
@@ -339,12 +344,17 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'Character not found' });
       }
 
-      return res.json({ character: legacyResult[0].character });
+      const legacyChar = legacyResult[0].character;
+      expandUserHairOverrideForDisplay(legacyChar);
+      return res.json({ character: legacyChar });
     }
 
     const char = result[0].character;
     // Normalize legacy photo fields on read (migration helper)
     normalizePhotos(char);
+    // Spread userHairOverride back to top-level hairLength / hairStyle so the
+    // CharacterForm UI can display the user's saved values.
+    expandUserHairOverrideForDisplay(char);
     const hasAvatars = char?.avatars && Object.keys(char.avatars).length > 0;
     const hasPhotos = char?.photos && Object.keys(char.photos).length > 0;
     const photoKeys = char?.photos ? Object.keys(char.photos).filter(k => char.photos[k]) : [];

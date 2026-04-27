@@ -207,6 +207,33 @@ function hasUserHairOverride(physical) {
 }
 
 /**
+ * Inverse of the fold inside stripLegacyPhysicalFields: copies
+ * physical.userHairOverride.{lengthTop,styling,density} back to
+ * physical.{hairLength,hairStyle,hairDensity} on the character object.
+ *
+ * Used when SHAPING API RESPONSES for the CharacterForm UI. The form's
+ * dropdowns bind to physical.hairLength / hairStyle, which storage no
+ * longer has — they live in userHairOverride. Without this expansion the
+ * form loads empty after a save round-trip even though the value WAS
+ * persisted.
+ *
+ * Pure read-side helper. Storage stays canonical (override-in-sub-object).
+ * Only mutates the character passed in so caller can map() over a list.
+ */
+function expandUserHairOverrideForDisplay(character) {
+  if (!character || !character.physical || typeof character.physical !== 'object') return character;
+  const o = character.physical.userHairOverride;
+  if (!o || typeof o !== 'object') return character;
+  for (const [topField, detailedKey] of Object.entries(HAIR_OVERRIDE_FIELD_TO_DETAILED_KEY)) {
+    const v = o[detailedKey];
+    if (v != null && String(v).trim() !== '') {
+      character.physical[topField] = String(v);
+    }
+  }
+  return character;
+}
+
+/**
  * Clear physical.userHairOverride. Called by the avatar pipeline AFTER a
  * successful regeneration + re-analysis: the fresh detailedHairAnalysis now
  * reflects what the user wanted, so the override is no longer needed.
@@ -238,6 +265,7 @@ module.exports = {
   normalizeAllPhysical,
   hasUserHairOverride,
   clearUserHairOverride,
+  expandUserHairOverrideForDisplay,
   FIELD_MAPPINGS,
   LEGACY_FIELDS
 };
