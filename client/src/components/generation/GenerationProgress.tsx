@@ -460,8 +460,8 @@ export function GenerationProgress({
       backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
-      canCloseTitle: 'Continues in the background',
-      canClose: 'Close this tab — we\'ll email you when your story is ready.',
+      canCloseTitle: 'We\'ll email you when it\'s ready',
+      canClose: 'You can close this tab — your story keeps generating on our servers.',
       continueInBackground: 'Continue in Background',
     },
     de: {
@@ -482,8 +482,8 @@ export function GenerationProgress({
       backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
-      canCloseTitle: 'Wird im Hintergrund erstellt',
-      canClose: 'Schliesse den Tab — du erhältst eine E-Mail, sobald deine Geschichte bereit ist.',
+      canCloseTitle: 'Wir mailen dich, wenn fertig',
+      canClose: 'Du kannst den Tab schliessen — deine Geschichte wird auf unseren Servern weiter erstellt.',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
@@ -504,8 +504,8 @@ export function GenerationProgress({
       backCover: 'Dos',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
-      canCloseTitle: 'Création en arrière-plan',
-      canClose: 'Fermez l\'onglet — nous vous enverrons un email dès que votre histoire est prête.',
+      canCloseTitle: 'Nous vous enverrons un e-mail quand prêt',
+      canClose: 'Vous pouvez fermer cet onglet — votre histoire continue sur nos serveurs.',
       continueInBackground: 'Continuer en arrière-plan',
     },
   };
@@ -633,29 +633,26 @@ export function GenerationProgress({
           />
         </div>
 
-        {/* Continue in background — single ghost button, neutral palette */}
+        {/* Continue in background — solid indigo CTA, outranks the info box
+            below so users see the action they can take, not just the message. */}
         {onMinimize && (
           <button
             onClick={onMinimize}
-            className="w-full mb-4 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors text-sm"
+            className="w-full mb-3 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-base shadow-sm"
           >
             {t.continueInBackground}
           </button>
         )}
 
-        {/* After 60s — gently surface the email + close-tab reassurance so
-            the user knows they can walk away. Calm, informational, no action
-            required. Replaces the old "stalled" warning which scared users
-            without offering recourse. */}
+        {/* After 60s — quiet reassurance below the CTA. Subordinate styling:
+            smaller text, lighter background, no border emphasis. The button
+            above is the primary action; this is just context. */}
         {showCloseHint && (
-          <div className="mb-4 border border-indigo-200 bg-indigo-50 rounded-xl p-4 flex items-start gap-3">
-            <Mail className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+          <div className="mb-4 bg-gray-50 rounded-lg p-3 flex items-start gap-2.5">
+            <Mail className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
             <div className="flex-1">
-              {/* Highlighted: the headline says the story keeps running in the
-                  background. The body collapses the old "close tab" + email
-                  reassurances into one sentence — they were redundant. */}
-              <h4 className="font-semibold text-indigo-900 mb-1">{t.canCloseTitle}</h4>
-              <p className="text-sm text-gray-700">{t.canClose}</p>
+              <p className="text-xs font-medium text-gray-800 mb-0.5">{t.canCloseTitle}</p>
+              <p className="text-xs text-gray-600">{t.canClose}</p>
             </div>
           </div>
         )}
