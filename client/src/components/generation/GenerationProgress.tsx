@@ -405,14 +405,21 @@ export function GenerationProgress({
         const gap = target - prev;
 
         if (gap <= 0) {
-          // No checkpoint ahead — slow creep so bar never looks stuck
+          // No checkpoint ahead — slow creep so the bar never looks stuck.
+          // Cap creep at target+3% so the create-screen bar never runs more
+          // than 3 points ahead of what /jobs/:id/status reports — the
+          // header indicator and Stories card both read that field
+          // directly via checkpointToPercent, so unbounded creep here used
+          // to make all three surfaces show different numbers (e.g. 7% in
+          // the card, 49% in the header, 70%+ in the create screen).
+          const creepCap = target + 3;
           if (prev < 55) {
-            return Math.min(prev + 0.15, 55);  // gentle creep through text gen phase
+            return Math.min(prev + 0.15, 55, creepCap);  // gentle creep through text gen phase
           }
           // Above 55%: slower creep toward 98%
           const creepInterval = Math.max(8, Math.min(15, pageCount * 0.6));
           const creepStep = 0.5 / (creepInterval / 0.5);
-          return Math.min(prev + creepStep, 98);
+          return Math.min(prev + creepStep, 98, creepCap);
         }
 
         // Checkpoint ahead — move toward it, faster when gap is large

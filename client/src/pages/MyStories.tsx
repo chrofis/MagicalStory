@@ -7,6 +7,7 @@ import { useToast } from '@/context/ToastContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
+import { checkpointToPercent } from '@/components/generation/GenerationProgress';
 import { MAX_BOOK_PAGES } from './Pricing';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
@@ -51,9 +52,12 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
   language: string;
   onView: () => void;
 }) {
-  const percentage = progress.total > 0
-    ? Math.round((progress.current / progress.total) * 100)
-    : 0;
+  // The server's `progress` field is a CHECKPOINT NUMBER (1–73, then 100),
+  // not a percentage. Navigation already maps it through checkpointToPercent
+  // to display a real %; this card used to do `current/total*100` instead,
+  // which made the same checkpoint show as 7% here and 49% in the header.
+  // Use the same mapping so all three surfaces agree.
+  const percentage = checkpointToPercent(progress.current);
 
   return (
     <div
