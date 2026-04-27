@@ -2988,11 +2988,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               setTrait('glasses', t.glasses);
               setTrait('eyeColorHex', t.eyeColorHex);
               setTrait('hairColorHex', t.hairColorHex);
-              // Hair shape / length / density / styling — single source of truth.
-              // The old simple fields hairLength/hairStyle/hairDensity have been
-              // removed; buildHairDescription reads only detailedHairAnalysis.
+              // Hair shape — single canonical source is physical.detailedHairAnalysis,
+              // re-extracted from the freshly generated avatar. After this save
+              // the override is no longer needed (the new analysis reflects
+              // what the user wanted), so userHairOverride gets stripped below.
+              let freshDetailedHair = false;
               if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
                 physical.detailedHairAnalysis = t.detailedHairAnalysis;
+                freshDetailedHair = true;
               }
 
               // Merge with existing physical object
@@ -3000,6 +3003,15 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(metadata->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
+
+              // Drop physical.userHairOverride now that the fresh extraction
+              // is the source of truth. Postgres jsonb `-` operator removes
+              // a key. Done as a separate step because the JSONB merge above
+              // is additive — it can't delete keys on its own.
+              if (freshDetailedHair) {
+                dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},physical}', (data->'characters'->${freshCharIndex}->'physical') - 'userHairOverride', true)`;
+                metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', (metadata->'characters'->${freshCharIndex}->'physical') - 'userHairOverride', true)`;
+              }
 
               // Persist trait sources (merge with existing, preserving 'user' entries)
               if (Object.keys(traitSources).length > 0) {
@@ -4054,11 +4066,14 @@ These corrections OVERRIDE what is visible in the reference photo.
               setTrait('glasses', t.glasses);
               setTrait('eyeColorHex', t.eyeColorHex);
               setTrait('hairColorHex', t.hairColorHex);
-              // Hair shape / length / density / styling — single source of truth.
-              // The old simple fields hairLength/hairStyle/hairDensity have been
-              // removed; buildHairDescription reads only detailedHairAnalysis.
+              // Hair shape — single canonical source is physical.detailedHairAnalysis,
+              // re-extracted from the freshly generated avatar. After this save
+              // the override is no longer needed (the new analysis reflects
+              // what the user wanted), so userHairOverride gets stripped below.
+              let freshDetailedHair = false;
               if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
                 physical.detailedHairAnalysis = t.detailedHairAnalysis;
+                freshDetailedHair = true;
               }
 
               // Merge with existing physical object
@@ -4066,6 +4081,13 @@ These corrections OVERRIDE what is visible in the reference photo.
               metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(metadata->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
+
+              // Drop physical.userHairOverride now that the fresh extraction
+              // is the source of truth.
+              if (freshDetailedHair) {
+                dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physical}', (data->'characters'->${charIndex}->'physical') - 'userHairOverride', true)`;
+                metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', (metadata->'characters'->${charIndex}->'physical') - 'userHairOverride', true)`;
+              }
 
               // Persist trait sources (merge with existing, preserving 'user' entries)
               if (Object.keys(traitSources).length > 0) {

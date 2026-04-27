@@ -218,11 +218,25 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
   if (!physical) return '';
 
   const detailed = physical.detailedHairAnalysis;
-  if (!detailed) {
-    // Truly legacy record (no detailed analysis). Use whatever prose is
-    // stored in the free-form `hair` field as a last resort.
+  const override = physical.userHairOverride && typeof physical.userHairOverride === 'object'
+    ? physical.userHairOverride
+    : {};
+
+  if (!detailed && Object.keys(override).length === 0) {
+    // Truly legacy record (no detailed analysis, no user overrides). Use
+    // whatever prose is stored in the free-form `hair` field as a last resort.
     return physical.hair || '';
   }
+
+  // Field-level read priority: user override wins, falls back to extraction.
+  // Each subfield is resolved independently so partial overrides work
+  // (e.g. user only changed styling; length/density still come from extraction).
+  const pick = (k) => {
+    const o = override[k];
+    if (o != null && String(o).trim() !== '') return String(o).trim();
+    const d = detailed?.[k];
+    return d != null && String(d).trim() !== '' ? String(d).trim() : null;
+  };
 
   const parts = [];
 
@@ -232,8 +246,8 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 
   // Bald / near-bald takes priority — don't add texture/length/styling that
   // make no sense on bald hair. ("white, bald" beats "white, straight".)
-  const lengthTop = detailed.lengthTop?.toLowerCase();
-  const density = detailed.density?.toLowerCase();
+  const lengthTop = pick('lengthTop')?.toLowerCase();
+  const density = pick('density')?.toLowerCase();
   const isBald = lengthTop === 'bald' || density === 'bald';
   const isBalding = density === 'balding';
   if (isBald) {
@@ -245,19 +259,18 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     // Fall through so we still describe whatever hair remains (e.g. "balding, short on sides").
   }
 
-  // Type/texture. User-edited override wins so users can correct the
-  // analyser. Accepts the same enum the detailed analyser uses.
-  if (physicalTraitsSource?.hairType === 'user' && detailed.type) {
-    parts.push(detailed.type);
-  } else if (detailed.type) {
-    parts.push(detailed.type);
-  }
+  // Type/texture. From extraction (no user dropdown for this).
+  const type = pick('type');
+  if (type) parts.push(type);
 
   // Length — scale for picking the more informative description.
   const lengthOrder = ['bald', 'buzz cut', 'shaved', 'fade', 'tapered', 'short', 'ear-length', 'chin-length', 'neck-length', 'shoulder-length', 'mid-back', 'waist-length'];
 
   if (lengthTop) {
-    const sidesLength = detailed.lengthSides?.toLowerCase();
+    // lengthSides only meaningful when the user didn't override the top
+    // length — a user "shoulder-length" intent shouldn't be split into
+    // "tapered on sides, shoulder-length on top".
+    const sidesLength = override.lengthTop ? null : pick('lengthSides')?.toLowerCase();
     if (sidesLength && sidesLength !== 'same as top') {
       const topIdx = lengthOrder.indexOf(lengthTop);
       const sidesIdx = lengthOrder.indexOf(sidesLength);
@@ -271,19 +284,25 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     }
   }
 
-  // Styling from detailed analysis (if descriptive).
-  const styling = detailed.styling?.toLowerCase();
-  if (styling && !['natural', 'textured'].includes(styling)) {
-    parts.push(styling);
+  // Styling — user override bypasses the "uninformative words" gate
+  // because user-typed values are explicit intent.
+  const styling = pick('styling')?.toLowerCase();
+  if (styling) {
+    if (override.styling) {
+      parts.push(styling);
+    } else if (!['natural', 'textured'].includes(styling)) {
+      parts.push(styling);
+    }
   }
 
   // Bangs.
-  if (detailed.bangsEndAt && detailed.bangsEndAt !== 'no bangs') {
-    parts.push(`bangs ${detailed.bangsEndAt}`);
+  const bangs = pick('bangsEndAt');
+  if (bangs && bangs !== 'no bangs') {
+    parts.push(`bangs ${bangs}`);
   }
 
   // Parting — supports legacy `direction` alias.
-  const parting = detailed.parting || detailed.direction;
+  const parting = pick('parting') || detailed?.direction;
   if (parting && !['none', 'natural', 'back', 'forward'].includes(parting)) {
     parts.push(parting);
   }

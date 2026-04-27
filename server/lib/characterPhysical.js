@@ -49,11 +49,17 @@ const FIELD_MAPPINGS = {
 // All legacy field names to strip
 const LEGACY_FIELDS = Object.keys(FIELD_MAPPINGS);
 
-// Hair-shape fields that the form still writes (CharacterForm has length /
-// style / density inputs) but no reader consumes since the d8f177f3
-// "single source of truth — detailedHairAnalysis only" refactor. Folded into
-// detailedHairAnalysis on save so user edits actually take effect.
-const HAIR_SHAPE_FIELD_TO_DETAILED_KEY = {
+// Hair-shape fields the CharacterForm writes when the user picks from the
+// length / style / density dropdowns. These are USER OVERRIDES — they do
+// NOT mix into the auto-extracted detailedHairAnalysis (which would let one
+// pollute the other). They live in their own sub-object physical.userHairOverride
+// that wins over detailedHairAnalysis at read time.
+//
+// After a successful avatar regeneration, the new avatar gets re-analysed and
+// the fresh detailedHairAnalysis replaces the old one. At that point
+// userHairOverride is cleared because the canonical extraction now agrees
+// with what the user wanted.
+const HAIR_OVERRIDE_FIELD_TO_DETAILED_KEY = {
   hairLength: 'lengthTop',
   hairStyle: 'styling',
   hairDensity: 'density',
@@ -161,35 +167,54 @@ function stripLegacyPhysicalFields(character) {
     delete character[field];
   }
 
-  // Fold + strip CharacterForm's hair-shape fields. The form writes
-  // physical.hairLength / physical.hairStyle / physical.hairDensity but
-  // since d8f177f3 ("single source of truth — detailedHairAnalysis only")
-  // nothing reads them. Without folding, every user hair edit was a write-
-  // only zombie. Now: fold each one into the matching detailedHairAnalysis
-  // key (lengthTop / styling / density), then drop the top-level field so
-  // detailedHairAnalysis stays the single source of truth.
+  // Move the form's hair-shape inputs into physical.userHairOverride.
+  // CharacterForm writes physical.hairLength / hairStyle / hairDensity from
+  // its dropdowns. Those are USER OVERRIDES — they belong in their own
+  // sub-object so they never blend into the auto-extracted
+  // detailedHairAnalysis. buildHairDescription reads override-first, falls
+  // back to detailedHairAnalysis when no override is present.
   if (character.physical && typeof character.physical === 'object') {
     const phys = character.physical;
-    // Collect non-empty fold candidates BEFORE deciding whether to create a
-    // detailedHairAnalysis object. If everything is empty, leave the
-    // structure alone — don't fabricate an empty detailed object.
-    const folds = {};
-    for (const [topField, detailedKey] of Object.entries(HAIR_SHAPE_FIELD_TO_DETAILED_KEY)) {
+    const overrides = {};
+    for (const [topField, detailedKey] of Object.entries(HAIR_OVERRIDE_FIELD_TO_DETAILED_KEY)) {
       const v = phys[topField];
       if (v != null && String(v).trim() !== '') {
-        folds[detailedKey] = String(v).trim();
+        overrides[detailedKey] = String(v).trim();
       }
-      // Always strip the top-level field — only the canonical structure stays.
+      // Strip the top-level field unconditionally — the canonical home is
+      // physical.userHairOverride.
       delete phys[topField];
     }
-    if (Object.keys(folds).length > 0) {
-      const existing = phys.detailedHairAnalysis && typeof phys.detailedHairAnalysis === 'object'
-        ? phys.detailedHairAnalysis
+    if (Object.keys(overrides).length > 0) {
+      const existing = phys.userHairOverride && typeof phys.userHairOverride === 'object'
+        ? phys.userHairOverride
         : {};
-      phys.detailedHairAnalysis = { ...existing, ...folds };
+      phys.userHairOverride = { ...existing, ...overrides };
     }
   }
 
+  return character;
+}
+
+/**
+ * Helper: did the user explicitly override any hair field? Used at avatar-
+ * generation time to decide whether to send PHYSICAL TRAIT CORRECTIONS for
+ * hair to Gemini.
+ */
+function hasUserHairOverride(physical) {
+  const o = physical?.userHairOverride;
+  return o && typeof o === 'object' && Object.keys(o).length > 0;
+}
+
+/**
+ * Clear physical.userHairOverride. Called by the avatar pipeline AFTER a
+ * successful regeneration + re-analysis: the fresh detailedHairAnalysis now
+ * reflects what the user wanted, so the override is no longer needed.
+ */
+function clearUserHairOverride(character) {
+  if (character?.physical?.userHairOverride) {
+    delete character.physical.userHairOverride;
+  }
   return character;
 }
 
@@ -211,6 +236,8 @@ module.exports = {
   normalizePhysical,
   stripLegacyPhysicalFields,
   normalizeAllPhysical,
+  hasUserHairOverride,
+  clearUserHairOverride,
   FIELD_MAPPINGS,
   LEGACY_FIELDS
 };

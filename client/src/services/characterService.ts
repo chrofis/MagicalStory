@@ -733,7 +733,12 @@ export const characterService = {
       log.info(`Physical skinTone value: '${character.physical?.skinTone}', source: '${traitsSource.skinTone}'`);
       log.info(`Physical hairStyle value: '${character.physical?.hairStyle}', source: '${traitsSource.hairStyle}'`);
 
-      const userTraits: typeof character.physical = {};
+      // Send only the simple, user-pickable fields. Detailed extraction
+      // structures (detailedHairAnalysis, detailedFaceAnalysis) are NOT sent —
+      // they were extracted from the photo and would only contradict the
+      // user's edits. After regeneration, the new avatar gets re-analysed
+      // and the fresh detailed structures replace the stale ones.
+      const userTraits: typeof character.physical & { userHairOverride?: Record<string, string> } = {};
       if (character.physical) {
         if (traitsSource.eyeColor === 'user' && character.physical.eyeColor) {
           userTraits.eyeColor = character.physical.eyeColor;
@@ -741,11 +746,19 @@ export const characterService = {
         if (traitsSource.hairColor === 'user' && character.physical.hairColor) {
           userTraits.hairColor = character.physical.hairColor;
         }
+        // Hair shape edits → userHairOverride sub-object on the server.
+        // The form's three dropdowns (length/style/density) all live here.
+        // The server merges this into character.physical.userHairOverride
+        // and buildHairDescription reads it as override-first.
+        const hairOverride: Record<string, string> = {};
         if (traitsSource.hairLength === 'user' && character.physical.hairLength) {
-          userTraits.hairLength = character.physical.hairLength;
+          hairOverride.lengthTop = character.physical.hairLength;
         }
         if (traitsSource.hairStyle === 'user' && character.physical.hairStyle) {
-          userTraits.hairStyle = character.physical.hairStyle;
+          hairOverride.styling = character.physical.hairStyle;
+        }
+        if (Object.keys(hairOverride).length > 0) {
+          userTraits.userHairOverride = hairOverride;
         }
         if (traitsSource.build === 'user' && character.physical.build) {
           userTraits.build = character.physical.build;
@@ -762,6 +775,12 @@ export const characterService = {
         }
         if (traitsSource.facialHair === 'user' && character.physical.facialHair) {
           userTraits.facialHair = character.physical.facialHair;
+        }
+        if (traitsSource.glasses === 'user' && character.physical.glasses) {
+          userTraits.glasses = character.physical.glasses;
+        }
+        if (traitsSource.apparentAge === 'user' && character.physical.apparentAge) {
+          userTraits.apparentAge = character.physical.apparentAge;
         }
         if (traitsSource.other === 'user' && character.physical.other) {
           userTraits.other = character.physical.other;
