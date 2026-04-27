@@ -267,10 +267,10 @@ export function GenerationProgress({
       { type: 'message' as const, key: 'timeInfo' },
       { type: 'message' as const, key: 'tipCharacters' },
       { type: 'message' as const, key: 'tipPrintedBook' },
-      { type: 'message' as const, key: 'emailInfo' },
       { type: 'message' as const, key: 'tipStoryPlot' },
       { type: 'message' as const, key: 'tipLearning' },
-      { type: 'message' as const, key: 'canClose' },
+      // canClose appears as the highlighted email-icon panel below — no need
+      // to also rotate the close-tab message through the tips carousel.
       { type: 'message' as const, key: 'tipLocations' },
       { type: 'message' as const, key: 'tipHistoric' },
       { type: 'message' as const, key: 'tipArtStyle' },
@@ -451,8 +451,6 @@ export function GenerationProgress({
     en: {
       title: 'Creating Your Story!',
       timeInfo: 'Your story takes about 5–10 minutes depending on length. The first pages will appear soon!',
-      emailInfo: 'You\'ll receive an email when your story is ready — feel free to do something else.',
-      canClose: 'You can close the browser anytime — your story keeps generating in the background.',
       tipCharacters: 'Children learn best when they see themselves in the story. That\'s the magic of personalized books!',
       tipStoryPlot: 'You can edit any text and regenerate any image after the story is created — make it perfect!',
       tipLocations: 'We include real photos of your hometown landmarks in the illustrations — select your location for a personal touch.',
@@ -468,14 +466,13 @@ export function GenerationProgress({
       backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
-      canCloseTitle: 'You can close this tab',
+      canCloseTitle: 'Continues in the background',
+      canClose: 'Close this tab — we\'ll email you when your story is ready.',
       continueInBackground: 'Continue in Background',
     },
     de: {
       title: 'Geschichte wird erstellt!',
       timeInfo: 'Deine Geschichte braucht etwa 5–10 Minuten je nach Länge. Die ersten Seiten erscheinen bald!',
-      emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist — mach ruhig etwas anderes.',
-      canClose: 'Du kannst den Browser jederzeit schliessen — deine Geschichte wird im Hintergrund weiter erstellt.',
       tipCharacters: 'Kinder lernen am besten, wenn sie sich selbst in der Geschichte sehen. Das ist die Magie personalisierter Bücher!',
       tipStoryPlot: 'Du kannst jeden Text bearbeiten und jedes Bild neu generieren — mach die Geschichte perfekt!',
       tipLocations: 'Wir verwenden echte Fotos deiner Heimat-Sehenswürdigkeiten in den Illustrationen — wähle deinen Ort für eine persönliche Note.',
@@ -491,14 +488,13 @@ export function GenerationProgress({
       backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
-      canCloseTitle: 'Du kannst diesen Tab schliessen',
+      canCloseTitle: 'Wird im Hintergrund erstellt',
+      canClose: 'Schliesse den Tab — du erhältst eine E-Mail, sobald deine Geschichte bereit ist.',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
       title: 'Création de votre histoire!',
       timeInfo: 'Votre histoire prend environ 5 à 10 minutes selon la longueur. Les premières pages apparaîtront bientôt !',
-      emailInfo: 'Vous recevrez un email quand votre histoire sera prête — n\'hésitez pas à faire autre chose.',
-      canClose: 'Vous pouvez fermer le navigateur à tout moment — votre histoire continue d\'être créée en arrière-plan.',
       tipCharacters: 'Les enfants apprennent mieux quand ils se voient dans l\'histoire. C\'est la magie des livres personnalisés !',
       tipStoryPlot: 'Vous pouvez modifier chaque texte et regénérer chaque image après la création — rendez-la parfaite !',
       tipLocations: 'Nous incluons de vraies photos de vos monuments locaux dans les illustrations — choisissez votre lieu pour une touche personnelle.',
@@ -514,7 +510,8 @@ export function GenerationProgress({
       backCover: 'Dos',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
-      canCloseTitle: 'Vous pouvez fermer cet onglet',
+      canCloseTitle: 'Création en arrière-plan',
+      canClose: 'Fermez l\'onglet — nous vous enverrons un email dès que votre histoire est prête.',
       continueInBackground: 'Continuer en arrière-plan',
     },
   };
@@ -574,7 +571,6 @@ export function GenerationProgress({
                 const messageKey = currentItem.key as keyof typeof t;
                 const messageText = t[messageKey] || '';
                 const icon = messageKey === 'timeInfo' ? <Clock size={20} className="text-indigo-500 shrink-0" /> :
-                             messageKey === 'emailInfo' ? <Mail size={20} className="text-indigo-500 shrink-0" /> :
                              <CheckCircle size={20} className="text-indigo-500 shrink-0" />;
                 return (
                   <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 max-w-sm animate-fade-in">
@@ -661,9 +657,11 @@ export function GenerationProgress({
           <div className="mb-4 border border-indigo-200 bg-indigo-50 rounded-xl p-4 flex items-start gap-3">
             <Mail className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h4 className="font-medium text-gray-800 mb-1">{t.canCloseTitle}</h4>
+              {/* Highlighted: the headline says the story keeps running in the
+                  background. The body collapses the old "close tab" + email
+                  reassurances into one sentence — they were redundant. */}
+              <h4 className="font-semibold text-indigo-900 mb-1">{t.canCloseTitle}</h4>
               <p className="text-sm text-gray-700">{t.canClose}</p>
-              <p className="text-sm text-gray-700 mt-1">{t.emailInfo}</p>
             </div>
           </div>
         )}
