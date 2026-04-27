@@ -1250,6 +1250,9 @@ function buildPhysicalTraitsForAvatar(character) {
     }
   }
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
+  if (traits.glasses && String(traits.glasses).trim().toLowerCase() !== 'none') {
+    parts.push(`Glasses: ${traits.glasses} — ALWAYS visible on the face`);
+  }
   if (traits.other && traits.other !== 'none') {
     parts.push(`Other features: ${traits.other}`);
   }
@@ -2317,6 +2320,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
         }
       }
+      if (physicalTraits.glasses && String(physicalTraits.glasses).trim().toLowerCase() !== 'none') {
+        traitLines.push(`- Glasses: ${physicalTraits.glasses} — ALWAYS visible on the face`);
+      }
       if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
       if (traitLines.length > 0) {
         userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${traitLines.join('\n')}`;
@@ -3253,6 +3259,9 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         } else if (physicalTraits.facialHair.toLowerCase() !== 'none') {
           traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
         }
+      }
+      if (physicalTraits.glasses && String(physicalTraits.glasses).trim().toLowerCase() !== 'none') {
+        traitLines.push(`- Glasses: ${physicalTraits.glasses} — ALWAYS visible on the face`);
       }
       if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
 
