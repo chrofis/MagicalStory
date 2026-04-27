@@ -224,19 +224,6 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     return physical.hair || '';
   }
 
-  // User-edit overrides for hair length/style. The CharacterForm saves these
-  // as top-level fields (physical.hairLength / physical.hairStyle) instead
-  // of merging into detailedHairAnalysis, so without this override the
-  // user-typed values were silently ignored — buildHairDescription only ever
-  // saw the auto-extracted detailedHairAnalysis. When a user-set value is
-  // present, it wins.
-  const userLengthTop = physical.hairLength
-    ? String(physical.hairLength).trim().toLowerCase()
-    : null;
-  const userStyling = physical.hairStyle
-    ? String(physical.hairStyle).trim().toLowerCase()
-    : null;
-
   const parts = [];
 
   // Color — the one non-hair-shape field that stays at top level. Describes
@@ -245,7 +232,7 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 
   // Bald / near-bald takes priority — don't add texture/length/styling that
   // make no sense on bald hair. ("white, bald" beats "white, straight".)
-  const lengthTop = userLengthTop || detailed.lengthTop?.toLowerCase();
+  const lengthTop = detailed.lengthTop?.toLowerCase();
   const density = detailed.density?.toLowerCase();
   const isBald = lengthTop === 'bald' || density === 'bald';
   const isBalding = density === 'balding';
@@ -271,9 +258,7 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 
   if (lengthTop) {
     const sidesLength = detailed.lengthSides?.toLowerCase();
-    // When the user override applies, ignore detailed.lengthSides — the
-    // user's intent is a uniform length, not a top/sides split.
-    if (!userLengthTop && sidesLength && sidesLength !== 'same as top') {
+    if (sidesLength && sidesLength !== 'same as top') {
       const topIdx = lengthOrder.indexOf(lengthTop);
       const sidesIdx = lengthOrder.indexOf(sidesLength);
       if (topIdx >= 0 && sidesIdx >= 0 && topIdx - sidesIdx >= 2) {
@@ -286,13 +271,9 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     }
   }
 
-  // Styling — user override wins. detailed.styling is otherwise filtered
-  // through an "uninformative words" gate; user-typed words bypass that
-  // gate because they're explicit intent.
-  const styling = userStyling || detailed.styling?.toLowerCase();
-  if (userStyling) {
-    parts.push(userStyling);
-  } else if (styling && !['natural', 'textured'].includes(styling)) {
+  // Styling from detailed analysis (if descriptive).
+  const styling = detailed.styling?.toLowerCase();
+  if (styling && !['natural', 'textured'].includes(styling)) {
     parts.push(styling);
   }
 

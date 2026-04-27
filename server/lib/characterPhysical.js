@@ -49,6 +49,16 @@ const FIELD_MAPPINGS = {
 // All legacy field names to strip
 const LEGACY_FIELDS = Object.keys(FIELD_MAPPINGS);
 
+// Hair-shape fields that the form still writes (CharacterForm has length /
+// style / density inputs) but no reader consumes since the d8f177f3
+// "single source of truth — detailedHairAnalysis only" refactor. Folded into
+// detailedHairAnalysis on save so user edits actually take effect.
+const HAIR_SHAPE_FIELD_TO_DETAILED_KEY = {
+  hairLength: 'lengthTop',
+  hairStyle: 'styling',
+  hairDensity: 'density',
+};
+
 /**
  * Get physical attributes from a character
  * Returns the canonical physical object, merging from legacy fields if needed
@@ -149,6 +159,35 @@ function stripLegacyPhysicalFields(character) {
 
   for (const field of LEGACY_FIELDS) {
     delete character[field];
+  }
+
+  // Fold + strip CharacterForm's hair-shape fields. The form writes
+  // physical.hairLength / physical.hairStyle / physical.hairDensity but
+  // since d8f177f3 ("single source of truth — detailedHairAnalysis only")
+  // nothing reads them. Without folding, every user hair edit was a write-
+  // only zombie. Now: fold each one into the matching detailedHairAnalysis
+  // key (lengthTop / styling / density), then drop the top-level field so
+  // detailedHairAnalysis stays the single source of truth.
+  if (character.physical && typeof character.physical === 'object') {
+    const phys = character.physical;
+    // Collect non-empty fold candidates BEFORE deciding whether to create a
+    // detailedHairAnalysis object. If everything is empty, leave the
+    // structure alone — don't fabricate an empty detailed object.
+    const folds = {};
+    for (const [topField, detailedKey] of Object.entries(HAIR_SHAPE_FIELD_TO_DETAILED_KEY)) {
+      const v = phys[topField];
+      if (v != null && String(v).trim() !== '') {
+        folds[detailedKey] = String(v).trim();
+      }
+      // Always strip the top-level field — only the canonical structure stays.
+      delete phys[topField];
+    }
+    if (Object.keys(folds).length > 0) {
+      const existing = phys.detailedHairAnalysis && typeof phys.detailedHairAnalysis === 'object'
+        ? phys.detailedHairAnalysis
+        : {};
+      phys.detailedHairAnalysis = { ...existing, ...folds };
+    }
   }
 
   return character;
