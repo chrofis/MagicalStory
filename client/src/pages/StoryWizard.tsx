@@ -183,6 +183,11 @@ export default function StoryWizard() {
   const [step, setStep] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('storyId')) return 6;
+    // ?jobId=… arrives from the "wird erstellt" card click on /stories.
+    // Land on step 6 synchronously so the user never sees a blank step 1
+    // while the GenerationContext catches up (or, on a fresh tab, hadn't
+    // started tracking at all).
+    if (params.get('jobId')) return 6;
     if (params.get('new') === 'true') return 1;  // New story starts at step 1
     if (activeJob) return 6;  // GenerationContext has an active job → resume on the generation view
     const savedStep = localStorage.getItem('wizard_step');
@@ -342,7 +347,13 @@ export default function StoryWizard() {
   const [season, setSeason] = useState<string>(() => getCurrentSeason());
 
   // Step 7: Generation & Display
-  const [isGenerating, setIsGenerating] = useState(false); // Full story generation
+  // ?jobId=… → start in the generating state so the GenerationProgress modal
+  // mounts on first render. Without this, the user sees a blank step-6 frame
+  // for a tick until the useEffect at line ~684 flips isGenerating=true.
+  const [isGenerating, setIsGenerating] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('jobId');
+  }); // Full story generation
   const [regeneratingCovers, setRegeneratingCovers] = useState<Set<string>>(new Set()); // Track which covers are regenerating
   const [editingPages, setEditingPages] = useState<Set<number>>(new Set()); // Track which pages are being edited
   const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
@@ -677,11 +688,27 @@ export default function StoryWizard() {
       restoredJobIdRef.current = null;
     }
 
+    // ?jobId=… (from MyStories' "wird erstellt" card click) — adopt it as the
+    // active job if the GenerationContext hasn't started tracking it yet.
+    // Without this, opening /create?jobId=… in a fresh tab leaves the wizard
+    // at step 6 with isGenerating=true but no progress or covers ever flow in.
+    const urlJobId = searchParams.get('jobId');
+    if (urlJobId && !activeJob && startTracking) {
+      log.info('[StoryWizard] Adopting jobId from URL into GenerationContext:', urlJobId);
+      startTracking(urlJobId, '');
+      // The next render will see activeJob populated and fall through to the
+      // restore branch below.
+      return;
+    }
+
     // If there's an active job and we haven't restored it yet, restore progressive view.
     // Skip if isGenerating is already true — that means generateStory() started this job
     // in the current session and already set up step 6. Only restore for jobs from a
     // previous session (user returning to page while generation is still running).
-    if (activeJob && !urlStoryId && !isGenerating && restoredJobIdRef.current !== activeJob.jobId) {
+    // (Caveat: when we just landed via ?jobId=…, isGenerating is true but
+    // restoredJobIdRef hasn't run yet — restore needs to run anyway.)
+    const wasJustAdoptedFromUrl = urlJobId && activeJob?.jobId === urlJobId && restoredJobIdRef.current !== activeJob.jobId;
+    if (activeJob && !urlStoryId && (!isGenerating || wasJustAdoptedFromUrl) && restoredJobIdRef.current !== activeJob.jobId) {
       log.info('Returning during active generation, restoring progress for job:', activeJob.jobId);
       restoredJobIdRef.current = activeJob.jobId;
       setStep(6);

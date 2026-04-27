@@ -948,7 +948,15 @@ export default function MyStories() {
                 storyTitle=""
                 progress={{ current: activeJob.progress, total: 100, message: activeJob.message }}
                 language={language}
-                onView={() => {}}
+                onView={() => {
+                  // Hand the jobId off to the wizard via URL so step 6 mounts
+                  // synchronously on first render — without ?jobId, the
+                  // wizard sits at step 1 (blank) until useEffect picks the
+                  // job up from GenerationContext, and if the context lost
+                  // it (fresh tab) the screen stays blank entirely.
+                  if (generation?.startTracking) generation.startTracking(activeJob.id, '');
+                  navigate(`/create?jobId=${encodeURIComponent(activeJob.id)}`);
+                }}
               />
             </div>
           ) : (
@@ -972,7 +980,7 @@ export default function MyStories() {
                   storyTitle={generation.activeJob.storyTitle}
                   progress={generation.progress}
                   language={language}
-                  onView={() => navigate('/create')}
+                  onView={() => navigate(`/create?jobId=${encodeURIComponent(generation.activeJob!.jobId)}`)}
                 />
               )}
               {stories
