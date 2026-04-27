@@ -517,8 +517,19 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     checkObjects = false,
     minAppearances = MIN_APPEARANCES,
     saveGrids = false,
-    outputDir = null
+    outputDir = null,
+    // Heartbeat callback. Called between each entity (character/object) so
+    // long object loops on stories with many distinct objects (Wilhelm Tell:
+    // crossbow + apple + hat pole + horse + market square + boat + …) don't
+    // trigger the front-end stall watcher. Caller wires this to an
+    // `UPDATE story_jobs SET updated_at = NOW() …` ping. Optional.
+    onHeartbeat = null
   } = options;
+  const heartbeat = async () => {
+    if (typeof onHeartbeat === 'function') {
+      try { await onHeartbeat(); } catch (e) { /* never let heartbeat break the loop */ }
+    }
+  };
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -670,6 +681,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
       // Phase 2: Run all tasks in parallel
       const results = await Promise.all(tasks.map(task => entityLimit(async () => {
+        await heartbeat();  // bump updated_at so the heartbeat watcher sees progress
         const { character, charName, clothingCategory, groupAppearances, minRequired } = task;
         try {
           log.info(`🔍 [ENTITY-CHECK] Checking ${charName} (${clothingCategory}): ${groupAppearances.length} appearances`);
@@ -872,6 +884,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
       for (const [objName, appearances] of objectAppearances) {
         if (appearances.length < minAppearances) continue;
 
+        await heartbeat();  // bump updated_at so the heartbeat watcher sees progress
         log.info(`🔍 [ENTITY-CHECK] Checking object ${objName}: ${appearances.length} appearances`);
 
         try {

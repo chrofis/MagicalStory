@@ -5659,6 +5659,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   };
 
+  // Heartbeat ping — lighter than updateProgress: only bumps updated_at,
+  // doesn't change percent or message. Passed to runEntityConsistencyChecks
+  // so the long object loop (Wilhelm Tell stories accumulate ~30 distinct
+  // objects to check; ~4s each = 2 min sequential) doesn't trip the
+  // front-end stall watcher (5-min no-progress timeout).
+  const pingHeartbeat = async () => {
+    if (jobId && dbPool) {
+      try {
+        await dbPool.query(
+          'UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+          [jobId]
+        );
+      } catch (e) { /* never let heartbeat break the loop */ }
+    }
+  };
+
   // =========================================================================
   // Step 1: Evaluate all images + entity consistency (parallel)
   // =========================================================================
@@ -5754,7 +5770,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       checkObjects: true,
-      saveGrids: false
+      saveGrids: false,
+      onHeartbeat: pingHeartbeat
     }).catch(err => {
       log.error(`❌ [UNIFIED PIPELINE] Entity consistency check failed: ${err.message}`);
       return { characters: {}, totalIssues: 0, overallConsistent: true, summary: 'Entity check failed', grids: [] };
@@ -6238,7 +6255,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const freshEntity = await runEntityConsistencyChecks(freshEntityCheckData, characters, {
           checkCharacters: true,
           checkObjects: true,
-          saveGrids: false
+          saveGrids: false,
+          onHeartbeat: pingHeartbeat
         });
         if (freshEntity?.tokenUsage && usageTracker) {
           usageTracker('gemini_quality', {
@@ -6325,7 +6343,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       finalEntityReport = await runEntityConsistencyChecks(finalEntityCheckData, characters, {
         checkCharacters: true,
         checkObjects: true,
-        saveGrids: false
+        saveGrids: false,
+        onHeartbeat: pingHeartbeat
       });
       if (finalEntityReport?.tokenUsage && usageTracker) {
         usageTracker('gemini_quality', {
@@ -6631,7 +6650,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const report = await runEntityConsistencyChecks(charFixEntityCheckData, characters, {
             checkCharacters: true,
             checkObjects: true,
-            saveGrids: false
+            saveGrids: false,
+            onHeartbeat: pingHeartbeat
           });
           if (report?.tokenUsage && usageTracker) {
             usageTracker('gemini_quality', {
