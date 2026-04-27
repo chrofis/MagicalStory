@@ -5760,7 +5760,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output${thinkingTotal} tokens`);
     log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
 
-    await checkCancellation();
+    // INTENTIONALLY no checkCancellation() here. By this point the pipeline
+    // has fully completed — every image generated, every cost paid, the
+    // ✅ [UNIFIED PIPELINE] Complete log line has fired. The remaining work
+    // is just persistence (writing the finished story to the stories table).
+    // Aborting here would discard the in-memory completed story without
+    // ever saving it — which is what bricked job_1777312806388_aja96pys7
+    // (cancel signal arrived 1ms after Pipeline Complete and the catch
+    // block returned null without persisting). After Pipeline Complete the
+    // user's intent to "stop work" no longer applies — work is done; saving
+    // the result is what turns paid compute into a deliverable. Earlier
+    // checkCancellation() calls (before each page generation, etc.) still
+    // honour cancellation while there's expensive work left to skip.
     log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
