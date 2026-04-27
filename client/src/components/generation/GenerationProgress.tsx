@@ -65,7 +65,7 @@ export function GenerationProgress({
   onMinimize,
   characters = [],
   isImpersonating = false,
-  pageCount = 20,
+  pageCount: _pageCount = 20,  // kept in props for caller compat; no longer used by progress timing
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -391,52 +391,39 @@ export function GenerationProgress({
   useEffect(() => {
     if (isDone) { setDisplayProgress(100); return; }
 
-    // Tick every 500ms for smooth animation
+    // Tick every 500ms for smooth animation toward the target.
+    //
+    // Single rule: never exceed `target`. The bar advances toward the latest
+    // checkpoint percentage (held in targetRef, monotonic) and stops there
+    // until the next checkpoint arrives. No creep above target — that's
+    // what produced the see-saw (Phase 1 climbed blindly to 35%, then
+    // Phase 2's creep cap snapped the bar back to target+3, then Phase 1
+    // climbed again). When target=8 the bar will sit at 8 — same as the
+    // header indicator and the Stories card.
     const interval = setInterval(() => {
       setDisplayProgress(prev => {
         const target = targetRef.current;
-
-        // Phase 1: Linear growth up to LINEAR_CAP (35%), regardless of checkpoints
-        if (prev < LINEAR_CAP && target <= LINEAR_CAP) {
-          return Math.min(prev + LINEAR_RATE, LINEAR_CAP);
-        }
-
-        // Phase 2: Checkpoint-driven
         const gap = target - prev;
+        if (gap <= 0) return prev; // already at target — wait for next checkpoint
 
-        if (gap <= 0) {
-          // No checkpoint ahead — slow creep so the bar never looks stuck.
-          // Cap creep at target+3% so the create-screen bar never runs more
-          // than 3 points ahead of what /jobs/:id/status reports — the
-          // header indicator and Stories card both read that field
-          // directly via checkpointToPercent, so unbounded creep here used
-          // to make all three surfaces show different numbers (e.g. 7% in
-          // the card, 49% in the header, 70%+ in the create screen).
-          const creepCap = target + 3;
-          if (prev < 55) {
-            return Math.min(prev + 0.15, 55, creepCap);  // gentle creep through text gen phase
-          }
-          // Above 55%: slower creep toward 98%
-          const creepInterval = Math.max(8, Math.min(15, pageCount * 0.6));
-          const creepStep = 0.5 / (creepInterval / 0.5);
-          return Math.min(prev + creepStep, 98, creepCap);
-        }
-
-        // Checkpoint ahead — move toward it, faster when gap is large
+        // Adaptive step toward target. Bigger gap → faster catch-up so the
+        // bar reaches a newly-arrived checkpoint within a few seconds.
         let step: number;
-        if (gap < 3) {
+        if (prev < LINEAR_CAP && target > LINEAR_CAP) {
+          // Early phase with a far-away target: 1%/sec linear feels right.
+          step = LINEAR_RATE;
+        } else if (gap < 3) {
           step = 0.3;
         } else if (gap < 10) {
           step = 0.3 + (gap - 3) * 0.1;  // 0.3 to 1.0
         } else {
           step = Math.min(2, 1 + (gap - 10) * 0.05);  // 1.0 to 2.0
         }
-
         return Math.min(prev + step, target);
       });
     }, 500);
     return () => clearInterval(interval);
-  }, [isDone, pageCount]);
+  }, [isDone]);
 
   const progressPercent = isDone ? 100 : Math.round(displayProgress);
 
