@@ -1209,8 +1209,10 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
     imageData = await normalizeImageToA4(imageData);
   }
 
-  // R2 dual-write (Phase 1). isConfigured() guards: if R2 env vars are missing,
-  // imageUrl stays null and we continue with the legacy bytes-only path.
+  // R2 write. Once Phase 1 dual-write proved stable, we stopped persisting
+  // image_data when R2 has the bytes — the column was eating 200 MB of DB
+  // space across rows that had a working image_url. If R2 isn't configured
+  // or upload fails, we still fall back to bytes-only so reads don't break.
   let imageUrl = null;
   try {
     const r2 = require('../lib/r2');
@@ -1223,6 +1225,10 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
     console.warn(`[R2] saveStoryImage upload skipped: ${err.message}`);
   }
 
+  // Only persist image_data when R2 didn't accept the bytes. Otherwise R2 is
+  // the source of truth and keeping the inline copy just bloats Postgres.
+  const persistedImageData = imageUrl ? null : imageData;
+
   if (pageNumber == null) {
     // Covers: use partial index ON CONFLICT for NULL page_number
     await dbQuery(
@@ -1230,7 +1236,7 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)
        ON CONFLICT (story_id, image_type, version_index) WHERE page_number IS NULL
        DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, versionIndex, imageData, imageUrl, qualityScore, generatedAt]
+      [storyId, imageType, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt]
     );
   } else {
     // Scenes: use partial index ON CONFLICT for non-NULL page_number
@@ -1239,7 +1245,7 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL
        DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, pageNumber, versionIndex, imageData, imageUrl, qualityScore, generatedAt]
+      [storyId, imageType, pageNumber, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt]
     );
   }
 }
@@ -1754,12 +1760,13 @@ async function saveRetryHistoryImages(storyId, pageNumber, retryHistory) {
         console.warn(`[R2] retry-image upload skipped: ${err.message}`);
       }
     }
+    const persistedData = imageUrl ? null : data;
     await dbQuery(
       `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data, image_url)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))
        DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url`,
-      [storyId, pageNumber, retryIdx, imageType, gridIdx, data, imageUrl]
+      [storyId, pageNumber, retryIdx, imageType, gridIdx, persistedData, imageUrl]
     );
   };
 
@@ -1859,6 +1866,7 @@ async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData,
     console.warn(`[R2] style-lab upload skipped: ${err.message}`);
   }
 
+  const persistedImageData = imageUrl ? null : imageData;
   await dbQuery(
     `INSERT INTO style_lab_images (story_id, page_number, run_id, model_id, image_data, image_url, thumbnail, style_prompt, elapsed_ms)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -1867,7 +1875,7 @@ async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData,
                    thumbnail = EXCLUDED.thumbnail,
                    style_prompt = EXCLUDED.style_prompt, elapsed_ms = EXCLUDED.elapsed_ms,
                    created_at = CURRENT_TIMESTAMP`,
-    [storyId, pageNumber, runId, modelId, imageData, imageUrl, thumbnail, stylePrompt, elapsedMs]
+    [storyId, pageNumber, runId, modelId, persistedImageData, imageUrl, thumbnail, stylePrompt, elapsedMs]
   );
 }
 
