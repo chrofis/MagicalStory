@@ -7910,8 +7910,21 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const croppedAvatar = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
   const croppedAvatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;
 
-  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  const sceneBuffer = Buffer.from(currentBase64, 'base64');
+  // imageData may be a base64 string, a data: URL, or — after the R2
+  // migration — an https:// URL pointing at the R2 bucket. The latter happens
+  // whenever rehydrateStoryImages falls back to imgSrc(row.image_url) because
+  // the row's image_data column is NULL. Fetch the actual bytes in that case.
+  let sceneBuffer;
+  if (typeof imageData === 'string' && /^https?:\/\//i.test(imageData)) {
+    const r2 = require('./r2');
+    sceneBuffer = await r2.fetchImageBytes(imageData);
+    if (!sceneBuffer) {
+      throw new Error(`Failed to fetch scene image from R2: ${imageData}`);
+    }
+  } else {
+    const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    sceneBuffer = Buffer.from(currentBase64, 'base64');
+  }
 
   const issueDescription = options.issueDescription || '';
   const clothingDescription = options.clothingDescription || '';

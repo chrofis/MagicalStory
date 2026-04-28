@@ -642,6 +642,26 @@ function imgSrc(row) {
   return row.image_data || row.image_url || null;
 }
 
+// Materialize bytes for a row: if image_data is set return it as-is; otherwise
+// fetch from the R2 URL and return a base64 string. Used by rehydrateStoryImages
+// so server-side byte-consumers (repair workflow, sharp metadata reads, semantic
+// eval, MagicAPI) keep working after image_data was NULL'd post-R2-migration.
+// Returns null on any failure so callers can keep the URL fallback.
+async function imgBytesAsync(row) {
+  if (!row) return null;
+  if (row.image_data) return row.image_data;
+  if (!row.image_url) return null;
+  try {
+    const r2 = require('../lib/r2');
+    const buf = await r2.fetchImageBytes(row.image_url);
+    if (!buf) return row.image_url; // fall back to URL — better than nothing
+    return buf.toString('base64');
+  } catch (err) {
+    console.warn(`[R2] imgBytesAsync fetch failed: ${err.message}`);
+    return row.image_url;
+  }
+}
+
 // Helper to log activity
 async function logActivity(userId, username, action, details) {
   try {
@@ -1580,31 +1600,32 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
     // Fast path: single optimized query returns only the active image per page/cover
     const activeImages = await getActiveStoryImages(storyId);
 
-    // Populate sceneImages with active image only
+    // Populate sceneImages with active image only — fetch bytes from R2 in
+    // parallel when the row is URL-only so byte-consumers (repair, sharp
+    // metadata, semantic eval) get base64 like before the migration.
     if (storyData.sceneImages) {
-      for (const scene of storyData.sceneImages) {
+      await Promise.all(storyData.sceneImages.map(async (scene) => {
         if (!scene.imageData) {
           const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
-          if (img) scene.imageData = imgSrc(img);
+          if (img) scene.imageData = await imgBytesAsync(img);
         }
-        // Load active version's bboxDetection onto scene
         const activeV = scene.imageVersions?.find(v => v.isActive);
         if (activeV?.bboxDetection) {
           scene.bboxDetection = activeV.bboxDetection;
         }
-      }
+      }));
     }
 
     // Populate coverImages with active image only
     if (storyData.coverImages) {
-      for (const coverType of ['frontCover', 'backCover', 'initialPage']) {
+      await Promise.all(['frontCover', 'backCover', 'initialPage'].map(async (coverType) => {
         storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
         const cover = storyData.coverImages[coverType];
         if (cover && !getCoverData(cover)) {
           const img = activeImages.find(i => i.image_type === coverType);
-          if (img) cover.imageData = imgSrc(img);
+          if (img) cover.imageData = await imgBytesAsync(img);
         }
-      }
+      }));
     }
 
     return storyData;
@@ -1627,7 +1648,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
   // saveStoryData to overwrite the original v0 with the active version's data.
   const activeOverrides = {};
   const coverTypes = ['frontCover', 'backCover', 'initialPage'];
-  for (const [key, meta] of Object.entries(versionMeta)) {
+  await Promise.all(Object.entries(versionMeta).map(async ([key, meta]) => {
     if (meta.activeVersion && meta.activeVersion > 0) {
       const isCover = coverTypes.includes(key);
       const activeImg = isCover
@@ -1635,53 +1656,49 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
         : allVersionImages.find(i => i.image_type === 'scene' && i.page_number === parseInt(key) && i.version_index === meta.activeVersion);
       if (activeImg) {
         const overrideKey = isCover ? `${key}:null` : `scene:${parseInt(key)}`;
-        activeOverrides[overrideKey] = imgSrc(activeImg);
+        activeOverrides[overrideKey] = await imgBytesAsync(activeImg);
       }
     }
-  }
+  }));
 
   // Populate sceneImages
   if (storyData.sceneImages) {
-    for (const scene of storyData.sceneImages) {
+    await Promise.all(storyData.sceneImages.map(async (scene) => {
       if (!scene.imageData) {
-        // Use active override if available, otherwise use v0
         const overrideKey = `scene:${scene.pageNumber}`;
         if (activeOverrides[overrideKey]) {
           scene.imageData = activeOverrides[overrideKey];
         } else {
           const img = allVersionImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === 0);
-          if (img) scene.imageData = imgSrc(img);
+          if (img) scene.imageData = await imgBytesAsync(img);
         }
       }
 
-      // Populate imageVersions with their imageData from database
       if (scene.imageVersions && scene.imageVersions.length > 0) {
-        for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
-          const version = scene.imageVersions[vIdx];
+        await Promise.all(scene.imageVersions.map(async (version, vIdx) => {
           if (!version.imageData) {
             const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
             const versionImg = allVersionImages.find(
               i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
             if (versionImg) {
-              version.imageData = imgSrc(versionImg);
+              version.imageData = await imgBytesAsync(versionImg);
               version._rehydrated = true;
             }
           }
-        }
+        }));
       }
 
-      // Load active version's bboxDetection onto scene
       const activeV = scene.imageVersions?.find(v => v.isActive);
       if (activeV?.bboxDetection) {
         scene.bboxDetection = activeV.bboxDetection;
       }
-    }
+    }));
   }
 
   // Populate coverImages
   if (storyData.coverImages) {
-    for (const coverType of coverTypes) {
+    await Promise.all(coverTypes.map(async (coverType) => {
       storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
       const cover = storyData.coverImages[coverType];
 
@@ -1691,26 +1708,25 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
           cover.imageData = activeOverrides[overrideKey];
         } else {
           const img = allVersionImages.find(i => i.image_type === coverType && i.version_index === 0);
-          if (img) cover.imageData = imgSrc(img);
+          if (img) cover.imageData = await imgBytesAsync(img);
         }
       }
 
       if (cover && cover.imageVersions && cover.imageVersions.length > 0) {
-        for (let vIdx = 0; vIdx < cover.imageVersions.length; vIdx++) {
-          const version = cover.imageVersions[vIdx];
+        await Promise.all(cover.imageVersions.map(async (version, vIdx) => {
           if (!version.imageData) {
             const dbVersionIndex = arrayToDbIndex(vIdx, coverType);
             const versionImg = allVersionImages.find(
               i => i.image_type === coverType && i.version_index === dbVersionIndex
             );
             if (versionImg) {
-              version.imageData = imgSrc(versionImg);
+              version.imageData = await imgBytesAsync(versionImg);
               version._rehydrated = true;
             }
           }
-        }
+        }));
       }
-    }
+    }));
   }
 
   return storyData;
