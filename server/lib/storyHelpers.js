@@ -930,11 +930,20 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, op
     'top-full': 'upper third',
     'bottom-full': 'lower third',
   };
+  const displacementDesc = {
+    'top-left': 'down and to the right of it',
+    'top-right': 'down and to the left of it',
+    'bottom-left': 'up and to the right of it',
+    'bottom-right': 'up and to the left of it',
+    'top-full': 'below this strip',
+    'bottom-full': 'above this strip',
+  };
   const corner = cornerDesc[textPosition] || textPosition.replace('-', ' ');
+  const displacement = displacementDesc[textPosition] || 'away from this area';
   const surface = textZoneDescription && String(textZoneDescription).trim()
     ? String(textZoneDescription).trim()
     : 'a calm continuous expanse of the surrounding scene material (sky, wall, water, foliage, or ground)';
-  let body = `**COMPOSITION — CALM ZONE:** Render the ${corner} of the image (roughly ${areaPct}) as: ${surface}. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings.`;
+  let body = `**COMPOSITION — CALM ZONE:** Render the ${corner} of the image (roughly ${areaPct}) as: ${surface}. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong ${displacement}.`;
   if (isEmptyScene) {
     body += ' If a layout reference image is attached, the slightly darker grey region marks this calm zone.';
   }
@@ -1067,6 +1076,7 @@ function extractSceneMetadata(sceneDescription) {
       textZoneDescription: metadata.textZoneDescription || null,
       era: metadata.era || null,
       framingPattern: metadata.framingPattern || null,
+      sceneIntent: metadata.sceneIntent || null,
       isJsonFormat: true,
       isProseFormat: true
     };
@@ -1218,6 +1228,7 @@ function extractSceneMetadata(sceneDescription) {
       textZoneDescription: parsedData.textZoneDescription || null,
       era: parsedData.era || null,
       framingPattern: parsedData.framingPattern || null,
+      sceneIntent: parsedData.sceneIntent || null,
       isJsonFormat: true
     };
   }
@@ -4264,6 +4275,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // image is attached. Terse imperatives at the end re-anchor the pose.
   const exactPosesBlock = buildExactPosesBlock(metadata?.interactions);
   const eraGuard = buildEraGuard(metadata?.era);
+  const sceneIntentLine = metadata?.sceneIntent
+    ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
+    : '';
 
   const appendExactPoses = (s) => exactPosesBlock ? `${s}\n\n${exactPosesBlock}` : s;
 
@@ -4280,6 +4294,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         SCENE_DESCRIPTION: cleanSceneDescription,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
         ERA_GUARD: eraGuard,
+        SCENE_INTENT: sceneIntentLine,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       }));
@@ -4298,6 +4313,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         REQUIRED_OBJECTS: requiredObjectsSection,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
         ERA_GUARD: eraGuard,
+        SCENE_INTENT: sceneIntentLine,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       }));
@@ -4313,6 +4329,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       REQUIRED_OBJECTS: requiredObjectsSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       ERA_GUARD: eraGuard,
+      SCENE_INTENT: sceneIntentLine,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     }));
