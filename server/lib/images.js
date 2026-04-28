@@ -1304,6 +1304,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Use sceneHint (original scene description with metadata block) rather than
     // originalPrompt (image prompt where metadata was already stripped).
     let interactionsBlock = '(none declared)';
+    let sceneIntentBlock = '(none declared)';
     try {
       const interactionSource = sceneHint || originalPrompt;
       const sceneMeta = getStoryHelpers().extractSceneMetadata(interactionSource);
@@ -1314,6 +1315,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
           .join('\n');
       }
+      const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
+      if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
 
     // Build expected head-to-body ratios per character (for STEP 2C proportion
@@ -1340,6 +1343,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           ORIGINAL_PROMPT: promptForEval,
           INTERACTIONS_BLOCK: interactionsBlock,
           FIGURE_PROPORTIONS: figureProportionsBlock,
+          SCENE_INTENT: sceneIntentBlock,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 

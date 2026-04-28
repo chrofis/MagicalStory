@@ -136,6 +136,7 @@ Write one continuous paragraph, 250–350 words. Open with the main subject and 
 ```
 METADATA:
 {
+  "sceneIntent": "One present-tense sentence naming the single moment this image depicts. Names every character physically present in that moment and the action between them.",
   "characters": [
     { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed:type", "depth": "foreground" },
     { "name": "Name", "position": "behind Roger, gripping the boat's far side", "clothing": "standard", "depth": "midground", "perspective": "back view" }
@@ -157,6 +158,15 @@ METADATA:
   "emptyScenePrompt": "2–4 sentences describing the background environment only."
 }
 ```
+
+**`sceneIntent`** (required): one sentence, present tense, naming the single moment the image depicts. Every named person in `sceneIntent` MUST appear in `characters[]` with a `position`. Every entry in `characters[]` MUST be doing something visible in `sceneIntent` or in an `interactions[]` entry. The sentence answers: who is doing what to whom, where. Pick ONE temporal moment — bolt mid-flight OR aftermath, not both. Do not stitch cause+effect ("X shoots Y, the horse stands riderless" = two moments; pick the one the image will render). Do not include characters who appear in adjacent paragraphs of the page text but are not physically present at this chosen moment.
+
+**Coherence self-check (mandatory before returning each page):**
+1. Does the prose visually describe what `sceneIntent` says? If `sceneIntent` says "X shoots Y" but the prose only describes Y's empty horse with no Y on it, REWRITE the prose to place Y in the frame.
+2. Is every person named in `sceneIntent` listed in `characters[]` AND described in the prose with appearance + position?
+3. Does the prose describe ONE continuous moment? Mid-flight projectile + already-fallen victim = two moments. Pick one and rewrite.
+4. Do `background`, `interactions`, and the prose all describe the same temporal moment? A "riderless horse" plus an "aiming at the rider" interaction is contradictory.
+If any check fails, rewrite the prose AND fix the metadata before returning. Do not return a page with internal contradictions.
 
 **Character fields:**
 - Every named character visible in the scene — foreground, midground, or background — belongs in `characters[]`, even if the prose or `background` field only names them once. If you mention a character by name anywhere in the prose or metadata, include them here with `clothing`.

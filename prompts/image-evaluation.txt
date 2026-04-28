@@ -7,6 +7,7 @@ You are an Illustration QA Analyst for publishing. Evaluate the generated artwor
 2. USER_PROMPT: "{ORIGINAL_PROMPT}"
 3. REF_IMAGES - character reference photos
 4. DECLARED INTERACTIONS: {INTERACTIONS_BLOCK}
+5. SCENE INTENT: {SCENE_INTENT}
 
 ---
 
@@ -69,6 +70,7 @@ Apply CATASTROPHIC (-5) when ONE OR MORE of these holds:
 - A character is rendered as a fragment that no occlusion can explain (head with no body where no railing/desk/wall is in the way; body with no head; ghostly transparent figure; figure fused into the background).
 - The scene's central declared interaction is geometrically impossible in the image as composed (e.g. character A is supposed to be holding character B's body part, but the rendered distance/angle between them makes it physically unreachable and the contact is not depicted).
 - The narrative beat shown is the wrong moment of the action (image shows the result when the prose describes the attempt, or shows the attempt when the prose describes the resolution — and this is the central beat of the page, not a side detail).
+- **SCENE INTENT not depicted.** Read the SCENE INTENT line above. Is the action it names visible? Is every character it names present? If the intent is "X shoots Y" and Y is not in the image, or "X hands Z to Y" and the handover is not shown, this gate fires regardless of how polished the rest of the image looks.
 - A large unrequested geometric shape — white triangle, white wedge, diagonal slash, monochrome panel, blank rectangle — covers a significant portion of the image, breaking the scene composition.
 - Two or more characters are merged into each other (single body with two heads, faces fused, limbs of one extending out of the other).
 - Several MAJOR failures stack such that the image no longer represents the requested scene at all (you would tell the user "this needs to be redone from scratch").
