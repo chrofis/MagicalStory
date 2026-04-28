@@ -8143,11 +8143,29 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       ...(options.protectedBodies || []),
       ...(options.protectedFaces || []),
     ];
+    // Target box center — used to clamp protected-rect padding/feather at the
+    // midline between target and neighbour. Without this, +10% padding plus the
+    // 30px feather pushes the protected zone past the midpoint and clips the
+    // target's face/body during repair (faces sit too close together).
+    const targetCx = (xmin + xmax) / 2;
+    const targetCy = (ymin + ymax) / 2;
+    const featherX = FEATHER_PX / sceneMeta.width;   // feather in fractional coords
+    const featherY = FEATHER_PX / sceneMeta.height;
     const protectedRects = protectedSourceBoxes.map(([fymin, fxmin, fymax, fxmax]) => {
       const fw = fxmax - fxmin, fh = fymax - fymin;
       const pad = 0.1;
-      const pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
-      const pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
+      let pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
+      let pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
+      // Clamp the side facing the target so the padded rect + feather never
+      // crosses the midpoint between the two boxes' centers.
+      const fcx = (fxmin + fxmax) / 2;
+      const fcy = (fymin + fymax) / 2;
+      const midX = (fcx + targetCx) / 2;
+      const midY = (fcy + targetCy) / 2;
+      if (fcx < targetCx) pxmax = Math.min(pxmax, midX - featherX);
+      else if (fcx > targetCx) pxmin = Math.max(pxmin, midX + featherX);
+      if (fcy < targetCy) pymax = Math.min(pymax, midY - featherY);
+      else if (fcy > targetCy) pymin = Math.max(pymin, midY + featherY);
       // Clamp coordinates to blend-region pixel space. Without clamping the
       // coordinates can go negative (char straddles blend region boundary) or
       // exceed blendWidth/blendHeight, which breaks the distance calculation
