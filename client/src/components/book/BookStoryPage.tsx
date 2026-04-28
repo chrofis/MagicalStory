@@ -1,14 +1,5 @@
 import React, { useCallback, useRef } from 'react';
 import { Maximize2 } from 'lucide-react';
-import {
-  getTextOverlayPosition,
-  getOverlayClasses,
-  getOverlayPositionStyle,
-  getTextContainerStyle,
-  OVERLAY_FONT_SIZE,
-  OVERLAY_TEXT_STROKE_STYLE,
-} from '@/utils/textOverlay';
-import type { TextPosition } from '@/utils/textOverlay';
 
 interface BookStoryPageProps {
   imageUrl: string;
@@ -29,9 +20,7 @@ interface BookStoryPageProps {
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, textPosition, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick }, ref) => {
-    const layout = getTextOverlayPosition(pageNumber, text, (textPosition || undefined) as TextPosition | undefined);
-    const isFullWidth = layout.position.includes('full');
+  ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick }, ref) => {
     const trimmedText = text.trim();
 
     // Mobile read mode: image at top, scrollable text panel below. Extracted
@@ -57,30 +46,18 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           draggable={false}
         />
 
-        {/* Text overlay — server-rendered or CSS fallback */}
-        {showTextOverlay && trimmedText && (
-          overlayImage ? (
-            <img
-              src={overlayImage}
-              alt=""
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              draggable={false}
-            />
-          ) : (
-            <div
-              className={getOverlayClasses(layout)}
-              style={getOverlayPositionStyle(layout)}
-            >
-              <div className="p-2 md:p-3" style={getTextContainerStyle(layout)}>
-                <p
-                  className={`leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                  style={{ fontSize: OVERLAY_FONT_SIZE, ...OVERLAY_TEXT_STROKE_STYLE }}
-                >
-                  {trimmedText}
-                </p>
-              </div>
-            </div>
-          )
+        {/* Text overlay — only shown once the server-rendered PNG arrives.
+            Rendering the CSS fallback while waiting for the API made the text
+            appear briefly in one position and then "jump" to the server
+            overlay's position when it loaded — disruptive. We now wait for
+            the canonical overlay; the image alone shows during the load. */}
+        {showTextOverlay && trimmedText && overlayImage && (
+          <img
+            src={overlayImage}
+            alt=""
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            draggable={false}
+          />
         )}
 
         {/* Translucent strip — when overlay is off AND text isn't shown on a facing page */}

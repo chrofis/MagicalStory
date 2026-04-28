@@ -23,6 +23,31 @@ const { verifyToken } = require('../middleware/auth');
 // Base URL for OG tags and share links (consistent with stories.js)
 const SITE_URL = process.env.FRONTEND_URL || 'https://www.magicalstory.ch';
 
+// In-memory cache for rendered text overlays. Result is fully deterministic
+// for (storyId, pageNumber, activeVersion, languageLevel, textPosition):
+// same inputs → same PNG. Without this, every shared-viewer load redoes
+// 10× sharp+canvas renders on the server (7-19s per page observed in HAR).
+// Browser caching can't help (POST responses aren't cached). Keyed string,
+// LRU-evicted when over MAX_OVERLAY_CACHE entries.
+const TEXT_OVERLAY_CACHE = new Map();
+const MAX_OVERLAY_CACHE = 500; // ~500 pages × ~200KB png = 100MB ceiling
+function cacheGet(key) {
+  if (!TEXT_OVERLAY_CACHE.has(key)) return null;
+  // Refresh recency: re-insert moves to the end of the Map's iteration order
+  const v = TEXT_OVERLAY_CACHE.get(key);
+  TEXT_OVERLAY_CACHE.delete(key);
+  TEXT_OVERLAY_CACHE.set(key, v);
+  return v;
+}
+function cacheSet(key, value) {
+  if (TEXT_OVERLAY_CACHE.size >= MAX_OVERLAY_CACHE) {
+    // Drop oldest (first inserted) entry
+    const oldestKey = TEXT_OVERLAY_CACHE.keys().next().value;
+    TEXT_OVERLAY_CACHE.delete(oldestKey);
+  }
+  TEXT_OVERLAY_CACHE.set(key, value);
+}
+
 // API router for /api/* endpoints
 const apiRouter = express.Router();
 // HTML router for root-level endpoints (/s/*, /shared/*)
@@ -324,8 +349,23 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    // Get the page image
+    // Custom text override skips the cache (rare path — only when a caller
+    // explicitly passes a different text body).
+    const customText = req.body?.text;
     const activeVersion = await getActiveVersion(storyId, pageNum);
+
+    // Cache lookup BEFORE doing any of the heavy work (image fetch, sharp,
+    // canvas). Only when no custom text override.
+    if (!customText) {
+      const cacheKey = `${storyId}:${pageNum}:${activeVersion}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) {
+        res.set('Cache-Control', 'private, max-age=3600');
+        return res.json({ overlayImage: cached });
+      }
+    }
+
+    // Get the page image
     let separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
     if (!separateImage?.imageData && !separateImage?.imageUrl && activeVersion !== 0) {
       separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
@@ -406,10 +446,15 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { languageLevel, pageNumber: pageNum });
 
     const overlayBase64 = result.overlayImage.toString('base64');
-    res.set('Cache-Control', 'no-store');
-    res.json({
-      overlayImage: `data:image/png;base64,${overlayBase64}`,
-    });
+    const dataUrl = `data:image/png;base64,${overlayBase64}`;
+
+    // Populate cache for future requests (skip when caller supplied custom text).
+    if (!customText) {
+      cacheSet(`${storyId}:${pageNum}:${activeVersion}`, dataUrl);
+    }
+
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.json({ overlayImage: dataUrl });
   } catch (err) {
     log.error('Error generating shared text overlay:', err);
     res.status(500).json({ error: 'Failed to generate text overlay' });
