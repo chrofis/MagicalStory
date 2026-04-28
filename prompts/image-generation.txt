@@ -18,6 +18,8 @@ The attached reference photos define each character's IDENTITY only: face, hair,
 
 {REQUIRED_OBJECTS}
 
+{ERA_GUARD}
+
 {TEXT_AREA_INSTRUCTION}
 
 **ART STYLE:** {STYLE_DESCRIPTION}

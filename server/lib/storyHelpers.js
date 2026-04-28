@@ -4258,6 +4258,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // (crossbows, held objects, barrier arms) go missing even when the reference
   // image is attached. Terse imperatives at the end re-anchor the pose.
   const exactPosesBlock = buildExactPosesBlock(metadata?.interactions);
+  const eraGuard = buildEraGuard(metadata?.era);
 
   const appendExactPoses = (s) => exactPosesBlock ? `${s}\n\n${exactPosesBlock}` : s;
 
@@ -4273,6 +4274,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
+        ERA_GUARD: eraGuard,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       }));
@@ -4290,6 +4292,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         CHARACTER_REFERENCE_LIST: characterReferenceList,
         REQUIRED_OBJECTS: requiredObjectsSection,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
+        ERA_GUARD: eraGuard,
         AGE_FROM: inputData.ageFrom || 3,
         AGE_TO: inputData.ageTo || 8
       }));
@@ -4304,6 +4307,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       VISUAL_BIBLE: visualBibleSection,
       REQUIRED_OBJECTS: requiredObjectsSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
+      ERA_GUARD: eraGuard,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     }));
