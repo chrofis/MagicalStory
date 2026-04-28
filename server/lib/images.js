@@ -6501,18 +6501,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const issueText = (fix.issueDescription || '').toLowerCase();
           const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
           const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
-          const isCritical = String(fix.severity || '').toUpperCase() === 'CRITICAL';
 
-          // Face-only is the safe default. Body inpaint reliably breaks the
-          // surrounding scene (moves figures, deletes neighbours, changes
-          // pose) and is only worth that risk when the issue is CRITICAL —
-          // wrong character matched, wrong age band, missing major body
-          // part. MAJOR clothing-color / accessory drifts vs the avatar
-          // reference are not worth the gamble; do face-only.
-          const useFaceOnly = !!faceBbox && (
-            !isCritical ||                       // non-CRITICAL: always face-only
-            (hasFaceIssue && !hasClothingIssue)  // CRITICAL face-only: face-only
-          );
+          const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
           const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
           // Collect both face AND body bboxes for every OTHER detected character.
