@@ -1728,23 +1728,48 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
-      // Await three-stage eval and merge (use lower score)
+      // Await three-stage eval. Always merge its fixableIssues into the
+      // visible list (the dev panel shows the full set). Then RECOMPUTE the
+      // visual quality score from the full merged fixable_issues array using
+      // the same §2 rubric — otherwise three-stage findings show up in the
+      // UI but never influence the threshold gate that triggers repair
+      // (observed on page 5 of job_1777325711738_d5brbvvx3: main eval
+      // emitted 1 MINOR → score 95, three-stage added 2 MODERATE + 1 MINOR
+      // composition issues, merged into the display array but NOT into the
+      // score → page stayed at qualityScore 85, above the 80 threshold,
+      // never repaired despite -30 worth of real visual defects).
       let threeStageResult = null;
+      let visualScore = score; // Quality score AFTER any three-stage merge
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
-          if (threeStageResult && threeStageResult.score < finalScore) {
-            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} < quality ${finalScore} — using three-stage score`);
-            finalScore = threeStageResult.score;
-            // Merge fixable issues
-            if (threeStageResult.fixableIssues?.length) {
-              fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
+          if (threeStageResult?.fixableIssues?.length) {
+            fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
+            // Recompute visual score from merged fixable_issues (same rubric
+            // as main eval). Then re-apply semantic penalty on top.
+            const mergedPenalty = fixableIssues.reduce(
+              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
+              0
+            );
+            const mergedRawScore = Math.max(0, Math.min(10, 10 - mergedPenalty));
+            visualScore = mergedRawScore * 10;
+            // Re-derive semantic penalty so finalScore = visualScore − semantic.
+            // (Was applied to `score` above; recomputed here against visualScore.)
+            let semanticPenalty = 0;
+            if (semanticResult?.semanticIssues?.length) {
+              for (const issue of semanticResult.semanticIssues) {
+                if (issue.severity === 'CRITICAL') semanticPenalty += 30;
+                else if (issue.severity === 'MAJOR') semanticPenalty += 20;
+                else semanticPenalty += 10;
+              }
             }
-            combinedIssuesSummary = threeStageResult.issuesSummary
-              ? (combinedIssuesSummary ? `${combinedIssuesSummary}; THREE-STAGE: ${threeStageResult.issuesSummary}` : `THREE-STAGE: ${threeStageResult.issuesSummary}`)
-              : combinedIssuesSummary;
-          } else if (threeStageResult) {
-            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} >= quality ${finalScore} — keeping quality score`);
+            finalScore = Math.max(0, visualScore - semanticPenalty);
+            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Merged ${threeStageResult.fixableIssues.length} issue(s); recomputed visual ${score}→${visualScore}, final ${finalScore} (semantic −${semanticPenalty})`);
+          }
+          if (threeStageResult?.issuesSummary) {
+            combinedIssuesSummary = combinedIssuesSummary
+              ? `${combinedIssuesSummary}; THREE-STAGE: ${threeStageResult.issuesSummary}`
+              : `THREE-STAGE: ${threeStageResult.issuesSummary}`;
           }
         } catch (tsErr) {
           log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
@@ -1773,11 +1798,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - threeStageScore: Separate three-stage compliance score (0-100, null if not evaluated).
       // When writing to scene.qualityScore in DB, use evaluation.qualityScore (NOT evaluation.score).
       return {
-        score: finalScore,                    // Combined final score
-        qualityScore: score,                  // Visual quality score only
+        score: finalScore,                    // Combined final score (visual − semantic)
+        qualityScore: visualScore,            // Visual quality score AFTER three-stage merge
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
         threeStageScore: threeStageResult?.score ?? null, // Three-stage compliance score (0-100)
-        rawScore, // Original 0-10 score (visual only)
+        rawScore, // Original 0-10 score (visual only, BEFORE three-stage merge — kept for audit)
         verdict,
         reasoning,
         rawOutput: responseText,              // Full unparsed API response (for dev testing)
