@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -1553,10 +1553,15 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         break;
 
       case 'empty_scene': {
-        // Load empty scene image from story_images table
+        // Load empty scene image from story_images table. Post-R2-migration the
+        // row may have image_data NULL'd with bytes living in R2 — fall through
+        // to imgBytesAsync (matches rehydrateStoryImages behaviour).
         const emptySceneRow = await getStoryImage(id, 'empty_scene', pageNum, 0);
+        const emptySceneBytes = emptySceneRow
+          ? await imgBytesAsync({ image_data: emptySceneRow.imageData, image_url: emptySceneRow.imageUrl })
+          : null;
         result = {
-          emptySceneImage: emptySceneRow?.imageData || null,
+          emptySceneImage: emptySceneBytes || null,
           emptyScenePrompt: sceneImage.emptyScenePrompt || null
         };
         break;

@@ -7290,7 +7290,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
           REQUIRED_OBJECTS: '',
           CHARACTER_SPACE: '',
-          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, '25%') : '',
+          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           ERA_GUARD: buildEraGuard(iterateEra),
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);

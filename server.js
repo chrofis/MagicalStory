@@ -4866,9 +4866,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // WHITE and overlaid at textPos, so the zone must render as a saturated,
             // high-contrast surface. Sonnet picks the corner + surface; the code
             // owns wording + spread-rule enforcement.
-            const emptyAreaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '25%';
+            const emptyAreaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '30%';
             const emptyTextAreaInstr = (layoutTextInImage && textPos)
-              ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct)
+              ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
               : '';
 
             const eraGuard = buildEraGuard(sceneMetadata?.era || null);
@@ -4956,7 +4956,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // text will be overlaid, so the zone must be a saturated, high-
                   // contrast surface — never a flat black rectangle or blank patch.
                   const softerTextInstr = textPos
-                    ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct)
+                    ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
                   const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {

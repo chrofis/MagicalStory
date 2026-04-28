@@ -920,7 +920,8 @@ function enforceSpreadTextPosition(textPosition, pageNumber) {
  * @param {string} areaPct - e.g. '30%'
  * @returns {string} Instruction paragraph for the image model
  */
-function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct) {
+function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, opts = {}) {
+  const { isEmptyScene = false } = opts;
   const cornerDesc = {
     'top-left': 'upper-left corner',
     'top-right': 'upper-right corner',
@@ -932,8 +933,12 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct) {
   const corner = cornerDesc[textPosition] || textPosition.replace('-', ' ');
   const surface = textZoneDescription && String(textZoneDescription).trim()
     ? String(textZoneDescription).trim()
-    : 'a deep, saturated surface — dark sky, deep foliage, rich wall, saturated water, or dark ground';
-  return `**COMPOSITION — CALM ZONE:** The ${corner} of the image (roughly ${areaPct}) is reserved for a white text overlay. Render the surface in that region as: ${surface} — gentle gradient, minimal texture, low contrast, saturated colour preferred (deep blue, dark green, rich brown, saturated cobblestone). The region carries scene material only — the same surface as its surroundings, painted continuously across. If a layout reference image is attached, the slightly darker grey region marks the calm zone — paint that area as continuous scene material (sky, wall, water, foliage, ground).`;
+    : 'a calm continuous expanse of the surrounding scene material (sky, wall, water, foliage, or ground)';
+  let body = `**COMPOSITION — CALM ZONE:** Render the ${corner} of the image (roughly ${areaPct}) as: ${surface}. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings.`;
+  if (isEmptyScene) {
+    body += ' If a layout reference image is attached, the slightly darker grey region marks this calm zone.';
+  }
+  return body;
 }
 
 /**
@@ -4008,7 +4013,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     'bottom-full': 'lower third',
   };
   const textAreaInstruction = (textInImage && textPosition)
-    ? buildTextZoneInstruction(textPosition, textZoneDescForPrompt, areaPct)
+    ? buildTextZoneInstruction(textPosition, textZoneDescForPrompt, areaPct, { isEmptyScene: false })
     : '';
 
   // Strip JSON metadata block from scene description (not needed in image prompt)

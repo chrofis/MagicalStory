@@ -1941,6 +1941,7 @@ module.exports = {
   // Image functions
   saveStoryImage,
   getStoryImage,
+  imgBytesAsync,
   getStoryImageWithVersions,
   getAllStoryImages,
   getActiveStoryImages,
