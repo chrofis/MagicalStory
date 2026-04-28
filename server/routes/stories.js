@@ -32,6 +32,17 @@ function pickImageSrc(imageData, imageUrl) {
   return null;
 }
 
+// Fast variant: prefer URL over base64 so the FAST /images?activeOnly batch
+// payload is a few KB of URLs instead of ~12MB of inlined image_data. Browser
+// fetches each image from R2/CDN in parallel — much faster on slow links.
+// Falls back to image_data (with data: prefix) when image_url is not yet
+// populated (older rows from before the R2 migration).
+function pickImageSrcFast(imageData, imageUrl) {
+  if (imageUrl) return imageUrl;
+  if (imageData) return normalizeImageData(imageData);
+  return null;
+}
+
 function normalizeImageData(imageData) {
   if (!imageData) return imageData;
 
@@ -1807,10 +1818,11 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           const pageNum = row.page_number;
 
           if (activeOnly) {
-            // Fast path: one image per page, no versions array
+            // Fast path: one image per page, no versions array. Prefer URL so
+            // the response stays small — browser fetches images from R2/CDN.
             sceneImagesMap.set(pageNum, {
               pageNumber: pageNum,
-              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageData: pickImageSrcFast(row.image_data, row.image_url),
               imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
@@ -1857,9 +1869,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           const coverType = row.image_type;
 
           if (activeOnly) {
-            // Fast path: one image per cover, no versions array
+            // Fast path: one image per cover, no versions array. Prefer URL.
             covers[coverType] = {
-              imageData: pickImageSrc(row.image_data, row.image_url),
+              imageData: pickImageSrcFast(row.image_data, row.image_url),
               imageUrl: row.image_url || null,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
