@@ -6565,6 +6565,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // composite (Step 6), and pick-best ignores unscored versions.
             const versions = pageVersions.get(pageNumber);
             if (versions) {
+              // Surface BOTH inputs Grok received: the avatar reference AND
+              // the masked scene (magenta crosshatch over the body, solid
+              // block over the face). The masked scene is what Grok actually
+              // edits; without it the version history can't explain "why
+              // did character X get repainted in the wrong place".
+              const sceneSent = repairResult.debug?.sceneSent || repairResult.blackoutImage || null;
+              const avatarSent = repairResult.debug?.avatarSent || repairResult.croppedAvatar || null;
               versions.push({
                 imageData: repairResult.imageData,
                 score: null,
@@ -6572,7 +6579,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 modelId: `grok-imagine (${repairResult.method || 'unknown'})`,
                 grokRefImages: null,
                 inpaintInstruction: repairResult.debug?.prompt || null,
-                inpaintReferenceImages: [repairResult.debug?.avatarSent].filter(Boolean),
+                inpaintReferenceImages: [avatarSent, sceneSent].filter(Boolean),
               });
             }
           }
@@ -6871,19 +6878,31 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${finalUpgradedCount} upgraded, ${charFixResults.size} character-fixed`);
 
-  // Convert charFixDetails Map to plain object for serialization
+  // Convert charFixDetails Map to plain object for serialization.
+  // Image fields can arrive in three shapes after R2 migration:
+  //   - data:image/...;base64,XXX  → pass through
+  //   - https://r2-bucket/key.png  → pass through (browser fetches it)
+  //   - raw base64 string          → wrap as data: URL
+  // The previous code only checked `startsWith('data:')` and wrapped the
+  // R2 URL into `data:image/png;base64,https://...` which broke the
+  // <img> tag entirely. Centralised helper guards every field.
+  const toImgSrc = (v) => {
+    if (!v || typeof v !== 'string') return v;
+    if (v.startsWith('data:') || /^https?:\/\//i.test(v)) return v;
+    return `data:image/png;base64,${v}`;
+  };
   const charFixDetailsObj = {};
   for (const [charName, pages] of charFixDetails) {
     charFixDetailsObj[charName] = { pages: {} };
     for (const [pageNum, data] of pages) {
       charFixDetailsObj[charName].pages[pageNum] = {
         comparison: {
-          before: data.before.startsWith('data:') ? data.before : `data:image/png;base64,${data.before}`,
-          after: data.after.startsWith('data:') ? data.after : `data:image/png;base64,${data.after}`,
-          blackoutImage: data.blackoutImage || null,
-          grokRawResult: data.grokRawResult || null,
-          blendMask: data.blendMask || null,
-          croppedAvatar: data.croppedAvatar || null,
+          before: toImgSrc(data.before),
+          after: toImgSrc(data.after),
+          blackoutImage: toImgSrc(data.blackoutImage) || null,
+          grokRawResult: toImgSrc(data.grokRawResult) || null,
+          blendMask: toImgSrc(data.blendMask) || null,
+          croppedAvatar: toImgSrc(data.croppedAvatar) || null,
         },
         method: data.method || 'grok_blended',
       };
@@ -7326,18 +7345,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // Append evaluation feedback if provided
   if (evaluationFeedback) {
     if (usageTracker) {
-      // Pipeline caller — append all feedback
-      const feedbackParts = [];
-      if (evaluationFeedback.reasoning) {
-        feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
-      }
+      // Pipeline caller — append the actionable bullets only. The full
+      // parsedJson reasoning string runs 3-5k chars and gets truncated by
+      // Grok's 7500-char cap, often cutting off the bullets that follow.
+      // The bullets already encode the same issues in compact form.
       if (evaluationFeedback.fixableIssues?.length > 0) {
-        feedbackParts.push('Specific problems to avoid:\n' +
-          evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${i.description || i.issue || i}`).join('\n'));
-      }
-      if (feedbackParts.length > 0) {
-        imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'}, ${evaluationFeedback.fixableIssues?.length ?? 0} issues)`);
+        const bullets = evaluationFeedback.fixableIssues.slice(0, 10)
+          .map(i => `- ${i.description || i.issue || i}`).join('\n');
+        imagePrompt = `${imagePrompt}\n\nIMPORTANT — fix these issues from the previous generation:\n${bullets}`;
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${evaluationFeedback.fixableIssues.length} feedback bullets (score: ${evaluationFeedback.score ?? 'N/A'})`);
       }
     } else {
       // UI route caller — only keep critical issues (missing/wrong elements)
