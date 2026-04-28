@@ -6397,6 +6397,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return;
       }
 
+      // GATE — skip character-fix on pages that are already PASSING (final
+      // score >= 70) when no remaining issue is CRITICAL. Body inpaint is
+      // risky (can move target, delete neighbours, alter pose); paying that
+      // risk to chase MAJOR cosmetic complaints (clothing color drift,
+      // accessory shape, hair waviness vs reference) on a clean page is a
+      // bad trade. Observed on page 3 of job_1777325711738_d5brbvvx3 where
+      // v3 was 70/PASS and the character-fix passes (v4-v6) destroyed it
+      // (Werner deleted, Verena moved to wrong depth, Manuel pose wrong).
+      const pageScore = best.score ?? best.evaluation?.score ?? 0;
+      const hasCritical = pageFixes.some(f => String(f.severity || '').toUpperCase() === 'CRITICAL');
+      if (pageScore >= 70 && !hasCritical) {
+        log.info(`👤 [UNIFIED PIPELINE] Page ${pageNumber}: skipping character-fix — already passing (score=${pageScore}) with no CRITICAL issues. ${pageFixes.length} non-critical fix(es) deferred.`);
+        return;
+      }
+
       let currentImageData = best.imageData;
       let anyFixApplied = false;
 
@@ -6486,8 +6501,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const issueText = (fix.issueDescription || '').toLowerCase();
           const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
           const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
+          const isCritical = String(fix.severity || '').toUpperCase() === 'CRITICAL';
 
-          const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
+          // Face-only is the safe default. Body inpaint reliably breaks the
+          // surrounding scene (moves figures, deletes neighbours, changes
+          // pose) and is only worth that risk when the issue is CRITICAL —
+          // wrong character matched, wrong age band, missing major body
+          // part. MAJOR clothing-color / accessory drifts vs the avatar
+          // reference are not worth the gamble; do face-only.
+          const useFaceOnly = !!faceBbox && (
+            !isCritical ||                       // non-CRITICAL: always face-only
+            (hasFaceIssue && !hasClothingIssue)  // CRITICAL face-only: face-only
+          );
           const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
           // Collect both face AND body bboxes for every OTHER detected character.
