@@ -6205,8 +6205,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const roundStart = Date.now();
     const repairLimit = pLimit(50);
 
+    // Periodic heartbeat while parallel repairs are in flight. Iterate's
+    // internal stages (Stage 1 vision, Stage 2 compliance Sonnet call,
+    // image gen, bbox detect) can each take 60-120s and don't ping the
+    // job heartbeat themselves. With 7 pages running in parallel, the
+    // slowest one drives the round duration; any single page stalled in
+    // a Sonnet call past 5 min trips the front-end stall watcher and
+    // kills the whole job. A 30s ticker keeps the row's updated_at
+    // fresh until Promise.all resolves.
+    const repairHeartbeatInterval = setInterval(() => {
+      pingHeartbeat().catch(() => {});
+    }, 30000);
+
     // Execute all repairs in parallel
-    const roundResults = await Promise.all(
+    let roundResults;
+    try {
+      roundResults = await Promise.all(
       pageStrategies.map(({ img, strategy, latestEval, skipped }) => repairLimit(async () => {
         const pageNumber = img.pageNumber;
         if (skipped) return { pageNumber, imageData: null, skipped: true };
@@ -6256,7 +6270,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           return { pageNumber, imageData: null, error: err.message };
         }
       }))
-    );
+      );
+    } finally {
+      clearInterval(repairHeartbeatInterval);
+    }
 
     const roundSuccess = roundResults.filter(r => r.imageData);
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
