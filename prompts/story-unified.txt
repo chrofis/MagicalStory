@@ -787,5 +787,6 @@ METADATA:
 - [ ] ALL {PAGES} pages written with TEXT, SCENE, and METADATA blocks
 - [ ] Visual Bible has specific colors for all elements
 - [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed:superhero`)
+- [ ] Re-tally `textPosition` across the FINAL pages: every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) sits on the side matching its page parity — odd pages on the left, even pages on the right. Fix any that drifted between draft and final before stopping.
 
 **DO NOT STOP until you have written all {PAGES} pages.**
