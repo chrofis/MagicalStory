@@ -976,6 +976,65 @@ function enforceSpreadTextPosition(textPosition, pageNumber) {
 }
 
 /**
+ * Mirror every left↔right token in a piece of prose / metadata text.
+ *
+ * When `enforceSpreadTextPosition` flips a page's textPosition for spread
+ * parity, Sonnet's prose was written for the original side — character
+ * positions, path direction, vanishing point, and "upper-X corner" wording
+ * all describe the wrong half of the frame. Without mirroring, the empty
+ * scene and page image receive a calm-zone instruction on one side and
+ * scene prose pointing geometry at the other side, producing the kind of
+ * "Roger aims left into a vertical path" failure mode where the model warps
+ * the layout to satisfy the calm-zone rule.
+ *
+ * Substitutions:
+ *   - case-insensitive whole-word swap of left ↔ right (preserves casing)
+ *   - left- / right- compound prefixes (lower-left, upper-right, far-left, …)
+ *   - the words "leftward" / "rightward" and "leftmost" / "rightmost"
+ *
+ * Body-relative phrases ("Roger's left arm") get flipped too — that's
+ * acceptable because the prose is also describing a mirrored composition.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function mirrorLeftRight(text) {
+  if (!text || typeof text !== 'string') return text;
+  // Use a placeholder pass to avoid double-replacement during left→right→left.
+  const SENTINEL_L = 'L';
+  const SENTINEL_R = 'R';
+  const swap = (s, from, to) =>
+    s.replace(new RegExp(from, 'g'), to);
+
+  let out = text;
+  // Whole-word left ↔ right (preserve case).
+  out = swap(out, '\\bleft\\b', SENTINEL_L);
+  out = swap(out, '\\bright\\b', SENTINEL_R);
+  out = swap(out, '\\bLeft\\b', SENTINEL_L + 'C');
+  out = swap(out, '\\bRight\\b', SENTINEL_R + 'C');
+  out = swap(out, '\\bLEFT\\b', SENTINEL_L + 'U');
+  out = swap(out, '\\bRIGHT\\b', SENTINEL_R + 'U');
+  // Compound suffixes: leftward, rightward, leftmost, rightmost.
+  out = swap(out, '\\bleftward\\b', SENTINEL_L + 'ward');
+  out = swap(out, '\\brightward\\b', SENTINEL_R + 'ward');
+  out = swap(out, '\\bleftmost\\b', SENTINEL_L + 'most');
+  out = swap(out, '\\brightmost\\b', SENTINEL_R + 'most');
+
+  // Now resolve sentinels by swapping L↔R.
+  out = out.replace(new RegExp(SENTINEL_L + 'ward', 'g'), 'rightward');
+  out = out.replace(new RegExp(SENTINEL_R + 'ward', 'g'), 'leftward');
+  out = out.replace(new RegExp(SENTINEL_L + 'most', 'g'), 'rightmost');
+  out = out.replace(new RegExp(SENTINEL_R + 'most', 'g'), 'leftmost');
+  out = out.replace(new RegExp(SENTINEL_L + 'U', 'g'), 'RIGHT');
+  out = out.replace(new RegExp(SENTINEL_R + 'U', 'g'), 'LEFT');
+  out = out.replace(new RegExp(SENTINEL_L + 'C', 'g'), 'Right');
+  out = out.replace(new RegExp(SENTINEL_R + 'C', 'g'), 'Left');
+  out = out.replace(new RegExp(SENTINEL_L, 'g'), 'right');
+  out = out.replace(new RegExp(SENTINEL_R, 'g'), 'left');
+  return out;
+}
+
+/**
  * Build the calm-zone paragraph that gets injected into image prompts.
  * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
  * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
@@ -5196,6 +5255,7 @@ module.exports = {
 
   // Text position
   enforceSpreadTextPosition,
+  mirrorLeftRight,
   buildCharacterDescriptionsForBbox,
   buildTextZoneInstruction,
   buildEraGuard,

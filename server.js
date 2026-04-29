@@ -4563,6 +4563,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Helper function to prepare page data without generation (for later use by pipeline)
       const preparePageData = async (scene, index) => {
         const pageNum = scene.pageNumber;
+
+        // Spread-parity flip: if Sonnet wrote textPosition for the wrong side
+        // (odd=left / even=right), enforceSpreadTextPosition flips it. The prose
+        // it wrote — character positions, path direction, "upper-X corner"
+        // language — was anchored to the original side and now points at the
+        // wrong half of the frame. Mirror left↔right in BOTH the page prose
+        // and the empty-scene prompt so the empty-scene background and the
+        // page image both render against side-consistent geometry.
+        try {
+          const { mirrorLeftRight } = require('./server/lib/storyHelpers');
+          const sonnetMeta = extractSceneMetadata(scene.sceneDescription);
+          const sonnetTP = sonnetMeta?.textPosition || null;
+          const correctedTP = enforceSpreadTextPosition(sonnetTP, pageNum);
+          if (sonnetTP && correctedTP && sonnetTP !== correctedTP) {
+            log.warn(`🪞 [SIDE-MIRROR] Page ${pageNum}: textPosition ${sonnetTP} → ${correctedTP}; mirroring left↔right in scene prose + emptyScenePrompt`);
+            scene.sceneDescription = mirrorLeftRight(scene.sceneDescription);
+            // Restore the corrected textPosition tag inside the metadata block
+            // (mirrorLeftRight just swapped it back to the wrong side).
+            scene.sceneDescription = scene.sceneDescription.replace(
+              /("textPosition"\s*:\s*")(top-left|top-right|bottom-left|bottom-right|top-full|bottom-full)(")/g,
+              `$1${correctedTP}$3`
+            );
+            // Mirror the structured emptyScenePrompt sitting on `scene` (extracted
+            // from the outline JSON downstream) and on sceneHint metadata.
+            if (scene.emptyScenePrompt) scene.emptyScenePrompt = mirrorLeftRight(scene.emptyScenePrompt);
+            if (scene.sceneHint && typeof scene.sceneHint === 'string' && scene.sceneHint.includes('emptyScenePrompt')) {
+              scene.sceneHint = mirrorLeftRight(scene.sceneHint).replace(
+                /("textPosition"\s*:\s*")(top-left|top-right|bottom-left|bottom-right|top-full|bottom-full)(")/g,
+                `$1${correctedTP}$3`
+              );
+            }
+          }
+        } catch (err) {
+          log.warn(`[SIDE-MIRROR] Page ${pageNum}: mirror step failed, continuing without flip — ${err.message}`);
+        }
+
         const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
