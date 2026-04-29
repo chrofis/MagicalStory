@@ -9483,72 +9483,15 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
 
-    // Build character descriptions for bbox detection
-    // Use rich descriptions from full character objects when available, fall back to prompt parsing
-    let characterDescriptions;
-    if (sceneCharacters.length > 0) {
-      characterDescriptions = {};
-      for (const char of sceneCharacters) {
-        characterDescriptions[char.name] = {
-          richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
-          // Pass the full clothing map (including nested costumed.*) so bbox
-          // detection can resolve per-page clothing — otherwise the detector
-          // gets told "Lukas wearing striped hoodie" on cowboy-costumed pages
-          // and tags every figure UNKNOWN because the clothes don't match.
-          clothingDescriptions: char.avatars?.clothing || {}
-        };
-      }
-    } else {
-      // Fallback: parse minimal descriptions from prompt
+    // Build character descriptions — primary characters + Visual Bible
+    // secondaries/animals named in expectedCharacterPositions. Single helper,
+    // same shape as the regeneration routes use.
+    const storyShape = { characters: sceneCharacters, visualBible };
+    let characterDescriptions = getStoryHelpers().buildCharacterDescriptionsForBbox(storyShape, expectedCharacterPositions);
+    if (Object.keys(characterDescriptions).length === 0) {
+      // No primary characters parsed and no VB matches — fall back to prompt parsing
+      // (very old stories without character objects).
       characterDescriptions = getStoryHelpers().parseCharacterDescriptions(currentPrompt);
-    }
-
-    // Enrich with Visual Bible entities (animals, secondary characters) that
-    // appear in the scene but aren't in sceneCharacters (which only has main
-    // input characters). Without this, e.g. a dragon "Floh" registered as ANI001
-    // is sent to the bbox detector with no description → returned as UNKNOWN
-    // → all evaluation issues mentioning Floh fail to match a character.
-    if (visualBible) {
-      const knownNames = new Set(Object.keys(characterDescriptions).map(n => n.toLowerCase()));
-      const expectedNames = Object.keys(expectedCharacterPositions || {});
-      for (const name of expectedNames) {
-        if (knownNames.has(name.toLowerCase())) continue;
-        // Search Visual Bible: secondary characters first, then animals.
-        // (Vehicles/artifacts go through the objects list, not characters.)
-        const vbLists = [
-          { list: visualBible.secondaryCharacters, kind: 'secondary character' },
-          { list: visualBible.animals, kind: 'creature' },
-        ];
-        let matched = null;
-        for (const { list, kind } of vbLists) {
-          if (!Array.isArray(list)) continue;
-          const entry = list.find(e => (e?.name && e.name.toLowerCase() === name.toLowerCase()) || (e?.id && e.id.toLowerCase() === name.toLowerCase()));
-          if (entry) { matched = { entry, kind }; break; }
-        }
-        if (!matched) continue;
-
-        const e = matched.entry;
-        // Compose a compact rich description from VB fields (varies by entity type).
-        const parts = [];
-        if (e.species) parts.push(`Species: ${e.species}`);
-        if (e.size) parts.push(`Size: ${e.size}`);
-        if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
-        if (e.features) parts.push(`Features: ${e.features}`);
-        if (e.hair) parts.push(`Hair: ${e.hair}`);
-        if (e.face) parts.push(`Face: ${e.face}`);
-        if (e.signatureLook) parts.push(`Distinctive: ${e.signatureLook}`);
-        if (e.clothing) parts.push(`Wearing: ${e.clothing}`);
-        const baseDesc = e.description || parts.join('. ');
-        const rich = baseDesc
-          ? `${e.name} (${matched.kind}). ${baseDesc}`
-          : `${e.name} (${matched.kind})`;
-
-        // Key by the scene-metadata name (which may be a VB id placeholder like
-        // "CHR001") so buildExpectedCharactersForBbox finds it via the same key
-        // that appears in expectedCharacterPositions.
-        characterDescriptions[name] = { richDescription: rich };
-        log.debug(`📦 [BBOX-PREP] ${pageLabel}Enriched bbox description for VB ${matched.kind} "${e.name}" (key: "${name}")`);
-      }
     }
 
     // Parse Visual Bible objects from prompt (REQUIRED OBJECTS section)

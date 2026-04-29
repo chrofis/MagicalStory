@@ -33,6 +33,7 @@ const {
   parseClothingCategory,
   getCharacterPhotoDetails,
   buildCharacterPhysicalDescription,
+  buildCharacterDescriptionsForBbox,
   buildCharacterReferenceList,
   getCharactersInScene,
   buildImagePrompt,
@@ -3067,16 +3068,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Run bbox enrichment — always run to keep bboxDetection in sync with active image
         {
-          const characterDescriptions = {};
-          for (const char of (storyData.characters || [])) {
-            characterDescriptions[char.name] = {
-              richDescription: buildCharacterPhysicalDescription(char)
-            };
-          }
           const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
           const expectedPositions = sceneMetadata?.characterPositions || {};
           const expectedClothing = sceneMetadata?.characterClothing || {};
           const expectedObjects = sceneMetadata?.objects || [];
+          // Includes Visual Bible secondaryCharacters/animals (e.g. CHR003 = Gessler)
+          // so the detector can identify them too — primary-only descriptions
+          // would force every secondary character to come back UNKNOWN.
+          const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
 
           const enrichResult = await enrichWithBoundingBoxes(
             imageData, allIssues, [], [],
@@ -3458,20 +3457,14 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'No valid image for this page' });
     }
 
-    // Build character descriptions
-    const characterDescriptions = {};
-    for (const char of (storyData.characters || [])) {
-      characterDescriptions[char.name] = {
-        richDescription: buildCharacterPhysicalDescription(char),
-        clothingDescriptions: char.avatars?.clothing || {}
-      };
-    }
-
     // Get scene metadata for expected positions/clothing/objects
     const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
     const expectedPositions = sceneMetadata?.characterPositions || {};
     const expectedClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
+    // Build character descriptions — primary characters + Visual Bible
+    // secondaries/animals named in expectedPositions (CHR003, ANI001, etc.).
+    const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
 
     // If loadOnly=true, return existing bbox without re-detecting
     if (req.body.loadOnly && scene.bboxDetection) {

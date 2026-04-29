@@ -897,6 +897,72 @@ function parseCharacterDescriptions(prompt) {
  * Even pages (right side of spread) → must use right or full, never left.
  * Flips wrong-side positions to the correct side.
  */
+/**
+ * Build the `characterDescriptions` map that bbox detection consumes.
+ *
+ * Combines:
+ *   - Primary characters from `storyData.characters` (avatars + clothing).
+ *   - Visual Bible secondaryCharacters / animals when their name or VB-id
+ *     (e.g. "CHR003") appears in the page's `expectedPositions` keys.
+ *
+ * Without the VB enrichment, secondary characters like Gessler (CHR003) or
+ * tracked animals (Floh = ANI001) are sent to the detector with no
+ * description and come back as UNKNOWN — even though the renderer drew
+ * them into the image. Used by every bbox call site so primary + VB
+ * characters are always presented to the detector together.
+ *
+ * @param {object} storyData - story.data (must have .characters and optionally .visualBible)
+ * @param {object} expectedPositions - sceneMetadata.characterPositions ({name|VBid: prosePosition})
+ * @returns {{[name: string]: { richDescription: string, clothingDescriptions?: object }}}
+ */
+function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
+  const out = {};
+  // Primary characters first — they have richer data (clothing variants etc.)
+  for (const char of (storyData?.characters || [])) {
+    if (!char?.name) continue;
+    out[char.name] = {
+      richDescription: buildCharacterPhysicalDescription(char),
+      clothingDescriptions: char.avatars?.clothing || {},
+    };
+  }
+  // Enrich with Visual Bible secondaries / animals whose name or VB-id is in
+  // the page's expected positions but not yet covered by a primary entry.
+  const vb = storyData?.visualBible;
+  if (!vb || !expectedPositions) return out;
+  const known = new Set(Object.keys(out).map(n => n.toLowerCase()));
+  const lists = [
+    { list: vb.secondaryCharacters, kind: 'secondary character' },
+    { list: vb.animals, kind: 'creature' },
+  ];
+  for (const name of Object.keys(expectedPositions)) {
+    if (known.has(name.toLowerCase())) continue;
+    let matched = null;
+    for (const { list, kind } of lists) {
+      if (!Array.isArray(list)) continue;
+      const entry = list.find(e => (e?.name && e.name.toLowerCase() === name.toLowerCase())
+        || (e?.id && e.id.toLowerCase() === name.toLowerCase()));
+      if (entry) { matched = { entry, kind }; break; }
+    }
+    if (!matched) continue;
+    const e = matched.entry;
+    const parts = [];
+    if (e.species) parts.push(`Species: ${e.species}`);
+    if (e.size) parts.push(`Size: ${e.size}`);
+    if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
+    if (e.features) parts.push(`Features: ${e.features}`);
+    if (e.hair) parts.push(`Hair: ${e.hair}`);
+    if (e.face) parts.push(`Face: ${e.face}`);
+    if (e.signatureLook) parts.push(`Distinctive: ${e.signatureLook}`);
+    if (e.clothing) parts.push(`Wearing: ${e.clothing}`);
+    const baseDesc = e.description || parts.join('. ');
+    const rich = baseDesc ? `${e.name} (${matched.kind}). ${baseDesc}` : `${e.name} (${matched.kind})`;
+    // Key by the metadata name (may be a VB id placeholder like "CHR001")
+    // so buildExpectedCharactersForBbox finds it via the same key.
+    out[name] = { richDescription: rich };
+  }
+  return out;
+}
+
 function enforceSpreadTextPosition(textPosition, pageNumber) {
   if (!textPosition || !pageNumber || pageNumber < 1) return textPosition;
   const isLeftPage = pageNumber % 2 === 1;  // odd = left in spread
@@ -5130,6 +5196,7 @@ module.exports = {
 
   // Text position
   enforceSpreadTextPosition,
+  buildCharacterDescriptionsForBbox,
   buildTextZoneInstruction,
   buildEraGuard,
 
