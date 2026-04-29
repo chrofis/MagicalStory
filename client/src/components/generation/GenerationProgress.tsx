@@ -482,7 +482,7 @@ export function GenerationProgress({
       backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
-      canCloseTitle: 'Wir mailen dich, wenn fertig',
+      canCloseTitle: 'Wir schicken dir eine E-Mail, sobald es so weit ist',
       canClose: 'Du kannst den Tab schliessen — deine Geschichte wird auf unseren Servern weiter erstellt.',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
