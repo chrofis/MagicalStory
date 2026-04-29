@@ -117,4 +117,23 @@ function getTextZonePolygon(textPosition, langLevel, width, height) {
   return [[cx, cy], [ax, ay], [bx, by]];
 }
 
-module.exports = { getTextAreaMask, getTextZonePolygon };
+/** Polygon area in px² (Shoelace, absolute). */
+function polygonArea(polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return 0;
+  let s = 0;
+  for (let i = 0, n = polygon.length; i < n; i++) {
+    const [x1, y1] = polygon[i];
+    const [x2, y2] = polygon[(i + 1) % n];
+    s += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(s) / 2;
+}
+
+/** Map a pipeline languageLevel to the polygon's size bucket name. */
+function sizeNameFor(languageLevel) {
+  return languageLevel === '1st-grade' ? 'small'
+    : languageLevel === 'advanced' ? 'large'
+    : 'medium';
+}
+
+module.exports = { getTextAreaMask, getTextZonePolygon, polygonArea, sizeNameFor };

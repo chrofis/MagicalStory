@@ -171,12 +171,13 @@ Both apply `enforceSpreadTextPosition` before rendering. The shared viewer defau
 |------|------|
 | `prompts/story-unified.txt` | Sonnet draft + critical-review with parity / forbidden-side / collision checks |
 | `server/lib/storyHelpers.js` | `enforceSpreadTextPosition`, `buildTextZoneInstruction`, `extractSceneMetadata` |
-| `server/lib/textMasks.js` | `getTextAreaMask` (pre-built PNG masks), `getTextZonePolygon` (analytical polygon) |
-| `server/config/textRegion.js` | `requiredTextPixels`, `computeOverlayPolygon`, `requiredFontPt`, `countWords`, repair budget |
+| `server/lib/textMasks.js` | `getTextAreaMask` (pre-built PNG masks), `getTextZonePolygon` (analytical polygon, **single source of truth for shape**), `polygonArea`, `sizeNameFor` |
+| `server/config/textRegion.js` | `requiredTextPixels`, `requiredFontPt`, `countWords`, repair budget |
 | `server/lib/textRegion.js` | `detectAndLightenTextRegion` — calmness measurement + polygon-aware calm count |
+| `server/lib/textSpaceRepair.js` | **`ensureCalmZone` — single source of truth for the gate + repair loop** (used by both initial gen and post-repair recovery) |
 | `server/lib/textOverlayRenderer.js` | `generateTextOverlay` — server-side text-on-image compositing |
-| `server.js` (text-region phase) | gate + text-space-repair loop, candidates → imageVersions |
-| `server/lib/images.js` (Step 7.5) | post-repair calm-zone recovery |
+| `server.js` (text-region phase) | calls `ensureCalmZone`, persists candidates + report |
+| `server/lib/images.js` (Step 7.5) | calls `ensureCalmZone`, swaps active version on recovery win |
 | `server/lib/pdf.js` | PDF rendering, calls `generateTextOverlay` |
 | `client/src/utils/textOverlay.ts` | CSS fallback positioning + spread parity for the browser |
 | `client/src/components/generation/StoryDisplay.tsx` | renders overlay PNG with CSS fallback |

@@ -26,12 +26,14 @@ interface ReferencePhotosDisplayProps {
   textCoverageReport?: {
     words: number;
     fontPt: number;
-    requiredPct: number;
-    finalPct: number;
+    calmNeededPx: number;
+    calmFoundPx: number;
+    areaPx: number;
     passed: boolean;
     retriesUsed: number;
     winnerIndex: number;
-    candidates: { index: number; coveragePct: number; position: string; overridden: boolean }[];
+    candidates: { index: number; source: string; calmFoundPx: number; calmPct: number; position: string }[];
+    postRepairChecked?: boolean;
   } | null;
   language: string;
   // For lazy loading
@@ -324,13 +326,14 @@ export function ReferencePhotosDisplay({
             </details>
           )}
 
-          {/* Text-space coverage report */}
+          {/* Text-space coverage report — calm pixels inside the actual
+              renderer polygon (triangle for corners, rectangle for full). */}
           {textCoverageReport && (
             <div className={`mt-2 border rounded-lg p-3 ${textCoverageReport.passed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-              <div className={`text-sm font-semibold flex items-center gap-2 ${textCoverageReport.passed ? 'text-emerald-800' : 'text-amber-800'}`}>
+              <div className={`text-sm font-semibold flex items-center gap-2 flex-wrap ${textCoverageReport.passed ? 'text-emerald-800' : 'text-amber-800'}`}>
                 {textCoverageReport.passed ? '✅' : '⚠️'} {language === 'de' ? 'Text-Platz' : 'Text space'}
                 <span className="text-xs font-normal text-gray-700">
-                  {textCoverageReport.finalPct}% / {textCoverageReport.requiredPct}% {language === 'de' ? 'benötigt' : 'required'}
+                  {textCoverageReport.calmFoundPx.toLocaleString()} / {textCoverageReport.calmNeededPx.toLocaleString()} px² {language === 'de' ? 'Ruhe' : 'calm'}
                 </span>
                 <span className="text-xs font-normal text-gray-600">
                   · {textCoverageReport.words} {language === 'de' ? 'Wörter' : 'words'} @ {textCoverageReport.fontPt}pt
@@ -340,15 +343,20 @@ export function ReferencePhotosDisplay({
                     {language === 'de' ? 'repariert' : 'repaired'} ({textCoverageReport.retriesUsed})
                   </span>
                 )}
+                {textCoverageReport.postRepairChecked && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                    {language === 'de' ? 'nach Reparatur' : 'post-repair'}
+                  </span>
+                )}
               </div>
               {textCoverageReport.candidates.length > 1 && (
                 <div className="mt-2 text-xs text-gray-700 space-y-0.5">
                   {textCoverageReport.candidates.map((c) => (
                     <div key={c.index} className="flex items-center gap-2">
                       <span className={c.index === textCoverageReport.winnerIndex ? 'font-semibold text-emerald-700' : ''}>
-                        {c.index === 0 ? (language === 'de' ? 'Original' : 'original') : `${language === 'de' ? 'Wiederholung' : 'retry'} ${c.index}`}
+                        {c.source}
                       </span>
-                      <span>→ {c.coveragePct}%</span>
+                      <span>→ {c.calmFoundPx.toLocaleString()} px² ({c.calmPct}%)</span>
                       <span className="text-gray-500">({c.position})</span>
                       {c.index === textCoverageReport.winnerIndex && <span className="text-xs bg-emerald-100 text-emerald-700 px-1 rounded">{language === 'de' ? 'ausgewählt' : 'picked'}</span>}
                     </div>

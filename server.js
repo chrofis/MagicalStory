@@ -5219,235 +5219,88 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
       const skipQualityEval = inputData.skipQualityEval === true;
 
-      // ── Text region detection + lightening wash: find the calmest region in
-      // each generated image and bake a white wash directly into the image.
-      // If the calm area is too small for the page's text, run a repair pass
-      // that asks the model to move characters out of the white mask region.
-      // Pick the best (highest-coverage) version across original + retries.
-      const { detectAndLightenTextRegion } = require('./server/lib/textRegion');
-      const {
-        requiredTextCoveragePct,
-        requiredTextPixels,
-        computeOverlayPolygon,
-        requiredFontPt,
-        countWords,
-        REPAIR: TEXT_REPAIR,
-      } = require('./server/config/textRegion');
-      const textRegionResults = {}; // pageNumber → { imageData, position, rect, score, report }
-      // Skip the entire text-region detection + wash + repair phase for layouts
-      // where text isn't overlaid on the image (advanced/square+below). The text
-      // is typeset on a separate strip below the image — no calm zone needed,
-      // no wash to bake in, no repair to run.
+      // ── Text-space gate + repair: count calm pixels INSIDE the polygon the
+      // renderer will draw text into. If calmFound < calmNeeded for the page's
+      // word count and font size, re-roll the image with a mask hint up to
+      // REPAIR.maxRetries. All candidates are persisted as separate
+      // imageVersions so the user can pick a different one in dev mode. One
+      // helper, one rule, one source of truth.
+      const { ensureCalmZone } = require('./server/lib/textSpaceRepair');
+      const textRegionResults = {}; // pageNumber → { winnerImage, position, report }
+      // Skip the entire phase for layouts where text isn't overlaid on the
+      // image (advanced/square+below renders text in a separate strip).
       const skipTextRegionPhase = inputData?.layout?.textInImage === false;
       try {
         if (skipTextRegionPhase) {
           log.info(`📝 [TEXT-REGION] Skipped (layout.textInImage=false — text rendered below image)`);
         }
         const scenePages = !skipTextRegionPhase ? rawImages.filter(img => img.pageNumber > 0 && img.imageData) : [];
-        const fontPt = requiredFontPt(inputData.languageLevel);
         await Promise.all(scenePages.map(async (img) => {
           const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);
-          const words = countWords(img.text);
-          const requiredPct = requiredTextCoveragePct(words, fontPt);
 
-          // Geometric pixel target: how many calm pixels does the actual text
-          // need to fit, and what overlay rectangle will the renderer draw it
-          // in. Both are computed up-front so detection can measure calm
-          // pixels INSIDE that rectangle (not just anywhere in the half×half
-          // zone) and compare directly against the geometric requirement.
-          const calmNeededPx = requiredTextPixels(words, fontPt);
+          // Caller-supplied retry image generator. Wraps generateImageOnly so
+          // ensureCalmZone doesn't import images.js (would be circular).
+          const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+            imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+            imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+            landmarkPhotos: img.landmarkPhotos || [],
+            visualBibleGrid: img.visualBibleGrid || null,
+            previousImage: opts.previousImage,
+            textAreaMask: opts.textAreaMask,
+            pageNumber: img.pageNumber,
+            skipCache: true,
+            aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+          });
 
-          // Candidate = { rawImage, washedImage, coverage (fraction), rect, position, prompt?, modelId? }
-          // Candidate 0 is always the original generated image; candidates 1..N
-          // are the text-space-repair attempts (each a fresh Grok/Gemini call
-          // with a mask hint, so each is a different composition).
-          const candidates = [];
-          const runDetection = async (rawImage, extra = {}) => {
-            // Probe image dimensions so we can compute the overlay polygon in
-            // absolute pixels. langLevel drives the polygon's size (small/
-            // medium/large = 10%/25%/40% area), matching the production text
-            // overlay renderer (server/lib/textOverlayRenderer.js).
-            let probeW = null, probeH = null;
-            try {
-              const meta = await sharp(Buffer.from((rawImage || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
-              probeW = meta.width; probeH = meta.height;
-            } catch { /* fall through; detection will return null overlay px */ }
-            const overlayPolygon = (probeW && probeH)
-              ? computeOverlayPolygon(preferred || 'top-left', inputData?.languageLevel || 'standard', probeW, probeH)
-              : null;
-            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber, { overlayPolygon });
-            const overlayCalmPct = (r.overlayCalmPx != null && r.overlayAreaPx)
-              ? Number(((r.overlayCalmPx / r.overlayAreaPx) * 100).toFixed(1))
-              : null;
-            candidates.push({
-              rawImage,
-              washedImage: r.imageData,
-              coverage: r.score || 0,
-              rect: r.rect,
-              position: r.position,
-              overridden: r.overridden,
-              overlayCalmPx: r.overlayCalmPx,
-              overlayAreaPx: r.overlayAreaPx,
-              overlayCalmPct,
-              ...extra,
-            });
-            return r;
+          const onUsage = (result) => {
+            if (!result.usage) return;
+            const isRunware = result.modelId?.startsWith('runware:');
+            const isGrok = result.modelId?.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            addUsage(provider, result.usage, 'page_images', result.modelId);
           };
 
-          await runDetection(img.imageData);
+          const result = await ensureCalmZone({
+            imageData: img.imageData,
+            text: img.text,
+            textPosition: preferred,
+            pageNumber: img.pageNumber,
+            languageLevel: inputData?.languageLevel || 'standard',
+            textAreaMask: img.textAreaMask,
+            sceneDescription: img.sceneDescription || '',
+            generateImage,
+            onUsage,
+            label: 'TEXT-SPACE',
+          });
 
-          // Repair gate (geometric): trigger when calm pixels measured INSIDE
-          // the actual overlay rectangle is below the geometric requirement
-          // for the page's text. Falls back to the legacy half-zone coverage
-          // metric if overlay-rect measurement is unavailable (probe failed).
-          const cand0 = candidates[0];
-          const calmFoundPx = cand0.overlayCalmPx;
-          const overlayPx = cand0.overlayAreaPx;
-          const overlayCalmFractionPct = cand0.overlayCalmPct;
-          const geometricFails = (calmFoundPx != null && calmFoundPx < calmNeededPx);
-          const legacyFails = (calmFoundPx == null && cand0.coverage * 100 < requiredPct);
-          const needsRepair = (img.textAreaMask
-            && (geometricFails || legacyFails)
-            && TEXT_REPAIR.maxRetries > 0);
-          if (calmFoundPx != null) {
-            log.info(`📝 [TEXT-REGION] P${img.pageNumber}: ${words}w@${fontPt}pt — calmNeeded ${calmNeededPx}px, calmFound ${calmFoundPx}px in ${overlayPx}px overlay (${overlayCalmFractionPct}% calm) — ${geometricFails ? 'BELOW THRESHOLD → repair' : 'OK'}`);
-          }
-          if (needsRepair) {
-            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: coverage ${(candidates[0].coverage * 100).toFixed(1)}% < required ${requiredPct.toFixed(1)}% (${words} words @ ${fontPt}pt) — repairing (zone: ${preferred})`);
-            for (let attempt = 1; attempt <= TEXT_REPAIR.maxRetries; attempt++) {
-              try {
-                const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
-                  SCENE_DESCRIPTION: (img.sceneDescription || '').substring(0, 1200),
-                });
-                // Pass the current page as previousImage + the mask as a spatial
-                // reference. The prompt must tell Grok explicitly that the mask
-                // is a LAYOUT guide (not content to paint), otherwise Grok bleeds
-                // hard-edged white/black patches into the output.
-                const repairResult = await generateImageOnly(repairPrompt, img.characterPhotos || [], {
-                  imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-                  imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
-                  landmarkPhotos: img.landmarkPhotos || [],
-                  visualBibleGrid: img.visualBibleGrid || null,
-                  previousImage: candidates[0].rawImage, // always repair off the original, not a retry
-                  textAreaMask: img.textAreaMask,
-                  pageNumber: img.pageNumber,
-                  skipCache: true,
-                  aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-                });
-                if (!repairResult?.imageData) {
-                  log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: no image returned`);
-                  continue;
-                }
-                if (repairResult.usage) {
-                  const isRunware = repairResult.modelId?.startsWith('runware:');
-                  const isGrok = repairResult.modelId?.startsWith('grok-imagine');
-                  const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-                  addUsage(provider, repairResult.usage, 'page_images', repairResult.modelId);
-                }
-                await runDetection(repairResult.imageData, {
-                  prompt: repairPrompt,
-                  modelId: repairResult.modelId || null,
-                  grokRefImages: repairResult.grokRefImages || null,
-                });
-                const latest = candidates[candidates.length - 1];
-                log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%${latest.overlayCalmPx != null ? ` overlay ${latest.overlayCalmPx}/${calmNeededPx}px` : ''}`);
-                // Stop early when the requirement that triggered the loop is met:
-                // geometric (calm pixels in overlay rect) takes priority over the
-                // legacy zone-coverage % when the probe succeeded. Otherwise fall
-                // back to the legacy %.
-                const earlyExit = latest.overlayCalmPx != null
-                  ? latest.overlayCalmPx >= calmNeededPx
-                  : latest.coverage * 100 >= requiredPct;
-                if (earlyExit) break;
-              } catch (repairErr) {
-                log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt} failed: ${repairErr.message}`);
-              }
-            }
-          }
-
-          // Pick the winner by overlay calm pixels (legibility-relevant metric);
-          // fall back to broad zone coverage on a per-candidate basis if a
-          // single probe failed, instead of discarding all overlay data.
-          const winnerIdx = candidates.reduce((best, c, i) => {
-            const a = candidates[best];
-            const cBetter = (c.overlayCalmPx != null && a.overlayCalmPx != null)
-              ? c.overlayCalmPx > a.overlayCalmPx
-              : c.coverage > a.coverage;
-            return cBetter ? i : best;
-          }, 0);
-          const winner = candidates[winnerIdx];
-          const finalPct = winner.coverage * 100;
-          const passed = winner.overlayCalmPx != null
-            ? winner.overlayCalmPx >= calmNeededPx
-            : finalPct >= requiredPct;
-
-          img.imageData = winner.washedImage; // textRegion no longer bakes anything — this is just the raw winner image
-          // Keep every candidate so the repair pipeline can expand them into
-          // separate versions. Without this, the retry attempts AND the
-          // truly-original image are discarded — the viewer then shows the
-          // coverage winner labeled "original" and the user has no way back.
-          // When the winner has dropped image quality for the sake of
-          // coverage (terrible scene / wrong characters / broken composition),
-          // we want every candidate visible so a different one can be picked.
-          img.textSpaceCandidates = candidates.length > 1
-            ? candidates.map((c, i) => ({
-                imageData: c.washedImage,
-                coverage: c.coverage,
-                coveragePct: Number((c.coverage * 100).toFixed(1)),
+          img.imageData = result.winnerImageData;
+          // Persist all candidates so the dev viewer can show each attempt.
+          // Candidate 0 inherits the original's Grok refs; repair candidates
+          // carry their own captured by ensureCalmZone.
+          img.textSpaceCandidates = result.candidates.length > 1
+            ? result.candidates.map((c, i) => ({
+                imageData: c.imageData,
                 position: c.position,
                 rect: c.rect,
-                overridden: c.overridden,
-                prompt: c.prompt || null,         // repair prompt (null for original)
+                calmFoundPx: c.calmFoundPx,
+                areaPx: c.areaPx,
+                source: c.source,
+                prompt: c.prompt,
                 modelId: c.modelId || img.modelId || null,
-                // i === 0 is the truly-original image — inherit the initial
-                // Grok refs from the generation call. Repair candidates carry
-                // their own refs captured in runDetection().
-                grokRefImages: i === 0 ? (img.grokRefImages || null) : (c.grokRefImages || null),
-                source: i === 0 ? 'original' : `text-space-repair-${i}`,
-                isWinner: i === winnerIdx,
+                grokRefImages: i === 0 ? (img.grokRefImages || null) : c.grokRefImages,
+                isWinner: i === result.winnerIndex,
               }))
             : null;
-          img.textCoverageReport = {
-            words,
-            fontPt,
-            requiredPct: Number(requiredPct.toFixed(1)),
-            finalPct: Number(finalPct.toFixed(1)),
-            passed,
-            retriesUsed: candidates.length - 1,
-            winnerIndex: winnerIdx,
-            // Geometric numbers (the legibility-relevant comparison)
-            calmNeededPx,
-            calmFoundPx: winner.overlayCalmPx ?? null,
-            overlayAreaPx: winner.overlayAreaPx ?? null,
-            overlayCalmPct: winner.overlayCalmPct ?? null,
-            geometricPassed: winner.overlayCalmPx != null
-              ? winner.overlayCalmPx >= calmNeededPx
-              : null,
-            candidates: candidates.map((c, i) => ({
-              index: i,
-              coveragePct: Number((c.coverage * 100).toFixed(1)),
-              position: c.position,
-              overridden: c.overridden,
-              calmFoundPx: c.overlayCalmPx ?? null,
-              overlayCalmPct: c.overlayCalmPct ?? null,
-            })),
-          };
+          img.textCoverageReport = result.report;
           textRegionResults[img.pageNumber] = {
-            imageData: winner.washedImage,
-            position: winner.position,
-            rect: winner.rect,
-            score: winner.coverage,
-            overridden: winner.overridden,
-            report: img.textCoverageReport,
+            position: result.winnerCandidate.position,
+            rect: result.winnerCandidate.rect,
+            report: result.report,
           };
-
-          if (candidates.length > 1) {
-            log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: picked v${winnerIdx} (coverage ${finalPct.toFixed(1)}%, required ${requiredPct.toFixed(1)}%, ${passed ? 'PASS' : 'BELOW'})`);
-          }
         }));
-        const washed = Object.entries(textRegionResults).filter(([, r]) => r.score > 0);
-        const repaired = Object.entries(textRegionResults).filter(([, r]) => r.report?.retriesUsed > 0);
-        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${washed.length} washed, ${repaired.length} repaired for text space`);
+        const passed = Object.entries(textRegionResults).filter(([, r]) => r.report.passed).length;
+        const repaired = Object.entries(textRegionResults).filter(([, r]) => r.report.retriesUsed > 0).length;
+        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${passed} passed, ${repaired} repaired for text space`);
       } catch (trErr) {
         log.warn(`⚠️ [TEXT-REGION] Detection failed: ${trErr.message} — using original images`);
       }

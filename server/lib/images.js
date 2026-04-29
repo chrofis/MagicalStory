@@ -6837,190 +6837,101 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 7.5: Post-repair calm-zone recovery
   // =========================================================================
-  // Iterate / inpaint / character-fix can all shift content into the
-  // text-overlay corner, undoing the calm zone established at initial
-  // generation. The text-space-repair loop only runs once at initial gen —
-  // post-repair pages with a degraded calm zone silently ship with text
-  // overlay landing on a face / hat. Re-detect coverage on the active
-  // version of each repaired page; if it dropped below requiredPct, run
-  // text-space-repair on the active image and swap if a candidate beats
-  // the current coverage. Same coverage-only selection rule the initial
-  // text-space loop uses.
+  // Iterate / inpaint / character-fix can shift content into the text-overlay
+  // polygon, undoing the calm zone established at initial generation. Re-run
+  // ensureCalmZone (the same helper used at initial gen) on the active
+  // version of each repaired page. If the recovery produces a better
+  // candidate, push it as a new version and re-point finalBestPerPage.
   try {
-    const { detectAndLightenTextRegion } = require('./textRegion');
-    const {
-      requiredTextPixels: postRepairRequiredPx,
-      requiredFontPt: postRepairFontPt,
-      countWords: postRepairCountWords,
-      computeOverlayPolygon: postRepairOverlayPolygon,
-      REPAIR: POST_REPAIR_TEXT_REPAIR,
-    } = require('../config/textRegion');
-    const sharpForProbe = require('sharp');
+    const { ensureCalmZone } = require('./textSpaceRepair');
+    const langLevel = storyData?.languageLevel || 'standard';
 
     const postRepairTextPages = rawImages.filter(img => {
       if (img.pageNumber <= 0 || !img.imageData) return false;
       if (!img.textAreaMask || !img.text) return false;            // textInImage + actual text required
+      if (!pageVersions.has(img.pageNumber)) return false;          // unknown page → silently dropped versions
       const src = finalBestPerPage.get(img.pageNumber)?.source || '';
-      // Skip pages whose active version is the original (untouched) OR a
-      // text-space-repair winner from initial gen (its calm zone was
-      // already validated against the geometric threshold there).
+      // Skip pages that didn't change (untouched original) or whose active
+      // version was already validated by ensureCalmZone at initial gen.
       if (src === 'original' || src.startsWith('text-space-repair')) return false;
       return true;
     });
     if (postRepairTextPages.length > 0) {
       log.info(`📝 [POST-REPAIR-TEXT] Re-checking calm zone on ${postRepairTextPages.length} repaired pages`);
     }
-    const langLevel = storyData?.languageLevel || 'standard';
-    const postRepairFont = postRepairFontPt(langLevel);
-
-    const probeOverlay = async (imageData, position) => {
-      try {
-        const meta = await sharpForProbe(Buffer.from((imageData || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
-        if (!meta.width || !meta.height) return null;
-        return postRepairOverlayPolygon(position, langLevel, meta.width, meta.height);
-      } catch { return null; }
-    };
 
     await Promise.all(postRepairTextPages.map(async (img) => {
       const pageNumber = img.pageNumber;
-      // If pageVersions has no entry for this page, our newVersion push
-      // below would land on a throwaway local array and never reach the
-      // build-final-results loop. Bail out instead of silently dropping.
-      if (!pageVersions.has(pageNumber)) return;
       const versions = pageVersions.get(pageNumber);
       const best = finalBestPerPage.get(pageNumber);
       if (!best?.imageData) return;
 
-      const words = postRepairCountWords(img.text);
-      if (!words) return;
-      const calmNeededPx = postRepairRequiredPx(words, postRepairFont);
-
       const preferred = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition
         || img.sceneMetadata?.textPosition
         || 'top-left';
-
-      const overlayPolygon = await probeOverlay(best.imageData, preferred);
-
-      let baseCalmPx = null;
-      let baseAreaPx = null;
-      try {
-        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber, { overlayPolygon });
-        baseCalmPx = det.overlayCalmPx;
-        baseAreaPx = det.overlayAreaPx;
-      } catch (err) {
-        log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber}: detection failed: ${err.message}`);
-        return;
-      }
-
-      // Geometric pass: calm pixels inside the overlay polygon ≥ pixels
-      // needed for the actual text. Skip silently when the polygon probe
-      // failed (no signal to act on).
-      if (baseCalmPx == null) return;
-      const baseCalmPct = baseAreaPx ? (baseCalmPx / baseAreaPx) * 100 : 0;
-      const passNow = baseCalmPx >= calmNeededPx;
-      log.info(`📝 [POST-REPAIR-TEXT] P${pageNumber}: ${words}w@${postRepairFont}pt — calmNeeded ${calmNeededPx}px, calmFound ${baseCalmPx}px in ${baseAreaPx}px overlay (${baseCalmPct.toFixed(0)}% calm) — ${passNow ? 'OK' : 'BELOW THRESHOLD → recovering'}`);
-
-      if (passNow) {
-        img.textCoverageReport = {
-          ...(img.textCoverageReport || {}),
-          calmNeededPx,
-          calmFoundPx: baseCalmPx,
-          overlayAreaPx: baseAreaPx,
-          overlayCalmPct: Number(baseCalmPct.toFixed(1)),
-          geometricPassed: true,
-          postRepairChecked: true,
-        };
-        return;
-      }
-
       const aspectRatio = img.imageAspect
         || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
         || null;
-      let bestRecoveryCalmPx = baseCalmPx;
-      let bestRecoveryResult = null;
 
-      for (let attempt = 1; attempt <= POST_REPAIR_TEXT_REPAIR.maxRetries; attempt++) {
-        try {
-          const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
-            SCENE_DESCRIPTION: (img.sceneDescription || '').substring(0, 1200),
-          });
-          const repairResult = await generateImageOnly(repairPrompt, img.characterPhotos || [], {
-            imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-            imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
-            landmarkPhotos: img.landmarkPhotos || [],
-            visualBibleGrid: img.visualBibleGrid || null,
-            previousImage: best.imageData,
-            textAreaMask: img.textAreaMask,
-            pageNumber,
-            skipCache: true,
-            aspectRatio,
-          });
-          if (!repairResult?.imageData) continue;
-          if (repairResult.usage && usageTracker) {
-            const isRunware = repairResult.modelId?.startsWith('runware:');
-            const isGrok = repairResult.modelId?.startsWith('grok-imagine');
-            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-            usageTracker(provider, repairResult.usage, 'post_repair_text_recovery', repairResult.modelId);
-          }
-          const newOverlay = await probeOverlay(repairResult.imageData, preferred);
-          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber, { overlayPolygon: newOverlay });
-          const newCalmPx = newDet.overlayCalmPx;
-          if (newCalmPx == null) continue;
-          log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt}: calmFound ${newCalmPx}px (was ${baseCalmPx}px, need ${calmNeededPx}px)`);
-          if (newCalmPx > bestRecoveryCalmPx) {
-            bestRecoveryCalmPx = newCalmPx;
-            bestRecoveryResult = {
-              imageData: repairResult.imageData,
-              modelId: repairResult.modelId || best.modelId,
-              grokRefImages: repairResult.grokRefImages || null,
-              prompt: repairPrompt,
-              calmFoundPx: newCalmPx,
-              overlayAreaPx: newDet.overlayAreaPx || null,
-            };
-            if (newCalmPx >= calmNeededPx) break; // good enough — stop attempting
-          }
-        } catch (err) {
-          log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt} failed: ${err.message}`);
-        }
+      const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+        imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+        imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+        landmarkPhotos: img.landmarkPhotos || [],
+        visualBibleGrid: img.visualBibleGrid || null,
+        previousImage: opts.previousImage,
+        textAreaMask: opts.textAreaMask,
+        pageNumber,
+        skipCache: true,
+        aspectRatio,
+      });
+
+      const onUsage = (result) => {
+        if (!result.usage || !usageTracker) return;
+        const isRunware = result.modelId?.startsWith('runware:');
+        const isGrok = result.modelId?.startsWith('grok-imagine');
+        const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+        usageTracker(provider, result.usage, 'post_repair_text_recovery', result.modelId);
+      };
+
+      let result;
+      try {
+        result = await ensureCalmZone({
+          imageData: best.imageData,
+          text: img.text,
+          textPosition: preferred,
+          pageNumber,
+          languageLevel: langLevel,
+          textAreaMask: img.textAreaMask,
+          sceneDescription: img.sceneDescription || '',
+          generateImage,
+          onUsage,
+          label: 'POST-REPAIR-TEXT',
+        });
+      } catch (err) {
+        log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber}: ${err.message} — keeping current best`);
+        return;
       }
 
-      if (bestRecoveryResult) {
+      // If the winner is the original (no improvement), just refresh the
+      // report. Otherwise push the recovery winner as a new version and
+      // re-point finalBestPerPage so the build-final-results loop sees it.
+      if (result.winnerIndex > 0) {
+        const w = result.winnerCandidate;
         const newVersion = {
-          imageData: bestRecoveryResult.imageData,
+          imageData: w.imageData,
           score: best.score,
           source: 'post-repair-text-space',
           evaluation: best.evaluation || null,
-          modelId: bestRecoveryResult.modelId,
-          grokRefImages: bestRecoveryResult.grokRefImages,
+          modelId: w.modelId || best.modelId,
+          grokRefImages: w.grokRefImages,
           entityPenalty: best.entityPenalty || 0,
           evaluatedAt: new Date().toISOString(),
-          prompt: bestRecoveryResult.prompt,
+          prompt: w.prompt,
         };
         versions.push(newVersion);
         finalBestPerPage.set(pageNumber, newVersion);
-        img.textCoverageReport = {
-          words,
-          fontPt: postRepairFont,
-          calmNeededPx,
-          calmFoundPx: bestRecoveryCalmPx,
-          overlayAreaPx: bestRecoveryResult.overlayAreaPx || null,
-          geometricPassed: bestRecoveryCalmPx >= calmNeededPx,
-          retriesUsed: (img.textCoverageReport?.retriesUsed || 0) + POST_REPAIR_TEXT_REPAIR.maxRetries,
-          postRepairRecovered: true,
-        };
-        log.info(`✅ [POST-REPAIR-TEXT] P${pageNumber}: recovered calmFound ${baseCalmPx}px → ${bestRecoveryCalmPx}px (need ${calmNeededPx}px, ${bestRecoveryCalmPx >= calmNeededPx ? 'PASS' : 'still below threshold but improved'})`);
-      } else {
-        log.info(`⏭️ [POST-REPAIR-TEXT] P${pageNumber}: no recovery candidate beat ${baseCalmPx}px — keeping current best`);
-        img.textCoverageReport = {
-          ...(img.textCoverageReport || {}),
-          calmNeededPx,
-          calmFoundPx: baseCalmPx,
-          overlayAreaPx: baseAreaPx,
-          overlayCalmPct: Number(baseCalmPct.toFixed(1)),
-          geometricPassed: false,
-          postRepairChecked: true,
-        };
       }
+      img.textCoverageReport = { ...result.report, postRepairChecked: true };
     }));
   } catch (postRepairErr) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
