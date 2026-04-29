@@ -1491,10 +1491,10 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
  * languageLevel='standard') and no auth required.
  */
 router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
-  // Set up SSE headers
+  // Set up SSE headers. Connection: keep-alive is forbidden in HTTP/2 — see
+  // storyIdeas.js for the same fix.
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
   res.flushHeaders();
 

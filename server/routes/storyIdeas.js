@@ -483,10 +483,12 @@ ${landmarkEntries}`;
 
 // SSE Streaming endpoint for story ideas - streams each story as it completes
 router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) => {
-  // Set up SSE headers
+  // Set up SSE headers. Don't set Connection: keep-alive — it's forbidden in
+  // HTTP/2 (RFC 7540 §8.1.2.2) and Cloudflare/Railway hand the response to
+  // the browser over HTTP/2, which then drops the frame with
+  // ERR_HTTP2_PROTOCOL_ERROR even though the server stream completed cleanly.
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
   res.flushHeaders();
 
