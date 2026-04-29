@@ -1410,8 +1410,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
 
-    // Helper function to call the API with retry for socket errors
-    const callQualityAPI = async (model) => {
+    // Helper function to call the API with retry for socket errors.
+    // thinkingBudget caps how many of the 32k output tokens Gemini may spend on
+    // hidden reasoning. Without a cap, 2.5 Flash has been observed burning the
+    // entire budget on thinking (30k+) and emitting truncated JSON → MAX_TOKENS.
+    const callQualityAPI = async (model, thinkingBudget = 8192) => {
       // Route to Grok vision API for xAI models
       const modelConfig = TEXT_MODELS[model];
       if (modelConfig?.provider === 'xai') {
@@ -1425,14 +1428,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
-              // Gemini 2.5's thinking tokens count against maxOutputTokens. 16k
-              // was too tight for complex scenes (3+ characters + multiple
-              // objects + spatial checks) — the response would hit the cap
-              // mid-JSON and the parse would fail, leaving the page un-scored.
-              // 32k gives ~22-24k for the actual JSON output after thinking,
-              // comfortably above the ~16k the longest responses produced.
               maxOutputTokens: 32000,
-              temperature: 0.3
+              temperature: 0.3,
+              thinkingConfig: { thinkingBudget }
             },
             safetySettings: GEMINI_SAFETY_SETTINGS
           })
@@ -1528,9 +1526,37 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Log finish reason to diagnose early stops
-    const finishReason = data.candidates?.[0]?.finishReason;
+    let finishReason = data.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
       log.warn(`⚠️  [QUALITY] Gemini finish reason: ${finishReason}`);
+    }
+
+    // MAX_TOKENS retry: thinking ate the budget → retry once with a tighter
+    // thinkingBudget so the model has more room for the actual JSON output.
+    // Failing fast (returning null) is preferable to silently hanging the pipeline.
+    if (finishReason === 'MAX_TOKENS' && TEXT_MODELS[modelId]?.provider !== 'xai') {
+      log.warn(`⚠️  [QUALITY] MAX_TOKENS — retrying once with thinkingBudget=2048`);
+      try {
+        const retry = await callQualityAPI(modelId, 2048);
+        if (retry.ok) {
+          const retryData = await retry.json();
+          const retryFinish = retryData.candidates?.[0]?.finishReason;
+          if (retryData.candidates?.[0]?.content?.parts?.[0]?.text && retryFinish !== 'MAX_TOKENS') {
+            log.info(`✅ [QUALITY] MAX_TOKENS retry succeeded`);
+            data = retryData;
+            finishReason = retryFinish;
+          } else {
+            log.warn(`⚠️  [QUALITY] MAX_TOKENS retry still truncated (finishReason=${retryFinish}) — giving up on this eval`);
+            return null;
+          }
+        } else {
+          log.warn(`⚠️  [QUALITY] MAX_TOKENS retry HTTP error — giving up on this eval`);
+          return null;
+        }
+      } catch (retryErr) {
+        log.warn(`⚠️  [QUALITY] MAX_TOKENS retry threw: ${retryErr.message} — giving up on this eval`);
+        return null;
+      }
     }
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
