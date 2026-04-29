@@ -182,7 +182,15 @@ function parsePatchSections(content) {
   let text = '';
   if (HAS_TEXT_LABEL_RE.test(content)) {
     const m = content.match(TEXT_RE);
-    text = m ? m[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
+    // Strip Sonnet's *(meta-comment)* annotations from BOTH ends of the page
+    // text. Trailing was already covered (word counts); leading wasn't, so
+    // section headers like "*(Page 5 — close-up, 1 char, Lukas nach dem
+    // Schuss)*" leaked into the printed page.
+    text = m ? m[1].trim()
+      .replace(/^\s*\*\([^)]*\)\*\s*/g, '')
+      .replace(/\s*\*\([^)]*\)\*\s*$/g, '')
+      .replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '')
+      .trim() : '';
   }
 
   let sceneProse = '';
@@ -219,7 +227,8 @@ function parseDraftSections(content) {
   const stopIndex = stopMatch ? stopMatch.index : content.length;
   const text = content.substring(0, stopIndex).trim()
     .replace(/^TEXT:\s*/i, '')
-    .replace(/\s*\*\([^)]*\)\s*\*?\s*$/g, '')
+    .replace(/^\s*\*\([^)]*\)\*\s*/g, '')         // leading meta-annotation (section header)
+    .replace(/\s*\*\([^)]*\)\s*\*?\s*$/g, '')     // trailing meta-annotation (word count etc.)
     .replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '')
     .trim();
 
