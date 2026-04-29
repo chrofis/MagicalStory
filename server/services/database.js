@@ -654,8 +654,12 @@ async function imgBytesAsync(row) {
   try {
     const r2 = require('../lib/r2');
     const buf = await r2.fetchImageBytes(row.image_url);
-    if (!buf) return row.image_url; // fall back to URL — better than nothing
-    return buf.toString('base64');
+    if (!buf) return row.image_url;
+    const mime = buf[0] === 0x89 && buf[1] === 0x50 ? 'image/png'
+               : buf[0] === 0xFF && buf[1] === 0xD8 ? 'image/jpeg'
+               : buf[0] === 0x52 && buf[1] === 0x49 ? 'image/webp'
+               : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
   } catch (err) {
     console.warn(`[R2] imgBytesAsync fetch failed: ${err.message}`);
     return row.image_url;
