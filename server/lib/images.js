@@ -6849,11 +6849,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   try {
     const { detectAndLightenTextRegion } = require('./textRegion');
     const {
-      requiredTextCoveragePct: postRepairRequiredPct,
+      requiredTextPixels: postRepairRequiredPx,
       requiredFontPt: postRepairFontPt,
       countWords: postRepairCountWords,
+      computeOverlayRect: postRepairOverlayRect,
       REPAIR: POST_REPAIR_TEXT_REPAIR,
     } = require('../config/textRegion');
+    const sharpForProbe = require('sharp');
 
     const postRepairTextPages = rawImages.filter(img => img.pageNumber > 0
       && img.imageData
@@ -6866,6 +6868,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const langLevel = storyData?.languageLevel || 'standard';
     const postRepairFont = postRepairFontPt(langLevel);
 
+    const probeOverlay = async (imageData, position, words) => {
+      try {
+        const meta = await sharpForProbe(Buffer.from((imageData || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+        if (!meta.width || !meta.height) return null;
+        return postRepairOverlayRect(position, words, meta.width, meta.height);
+      } catch { return null; }
+    };
+
     await Promise.all(postRepairTextPages.map(async (img) => {
       const pageNumber = img.pageNumber;
       const versions = pageVersions.get(pageNumber) || [];
@@ -6874,40 +6884,50 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       const words = postRepairCountWords(img.text);
       if (!words) return;
-      const requiredPct = postRepairRequiredPct(words, postRepairFont);
+      const calmNeededPx = postRepairRequiredPx(words, postRepairFont);
 
-      // Detect calm zone on the active image at the locked text position
       const preferred = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition
         || img.sceneMetadata?.textPosition
         || 'top-left';
 
-      let baseCoveragePct;
+      const overlayRect = await probeOverlay(best.imageData, preferred, words);
+
+      let baseCalmPx = null;
+      let baseAreaPx = null;
       try {
-        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber);
-        baseCoveragePct = (det.score || 0) * 100;
+        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber, { overlayRect });
+        baseCalmPx = det.overlayCalmPx;
+        baseAreaPx = det.overlayAreaPx;
       } catch (err) {
         log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber}: detection failed: ${err.message}`);
         return;
       }
 
-      if (baseCoveragePct >= requiredPct) {
-        // Calm zone survived the repair — just refresh the report and move on
+      // Geometric pass: calm pixels inside the overlay rect ≥ pixels needed
+      // for the actual text. Falls through to "no signal, skip" when the
+      // overlay-rect probe failed.
+      if (baseCalmPx == null) return;
+      const baseCalmPct = baseAreaPx ? (baseCalmPx / baseAreaPx) * 100 : 0;
+      const passNow = baseCalmPx >= calmNeededPx;
+      log.info(`📝 [POST-REPAIR-TEXT] P${pageNumber}: ${words}w@${postRepairFont}pt — calmNeeded ${calmNeededPx}px, calmFound ${baseCalmPx}px in ${baseAreaPx}px overlay (${baseCalmPct.toFixed(0)}% calm) — ${passNow ? 'OK' : 'BELOW THRESHOLD → recovering'}`);
+
+      if (passNow) {
         img.textCoverageReport = {
           ...(img.textCoverageReport || {}),
-          finalPct: Number(baseCoveragePct.toFixed(1)),
-          requiredPct: Number(requiredPct.toFixed(1)),
-          passed: true,
+          calmNeededPx,
+          calmFoundPx: baseCalmPx,
+          overlayAreaPx: baseAreaPx,
+          overlayCalmPct: Number(baseCalmPct.toFixed(1)),
+          geometricPassed: true,
           postRepairChecked: true,
         };
         return;
       }
 
-      log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber}: post-repair coverage ${baseCoveragePct.toFixed(1)}% < required ${requiredPct.toFixed(1)}% — recovering (${POST_REPAIR_TEXT_REPAIR.maxRetries} attempts max)`);
-
       const aspectRatio = img.imageAspect
         || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
         || null;
-      let bestRecoveryPct = baseCoveragePct;
+      let bestRecoveryCalmPx = baseCalmPx;
       let bestRecoveryResult = null;
 
       for (let attempt = 1; attempt <= POST_REPAIR_TEXT_REPAIR.maxRetries; attempt++) {
@@ -6933,19 +6953,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
             usageTracker(provider, repairResult.usage, 'post_repair_text_recovery', repairResult.modelId);
           }
-          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber);
-          const newPct = (newDet.score || 0) * 100;
-          log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt}: coverage ${newPct.toFixed(1)}% (was ${baseCoveragePct.toFixed(1)}%, target ${requiredPct.toFixed(1)}%)`);
-          if (newPct > bestRecoveryPct) {
-            bestRecoveryPct = newPct;
+          const newOverlay = await probeOverlay(repairResult.imageData, preferred, words);
+          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber, { overlayRect: newOverlay });
+          const newCalmPx = newDet.overlayCalmPx;
+          if (newCalmPx == null) continue;
+          log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt}: calmFound ${newCalmPx}px (was ${baseCalmPx}px, need ${calmNeededPx}px)`);
+          if (newCalmPx > bestRecoveryCalmPx) {
+            bestRecoveryCalmPx = newCalmPx;
             bestRecoveryResult = {
               imageData: repairResult.imageData,
               modelId: repairResult.modelId || best.modelId,
               grokRefImages: repairResult.grokRefImages || null,
               prompt: repairPrompt,
-              coveragePct: newPct,
+              calmFoundPx: newCalmPx,
+              overlayAreaPx: newDet.overlayAreaPx || null,
             };
-            if (newPct >= requiredPct) break; // good enough — stop attempting
+            if (newCalmPx >= calmNeededPx) break; // good enough — stop attempting
           }
         } catch (err) {
           log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt} failed: ${err.message}`);
@@ -6953,9 +6976,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
 
       if (bestRecoveryResult) {
-        // Add the recovery as a new version. Quality wasn't re-evaluated, so
-        // inherit the previous best's score; the recovery is preferred only
-        // because its calm zone is actually usable for text.
         const newVersion = {
           imageData: bestRecoveryResult.imageData,
           score: best.score,
@@ -6972,20 +6992,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         img.textCoverageReport = {
           words,
           fontPt: postRepairFont,
-          requiredPct: Number(requiredPct.toFixed(1)),
-          finalPct: Number(bestRecoveryPct.toFixed(1)),
-          passed: bestRecoveryPct >= requiredPct,
+          calmNeededPx,
+          calmFoundPx: bestRecoveryCalmPx,
+          overlayAreaPx: bestRecoveryResult.overlayAreaPx || null,
+          geometricPassed: bestRecoveryCalmPx >= calmNeededPx,
           retriesUsed: (img.textCoverageReport?.retriesUsed || 0) + POST_REPAIR_TEXT_REPAIR.maxRetries,
           postRepairRecovered: true,
         };
-        log.info(`✅ [POST-REPAIR-TEXT] P${pageNumber}: recovered coverage ${baseCoveragePct.toFixed(1)}% → ${bestRecoveryPct.toFixed(1)}% (${bestRecoveryPct >= requiredPct ? 'PASS' : 'still below threshold but improved'})`);
+        log.info(`✅ [POST-REPAIR-TEXT] P${pageNumber}: recovered calmFound ${baseCalmPx}px → ${bestRecoveryCalmPx}px (need ${calmNeededPx}px, ${bestRecoveryCalmPx >= calmNeededPx ? 'PASS' : 'still below threshold but improved'})`);
       } else {
-        log.info(`⏭️ [POST-REPAIR-TEXT] P${pageNumber}: no recovery candidate beat ${baseCoveragePct.toFixed(1)}% — keeping current best`);
+        log.info(`⏭️ [POST-REPAIR-TEXT] P${pageNumber}: no recovery candidate beat ${baseCalmPx}px — keeping current best`);
         img.textCoverageReport = {
           ...(img.textCoverageReport || {}),
-          finalPct: Number(baseCoveragePct.toFixed(1)),
-          requiredPct: Number(requiredPct.toFixed(1)),
-          passed: false,
+          calmNeededPx,
+          calmFoundPx: baseCalmPx,
+          overlayAreaPx: baseAreaPx,
+          overlayCalmPct: Number(baseCalmPct.toFixed(1)),
+          geometricPassed: false,
           postRepairChecked: true,
         };
       }

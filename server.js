@@ -5227,6 +5227,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const { detectAndLightenTextRegion } = require('./server/lib/textRegion');
       const {
         requiredTextCoveragePct,
+        requiredTextPixels,
+        computeOverlayRect,
         requiredFontPt,
         countWords,
         REPAIR: TEXT_REPAIR,
@@ -5248,13 +5250,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const words = countWords(img.text);
           const requiredPct = requiredTextCoveragePct(words, fontPt);
 
+          // Geometric pixel target: how many calm pixels does the actual text
+          // need to fit, and what overlay rectangle will the renderer draw it
+          // in. Both are computed up-front so detection can measure calm
+          // pixels INSIDE that rectangle (not just anywhere in the half×half
+          // zone) and compare directly against the geometric requirement.
+          const calmNeededPx = requiredTextPixels(words, fontPt);
+
           // Candidate = { rawImage, washedImage, coverage (fraction), rect, position, prompt?, modelId? }
           // Candidate 0 is always the original generated image; candidates 1..N
           // are the text-space-repair attempts (each a fresh Grok/Gemini call
           // with a mask hint, so each is a different composition).
           const candidates = [];
           const runDetection = async (rawImage, extra = {}) => {
-            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber);
+            // Probe image dimensions once so we can compute the overlay rect
+            // in absolute pixels (computeOverlayRect expects px, not %).
+            let probeW = null, probeH = null;
+            try {
+              const sharp = require('sharp');
+              const meta = await sharp(Buffer.from((rawImage || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+              probeW = meta.width; probeH = meta.height;
+            } catch { /* fall through; detection will return null overlay px */ }
+            const overlayRect = (probeW && probeH)
+              ? computeOverlayRect(preferred || 'top-left', words, probeW, probeH)
+              : null;
+            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber, { overlayRect });
+            const overlayCalmPct = (r.overlayCalmPx != null && r.overlayAreaPx)
+              ? Number(((r.overlayCalmPx / r.overlayAreaPx) * 100).toFixed(1))
+              : null;
             candidates.push({
               rawImage,
               washedImage: r.imageData,
@@ -5262,6 +5285,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               rect: r.rect,
               position: r.position,
               overridden: r.overridden,
+              overlayCalmPx: r.overlayCalmPx,
+              overlayAreaPx: r.overlayAreaPx,
+              overlayCalmPct,
               ...extra,
             });
             return r;
@@ -5269,9 +5295,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           await runDetection(img.imageData);
 
+          // Repair gate (geometric): trigger when calm pixels measured INSIDE
+          // the actual overlay rectangle is below the geometric requirement
+          // for the page's text. Falls back to the legacy half-zone coverage
+          // metric if overlay-rect measurement is unavailable (probe failed).
+          const cand0 = candidates[0];
+          const calmFoundPx = cand0.overlayCalmPx;
+          const overlayPx = cand0.overlayAreaPx;
+          const overlayCalmFractionPct = cand0.overlayCalmPct;
+          const geometricFails = (calmFoundPx != null && calmFoundPx < calmNeededPx);
+          const legacyFails = (calmFoundPx == null && cand0.coverage * 100 < requiredPct);
           const needsRepair = (img.textAreaMask
-            && candidates[0].coverage * 100 < requiredPct
+            && (geometricFails || legacyFails)
             && TEXT_REPAIR.maxRetries > 0);
+          if (calmFoundPx != null) {
+            log.info(`📝 [TEXT-REGION] P${img.pageNumber}: ${words}w@${fontPt}pt — calmNeeded ${calmNeededPx}px, calmFound ${calmFoundPx}px in ${overlayPx}px overlay (${overlayCalmFractionPct}% calm) — ${geometricFails ? 'BELOW THRESHOLD → repair' : 'OK'}`);
+          }
           if (needsRepair) {
             log.info(`🩹 [TEXT-SPACE] P${img.pageNumber}: coverage ${(candidates[0].coverage * 100).toFixed(1)}% < required ${requiredPct.toFixed(1)}% (${words} words @ ${fontPt}pt) — repairing (zone: ${preferred})`);
             for (let attempt = 1; attempt <= TEXT_REPAIR.maxRetries; attempt++) {
@@ -5318,12 +5357,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
 
-          // Pick the winner by coverage (original or any retry)
-          const winnerIdx = candidates.reduce((best, c, i) =>
-            c.coverage > candidates[best].coverage ? i : best, 0);
+          // Pick the winner by overlay calm pixels (legibility-relevant metric);
+          // fall back to broad zone coverage when overlay-rect probe failed.
+          const overlayMetricAvailable = candidates.every(c => c.overlayCalmPx != null);
+          const winnerIdx = overlayMetricAvailable
+            ? candidates.reduce((best, c, i) =>
+                c.overlayCalmPx > candidates[best].overlayCalmPx ? i : best, 0)
+            : candidates.reduce((best, c, i) =>
+                c.coverage > candidates[best].coverage ? i : best, 0);
           const winner = candidates[winnerIdx];
           const finalPct = winner.coverage * 100;
-          const passed = finalPct >= requiredPct;
+          const passed = overlayMetricAvailable
+            ? winner.overlayCalmPx >= calmNeededPx
+            : finalPct >= requiredPct;
 
           img.imageData = winner.washedImage; // textRegion no longer bakes anything — this is just the raw winner image
           // Keep every candidate so the repair pipeline can expand them into
@@ -5359,11 +5405,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             passed,
             retriesUsed: candidates.length - 1,
             winnerIndex: winnerIdx,
+            // Geometric numbers (the legibility-relevant comparison)
+            calmNeededPx,
+            calmFoundPx: winner.overlayCalmPx ?? null,
+            overlayAreaPx: winner.overlayAreaPx ?? null,
+            overlayCalmPct: winner.overlayCalmPct ?? null,
+            geometricPassed: winner.overlayCalmPx != null
+              ? winner.overlayCalmPx >= calmNeededPx
+              : null,
             candidates: candidates.map((c, i) => ({
               index: i,
               coveragePct: Number((c.coverage * 100).toFixed(1)),
               position: c.position,
               overridden: c.overridden,
+              calmFoundPx: c.overlayCalmPx ?? null,
+              overlayCalmPct: c.overlayCalmPct ?? null,
             })),
           };
           textRegionResults[img.pageNumber] = {

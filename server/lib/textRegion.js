@@ -36,7 +36,12 @@ const BLOCK_SIZE = 16;
 async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
   // washOpacity and calmThreshold are kept for the coverage/rect math below;
   // no wash is actually baked into the image anymore.
-  const { washOpacity = 0.9, calmThreshold = 0.35 } = options;
+  // overlayRect: the actual rectangle the renderer will place text in. When
+  // provided, we ALSO count calm pixels inside that rect — that's the only
+  // measurement that tells us whether the user-visible overlay will land on
+  // a calm area. The half×half-zone score is too coarse: a top-right corner
+  // can be 28% calm while the actual overlay rectangle inside it is 5% calm.
+  const { washOpacity = 0.9, calmThreshold = 0.35, overlayRect = null } = options;
 
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -149,10 +154,30 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     }
     const washCoverage = washPixelCount / (width * height);
 
+    // Count calm pixels INSIDE the actual overlay rectangle (the rect the
+    // renderer will draw text in). This is the legibility-relevant metric.
+    let overlayCalmPx = null;
+    let overlayAreaPx = null;
+    if (overlayRect && overlayRect.w > 0 && overlayRect.h > 0) {
+      const x0 = Math.max(0, overlayRect.x);
+      const y0 = Math.max(0, overlayRect.y);
+      const x1 = Math.min(width, overlayRect.x + overlayRect.w);
+      const y1 = Math.min(height, overlayRect.y + overlayRect.h);
+      let count = 0;
+      for (let y = y0; y < y1; y++) {
+        const row = y * width;
+        for (let x = x0; x < x1; x++) {
+          if (maskPixels[row + x] > 30) count++;
+        }
+      }
+      overlayCalmPx = count;
+      overlayAreaPx = (x1 - x0) * (y1 - y0);
+    }
+
     if (washCoverage < 0.05) {
       // Less than 5% of image is calm enough — don't wash, just return original
       log.info(`📝 [TEXT-REGION] P${pageNumber}: no calm region found (${(washCoverage * 100).toFixed(1)}% coverage) — using original`);
-      return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
+      return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false, overlayCalmPx, overlayAreaPx };
     }
 
     // Image is returned untouched — blur + text are composited at render time,
@@ -176,7 +201,7 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     // Guard: if no pixel passed the threshold, bbox stays at init values (negative dims)
     if (maxX <= minX || maxY <= minY) {
       log.info(`📝 [TEXT-REGION] P${pageNumber}: washed but no pixels above bbox threshold — using position only`);
-      return { imageData: washedDataUri, position: preferredPosition, rect: null, score: washCoverage, overridden: false };
+      return { imageData: washedDataUri, position: preferredPosition, rect: null, score: washCoverage, overridden: false, overlayCalmPx, overlayAreaPx };
     }
 
     const rect = {
@@ -194,7 +219,10 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     // to lie inside the intended half, so preferredPosition is authoritative.
     const position = preferredPosition;
     const overridden = false;
-    log.info(`📝 [TEXT-REGION] P${pageNumber}: ${position}, wash ${(washCoverage * 100).toFixed(0)}% of image, rect ${rect.x},${rect.y} ${rect.w}×${rect.h}`);
+    const overlayPctStr = overlayAreaPx
+      ? ` overlay ${overlayCalmPx}/${overlayAreaPx}px (${((overlayCalmPx / overlayAreaPx) * 100).toFixed(0)}% calm)`
+      : '';
+    log.info(`📝 [TEXT-REGION] P${pageNumber}: ${position}, wash ${(washCoverage * 100).toFixed(0)}% of image, rect ${rect.x},${rect.y} ${rect.w}×${rect.h}${overlayPctStr}`);
 
     return {
       imageData: washedDataUri,
@@ -202,10 +230,12 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
       rect,
       score: washCoverage,
       overridden,
+      overlayCalmPx,
+      overlayAreaPx,
     };
   } catch (err) {
     log.warn(`⚠️ [TEXT-REGION] P${pageNumber} failed: ${err.message}`);
-    return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
+    return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false, overlayCalmPx: null, overlayAreaPx: null };
   }
 }
 
