@@ -755,12 +755,14 @@ export interface SceneImage {
   textCoverageReport?: {  // Text-space repair outcome (dev mode)
     words: number;
     fontPt: number;
-    requiredPct: number;
-    finalPct: number;
+    calmNeededPx: number;
+    calmFoundPx: number;
+    areaPx: number;
     passed: boolean;
     retriesUsed: number;
     winnerIndex: number;
-    candidates: { index: number; coveragePct: number; position: string; overridden: boolean }[];
+    candidates: { index: number; source: string; calmFoundPx: number; calmPct: number; position: string }[];
+    postRepairChecked?: boolean;
   } | null;
   // API model used (for dev mode)
   modelId?: string;
