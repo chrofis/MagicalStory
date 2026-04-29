@@ -6808,6 +6808,166 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   log.info(`✅ [UNIFIED PIPELINE] Step 7: ${finalUpgradedCount} pages upgraded total`);
 
+  // =========================================================================
+  // Step 7.5: Post-repair calm-zone recovery
+  // =========================================================================
+  // Iterate / inpaint / character-fix can all shift content into the
+  // text-overlay corner, undoing the calm zone established at initial
+  // generation. The text-space-repair loop only runs once at initial gen —
+  // post-repair pages with a degraded calm zone silently ship with text
+  // overlay landing on a face / hat. Re-detect coverage on the active
+  // version of each repaired page; if it dropped below requiredPct, run
+  // text-space-repair on the active image and swap if a candidate beats
+  // the current coverage. Same coverage-only selection rule the initial
+  // text-space loop uses.
+  try {
+    const { detectAndLightenTextRegion } = require('./textRegion');
+    const {
+      requiredTextCoveragePct: postRepairRequiredPct,
+      requiredFontPt: postRepairFontPt,
+      countWords: postRepairCountWords,
+      REPAIR: POST_REPAIR_TEXT_REPAIR,
+    } = require('../config/textRegion');
+
+    const postRepairTextPages = rawImages.filter(img => img.pageNumber > 0
+      && img.imageData
+      && img.textAreaMask                       // textInImage layouts only
+      && img.text                               // need actual page text to size against
+      && finalBestPerPage.get(img.pageNumber)?.source !== 'original'); // skipped pages haven't changed
+    if (postRepairTextPages.length > 0) {
+      log.info(`📝 [POST-REPAIR-TEXT] Re-checking calm zone on ${postRepairTextPages.length} repaired pages`);
+    }
+    const langLevel = storyData?.languageLevel || 'standard';
+    const postRepairFont = postRepairFontPt(langLevel);
+
+    await Promise.all(postRepairTextPages.map(async (img) => {
+      const pageNumber = img.pageNumber;
+      const versions = pageVersions.get(pageNumber) || [];
+      const best = finalBestPerPage.get(pageNumber);
+      if (!best?.imageData) return;
+
+      const words = postRepairCountWords(img.text);
+      if (!words) return;
+      const requiredPct = postRepairRequiredPct(words, postRepairFont);
+
+      // Detect calm zone on the active image at the locked text position
+      const preferred = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition
+        || img.sceneMetadata?.textPosition
+        || 'top-left';
+
+      let baseCoveragePct;
+      try {
+        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber);
+        baseCoveragePct = (det.score || 0) * 100;
+      } catch (err) {
+        log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber}: detection failed: ${err.message}`);
+        return;
+      }
+
+      if (baseCoveragePct >= requiredPct) {
+        // Calm zone survived the repair — just refresh the report and move on
+        img.textCoverageReport = {
+          ...(img.textCoverageReport || {}),
+          finalPct: Number(baseCoveragePct.toFixed(1)),
+          requiredPct: Number(requiredPct.toFixed(1)),
+          passed: true,
+          postRepairChecked: true,
+        };
+        return;
+      }
+
+      log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber}: post-repair coverage ${baseCoveragePct.toFixed(1)}% < required ${requiredPct.toFixed(1)}% — recovering (${POST_REPAIR_TEXT_REPAIR.maxRetries} attempts max)`);
+
+      const aspectRatio = img.imageAspect
+        || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
+        || null;
+      let bestRecoveryPct = baseCoveragePct;
+      let bestRecoveryResult = null;
+
+      for (let attempt = 1; attempt <= POST_REPAIR_TEXT_REPAIR.maxRetries; attempt++) {
+        try {
+          const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
+            SCENE_DESCRIPTION: (img.sceneDescription || '').substring(0, 1200),
+          });
+          const repairResult = await generateImageOnly(repairPrompt, img.characterPhotos || [], {
+            imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+            imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+            landmarkPhotos: img.landmarkPhotos || [],
+            visualBibleGrid: img.visualBibleGrid || null,
+            previousImage: best.imageData,
+            textAreaMask: img.textAreaMask,
+            pageNumber,
+            skipCache: true,
+            aspectRatio,
+          });
+          if (!repairResult?.imageData) continue;
+          if (repairResult.usage && usageTracker) {
+            const isRunware = repairResult.modelId?.startsWith('runware:');
+            const isGrok = repairResult.modelId?.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            usageTracker(provider, repairResult.usage, 'post_repair_text_recovery', repairResult.modelId);
+          }
+          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber);
+          const newPct = (newDet.score || 0) * 100;
+          log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt}: coverage ${newPct.toFixed(1)}% (was ${baseCoveragePct.toFixed(1)}%, target ${requiredPct.toFixed(1)}%)`);
+          if (newPct > bestRecoveryPct) {
+            bestRecoveryPct = newPct;
+            bestRecoveryResult = {
+              imageData: repairResult.imageData,
+              modelId: repairResult.modelId || best.modelId,
+              grokRefImages: repairResult.grokRefImages || null,
+              prompt: repairPrompt,
+              coveragePct: newPct,
+            };
+            if (newPct >= requiredPct) break; // good enough — stop attempting
+          }
+        } catch (err) {
+          log.warn(`⚠️ [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt} failed: ${err.message}`);
+        }
+      }
+
+      if (bestRecoveryResult) {
+        // Add the recovery as a new version. Quality wasn't re-evaluated, so
+        // inherit the previous best's score; the recovery is preferred only
+        // because its calm zone is actually usable for text.
+        const newVersion = {
+          imageData: bestRecoveryResult.imageData,
+          score: best.score,
+          source: 'post-repair-text-space',
+          evaluation: best.evaluation || null,
+          modelId: bestRecoveryResult.modelId,
+          grokRefImages: bestRecoveryResult.grokRefImages,
+          entityPenalty: best.entityPenalty || 0,
+          evaluatedAt: new Date().toISOString(),
+          prompt: bestRecoveryResult.prompt,
+        };
+        versions.push(newVersion);
+        finalBestPerPage.set(pageNumber, newVersion);
+        img.textCoverageReport = {
+          words,
+          fontPt: postRepairFont,
+          requiredPct: Number(requiredPct.toFixed(1)),
+          finalPct: Number(bestRecoveryPct.toFixed(1)),
+          passed: bestRecoveryPct >= requiredPct,
+          retriesUsed: (img.textCoverageReport?.retriesUsed || 0) + POST_REPAIR_TEXT_REPAIR.maxRetries,
+          postRepairRecovered: true,
+        };
+        log.info(`✅ [POST-REPAIR-TEXT] P${pageNumber}: recovered coverage ${baseCoveragePct.toFixed(1)}% → ${bestRecoveryPct.toFixed(1)}% (${bestRecoveryPct >= requiredPct ? 'PASS' : 'still below threshold but improved'})`);
+      } else {
+        log.info(`⏭️ [POST-REPAIR-TEXT] P${pageNumber}: no recovery candidate beat ${baseCoveragePct.toFixed(1)}% — keeping current best`);
+        img.textCoverageReport = {
+          ...(img.textCoverageReport || {}),
+          finalPct: Number(baseCoveragePct.toFixed(1)),
+          requiredPct: Number(requiredPct.toFixed(1)),
+          passed: false,
+          postRepairChecked: true,
+        };
+      }
+    }));
+  } catch (postRepairErr) {
+    log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
+  }
+
   await updateProgress(73, 'Finalizing repair results...');
 
   // =========================================================================
