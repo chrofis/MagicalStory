@@ -5267,7 +5267,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // in absolute pixels (computeOverlayRect expects px, not %).
             let probeW = null, probeH = null;
             try {
-              const sharp = require('sharp');
               const meta = await sharp(Buffer.from((rawImage || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
               probeW = meta.width; probeH = meta.height;
             } catch { /* fall through; detection will return null overlay px */ }
@@ -5349,8 +5348,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   grokRefImages: repairResult.grokRefImages || null,
                 });
                 const latest = candidates[candidates.length - 1];
-                log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%`);
-                if (latest.coverage * 100 >= requiredPct) break; // good enough, stop early
+                log.info(`🩹 [TEXT-SPACE] P${img.pageNumber} attempt ${attempt}: coverage ${(latest.coverage * 100).toFixed(1)}%${latest.overlayCalmPx != null ? ` overlay ${latest.overlayCalmPx}/${calmNeededPx}px` : ''}`);
+                // Stop early when the requirement that triggered the loop is met:
+                // geometric (calm pixels in overlay rect) takes priority over the
+                // legacy zone-coverage % when the probe succeeded. Otherwise fall
+                // back to the legacy %.
+                const earlyExit = latest.overlayCalmPx != null
+                  ? latest.overlayCalmPx >= calmNeededPx
+                  : latest.coverage * 100 >= requiredPct;
+                if (earlyExit) break;
               } catch (repairErr) {
                 log.warn(`⚠️ [TEXT-SPACE] P${img.pageNumber} attempt ${attempt} failed: ${repairErr.message}`);
               }
@@ -5358,16 +5364,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           // Pick the winner by overlay calm pixels (legibility-relevant metric);
-          // fall back to broad zone coverage when overlay-rect probe failed.
-          const overlayMetricAvailable = candidates.every(c => c.overlayCalmPx != null);
-          const winnerIdx = overlayMetricAvailable
-            ? candidates.reduce((best, c, i) =>
-                c.overlayCalmPx > candidates[best].overlayCalmPx ? i : best, 0)
-            : candidates.reduce((best, c, i) =>
-                c.coverage > candidates[best].coverage ? i : best, 0);
+          // fall back to broad zone coverage on a per-candidate basis if a
+          // single probe failed, instead of discarding all overlay data.
+          const winnerIdx = candidates.reduce((best, c, i) => {
+            const a = candidates[best];
+            const cBetter = (c.overlayCalmPx != null && a.overlayCalmPx != null)
+              ? c.overlayCalmPx > a.overlayCalmPx
+              : c.coverage > a.coverage;
+            return cBetter ? i : best;
+          }, 0);
           const winner = candidates[winnerIdx];
           const finalPct = winner.coverage * 100;
-          const passed = overlayMetricAvailable
+          const passed = winner.overlayCalmPx != null
             ? winner.overlayCalmPx >= calmNeededPx
             : finalPct >= requiredPct;
 

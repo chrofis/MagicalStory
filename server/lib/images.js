@@ -6857,11 +6857,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     } = require('../config/textRegion');
     const sharpForProbe = require('sharp');
 
-    const postRepairTextPages = rawImages.filter(img => img.pageNumber > 0
-      && img.imageData
-      && img.textAreaMask                       // textInImage layouts only
-      && img.text                               // need actual page text to size against
-      && finalBestPerPage.get(img.pageNumber)?.source !== 'original'); // skipped pages haven't changed
+    const postRepairTextPages = rawImages.filter(img => {
+      if (img.pageNumber <= 0 || !img.imageData) return false;
+      if (!img.textAreaMask || !img.text) return false;            // textInImage + actual text required
+      const src = finalBestPerPage.get(img.pageNumber)?.source || '';
+      // Skip pages whose active version is the original (untouched) OR a
+      // text-space-repair winner from initial gen (its calm zone was
+      // already validated against the geometric threshold there).
+      if (src === 'original' || src.startsWith('text-space-repair')) return false;
+      return true;
+    });
     if (postRepairTextPages.length > 0) {
       log.info(`📝 [POST-REPAIR-TEXT] Re-checking calm zone on ${postRepairTextPages.length} repaired pages`);
     }
@@ -6878,7 +6883,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     await Promise.all(postRepairTextPages.map(async (img) => {
       const pageNumber = img.pageNumber;
-      const versions = pageVersions.get(pageNumber) || [];
+      // If pageVersions has no entry for this page, our newVersion push
+      // below would land on a throwaway local array and never reach the
+      // build-final-results loop. Bail out instead of silently dropping.
+      if (!pageVersions.has(pageNumber)) return;
+      const versions = pageVersions.get(pageNumber);
       const best = finalBestPerPage.get(pageNumber);
       if (!best?.imageData) return;
 
