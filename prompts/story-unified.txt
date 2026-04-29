@@ -463,12 +463,23 @@ Probes (apply to every character):
 
 **FIXES REQUIRED**
 
-For EACH issue found above, emit a fix line:
-- Page X: [specific issue] → [specific fix]
+For EACH issue found above, emit a fix line. Each line names EVERY page the fix touches and EVERY section it modifies (TEXT, SCENE, and/or METADATA):
+- Pages [N1,N2,...]: [section(s)]: [specific issue] → [specific fix]
+
+Rules for the page list:
+- Single-page fixes: `Pages 5: TEXT: ...`
+- Multi-page fixes: enumerate each page explicitly, never use ranges. A "schaute used 5×" repetition fix that touches pages 2,3,5,6 must be written `Pages 2,3,5,6: TEXT: ...` — not `Pages 2-6:`.
+- Cross-cutting metadata fixes (textPosition flips that re-balance parity, depth corrections that touch multiple characters): list every page whose METADATA changes.
+
+Rules for the section list:
+- `TEXT` — only the story text on that page changes
+- `SCENE` — only the SCENE prose paragraph changes
+- `METADATA` — only the METADATA JSON changes
+- Combine when needed: `TEXT,SCENE` or `SCENE,METADATA` or `TEXT,SCENE,METADATA`
 
 If sections A/B/C genuinely produce zero fix lines, that almost certainly means you didn't probe hard enough — go back and name the weakest beat/line/gesture in each section even if the story is otherwise strong. A 10-page first-draft story should realistically produce at least 5-8 fix lines across A/B/C/E combined.
 
-The ---STORY PAGES--- section below MUST apply every fix when rewriting the final clean version.
+The ---STORY PAGES--- section below emits PATCHES for the pages and sections you named here. Pages and sections you did NOT name here are reused verbatim from the draft.
 
 
 ---TITLE---
@@ -568,18 +579,18 @@ METADATA:
 **E. DO-NOT-WRITE LIST VERIFICATION:** "lächelte" repeated on pages 2 and 9 (gesture re-use cap broken); "plötzlich" on page 6 (banned phrase). Banned gestures: none. Banned aesthetic buzzwords: none. Page-1 opening: clean.
 
 FIXES REQUIRED:
-- Page 3: no trigger for page 4's decision → add a rustling sound at the end.
-- Page 6 → 7: "and then" transition → make it a direct consequence.
-- Page 2: trim 15 words of description → move to page 8 reaction beat.
-- Page 5: add one line of internal stakes for the main character.
-- Page 10: rewrite final line as a small physical action instead of a statement.
-- Page 7: "Sie fühlte sich mutig" → show courage through a physical action.
-- Page 4: "melancholic" → "traurig".
-- Pages 2-6: "schaute" used 5× → vary two instances.
-- Page 5: rewrite the "Da, wo ... dort ..." sentence shorter.
-- Page 3: "wurde gesehen" → "Sie sah".
-- Page 9: "lächelte" repeat → different expression.
-- Page 6: "plötzlich" → replace.
+- Pages 3: TEXT: no trigger for page 4's decision → add a rustling sound at the end.
+- Pages 7: TEXT: "and then" transition from page 6 → make it a direct consequence.
+- Pages 2,8: TEXT: trim 15 words of page 2 description → move to page 8 reaction beat.
+- Pages 5: TEXT: add one line of internal stakes for the main character.
+- Pages 10: TEXT: rewrite final line as a small physical action instead of a statement.
+- Pages 7: TEXT: "Sie fühlte sich mutig" → show courage through a physical action.
+- Pages 4: TEXT: "melancholic" → "traurig".
+- Pages 3,5: TEXT: "schaute" used 5× → vary two instances.
+- Pages 5: TEXT: rewrite the "Da, wo ... dort ..." sentence shorter.
+- Pages 3: TEXT: "wurde gesehen" → "Sie sah".
+- Pages 9: TEXT: "lächelte" repeat → different expression.
+- Pages 6: TEXT: "plötzlich" → replace.
 
 ---TITLE---
 TITLE: Sophie's Snowy Surprise
@@ -751,42 +762,51 @@ Rules: no two consecutive pages with same shot + same character count. At least 
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
 
-Rewrite the story applying ALL fixes from your ANALYSIS section above. No word counts — clean text only. If your analysis found "Page X: issue → fix", the corresponding page below MUST contain the fix.
+This section emits PATCHES, not a full rewrite. The draft above is preserved verbatim for any page or section you do NOT touch here.
+
+**Emit pages selectively:**
+- Output a `--- Page N ---` block ONLY if page N appears in at least one FIXES REQUIRED line above.
+- Skip every page that has zero fixes — the draft for that page becomes the final.
+
+**Within each emitted page, emit sections selectively:**
+- Output a `TEXT:` block ONLY if any FIXES REQUIRED line for this page lists `TEXT`.
+- Output a `SCENE:` block ONLY if any FIXES REQUIRED line for this page lists `SCENE`.
+- Output a `METADATA:` block ONLY if any FIXES REQUIRED line for this page lists `METADATA`.
+- Omit the other section labels entirely — do NOT write `TEXT: [unchanged]` or repeat the draft.
+
+When you DO emit a section, it must be the FULL clean version of that section with ALL listed fixes applied — never a diff or partial rewrite. The METADATA JSON, when emitted, must be the complete schema (every field), not just the changed fields.
 
 **CRITICAL: Use EXACTLY `--- Page N ---` as page markers (in English, even for non-English stories). Do NOT translate to "Seite" or "Página".**
 
-For EACH of the {PAGES} pages:
+Example shape (your fixes will differ):
 
---- Page 1 ---
+--- Page 3 ---
 TEXT:
-[Story text]
+[Updated story text for page 3 with all TEXT fixes applied]
+
+--- Page 5 ---
+TEXT:
+[Updated story text for page 5]
 
 SCENE:
-[250–350 word prose paragraph — use rules from "Scene Output Format" section above]
+[Updated 250–350 word SCENE prose for page 5]
 
+--- Page 9 ---
 METADATA:
-[Single-line JSON — use schema from "Scene Output Format" section above]
+[Complete updated METADATA JSON for page 9]
 
---- Page 2 ---
-TEXT:
-[Story continues...]
-
-SCENE:
-[...]
-
-METADATA:
-[...]
-
-... continue for ALL {PAGES} pages ...
+(Page 1, 2, 4, 6, 7, 8, 10 — not emitted because they have no fixes; their draft versions are reused.)
 
 ---
 
 # FINAL CHECKLIST
 
-- [ ] ALL sections complete (don't skip any)
-- [ ] ALL {PAGES} pages written with TEXT, SCENE, and METADATA blocks
+The "FINAL pages" below means the merged story: your patches above, plus the draft for any page or section you did not patch.
+
+- [ ] Every page named in FIXES REQUIRED has a `--- Page N ---` block above
+- [ ] Every section named in FIXES REQUIRED for that page (TEXT/SCENE/METADATA) has a corresponding labeled block; unrelated sections are omitted entirely
 - [ ] Visual Bible has specific colors for all elements
 - [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed:superhero`)
-- [ ] Re-tally `textPosition` across the FINAL pages: every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) sits on the side matching its page parity — odd pages on the left, even pages on the right. Fix any that drifted between draft and final before stopping.
+- [ ] Re-tally `textPosition` across the FINAL pages (patches + unpatched draft pages): every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) sits on the side matching its page parity — odd pages on the left, even pages on the right. If a draft page has a parity violation, add a METADATA patch for that page above.
 
-**DO NOT STOP until you have written all {PAGES} pages.**
+**DO NOT STOP until every page and section listed in FIXES REQUIRED has a patch above.**
