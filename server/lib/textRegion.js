@@ -36,12 +36,13 @@ const BLOCK_SIZE = 16;
 async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumber, options = {}) {
   // washOpacity and calmThreshold are kept for the coverage/rect math below;
   // no wash is actually baked into the image anymore.
-  // overlayRect: the actual rectangle the renderer will place text in. When
-  // provided, we ALSO count calm pixels inside that rect — that's the only
-  // measurement that tells us whether the user-visible overlay will land on
-  // a calm area. The half×half-zone score is too coarse: a top-right corner
-  // can be 28% calm while the actual overlay rectangle inside it is 5% calm.
-  const { washOpacity = 0.9, calmThreshold = 0.35, overlayRect = null } = options;
+  // overlayPolygon: the actual polygon the renderer will draw text into.
+  //   Corner positions are RIGHT TRIANGLES, not rectangles — measuring a
+  //   bounding rectangle overestimates calm coverage by ~2× (triangle area
+  //   is half the bounding rect's). When provided, we count calm pixels
+  //   INSIDE that polygon, which is the only measurement that tells us
+  //   whether the rendered overlay will land on a calm area.
+  const { washOpacity = 0.9, calmThreshold = 0.35, overlayPolygon = null } = options;
 
   try {
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -154,24 +155,58 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     }
     const washCoverage = washPixelCount / (width * height);
 
-    // Count calm pixels INSIDE the actual overlay rectangle (the rect the
-    // renderer will draw text in). This is the legibility-relevant metric.
+    // Count calm pixels INSIDE the actual overlay polygon (the shape the
+    // production renderer will draw text into). For corner positions the
+    // polygon is a right TRIANGLE — measuring a bounding rectangle would
+    // overestimate calm area by ~2× because triangle area is half its
+    // bounding rect's. For full-width positions the polygon is a rectangle.
     let overlayCalmPx = null;
     let overlayAreaPx = null;
-    if (overlayRect && overlayRect.w > 0 && overlayRect.h > 0) {
-      const x0 = Math.max(0, overlayRect.x);
-      const y0 = Math.max(0, overlayRect.y);
-      const x1 = Math.min(width, overlayRect.x + overlayRect.w);
-      const y1 = Math.min(height, overlayRect.y + overlayRect.h);
+    if (Array.isArray(overlayPolygon) && overlayPolygon.length >= 3) {
+      // Compute polygon's pixel-axis bounding box to limit the scan.
+      let minPx = width, minPy = height, maxPx = 0, maxPy = 0;
+      for (const [px, py] of overlayPolygon) {
+        if (px < minPx) minPx = px;
+        if (py < minPy) minPy = py;
+        if (px > maxPx) maxPx = px;
+        if (py > maxPy) maxPy = py;
+      }
+      const x0 = Math.max(0, Math.floor(minPx));
+      const y0 = Math.max(0, Math.floor(minPy));
+      const x1 = Math.min(width, Math.ceil(maxPx));
+      const y1 = Math.min(height, Math.ceil(maxPy));
+
+      // Polygon area via shoelace (absolute, in pixel²).
+      let signed = 0;
+      for (let i = 0; i < overlayPolygon.length; i++) {
+        const [x1p, y1p] = overlayPolygon[i];
+        const [x2p, y2p] = overlayPolygon[(i + 1) % overlayPolygon.length];
+        signed += x1p * y2p - x2p * y1p;
+      }
+      overlayAreaPx = Math.abs(signed) / 2;
+
+      // Ray-cast point-in-polygon test, only across the bbox region.
+      const insidePolygon = (px, py) => {
+        let inside = false;
+        for (let i = 0, j = overlayPolygon.length - 1; i < overlayPolygon.length; j = i++) {
+          const [xi, yi] = overlayPolygon[i];
+          const [xj, yj] = overlayPolygon[j];
+          if (((yi > py) !== (yj > py))
+            && (px < (xj - xi) * (py - yi) / ((yj - yi) || 1e-9) + xi)) {
+            inside = !inside;
+          }
+        }
+        return inside;
+      };
+
       let count = 0;
       for (let y = y0; y < y1; y++) {
         const row = y * width;
         for (let x = x0; x < x1; x++) {
-          if (maskPixels[row + x] > 30) count++;
+          if (maskPixels[row + x] > 30 && insidePolygon(x + 0.5, y + 0.5)) count++;
         }
       }
       overlayCalmPx = count;
-      overlayAreaPx = (x1 - x0) * (y1 - y0);
     }
 
     if (washCoverage < 0.05) {

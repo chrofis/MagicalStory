@@ -6852,7 +6852,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       requiredTextPixels: postRepairRequiredPx,
       requiredFontPt: postRepairFontPt,
       countWords: postRepairCountWords,
-      computeOverlayRect: postRepairOverlayRect,
+      computeOverlayPolygon: postRepairOverlayPolygon,
       REPAIR: POST_REPAIR_TEXT_REPAIR,
     } = require('../config/textRegion');
     const sharpForProbe = require('sharp');
@@ -6873,11 +6873,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const langLevel = storyData?.languageLevel || 'standard';
     const postRepairFont = postRepairFontPt(langLevel);
 
-    const probeOverlay = async (imageData, position, words) => {
+    const probeOverlay = async (imageData, position) => {
       try {
         const meta = await sharpForProbe(Buffer.from((imageData || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
         if (!meta.width || !meta.height) return null;
-        return postRepairOverlayRect(position, words, meta.width, meta.height);
+        return postRepairOverlayPolygon(position, langLevel, meta.width, meta.height);
       } catch { return null; }
     };
 
@@ -6899,12 +6899,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         || img.sceneMetadata?.textPosition
         || 'top-left';
 
-      const overlayRect = await probeOverlay(best.imageData, preferred, words);
+      const overlayPolygon = await probeOverlay(best.imageData, preferred);
 
       let baseCalmPx = null;
       let baseAreaPx = null;
       try {
-        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber, { overlayRect });
+        const det = await detectAndLightenTextRegion(best.imageData, preferred, pageNumber, { overlayPolygon });
         baseCalmPx = det.overlayCalmPx;
         baseAreaPx = det.overlayAreaPx;
       } catch (err) {
@@ -6912,9 +6912,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return;
       }
 
-      // Geometric pass: calm pixels inside the overlay rect ≥ pixels needed
-      // for the actual text. Falls through to "no signal, skip" when the
-      // overlay-rect probe failed.
+      // Geometric pass: calm pixels inside the overlay polygon ≥ pixels
+      // needed for the actual text. Skip silently when the polygon probe
+      // failed (no signal to act on).
       if (baseCalmPx == null) return;
       const baseCalmPct = baseAreaPx ? (baseCalmPx / baseAreaPx) * 100 : 0;
       const passNow = baseCalmPx >= calmNeededPx;
@@ -6962,8 +6962,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
             usageTracker(provider, repairResult.usage, 'post_repair_text_recovery', repairResult.modelId);
           }
-          const newOverlay = await probeOverlay(repairResult.imageData, preferred, words);
-          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber, { overlayRect: newOverlay });
+          const newOverlay = await probeOverlay(repairResult.imageData, preferred);
+          const newDet = await detectAndLightenTextRegion(repairResult.imageData, preferred, pageNumber, { overlayPolygon: newOverlay });
           const newCalmPx = newDet.overlayCalmPx;
           if (newCalmPx == null) continue;
           log.info(`🩹 [POST-REPAIR-TEXT] P${pageNumber} attempt ${attempt}: calmFound ${newCalmPx}px (was ${baseCalmPx}px, need ${calmNeededPx}px)`);

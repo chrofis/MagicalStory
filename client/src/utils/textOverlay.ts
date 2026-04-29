@@ -52,16 +52,38 @@ export interface TextOverlayLayout {
 }
 
 function getTextSize(text: string): 'short' | 'medium' | 'long' {
-  const wordCount = text.trim().split(/\s+/).length;
+  // ''.trim().split(/\s+/) returns [''] (length 1), so filter empty tokens
+  // before counting — otherwise empty/whitespace text reports 1 word.
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   if (wordCount < 20) return 'short';
   if (wordCount < 50) return 'medium';
   return 'long';
 }
 
+/**
+ * Apply the book-spread parity rule: odd pages sit on the left side of the
+ * spread (text must use *-left or *-full), even pages sit on the right
+ * (text must use *-right or *-full). Mirrors enforceSpreadTextPosition in
+ * server/lib/storyHelpers.js so the CSS fallback can't render text on the
+ * wrong side of the gutter while the server-rendered overlay PNG loads.
+ */
+function enforceSpreadParity(position: TextPosition, pageNumber: number): TextPosition {
+  if (!pageNumber || pageNumber < 1) return position;
+  const isLeftPage = pageNumber % 2 === 1;
+  if (isLeftPage && position.includes('right')) {
+    return position.replace('right', 'left') as TextPosition;
+  }
+  if (!isLeftPage && position.includes('left')) {
+    return position.replace('left', 'right') as TextPosition;
+  }
+  return position;
+}
+
 export function getTextOverlayPosition(pageNumber: number, text: string, explicitPosition?: TextPosition | null): TextOverlayLayout {
   // Use explicit position from scene expansion if available, otherwise cycle
   const posIndex = ((pageNumber - 1) % POSITION_CYCLE.length + POSITION_CYCLE.length) % POSITION_CYCLE.length;
-  const position = (explicitPosition && POSITION_CYCLE.includes(explicitPosition)) ? explicitPosition : POSITION_CYCLE[posIndex];
+  const rawPosition = (explicitPosition && POSITION_CYCLE.includes(explicitPosition)) ? explicitPosition : POSITION_CYCLE[posIndex];
+  const position = enforceSpreadParity(rawPosition, pageNumber);
   const size = getTextSize(text);
 
   // Width for corner positions (adapts to text length)

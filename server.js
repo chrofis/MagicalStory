@@ -5228,7 +5228,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const {
         requiredTextCoveragePct,
         requiredTextPixels,
-        computeOverlayRect,
+        computeOverlayPolygon,
         requiredFontPt,
         countWords,
         REPAIR: TEXT_REPAIR,
@@ -5263,17 +5263,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // with a mask hint, so each is a different composition).
           const candidates = [];
           const runDetection = async (rawImage, extra = {}) => {
-            // Probe image dimensions once so we can compute the overlay rect
-            // in absolute pixels (computeOverlayRect expects px, not %).
+            // Probe image dimensions so we can compute the overlay polygon in
+            // absolute pixels. langLevel drives the polygon's size (small/
+            // medium/large = 10%/25%/40% area), matching the production text
+            // overlay renderer (server/lib/textOverlayRenderer.js).
             let probeW = null, probeH = null;
             try {
               const meta = await sharp(Buffer.from((rawImage || '').replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
               probeW = meta.width; probeH = meta.height;
             } catch { /* fall through; detection will return null overlay px */ }
-            const overlayRect = (probeW && probeH)
-              ? computeOverlayRect(preferred || 'top-left', words, probeW, probeH)
+            const overlayPolygon = (probeW && probeH)
+              ? computeOverlayPolygon(preferred || 'top-left', inputData?.languageLevel || 'standard', probeW, probeH)
               : null;
-            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber, { overlayRect });
+            const r = await detectAndLightenTextRegion(rawImage, preferred || 'top-left', img.pageNumber, { overlayPolygon });
             const overlayCalmPct = (r.overlayCalmPx != null && r.overlayAreaPx)
               ? Number(((r.overlayCalmPx / r.overlayAreaPx) * 100).toFixed(1))
               : null;
