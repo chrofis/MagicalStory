@@ -5347,6 +5347,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // become the active version after the round-1 score, silently changing the
     // book's layout. Falls through to editImageWithPrompt → Grok/Gemini.
     aspectRatio = null,
+    // Page's locked text-overlay corner. When set, the inpaint instruction
+    // gets a soft "Quiet zone:" suffix telling Grok not to introduce
+    // high-contrast detail in that corner — same warning the character-fix
+    // path uses. Without this, inpaint can paint a face/hat into the calm
+    // zone when the bbox happens to overlap it.
+    textPosition = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -5579,7 +5585,21 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     return { imageData: null, repaired: false, instruction: null, consolidatedPlan, usage: null };
   }
 
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}`;
+  // Append a quiet-zone reminder when the page reserves a text-overlay
+  // corner. Same wording as the character-fix path so Grok gets the same
+  // signal regardless of repair mode.
+  const TEXT_POSITION_DESC_INPAINT = {
+    'top-left': 'upper left corner',
+    'top-right': 'upper right corner',
+    'bottom-left': 'lower left corner',
+    'bottom-right': 'lower right corner',
+    'top-full': 'upper third (full width)',
+    'bottom-full': 'lower third (full width)',
+  };
+  const quietZoneSuffix = textPosition && TEXT_POSITION_DESC_INPAINT[textPosition]
+    ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} soft and visually calm — do not introduce faces, hats, patterns, or other high-contrast detail there. It is intentional negative space in the composition.`
+    : '';
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -6026,6 +6046,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const sceneAspect = img.imageAspect
       || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
       || null;
+    // Look up the page's locked text-overlay corner so inpaint can warn
+    // Grok not to paint high-contrast detail in that zone.
+    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
@@ -6038,6 +6061,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       storyId: storyData?.id || jobId || null,
       round: roundNum,
       aspectRatio: sceneAspect,
+      textPosition: pageTextPosition,
     });
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
