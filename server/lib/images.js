@@ -6639,6 +6639,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               before: beforeImageData,
               after: currentImageData,
               blackoutImage: repairResult.blackoutImage || null,
+              cutoutSent: repairResult.cutoutSent || repairResult.comparison?.cutoutSent || null,
               grokRawResult: repairResult.grokRawResult || null,
               blendMask: repairResult.blendMask || null,
               croppedAvatar: repairResult.croppedAvatar || null,
@@ -7099,6 +7100,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           before: toImgSrc(data.before),
           after: toImgSrc(data.after),
           blackoutImage: toImgSrc(data.blackoutImage) || null,
+          cutoutSent: toImgSrc(data.cutoutSent) || null,
           grokRawResult: toImgSrc(data.grokRawResult) || null,
           blendMask: toImgSrc(data.blendMask) || null,
           croppedAvatar: toImgSrc(data.croppedAvatar) || null,
@@ -8725,6 +8727,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     // The cutout sent to Grok is always returned in the comparison payload
     // so the UI can show exactly what was inpainted (alongside before/after).
+    // Also surface it at top level — the unified-pipeline character-fix step
+    // reads top-level fields when copying into charFixDetails, so the inner
+    // `comparison.cutoutSent` would otherwise be dropped on the floor.
     return {
       imageData: finalImageData,
       comparison: {
@@ -8733,6 +8738,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         cutoutSent: regionDataUri,
         grokRawResult: grokResult.imageData,
       },
+      cutoutSent: regionDataUri,
+      grokRawResult: grokResult.imageData,
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
