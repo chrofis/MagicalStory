@@ -7165,7 +7165,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // strict template (outline authoritative). When true, iterate may drop/swap
     // characters and reframe the scene to escape an impossible composition.
     freeIterate = false,
+    // Reference mode + single-pass flag — see applyReferenceMode in storyHelpers.
+    // null/undefined = inherit MODEL_DEFAULTS; otherwise one of strict|loose|styled-only|off.
+    referenceMode = null,
+    singlePassScene = null,
   } = options;
+  const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
+  const effectiveSinglePass = singlePassScene === true
+    || (singlePassScene == null && CONFIG_DEFAULTS.singlePassScene === true);
   const sceneAspect = aspectRatioIn || CONFIG_DEFAULTS.pageAspect;
 
   const {
@@ -7461,8 +7468,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // Resolve empty scene background.
   // If sceneBackgroundIn was pre-supplied (pipeline), use it directly.
   // If emptySceneCallbacks are provided (UI route), load/generate based on scene metadata.
+  // singlePassScene flag forces a one-pass render with no plate.
   let sceneBackground = sceneBackgroundIn;
-  if (!sceneBackground && emptySceneCallbacks) {
+  if (effectiveSinglePass) {
+    sceneBackground = null;
+    log.info(`🎛️ [ITERATE] Page ${pageNumber}: singlePassScene=true — skipping empty-scene plate`);
+  } else if (!sceneBackground && emptySceneCallbacks) {
     if (iterateSceneMetadata?.reuseEmptyScene) {
       try {
         const existing = await emptySceneCallbacks.load(pageNumber);
@@ -7614,7 +7625,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
   }
 
-  log.info(`🔄 [ITERATE] Page ${pageNumber}: Generating new image with corrected scene description...`);
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Generating new image (referenceMode=${effectiveReferenceMode}, singlePassScene=${effectiveSinglePass})...`);
+
+  // Apply reference-mode flag to refs/grid/landmarks/sceneBackground.
+  const { applyReferenceMode } = getStoryHelpers();
+  const refApplied = applyReferenceMode({
+    mode: effectiveReferenceMode,
+    characterPhotos: referencePhotos,
+    visualBibleGrid,
+    landmarkPhotos: finalLandmarkPhotos,
+    sceneBackground,
+    sceneMetadata: iterateSceneMetadata,
+  });
 
   // Step 6: Generate image
   let imageResult;
@@ -7622,21 +7644,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     const { resolveArtStyle: resolveIterStyle } = getStoryHelpers();
     const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
     const iterArtStyleDesc = resolveIterStyle(storyData.artStyle || 'pixar', iterBackend) || resolveIterStyle('pixar') || '';
-    imageResult = await generateWithIterativePlacement(imagePrompt, referencePhotos, iterateSceneMetadata, {
+    imageResult = await generateWithIterativePlacement(imagePrompt, refApplied.characterPhotos, iterateSceneMetadata, {
       imageModelOverride,
       imageBackendOverride: iterBackend,
-      landmarkPhotos: finalLandmarkPhotos,
-      visualBibleGrid,
+      landmarkPhotos: refApplied.landmarkPhotos,
+      visualBibleGrid: refApplied.visualBibleGrid,
       pageNumber,
       artStyle: iterArtStyleDesc,
-      sceneBackground,
+      sceneBackground: refApplied.sceneBackground,
     });
   } else {
     imageResult = await generateImageWithQualityRetry(
-      imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
+      imagePrompt, refApplied.characterPhotos, previousImage, 'scene', null, usageTracker, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: finalLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground, visualBible: storyData?.visualBible || null }
+      { landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground: refApplied.sceneBackground, visualBible: storyData?.visualBible || null }
     );
   }
 
@@ -8761,6 +8783,37 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     //    on the face area. Grok repaints inside the magenta and returns
     //    at the same aspect — same dimensions in, same dimensions out,
     //    no padding round-trip, no resize drift. ──
+
+    // Midpoint-split overlap with other detected bodies. When the target's
+    // bbox overlaps a neighbour's, painting the magenta crosshatch on the
+    // full target bbox would also cover the neighbour and Grok would repaint
+    // them too. Contract the target on the dominant axis of centre
+    // separation, stopping at the midpoint between the two body centres —
+    // the magenta then stays on the target's "side" of the shared region.
+    const protectedBodies = Array.isArray(options.protectedBodies) ? options.protectedBodies : [];
+    for (const pb of protectedBodies) {
+      if (!Array.isArray(pb) || pb.length !== 4) continue;
+      const [pyMin, pxMin, pyMax, pxMax] = pb;
+      if ([pyMin, pxMin, pyMax, pxMax].some(v => v == null || isNaN(v))) continue;
+      if (pyMin === ymin && pxMin === xmin && pyMax === ymax && pxMax === xmax) continue;
+      if (pxMax <= xmin || pxMin >= xmax || pyMax <= ymin || pyMin >= ymax) continue;
+      const cxT = (xmin + xmax) / 2, cyT = (ymin + ymax) / 2;
+      const cxP = (pxMin + pxMax) / 2, cyP = (pyMin + pyMax) / 2;
+      const dx = Math.abs(cxT - cxP);
+      const dy = Math.abs(cyT - cyP);
+      const before = [ymin, xmin, ymax, xmax];
+      if (dx >= dy && dx > 0) {
+        const split = (cxT + cxP) / 2;
+        if (cxT < cxP) xmax = Math.max(xmin + 0.01, Math.min(xmax, split));
+        else           xmin = Math.min(xmax - 0.01, Math.max(xmin, split));
+      } else if (dy > 0) {
+        const split = (cyT + cyP) / 2;
+        if (cyT < cyP) ymax = Math.max(ymin + 0.01, Math.min(ymax, split));
+        else           ymin = Math.min(ymax - 0.01, Math.max(ymin, split));
+      }
+      log.info(`👤 [CHAR REPAIR GROK] Midpoint-split: target bbox [${before.map(v => (v*100).toFixed(0)+'%').join(', ')}] vs neighbour [${[pyMin,pxMin,pyMax,pxMax].map(v => (v*100).toFixed(0)+'%').join(', ')}] → contracted to [${[ymin,xmin,ymax,xmax].map(v => (v*100).toFixed(0)+'%').join(', ')}]`);
+    }
+
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
     // No mirror padding — pick the Grok preset that matches the scene's
@@ -8777,8 +8830,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const figWidth  = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const figHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Step 3 — magenta crosshatch on the body bbox + 12% safety margin.
-    const HATCH_SAFETY = 0.12;
+    // Step 3 — magenta crosshatch hugs the body bbox (no safety margin).
+    // Earlier we padded by 12% so the crosshatch always covered limb tips,
+    // but the extra fill space let Grok scale the repainted figure up and
+    // it consistently read as "moved forward". Drop to 0 — the silhouette
+    // is small but Grok stays inside it.
+    const HATCH_SAFETY = 0;
     const HATCH_STROKE = 2;
     const HATCH_COLOR = '#FF00FF';
     const hatchMarginX = Math.round(figWidth * HATCH_SAFETY);
@@ -12370,7 +12427,27 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
   return buildVisualBibleGrid(vehicleAndLocationRefs, secondaryLandmarks);
 }
 
-async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
+async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], options = {}) {
+  // stripLabels: when 'all' (or true), omit the text strip on every cell.
+  // When 'generic' (default), only keep labels for proper-named entities
+  // (characters + landmarks) — the model already knows what a sword, soldier,
+  // horse, or village square looks like, so labeling those cells just adds
+  // text the generator can copy into the illustration. Proper names like
+  // "Gessler" or "Hohle Gasse" stay labeled because the model can't infer
+  // them from the image alone.
+  // When 'none', keep labels on every cell (legacy behaviour).
+  const stripLabelsRaw = options.stripLabels;
+  const labelMode = stripLabelsRaw === true || stripLabelsRaw === 'all'
+    ? 'all'
+    : stripLabelsRaw === 'none'
+      ? 'none'
+      : 'generic'; // default
+  const NAMED_TYPES = new Set(['character', 'landmark']);
+  const shouldDropLabel = (el) => {
+    if (labelMode === 'all') return true;
+    if (labelMode === 'none') return false;
+    return !NAMED_TYPES.has(el.type);
+  };
   const allElements = [];
 
   // Add VB elements (secondary chars, animals, artifacts, vehicles, locations)
@@ -12416,6 +12493,12 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
       const resized = await sharp(imageBuffer)
         .resize({ width: 512, withoutEnlargement: true })
         .toBuffer({ resolveWithObject: true });
+      if (shouldDropLabel(el)) {
+        const gridBuffer = await sharp(resized.data).jpeg({ quality: 85 }).toBuffer();
+        log.info(`🔲 [VB-GRID] Single element (label dropped, ${labelMode}): ${el.name} (${el.type}), ${resized.info.width}x${resized.info.height}px, ${Math.round(gridBuffer.length / 1024)}KB`);
+        gridBuffer.rawElements = gridElements;
+        return gridBuffer;
+      }
       const labelHeight = 24;
       const totalHeight = resized.info.height + labelHeight;
       const labelText = `${el.name} (${el.type})`;
@@ -12461,28 +12544,39 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
     }
 
     const gridWidth = cellWidth;
-    const gridHeight = resizedElements.reduce((sum, r) => sum + r.height + labelHeight + gap, 0) - gap;
+    // Per-cell label decision is made up front so the height calc matches the
+    // composites we emit below.
+    const cellLayout = resizedElements.map(r => ({ ...r, drop: shouldDropLabel(r.el) }));
+    const gridHeight = cellLayout.reduce((sum, r) => sum + r.height + (r.drop ? 0 : labelHeight) + gap, 0) - gap;
 
     // Create composite operations — stack vertically
     const composites = [];
     let y = 0;
-    for (const { el, buffer, height } of resizedElements) {
-      // Label above the image
-      const labelText = `${el.name} (${el.type})`;
-      const displayText = escapeXml(labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText);
-      const labelSvg = `
-        <svg width="${cellWidth}" height="${labelHeight}">
-          <rect width="${cellWidth}" height="${labelHeight}" fill="#333"/>
-          <text x="${cellWidth / 2}" y="20" font-family="Arial, sans-serif" font-size="14"
-                fill="white" text-anchor="middle">${displayText}</text>
-        </svg>
-      `;
-      composites.push({ input: Buffer.from(labelSvg), left: 0, top: y });
-      y += labelHeight;
+    let droppedCount = 0;
+    for (const { el, buffer, height, drop } of cellLayout) {
+      if (drop) {
+        droppedCount++;
+      } else {
+        // Label above the image
+        const labelText = `${el.name} (${el.type})`;
+        const displayText = escapeXml(labelText.length > 40 ? labelText.substring(0, 37) + '...' : labelText);
+        const labelSvg = `
+          <svg width="${cellWidth}" height="${labelHeight}">
+            <rect width="${cellWidth}" height="${labelHeight}" fill="#333"/>
+            <text x="${cellWidth / 2}" y="20" font-family="Arial, sans-serif" font-size="14"
+                  fill="white" text-anchor="middle">${displayText}</text>
+          </svg>
+        `;
+        composites.push({ input: Buffer.from(labelSvg), left: 0, top: y });
+        y += labelHeight;
+      }
 
-      // Image below the label
+      // Image below the label (or at top if labels stripped)
       composites.push({ input: buffer, left: 0, top: y });
       y += height + gap;
+    }
+    if (droppedCount > 0) {
+      log.info(`🔲 [VB-GRID] Dropped labels for ${droppedCount}/${cellLayout.length} cells (mode=${labelMode})`);
     }
 
     // Create base image and composite all elements
