@@ -62,6 +62,8 @@ const MODEL_DEFAULTS: ModelSelections = {
   avatarModel: null,
   storyAvatarModel: null,
   generateEmptyScenes: null,
+  referenceMode: null,
+  singlePassScene: null,
 };
 
 /**

@@ -197,6 +197,10 @@ export interface ModelSelections {
   avatarModel: AvatarModelKey | null;  // Character creation avatar model
   storyAvatarModel: StoryAvatarModelKey | null;  // Styled avatar model during story generation
   generateEmptyScenes: boolean | null;  // null = server default (on), false = disabled
+  // Reference mode + single-pass scene flag (per-run; per-page overrides live in StoryDisplay)
+  // null on either field = use server default from MODEL_DEFAULTS in server/config/models.js
+  referenceMode: 'strict' | 'loose' | 'styled-only' | 'off' | null;
+  singlePassScene: boolean | null;
 }
 
 interface ModelSelectorProps {
@@ -339,6 +343,46 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           <label htmlFor="emptyScenes" className="text-xs text-gray-600">
             Generate empty scenes first (style anchoring, +$0.02/page)
           </label>
+        </div>
+
+        {/* Reference mode (controls character refs / landmarks attached to page gen) */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+            <Image size={12} />
+            Reference Mode
+          </label>
+          <select
+            value={selections.referenceMode ?? ''}
+            onChange={(e) => updateSelection('referenceMode', e.target.value || null)}
+            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          >
+            <option value="">Server default</option>
+            <option value="strict">strict — all refs + VB grid</option>
+            <option value="loose">loose — refs only on close-ups</option>
+            <option value="styled-only">styled-only — keep refs, no shot filter</option>
+            <option value="off">off — no character refs / landmarks</option>
+          </select>
+          <p className="text-[10px] text-gray-500 italic">VB grid is always kept — proper-named entities only get text labels.</p>
+        </div>
+
+        {/* Single-pass scene mode (skip empty-scene plate, render in one pass) */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+            <Image size={12} />
+            Empty-Scene Plate
+          </label>
+          <select
+            value={selections.singlePassScene === true ? 'on' : selections.singlePassScene === false ? 'off' : ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              updateSelection('singlePassScene', v === 'on' ? true : v === 'off' ? false : null);
+            }}
+            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          >
+            <option value="">Server default</option>
+            <option value="off">use plate (two-pass)</option>
+            <option value="on">skip plate (single-pass)</option>
+          </select>
         </div>
 
         {/* Image Generation Models */}

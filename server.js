@@ -4791,7 +4791,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Reference-mode + single-pass flags resolved once for the run. Per-page
       // overrides (test-models / iterate) are read in the call sites.
       const runReferenceMode = modelOverrides.referenceMode || MODEL_DEFAULTS.referenceMode || 'strict';
-      const runSinglePassScene = modelOverrides.singlePassScene === true || MODEL_DEFAULTS.singlePassScene === true;
+      // Explicit false from the wizard must beat MODEL_DEFAULTS.singlePassScene=true.
+      const runSinglePassScene = typeof modelOverrides.singlePassScene === 'boolean'
+        ? modelOverrides.singlePassScene
+        : MODEL_DEFAULTS.singlePassScene === true;
       log.info(`🎛️ [UNIFIED] referenceMode=${runReferenceMode} singlePassScene=${runSinglePassScene}`);
 
       // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring

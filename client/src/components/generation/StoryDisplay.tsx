@@ -1733,12 +1733,12 @@ export function StoryDisplay({
         className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
           isGenerating || iteratingPages.has(pageNum) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
         }`}
-        title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
+        title={language === 'de' ? 'Bild neu generieren — Reference Mode + Empty-Scene Plate konfigurieren' : language === 'fr' ? 'Régénérer l\'image — configurer Reference Mode + Empty-Scene Plate' : 'Regenerate image — configure Reference Mode + Empty-Scene Plate'}
       >
         {iteratingPages.has(pageNum) ? (
-          <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}</>
+          <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Regenerating...'}</>
         ) : (
-          <><RotateCcw size={14} /> {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}</>
+          <><RotateCcw size={14} /> {language === 'de' ? 'Neu generieren (Dev)' : language === 'fr' ? 'Régénérer (Dev)' : 'Regenerate (Dev)'}</>
         )}
       </button>
       {iterateOptionsPage === pageNum && (

@@ -1674,6 +1674,8 @@ export const storyService = {
       imageBackend?: string | null;  // 'gemini' or 'runware'
       storyAvatarModel?: string | null;  // styled avatar model during story gen
       generateEmptyScenes?: boolean | null;  // null = server default (on), false = disabled
+      referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off' | null;
+      singlePassScene?: boolean | null;
     };
     // User location for landmark discovery
     userLocation?: { city: string | null; region: string | null; country: string | null };

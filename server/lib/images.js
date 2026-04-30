@@ -7171,8 +7171,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     singlePassScene = null,
   } = options;
   const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
-  const effectiveSinglePass = singlePassScene === true
-    || (singlePassScene == null && CONFIG_DEFAULTS.singlePassScene === true);
+  // Explicit boolean from caller wins over the run-level default.
+  const effectiveSinglePass = typeof singlePassScene === 'boolean'
+    ? singlePassScene
+    : CONFIG_DEFAULTS.singlePassScene === true;
   const sceneAspect = aspectRatioIn || CONFIG_DEFAULTS.pageAspect;
 
   const {

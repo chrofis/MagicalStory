@@ -3915,6 +3915,8 @@ export default function StoryWizard() {
           imageBackend: modelSelections.imageBackend,
           storyAvatarModel: modelSelections.storyAvatarModel,
           generateEmptyScenes: modelSelections.generateEmptyScenes,
+          referenceMode: modelSelections.referenceMode,
+          singlePassScene: modelSelections.singlePassScene,
         } : undefined,
         // User location for landmark discovery
         userLocation: userLocation || undefined,
