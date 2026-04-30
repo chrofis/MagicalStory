@@ -1489,6 +1489,32 @@ async function deleteStoryImages(storyId) {
  * @param {number|string} pageNumber - Page number or cover type
  * @returns {Promise<number>} Active version index (0-based)
  */
+/**
+ * Fast existence check for a set of image types on a story.
+ * Returns a Set of imageType strings that have at least one row with usable
+ * data (image_data OR image_url present). Single round-trip, no blob fetch.
+ *
+ * Use this instead of looping getActiveVersion + getStoryImage when you only
+ * need a yes/no flag — the latter pulls multi-MB byteas just to see existence.
+ *
+ * @param {string} storyId
+ * @param {string[]} imageTypes - e.g. ['frontCover', 'initialPage', 'backCover']
+ * @returns {Promise<Set<string>>}
+ */
+async function imagesExistByType(storyId, imageTypes) {
+  if (!isDatabaseMode() || !Array.isArray(imageTypes) || imageTypes.length === 0) {
+    return new Set();
+  }
+  const rows = await dbQuery(
+    `SELECT DISTINCT image_type FROM story_images
+     WHERE story_id = $1
+       AND image_type = ANY($2::text[])
+       AND (image_data IS NOT NULL OR image_url IS NOT NULL)`,
+    [storyId, imageTypes]
+  );
+  return new Set(rows.map(r => r.image_type));
+}
+
 async function getActiveVersion(storyId, pageNumber) {
   if (!isDatabaseMode()) {
     return 0;
@@ -1945,6 +1971,7 @@ module.exports = {
   // Image functions
   saveStoryImage,
   getStoryImage,
+  imagesExistByType,
   imgBytesAsync,
   getStoryImageWithVersions,
   getAllStoryImages,

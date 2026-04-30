@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
-const { dbQuery, getStoryImage, getActiveVersion } = require('../services/database');
+const { dbQuery, getStoryImage, getActiveVersion, imagesExistByType } = require('../services/database');
 const { log } = require('../utils/logger');
 const { verifyToken } = require('../middleware/auth');
 
@@ -208,23 +208,21 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       }
     }
 
-    // Check which covers exist. Use the ACTIVE version, not hardcoded 0 —
-    // a regenerated cover may live at version 1+ with no data at version 0,
-    // which would previously make the check falsely return "no cover" and
-    // cause the frontend to omit the cover from the page list entirely.
+    // Cover existence — single round-trip, no blob fetch. The previous loop
+    // ran 3× getActiveVersion + getStoryImage, and getStoryImage pulled the
+    // full image_data bytea (multi-MB) just to check a yes/no flag — that
+    // alone added ~3s to every shared-viewer load. imagesExistByType returns
+    // a Set in one query, no version traversal, no blob transfer.
+    //
+    // The fetch endpoint /shared/.../cover-image/:coverType still resolves
+    // the active version and falls back to v0 — so "exists in any version"
+    // is the right signal for whether the page list should include the cover.
     const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+    const existing = await imagesExistByType(story.id, coverTypes);
     const covers = {};
     for (const coverType of coverTypes) {
-      const activeIdx = await getActiveVersion(story.id, coverType);
-      const img = await getStoryImage(story.id, coverType, null, activeIdx);
-      // After R2 migration image_data may be NULL but image_url is set —
-      // either is enough to consider the cover available.
-      if (img?.imageData || img?.imageUrl) {
-        covers[coverType] = true;
-      } else {
-        // Fallback: check legacy coverImages in story data
-        covers[coverType] = !!data.coverImages?.[coverType]?.imageData;
-      }
+      covers[coverType] = existing.has(coverType)
+        || !!data.coverImages?.[coverType]?.imageData; // legacy fallback
     }
 
     res.json({
