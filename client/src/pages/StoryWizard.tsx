@@ -5162,13 +5162,15 @@ export default function StoryWizard() {
                 }
               } : undefined}
               // Iterate page using 17-check scene description with actual image analysis (dev mode only)
-              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string }) => {
+              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }) => {
                 try {
                   log.info('Starting iteration for page:', pageNumber, 'imageModel:', options?.imageModel || modelSelections.imageModel, 'options:', options);
                   const result = await storyService.iteratePage(storyId, pageNumber, options?.imageModel || modelSelections.imageModel || undefined, {
                     sceneModel: options?.sceneModel,
                     useOriginalAsReference: options?.useOriginalAsReference,
                     blackoutIssues: options?.blackoutIssues,
+                    referenceMode: options?.referenceMode,
+                    singlePassScene: options?.singlePassScene,
                   });
 
                   if (result.success) {

@@ -1187,7 +1187,7 @@ export const storyService = {
   },
 
   // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
-  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; previewOnly?: boolean; customImagePrompt?: string; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
+  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { sceneModel?: string; useOriginalAsReference?: boolean; blackoutIssues?: boolean; previewOnly?: boolean; customImagePrompt?: string; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> }; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }): Promise<{
     success: boolean;
     pageNumber: number;
     // What the vision model saw
@@ -1268,7 +1268,7 @@ export const storyService = {
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,
-      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.previewOnly && { previewOnly: true }), ...(options?.customImagePrompt && { customImagePrompt: options.customImagePrompt }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
+      { imageModel, ...(options?.sceneModel && { sceneModel: options.sceneModel }), ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.previewOnly && { previewOnly: true }), ...(options?.customImagePrompt && { customImagePrompt: options.customImagePrompt }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }), ...(options?.referenceMode && { referenceMode: options.referenceMode }), ...(typeof options?.singlePassScene === 'boolean' && { singlePassScene: options.singlePassScene }) }
     );
     return response;
   },

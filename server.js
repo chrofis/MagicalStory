@@ -4788,9 +4788,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         expandedScenes.map((scene, index) => preparePageData(scene, index))
       );
 
+      // Reference-mode + single-pass flags resolved once for the run. Per-page
+      // overrides (test-models / iterate) are read in the call sites.
+      const runReferenceMode = modelOverrides.referenceMode || MODEL_DEFAULTS.referenceMode || 'strict';
+      const runSinglePassScene = modelOverrides.singlePassScene === true || MODEL_DEFAULTS.singlePassScene === true;
+      log.info(`🎛️ [UNIFIED] referenceMode=${runReferenceMode} singlePassScene=${runSinglePassScene}`);
+
       // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
       // Note: sceneBackgrounds may already have entries from trial mode early generation
-      if (modelOverrides.generateEmptyScenes !== false) {
+      if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene) {
         log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
         const bgStartTime = Date.now();
         const bgLimit = pLimit(50);
@@ -5106,17 +5112,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           try {
+            // Apply reference-mode flag — strips refs/grid per the chosen mode.
+            // singlePassScene already prevented the empty-scene plate from being
+            // generated above, so sceneBackground is naturally null in that mode.
+            const refApplied = require('./server/lib/storyHelpers').applyReferenceMode({
+              mode: runReferenceMode,
+              characterPhotos: pageData.characterPhotos,
+              visualBibleGrid: pageData.visualBibleGrid,
+              landmarkPhotos: pageData.landmarkPhotos,
+              sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+              sceneMetadata: pageData.sceneMetadata,
+            });
             const genResult = await generateImageOnly(
               pageData.prompt,
-              pageData.characterPhotos,
+              refApplied.characterPhotos,
               {
                 aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
-                landmarkPhotos: pageData.landmarkPhotos,
-                visualBibleGrid: pageData.visualBibleGrid,
+                landmarkPhotos: refApplied.landmarkPhotos,
+                visualBibleGrid: refApplied.visualBibleGrid,
                 pageNumber: pageData.pageNumber,
-                sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+                sceneBackground: refApplied.sceneBackground,
                 // Text-zone mask only attached when text is overlaid on image
                 // (textInImage=true). For square+below layout this is null —
                 // the model is free to fill the whole frame.

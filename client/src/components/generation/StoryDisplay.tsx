@@ -127,7 +127,7 @@ interface StoryDisplayProps {
     beforeScore?: number | null;
     afterScore?: number | null;
   } | void>;
-  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string }) => Promise<void>;
+  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; previewOnly?: boolean; customImagePrompt?: string; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   shareToken?: string | null;
@@ -316,6 +316,10 @@ export function StoryDisplay({
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
   const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
+  // Reference mode + single-pass scene flags for the iterate panel.
+  // 'inherit' = use server default; otherwise overrides the run config.
+  const [iterateReferenceMode, setIterateReferenceMode] = useState<'inherit' | 'strict' | 'loose' | 'styled-only' | 'off'>('inherit');
+  const [iterateSinglePassScene, setIterateSinglePassScene] = useState<'inherit' | 'on' | 'off'>('inherit');
   const [reviewPrompt, setReviewPrompt] = useState(false);
   const [previewPromptText, setPreviewPromptText] = useState<string | null>(null);
   const [previewPromptPage, setPreviewPromptPage] = useState<number | null>(null);
@@ -823,7 +827,7 @@ export function StoryDisplay({
 
   // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
   // Supports parallel: multiple pages can iterate simultaneously
-  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; customImagePrompt?: string }) => {
+  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; sceneModel?: string; imageModel?: string; customImagePrompt?: string; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }) => {
     if (!onIteratePage || iteratingPages.has(pageNumber)) return;
     setIteratingPages(prev => new Set(prev).add(pageNumber));
     setIterateOptionsPage(null); // Close options panel
@@ -1784,6 +1788,35 @@ export function StoryDisplay({
               <option value="gemini-3-pro-image-preview">Gemini 3 Pro ($0.15/img)</option>
             </select>
           </div>
+          {/* Reference mode + single-pass scene overrides (rerun the page with different settings) */}
+          <div className="flex gap-2 pt-2 border-t border-gray-200">
+            <label className="flex-1 text-xs text-gray-700">
+              <span className="block mb-0.5 font-medium text-indigo-700">Reference mode</span>
+              <select
+                value={iterateReferenceMode}
+                onChange={e => setIterateReferenceMode(e.target.value as typeof iterateReferenceMode)}
+                className="w-full rounded border-gray-300 text-xs p-1"
+              >
+                <option value="inherit">inherit (server default)</option>
+                <option value="strict">strict — all refs + VB grid</option>
+                <option value="loose">loose — refs only on close-ups, no grid</option>
+                <option value="styled-only">styled-only — refs, no grid</option>
+                <option value="off">off — no refs, no grid</option>
+              </select>
+            </label>
+            <label className="flex-1 text-xs text-gray-700">
+              <span className="block mb-0.5 font-medium text-indigo-700">Empty-scene plate</span>
+              <select
+                value={iterateSinglePassScene}
+                onChange={e => setIterateSinglePassScene(e.target.value as typeof iterateSinglePassScene)}
+                className="w-full rounded border-gray-300 text-xs p-1"
+              >
+                <option value="inherit">inherit (server default)</option>
+                <option value="off">use plate (two-pass)</option>
+                <option value="on">skip plate (single-pass)</option>
+              </select>
+            </label>
+          </div>
           {previewPromptPage === pageNum && previewPromptText != null && (
             <div className="space-y-2 p-2 bg-white border border-indigo-200 rounded-lg">
               <div className="text-xs font-medium text-indigo-700">{language === 'de' ? 'Bild-Prompt (bearbeitbar):' : 'Image Prompt (editable):'}</div>
@@ -1803,6 +1836,8 @@ export function StoryDisplay({
                       sceneModel: improveSceneModel || undefined,
                       imageModel: improveImageModel || undefined,
                       customImagePrompt: previewPromptText || undefined,
+                      referenceMode: iterateReferenceMode === 'inherit' ? undefined : iterateReferenceMode,
+                      singlePassScene: iterateSinglePassScene === 'inherit' ? undefined : iterateSinglePassScene === 'on',
                     });
                     setPreviewPromptText(null);
                   }}
@@ -1828,6 +1863,8 @@ export function StoryDisplay({
                       useOriginalAsReference: iterateMode === 'reference',
                       blackoutIssues: iterateMode === 'blackout',
                       previewOnly: true,
+                      referenceMode: iterateReferenceMode === 'inherit' ? undefined : iterateReferenceMode,
+                      singlePassScene: iterateSinglePassScene === 'inherit' ? undefined : iterateSinglePassScene === 'on',
                     });
                     if (result.previewOnly && result.imagePrompt) {
                       setPreviewPromptText(result.imagePrompt);
@@ -1844,6 +1881,8 @@ export function StoryDisplay({
                     blackoutIssues: iterateMode === 'blackout',
                     sceneModel: improveSceneModel || undefined,
                     imageModel: improveImageModel || undefined,
+                    referenceMode: iterateReferenceMode === 'inherit' ? undefined : iterateReferenceMode,
+                    singlePassScene: iterateSinglePassScene === 'inherit' ? undefined : iterateSinglePassScene === 'on',
                   });
                 }
               }}

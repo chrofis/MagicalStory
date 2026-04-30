@@ -122,6 +122,17 @@ const MODEL_DEFAULTS = {
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
   generateEmptyScenes: true,           // Pre-generate empty scene backgrounds for style anchoring
+  // Reference mode for character refs / VB grid attached to page generation.
+  //   'strict'      — photo + costumed + styled avatars; full VB grid (current default)
+  //   'loose'       — costumed + styled; photo only on close-ups; identity cells without grid frame
+  //   'styled-only' — only the in-art-style avatar; identity cells without grid frame
+  //   'off'         — no character refs, no VB grid (single-pass, prose-only)
+  // Looser modes trade identity stability for painterly cohesion.
+  referenceMode: 'loose',
+  // Single-pass scene mode — when true, skip empty-scene plate generation
+  // and render the page in one pass (populated prose only). Recommended
+  // pairing with referenceMode != 'strict'.
+  singlePassScene: true,
   // Unified scene prose: Sonnet writes the ~300-word scene paragraph directly
   // in the unified story pass (instead of emitting a tight JSON hint that Haiku
   // then expands). Eliminates the Haiku scene-expansion call for initial gen.

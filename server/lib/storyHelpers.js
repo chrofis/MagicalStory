@@ -1109,6 +1109,59 @@ function buildEraGuard(era) {
   return `**STORY ERA:** ${trimmed}. Every architectural and street element in the frame must match this era. No vehicles, traffic signs, road markings, street lamps, utility poles, power lines, billboards, modern signage, plastic objects, satellite dishes, air conditioners, or modern pedestrians — anywhere in the frame.`;
 }
 
+/**
+ * Apply a reference mode to a page's image-generation inputs. The mode controls
+ * how many character / landmark photos get attached to the model call. The
+ * Visual Bible grid is ALWAYS kept (it carries identity for proper-named
+ * entities the model can't infer from the image alone). Looser modes trade
+ * identity stability for painterly cohesion.
+ *
+ * Modes:
+ *   'strict'      — pass everything through unchanged (legacy behaviour)
+ *   'loose'       — keep character photos only on close-up / medium / OTS shots
+ *   'styled-only' — keep character photos (already styled) on every shot
+ *   'off'         — drop character photos, landmarks, and empty-scene plate
+ *
+ * @param {Object} args
+ * @param {string} args.mode               — one of strict|loose|styled-only|off
+ * @param {Array}  args.characterPhotos    — current page character refs
+ * @param {Buffer|string|null} args.visualBibleGrid — passed through untouched
+ * @param {Array}  args.landmarkPhotos
+ * @param {string|null} args.sceneBackground
+ * @param {Object|null} args.sceneMetadata — used to read the shot type
+ */
+function applyReferenceMode({
+  mode,
+  characterPhotos = [],
+  visualBibleGrid = null,
+  landmarkPhotos = [],
+  sceneBackground = null,
+  sceneMetadata = null,
+} = {}) {
+  const m = String(mode || 'strict').toLowerCase();
+  if (m === 'strict' || !m) {
+    return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
+  }
+  if (m === 'off') {
+    // VB grid stays — it's identity, not style noise.
+    return { characterPhotos: [], visualBibleGrid, landmarkPhotos: [], sceneBackground: null };
+  }
+  if (m === 'styled-only') {
+    return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
+  }
+  if (m === 'loose') {
+    const shot = String(sceneMetadata?.fullData?.shot || sceneMetadata?.framingPattern || '').toLowerCase();
+    const isCloseFraming = shot.includes('close') || shot.includes('medium') || shot.includes('over-the-shoulder');
+    return {
+      characterPhotos: isCloseFraming ? characterPhotos : [],
+      visualBibleGrid,
+      landmarkPhotos,
+      sceneBackground,
+    };
+  }
+  return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
+}
+
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -5273,6 +5326,7 @@ module.exports = {
   buildCharacterDescriptionsForBbox,
   buildTextZoneInstruction,
   buildEraGuard,
+  applyReferenceMode,
 
   // Parsers
   parseStoryPages,
