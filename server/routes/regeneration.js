@@ -4510,11 +4510,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 before: sceneImage.imageData,
                 after: grokResult.imageData,
                 reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
-                croppedAvatar: grokResult.croppedAvatar || null,
-                blackoutImage: grokResult.blackoutImage || null,
+                croppedAvatar: grokResult.croppedAvatar || grokResult.comparison?.croppedAvatar || null,
+                blackoutImage: grokResult.blackoutImage || grokResult.comparison?.blackoutImage || null,
                 grokRawResult: grokResult.grokRawResult || grokResult.comparison?.grokRawResult || null,
-                blendMask: grokResult.blendMask || null,
-                cutoutSent: grokResult.comparison?.cutoutSent || null,
+                blendMask: grokResult.blendMask || grokResult.comparison?.blendMask || null,
+                cutoutSent: grokResult.cutoutSent || grokResult.comparison?.cutoutSent || null,
               },
             };
           } else {
