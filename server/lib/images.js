@@ -8889,10 +8889,31 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const facePad = Math.round(Math.min(faceWidth, faceHeight) * 0.10);
     faceLeft = Math.max(0, faceLeft - facePad);
     faceTop  = Math.max(0, faceTop - facePad);
-    const faceRight  = Math.min(paddedW, faceLeft + faceWidth + facePad * 2);
-    const faceBottom = Math.min(paddedH, faceTop + faceHeight + facePad * 2);
-    faceWidth  = faceRight - faceLeft;
-    faceHeight = faceBottom - faceTop;
+    let faceRight  = Math.min(paddedW, faceLeft + faceWidth + facePad * 2);
+    let faceBottom = Math.min(paddedH, faceTop + faceHeight + facePad * 2);
+
+    // Clamp the face block to be 10% smaller than the (post-midpoint-split)
+    // hatch box on each axis — i.e. inset 5% from every hatch edge. Without
+    // this, a face bbox that came in wider than the body (or a midpoint-
+    // split hatch that contracted while the face stayed put) leaves the
+    // solid magenta block sticking out past the body crosshatch into the
+    // neighbour's territory.
+    const FACE_INSET = 0.05;
+    const insetX = Math.round(hatchWidth  * FACE_INSET);
+    const insetY = Math.round(hatchHeight * FACE_INSET);
+    const faceMinLeft   = hatchLeft   + insetX;
+    const faceMaxRight  = hatchRight  - insetX;
+    const faceMinTop    = hatchTop    + insetY;
+    const faceMaxBottom = hatchBottom - insetY;
+    if (faceMaxRight > faceMinLeft && faceMaxBottom > faceMinTop) {
+      faceLeft   = Math.max(faceLeft,   faceMinLeft);
+      faceTop    = Math.max(faceTop,    faceMinTop);
+      faceRight  = Math.min(faceRight,  faceMaxRight);
+      faceBottom = Math.min(faceBottom, faceMaxBottom);
+    }
+
+    faceWidth  = Math.max(1, faceRight - faceLeft);
+    faceHeight = Math.max(1, faceBottom - faceTop);
     const solidFace = await sharp({
       create: { width: faceWidth, height: faceHeight, channels: 3, background: HATCH_COLOR },
     }).png().toBuffer();
