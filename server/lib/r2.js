@@ -88,6 +88,26 @@ function keyForCharacterPhoto(storyId, characterId, slot) {
   return `stories/${storyId}/characters/${characterId}/${slot}.jpg`;
 }
 
+// Account-scoped avatar keys (Phase 0 of the avatar→R2 migration). The
+// existing keyForCharacterPhoto above is *story-scoped* and is for the
+// per-story photo uploads. Avatars live on the characters table, so they
+// need their own key shape rooted at the userId.
+function keyForCharacterAvatar(userId, characterId, slot) {
+  return `characters/${userId}/${characterId}/avatars/${slot}.jpg`;
+}
+
+function keyForCharacterStyledAvatar(userId, characterId, key) {
+  return `characters/${userId}/${characterId}/avatars/styled/${key}.jpg`;
+}
+
+function keyForCharacterThumb(userId, characterId, kind, slot) {
+  return `characters/${userId}/${characterId}/avatars/thumbs/${kind}-${slot}.jpg`;
+}
+
+function keyForVbReference(storyId, entryId) {
+  return `stories/${storyId}/vb/${entryId}.jpg`;
+}
+
 function publicUrlForKey(key) {
   if (!process.env.R2_PUBLIC_URL) return null;
   const base = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
@@ -164,4 +184,8 @@ module.exports = {
   keyForRetryImage,
   keyForStyleLabImage,
   keyForCharacterPhoto,
+  keyForCharacterAvatar,
+  keyForCharacterStyledAvatar,
+  keyForCharacterThumb,
+  keyForVbReference,
 };
