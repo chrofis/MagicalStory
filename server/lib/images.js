@@ -8484,7 +8484,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // G. Composite blended region onto original scene
     const composited = await sharp(sceneBuffer)
       .composite([{ input: blendedRegion, left: blendLeft, top: blendTop }])
-      .jpeg({ quality: 92 }).toBuffer();
+      .jpeg({ quality: 95 }).toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Blended repair for ${charName} completed. Blend region: ${blendWidth}x${blendHeight}. Cost: $${grokResult.usage?.cost || 0.02}`);
@@ -8740,7 +8740,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     const composited = await sharp(sceneBuffer)
       .composite([{ input: blendedRegion, left: extractLeft, top: extractTop }])
-      .jpeg({ quality: 92 })
+      .jpeg({ quality: 95 })
       .toBuffer();
 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
@@ -11005,7 +11005,7 @@ IMPORTANT:
     const blendedPng = await sharp(blended, { raw: { width: bw, height: bh, channels: 3 } }).png().toBuffer();
     resultBuffer = await sharp(resultBuffer)
       .composite([{ input: blendedPng, left: bx, top: by }])
-      .jpeg({ quality: 92 }).toBuffer();
+      .jpeg({ quality: 95 }).toBuffer();
   }
 
   const finalDataUri = `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
