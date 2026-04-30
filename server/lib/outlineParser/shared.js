@@ -160,16 +160,52 @@ function parseCharacterClothingBlock(content) {
 
 // Terminator lookahead for TEXT/SCENE inside a page block.
 const PAGE_SECTION_END = '(?=SCENE:|METADATA:|SCENE HINT:|---\\s*(?:Page|Seite|Página|Pagina)|^#\\s+FINAL|^#\\s+\\w|$)';
-// Terminator lookahead for the METADATA JSON object (the lookahead lets the
-// non-greedy `\{...\}` expand past inner `}` characters until a real boundary).
-const METADATA_END = '(?=\\s*(?:```\\s*)?(?:---\\s*(?:Page|Seite|Página|Pagina)|TEXT:|SCENE:|SCENE HINT:|^#\\s+FINAL|^#\\s+\\w|$))';
 
 const TEXT_RE = new RegExp(`TEXT:\\s*([\\s\\S]*?)${PAGE_SECTION_END}`, 'im');
 const SCENE_RE = new RegExp(`SCENE:\\s*([\\s\\S]*?)${PAGE_SECTION_END}`, 'im');
-const METADATA_RE = new RegExp(`METADATA:\\s*(?:\`\`\`json\\s*\\n?)?\\s*(\\{[\\s\\S]*?\\})${METADATA_END}`, 'im');
-const SCENE_HINT_JSON_RE = new RegExp(`SCENE HINT:\\s*(?:\`\`\`json\\s*\\n?)?\\s*(\\{[\\s\\S]*?\\})${METADATA_END}`, 'im');
+const METADATA_LABEL_RE = /METADATA:\s*(?:```json\s*\n?)?\s*/im;
+const SCENE_HINT_LABEL_RE = /SCENE HINT:\s*(?:```json\s*\n?)?\s*/im;
 const SCENE_HINT_TEXT_RE = /SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*(?:Page|Seite|Página|Pagina)|^#\s+FINAL|$)/im;
 const HAS_TEXT_LABEL_RE = /^\s*TEXT\s*:/im;
+
+/**
+ * Extract a balanced JSON object starting at the first `{` at-or-after `startIdx`.
+ * Tracks string state (with backslash escapes) so that braces inside strings
+ * don't affect depth. Returns the captured substring (including outer braces)
+ * or null if no balanced object is found.
+ *
+ * Replaces a regex-based capture that broke because the terminator lookahead
+ * used `$` under the `m` flag — any inner `}` at end-of-line satisfied the
+ * lookahead and truncated the captured JSON mid-array.
+ */
+function extractBalancedJsonObject(text, startIdx = 0) {
+  if (!text || typeof text !== 'string') return null;
+  const open = text.indexOf('{', startIdx);
+  if (open === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.substring(open, i + 1);
+    }
+  }
+  // Unclosed — return what we have so the caller can hand it to a tolerant
+  // JSON extractor. JSON.parse will fail, but extractJsonFromText may still
+  // recover usable fields, and the loud-log fallback can show the prose.
+  return depth > 0 ? text.substring(open) : null;
+}
 
 /**
  * Parse a labeled patch page block (TEXT / SCENE / METADATA, any subset).
@@ -200,17 +236,23 @@ function parsePatchSections(content) {
   }
 
   let sceneHint = '';
-  const metaM = content.match(METADATA_RE);
-  if (metaM) {
-    sceneHint = metaM[1].trim();
-  } else {
-    const hintJsonM = content.match(SCENE_HINT_JSON_RE);
-    if (hintJsonM) {
-      sceneHint = hintJsonM[1].trim();
-    } else {
-      const hintTextM = content.match(SCENE_HINT_TEXT_RE);
-      sceneHint = hintTextM ? hintTextM[1].trim() : '';
+  const metaLabelM = content.match(METADATA_LABEL_RE);
+  if (metaLabelM) {
+    const labelEnd = metaLabelM.index + metaLabelM[0].length;
+    const json = extractBalancedJsonObject(content, labelEnd);
+    if (json) sceneHint = json.trim();
+  }
+  if (!sceneHint) {
+    const hintLabelM = content.match(SCENE_HINT_LABEL_RE);
+    if (hintLabelM) {
+      const labelEnd = hintLabelM.index + hintLabelM[0].length;
+      const json = extractBalancedJsonObject(content, labelEnd);
+      if (json) sceneHint = json.trim();
     }
+  }
+  if (!sceneHint) {
+    const hintTextM = content.match(SCENE_HINT_TEXT_RE);
+    sceneHint = hintTextM ? hintTextM[1].trim() : '';
   }
 
   return { text, sceneProse, sceneHint };
