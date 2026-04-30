@@ -54,7 +54,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -92,6 +92,15 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
       testMatch: /trial-to-full\.spec\.ts/,
+    },
+
+    // Repair-tile visibility (no auth dep — injects admin JWT directly).
+    {
+      name: 'repair-tile',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /repair-tile-visibility\.spec\.ts/,
     },
 
     // Responsive screenshot harness — drives the site at a matrix of viewport
