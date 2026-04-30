@@ -8857,13 +8857,13 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   </defs>
   <rect x="0" y="0" width="${hatchWidth}" height="${hatchHeight}" fill="url(#h)"/>
 </svg>`;
+    // Hatch region — extract → paint hatch SVG → keep as PNG buffer for the
+    // final composite (avoid intermediate JPEG encoding here, the lossy step
+    // is what compounded blur across rounds).
     const hatchRegion = await sharp(paddedScene)
       .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
       .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
       .png().toBuffer();
-    let masked = await sharp(paddedScene)
-      .composite([{ input: hatchRegion, top: hatchTop, left: hatchLeft }])
-      .jpeg({ quality: 92 }).toBuffer();
 
     // Step 4 — solid magenta block over the face. Use options.faceBbox if
     // provided (entity consistency passes one when face detection ran);
@@ -8895,10 +8895,19 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     faceHeight = faceBottom - faceTop;
     const solidFace = await sharp({
       create: { width: faceWidth, height: faceHeight, channels: 3, background: HATCH_COLOR },
-    }).jpeg({ quality: 95 }).toBuffer();
-    masked = await sharp(masked)
-      .composite([{ input: solidFace, top: faceTop, left: faceLeft }])
-      .jpeg({ quality: 92 }).toBuffer();
+    }).png().toBuffer();
+
+    // Single composite: hatch + face block onto the previous scene → PNG.
+    // Was two sequential JPEG q92 encodings (decode-encode-decode-encode);
+    // collapsing into one lossless pass is where most of the round-trip
+    // blur came from on the input side.
+    const masked = await sharp(paddedScene)
+      .composite([
+        { input: hatchRegion, top: hatchTop, left: hatchLeft },
+        { input: solidFace,   top: faceTop,  left: faceLeft  },
+      ])
+      .png()
+      .toBuffer();
 
     log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); face block ${faceWidth}x${faceHeight} @ (${faceLeft},${faceTop})`);
 
@@ -8958,7 +8967,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // Step 7 — send to Grok at the scene's native aspect.
     const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
     log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok (aspect=${sceneAspectStr})`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, `data:image/jpeg;base64,${masked.toString('base64')}`], {
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, `data:image/png;base64,${masked.toString('base64')}`], {
       aspectRatio: sceneAspectStr,
       skipOutputPadding: true,
     });
@@ -8968,21 +8977,26 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Step 8 — keep Grok's native output dims. No rescale.
+    // Step 8 — keep Grok's native output dims AND its native bytes.
     //
-    // Why: Grok's edit endpoint always outputs at its standard ~1k raster
-    // for the requested aspect (e.g. 896×1280 for 3:4, 1024×1024 for 1:1).
-    // If the source happens to be smaller than Grok's native (legacy
-    // A4-normalised stories pre-963e3bbd were saved at 880×1168 for 3:4),
-    // resizing the Grok output back to source dims would silently downsample
-    // the cleanest pixels we ever get. Just keep Grok's bytes; storage and
-    // downstream code already handle varying page dims.
-    const rawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const finalBuf = await sharp(rawBuf).jpeg({ quality: 95 }).toBuffer();
+    // Why no rescale: Grok's edit endpoint always outputs at its standard ~1k
+    // raster for the requested aspect (e.g. 896×1280 for 3:4, 1024×1024 for
+    // 1:1). Resizing back to source dims would downsample the cleanest pixels
+    // we ever get.
+    //
+    // Why no re-encode: this version becomes the input to the NEXT inpaint
+    // round. Each JPEG decode/re-encode strips high-frequency detail; over
+    // 2-3 rounds Laplacian variance dropped ~50% (HAR analysis 2026-04-30).
+    // Pass Grok's bytes through verbatim. Mime is sniffed from magic bytes so
+    // downstream consumers (frontend <img>, R2 cache, PDF renderer) get the
+    // correct content type.
+    const finalBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const isPng = finalBuf[0] === 0x89 && finalBuf[1] === 0x50 && finalBuf[2] === 0x4e && finalBuf[3] === 0x47;
+    const finalMime = isPng ? 'image/png' : 'image/jpeg';
 
-    const finalImageData = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
+    const finalImageData = `data:${finalMime};base64,${finalBuf.toString('base64')}`;
     const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
-    const sentToGrokDataUri = `data:image/jpeg;base64,${masked.toString('base64')}`;
+    const sentToGrokDataUri = `data:image/png;base64,${masked.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Inpaint repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
 
     return {
