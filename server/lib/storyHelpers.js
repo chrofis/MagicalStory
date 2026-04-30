@@ -976,6 +976,79 @@ function enforceSpreadTextPosition(textPosition, pageNumber) {
 }
 
 /**
+ * Mirror directional left↔right tokens in prose without touching non-directional
+ * uses ("she left the room", "what was left", "leftover", "all right", etc.).
+ *
+ * Used when enforceSpreadTextPosition flips a page's textPosition to the other
+ * side of the spread — the prose Sonnet wrote was anchored to the original side
+ * and the empty-scene + page-image both need geometry pointing at the new side.
+ *
+ * Only swaps `left` / `right` when they appear in one of these directional
+ * contexts:
+ *   - compound corner words: `top-left`, `upper-right`, `far-left`, `mid-right`, `the right`, …
+ *   - positional-noun follower: `left foreground`, `right side`, `left-hand`, …
+ *   - prepositional: `to the left`, `from the right`, `into the left`, …
+ *   - visual-verb + direction: `facing right`, `aiming left`, `gazes toward the right`, …
+ *   - possessive + body-noun: `Roger's left arm`, `her right shoulder`, …
+ *   - `leftward` / `rightward` / `leftmost` / `rightmost`
+ *
+ * Bare `left` and `right` outside these contexts are left alone, so verbs and
+ * idioms ("she left", "what was left", "right away", "all right") survive intact.
+ *
+ * Casing is preserved (`LEFT` ↔ `RIGHT`, `Left` ↔ `Right`, `left` ↔ `right`).
+ * Applying the function twice returns the original text.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function mirrorLeftRight(text) {
+  if (!text || typeof text !== 'string') return text;
+
+  // Sentinels avoid the "left → right → left" double-swap problem.
+  const SL = '';
+  const SR = '';
+
+  const tagWord = (m) => {
+    const lower = m.toLowerCase();
+    const sentinel = lower === 'left' ? SL : SR;
+    if (m === m.toUpperCase()) return sentinel + 'U';
+    if (m[0] === m[0].toUpperCase()) return sentinel + 'C';
+    return sentinel;
+  };
+
+  const POSITIONAL_NOUN = '(?:foreground|midground|background|side|half|edge|hand|flank|margin|band|strip|corner|portion|section|column|wall|panel|profile|cheek|shoulder)';
+  const BODY_NOUN = '(?:hand|arm|leg|foot|feet|shoulder|knee|hip|cheek|eye|ear|side|profile|fist|wrist|elbow|ankle|finger|thumb|toe|temple)';
+
+  const directionalRegexes = [
+    // (upper|lower|top|bottom|far|center|mid|extreme) [-space] left/right
+    /(?<=\b(?:upper|lower|top|bottom|far|center|centre|mid|middle|extreme)[-\s])(left|right)\b/gi,
+    // left/right [-space] positional-noun
+    new RegExp(`\\b(left|right)(?=[-\\s]${POSITIONAL_NOUN}\\b)`, 'gi'),
+    // (to|on|from|at|toward|along|across|into|past) [the] left/right
+    /(?<=\b(?:to|on|from|at|toward|towards|along|across|into|past)\s+(?:the\s+)?)(left|right)\b/gi,
+    // visual-verb (+ optional preposition) + left/right
+    /(?<=\b(?:looks?|looking|looked|faces?|facing|faced|aims?|aiming|aimed|points?|pointing|pointed|turns?|turning|turned|gazes?|gazing|gazed|peers?|peering|peered|leans?|leaning|leaned|tilts?|tilting|tilted|sights?|sighting|sighted|veers?|veering|veered|swerves?|swerving|swerved|drifts?|drifting|drifted|shifts?|shifting|shifted|steps?|stepping|stepped|walks?|walking|walked|runs?|running|ran|moves?|moving|moved|crouches?|crouching|crouched)\s+(?:to\s+the\s+|at\s+|toward(?:s)?\s+(?:the\s+)?)?)(left|right)\b/gi,
+    // possessive + left/right + body-noun
+    new RegExp(`(?<=\\b\\w+'s\\s+)(left|right)(?=\\s+${BODY_NOUN}\\b)`, 'gi'),
+    // -ward / -wards / -most
+    /\b(left|right)(?=(?:ward|wards|most)\b)/gi,
+  ];
+
+  let out = text;
+  for (const re of directionalRegexes) {
+    out = out.replace(re, tagWord);
+  }
+  // Resolve sentinels: `left` was tagged SL → becomes "right"; `right` was tagged SR → becomes "left".
+  out = out.replace(new RegExp(SL + 'U', 'g'), 'RIGHT');
+  out = out.replace(new RegExp(SR + 'U', 'g'), 'LEFT');
+  out = out.replace(new RegExp(SL + 'C', 'g'), 'Right');
+  out = out.replace(new RegExp(SR + 'C', 'g'), 'Left');
+  out = out.replace(new RegExp(SL, 'g'), 'right');
+  out = out.replace(new RegExp(SR, 'g'), 'left');
+  return out;
+}
+
+/**
  * Build the calm-zone paragraph that gets injected into image prompts.
  * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
  * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
@@ -5196,6 +5269,7 @@ module.exports = {
 
   // Text position
   enforceSpreadTextPosition,
+  mirrorLeftRight,
   buildCharacterDescriptionsForBbox,
   buildTextZoneInstruction,
   buildEraGuard,

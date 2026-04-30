@@ -4563,6 +4563,48 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Helper function to prepare page data without generation (for later use by pipeline)
       const preparePageData = async (scene, index) => {
         const pageNum = scene.pageNumber;
+
+        // Spread-parity flip: when Sonnet picks a textPosition on the wrong
+        // side for the spread (odd=left / even=right), enforceSpreadTextPosition
+        // flips the corner. The prose Sonnet wrote — character positions, path
+        // direction, vanishing-point references, "upper-X corner" surfaces —
+        // was anchored to the original side, so the empty scene and page image
+        // would receive a calm-zone instruction on one side and geometry
+        // pointing at the other. Mirror left↔right in the prose + emptyScene
+        // prompt so both renderers see side-consistent geometry.
+        //
+        // mirrorLeftRight only swaps directional uses of left/right (compound
+        // corners, positional-noun followers, prepositional, visual-verb
+        // contexts, possessive + body-noun) — bare verb/idiom uses ("she left",
+        // "what was left", "right away") are preserved.
+        try {
+          const { mirrorLeftRight } = require('./server/lib/storyHelpers');
+          const sonnetMeta = extractSceneMetadata(scene.sceneDescription);
+          const sonnetTP = sonnetMeta?.textPosition || null;
+          const correctedTP = enforceSpreadTextPosition(sonnetTP, pageNum);
+          if (sonnetTP && correctedTP && sonnetTP !== correctedTP) {
+            log.warn(`🪞 [SIDE-MIRROR] Page ${pageNum}: textPosition ${sonnetTP} → ${correctedTP}; mirroring left↔right in scene prose + emptyScenePrompt`);
+            scene.sceneDescription = mirrorLeftRight(scene.sceneDescription);
+            // The mirror flips textPosition inside the metadata block too
+            // (e.g. "top-left" → "top-right"). That's actually what we want
+            // since the corrected value matches, but be defensive: stamp the
+            // corrected value back in case the metadata had a different shape.
+            scene.sceneDescription = scene.sceneDescription.replace(
+              /("textPosition"\s*:\s*")(top-left|top-right|bottom-left|bottom-right|top-full|bottom-full)(")/g,
+              `$1${correctedTP}$3`
+            );
+            if (scene.emptyScenePrompt) scene.emptyScenePrompt = mirrorLeftRight(scene.emptyScenePrompt);
+            if (scene.sceneHint && typeof scene.sceneHint === 'string' && scene.sceneHint.includes('emptyScenePrompt')) {
+              scene.sceneHint = mirrorLeftRight(scene.sceneHint).replace(
+                /("textPosition"\s*:\s*")(top-left|top-right|bottom-left|bottom-right|top-full|bottom-full)(")/g,
+                `$1${correctedTP}$3`
+              );
+            }
+          }
+        } catch (err) {
+          log.warn(`[SIDE-MIRROR] Page ${pageNum}: mirror step failed, continuing without flip — ${err.message}`);
+        }
+
         const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
