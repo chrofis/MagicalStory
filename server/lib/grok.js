@@ -321,7 +321,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
           log.warn(`⚠️ [GROK] Output aspect drift: ${outMeta.width}x${outMeta.height} (ratio ${outRatio.toFixed(3)}) vs requested ${aspectRatio} (ratio ${targetRatio.toFixed(3)}) — center-cropping to ${targetW}x${targetH}`);
           const cropped = await sharp(outBuf)
             .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
-            .jpeg({ quality: 90 })
+            .jpeg({ quality: 95 })
             .toBuffer();
           imageData = `data:image/jpeg;base64,${cropped.toString('base64')}`;
           log.info(`🎨 [GROK] Output corrected: ${outMeta.width}x${outMeta.height} → ${targetW}x${targetH} (cover-crop)`);
