@@ -1,17 +1,17 @@
-Inpaint task: paint {charName} into this children's book illustration. Magenta marks (at the {regionDesc}) show the region to repaint — crosshatch over the body, solid block over the face. A cyan outline traces the EXACT silhouette {charName} must occupy.{actionContext}
+Inpaint task: paint {charName} into this children's book illustration. A solid BLUE shape (at the {regionDesc}) marks the EXACT silhouette {charName} must occupy — head, shoulders, arms, legs, feet all live inside the blue. A magenta crosshatch surrounds the blue and shows the rectangular region being repainted.{actionContext}
 
-The cyan outline is the figure's exact size and shape. Paint {charName} so the body fills the cyan outline edge-to-edge. Do not paint outside the cyan outline. Do not paint a smaller figure floating inside the cyan outline. Match the silhouette precisely — head, shoulders, arms, legs, feet all land on the cyan line.
+The figure must stay within the blue. Paint {charName} so the body fills the blue edge-to-edge — same exact size, same exact shape. Do not paint outside the blue. Do not paint a smaller figure floating inside the blue. Do not paint a bigger figure that overflows the blue. Match the silhouette precisely.
 
 CRITICAL — match the action above exactly. The repainted figure must be DOING what the scene calls for, with the right expression and gaze. Never default to "standing still and smiling at the camera". Do not face the camera unless the original was facing the camera.
 
-For the face: it is fully blocked by the solid magenta. Invent a new face from the reference photo — match the face shape, eyes, nose, mouth, hair, and skin tone exactly.
+Invent the face from the reference photo — match the face shape, eyes, nose, mouth, hair, and skin tone exactly. The face lands at the top of the blue silhouette.
 
-For the body: keep the original pose, body language, hand positions, and held items — infer these from the figure faintly visible through the crosshatch and from the action description above.
+Keep the original pose, body language, hand positions, and held items — infer these from the silhouette shape and from the action description above.
 
-PRESERVE THE FRAMING. Do not zoom in or crop. {charName} occupies the same area of the frame in the output as the cyan outline in the input. Buildings, cobblestones, lampposts, and other background stay in the same positions.
+PRESERVE THE FRAMING. Do not zoom in or crop. {charName} occupies the same area of the frame in the output as the blue silhouette in the input. Buildings, cobblestones, lampposts, and other background stay in the same positions.
 
-Only ONE figure should appear inside the cyan outline. If a partial figure pokes outside the marks, absorb it into {charName} — do not paint a second character.
+Only ONE figure should appear inside the blue. If a partial figure pokes outside the blue, absorb it into {charName} — do not paint a second character.
 
-Background outside the cyan outline stays the same. Other characters outside the cyan outline stay unchanged — same faces, same clothing, same poses, same positions. Do not touch a single pixel outside the cyan outline.
+Pixels outside the blue stay unchanged. The magenta crosshatch around the blue should become normal background. Other characters in the scene stay unchanged — same faces, same clothing, same poses, same positions. Do not touch a single pixel outside the blue silhouette except to clear the magenta crosshatch back to background.
 
 Match the art style of the surrounding illustration exactly — same brush technique, same level of stylization, same color palette. Do not push toward photorealism, anime, or cartoon.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}

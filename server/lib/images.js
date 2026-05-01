@@ -3510,6 +3510,19 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           : MODEL_DEFAULTS.pageAspect);
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
+    // Truncate to Grok's prompt-length cap BEFORE the API call. Without this,
+    // iterate-mode prompts with appended feedback bullets cross 8000 chars
+    // and fail with `Prompt length exceeds the maximum allowed length of 8000`,
+    // forcing a fallback to Gemini. The Gemini-path code at line ~3785 already
+    // truncates, but only AFTER Grok has already failed.
+    const grokModelKey = imageModelOverride || (imageModelOverride === 'grok-imagine-pro' ? 'grok-imagine-pro' : 'grok-imagine');
+    const grokMaxPrompt = IMAGE_MODELS[grokModelKey]?.maxPromptLength || 7500;
+    let grokPrompt = prompt;
+    if (prompt.length > grokMaxPrompt) {
+      log.warn(`✂️ [IMAGE GEN] Prompt too long (${prompt.length} chars), truncating to ${grokMaxPrompt} for ${grokModel}`);
+      grokPrompt = prompt.substring(0, grokMaxPrompt - 3) + '...';
+    }
+
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
@@ -3518,9 +3531,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, { model: grokModel, aspectRatio: grokAspect });
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect });
       } else {
-        result = await generateWithGrok(prompt, { model: grokModel, aspectRatio: grokAspect });
+        result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
       }
 
       // Call onImageReady callback for progressive display
@@ -4251,6 +4264,15 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // generateImageOnly is only used for page regeneration, so always STANDARD
     log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend (model: ${GROK_MODELS.STANDARD})`);
 
+    // Truncate to Grok's prompt-length cap before the API call (see note at the
+    // matching block in callGeminiAPIForImage's Grok branch).
+    const grokMaxPrompt = IMAGE_MODELS['grok-imagine']?.maxPromptLength || 7500;
+    let grokPrompt = prompt;
+    if (prompt.length > grokMaxPrompt) {
+      log.warn(`✂️ [IMAGE GEN-ONLY] Prompt too long (${prompt.length} chars), truncating to ${grokMaxPrompt} for ${GROK_MODELS.STANDARD}`);
+      grokPrompt = prompt.substring(0, grokMaxPrompt - 3) + '...';
+    }
+
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
@@ -4259,9 +4281,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio });
+        result = await editWithGrok(grokPrompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio });
       } else {
-        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio });
+        result = await generateWithGrok(grokPrompt, { model: GROK_MODELS.STANDARD, aspectRatio });
       }
 
       if (onImageReady && result.imageData) {
@@ -8867,73 +8889,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
       .png().toBuffer();
 
-    // Step 4 — solid magenta block over the face. Use options.faceBbox if
-    // provided (entity consistency passes one when face detection ran);
-    // otherwise heuristic = top 22% of body, narrower than full body width.
-    let faceLeft, faceTop, faceWidth, faceHeight;
-    const faceBboxOpt = options.faceBbox;
-    if (Array.isArray(faceBboxOpt) && faceBboxOpt.length === 4
-        && faceBboxOpt.every(v => v != null && !isNaN(v) && v >= 0 && v <= 1)) {
-      const [fy0, fx0, fy1, fx1] = faceBboxOpt;
-      faceLeft   = Math.floor(fx0 * sceneMeta.width) + padLeft;
-      faceTop    = Math.floor(fy0 * sceneMeta.height) + padTop;
-      faceWidth  = Math.max(1, Math.ceil((fx1 - fx0) * sceneMeta.width));
-      faceHeight = Math.max(1, Math.ceil((fy1 - fy0) * sceneMeta.height));
-    } else {
-      const headFraction = 0.22;
-      const headWidthFraction = 0.60;
-      faceHeight = Math.round(figHeight * headFraction);
-      faceWidth  = Math.round(figWidth * headWidthFraction);
-      faceTop    = figTop;
-      faceLeft   = figLeft + Math.round((figWidth - faceWidth) / 2);
-    }
-    // Pad ~10% so ears/jawline are covered too.
-    const facePad = Math.round(Math.min(faceWidth, faceHeight) * 0.10);
-    faceLeft = Math.max(0, faceLeft - facePad);
-    faceTop  = Math.max(0, faceTop - facePad);
-    let faceRight  = Math.min(paddedW, faceLeft + faceWidth + facePad * 2);
-    let faceBottom = Math.min(paddedH, faceTop + faceHeight + facePad * 2);
-
-    // Clamp the face block to be 10% smaller than the (post-midpoint-split)
-    // hatch box on each axis — i.e. inset 5% from every hatch edge. Without
-    // this, a face bbox that came in wider than the body (or a midpoint-
-    // split hatch that contracted while the face stayed put) leaves the
-    // solid magenta block sticking out past the body crosshatch into the
-    // neighbour's territory.
-    const FACE_INSET = 0.05;
-    const insetX = Math.round(hatchWidth  * FACE_INSET);
-    const insetY = Math.round(hatchHeight * FACE_INSET);
-    const faceMinLeft   = hatchLeft   + insetX;
-    const faceMaxRight  = hatchRight  - insetX;
-    const faceMinTop    = hatchTop    + insetY;
-    const faceMaxBottom = hatchBottom - insetY;
-    if (faceMaxRight > faceMinLeft && faceMaxBottom > faceMinTop) {
-      faceLeft   = Math.max(faceLeft,   faceMinLeft);
-      faceTop    = Math.max(faceTop,    faceMinTop);
-      faceRight  = Math.min(faceRight,  faceMaxRight);
-      faceBottom = Math.min(faceBottom, faceMaxBottom);
-    }
-
-    faceWidth  = Math.max(1, faceRight - faceLeft);
-    faceHeight = Math.max(1, faceBottom - faceTop);
-    const solidFace = await sharp({
-      create: { width: faceWidth, height: faceHeight, channels: 3, background: HATCH_COLOR },
-    }).png().toBuffer();
-
-    // Step 4b — silhouette outline overlay. Crop the (pre-mask) scene to the
-    // hatch box, send to the Python service which runs rembg → morphological
-    // gradient → returns a transparent PNG with only the figure's edge in
-    // cyan. We then composite that edge ON TOP of the magenta marks. The
-    // model now has TWO signals:
-    //   - magenta crosshatch / face block = "repaint this region"
-    //   - cyan outline                    = "the figure must fit EXACTLY
-    //                                        inside this shape — no bigger,
-    //                                        no smaller"
-    // Without the outline Aurora consistently scaled the repainted figure
-    // up to comfortably fill the rectangle; with it the silhouette is a
-    // hard visual constraint.
-    let edgeOverlayBuf = null;
-    let edgePixels = 0;
+    // Step 4 — silhouette FILL overlay. Crop the (pre-mask) scene to the
+    // hatch box, send to the Python service which runs rembg → returns a
+    // transparent PNG with the figure's interior filled solid blue. We
+    // composite that ON TOP of the magenta crosshatch. The model sees two
+    // signals:
+    //   - magenta crosshatch = "this rectangular region is being repainted"
+    //   - solid blue fill    = "the figure must stay EXACTLY inside this
+    //                            shape — no bigger, no smaller, no leaks"
+    // The solid magenta face block is gone — the blue fill already covers
+    // the face area, and we don't need a second face-only signal.
+    let fillOverlayBuf = null;
+    let fillPixels = 0;
     try {
       const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
       const hatchCrop = await sharp(paddedScene)
@@ -8944,39 +8911,38 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: `data:image/jpeg;base64,${hatchCrop.toString('base64')}`,
-          thickness: 3,
-          color: [0, 255, 255], // cyan — complementary to magenta
+          color: [0, 200, 255], // bright blue — complementary to magenta
+          alpha: 255,
         }),
         signal: AbortSignal.timeout(15_000),
       });
       if (edgeRes.ok) {
         const edgeJson = await edgeRes.json();
         if (edgeJson?.success && edgeJson.image) {
-          edgePixels = edgeJson.edge_pixels || 0;
+          fillPixels = edgeJson.fill_pixels || edgeJson.edge_pixels || 0;
           const m = edgeJson.image.match(/^data:image\/\w+;base64,(.+)$/);
-          if (m) edgeOverlayBuf = Buffer.from(m[1], 'base64');
+          if (m) fillOverlayBuf = Buffer.from(m[1], 'base64');
         }
       } else {
         log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge endpoint returned ${edgeRes.status}`);
       }
     } catch (edgeErr) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — proceeding without outline`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — proceeding without fill`);
     }
 
-    // Composite: hatch + face block + (optional) cyan silhouette outline.
+    // Composite: crosshatch + (optional) blue silhouette fill. No face block.
     const composites = [
       { input: hatchRegion, top: hatchTop, left: hatchLeft },
-      { input: solidFace,   top: faceTop,  left: faceLeft  },
     ];
-    if (edgeOverlayBuf) {
-      composites.push({ input: edgeOverlayBuf, top: hatchTop, left: hatchLeft });
+    if (fillOverlayBuf) {
+      composites.push({ input: fillOverlayBuf, top: hatchTop, left: hatchLeft });
     }
     const masked = await sharp(paddedScene)
       .composite(composites)
       .png()
       .toBuffer();
 
-    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); face block ${faceWidth}x${faceHeight} @ (${faceLeft},${faceTop}); silhouette outline ${edgeOverlayBuf ? `${edgePixels}px` : 'OFF'}`);
+    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); silhouette fill ${fillOverlayBuf ? `${fillPixels}px` : 'OFF'}`);
 
     // Step 5 — build action context (expression / pose / gaze / holding).
     // This is what stops repaired characters defaulting to "smiling at the

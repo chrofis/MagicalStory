@@ -1224,23 +1224,23 @@ def remove_bg_endpoint():
 @app.route('/silhouette-edge', methods=['POST'])
 def silhouette_edge_endpoint():
     """
-    Run rembg on the input crop, return a transparent PNG with only the
-    figure's silhouette OUTLINE drawn in the requested colour. Used by the
-    char-repair-inpaint pipeline to overlay an exact-shape boundary on top
-    of the magenta crosshatch — gives the image model a hard size signal
+    Run rembg on the input crop, return a transparent PNG with the figure's
+    silhouette filled in the requested colour. Used by the char-repair-
+    inpaint pipeline to overlay a hard exact-shape signal on top of the
+    magenta crosshatch — gives the image model an unambiguous fill region
     so it stops scaling the repainted figure up.
 
     Expected JSON:
     {
         "image": "data:image/jpeg;base64,...",  # crop of the scene where the figure sits
-        "thickness": 2,                          # outline thickness in pixels (default 2)
-        "color": [0, 255, 255]                   # outline RGB; default cyan (complementary to magenta crosshatch)
+        "color": [0, 200, 255],                 # fill RGB; default bright blue (complementary to magenta)
+        "alpha": 255                            # fill alpha 0–255 (default 255 = solid)
     }
 
     Returns:
     {
         "success": true,
-        "image": "data:image/png;base64,..."     # transparent PNG, same dims as input, only edge pixels filled
+        "image": "data:image/png;base64,..."     # transparent PNG, same dims as input, silhouette interior filled
     }
     """
     try:
@@ -1249,12 +1249,12 @@ def silhouette_edge_endpoint():
             return jsonify({"success": False, "error": "No image provided"}), 400
 
         image_data = data['image']
-        thickness = max(1, int(data.get('thickness', 2)))
-        color_rgb = data.get('color', [0, 255, 255])
+        color_rgb = data.get('color', [0, 200, 255])
         if not (isinstance(color_rgb, list) and len(color_rgb) == 3):
-            color_rgb = [0, 255, 255]
+            color_rgb = [0, 200, 255]
         # OpenCV is BGR
         color_bgr = (int(color_rgb[2]), int(color_rgb[1]), int(color_rgb[0]))
+        alpha = max(0, min(255, int(data.get('alpha', 255))))
 
         if ',' in image_data:
             image_data = image_data.split(',')[1]
@@ -1269,26 +1269,22 @@ def silhouette_edge_endpoint():
         if mask is None:
             return jsonify({"success": False, "error": "Background removal failed"}), 500
 
-        # Binary mask
-        binary = (mask > 128).astype(np.uint8) * 255
+        # Binary silhouette mask
+        binary = (mask > 128)
 
-        # Morphological gradient = dilate - erode → exact boundary band of `thickness` px
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (thickness * 2 + 1, thickness * 2 + 1))
-        edge = cv2.morphologyEx(binary, cv2.MORPH_GRADIENT, kernel)
-
-        # Build transparent BGRA: edge pixels = solid color, everything else = (0,0,0,0)
+        # Build transparent BGRA: silhouette interior = solid color at requested alpha,
+        # background = (0,0,0,0)
         out = np.zeros((h, w, 4), dtype=np.uint8)
-        edge_mask = edge > 0
-        out[edge_mask, 0] = color_bgr[0]
-        out[edge_mask, 1] = color_bgr[1]
-        out[edge_mask, 2] = color_bgr[2]
-        out[edge_mask, 3] = 255
+        out[binary, 0] = color_bgr[0]
+        out[binary, 1] = color_bgr[1]
+        out[binary, 2] = color_bgr[2]
+        out[binary, 3] = alpha
 
         _, buffer = cv2.imencode('.png', out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
         result_b64 = f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}"
-        edge_pixels = int(edge_mask.sum())
-        print(f"[SILHOUETTE-EDGE] {w}x{h} crop, thickness={thickness}, edge px={edge_pixels}, out={len(buffer)//1024}KB")
-        return jsonify({"success": True, "image": result_b64, "edge_pixels": edge_pixels})
+        fill_pixels = int(binary.sum())
+        print(f"[SILHOUETTE-EDGE] {w}x{h} crop, fill px={fill_pixels}, alpha={alpha}, out={len(buffer)//1024}KB")
+        return jsonify({"success": True, "image": result_b64, "edge_pixels": fill_pixels, "fill_pixels": fill_pixels})
 
     except Exception as e:
         print(f"[SILHOUETTE-EDGE] Error: {e}")
