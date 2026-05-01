@@ -9016,20 +9016,62 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Step 8 — keep Grok's native output dims AND its native bytes.
+    // Step 8 — preserve untouched pixels.
     //
-    // Why no rescale: Grok's edit endpoint always outputs at its standard ~1k
-    // raster for the requested aspect (e.g. 896×1280 for 3:4, 1024×1024 for
-    // 1:1). Resizing back to source dims would downsample the cleanest pixels
-    // we ever get.
+    // Aurora is autoregressive: even with a tight inpaint mask in the input,
+    // it re-renders the entire scene, which re-quantises colours, shifts
+    // saturation, and touches every pixel — visibly degrading the other
+    // characters and background. We only want the silhouette area to change.
     //
-    // Why no re-encode: this version becomes the input to the NEXT inpaint
-    // round. Each JPEG decode/re-encode strips high-frequency detail; over
-    // 2-3 rounds Laplacian variance dropped ~50% (HAR analysis 2026-04-30).
-    // Pass Grok's bytes through verbatim. Mime is sniffed from magic bytes so
-    // downstream consumers (frontend <img>, R2 cache, PDF renderer) get the
-    // correct content type.
-    const finalBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    // Solution: feather-composite Grok's output over the ORIGINAL scene
+    // using the silhouette mask. Outside the silhouette = original pixels,
+    // pixel-perfect. Inside = Grok's repaint, with a small feather at the
+    // boundary to hide the seam.
+    //
+    // Trade-off: we have to resize Grok's output (typically 896×1280 for 3:4)
+    // back to source dims (e.g. 880×1168). That's a ~2% linear downsample of
+    // the silhouette region only — losing a tiny bit of detail there is far
+    // cheaper than letting Aurora touch every other pixel in the frame.
+    const grokRawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    let finalBuf;
+    if (silhouetteMaskBuf) {
+      // Resize Grok output to source dims, then mask-composite.
+      const grokAtSourceDims = await sharp(grokRawBuf)
+        .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill', kernel: 'lanczos3' })
+        .png()
+        .toBuffer();
+      // Build a feathered single-channel mask at scene dims:
+      //   alpha = 255 inside silhouette, 0 outside, blurred at the boundary.
+      const FEATHER_PX = 6;
+      const silMeta = await sharp(silhouetteMaskBuf).metadata();
+      const silAlphaRaw = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
+      const featheredMask = await sharp({
+        create: { width: sceneMeta.width, height: sceneMeta.height, channels: 1, background: { r: 0, g: 0, b: 0 } },
+      })
+        .composite([{
+          input: silAlphaRaw,
+          raw: { width: silMeta.width, height: silMeta.height, channels: 1 },
+          top: hatchTop,
+          left: hatchLeft,
+        }])
+        .blur(FEATHER_PX)
+        .png()
+        .toBuffer();
+      // Attach the feathered mask as the alpha of Grok's image, then composite over the original.
+      const grokWithAlpha = await sharp(grokAtSourceDims)
+        .removeAlpha()
+        .joinChannel(featheredMask)
+        .png()
+        .toBuffer();
+      finalBuf = await sharp(sceneBuffer)
+        .composite([{ input: grokWithAlpha, top: 0, left: 0, blend: 'over' }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      log.info(`👤 [CHAR REPAIR GROK] Mask-composite: Grok output blended over original at silhouette only (feather ${FEATHER_PX}px)`);
+    } else {
+      // No silhouette mask → fall back to Grok's raw bytes verbatim (legacy behaviour).
+      finalBuf = grokRawBuf;
+    }
     const isPng = finalBuf[0] === 0x89 && finalBuf[1] === 0x50 && finalBuf[2] === 0x4e && finalBuf[3] === 0x47;
     const finalMime = isPng ? 'image/png' : 'image/jpeg';
 

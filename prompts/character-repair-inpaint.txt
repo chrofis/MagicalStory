@@ -2,4 +2,4 @@ Replace the figure under the magenta crosshatch with {charName} from the referen
 
 Face: match the reference photo (face shape, eyes, hair, skin tone).
 
-Pixels outside the crosshatch stay unchanged.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
+Every pixel outside the crosshatch is final — copy the input image verbatim. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
