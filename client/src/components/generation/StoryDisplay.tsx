@@ -1856,24 +1856,42 @@ export function StoryDisplay({
               disabled={(reviewPrompt && previewPromptPage === pageNum) || isPreviewingPrompt}
               onClick={async () => {
                 if (reviewPrompt) {
-                  setIsPreviewingPrompt(true);
-                  try {
-                    const result = await storyService.iteratePage(storyId!, pageNum, improveImageModel || undefined, {
-                      sceneModel: improveSceneModel || undefined,
-                      useOriginalAsReference: iterateMode === 'reference',
-                      blackoutIssues: iterateMode === 'blackout',
-                      previewOnly: true,
-                      referenceMode: iterateReferenceMode === 'inherit' ? undefined : iterateReferenceMode,
-                      singlePassScene: iterateSinglePassScene === 'inherit' ? undefined : iterateSinglePassScene === 'on',
-                    });
-                    if (result.previewOnly && result.imagePrompt) {
-                      setPreviewPromptText(result.imagePrompt);
-                      setPreviewPromptPage(pageNum);
+                  // Fast path: use the saved prompt that's already in local state.
+                  // No vision call, no Claude re-expansion, no API round-trip —
+                  // the prompt that produced the original image is right here.
+                  const savedPrompt = pageNum < 0
+                    ? (() => {
+                        const map: Record<number, 'frontCover' | 'initialPage' | 'backCover'> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                        const k = map[pageNum];
+                        const c = k && coverImages ? coverImages[k] : null;
+                        return c?.prompt || '';
+                      })()
+                    : (sceneImages.find(s => s.pageNumber === pageNum)?.prompt || '');
+                  if (savedPrompt) {
+                    setPreviewPromptText(savedPrompt);
+                    setPreviewPromptPage(pageNum);
+                  } else {
+                    // No saved prompt (legacy stories) — fall back to the slow
+                    // API path that rebuilds it via iteratePageCore.
+                    setIsPreviewingPrompt(true);
+                    try {
+                      const result = await storyService.iteratePage(storyId!, pageNum, improveImageModel || undefined, {
+                        sceneModel: improveSceneModel || undefined,
+                        useOriginalAsReference: iterateMode === 'reference',
+                        blackoutIssues: iterateMode === 'blackout',
+                        previewOnly: true,
+                        referenceMode: iterateReferenceMode === 'inherit' ? undefined : iterateReferenceMode,
+                        singlePassScene: iterateSinglePassScene === 'inherit' ? undefined : iterateSinglePassScene === 'on',
+                      });
+                      if (result.previewOnly && result.imagePrompt) {
+                        setPreviewPromptText(result.imagePrompt);
+                        setPreviewPromptPage(pageNum);
+                      }
+                    } catch (err) {
+                      console.error('Failed to preview prompt:', err);
+                    } finally {
+                      setIsPreviewingPrompt(false);
                     }
-                  } catch (err) {
-                    console.error('Failed to preview prompt:', err);
-                  } finally {
-                    setIsPreviewingPrompt(false);
                   }
                 } else {
                   handleIteratePage(pageNum, {
