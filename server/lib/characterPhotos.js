@@ -204,6 +204,78 @@ async function loadVbReferenceBytes(vbEntry) {
   return _getOrFetch(vbEntry.referenceImageUrl);
 }
 
+/**
+ * Normalize an avatars object for API responses.
+ *
+ * The DB stores R2 URLs in `*Url` siblings (`standardUrl`, `summerUrl`,
+ * `winterUrl`, `faceThumbnailsUrl`, `bodyThumbnailsUrl`) while the primary
+ * fields (`standard`, `summer`, `winter`, `faceThumbnails`, `bodyThumbnails`)
+ * are nulled out post-Phase-5. The frontend's contract is "avatars.standard
+ * is an image src string". This helper coalesces the URL siblings into the
+ * primary fields and strips the `*Url` keys so the response has one obvious
+ * source of truth per slot. Inline base64 (legacy rows) is kept as the
+ * fallback when no URL exists.
+ *
+ * Also normalizes styled-avatar slots that the Phase 1e backfill turned
+ * into `{imageUrl, imageData: null}` objects, collapsing them to a string.
+ */
+function normalizeAvatarsForResponse(avatars) {
+  if (!avatars || typeof avatars !== 'object') return avatars;
+  const out = { ...avatars };
+  for (const slot of ['standard', 'summer', 'winter']) {
+    const url = out[`${slot}Url`];
+    if (url) out[slot] = url;
+    delete out[`${slot}Url`];
+  }
+  for (const kind of ['face', 'body']) {
+    const tk = `${kind}Thumbnails`;
+    const uk = `${kind}ThumbnailsUrl`;
+    const urls = out[uk];
+    if (urls && typeof urls === 'object') {
+      const merged = { ...(out[tk] || {}) };
+      for (const k of Object.keys(urls)) if (urls[k]) merged[k] = urls[k];
+      out[tk] = merged;
+    }
+    delete out[uk];
+  }
+  if (out.styledAvatars && typeof out.styledAvatars === 'object') {
+    const styledOut = {};
+    for (const [artStyle, slots] of Object.entries(out.styledAvatars)) {
+      if (!slots || typeof slots !== 'object') { styledOut[artStyle] = slots; continue; }
+      const slotsOut = {};
+      for (const [slot, v] of Object.entries(slots)) {
+        if (slot === 'costumed' && v && typeof v === 'object') {
+          // Costumed: { costumeName: stringOrObject }
+          const costumed = {};
+          for (const [name, cv] of Object.entries(v)) {
+            costumed[name] = (cv && typeof cv === 'object') ? (cv.imageUrl || cv.imageData || null) : cv;
+          }
+          slotsOut.costumed = costumed;
+        } else if (v && typeof v === 'object') {
+          slotsOut[slot] = v.imageUrl || v.imageData || null;
+        } else {
+          slotsOut[slot] = v;
+        }
+      }
+      styledOut[artStyle] = slotsOut;
+    }
+    out.styledAvatars = styledOut;
+  }
+  return out;
+}
+
+/**
+ * Walk a list of characters and replace each `avatars` with the normalized
+ * shape. Mutates in place.
+ */
+function normalizeCharacterAvatars(characters) {
+  if (!Array.isArray(characters)) return characters;
+  for (const c of characters) {
+    if (c?.avatars) c.avatars = normalizeAvatarsForResponse(c.avatars);
+  }
+  return characters;
+}
+
 module.exports = {
   getPhoto,
   getPrimaryPhoto,
@@ -214,4 +286,6 @@ module.exports = {
   normalizeAllPhotos,
   loadAvatarBytes,
   loadVbReferenceBytes,
+  normalizeAvatarsForResponse,
+  normalizeCharacterAvatars,
 };

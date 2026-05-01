@@ -9,7 +9,7 @@ const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
-const { normalizePhotos, stripLegacyPhotoFields } = require('../lib/characterPhotos');
+const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
@@ -148,6 +148,11 @@ router.get('/', authenticateToken, async (req, res) => {
         console.log(`[Characters] GET - Runtime stripped ${Math.round((preStripSize - postStripSize)/1024)}KB from stale metadata`);
       }
     }
+
+    // Coalesce *Url siblings into the primary slot so the response has one
+    // src per slot. Frontend reads avatars.standard / faceThumbnails.standard
+    // without knowing about the storage shape.
+    normalizeCharacterAvatars(characterData.characters);
 
     // Fire and forget - don't block response for logging
     logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length }).catch(() => {});
@@ -322,11 +327,11 @@ router.get('/:characterId/avatars', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'Character not found' });
       }
 
-      return res.json({ avatars: legacyResult[0].avatars || {} });
+      return res.json({ avatars: normalizeAvatarsForResponse(legacyResult[0].avatars || {}) });
     }
 
     console.log(`[Characters] GET /${characterId}/avatars - Loaded full avatars`);
-    res.json({ avatars: result[0].avatars || {} });
+    res.json({ avatars: normalizeAvatarsForResponse(result[0].avatars || {}) });
   } catch (err) {
     console.error('Error fetching character avatars:', err);
     res.status(500).json({ error: 'Failed to fetch character avatars' });
@@ -371,12 +376,14 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
 
       const legacyChar = legacyResult[0].character;
       expandUserHairOverrideForDisplay(legacyChar);
+      if (legacyChar?.avatars) legacyChar.avatars = normalizeAvatarsForResponse(legacyChar.avatars);
       return res.json({ character: legacyChar });
     }
 
     const char = result[0].character;
     // Normalize legacy photo fields on read (migration helper)
     normalizePhotos(char);
+    if (char?.avatars) char.avatars = normalizeAvatarsForResponse(char.avatars);
     // Spread userHairOverride back to top-level hairLength / hairStyle so the
     // CharacterForm UI can display the user's saved values.
     expandUserHairOverrideForDisplay(char);
