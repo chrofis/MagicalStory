@@ -7000,22 +7000,35 @@ app.get('/shared/:shareToken', async (req, res, next) => {
     const { shareToken } = req.params;
     if (!shareToken || shareToken.length !== 64) return next();
     const { dbQuery, getActiveVersion, getStoryImage } = require('./server/services/database');
+    // Look up the token regardless of is_shared so we can prime the
+    // images.magicalstory.ch preconnect even for private (owner-only)
+    // stories. Only inject the specific cover-URL preload when public —
+    // otherwise we'd leak the R2 path on a private story.
     const rows = await dbQuery(
-      'SELECT id FROM stories WHERE share_token = $1 AND is_shared = true',
+      'SELECT id, is_shared FROM stories WHERE share_token = $1',
       [shareToken]
     );
-    if (rows.length === 0) return next(); // private/missing → fall through to SPA
-    const storyId = rows[0].id;
-    const activeIdx = await getActiveVersion(storyId, 'frontCover');
-    const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
-    const coverUrl = img?.imageUrl;
-    if (!coverUrl) return next();
+    if (rows.length === 0) return next();
+    const { id: storyId, is_shared: isShared } = rows[0];
+
+    let coverUrl = null;
+    let r2Origin = 'https://images.magicalstory.ch'; // safe fallback if cover lookup fails
+    if (isShared) {
+      try {
+        const activeIdx = await getActiveVersion(storyId, 'frontCover');
+        const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
+        if (img?.imageUrl) {
+          coverUrl = img.imageUrl;
+          r2Origin = new URL(coverUrl).origin;
+        }
+      } catch { /* fall through to preconnect-only */ }
+    }
 
     const html = loadIndexHtml();
-    const r2Origin = new URL(coverUrl).origin;
-    const hints =
-      `<link rel="preconnect" href="${r2Origin}" crossorigin>` +
-      `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
+    let hints = `<link rel="preconnect" href="${r2Origin}" crossorigin>`;
+    if (coverUrl) {
+      hints += `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
+    }
     const out = html.replace('</head>', `${hints}</head>`);
     res.set('Cache-Control', 'private, max-age=60');
     res.type('html').send(out);
