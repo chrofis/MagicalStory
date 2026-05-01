@@ -70,17 +70,17 @@ Apply CATASTROPHIC (-5) when ONE OR MORE of these holds:
 - A character is rendered as a fragment that no occlusion can explain (head with no body where no railing/desk/wall is in the way; body with no head; ghostly transparent figure; figure fused into the background).
 - The scene's central declared interaction is geometrically impossible in the image as composed (e.g. character A is supposed to be holding character B's body part, but the rendered distance/angle between them makes it physically unreachable and the contact is not depicted).
 - The narrative beat shown is the wrong moment of the action (image shows the result when the prose describes the attempt, or shows the attempt when the prose describes the resolution — and this is the central beat of the page, not a side detail).
-- A required character named in the SCENE INTENT or DECLARED INTERACTIONS is **entirely absent** from the image (no figure of that character anywhere — not just misplaced or rendered at the wrong scale).
 - A large unrequested geometric shape — white triangle, white wedge, diagonal slash, monochrome panel, blank rectangle — covers a significant portion of the image, breaking the scene composition.
 - Two or more characters are merged into each other (single body with two heads, faces fused, limbs of one extending out of the other).
 
-**Do NOT apply CATASTROPHIC** when the issue is recoverable by repainting one figure within an existing region:
-- A character is present but in the wrong **position**, **depth**, or **scale** (e.g. should be far background but rendered in foreground; should be small but rendered large; should be on the left but appears on the right). These are CRITICAL position/scale issues, not catastrophic — flag them as `position_and_scale` or `composition` issues with their own severity in STEP 4.
-- A character is present but the wrong **identity / age / gender / hair / clothing**. These are CRITICAL character-identity issues, not catastrophic — handled by character repair.
-- A required object is in the wrong place or rendered as the wrong material (apple is purple, tree is a stone pillar). These are MAJOR object issues.
+**Do NOT apply CATASTROPHIC** when the issue is recoverable by repainting one region:
+- A character is present but in the wrong **position**, **depth**, or **scale** (e.g. should be far background but rendered in foreground; should be small but rendered large; should be on the left but appears on the right). CRITICAL position/scale issue, not catastrophic — flag as `position_and_scale` or `composition` in STEP 4.
+- A required character is **entirely absent** from the image. CRITICAL missing-figure issue — inpaint can add a figure to a region just as easily as it can repaint one. Flag as `missing_character` with the target region in the description.
+- A character is present but the wrong **identity / age / gender / hair / clothing**. CRITICAL character-identity issue, not catastrophic — handled by character repair.
+- A required object is in the wrong place or rendered as the wrong material (apple is purple, tree is a stone pillar). MAJOR object issue.
 - A non-central detail is missing (background prop, secondary character pose detail). MINOR/MODERATE.
 
-The reason for the carveout: misplaced or mis-scaled characters CAN be moved with a fresh inpaint pass (mask the old position with background, paint the figure at the new position with the correct scale). Forcing a from-scratch regen for those cases discards a usable image and gambles on Grok ignoring the same depth instruction it ignored the first time. Save CATASTROPHIC for breaks where inpaint genuinely cannot recover (fragment characters, fused bodies, missing characters, giant white wedges).
+The reason for the carveout: any of these cases can be fixed by an inpaint pass — mask the relevant region, paint the corrected figure / object / position. Forcing a from-scratch regen discards a usable image and gambles on Grok ignoring the same instruction it ignored the first time. Save CATASTROPHIC for breaks where inpaint genuinely cannot recover (fragment characters, fused bodies, geometrically impossible interactions, giant white wedges, wrong narrative beat).
 
 If none of the catastrophic triggers hold, do NOT apply CATASTROPHIC. Skip to the detail-level checks below — granular issues belong there with their own severities. CATASTROPHIC is the "this image cannot be published" gate, not a stack-the-deductions shortcut.
 
