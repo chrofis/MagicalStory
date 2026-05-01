@@ -2957,20 +2957,28 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.info(`📊 [AVATAR JOB ${jobId}] Will save token usage: ${JSON.stringify(results.tokenUsage.byModel)}`);
             }
 
-            // Build avatar data for full data column
-            // NOTE: We intentionally DON'T spread old avatars here - we use SQL-level merge below
-            // to avoid race conditions with stale in-memory data
+            // Build avatar data for full data column. URL-only — inline base64
+            // is persisted ONLY when R2 upload failed (so the readers, which
+            // require URL, still have something). Sliced inlines elsewhere
+            // are intermediate results that don't need to land in Postgres.
+            const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
+            const onlyMissingThumbs = (inline, urls) => {
+              if (!inline) return undefined;
+              if (!urls) return inline;
+              const out = {};
+              for (const k of Object.keys(inline)) if (!urls[k]) out[k] = inline[k];
+              return Object.keys(out).length ? out : undefined;
+            };
+            const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
+            const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
             const newAvatarData = {
               status: 'complete',
               generatedAt: new Date().toISOString(),
-              ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
-              ...(results.bodyThumbnails && { bodyThumbnails: results.bodyThumbnails }),
-              ...(results.standard && { standard: results.standard }),
-              ...(results.winter && { winter: results.winter }),
-              ...(results.summer && { summer: results.summer }),
-              // Phase 1 R2 migration: persist Url fields so loadAvatarBytes can
-              // prefer them in Phase 2. Inline base64 above stays for backwards
-              // compat until Phase 4 nulls them out via migration.
+              ...(fbThumbs && { faceThumbnails: fbThumbs }),
+              ...(bbThumbs && { bodyThumbnails: bbThumbs }),
+              ...(onlyIfNoUrl(results.standard, results.standardUrl) && { standard: results.standard }),
+              ...(onlyIfNoUrl(results.winter, results.winterUrl) && { winter: results.winter }),
+              ...(onlyIfNoUrl(results.summer, results.summerUrl) && { summer: results.summer }),
               ...(results.standardUrl && { standardUrl: results.standardUrl }),
               ...(results.winterUrl && { winterUrl: results.winterUrl }),
               ...(results.summerUrl && { summerUrl: results.summerUrl }),
@@ -2979,13 +2987,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               ...(results.clothing && { clothing: results.clothing }),
             };
 
-            // Build lightweight avatar data for metadata column
+            // Lightweight metadata: prefer URL standard slot, fall back to
+            // inline only when R2 had no URL.
+            const stdFace = results.faceThumbnailsUrl?.standard || results.faceThumbnails?.standard;
+            const stdBody = results.bodyThumbnailsUrl?.standard || results.bodyThumbnails?.standard;
             const lightAvatarData = {
               status: 'complete',
               generatedAt: newAvatarData.generatedAt,
               hasFullAvatars: true,
-              faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
-              bodyThumbnails: results.bodyThumbnails?.standard ? { standard: results.bodyThumbnails.standard } : undefined,
+              faceThumbnails: stdFace ? { standard: stdFace } : undefined,
+              bodyThumbnails: stdBody ? { standard: stdBody } : undefined,
               clothing: results.clothing,
             };
 
@@ -4087,25 +4098,43 @@ These corrections OVERRIDE what is visible in the reference photo.
             // Use ATOMIC updates to prevent race conditions with concurrent saves
             // Instead of read-modify-write on entire document, use jsonb_set for each field
 
-            // Build avatar data for full data column (don't spread stale in-memory data)
+            // URL-only writer (Phase 5). Inline base64 only persists when
+            // R2 upload returned no URL — readers expect URL field.
+            const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
+            const onlyMissingThumbs = (inline, urls) => {
+              if (!inline) return undefined;
+              if (!urls) return inline;
+              const out = {};
+              for (const k of Object.keys(inline)) if (!urls[k]) out[k] = inline[k];
+              return Object.keys(out).length ? out : undefined;
+            };
+            const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
+            const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
             const newAvatarData = {
               status: 'complete',
               generatedAt: new Date().toISOString(),
-              ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
-              ...(results.bodyThumbnails && { bodyThumbnails: results.bodyThumbnails }),
-              ...(results.standard && { standard: results.standard }),
-              ...(results.winter && { winter: results.winter }),
-              ...(results.summer && { summer: results.summer }),
+              ...(fbThumbs && { faceThumbnails: fbThumbs }),
+              ...(bbThumbs && { bodyThumbnails: bbThumbs }),
+              ...(onlyIfNoUrl(results.standard, results.standardUrl) && { standard: results.standard }),
+              ...(onlyIfNoUrl(results.winter, results.winterUrl) && { winter: results.winter }),
+              ...(onlyIfNoUrl(results.summer, results.summerUrl) && { summer: results.summer }),
+              ...(results.standardUrl && { standardUrl: results.standardUrl }),
+              ...(results.winterUrl && { winterUrl: results.winterUrl }),
+              ...(results.summerUrl && { summerUrl: results.summerUrl }),
+              ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
+              ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
               ...(results.clothing && { clothing: results.clothing }),
             };
 
-            // Build lightweight avatar data for metadata column
+            // Lightweight metadata: prefer URL standard slot, fall back to inline only when missing.
+            const stdFace = results.faceThumbnailsUrl?.standard || results.faceThumbnails?.standard;
+            const stdBody = results.bodyThumbnailsUrl?.standard || results.bodyThumbnails?.standard;
             const lightAvatarData = {
               status: 'complete',
               generatedAt: newAvatarData.generatedAt,
               hasFullAvatars: true,
-              faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
-              bodyThumbnails: results.bodyThumbnails?.standard ? { standard: results.bodyThumbnails.standard } : undefined,
+              faceThumbnails: stdFace ? { standard: stdFace } : undefined,
+              bodyThumbnails: stdBody ? { standard: stdBody } : undefined,
               clothing: results.clothing,
             };
 

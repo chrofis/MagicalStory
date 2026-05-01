@@ -1738,10 +1738,16 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
   const findAndUpdate = (entries) => {
     for (const entry of entries || []) {
       if (entry.id === elementId) {
-        entry.referenceImageData = referenceImageData;
-        if (referenceImageUrl) entry.referenceImageUrl = referenceImageUrl;
+        // URL-only writer (Phase 5). Inline base64 only persists when R2
+        // upload returned no URL — readers expect referenceImageUrl.
+        if (referenceImageUrl) {
+          entry.referenceImageUrl = referenceImageUrl;
+          entry.referenceImageData = null;
+        } else {
+          entry.referenceImageData = referenceImageData;
+        }
         entry.referenceImageGenerated = true;
-        log.info(`[VISUAL BIBLE] 🖼️ Set reference image for "${entry.name}" [${elementId}]${referenceImageUrl ? ' (+R2 url)' : ''}`);
+        log.info(`[VISUAL BIBLE] 🖼️ Set reference image for "${entry.name}" [${elementId}]${referenceImageUrl ? ' (R2)' : ' (inline fallback — R2 unavailable)'}`);
         return true;
       }
     }
