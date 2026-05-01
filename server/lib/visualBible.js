@@ -1732,15 +1732,16 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
  * @param {string} elementId - Element ID (e.g., CHR001, ART001)
  * @param {string} referenceImageData - Base64 image data
  */
-function updateElementReferenceImage(visualBible, elementId, referenceImageData) {
+function updateElementReferenceImage(visualBible, elementId, referenceImageData, referenceImageUrl = null) {
   if (!visualBible || !elementId || !referenceImageData) return;
 
   const findAndUpdate = (entries) => {
     for (const entry of entries || []) {
       if (entry.id === elementId) {
         entry.referenceImageData = referenceImageData;
+        if (referenceImageUrl) entry.referenceImageUrl = referenceImageUrl;
         entry.referenceImageGenerated = true;
-        log.info(`[VISUAL BIBLE] 🖼️ Set reference image for "${entry.name}" [${elementId}]`);
+        log.info(`[VISUAL BIBLE] 🖼️ Set reference image for "${entry.name}" [${elementId}]${referenceImageUrl ? ' (+R2 url)' : ''}`);
         return true;
       }
     }

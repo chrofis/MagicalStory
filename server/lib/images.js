@@ -12307,8 +12307,12 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     minAppearances = 2,
     maxPerBatch = 4,
     imageModel = null,
-    maxElements = null
+    maxElements = null,
+    storyId = null,    // Phase 1d R2 migration: when present, each reference
+                       // image is uploaded to R2 and the URL is stored on the
+                       // VB entry alongside the inline base64.
   } = options;
+  const { saveVbReferenceToR2 } = storyId ? require('../services/database') : { saveVbReferenceToR2: null };
 
   // Generate reference sheets using whatever image model is configured
   // (same flow for Gemini, Grok, etc.)
@@ -12421,13 +12425,24 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // Split grid into individual references
       const references = await splitGridIntoReferences(gridImageData, batch.length);
 
-      // Update Visual Bible with extracted references
+      // Update Visual Bible with extracted references. When storyId is set,
+      // each reference is also uploaded to R2 in parallel; the URL lands on
+      // the VB entry as referenceImageUrl alongside the inline base64.
+      const r2Uploads = saveVbReferenceToR2
+        ? await Promise.all(batch.map(async (element, i) => {
+            const refImage = references[i];
+            if (!refImage) return { id: element.id, url: null };
+            const url = await saveVbReferenceToR2(storyId, element.id, refImage);
+            return { id: element.id, url };
+          }))
+        : [];
+      const urlById = new Map(r2Uploads.map(({ id, url }) => [id, url]));
       for (let i = 0; i < batch.length; i++) {
         const element = batch[i];
         const refImage = references[i];
 
         if (refImage) {
-          updateElementReferenceImage(visualBible, element.id, `data:image/png;base64,${refImage}`);
+          updateElementReferenceImage(visualBible, element.id, `data:image/png;base64,${refImage}`, urlById.get(element.id) || null);
           generated++;
           processedElements.push({
             id: element.id,

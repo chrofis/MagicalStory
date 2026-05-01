@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery, saveAvatarToR2 } = require('../services/database');
+const { logActivity, dbQuery, saveAvatarToR2, saveAvatarThumbToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
@@ -2533,7 +2533,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       }
     }
 
-    // Extract face/body thumbnails from 2x2 grids — ALL in parallel
+    // Extract face/body thumbnails from 2x2 grids — ALL in parallel.
+    // Each thumbnail is also uploaded to R2 (Phase 1 dual-write) so the
+    // Url fields land alongside the inline base64 in the persisted shape.
     const avatarsWithImages = generatedAvatars.filter(a => a.imageData);
     const splitPromises = avatarsWithImages.map(async ({ category, imageData }) => {
       try {
@@ -2543,11 +2545,25 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             if (!results.faceThumbnails) results.faceThumbnails = {};
             results.faceThumbnails[category] = splitResult.faceThumbnail;
             log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
+            if (job.userId && characterId) {
+              const u = await saveAvatarThumbToR2(job.userId, characterId, 'face', category, splitResult.faceThumbnail);
+              if (u) {
+                if (!results.faceThumbnailsUrl) results.faceThumbnailsUrl = {};
+                results.faceThumbnailsUrl[category] = u;
+              }
+            }
           }
           if (splitResult.quadrants?.bodyFront) {
             if (!results.bodyThumbnails) results.bodyThumbnails = {};
             results.bodyThumbnails[category] = splitResult.quadrants.bodyFront;
             log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} body thumbnail`);
+            if (job.userId && characterId) {
+              const u = await saveAvatarThumbToR2(job.userId, characterId, 'body', category, splitResult.quadrants.bodyFront);
+              if (u) {
+                if (!results.bodyThumbnailsUrl) results.bodyThumbnailsUrl = {};
+                results.bodyThumbnailsUrl[category] = u;
+              }
+            }
           }
         }
       } catch (err) {
@@ -2555,7 +2571,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       }
     });
 
-    // Wait for grid splits (needed for thumbnails the client displays)
+    // Wait for grid splits + R2 thumb uploads (needed for thumbnails the client displays)
     await Promise.all(splitPromises);
 
     // Return thumbnails to client NOW — evaluation + DB save continue in background
@@ -2958,6 +2974,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               ...(results.standardUrl && { standardUrl: results.standardUrl }),
               ...(results.winterUrl && { winterUrl: results.winterUrl }),
               ...(results.summerUrl && { summerUrl: results.summerUrl }),
+              ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
+              ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
               ...(results.clothing && { clothing: results.clothing }),
             };
 
@@ -3647,25 +3665,72 @@ These corrections OVERRIDE what is visible in the reference photo.
     const generationTime = Date.now() - generationStart;
     log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
+    // Phase 1 R2 dual-write — upload main avatars + thumbnails to R2 in
+    // parallel. URL fields land alongside inline base64; readers can prefer
+    // URL once Phase 2 wires loadAvatarBytes. Failure → URL absent, inline
+    // path keeps working unchanged.
+    const r2Uploads = [];
+    if (req.user?.id && validCharacterId) {
+      for (const { category, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
+        if (imageData) {
+          r2Uploads.push(saveAvatarToR2(req.user.id, validCharacterId, category, imageData)
+            .then(url => ({ kind: 'main', category, url })));
+        }
+        if (faceThumbnail) {
+          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'face', category, faceThumbnail)
+            .then(url => ({ kind: 'face', category, url })));
+        }
+        if (bodyThumbnail) {
+          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'body', category, bodyThumbnail)
+            .then(url => ({ kind: 'body', category, url })));
+        }
+      }
+    }
+    const uploadResults = await Promise.all(r2Uploads);
+    const mainUrls = new Map();
+    const faceUrls = new Map();
+    const bodyUrls = new Map();
+    for (const { kind, category, url } of uploadResults) {
+      if (!url) continue;
+      if (kind === 'main') mainUrls.set(category, url);
+      else if (kind === 'face') faceUrls.set(category, url);
+      else if (kind === 'body') bodyUrls.set(category, url);
+    }
+    if (mainUrls.size + faceUrls.size + bodyUrls.size > 0) {
+      log.info(`☁️  [CLOTHING AVATARS] R2 uploaded ${mainUrls.size} main + ${faceUrls.size} face + ${bodyUrls.size} body thumbs`);
+    }
+
     // Store prompts, images, face thumbnails, and body thumbnails
     for (const { category, prompt, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
       if (imageData) {
         // Store original 2x2 grid image (unchanged - used for story generation)
         results[category] = imageData;
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} avatar`);
+        const mainUrl = mainUrls.get(category);
+        if (mainUrl) results[`${category}Url`] = mainUrl;
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} avatar${mainUrl ? ' (+R2 url)' : ''}`);
       }
       // Store face thumbnail separately (for display only)
       if (faceThumbnail) {
         if (!results.faceThumbnails) results.faceThumbnails = {};
         results.faceThumbnails[category] = faceThumbnail;
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} face thumbnail`);
+        const u = faceUrls.get(category);
+        if (u) {
+          if (!results.faceThumbnailsUrl) results.faceThumbnailsUrl = {};
+          results.faceThumbnailsUrl[category] = u;
+        }
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} face thumbnail${u ? ' (+R2 url)' : ''}`);
       }
       // Store body thumbnail separately (for display only)
       if (bodyThumbnail) {
         if (!results.bodyThumbnails) results.bodyThumbnails = {};
         results.bodyThumbnails[category] = bodyThumbnail;
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} body thumbnail`);
+        const u = bodyUrls.get(category);
+        if (u) {
+          if (!results.bodyThumbnailsUrl) results.bodyThumbnailsUrl = {};
+          results.bodyThumbnailsUrl[category] = u;
+        }
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} body thumbnail${u ? ' (+R2 url)' : ''}`);
       }
     }
 
