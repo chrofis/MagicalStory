@@ -6980,6 +6980,51 @@ function resolvePrerenderedFile(routePath, lang) {
   return require('fs').existsSync(filePath) ? filePath : null;
 }
 
+// /shared/:token — intercept HTML response to inject a preload hint for the
+// front cover image. Browser kicks off the R2 fetch during HTML parse (~50 ms
+// post-nav) instead of waiting for React to mount + run the SharedStoryViewer
+// effect (~1.5 s post-nav). Title-page paint moves earlier by ~1+ s without
+// touching React.
+//
+// Index HTML is cached in memory after first read.
+let cachedIndexHtml = null;
+function loadIndexHtml() {
+  if (cachedIndexHtml) return cachedIndexHtml;
+  const fs = require('fs');
+  const indexPath = hasDistFolder ? path.join(distPath, 'index.html') : path.join(__dirname, 'index.html');
+  cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
+  return cachedIndexHtml;
+}
+app.get('/shared/:shareToken', async (req, res, next) => {
+  try {
+    const { shareToken } = req.params;
+    if (!shareToken || shareToken.length !== 64) return next();
+    const { dbQuery, getActiveVersion, getStoryImage } = require('./server/services/database');
+    const rows = await dbQuery(
+      'SELECT id FROM stories WHERE share_token = $1 AND is_shared = true',
+      [shareToken]
+    );
+    if (rows.length === 0) return next(); // private/missing → fall through to SPA
+    const storyId = rows[0].id;
+    const activeIdx = await getActiveVersion(storyId, 'frontCover');
+    const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
+    const coverUrl = img?.imageUrl;
+    if (!coverUrl) return next();
+
+    const html = loadIndexHtml();
+    const r2Origin = new URL(coverUrl).origin;
+    const hints =
+      `<link rel="preconnect" href="${r2Origin}" crossorigin>` +
+      `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
+    const out = html.replace('</head>', `${hints}</head>`);
+    res.set('Cache-Control', 'private, max-age=60');
+    res.type('html').send(out);
+  } catch (err) {
+    if (typeof log !== 'undefined') log.warn(`[shared-preload] inject failed: ${err.message}`);
+    next();
+  }
+});
+
 // SPA fallback — serves pre-rendered HTML for SEO routes, raw index.html for app routes
 app.get('*', (req, res, next) => {
   // Skip API routes

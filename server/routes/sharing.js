@@ -214,6 +214,16 @@ apiRouter.get('/shared/:shareToken/header', async (req, res) => {
     const covers = {};
     for (const t of coverTypes) covers[t] = existing.has(t);
 
+    // Direct R2 URL for the front cover so the client can fetch the image
+    // without the 302 redirect through /api/shared/<token>/cover-image — saves
+    // one round-trip on first paint.
+    let frontCoverUrl = null;
+    if (covers.frontCover) {
+      const activeIdx = await getActiveVersion(row.id, 'frontCover');
+      const img = await getStoryImage(row.id, 'frontCover', null, activeIdx);
+      if (img?.imageUrl) frontCoverUrl = img.imageUrl;
+    }
+
     res.json({
       id: row.id,
       title: row.title,
@@ -222,6 +232,7 @@ apiRouter.get('/shared/:shareToken/header', async (req, res) => {
       layout: row.layout || null,
       pageCount: row.page_count || 0,
       covers,
+      frontCoverUrl,
       isOwner,
       isShared: row.is_shared,
       needsPassword,

@@ -65,6 +65,7 @@ export default function SharedStoryViewer() {
     layout?: { textInImage?: boolean } | null;
     pageCount: number;
     covers: { frontCover?: boolean; initialPage?: boolean; backCover?: boolean };
+    frontCoverUrl?: string | null;
     isOwner: boolean;
     isShared: boolean;
     needsPassword: boolean;
@@ -348,9 +349,13 @@ export default function SharedStoryViewer() {
   // navigation; the BookViewer mounts in place once `story` lands a few
   // seconds later. Stays visually in the same spot to avoid layout shift.
   if (loading && header) {
-    const coverUrl = header.covers.frontCover
-      ? `/api/shared/${shareToken}/cover-image/frontCover${tokenParam}`
-      : null;
+    // Prefer the direct R2 URL from /header — it's the SAME url the HTML
+    // <link rel="preload"> already kicked off, so the browser serves it
+    // from cache instantly. Falls back to the redirect endpoint when the
+    // direct URL isn't available (e.g. legacy stories with image_data
+    // bytes still inline in the JSONB blob).
+    const coverUrl = header.frontCoverUrl
+      || (header.covers.frontCover ? `/api/shared/${shareToken}/cover-image/frontCover${tokenParam}` : null);
     return (
       <div className="h-[100dvh] overflow-hidden bg-white flex flex-col items-center justify-center p-4">
         {coverUrl ? (
