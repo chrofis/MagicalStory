@@ -196,11 +196,27 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
   // editor's old behaviour. /shared/ skips the server-side /s/ handler that
   // gates on is_shared and sends non-authenticated recipients to the landing
   // page.
-  const storyUrl = options.shareToken
-    ? `https://www.magicalstory.ch/shared/${options.shareToken}`
-    : storyId
-    ? `https://www.magicalstory.ch/create?storyId=${storyId}`
-    : 'https://www.magicalstory.ch';
+  //
+  // Signed `?key=` is added so the /shared/<token> HTML handler can
+  // recognise an email-link click and inject the R2 cover preload even
+  // for private (owner-only) stories. The signature is only an HTML-paint
+  // hint — actual story data still requires the owner's JWT. See
+  // server/lib/shareLinkSig.js for the threat model.
+  let storyUrl;
+  if (options.shareToken) {
+    storyUrl = `https://www.magicalstory.ch/shared/${options.shareToken}`;
+    try {
+      const { sign } = require('./server/lib/shareLinkSig');
+      const key = sign(options.shareToken);
+      if (key) storyUrl += `?key=${encodeURIComponent(key)}`;
+    } catch (err) {
+      console.warn('⚠️ [email] could not sign share link, falling back to bare URL:', err.message);
+    }
+  } else if (storyId) {
+    storyUrl = `https://www.magicalstory.ch/create?storyId=${storyId}`;
+  } else {
+    storyUrl = 'https://www.magicalstory.ch';
+  }
 
   // Fill in placeholders
   const values = {

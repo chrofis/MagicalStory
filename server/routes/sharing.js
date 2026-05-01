@@ -755,6 +755,14 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
     // Token-only existence check for the perf hints. Even if OG tags can't
     // be added (private story, anonymous request), we still want to inject
     // preconnect so the eventual cover fetch is faster.
+    // Email links carry a signed ?key=<expiry>.<hmac> that proves the
+    // request originated from one of our outbound emails. Treat valid
+    // signatures as "owner-grade access for HTML preload only" so private
+    // stories also get the cover-URL preload on first paint. Signature
+    // does NOT bypass /api/shared/* auth — that still needs the JWT.
+    const signedKey = typeof req.query.key === 'string' ? req.query.key : null;
+    const linkSigOk = !!signedKey && require('../lib/shareLinkSig').verify(shareToken, signedKey);
+
     let storyId = null;
     let isPublic = false;
     let coverUrl = null;
@@ -766,7 +774,9 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       if (rows.length > 0) {
         storyId = rows[0].id;
         isPublic = !!rows[0].is_shared;
-        if (isPublic) {
+        // Inject the R2 cover URL when the story is public OR when the
+        // request carries a valid signed-link key (email path).
+        if (isPublic || linkSigOk) {
           try {
             const activeIdx = await getActiveVersion(storyId, 'frontCover');
             const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
@@ -776,7 +786,7 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       }
     }
 
-    log.debug(`[SHARED] Story found: ${!!story}, public: ${isPublic}, coverUrl: ${!!coverUrl}, hasDistFolder: ${hasDistFolder}`);
+    log.debug(`[SHARED] Story found: ${!!story}, public: ${isPublic}, signedLink: ${linkSigOk}, coverUrl: ${!!coverUrl}, hasDistFolder: ${hasDistFolder}`);
 
     if (!storyId) {
       // Token unknown — let the SPA shell handle it.
