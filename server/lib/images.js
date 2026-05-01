@@ -6371,16 +6371,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
     log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
 
-    // Run fresh entity consistency AND quality eval in parallel. They're
-    // independent — `evaluateImageBatch` doesn't consume the entity report
-    // (entity penalties are applied later when scores are combined). Running
-    // them sequentially used to add ~90-120s per round; on a 3-round repair
-    // pipeline that was ~5 min of dead serialisation. Step 1 already does the
-    // same Promise.all for the initial pass.
-    let roundEvals = [];
+    // Run fresh entity consistency FIRST (on the latest images including new repairs)
+    // so the new versions get their own entity penalty, not a stale one from the
+    // previous round. Runs every round (including the last) so final-round repairs
+    // also get proper per-version entity data.
     if (roundSuccess.length > 0) {
-      // Build entity check inputs (snapshot of latest images: repaired pages
-      // from this round + best-so-far for pages not touched this round).
+      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency on latest images...`);
+      // Build snapshot of latest images: repaired images from this round + original
+      // best-so-far for pages not touched this round.
       const roundImageMap = new Map(roundSuccess.map(r => [r.pageNumber, r.imageData]));
       const latestImages = rawImages.filter(img => img.imageData).map(img => {
         if (roundImageMap.has(img.pageNumber)) {
@@ -6391,24 +6389,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
       });
       const freshEntityCheckData = buildEntityCheckData(latestImages);
-      const roundEvalInputs = buildEvalInputs(roundSuccess);
-
-      const evalProgressPct = progressBase + 8;
-      await updateProgress(evalProgressPct, `Round ${round}: Evaluating + entity check ${roundSuccess.length} repaired images...`);
-      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency + eval in parallel on ${roundSuccess.length} images...`);
-
-      const [freshEntityResult, evalsResult] = await Promise.allSettled([
-        runEntityConsistencyChecks(freshEntityCheckData, characters, {
+      try {
+        const freshEntity = await runEntityConsistencyChecks(freshEntityCheckData, characters, {
           checkCharacters: true,
           checkObjects: true,
           saveGrids: false,
           onHeartbeat: pingHeartbeat
-        }),
-        evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
-      ]);
-
-      if (freshEntityResult.status === 'fulfilled') {
-        const freshEntity = freshEntityResult.value;
+        });
         if (freshEntity?.tokenUsage && usageTracker) {
           usageTracker('gemini_quality', {
             input_tokens: freshEntity.tokenUsage.inputTokens || 0,
@@ -6417,16 +6404,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
         currentEntityReport = freshEntity;
         log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
-      } else {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${freshEntityResult.reason?.message || freshEntityResult.reason}`);
+      } catch (entityErr) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${entityErr.message}`);
       }
+    }
 
-      if (evalsResult.status === 'fulfilled') {
-        roundEvals = evalsResult.value;
-      } else {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Quality eval failed: ${evalsResult.reason?.message || evalsResult.reason}`);
-        roundEvals = [];
-      }
+    // Evaluate repaired pages using the FRESH entity report.
+    if (roundSuccess.length > 0) {
+      const evalProgressPct = progressBase + 8;
+      await updateProgress(evalProgressPct, `Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
+      log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Evaluating ${roundSuccess.length} repaired images...`);
+
+      const roundEvalInputs = buildEvalInputs(roundSuccess);
+      const roundEvals = await evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
 
       for (const ev of roundEvals) {
         if (ev.usage && usageTracker) {
