@@ -4199,9 +4199,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         continue;
       }
 
-      // Check if character has usable avatar data
+      // Check if character has usable avatar data — Phase 2 accepts either
+      // inline base64 OR an R2 URL on the base standard slot.
       const hasStyledStandard = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
-      const hasBaseStandard = !!character.avatars?.standard;
+      const hasBaseStandard = !!(character.avatars?.standard || character.avatars?.standardUrl);
       if (!hasStyledStandard && !hasBaseStandard) {
         log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing standard avatar, fetching from database...`);
         try {
@@ -4320,7 +4321,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
             } else {
               const clothingCategory = appearance.clothing || 'standard';
-              const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+              const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
               if (!styledAvatar) {
                 log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
@@ -4476,7 +4477,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           const clothingCategory = storedAppearance.clothing || 'standard';
-          const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
           const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';
 

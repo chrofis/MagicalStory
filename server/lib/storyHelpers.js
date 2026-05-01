@@ -2459,7 +2459,31 @@ function parseSceneHintMetadata(sceneHint) {
  * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle = null, clothingRequirements = null) {
+/**
+ * Phase 2 R2 reader helper: pre-load avatar bytes for a list of characters
+ * so the synchronous getCharacterPhotoDetails() can resolve URL-only avatars
+ * by looking up the cache instead of needing await.
+ *
+ * Returns a Map keyed by `${charId}:${slot}` → base64 string (no data: prefix).
+ * Caller should await this BEFORE calling getCharacterPhotoDetails and pass
+ * the result via the optional `avatarBytesCache` parameter.
+ *
+ * @param {Array} characters
+ * @param {string[]} slotsNeeded - default ['standard', 'summer', 'winter']
+ * @returns {Promise<Map<string, string>>}
+ */
+async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = ['standard', 'summer', 'winter']) {
+  const { loadAvatarBytes } = require('./characterPhotos');
+  const cache = new Map();
+  if (!Array.isArray(characters) || characters.length === 0) return cache;
+  await Promise.all(characters.flatMap(c => slotsNeeded.map(async slot => {
+    const bytes = await loadAvatarBytes(c.avatars || c.clothingAvatars || {}, slot);
+    if (bytes) cache.set(`${c.id}:${slot}`, bytes);
+  })));
+  return cache;
+}
+
+function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle = null, clothingRequirements = null, avatarBytesCache = null) {
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
@@ -2583,16 +2607,24 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
       }
       // Fall back to unstyled clothing avatar (standard, winter, summer)
-      else if (resolvedClothing && resolvedClothing !== 'costumed' && avatars && avatars[resolvedClothing]) {
+      // Phase 2 R2 reader: usable when EITHER inline base64 OR R2 URL exists.
+      // When inline is null but cache has bytes (from prefetchAvatarBytesForCharacters),
+      // wrap as data URI so downstream consumers see the same shape as before.
+      else if (resolvedClothing && resolvedClothing !== 'costumed' && avatars &&
+               (avatars[resolvedClothing] || avatars[`${resolvedClothing}Url`] || avatarBytesCache?.has(`${char.id}:${resolvedClothing}`))) {
         photoType = `clothing-${resolvedClothing}`;
         // Handle various legacy formats: arrays, {imageData, clothing} objects
         const avatarData = avatars[resolvedClothing];
         if (Array.isArray(avatarData)) {
           photoUrl = avatarData[0];
-        } else if (typeof avatarData === 'object' && avatarData.imageData) {
+        } else if (typeof avatarData === 'object' && avatarData?.imageData) {
           photoUrl = avatarData.imageData;
-        } else {
+        } else if (avatarData) {
           photoUrl = avatarData;
+        } else {
+          // Inline missing — try the prefetch cache (R2-resolved bytes).
+          const cached = avatarBytesCache?.get(`${char.id}:${resolvedClothing}`);
+          if (cached) photoUrl = `data:image/jpeg;base64,${cached}`;
         }
         actualClothingUsed = resolvedClothing;
         // Get extracted clothing description for this avatar
@@ -2629,18 +2661,23 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       if (!photoUrl && resolvedClothing && avatars) {
         const fallbacks = clothingFallbackOrder[resolvedClothing] || ['standard', 'summer', 'winter'];
 
-        // Check unstyled avatars only (styling applied later via cache)
+        // Check unstyled avatars only (styling applied later via cache).
+        // Phase 2: cache fallback when inline is null but R2 bytes were preloaded.
         for (const fallbackCategory of fallbacks) {
-          if (avatars[fallbackCategory]) {
+          const inlineFallback = avatars[fallbackCategory];
+          const cachedFallback = avatarBytesCache?.get(`${char.id}:${fallbackCategory}`);
+          if (inlineFallback || cachedFallback) {
             photoType = `clothing-${fallbackCategory}`;
             // Handle various legacy formats: arrays, {imageData, clothing} objects
-            const fallbackData = avatars[fallbackCategory];
+            const fallbackData = inlineFallback;
             if (Array.isArray(fallbackData)) {
               photoUrl = fallbackData[0];
-            } else if (typeof fallbackData === 'object' && fallbackData.imageData) {
+            } else if (typeof fallbackData === 'object' && fallbackData?.imageData) {
               photoUrl = fallbackData.imageData;
-            } else {
+            } else if (fallbackData) {
               photoUrl = fallbackData;
+            } else if (cachedFallback) {
+              photoUrl = `data:image/jpeg;base64,${cachedFallback}`;
             }
             actualClothingUsed = fallbackCategory;
             // Only fill clothingDescription if not already set. The costumed branch
@@ -3567,10 +3604,10 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
     // Legacy behavior: show all available avatars
     const available = [];
 
-    // Standard categories
-    if (avatars.standard) available.push('standard');
-    if (avatars.winter) available.push('winter');
-    if (avatars.summer) available.push('summer');
+    // Standard categories — accept either inline base64 or R2 URL (Phase 2).
+    if (avatars.standard || avatars.standardUrl) available.push('standard');
+    if (avatars.winter   || avatars.winterUrl)   available.push('winter');
+    if (avatars.summer   || avatars.summerUrl)   available.push('summer');
 
     // Costumed categories
     if (avatars.costumed && typeof avatars.costumed === 'object') {
@@ -5330,6 +5367,7 @@ module.exports = {
   parseClothingCategory,
   parseCharacterClothing,
   getCharacterPhotoDetails,
+  prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,

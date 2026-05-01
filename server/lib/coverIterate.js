@@ -379,7 +379,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const nameMatched = [];
       const checkEntries = (entries, type, priority) => {
         for (const entry of entries || []) {
-          if (!entry.referenceImageData || !entry.name) continue;
+          // Phase 2 R2 reader: an entry is usable if EITHER inline base64 OR
+          // R2 URL is set. buildVisualBibleGrid below resolves whichever via
+          // loadVbReferenceBytes. Carry both fields through so it can pick.
+          if ((!entry.referenceImageData && !entry.referenceImageUrl) || !entry.name) continue;
           if (!descLower.includes(entry.name.toLowerCase())) continue;
           nameMatched.push({
             id: entry.id,
@@ -387,6 +390,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
             type,
             description: entry.extractedDescription || entry.description,
             referenceImageData: entry.referenceImageData,
+            referenceImageUrl: entry.referenceImageUrl,
             priority,
           });
         }

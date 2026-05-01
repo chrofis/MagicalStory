@@ -17,6 +17,7 @@ const { dbToArrayIndex } = require('../lib/versionManager');
 const { generateTextOverlay } = require('../lib/textOverlayRenderer');
 const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
 const { getTextAreaMask } = require('../lib/textMasks');
+const { loadVbReferenceBytes } = require('../lib/characterPhotos');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -976,7 +977,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attributes: char.attributes,
           source: char.source,
           appearsInPages: char.appearsInPages,
-          hasReferenceImage: !!char.referenceImageData
+          hasReferenceImage: !!(char.referenceImageData || char.referenceImageUrl)
         })),
         animals: (story.visualBible.animals || []).map(animal => ({
           id: animal.id,
@@ -986,7 +987,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attributes: animal.attributes,
           source: animal.source,
           appearsInPages: animal.appearsInPages,
-          hasReferenceImage: !!animal.referenceImageData
+          hasReferenceImage: !!(animal.referenceImageData || animal.referenceImageUrl)
         })),
         artifacts: (story.visualBible.artifacts || []).map(artifact => ({
           id: artifact.id,
@@ -996,7 +997,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attributes: artifact.attributes,
           source: artifact.source,
           appearsInPages: artifact.appearsInPages,
-          hasReferenceImage: !!artifact.referenceImageData
+          hasReferenceImage: !!(artifact.referenceImageData || artifact.referenceImageUrl)
         })),
         locations: (story.visualBible.locations || []).map(loc => ({
           id: loc.id,
@@ -1007,7 +1008,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           source: loc.source,
           isRealLandmark: loc.isRealLandmark,
           appearsInPages: loc.appearsInPages,
-          hasReferenceImage: !!(loc.referenceImageData || loc.referencePhotoData),
+          hasReferenceImage: !!(loc.referenceImageData || loc.referenceImageUrl || loc.referencePhotoData),
           photoUrl: loc.referencePhotoUrl || null,
         })),
         vehicles: (story.visualBible.vehicles || []).map(v => ({
@@ -1018,7 +1019,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attributes: v.attributes,
           source: v.source,
           appearsInPages: v.appearsInPages,
-          hasReferenceImage: !!v.referenceImageData
+          hasReferenceImage: !!(v.referenceImageData || v.referenceImageUrl)
         })),
         clothing: (story.visualBible.clothing || []).map(c => ({
           id: c.id,
@@ -1037,7 +1038,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attributes: obj.attributes,
           source: obj.source,
           appearsInPages: obj.appearsInPages,
-          hasReferenceImage: !!obj.referenceImageData
+          hasReferenceImage: !!(obj.referenceImageData || obj.referenceImageUrl)
         })),
         changeLog: story.visualBible.changeLog || [],
       } : null,
@@ -2393,7 +2394,12 @@ router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, 
       return res.status(404).json({ error: 'Element not found' });
     }
 
-    const imageData = foundElement.referenceImageData || foundElement.referencePhotoData;
+    // Phase 2 R2 reader: prefer referenceImageUrl (R2) over inline base64.
+    // Falls back to referencePhotoData (a separate legacy path used for some
+    // location entries). loadVbReferenceBytes returns base64 with no data:
+    // prefix; wrap to match the response contract clients expect.
+    let bytes = await loadVbReferenceBytes(foundElement);
+    let imageData = bytes ? `data:image/jpeg;base64,${bytes}` : foundElement.referencePhotoData;
     if (!imageData) {
       return res.status(404).json({ error: 'No reference image for this element' });
     }

@@ -1790,11 +1790,16 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
   if (!visualBible) return [];
 
+  // Phase 2 R2 reader: an entry is usable if EITHER inline base64 OR R2 URL
+  // is set. Carry both fields through so downstream loadVbReferenceBytes can
+  // pick the URL when present.
+  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
   const refs = [];
 
   // Vehicles (ships, cars, carriages, spacecraft) — part of the setting
   for (const entry of visualBible.vehicles || []) {
-    if (!entry.referenceImageData) continue;
+    if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
     refs.push({
       id: entry.id,
@@ -1802,6 +1807,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
       type: 'vehicle',
       description: entry.extractedDescription || entry.description,
       referenceImageData: entry.referenceImageData,
+      referenceImageUrl: entry.referenceImageUrl,
       priority: 1,
     });
   }
@@ -1809,7 +1815,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
   // Non-landmark locations (real landmarks use real photos via getLandmarkPhotosForScene)
   for (const entry of visualBible.locations || []) {
     if (entry.isRealLandmark) continue;
-    if (!entry.referenceImageData) continue;
+    if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
     refs.push({
       id: entry.id,
@@ -1817,6 +1823,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
       type: 'location',
       description: entry.extractedDescription || entry.description,
       referenceImageData: entry.referenceImageData,
+      referenceImageUrl: entry.referenceImageUrl,
       priority: 2,
     });
   }
@@ -1828,12 +1835,15 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
 function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) {
   if (!visualBible) return [];
 
+  // Phase 2 R2 reader: same dual-field check as getEmptySceneElementReferences.
+  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
   const relevantRefs = [];
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
-      // Must have reference image and appear on this page
-      if (!entry.referenceImageData) continue;
+      // Must have reference image (inline OR R2 URL) and appear on this page
+      if (!hasRef(entry)) continue;
       if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
 
       relevantRefs.push({
@@ -1842,6 +1852,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
         type,
         description: entry.extractedDescription || entry.description,
         referenceImageData: entry.referenceImageData,
+        referenceImageUrl: entry.referenceImageUrl,
         priority // Lower = higher priority
       });
     }
@@ -1857,8 +1868,8 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
   for (const entry of visualBible.locations || []) {
     // Skip landmarks - they use real photos, not generated reference images
     if (entry.isRealLandmark) continue;
-    // Must have generated reference image and appear on this page
-    if (!entry.referenceImageData) continue;
+    // Must have generated reference image (inline OR R2 URL) and appear on this page
+    if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
 
     relevantRefs.push({
@@ -1867,6 +1878,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
       type: 'location',
       description: entry.extractedDescription || entry.description,
       referenceImageData: entry.referenceImageData,
+      referenceImageUrl: entry.referenceImageUrl,
       priority: 5 // Lower priority than objects/characters
     });
   }
@@ -1886,6 +1898,9 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
 function getElementReferenceImagesByIds(visualBible, elementIds) {
   if (!visualBible || !elementIds || elementIds.length === 0) return [];
 
+  // Phase 2 R2 reader: dual-field presence check; carry both fields through.
+  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
   const results = [];
   const idSet = new Set(elementIds.map(id => id.toUpperCase()));
 
@@ -1899,7 +1914,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
 
   for (const [entries, type] of searchArrays) {
     for (const entry of entries || []) {
-      if (!entry.referenceImageData) continue;
+      if (!hasRef(entry)) continue;
       if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
       results.push({
         id: entry.id,
@@ -1907,6 +1922,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
         type,
         description: entry.extractedDescription || entry.description,
         referenceImageData: entry.referenceImageData,
+        referenceImageUrl: entry.referenceImageUrl,
         priority: priorities[type]
       });
     }
@@ -1915,7 +1931,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
   // Non-landmark locations
   for (const entry of visualBible.locations || []) {
     if (entry.isRealLandmark) continue;
-    if (!entry.referenceImageData) continue;
+    if (!hasRef(entry)) continue;
     if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
     results.push({
       id: entry.id,
@@ -1923,6 +1939,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
       type: 'location',
       description: entry.extractedDescription || entry.description,
       referenceImageData: entry.referenceImageData,
+      referenceImageUrl: entry.referenceImageUrl,
       priority: priorities.location
     });
   }

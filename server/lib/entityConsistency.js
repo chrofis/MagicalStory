@@ -16,7 +16,7 @@ const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription } = require('./storyHelpers');
-const { getFacePhoto } = require('./characterPhotos');
+const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
 
@@ -412,16 +412,26 @@ function groupAppearancesByClothing(appearances) {
  * @param {string} clothingCategory - Clothing category (e.g., 'standard', 'winter', 'costumed:pirate')
  * @returns {string|null} Styled avatar URL/data URI, or null if not found
  */
-function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
+async function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const avatars = character.avatars;
   const charName = character.name || 'Unknown';
 
   // Helper to get fallback photo - uses centralized helper
   const getFallbackPhoto = () => getFacePhoto(character);
 
+  // Phase 2 R2 reader: when a base avatar slot has only the URL field set
+  // (post-migration shape), loadAvatarBytes fetches from R2; for legacy rows
+  // with inline base64 it returns the inline bytes. Returns base64 with no
+  // data: prefix, so we wrap before returning to preserve the contract that
+  // callers expect (data: URI or raw photo URL string).
+  const baseFromSlot = async (slot) => {
+    const bytes = await loadAvatarBytes(avatars || {}, slot);
+    return bytes ? `data:image/jpeg;base64,${bytes}` : null;
+  };
+
   if (!avatars?.styledAvatars?.[artStyle]) {
     // No styled avatars for this art style — try base avatar (2x2 sheet) before face photo
-    const baseAvatar = avatars?.standard || avatars?.[clothingCategory];
+    const baseAvatar = (await baseFromSlot('standard')) || (await baseFromSlot(clothingCategory));
     if (baseAvatar) {
       log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, using base standard avatar`);
       return baseAvatar;
@@ -485,11 +495,17 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
     }
   }
 
-  // Try base avatars (not styled) as fallback before photo
-  const baseAvatar = avatars[clothingCategory] || avatars.standard;
-  if (baseAvatar) {
-    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base ${avatars[clothingCategory] ? clothingCategory : 'standard'} avatar`);
-    return baseAvatar;
+  // Try base avatars (not styled) as fallback before photo. Phase 2: same
+  // URL-or-inline resolution as the early-return branch above.
+  const baseFromCategory = await baseFromSlot(clothingCategory);
+  if (baseFromCategory) {
+    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base ${clothingCategory} avatar`);
+    return baseFromCategory;
+  }
+  const baseFromStandard = await baseFromSlot('standard');
+  if (baseFromStandard) {
+    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base standard avatar`);
+    return baseFromStandard;
   }
 
   // Final fallback to original photo
@@ -692,7 +708,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             return null;
           }
 
-          const refAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          const refAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const gridLabel = `${charName} (${clothingCategory})`;
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
@@ -1956,7 +1972,7 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
       if (clothingCrops.length < 1) continue;
 
       // Get appropriate styled avatar as reference for this clothing category
-      const referencePhoto = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+      const referencePhoto = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
       log.info(`🔧 [ENTITY-REPAIR] Processing "${clothingCategory}" (${clothingCrops.length} crops) with ${referencePhoto ? 'styled' : 'no'} reference`);
 
       // Create grid for this clothing group
@@ -2843,7 +2859,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Target page ${pageNumber} has clothing: ${clothingCategory}`);
 
     // Get styled avatar for this clothing category
-    const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
     if (!styledAvatar) {
       return { success: false, error: `No styled avatar found for ${charName} with ${clothingCategory} clothing` };
