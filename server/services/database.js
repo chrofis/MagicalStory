@@ -719,6 +719,155 @@ function buildStoryMetadata(story) {
 }
 
 /**
+ * Strip every inline base64 / data: URI image payload from a story-data
+ * subtree. Source of truth lives elsewhere (characters table for character
+ * photos+avatars, story_images for scene/cover bytes, R2 for reference
+ * sheets), so these payloads only inflate the JSONB row.
+ *
+ * Targets identified from production audit (per ~150MB story):
+ *   - sceneImages[*].entityReport.grids[*].gridImage              (Gemini eval grids)
+ *   - sceneImages[*].entityReport.characters.*.byClothing.*.gridImage
+ *   - sceneImages[*].sceneCharacters[*].photos.*                  (snapshot)
+ *   - sceneImages[*].sceneCharacters[*].avatars.{standard,summer,winter,faceThumbnails,bodyThumbnails,styledAvatars}
+ *   - sceneImages[*].imageVersions[*].grokRefImages[*]            (Grok inputs)
+ *   - sceneImages[*].grokRefImages[*]
+ *   - sceneImages[*].bboxOverlayImage                             (debug overlay)
+ *   - coverImages.{front,initial,back}Cover.{retryHistory,grokRefImages,bboxOverlayImage}
+ *   - finalChecksReport.entity.grids[*].gridImage
+ *   - finalChecksReport.entityRepairs.*.pages.*.comparison.{before,after,grokRawResult,blackoutImage,blendMask,croppedAvatar,cutoutSent}
+ *   - styledAvatarGeneration[*].inputs.*.imageData / .output.imageData
+ *   - characters[*].photos.*                                       (top-level snapshot duplicates characters table)
+ *   - characters[*].avatars.{standard,summer,winter,faceThumbnails,bodyThumbnails,styledAvatars}
+ *
+ * Mutates `data` in place. Idempotent.
+ */
+function stripInlineImagesFromStoryData(data) {
+  if (!data || typeof data !== 'object') return;
+
+  const stripCharSnapshot = (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.photos && typeof c.photos === 'object') {
+      for (const k of ['original', 'face', 'body', 'bodyNoBg']) c.photos[k] = undefined;
+    }
+    if (c.avatars && typeof c.avatars === 'object') {
+      for (const k of ['standard', 'summer', 'winter', 'formal']) c.avatars[k] = undefined;
+      c.avatars.faceThumbnails = undefined;
+      c.avatars.bodyThumbnails = undefined;
+      c.avatars.styledAvatars = undefined;
+      c.avatars.costumed = undefined;
+    }
+  };
+
+  // sceneImages
+  if (Array.isArray(data.sceneImages)) {
+    for (const s of data.sceneImages) {
+      if (!s || typeof s !== 'object') continue;
+      s.bboxOverlayImage = undefined;
+      s.grokRefImages = undefined;
+      s.originalImage = undefined;
+      s.preEntityRepairImage = undefined;
+      if (Array.isArray(s.imageVersions)) {
+        for (const v of s.imageVersions) {
+          if (!v) continue;
+          v.grokRefImages = undefined;
+          v.bboxOverlayImage = undefined;
+        }
+      }
+      if (Array.isArray(s.sceneCharacters)) {
+        for (const c of s.sceneCharacters) stripCharSnapshot(c);
+      }
+      if (s.entityReport && typeof s.entityReport === 'object') {
+        if (Array.isArray(s.entityReport.grids)) {
+          for (const g of s.entityReport.grids) if (g) g.gridImage = undefined;
+        }
+        if (s.entityReport.characters && typeof s.entityReport.characters === 'object') {
+          for (const charReport of Object.values(s.entityReport.characters)) {
+            if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
+              for (const clothing of Object.values(charReport.byClothing)) {
+                if (clothing) clothing.gridImage = undefined;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // coverImages
+  if (data.coverImages && typeof data.coverImages === 'object') {
+    for (const kind of ['frontCover', 'initialPage', 'backCover']) {
+      const cv = data.coverImages[kind];
+      if (!cv || typeof cv !== 'object') continue;
+      cv.bboxOverlayImage = undefined;
+      cv.grokRefImages = undefined;
+      if (Array.isArray(cv.retryHistory)) {
+        for (const r of cv.retryHistory) {
+          if (!r) continue;
+          r.imageData = undefined;
+          r.bboxOverlayImage = undefined;
+          r.originalImage = undefined;
+          r.annotatedOriginal = undefined;
+        }
+      }
+    }
+  }
+
+  // finalChecksReport
+  if (data.finalChecksReport && typeof data.finalChecksReport === 'object') {
+    const fcr = data.finalChecksReport;
+    if (fcr.entity?.grids && Array.isArray(fcr.entity.grids)) {
+      for (const g of fcr.entity.grids) if (g) g.gridImage = undefined;
+    }
+    if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
+      for (const charRepair of Object.values(fcr.entityRepairs)) {
+        if (charRepair?.pages && typeof charRepair.pages === 'object') {
+          for (const pageRepair of Object.values(charRepair.pages)) {
+            if (pageRepair?.comparison && typeof pageRepair.comparison === 'object') {
+              for (const k of ['before', 'after', 'grokRawResult', 'blackoutImage', 'blendMask', 'croppedAvatar', 'cutoutSent']) {
+                pageRepair.comparison[k] = undefined;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // styledAvatarGeneration
+  if (Array.isArray(data.styledAvatarGeneration)) {
+    for (const e of data.styledAvatarGeneration) {
+      if (!e) continue;
+      if (e.inputs && typeof e.inputs === 'object') {
+        for (const v of Object.values(e.inputs)) {
+          if (v && typeof v === 'object' && 'imageData' in v) v.imageData = undefined;
+        }
+      }
+      if (e.output && typeof e.output === 'object' && 'imageData' in e.output) {
+        e.output.imageData = undefined;
+      }
+    }
+  }
+  if (Array.isArray(data.costumedAvatarGeneration)) {
+    for (const e of data.costumedAvatarGeneration) {
+      if (!e) continue;
+      if (e.inputs && typeof e.inputs === 'object') {
+        for (const v of Object.values(e.inputs)) {
+          if (v && typeof v === 'object' && 'imageData' in v) v.imageData = undefined;
+        }
+      }
+      if (e.output && typeof e.output === 'object' && 'imageData' in e.output) {
+        e.output.imageData = undefined;
+      }
+    }
+  }
+
+  // top-level characters snapshot — strip photos and inline avatars
+  if (Array.isArray(data.characters)) {
+    for (const c of data.characters) stripCharSnapshot(c);
+  }
+}
+
+/**
  * Save story data with metadata column for fast list queries.
  * Use this instead of raw UPDATE to ensure metadata stays in sync.
  * OPTIMIZED: Extracts images to story_images table for faster queries.
@@ -849,6 +998,13 @@ async function saveStoryData(storyId, storyData) {
     }
   }
 
+  // Strip every other inline base64 payload (entityReport grids, scene-
+  // character snapshots, grokRefImages, debug overlays, finalChecksReport
+  // comparison images, styledAvatarGeneration debug, top-level character
+  // snapshot photos+avatars). Source of truth lives in characters table,
+  // story_images, and R2.
+  stripInlineImagesFromStoryData(dataForStorage);
+
   const metadata = buildStoryMetadata(storyData);
   if (imagesSaved > 0) {
     console.log(`💾 [SAVE] Extracted ${imagesSaved} images to story_images for ${storyId}`);
@@ -926,6 +1082,12 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
     dataForStorage.hasEmptySceneImage = true;
   }
   delete dataForStorage.emptySceneImage;
+
+  // Strip the same inline payloads as saveStoryData (entityReport grids,
+  // sceneCharacters snapshots, grokRefImages, debug overlays). The data
+  // in scope here is a single sceneImages entry, so we wrap it in the
+  // shape the sanitizer expects and let it walk just this subtree.
+  stripInlineImagesFromStoryData({ sceneImages: [dataForStorage] });
 
   if (imagesSaved > 0) {
     console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
