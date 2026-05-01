@@ -9039,8 +9039,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // the silhouette region only — losing a tiny bit of detail there is far
     // cheaper than letting Aurora touch every other pixel in the frame.
     const grokRawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    // Dev toggle: when false, skip the feather-composite and pass Grok's
+    // bytes through verbatim (legacy behaviour, see docs/char-repair-decisions.md).
+    const featherComposite = options.featherComposite !== false;
     let finalBuf;
-    if (silhouetteMaskBuf) {
+    if (silhouetteMaskBuf && featherComposite) {
       // Resize Grok output to source dims, then mask-composite.
       const grokAtSourceDims = await sharp(grokRawBuf)
         .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill', kernel: 'lanczos3' })
@@ -9071,8 +9074,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         .toBuffer();
       log.info(`👤 [CHAR REPAIR GROK] Mask-composite: Grok output blended over original at silhouette only (feather ${FEATHER_PX}px)`);
     } else {
-      // No silhouette mask → fall back to Grok's raw bytes verbatim (legacy behaviour).
+      // Either silhouette fetch failed OR featherComposite was disabled by
+      // the caller → keep Grok's raw bytes verbatim (legacy behaviour, full
+      // scene gets re-rendered).
       finalBuf = grokRawBuf;
+      log.info(`👤 [CHAR REPAIR GROK] Mask-composite: OFF (${silhouetteMaskBuf ? 'dev toggle' : 'no silhouette'}) — using Grok bytes verbatim`);
     }
     const isPng = finalBuf[0] === 0x89 && finalBuf[1] === 0x50 && finalBuf[2] === 0x4e && finalBuf[3] === 0x47;
     const finalMime = isPng ? 'image/png' : 'image/jpeg';

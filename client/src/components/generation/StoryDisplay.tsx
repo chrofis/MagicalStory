@@ -121,7 +121,7 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body', repairMode?: 'auto' | 'blended' | 'cutout') => Promise<{
+  onRepairCharacter?: (pageNumber: number, characterName: string, whiteoutTarget: 'face' | 'body', repairMode?: 'auto' | 'blended' | 'cutout', extra?: { featherComposite?: boolean }) => Promise<{
     comparison?: { before?: string | null; after?: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; croppedAvatar?: string | null; cutoutSent?: string | null } | null;
     method?: string;
     beforeScore?: number | null;
@@ -284,6 +284,12 @@ export function StoryDisplay({
   const [charRepairSelected, setCharRepairSelected] = useState<string>('');
   const [charRepairTarget, setCharRepairTarget] = useState<'face' | 'body'>('face');
   const [charRepairMode, setCharRepairMode] = useState<'auto' | 'blended' | 'cutout'>('auto');
+  // Inpaint-only dev toggle: when true, the Grok output is feather-composited
+  // over the original at the silhouette only, preserving every pixel outside.
+  // When false, Grok's bytes are passed through verbatim (legacy behaviour —
+  // entire scene re-renders, neighbours can lose colour/saturation). Default ON.
+  // See docs/char-repair-decisions.md.
+  const [charRepairFeather, setCharRepairFeather] = useState<boolean>(true);
   const [charRepairingPages, setCharRepairingPages] = useState<Set<number>>(new Set());
   const [charDetectingBbox, setCharDetectingBbox] = useState<Set<number>>(new Set());
   const [charRepairResults, setCharRepairResults] = useState<Record<number, {
@@ -1613,6 +1619,18 @@ export function StoryDisplay({
                     <p className="text-[11px] text-gray-500 mt-1">
                       Auto: face→blended, body→cutout. Blended blurs the region and regenerates; Cut-out extracts the figure, inpaints, composites back.
                     </p>
+                    <label className="flex items-start gap-2 mt-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={charRepairFeather}
+                        onChange={e => setCharRepairFeather(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-[11px] text-gray-600">
+                        Feather composite (inpaint only) — preserve untouched pixels outside the silhouette.
+                        Off = Grok's full output replaces the scene; entire frame re-renders. See <span className="font-mono">docs/char-repair-decisions.md</span>.
+                      </span>
+                    </label>
                   </div>
                 )}
               </div>
@@ -1629,7 +1647,7 @@ export function StoryDisplay({
                     setCharRepairPopover(null);
                     setCharRepairingPages(prev => new Set([...prev, pageNumber]));
                     try {
-                      const repairResult = await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget, charRepairMode);
+                      const repairResult = await onRepairCharacter(pageNumber, charRepairSelected, charRepairTarget, charRepairMode, { featherComposite: charRepairFeather });
                       if (repairResult) {
                         setCharRepairResults(prev => ({ ...prev, [pageNumber]: repairResult }));
                       }
