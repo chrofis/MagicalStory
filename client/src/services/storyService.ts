@@ -37,6 +37,27 @@ function normalizeCoverImages(covers: { frontCover?: unknown; initialPage?: unkn
  * Any new field added to the API response needs an entry here AND in the
  * merge — otherwise it gets silently dropped between network and state.
  */
+// Snapshot of inputs sent to every model in a Test Models run. Returned from
+// /test-models so the panel can display "what was sent" alongside each result.
+export interface TestModelsInputSnapshot {
+  promptLength: number;
+  promptPreview: string;
+  promptFull: string;
+  referenceMode: 'strict' | 'loose' | 'styled-only' | 'off';
+  singlePassScene: boolean;
+  iterativePlacement: boolean;
+  characterPhotos: Array<{
+    name: string;
+    photoType?: string;
+    clothingCategory?: string;
+    clothingDescription?: string;
+    photoUrl?: string | null;
+  }>;
+  landmarkPhotos: Array<{ name: string; photoData: string | null }>;
+  visualBibleGrid: string | null;
+  sceneBackground: string | null;
+}
+
 interface CoverDevMeta {
   prompt: string | null;
   qualityReasoning: string | null;
@@ -1286,7 +1307,9 @@ export const storyService = {
       pass2Prompt?: string;
       pass2Failed?: boolean;
       pass2Error?: string;
+      grokRefImages?: string[] | null;
     }>;
+    inputSnapshot?: TestModelsInputSnapshot;
   }> {
     const response = await api.post<{
       success: boolean;
@@ -1302,7 +1325,9 @@ export const storyService = {
         pass2Prompt?: string;
         pass2Failed?: boolean;
         pass2Error?: string;
+        grokRefImages?: string[] | null;
       }>;
+      inputSnapshot?: TestModelsInputSnapshot;
     }>(
       `/api/stories/${storyId}/test-models/${pageNumber}`,
       {

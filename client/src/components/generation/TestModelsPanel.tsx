@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush } from 'lucide-react';
+import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
+import type { TestModelsInputSnapshot } from '@/services/storyService';
 import { artStyles } from '@/constants/artStyles';
 import { StyleLabSection } from './StyleLabSection';
 
@@ -25,6 +26,10 @@ interface ModelTestResult {
   pass2Prompt?: string;
   pass2Failed?: boolean;
   pass2Error?: string;
+  // Exact images packed for the model (most useful for "what did it see")
+  grokRefImages?: string[] | null;
+  // Snapshot of the inputs that produced this result (shared across all models in the run)
+  inputSnapshot?: TestModelsInputSnapshot | null;
 }
 
 interface ModelOption {
@@ -123,6 +128,8 @@ export function TestModelsPanel({
             pass2Prompt: result?.pass2Prompt,
             pass2Failed: result?.pass2Failed,
             pass2Error: result?.pass2Error,
+            grokRefImages: result?.grokRefImages,
+            inputSnapshot: response.inputSnapshot,
           },
         }));
       } catch (err: unknown) {
@@ -399,6 +406,115 @@ export function TestModelsPanel({
                           <pre className="text-xs bg-gray-50 p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">{result.pass2Prompt}</pre>
                         </div>
                       )}
+                    </details>
+                  )}
+                  {/* Test parameters + exact inputs sent to the model — keeps the
+                      history self-explanatory (refMode, plate, refs, prompt). */}
+                  {result.inputSnapshot && (
+                    <details className="mt-2 border-t border-gray-200 pt-2">
+                      <summary className="text-[10px] font-medium text-indigo-600 cursor-pointer flex items-center gap-1">
+                        <ChevronRight size={10} className="inline group-open:hidden" />
+                        <ChevronDown size={10} className="hidden group-open:inline" />
+                        Test parameters & inputs sent
+                      </summary>
+                      <div className="mt-2 space-y-2 text-[10px] text-gray-700">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200">
+                            referenceMode: <strong>{result.inputSnapshot.referenceMode}</strong>
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200">
+                            singlePassScene: <strong>{String(result.inputSnapshot.singlePassScene)}</strong>
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200">
+                            iterativePlacement: <strong>{String(result.inputSnapshot.iterativePlacement)}</strong>
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">
+                            promptLength: {result.inputSnapshot.promptLength}
+                          </span>
+                        </div>
+                        {/* Reference images sent to the model */}
+                        {(result.inputSnapshot.characterPhotos.length > 0
+                          || result.inputSnapshot.landmarkPhotos.length > 0
+                          || result.inputSnapshot.visualBibleGrid
+                          || result.inputSnapshot.sceneBackground
+                          || (result.grokRefImages && result.grokRefImages.length > 0)) && (
+                          <div>
+                            <div className="text-[9px] font-medium text-gray-500 mb-1">Images sent to model:</div>
+                            <div className="flex flex-wrap gap-1">
+                              {result.inputSnapshot.sceneBackground && (
+                                <div className="flex flex-col items-center">
+                                  <img
+                                    src={result.inputSnapshot.sceneBackground.startsWith('data:')
+                                      ? result.inputSnapshot.sceneBackground
+                                      : `data:image/jpeg;base64,${result.inputSnapshot.sceneBackground}`}
+                                    alt="Empty-scene plate"
+                                    className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
+                                    onClick={() => setLightboxImage(result.inputSnapshot!.sceneBackground!.startsWith('data:')
+                                      ? result.inputSnapshot!.sceneBackground!
+                                      : `data:image/jpeg;base64,${result.inputSnapshot!.sceneBackground!}`)}
+                                  />
+                                  <span className="text-[8px] text-gray-500 mt-0.5">plate</span>
+                                </div>
+                              )}
+                              {result.inputSnapshot.visualBibleGrid && (
+                                <div className="flex flex-col items-center">
+                                  <img
+                                    src={result.inputSnapshot.visualBibleGrid}
+                                    alt="VB grid"
+                                    className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
+                                    onClick={() => setLightboxImage(result.inputSnapshot!.visualBibleGrid!)}
+                                  />
+                                  <span className="text-[8px] text-gray-500 mt-0.5">VB grid</span>
+                                </div>
+                              )}
+                              {result.inputSnapshot.characterPhotos.map((p, i) => p.photoUrl ? (
+                                <div key={`char-${i}`} className="flex flex-col items-center">
+                                  <img
+                                    src={p.photoUrl}
+                                    alt={p.name}
+                                    className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
+                                    onClick={() => setLightboxImage(p.photoUrl!)}
+                                  />
+                                  <span className="text-[8px] text-gray-500 mt-0.5 truncate max-w-[64px]">{p.name}</span>
+                                </div>
+                              ) : null)}
+                              {result.inputSnapshot.landmarkPhotos.map((l, i) => l.photoData ? (
+                                <div key={`lm-${i}`} className="flex flex-col items-center">
+                                  <img
+                                    src={l.photoData.startsWith('data:') ? l.photoData : `data:image/jpeg;base64,${l.photoData}`}
+                                    alt={l.name}
+                                    className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
+                                    onClick={() => setLightboxImage(l.photoData!.startsWith('data:') ? l.photoData! : `data:image/jpeg;base64,${l.photoData!}`)}
+                                  />
+                                  <span className="text-[8px] text-gray-500 mt-0.5 truncate max-w-[64px]">{l.name}</span>
+                                </div>
+                              ) : null)}
+                            </div>
+                          </div>
+                        )}
+                        {/* Exact images packed for Grok (after letterboxing/etc) */}
+                        {result.grokRefImages && result.grokRefImages.length > 0 && (
+                          <div>
+                            <div className="text-[9px] font-medium text-gray-500 mb-1">Packed Grok refs ({result.grokRefImages.length}):</div>
+                            <div className="flex flex-wrap gap-1">
+                              {result.grokRefImages.map((img, i) => (
+                                <img
+                                  key={`grok-${i}`}
+                                  src={img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`}
+                                  alt={`Grok ref ${i + 1}`}
+                                  className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
+                                  onClick={() => setLightboxImage(img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Full prompt for verification — collapsed by default */}
+                        <details>
+                          <summary className="text-[9px] font-medium text-gray-500 cursor-pointer">Full prompt</summary>
+                          <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-64 overflow-auto whitespace-pre-wrap mt-1">{result.inputSnapshot.promptFull}</pre>
+                        </details>
+                      </div>
                     </details>
                   )}
                 </div>

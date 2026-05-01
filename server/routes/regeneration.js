@@ -880,20 +880,26 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     const artStyle = storyData.artStyle || 'pixar';
     const visualBible = storyData.visualBible || null;
     const clothingReqs = storyData.clothingRequirements || null;
-    // Resolve scene description, characters, and prompt
+    // Resolve EXACT inputs from the original generation: saved image prompt,
+    // saved empty-scene plate, current refs/grid (rebuilt from current state
+    // because the actual image data isn't preserved on the scene). Test Models
+    // is a fixed-prompt A/B harness — it must NOT re-run scene expansion.
     let prompt, characterPhotos, landmarkPhotos = [], visualBibleGrid = null, sceneMetadata = null;
+    let savedSceneBackground = null;
     if (pageNumber < 0) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
       const cover = getCoverData(storyData, coverType);
       if (!cover) return res.status(400).json({ error: `No cover found for ${coverType}` });
+      // Reuse the saved prompt verbatim if present; only fall back to a rebuild
+      // for legacy covers that didn't persist the prompt.
       const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
       characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
-      prompt = buildImagePrompt(cover.description || '', storyData, chars, true, visualBible, pageNumber, true, characterPhotos);
+      prompt = cover.prompt || buildImagePrompt(cover.description || '', storyData, chars, true, visualBible, pageNumber, true, characterPhotos);
     } else {
-      const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
-      if (!sceneDesc) return res.status(400).json({ error: `No scene description for page ${pageNumber}` });
-      const desc = sceneDesc.description || '';
+      const savedSceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+      if (!savedSceneImage) return res.status(400).json({ error: `No scene image found for page ${pageNumber}` });
+      const desc = savedSceneImage.sceneDescription || savedSceneImage.description || '';
       const chars = getCharactersInScene(desc, storyData.characters || []);
       const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
       const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
@@ -906,7 +912,21 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
-      prompt = buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
+      // Reuse the saved prompt verbatim — Test Models tests image models against
+      // a fixed prompt, not against a re-expanded scene.
+      prompt = savedSceneImage.prompt || buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
+      // Reuse the original empty-scene plate so two-pass renders use the same
+      // background. If absent (older stories), the per-model render still works
+      // — generateImageOnly just won't have a sceneBackground to anchor on.
+      try {
+        const row = await getStoryImage(id, 'empty_scene', pageNumber, 0);
+        if (row?.imageData) {
+          savedSceneBackground = row.imageData;
+          log.info(`🧪 [TEST-MODELS] Page ${pageNumber}: reusing saved empty-scene plate`);
+        }
+      } catch (e) {
+        log.debug(`🧪 [TEST-MODELS] Page ${pageNumber}: no saved empty-scene plate (${e.message})`);
+      }
     }
     // Resolve dev flag effective values (per-page Test Models override)
     const { applyReferenceMode, MODEL_DEFAULTS: DEFAULTS } = (() => {
@@ -918,31 +938,61 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     const effSinglePass = typeof singlePassScene === 'boolean'
       ? singlePassScene
       : DEFAULTS.singlePassScene === true;
-    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models (refMode=${effRefMode}, singlePass=${effSinglePass}${iterativePlacement ? ', iterative-placement' : ''})`);
+    // Resolve effective sceneBackground based on the singlePassScene flag.
+    // If skipping the plate (single-pass), don't pass the saved background.
+    // Otherwise reuse the saved one (no regeneration).
+    const effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
+    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models (refMode=${effRefMode}, singlePass=${effSinglePass}, plate=${effectiveSceneBackground ? 'reused' : 'none'}${iterativePlacement ? ', iterative-placement' : ''})`);
+    // Pre-compute applied refs once — same for every model (only the model id varies)
+    const refApplied = applyReferenceMode({
+      mode: effRefMode,
+      characterPhotos,
+      visualBibleGrid,
+      landmarkPhotos,
+      sceneBackground: effectiveSceneBackground,
+      sceneMetadata,
+    });
+    // Snapshot of inputs that every model in this run was given. Surfaced in
+    // the response so the panel can show "what was sent to the model" next to
+    // each result image — makes the test history self-explanatory.
+    const inputSnapshot = {
+      promptLength: prompt.length,
+      promptPreview: prompt.slice(0, 4000),
+      promptFull: prompt,
+      referenceMode: effRefMode,
+      singlePassScene: effSinglePass,
+      iterativePlacement: !!iterativePlacement,
+      // Effective refs after applyReferenceMode (these are what actually got attached).
+      characterPhotos: (refApplied.characterPhotos || []).map(p => ({
+        name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
+        clothingDescription: p.clothingDescription, photoUrl: p.photoUrl || null,
+      })),
+      landmarkPhotos: (refApplied.landmarkPhotos || []).map(l => ({
+        name: l.name, photoData: l.photoData || null,
+      })),
+      visualBibleGrid: refApplied.visualBibleGrid
+        ? `data:image/jpeg;base64,${refApplied.visualBibleGrid.toString('base64')}`
+        : null,
+      sceneBackground: refApplied.sceneBackground || null,
+    };
     // Run all models in parallel
     const results = {};
     const settled = await Promise.allSettled(models.map(async (model) => {
       const start = Date.now();
       let result;
-      const refApplied = applyReferenceMode({
-        mode: effRefMode,
-        characterPhotos,
-        visualBibleGrid,
-        landmarkPhotos,
-        sceneBackground: null, // empty-scene plate is handled by iterativePlacement / two-pass paths only
-        sceneMetadata,
-      });
       if (iterativePlacement && sceneMetadata) {
         const { resolveArtStyle } = require('../lib/storyHelpers');
         const artStyleDesc = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[model].backend) || resolveArtStyle('pixar') || '';
         result = await generateWithIterativePlacement(prompt, refApplied.characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, artStyle: artStyleDesc,
+          sceneBackground: refApplied.sceneBackground,
         });
       } else {
         result = await generateImageOnly(prompt, refApplied.characterPhotos, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-          landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, skipCache: true
+          landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, skipCache: true,
+          sceneBackground: refApplied.sceneBackground,
         });
       }
       return {
@@ -950,17 +1000,23 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         // Iterative placement debug data
         pass1Image: result.pass1Image || null, pass1Prompt: result.pass1Prompt || null, pass2Prompt: result.pass2Prompt || null,
         pass2Failed: result.pass2Failed || false, pass2Error: result.pass2Error || null,
+        // Exact images packed for Grok (most useful for debugging "what did the model see")
+        grokRefImages: result.grokRefImages || null,
       };
     }));
     for (const [i, s] of settled.entries()) {
       if (s.status === 'fulfilled') {
         const r = s.value;
-        results[r.model] = { imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage, pass1Image: r.pass1Image, pass1Prompt: r.pass1Prompt, pass2Prompt: r.pass2Prompt, pass2Failed: r.pass2Failed, pass2Error: r.pass2Error };
+        results[r.model] = {
+          imageData: r.imageData, modelId: r.modelId, elapsed: r.elapsed, usage: r.usage,
+          pass1Image: r.pass1Image, pass1Prompt: r.pass1Prompt, pass2Prompt: r.pass2Prompt,
+          pass2Failed: r.pass2Failed, pass2Error: r.pass2Error, grokRefImages: r.grokRefImages,
+        };
       } else {
         results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
       }
     }
-    res.json({ success: true, pageNumber, results });
+    res.json({ success: true, pageNumber, results, inputSnapshot });
   } catch (err) {
     log.error('Error in test-models:', err);
     res.status(500).json({ error: 'Failed to test models: ' + err.message });
