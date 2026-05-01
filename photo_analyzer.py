@@ -1221,6 +1221,81 @@ def remove_bg_endpoint():
         }), 500
 
 
+@app.route('/silhouette-edge', methods=['POST'])
+def silhouette_edge_endpoint():
+    """
+    Run rembg on the input crop, return a transparent PNG with only the
+    figure's silhouette OUTLINE drawn in the requested colour. Used by the
+    char-repair-inpaint pipeline to overlay an exact-shape boundary on top
+    of the magenta crosshatch — gives the image model a hard size signal
+    so it stops scaling the repainted figure up.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",  # crop of the scene where the figure sits
+        "thickness": 2,                          # outline thickness in pixels (default 2)
+        "color": [0, 255, 255]                   # outline RGB; default cyan (complementary to magenta crosshatch)
+    }
+
+    Returns:
+    {
+        "success": true,
+        "image": "data:image/png;base64,..."     # transparent PNG, same dims as input, only edge pixels filled
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        image_data = data['image']
+        thickness = max(1, int(data.get('thickness', 2)))
+        color_rgb = data.get('color', [0, 255, 255])
+        if not (isinstance(color_rgb, list) and len(color_rgb) == 3):
+            color_rgb = [0, 255, 255]
+        # OpenCV is BGR
+        color_bgr = (int(color_rgb[2]), int(color_rgb[1]), int(color_rgb[0]))
+
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        img_bytes = base64.b64decode(image_data)
+        img_array = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        h, w = img.shape[:2]
+        result_rgba, mask = remove_background(img)
+        if mask is None:
+            return jsonify({"success": False, "error": "Background removal failed"}), 500
+
+        # Binary mask
+        binary = (mask > 128).astype(np.uint8) * 255
+
+        # Morphological gradient = dilate - erode → exact boundary band of `thickness` px
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (thickness * 2 + 1, thickness * 2 + 1))
+        edge = cv2.morphologyEx(binary, cv2.MORPH_GRADIENT, kernel)
+
+        # Build transparent BGRA: edge pixels = solid color, everything else = (0,0,0,0)
+        out = np.zeros((h, w, 4), dtype=np.uint8)
+        edge_mask = edge > 0
+        out[edge_mask, 0] = color_bgr[0]
+        out[edge_mask, 1] = color_bgr[1]
+        out[edge_mask, 2] = color_bgr[2]
+        out[edge_mask, 3] = 255
+
+        _, buffer = cv2.imencode('.png', out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        result_b64 = f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}"
+        edge_pixels = int(edge_mask.sum())
+        print(f"[SILHOUETTE-EDGE] {w}x{h} crop, thickness={thickness}, edge px={edge_pixels}, out={len(buffer)//1024}KB")
+        return jsonify({"success": True, "image": result_b64, "edge_pixels": edge_pixels})
+
+    except Exception as e:
+        print(f"[SILHOUETTE-EDGE] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

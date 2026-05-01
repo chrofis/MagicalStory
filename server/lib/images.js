@@ -8920,19 +8920,63 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       create: { width: faceWidth, height: faceHeight, channels: 3, background: HATCH_COLOR },
     }).png().toBuffer();
 
-    // Single composite: hatch + face block onto the previous scene → PNG.
-    // Was two sequential JPEG q92 encodings (decode-encode-decode-encode);
-    // collapsing into one lossless pass is where most of the round-trip
-    // blur came from on the input side.
+    // Step 4b — silhouette outline overlay. Crop the (pre-mask) scene to the
+    // hatch box, send to the Python service which runs rembg → morphological
+    // gradient → returns a transparent PNG with only the figure's edge in
+    // cyan. We then composite that edge ON TOP of the magenta marks. The
+    // model now has TWO signals:
+    //   - magenta crosshatch / face block = "repaint this region"
+    //   - cyan outline                    = "the figure must fit EXACTLY
+    //                                        inside this shape — no bigger,
+    //                                        no smaller"
+    // Without the outline Aurora consistently scaled the repainted figure
+    // up to comfortably fill the rectangle; with it the silhouette is a
+    // hard visual constraint.
+    let edgeOverlayBuf = null;
+    let edgePixels = 0;
+    try {
+      const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+      const hatchCrop = await sharp(paddedScene)
+        .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+        .jpeg({ quality: 90 }).toBuffer();
+      const edgeRes = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: `data:image/jpeg;base64,${hatchCrop.toString('base64')}`,
+          thickness: 3,
+          color: [0, 255, 255], // cyan — complementary to magenta
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (edgeRes.ok) {
+        const edgeJson = await edgeRes.json();
+        if (edgeJson?.success && edgeJson.image) {
+          edgePixels = edgeJson.edge_pixels || 0;
+          const m = edgeJson.image.match(/^data:image\/\w+;base64,(.+)$/);
+          if (m) edgeOverlayBuf = Buffer.from(m[1], 'base64');
+        }
+      } else {
+        log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge endpoint returned ${edgeRes.status}`);
+      }
+    } catch (edgeErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — proceeding without outline`);
+    }
+
+    // Composite: hatch + face block + (optional) cyan silhouette outline.
+    const composites = [
+      { input: hatchRegion, top: hatchTop, left: hatchLeft },
+      { input: solidFace,   top: faceTop,  left: faceLeft  },
+    ];
+    if (edgeOverlayBuf) {
+      composites.push({ input: edgeOverlayBuf, top: hatchTop, left: hatchLeft });
+    }
     const masked = await sharp(paddedScene)
-      .composite([
-        { input: hatchRegion, top: hatchTop, left: hatchLeft },
-        { input: solidFace,   top: faceTop,  left: faceLeft  },
-      ])
+      .composite(composites)
       .png()
       .toBuffer();
 
-    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); face block ${faceWidth}x${faceHeight} @ (${faceLeft},${faceTop})`);
+    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); face block ${faceWidth}x${faceHeight} @ (${faceLeft},${faceTop}); silhouette outline ${edgeOverlayBuf ? `${edgePixels}px` : 'OFF'}`);
 
     // Step 5 — build action context (expression / pose / gaze / holding).
     // This is what stops repaired characters defaulting to "smiling at the
