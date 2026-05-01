@@ -2398,10 +2398,8 @@ router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, 
       return res.status(404).json({ error: 'Element not found' });
     }
 
-    // Phase 2 R2 reader: prefer referenceImageUrl (R2) over inline base64.
-    // Falls back to referencePhotoData (a separate legacy path used for some
-    // location entries). loadVbReferenceBytes returns base64 with no data:
-    // prefix; wrap to match the response contract clients expect.
+    // R2-only reader (post Phase 4 cleanup). referencePhotoData is a separate
+    // legacy field used for some location entries and is kept as a fallback.
     let bytes = await loadVbReferenceBytes(foundElement);
     let imageData = bytes ? `data:image/jpeg;base64,${bytes}` : foundElement.referencePhotoData;
     if (!imageData) {

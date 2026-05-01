@@ -183,20 +183,8 @@ function normalizeAllPhotos(characters) {
 }
 
 /**
- * Load avatar bytes for a slot. Prefers the R2 URL field if set (newer
- * shape, post-migration), falls back to the inline base64 string (legacy
- * shape, pre-migration). Returns base64 string suitable for sharp/Buffer
- * decode, or null when nothing is available.
- *
- * Avatar object shape (post-migration target):
- *   {
- *     status, generatedAt, clothing,
- *     standard: null,                 // legacy inline base64 (post-migration: nulled)
- *     standardUrl: 'https://…/standard.jpg',
- *     summer / summerUrl, winter / winterUrl,
- *     styledAvatars: { …Url fields },
- *     bodyThumbnails / faceThumbnails: { …Url fields },
- *   }
+ * Load avatar bytes for a slot from R2. Returns base64 string suitable for
+ * sharp/Buffer decode, or null when no URL is set or the fetch failed.
  *
  * @param {Object} avatar - The avatars object from character.avatars
  * @param {string} slot   - 'standard' | 'summer' | 'winter'
@@ -204,45 +192,18 @@ function normalizeAllPhotos(characters) {
  */
 async function loadAvatarBytes(avatar, slot) {
   if (!avatar || !slot) return null;
-  const url = avatar[`${slot}Url`];
-  if (url) {
-    const b = await _getOrFetch(url);
-    if (b) return b;
-    // R2 fetch failed — fall through to inline if present (defense in depth)
-  }
-  const inline = avatar[slot];
-  if (typeof inline === 'string' && inline.length > 0) {
-    return inline.replace(/^data:image\/\w+;base64,/, '');
-  }
-  return null;
+  return _getOrFetch(avatar[`${slot}Url`]);
 }
 
 /**
- * Load Visual Bible reference image bytes. Same dual-shape pattern as
- * loadAvatarBytes — prefers `referenceImageUrl` (R2), falls back to
- * `referenceImageData` (legacy inline base64).
- *
- * VB entry shape (post-migration target):
- *   {
- *     id, name, extractedDescription, ...,
- *     referenceImageData: null,
- *     referenceImageUrl: 'https://…/vb/ART003.jpg'
- *   }
+ * Load Visual Bible reference image bytes from R2.
  *
  * @param {Object} vbEntry - A single VB entry (character/animal/artifact/etc.)
  * @returns {Promise<string|null>} base64 string (no data: prefix) or null
  */
 async function loadVbReferenceBytes(vbEntry) {
   if (!vbEntry) return null;
-  if (vbEntry.referenceImageUrl) {
-    const b = await _getOrFetch(vbEntry.referenceImageUrl);
-    if (b) return b;
-  }
-  const inline = vbEntry.referenceImageData;
-  if (typeof inline === 'string' && inline.length > 0) {
-    return inline.replace(/^data:image\/\w+;base64,/, '');
-  }
-  return null;
+  return _getOrFetch(vbEntry.referenceImageUrl);
 }
 
 module.exports = {
