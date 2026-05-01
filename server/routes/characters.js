@@ -13,6 +13,28 @@ const { normalizePhotos, stripLegacyPhotoFields } = require('../lib/characterPho
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
+// Merge inline thumbnail slots with their R2 URL counterparts. After Phase 4
+// cleanup, faceThumbnails.{slot} is null and the URL lives in
+// faceThumbnailsUrl.{slot}; the frontend uses the value as <img src> which
+// accepts both data: URIs and https URLs. Returns a lean object the client
+// already understands (faceThumbnails / bodyThumbnails only).
+function mergeThumbs(t) {
+  if (!t) return t;
+  const merge = (inline, urls) => {
+    if (!inline && !urls) return undefined;
+    const out = {};
+    for (const k of new Set([...Object.keys(inline || {}), ...Object.keys(urls || {})])) {
+      out[k] = (inline && inline[k]) || (urls && urls[k]) || null;
+    }
+    return out;
+  };
+  return {
+    id: t.id,
+    faceThumbnails: merge(t.faceThumbnails, t.faceThumbnailsUrl),
+    bodyThumbnails: merge(t.bodyThumbnails, t.bodyThumbnailsUrl),
+  };
+}
+
 // GET /api/characters - Get user's characters (lightweight, for list view)
 // Returns stripped metadata only - use /:characterId/avatars for full avatar data
 router.get('/', authenticateToken, async (req, res) => {
@@ -57,10 +79,12 @@ router.get('/', authenticateToken, async (req, res) => {
             const lightChars = chars.map(c => {
               const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...light } = c;
               if (light.avatars) {
-                const stdThumb = light.avatars.faceThumbnails?.standard;
+                const stdThumb = light.avatars.faceThumbnails?.standard
+                  || light.avatars.faceThumbnailsUrl?.standard;
                 light.avatars = {
                   status: light.avatars.status, stale: light.avatars.stale, generatedAt: light.avatars.generatedAt,
-                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer),
+                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer
+                    || light.avatars.winterUrl || light.avatars.standardUrl || light.avatars.summerUrl),
                   faceThumbnails: stdThumb ? { standard: stdThumb } : undefined,
                   clothing: light.avatars.clothing
                 };
@@ -109,9 +133,12 @@ router.get('/', authenticateToken, async (req, res) => {
           ...lightChar
         } = char;
 
-        // Also strip faceThumbnails except 'standard' (they're 260-330KB each)
-        if (lightChar.avatars?.faceThumbnails) {
-          const standardThumb = lightChar.avatars.faceThumbnails.standard;
+        // Also strip faceThumbnails except 'standard' (they're 260-330KB each).
+        // Post-Phase-4 the inline slot is null and the URL lives in
+        // faceThumbnailsUrl.standard — fall back so the client always gets a src.
+        if (lightChar.avatars?.faceThumbnails || lightChar.avatars?.faceThumbnailsUrl) {
+          const standardThumb = lightChar.avatars.faceThumbnails?.standard
+            || lightChar.avatars.faceThumbnailsUrl?.standard;
           lightChar.avatars = {
             ...lightChar.avatars,
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined
@@ -151,36 +178,43 @@ router.get('/thumbnails', authenticateToken, async (req, res) => {
 
     const characterId = `characters_${req.user.id}`;
 
-    // Extract only id + thumbnails from JSONB, avoiding full data column parse
+    // Extract id + thumbnails (inline) + thumbnail URLs (R2). Post-Phase-4
+    // the inline slots are nulled and the URL fields hold the R2 URL —
+    // mergeThumbs() below picks whichever exists per slot. <img src> accepts
+    // both data: URIs and https URLs interchangeably.
     const result = await dbQuery(`
       SELECT jsonb_agg(
         jsonb_build_object(
           'id', (c->>'id')::bigint,
           'faceThumbnails', c->'avatars'->'faceThumbnails',
-          'bodyThumbnails', c->'avatars'->'bodyThumbnails'
+          'faceThumbnailsUrl', c->'avatars'->'faceThumbnailsUrl',
+          'bodyThumbnails', c->'avatars'->'bodyThumbnails',
+          'bodyThumbnailsUrl', c->'avatars'->'bodyThumbnailsUrl'
         )
       ) as thumbnails
       FROM characters, jsonb_array_elements(data->'characters') c
       WHERE id = $1
     `, [characterId]);
 
-    if (!result.length || !result[0].thumbnails) {
-      // Try legacy format (subquery to get latest row first, then expand)
+    let thumbnails = result[0]?.thumbnails;
+    if (!result.length || !thumbnails) {
       const legacy = await dbQuery(`
         SELECT jsonb_agg(
           jsonb_build_object(
             'id', (c->>'id')::bigint,
             'faceThumbnails', c->'avatars'->'faceThumbnails',
-            'bodyThumbnails', c->'avatars'->'bodyThumbnails'
+            'faceThumbnailsUrl', c->'avatars'->'faceThumbnailsUrl',
+            'bodyThumbnails', c->'avatars'->'bodyThumbnails',
+            'bodyThumbnailsUrl', c->'avatars'->'bodyThumbnailsUrl'
           )
         ) as thumbnails
         FROM (SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) chars,
              jsonb_array_elements(chars.data->'characters') c
       `, [req.user.id]);
-      return res.json({ thumbnails: legacy[0]?.thumbnails || [] });
+      thumbnails = legacy[0]?.thumbnails || [];
     }
 
-    res.json({ thumbnails: result[0].thumbnails });
+    res.json({ thumbnails: thumbnails.map(mergeThumbs) });
   } catch (err) {
     console.error('Error fetching character thumbnails:', err);
     res.status(500).json({ error: 'Failed to fetch thumbnails' });
