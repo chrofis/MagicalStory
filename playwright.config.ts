@@ -130,6 +130,16 @@ export default defineConfig({
       testMatch: /shared-viewer-har\.spec\.ts/,
     },
 
+    // Referral flow read-only API checks (admin JWT injected). NEVER hits
+    // checkout / Stripe / Gelato — see safety rails in the spec body.
+    {
+      name: 'referral-flow',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /referral-flow\.spec\.ts/,
+    },
+
     // Dev-panel UI checks (admin JWT injected, no full auth dep). Used to
     // verify dev-only buttons/dropdowns render after a deploy.
     {
