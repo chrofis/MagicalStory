@@ -322,38 +322,46 @@ async function migrateVbRefs(pool) {
     let perRowNulls = 0;
     let perRowBytes = 0;
 
+    // Parallelize uploads WITHIN a single story. Each entry's R2 PUT is
+    // independent — was sequential at ~200ms each, ~5–15 sequential uploads
+    // per story = the dominant per-row cost. Promise.all cuts that to one
+    // round-trip's worth.
+    const tasks = [];
     for (const arrName of VB_ARRAYS) {
       const arr = vb[arrName];
       if (!Array.isArray(arr)) continue;
       for (const entry of arr) {
         if (!entry?.id) continue;
-        const inline = entry.referenceImageData;
-        const url = entry.referenceImageUrl;
+        tasks.push((async () => {
+          const inline = entry.referenceImageData;
+          const url = entry.referenceImageUrl;
 
-        const result = await uploadIfMissing(
-          (b64) => r2.uploadImage(b64, r2.keyForVbReference(row.id, entry.id)),
-          inline,
-          url,
-        );
+          const result = await uploadIfMissing(
+            (b64) => r2.uploadImage(b64, r2.keyForVbReference(row.id, entry.id)),
+            inline,
+            url,
+          );
 
-        if (result.uploaded) {
-          entry.referenceImageUrl = result.newUrl;
-          rowChanged = true;
-          perRowUploads++;
-          perRowBytes += byteSize(inline);
-          console.log(`${tag}  ✓ uploaded ${row.id}/vb/${entry.id}.jpg (${(byteSize(inline) / 1024).toFixed(0)}KB)`);
-        } else if (DRY_RUN && result.newUrl === 'WOULD-UPLOAD') {
-          perRowUploads++;
-          perRowBytes += byteSize(inline);
-        }
+          if (result.uploaded) {
+            entry.referenceImageUrl = result.newUrl;
+            rowChanged = true;
+            perRowUploads++;
+            perRowBytes += byteSize(inline);
+            console.log(`${tag}  ✓ uploaded ${row.id}/vb/${entry.id}.jpg (${(byteSize(inline) / 1024).toFixed(0)}KB)`);
+          } else if (DRY_RUN && result.newUrl === 'WOULD-UPLOAD') {
+            perRowUploads++;
+            perRowBytes += byteSize(inline);
+          }
 
-        if (NULL_INLINE && (result.uploaded || url) && entry.referenceImageData != null) {
-          if (!DRY_RUN) entry.referenceImageData = null;
-          rowChanged = true;
-          perRowNulls++;
-        }
+          if (NULL_INLINE && (result.uploaded || url) && entry.referenceImageData != null) {
+            if (!DRY_RUN) entry.referenceImageData = null;
+            rowChanged = true;
+            perRowNulls++;
+          }
+        })());
       }
     }
+    await Promise.all(tasks);
 
     if (perRowUploads + perRowNulls > 0) {
       console.log(`${tag}story ${row.id}: ${perRowUploads} VB uploads, ${perRowNulls} nulls, ${(perRowBytes / 1024).toFixed(0)}KB moved`);
