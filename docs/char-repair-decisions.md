@@ -46,12 +46,27 @@ Status legend: ✅ kept · ❌ rejected · 🟡 conditional/dev-toggle.
 
 ### Grok output handling
 
+This is the most-relitigated part of the pipeline. The ground truth is
+that **two failure modes are in tension**:
+- (a) Grok bytes verbatim → Aurora re-quantises every pixel; neighbours
+  and background lose saturation, edges get crunchy.
+- (b) Always feather over the original silhouette → if the repainted
+  figure landed in a slightly different pose/position, the silhouette
+  mask is wrong for the new figure: feather clips real character pixels
+  and stitches old-pose pixels at the boundary (two-headed bodies,
+  ghost limbs).
+
+We've toggled between (a) and (b) at least twice. The current rule is
+**conditional**: feather only when the repainted figure is mostly inside
+the original silhouette.
+
 | # | Decision | Status | Why | Last commit |
 |---|---|---|---|---|
-| 8 | Resize Grok output back to source dims | 🟡 (gated by feather toggle) | Trade-off: resizing 896×1280 → 880×1168 loses ~2% linear in the silhouette region. Worth it because the alternative is Aurora touching every pixel of the frame | `0d1c3ddd` |
-| 9 | Pass Grok bytes verbatim (no resize, no re-encode) | 🟡 (legacy default in older builds) | Was correct when we trusted Aurora to only repaint inside the mask. Aurora doesn't honour that — it re-renders the whole scene | `ecaa54b2`, `6f9d9202` (set), `0d1c3ddd` (default off) |
-| 10 | **Feather-composite Grok output over the original scene at the silhouette only** (6px feather) | ✅ default ON, dev-toggleable | The actual fix for "other characters degraded after repair". Outside silhouette = original JPEG bytes pixel-for-pixel. Inside = Grok's repaint. | `0d1c3ddd` |
-| 11 | Sharp `create({channels:1})` for the feathered mask | ❌ | Sharp requires 3+ channels for `create`. Build 3-channel black canvas, composite silhouette PNG, blur, then `extractChannel(0)` | `255fb796` |
+| 8 | Pass Grok bytes verbatim (no resize, no re-encode) | ❌ deprecated as a default | Was right when ghost-limb artefacts dominated. Now we have a fitness check that detects the dangerous case, so we can feather in the safe ones | `ecaa54b2`, `6f9d9202` |
+| 9 | Always feather-composite Grok output over original at silhouette | ❌ | Caused ghost limbs whenever the repainted figure shifted out of the original silhouette. Replaced by row #10 | `0d1c3ddd` |
+| 10 | **Conditional feather**: rembg the Grok output, compare new silhouette vs old; feather only if `newOnly < 15% × oldPx`; otherwise use Grok verbatim | ✅ default | Auto-detect handles both failure modes — preserves scene when feather is safe, accepts scene drift when figure moved | `<this commit>` |
+| 11 | Resize Grok output to source dims (when feathering) | ✅ (only when feather is applied) | Required for like-for-like compositing. ~2% linear downsample of figure region only. When feather is skipped, Grok bytes pass verbatim and dims are preserved | `<this commit>` |
+| 12 | Sharp `create({channels:1})` for the feathered mask | ❌ | Sharp requires 3+ channels for `create`. Build 3-channel black canvas, composite silhouette PNG, blur, then `extractChannel(0)` | `255fb796` |
 
 ### Prompt
 
@@ -64,25 +79,25 @@ Status legend: ✅ kept · ❌ rejected · 🟡 conditional/dev-toggle.
 
 ## Dev toggle: feather composite
 
-Knob name: `featherComposite` (default `true`).
+The default behaviour is **automatic**: the conditional check in row #10
+decides per repair whether to feather or pass Grok bytes verbatim. The
+log line `[CHAR REPAIR GROK] Feather composite: ...` shows the decision
+and the leak ratio.
 
-- **UI** — `StoryDisplay.tsx`'s admin char-repair popover has a checkbox: **"Feather composite (inpaint only) — preserve untouched pixels outside the silhouette."**
-- **API** — `POST /api/stories/:id/repair-workflow/character-repair` accepts `featherComposite: false` in the body.
-- **Backend** — `repairCharacterMismatchWithGrok({ featherComposite: false })` skips Step 8 and returns Grok bytes verbatim.
+There is also a manual override:
 
-When **ON** (default): Grok's output is resized to source dims, masked by
-the silhouette (with 6 px feather), and composited over the original
-scene. Other characters and background are byte-for-byte identical to
-before. Slight detail loss inside the silhouette only.
+- Knob name: `featherComposite` (default `true`).
+- **UI** — `StoryDisplay.tsx`'s admin char-repair popover has a checkbox.
+- **API** — `POST /api/stories/:id/repair-workflow/character-repair` accepts `featherComposite: false`.
+- **Backend** — `repairCharacterMismatchWithGrok({ featherComposite: false })` skips even the fitness check and returns Grok bytes verbatim.
 
-When **OFF**: Grok's bytes pass through verbatim (legacy behaviour). The
-entire scene re-renders — saturation drifts, edges crunch up, colours
-re-quantise across every pixel, but you keep Grok's full native
-resolution inside the figure.
+When the checkbox is **ON** (default): the auto-detect runs. Feather is
+applied only when the figure stayed inside the original silhouette;
+otherwise Grok bytes pass through unchanged.
 
-You almost always want it ON. The toggle exists for A/B comparisons and
-for the rare scene where the silhouette mask comes back wrong (e.g.
-rembg failed and you want Grok's full output anyway).
+When the checkbox is **OFF**: Grok's bytes pass through verbatim,
+unconditionally. Use this only for A/B debugging. The auto-detect
+already handles "skip if bad" — you almost never want to disable it.
 
 ## When to revisit
 

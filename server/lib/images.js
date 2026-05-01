@@ -9022,64 +9022,126 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // Step 8 — preserve untouched pixels.
+    // Step 8 — conditional feather composite.
     //
-    // Aurora is autoregressive: even with a tight inpaint mask in the input,
-    // it re-renders the entire scene, which re-quantises colours, shifts
-    // saturation, and touches every pixel — visibly degrading the other
-    // characters and background. We only want the silhouette area to change.
+    // Two failure modes are in tension here:
+    //   (a) Grok bytes verbatim → Aurora re-quantises every pixel, neighbours
+    //       and background lose saturation / get crunchy edges.
+    //   (b) Always feather over the original silhouette → if the repainted
+    //       figure landed in a slightly different pose/position, the silhouette
+    //       mask is wrong for the new figure: feather clips real character
+    //       pixels and stitches in old-pose pixels at the boundary
+    //       (two-headed bodies, ghost limbs — see
+    //       docs/char-repair-decisions.md for the historical context).
     //
-    // Solution: feather-composite Grok's output over the ORIGINAL scene
-    // using the silhouette mask. Outside the silhouette = original pixels,
-    // pixel-perfect. Inside = Grok's repaint, with a small feather at the
-    // boundary to hide the seam.
+    // Right answer: feather only when it's safe.
+    //   1. resize Grok output to source dims
+    //   2. run rembg on Grok's output crop → new silhouette
+    //   3. compare new silhouette vs old: if the new figure stays mostly
+    //      inside the old silhouette, feather is safe → preserve scene
+    //   4. otherwise → use Grok bytes verbatim (figure intact, scene drifts)
     //
-    // Trade-off: we have to resize Grok's output (typically 896×1280 for 3:4)
-    // back to source dims (e.g. 880×1168). That's a ~2% linear downsample of
-    // the silhouette region only — losing a tiny bit of detail there is far
-    // cheaper than letting Aurora touch every other pixel in the frame.
+    // The user can also force feather OFF via options.featherComposite=false
+    // for A/B debugging (rare; the auto-detect handles the normal case).
     const grokRawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    // Dev toggle: when false, skip the feather-composite and pass Grok's
-    // bytes through verbatim (legacy behaviour, see docs/char-repair-decisions.md).
-    const featherComposite = options.featherComposite !== false;
+    const featherEnabled = options.featherComposite !== false;
     let finalBuf;
-    if (silhouetteMaskBuf && featherComposite) {
-      // Resize Grok output to source dims, then mask-composite.
+    let featherDecision = 'OFF (no silhouette)';
+
+    if (silhouetteMaskBuf && featherEnabled) {
+      // Resize Grok output to source dims so we can compare like-for-like
+      // and (later) composite at scene dims.
       const grokAtSourceDims = await sharp(grokRawBuf)
         .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill', kernel: 'lanczos3' })
         .png()
         .toBuffer();
-      // Build a feathered single-channel mask at scene dims.
-      // Sharp's `create` requires 3 or 4 channels — build a 3-channel black
-      // canvas, paste the silhouette PNG (white-on-transparent) onto it,
-      // blur, then extract one channel as the grayscale mask.
-      const FEATHER_PX = 6;
-      const featheredRGB = await sharp({
-        create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } },
-      })
-        .composite([{ input: silhouetteMaskBuf, top: hatchTop, left: hatchLeft }])
-        .blur(FEATHER_PX)
-        .png()
-        .toBuffer();
-      const featheredMask = await sharp(featheredRGB).extractChannel(0).png().toBuffer();
-      // Attach the feathered mask as the alpha of Grok's image, then composite over the original.
-      const grokWithAlpha = await sharp(grokAtSourceDims)
-        .removeAlpha()
-        .joinChannel(featheredMask)
-        .png()
-        .toBuffer();
-      finalBuf = await sharp(sceneBuffer)
-        .composite([{ input: grokWithAlpha, top: 0, left: 0, blend: 'over' }])
-        .jpeg({ quality: 95 })
-        .toBuffer();
-      log.info(`👤 [CHAR REPAIR GROK] Mask-composite: Grok output blended over original at silhouette only (feather ${FEATHER_PX}px)`);
-    } else {
-      // Either silhouette fetch failed OR featherComposite was disabled by
-      // the caller → keep Grok's raw bytes verbatim (legacy behaviour, full
-      // scene gets re-rendered).
+
+      // Fitness check: rembg the Grok output's hatch crop → new silhouette.
+      // Compare alpha pixel-by-pixel against the old silhouette. If a large
+      // fraction of the new silhouette lies OUTSIDE the old silhouette, the
+      // figure moved/grew and feathering would clip it.
+      let canFeather = false;
+      let leakRatio = null;
+      try {
+        const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+        const grokHatchCrop = await sharp(grokAtSourceDims)
+          .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+          .jpeg({ quality: 90 }).toBuffer();
+        const newSilRes = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: `data:image/jpeg;base64,${grokHatchCrop.toString('base64')}`,
+            color: [255, 255, 255],
+            alpha: 255,
+          }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (newSilRes.ok) {
+          const j = await newSilRes.json();
+          const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+          if (j?.success && m) {
+            const newSilBuf = Buffer.from(m[1], 'base64');
+            const oldAlpha = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
+            const newAlpha = await sharp(newSilBuf).extractChannel(3).raw().toBuffer();
+            // Both buffers are at hatchWidth × hatchHeight so lengths match.
+            let oldPx = 0, newOnly = 0;
+            const len = Math.min(oldAlpha.length, newAlpha.length);
+            for (let i = 0; i < len; i++) {
+              const oldSet = oldAlpha[i] > 128;
+              const newSet = newAlpha[i] > 128;
+              if (oldSet) oldPx++;
+              if (newSet && !oldSet) newOnly++;
+            }
+            // Threshold: up to 15% of the old silhouette can leak outside
+            // before we declare the feather unsafe. Tune in
+            // docs/char-repair-decisions.md if false-positives appear.
+            const FEATHER_LEAK_THRESHOLD = 0.15;
+            leakRatio = oldPx > 0 ? newOnly / oldPx : 1;
+            canFeather = leakRatio < FEATHER_LEAK_THRESHOLD;
+          }
+        }
+      } catch (checkErr) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Feather fitness check failed (${checkErr.message}) — using Grok verbatim`);
+      }
+
+      if (canFeather) {
+        // Build a feathered single-channel mask at scene dims and composite.
+        // Sharp's `create` requires 3 or 4 channels — build a 3-channel black
+        // canvas, paste the silhouette PNG, blur, extract one channel.
+        const FEATHER_PX = 6;
+        const featheredRGB = await sharp({
+          create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } },
+        })
+          .composite([{ input: silhouetteMaskBuf, top: hatchTop, left: hatchLeft }])
+          .blur(FEATHER_PX)
+          .png()
+          .toBuffer();
+        const featheredMask = await sharp(featheredRGB).extractChannel(0).png().toBuffer();
+        const grokWithAlpha = await sharp(grokAtSourceDims)
+          .removeAlpha()
+          .joinChannel(featheredMask)
+          .png()
+          .toBuffer();
+        finalBuf = await sharp(sceneBuffer)
+          .composite([{ input: grokWithAlpha, top: 0, left: 0, blend: 'over' }])
+          .jpeg({ quality: 95 })
+          .toBuffer();
+        featherDecision = `ON (newOnly ${(leakRatio * 100).toFixed(1)}%, feather ${FEATHER_PX}px)`;
+      } else {
+        finalBuf = grokRawBuf;
+        featherDecision = leakRatio == null
+          ? 'OFF (fitness check failed)'
+          : `OFF (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% — figure moved)`;
+      }
+    } else if (silhouetteMaskBuf && !featherEnabled) {
       finalBuf = grokRawBuf;
-      log.info(`👤 [CHAR REPAIR GROK] Mask-composite: OFF (${silhouetteMaskBuf ? 'dev toggle' : 'no silhouette'}) — using Grok bytes verbatim`);
+      featherDecision = 'OFF (dev toggle)';
+    } else {
+      finalBuf = grokRawBuf;
+      featherDecision = 'OFF (no silhouette)';
     }
+    log.info(`👤 [CHAR REPAIR GROK] Feather composite: ${featherDecision}`);
     const isPng = finalBuf[0] === 0x89 && finalBuf[1] === 0x50 && finalBuf[2] === 0x4e && finalBuf[3] === 0x47;
     const finalMime = isPng ? 'image/png' : 'image/jpeg';
 
