@@ -26,9 +26,12 @@ const _avatarFetchCache = new Map();
 async function _getOrFetch(url) {
   if (!url) return null;
   if (_avatarFetchCache.has(url)) return _avatarFetchCache.get(url);
-  const bytes = await fetchImageBytes(url);
-  if (bytes) _avatarFetchCache.set(url, bytes);
-  return bytes;
+  const buf = await fetchImageBytes(url);
+  if (!buf) return null;
+  // fetchImageBytes returns Buffer; loaders below contract base64 string.
+  const b64 = buf.toString('base64');
+  _avatarFetchCache.set(url, b64);
+  return b64;
 }
 
 /**
