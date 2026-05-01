@@ -279,6 +279,13 @@ async function migrateCharacters(pool) {
 // ── Visual Bible refs migration ────────────────────────────────────────────
 async function migrateVbRefs(pool) {
   console.log(`${tag}=== STORIES table (visual bible refs) ===`);
+
+  // Stream rows one at a time. The stories.data column is multi-MB per row
+  // (4.97 GB total across 96 rows). A single bulk SELECT pulls all of it
+  // into one buffer over the network — easily multi-minute hang. Instead:
+  //   1) Get the LIST of story ids cheaply (no data blob).
+  //   2) For each id, fetch + process + commit + move on. Each row holds
+  //      one ~50MB blob in memory at a time.
   const conditions = ['data->\'visualBible\' IS NOT NULL'];
   const params = [];
   if (STORY_ID) {
@@ -288,11 +295,11 @@ async function migrateVbRefs(pool) {
     conditions.push(`id >= $${params.length + 1}`);
     params.push(FROM_ID);
   }
-  let query = `SELECT id, data FROM stories WHERE ${conditions.join(' AND ')} ORDER BY id`;
-  if (LIMIT > 0) query += ` LIMIT ${LIMIT}`;
+  let listQuery = `SELECT id FROM stories WHERE ${conditions.join(' AND ')} ORDER BY id`;
+  if (LIMIT > 0) listQuery += ` LIMIT ${LIMIT}`;
 
-  const { rows } = await pool.query(query, params);
-  console.log(`${tag}Loaded ${rows.length} story rows with VB`);
+  const { rows: idRows } = await pool.query(listQuery, params);
+  console.log(`${tag}Streaming ${idRows.length} story rows with VB (one at a time)`);
 
   let totalUploads = 0;
   let totalNullified = 0;
@@ -301,7 +308,11 @@ async function migrateVbRefs(pool) {
 
   const VB_ARRAYS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations'];
 
-  for (const row of rows) {
+  for (let i = 0; i < idRows.length; i++) {
+    const storyId = idRows[i].id;
+    const { rows: dataRows } = await pool.query(`SELECT id, data FROM stories WHERE id = $1`, [storyId]);
+    if (dataRows.length === 0) continue;
+    const row = dataRows[0];
     const data = row.data || {};
     const vb = data.visualBible;
     if (!vb || typeof vb !== 'object') continue;
