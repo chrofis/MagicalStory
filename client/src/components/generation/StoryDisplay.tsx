@@ -332,6 +332,16 @@ export function StoryDisplay({
   const [isPreviewingPrompt, setIsPreviewingPrompt] = useState(false);
   // Test Models panel: which page is showing the comparison
   const [testModelsPage, setTestModelsPage] = useState<number | null>(null);
+  // Style consistency check (dev): loading state + last result + visibility
+  const [styleCheckLoading, setStyleCheckLoading] = useState(false);
+  const [styleCheckResult, setStyleCheckResult] = useState<{
+    verdict: 'consistent' | 'mixed' | 'fragmented';
+    dominantCluster: number[];
+    anchorPage: number;
+    outliers: Array<{ page: number; severity: 'major' | 'moderate' | 'minor'; differences: string[] }>;
+    reasoning: string;
+    gridImage: string;
+  } | null>(null);
 
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
@@ -2156,7 +2166,7 @@ export function StoryDisplay({
 
       {/* Developer Mode Buttons */}
       {developerMode && (
-        <div className="flex gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-2">
           {onDownloadTxt && (
             <button
               onClick={onDownloadTxt}
@@ -2176,6 +2186,76 @@ export function StoryDisplay({
               <BookOpen size={14} /> Print (DEV)
             </button>
           )}
+          {hasImages && storyId && (
+            <button
+              disabled={styleCheckLoading || isGenerating}
+              onClick={async () => {
+                setStyleCheckLoading(true);
+                try {
+                  const r = await storyService.styleCheck(storyId);
+                  setStyleCheckResult({
+                    verdict: r.verdict, dominantCluster: r.dominantCluster, anchorPage: r.anchorPage,
+                    outliers: r.outliers, reasoning: r.reasoning, gridImage: r.gridImage,
+                  });
+                } catch (err) {
+                  console.error('Style check failed:', err);
+                  alert('Style check failed: ' + (err instanceof Error ? err.message : String(err)));
+                } finally {
+                  setStyleCheckLoading(false);
+                }
+              }}
+              className={`bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${styleCheckLoading || isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-700'}`}
+              title="Cross-page style consistency check (admin only)"
+            >
+              {styleCheckLoading ? <><Loader2 size={14} className="animate-spin" /> Checking…</> : <><Eye size={14} /> Style Check (DEV)</>}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Style Check result panel */}
+      {developerMode && styleCheckResult && (
+        <div className="mt-3 border-2 rounded-xl p-4 bg-purple-50 border-purple-300">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-purple-900">Style consistency:</span>
+              <span className={`text-xs font-mono px-2 py-0.5 rounded ${
+                styleCheckResult.verdict === 'consistent' ? 'bg-green-200 text-green-900' :
+                styleCheckResult.verdict === 'mixed' ? 'bg-yellow-200 text-yellow-900' :
+                'bg-red-200 text-red-900'
+              }`}>
+                {styleCheckResult.verdict.toUpperCase()}
+              </span>
+              <span className="text-xs text-gray-600">
+                {styleCheckResult.dominantCluster.length} in cluster, {styleCheckResult.outliers.length} outlier{styleCheckResult.outliers.length === 1 ? '' : 's'}, anchor: {styleCheckResult.anchorPage === -1 ? 'Front cover' : `Page ${styleCheckResult.anchorPage}`}
+              </span>
+            </div>
+            <button onClick={() => setStyleCheckResult(null)} className="p-1 hover:bg-purple-200 rounded text-gray-500"><X size={16} /></button>
+          </div>
+          <p className="text-xs text-gray-700 mb-3">{styleCheckResult.reasoning}</p>
+          {styleCheckResult.outliers.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {styleCheckResult.outliers.map((o, i) => (
+                <div key={i} className="bg-white border border-purple-200 rounded p-2 text-xs">
+                  <div className="font-semibold text-gray-900">
+                    {o.page === -1 ? 'Front cover' : `Page ${o.page}`}
+                    <span className={`ml-2 px-1.5 py-0.5 rounded font-mono text-[10px] ${
+                      o.severity === 'major' ? 'bg-red-100 text-red-700' :
+                      o.severity === 'moderate' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>{o.severity}</span>
+                  </div>
+                  <ul className="mt-1 ml-4 list-disc text-gray-700">
+                    {o.differences.map((d, j) => <li key={j}>{d}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+          <details>
+            <summary className="text-xs text-purple-700 cursor-pointer">Show grid sent to model</summary>
+            <img src={styleCheckResult.gridImage} alt="Style grid" className="mt-2 max-w-full border rounded" />
+          </details>
         </div>
       )}
 

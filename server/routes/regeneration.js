@@ -1023,6 +1023,37 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
   }
 });
 
+// Cross-page style consistency check (ADMIN ONLY).
+// Builds a thumbnail grid of all pages + cover, sends to Gemini, returns the
+// dominant style cluster + outliers. Detection only — no auto-repair here.
+router.post('/:id/style-check', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Admin gate
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+    // Load + rehydrate story (images live in story_images, not in data)
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    const { checkStoryStyleConsistency } = require('../lib/styleConsistency');
+    const result = await checkStoryStyleConsistency(storyData);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    log.error('Error in style-check:', err);
+    res.status(500).json({ error: 'Style check failed: ' + err.message });
+  }
+});
+
 // Style transfer: re-render current page image in the story's art style using a different model (admin only)
 router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
   try {

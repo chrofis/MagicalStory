@@ -1370,6 +1370,21 @@ export const storyService = {
     return response;
   },
 
+  // Cross-page style consistency check (ADMIN ONLY). Sends a thumbnail grid
+  // of every page + cover to Gemini, returns the dominant style cluster and
+  // any outliers. Detection only — repair is a separate action.
+  async styleCheck(storyId: string): Promise<{
+    success: boolean;
+    verdict: 'consistent' | 'mixed' | 'fragmented';
+    dominantCluster: number[];
+    anchorPage: number;
+    outliers: Array<{ page: number; severity: 'major' | 'moderate' | 'minor'; differences: string[] }>;
+    reasoning: string;
+    gridImage: string;
+  }> {
+    return api.post(`/api/stories/${storyId}/style-check`, {});
+  },
+
   // Update scene image directly (admin only - for reverting repairs)
   async updateSceneImage(storyId: string, pageNumber: number, imageData: string): Promise<{
     success: boolean;
