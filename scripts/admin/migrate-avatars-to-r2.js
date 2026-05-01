@@ -55,11 +55,25 @@ const val = (flag, dflt = null) => {
 
 const DRY_RUN = !has('--apply');
 const NULL_INLINE = has('--null-inline');
-const WHAT = (val('--what', 'both') || 'both').toLowerCase();
 const FROM_ID = val('--from-id', null);
 const CHARACTER_ROW = val('--character-row', null);
 const STORY_ID = val('--story-id', null);
 const LIMIT = parseInt(val('--limit', '0'), 10) || 0;
+
+// Auto-scope --what based on the row filter unless caller is explicit.
+// --character-row applies only to the characters table, so scanning stories
+// with that flag is wasted work; same for --story-id.
+const WHAT_EXPLICIT = val('--what', null);
+let WHAT;
+if (WHAT_EXPLICIT) {
+  WHAT = WHAT_EXPLICIT.toLowerCase();
+} else if (CHARACTER_ROW) {
+  WHAT = 'avatars';
+} else if (STORY_ID) {
+  WHAT = 'vb';
+} else {
+  WHAT = 'both';
+}
 
 if (!['avatars', 'vb', 'both'].includes(WHAT)) {
   console.error(`--what must be one of: avatars, vb, both (got: ${WHAT})`);
