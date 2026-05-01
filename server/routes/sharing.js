@@ -730,30 +730,82 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
 });
 
 // GET /shared/:shareToken - Serve React app with OG meta tags for social previews
-// This is the URL users copy from browser, needs OG tags for WhatsApp/Facebook
+// AND a cover-image preload hint for first-paint perf.
+//
+// Two passes through the same HTML response:
+//   - OG tags: only when the story is PUBLICLY shared (getSharedStory matches
+//     is_shared=true) — social crawlers can't be authenticated.
+//   - Cover preload + preconnect: always when the token resolves to a story,
+//     even private ones owned by a logged-in user. Preconnect to the R2
+//     origin saves DNS+TLS handshake on first paint (~150 ms). The actual
+//     <link rel=preload> with the R2 cover URL is only added for public
+//     stories (we don't want to leak private R2 paths in HTML).
 htmlRouter.get('/shared/:shareToken', async (req, res) => {
   const { shareToken } = req.params;
   log.debug(`[SHARED] Request for /shared/${shareToken.substring(0, 8)}...`);
 
   try {
+    if (!hasDistFolder) {
+      return res.redirect('/');
+    }
+
+    // Story for OG tags — needs public access OR ownership.
     const story = await getSharedStory(shareToken, req.user?.id);
-    log.debug(`[SHARED] Story found: ${!!story}, hasDistFolder: ${hasDistFolder}`);
 
-    if (story && hasDistFolder) {
-      // Read the index.html
-      const indexPath = path.join(distPath, 'index.html');
-      let html = await fs.readFile(indexPath, 'utf8');
+    // Token-only existence check for the perf hints. Even if OG tags can't
+    // be added (private story, anonymous request), we still want to inject
+    // preconnect so the eventual cover fetch is faster.
+    let storyId = null;
+    let isPublic = false;
+    let coverUrl = null;
+    if (shareToken && shareToken.length === 64) {
+      const rows = await dbQuery(
+        'SELECT id, is_shared FROM stories WHERE share_token = $1',
+        [shareToken]
+      );
+      if (rows.length > 0) {
+        storyId = rows[0].id;
+        isPublic = !!rows[0].is_shared;
+        if (isPublic) {
+          try {
+            const activeIdx = await getActiveVersion(storyId, 'frontCover');
+            const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
+            if (img?.imageUrl) coverUrl = img.imageUrl;
+          } catch { /* fall through — preconnect-only */ }
+        }
+      }
+    }
 
+    log.debug(`[SHARED] Story found: ${!!story}, public: ${isPublic}, coverUrl: ${!!coverUrl}, hasDistFolder: ${hasDistFolder}`);
+
+    if (!storyId) {
+      // Token unknown — let the SPA shell handle it.
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+
+    const indexPath = path.join(distPath, 'index.html');
+    let html = await fs.readFile(indexPath, 'utf8');
+
+    // ── First-paint hints ─────────────────────────────────────────────
+    // Always add preconnect to the R2 origin (saves ~150 ms DNS+TLS on
+    // first cover fetch). Add the specific cover URL preload only for
+    // public stories.
+    const r2Origin = coverUrl ? new URL(coverUrl).origin : 'https://images.magicalstory.ch';
+    let perfHints = `<link rel="preconnect" href="${r2Origin}" crossorigin>`;
+    if (coverUrl) {
+      perfHints += `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
+    }
+
+    // ── OG tags (only when story is public and getSharedStory matched) ─
+    if (story) {
       const rawTitle = (story.data.title || 'Eine magische Geschichte')
         .replace(/^\*{1,2}|\*{1,2}$/g, '').replace(/^#+\s*/, '').trim();
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      // Cache buster: rotate daily so WhatsApp/Facebook re-fetch after fixes or image changes
       const ogCacheBuster = Math.floor(Date.now() / 86400000);
       const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg?v=${ogCacheBuster}`;
       const pageUrl = `${SITE_URL}/shared/${shareToken}`;
 
-      // Create OG meta tags
       const ogTags = `
   <!-- Story-specific Open Graph / Facebook / WhatsApp -->
   <meta property="og:type" content="article">
@@ -772,28 +824,19 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
   <meta name="twitter:image" content="${ogImageUrl}">
   <title>${title} - MagicalStory</title>`;
 
-      // Replace the default OG tags and title with story-specific ones
-      // Remove existing OG tags
       html = html.replace(/<meta property="og:[^>]*>\s*/g, '');
       html = html.replace(/<meta name="twitter:[^>]*>\s*/g, '');
-      // Replace title
       html = html.replace(/<title>[^<]*<\/title>/, '');
-      // Remove canonical URL (points to homepage, confuses WhatsApp/Facebook crawler)
       html = html.replace(/<link rel="canonical"[^>]*>\s*/g, '');
-      // Insert story-specific tags after <head>
       html = html.replace('<head>', '<head>' + ogTags);
 
-      // Override Helmet's same-origin CORP so social crawlers (WhatsApp, Facebook) can read OG tags
       res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.type('text/html').send(html);
-    } else {
-      // Story not found or no dist folder - serve default
-      if (hasDistFolder) {
-        res.sendFile(path.join(distPath, 'index.html'));
-      } else {
-        res.redirect('/');
-      }
     }
+
+    // Inject perf hints right before </head> so they parse last but still
+    // fire during HTML parse (preconnect/preload are processed eagerly).
+    html = html.replace('</head>', `${perfHints}</head>`);
+    res.type('text/html').send(html);
   } catch (err) {
     log.error('Error serving shared story page:', err);
     if (hasDistFolder) {

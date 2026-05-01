@@ -6980,63 +6980,9 @@ function resolvePrerenderedFile(routePath, lang) {
   return require('fs').existsSync(filePath) ? filePath : null;
 }
 
-// /shared/:token — intercept HTML response to inject a preload hint for the
-// front cover image. Browser kicks off the R2 fetch during HTML parse (~50 ms
-// post-nav) instead of waiting for React to mount + run the SharedStoryViewer
-// effect (~1.5 s post-nav). Title-page paint moves earlier by ~1+ s without
-// touching React.
-//
-// Index HTML is cached in memory after first read.
-let cachedIndexHtml = null;
-function loadIndexHtml() {
-  if (cachedIndexHtml) return cachedIndexHtml;
-  const fs = require('fs');
-  const indexPath = hasDistFolder ? path.join(distPath, 'index.html') : path.join(__dirname, 'index.html');
-  cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
-  return cachedIndexHtml;
-}
-app.get('/shared/:shareToken', async (req, res, next) => {
-  try {
-    const { shareToken } = req.params;
-    if (!shareToken || shareToken.length !== 64) return next();
-    const { dbQuery, getActiveVersion, getStoryImage } = require('./server/services/database');
-    // Look up the token regardless of is_shared so we can prime the
-    // images.magicalstory.ch preconnect even for private (owner-only)
-    // stories. Only inject the specific cover-URL preload when public —
-    // otherwise we'd leak the R2 path on a private story.
-    const rows = await dbQuery(
-      'SELECT id, is_shared FROM stories WHERE share_token = $1',
-      [shareToken]
-    );
-    if (rows.length === 0) return next();
-    const { id: storyId, is_shared: isShared } = rows[0];
-
-    let coverUrl = null;
-    let r2Origin = 'https://images.magicalstory.ch'; // safe fallback if cover lookup fails
-    if (isShared) {
-      try {
-        const activeIdx = await getActiveVersion(storyId, 'frontCover');
-        const img = await getStoryImage(storyId, 'frontCover', null, activeIdx);
-        if (img?.imageUrl) {
-          coverUrl = img.imageUrl;
-          r2Origin = new URL(coverUrl).origin;
-        }
-      } catch { /* fall through to preconnect-only */ }
-    }
-
-    const html = loadIndexHtml();
-    let hints = `<link rel="preconnect" href="${r2Origin}" crossorigin>`;
-    if (coverUrl) {
-      hints += `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
-    }
-    const out = html.replace('</head>', `${hints}</head>`);
-    res.set('Cache-Control', 'private, max-age=60');
-    res.type('html').send(out);
-  } catch (err) {
-    if (typeof log !== 'undefined') log.warn(`[shared-preload] inject failed: ${err.message}`);
-    next();
-  }
-});
+// NOTE: /shared/:token HTML response is handled by htmlRouter in
+// server/routes/sharing.js — that handler now also injects the cover-image
+// preconnect/preload hints alongside the OG tags it was already adding.
 
 // SPA fallback — serves pre-rendered HTML for SEO routes, raw index.html for app routes
 app.get('*', (req, res, next) => {
