@@ -5262,6 +5262,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             } else if (coverKey === 'backCover') {
               coverEvalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
             }
+            // Resolve full character objects for the figures appearing on this
+            // cover so downstream eval/enrich/char-repair can identify them by
+            // name. Without this, covers reach BBOX-ENRICH with 0 expected
+            // characters and every figure comes back UNKNOWN — char repair
+            // then filters them all out and `protectedFaces` ends up empty,
+            // so only the target face gets blurred.
+            const coverCharacterNames = (coverData.referencePhotos || [])
+              .map(p => p.name)
+              .filter(Boolean);
+            const coverSceneCharacters = (inputData.characters || [])
+              .filter(c => coverCharacterNames.includes(c.name));
             rawImages.push({
               pageNumber: COVER_PAGE_MAP[coverKey],
               text: '',
@@ -5269,6 +5280,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: coverData.imageData,
               prompt: coverData.prompt,
               characterPhotos: coverData.referencePhotos || [],
+              sceneCharacters: coverSceneCharacters,
               scene: { outlineExtract: coverData.description },
               evaluationType: 'cover', // Use cover evaluation (includes text checks)
             });

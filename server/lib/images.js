@@ -5816,6 +5816,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageText: orig.text,
       sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
+      // Phase 5b-pre detected bboxes for every image (incl. covers); without
+      // forwarding it the eval's enrich step re-detects from scratch with no
+      // expectedCharacters list, which on covers makes every figure UNKNOWN.
+      // Char repair then filters out all UNKNOWN figures and protectedFaces
+      // ends up empty — so only the target face is blurred during repair.
+      sharedBboxDetection: orig.sharedBboxDetection || null,
     };
   });
 
