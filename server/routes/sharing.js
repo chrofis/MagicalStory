@@ -171,6 +171,67 @@ function getPageText(storyText, pageNumber) {
 // They are mounted at /api/stories before this router, so they handle those requests.
 
 // GET /api/shared/:shareToken - Get shared story data (public or owner)
+// GET /api/shared/:shareToken/header — slim metadata for first paint.
+// Returns just what the title page + cover preload + per-page overlay
+// pre-fire need: title, language, page count, cover existence, ownership
+// flags. NO JSONB blob fetch — uses Postgres' `->>` JSON extraction so
+// PG only ships the scalars over the wire (the full data column for some
+// stories is multi-MB and dominated the old endpoint's wall time).
+apiRouter.get('/shared/:shareToken/header', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    if (!shareToken || shareToken.length !== 64) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+    const userId = req.user?.id || null;
+    const rows = await dbQuery(
+      `SELECT id,
+              user_id,
+              is_shared,
+              data->>'title'         AS title,
+              data->>'language'      AS language,
+              data->>'languageLevel' AS language_level,
+              data->'layout'         AS layout,
+              jsonb_array_length(COALESCE(data->'sceneImages', '[]'::jsonb)) AS page_count
+         FROM stories
+        WHERE share_token = $1
+          AND (is_shared = true OR user_id = $2)`,
+      [shareToken, userId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+    const row = rows[0];
+    const isOwner = !!userId && userId === row.user_id;
+    let needsPassword = false;
+    if (isOwner) {
+      const ur = await dbQuery('SELECT password FROM users WHERE id = $1', [userId]);
+      needsPassword = ur.length > 0 && !ur[0].password;
+    }
+    // Cover existence — same Set-returning helper the fat endpoint uses.
+    const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+    const existing = await imagesExistByType(row.id, coverTypes);
+    const covers = {};
+    for (const t of coverTypes) covers[t] = existing.has(t);
+
+    res.json({
+      id: row.id,
+      title: row.title,
+      language: row.language,
+      languageLevel: row.language_level || 'standard',
+      layout: row.layout || null,
+      pageCount: row.page_count || 0,
+      covers,
+      isOwner,
+      isShared: row.is_shared,
+      needsPassword,
+    });
+  } catch (err) {
+    log.error('Error fetching shared story header:', err);
+    res.status(500).json({ error: 'Failed to load story header' });
+  }
+});
+
 apiRouter.get('/shared/:shareToken', async (req, res) => {
   try {
     const { shareToken } = req.params;

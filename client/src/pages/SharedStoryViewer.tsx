@@ -53,6 +53,22 @@ export default function SharedStoryViewer() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { language, t } = useLanguage();
   const [story, setStory] = useState<SharedStoryData | null>(null);
+  // Slim header (title, cover existence, page count). Lands ~10× faster
+  // than the full story payload because it skips the multi-MB JSONB blob
+  // fetch — used to paint the title page immediately while the fat
+  // /api/shared/<token> request is still in flight.
+  const [header, setHeader] = useState<{
+    id: string;
+    title: string;
+    language?: string;
+    languageLevel?: string;
+    layout?: { textInImage?: boolean } | null;
+    pageCount: number;
+    covers: { frontCover?: boolean; initialPage?: boolean; backCover?: boolean };
+    isOwner: boolean;
+    isShared: boolean;
+    needsPassword: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -118,50 +134,77 @@ export default function SharedStoryViewer() {
   const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
 
   useEffect(() => {
-    async function fetchStory() {
-      if (!shareToken) {
-        setError('Invalid share link');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const authToken = localStorage.getItem('auth_token');
-        const headers: Record<string, string> = {};
-        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-        const response = await fetch(`/api/shared/${shareToken}`, { headers });
-        if (!response.ok) {
-          // Private story + not logged in: could be the owner viewing their
-          // own story from the email link with an expired session. Redirect
-          // to login with return URL — matches the editor's old behaviour.
-          if (response.status === 404 && !isAuthenticated) {
-            const returnTo = `/shared/${shareToken}`;
-            navigate(`/?login=true&redirect=${encodeURIComponent(returnTo)}`);
-            return;
-          }
-          if (response.status === 404) {
-            setError('This story is no longer available or the link is invalid.');
-          } else {
-            setError('Failed to load story. Please try again later.');
-          }
-          setLoading(false);
-          return;
-        }
-
-        const data = await response.json();
-        setStory(data);
-        setSharingEnabled(data.isShared || false);
-      } catch (err) {
-        setError('Failed to load story. Please check your connection.');
-      } finally {
-        setLoading(false);
-      }
+    if (!shareToken) {
+      setError('Invalid share link');
+      setLoading(false);
+      return;
     }
-
     // Wait for auth state to resolve before fetching — otherwise a private
     // story owned by a logged-in user may 404 during the brief pre-auth window.
     if (isAuthLoading) return;
-    fetchStory();
+
+    let cancelled = false;
+    const authToken = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    // Phase 1: fast header fetch → title page paints immediately.
+    // Phase 2: full story fetch (in parallel) → BookViewer mounts when ready.
+    // Phase 3: pre-fire text-overlay POSTs as soon as header lands so the
+    //          server cache is warm by the time BookViewer asks for them.
+    const handle404 = (status: number) => {
+      if (status === 404 && !isAuthenticated) {
+        const returnTo = `/shared/${shareToken}`;
+        navigate(`/?login=true&redirect=${encodeURIComponent(returnTo)}`);
+        return;
+      }
+      if (status === 404) {
+        setError('This story is no longer available or the link is invalid.');
+      } else {
+        setError('Failed to load story. Please try again later.');
+      }
+      setLoading(false);
+    };
+
+    // Phase 1
+    fetch(`/api/shared/${shareToken}/header`, { headers })
+      .then(async r => {
+        if (cancelled) return;
+        if (!r.ok) { handle404(r.status); return; }
+        const h = await r.json();
+        if (cancelled) return;
+        setHeader(h);
+        setSharingEnabled(h.isShared || false);
+        // Phase 3 — fire-and-forget overlay POSTs, one per page. Server caches
+        // them; when BookViewer mounts later it'll hit the cache and render
+        // without waiting on Sharp.
+        for (let p = 1; p <= h.pageCount; p++) {
+          fetch(`/api/shared/${shareToken}/text-overlay/${p}`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          }).catch(() => { /* best-effort */ });
+        }
+      })
+      .catch(() => { /* fall through to full fetch error handling */ });
+
+    // Phase 2 — fat request in parallel with the header.
+    fetch(`/api/shared/${shareToken}`, { headers })
+      .then(async r => {
+        if (cancelled) return;
+        if (!r.ok) { handle404(r.status); return; }
+        const data = await r.json();
+        if (cancelled) return;
+        setStory(data);
+        setSharingEnabled(data.isShared || false);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load story. Please check your connection.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, [shareToken, isAuthLoading, isAuthenticated, navigate]);
 
   // Toggle sharing on/off (owner only)
@@ -299,6 +342,37 @@ export default function SharedStoryViewer() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [flipNext, flipPrev, fullscreenImage]);
+
+  // Pre-paint state: header arrived but full story still loading. Show the
+  // front cover image straight away. Painting happens within ~300 ms of
+  // navigation; the BookViewer mounts in place once `story` lands a few
+  // seconds later. Stays visually in the same spot to avoid layout shift.
+  if (loading && header) {
+    const coverUrl = header.covers.frontCover
+      ? `/api/shared/${shareToken}/cover-image/frontCover${tokenParam}`
+      : null;
+    return (
+      <div className="h-[100dvh] overflow-hidden bg-white flex flex-col items-center justify-center p-4">
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={header.title || 'Cover'}
+            className="max-h-[85vh] max-w-full object-contain rounded shadow-lg"
+            draggable={false}
+          />
+        ) : (
+          <div className="text-center text-gray-500">
+            <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
+            <p>{header.title}</p>
+          </div>
+        )}
+        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>{language === 'de' ? 'Lade Seiten…' : language === 'fr' ? 'Chargement des pages…' : 'Loading pages…'}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
