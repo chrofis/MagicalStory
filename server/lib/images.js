@@ -9040,23 +9040,19 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill', kernel: 'lanczos3' })
         .png()
         .toBuffer();
-      // Build a feathered single-channel mask at scene dims:
-      //   alpha = 255 inside silhouette, 0 outside, blurred at the boundary.
+      // Build a feathered single-channel mask at scene dims.
+      // Sharp's `create` requires 3 or 4 channels — build a 3-channel black
+      // canvas, paste the silhouette PNG (white-on-transparent) onto it,
+      // blur, then extract one channel as the grayscale mask.
       const FEATHER_PX = 6;
-      const silMeta = await sharp(silhouetteMaskBuf).metadata();
-      const silAlphaRaw = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
-      const featheredMask = await sharp({
-        create: { width: sceneMeta.width, height: sceneMeta.height, channels: 1, background: { r: 0, g: 0, b: 0 } },
+      const featheredRGB = await sharp({
+        create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } },
       })
-        .composite([{
-          input: silAlphaRaw,
-          raw: { width: silMeta.width, height: silMeta.height, channels: 1 },
-          top: hatchTop,
-          left: hatchLeft,
-        }])
+        .composite([{ input: silhouetteMaskBuf, top: hatchTop, left: hatchLeft }])
         .blur(FEATHER_PX)
         .png()
         .toBuffer();
+      const featheredMask = await sharp(featheredRGB).extractChannel(0).png().toBuffer();
       // Attach the feathered mask as the alpha of Grok's image, then composite over the original.
       const grokWithAlpha = await sharp(grokAtSourceDims)
         .removeAlpha()
