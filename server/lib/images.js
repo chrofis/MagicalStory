@@ -9053,10 +9053,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         avatarSent: croppedAvatarDataUri,
         grokRawResult: grokResult.imageData,
         bbox: [ymin, xmin, ymax, xmax],
-        faceBbox: faceBboxOpt || null,
+        faceBbox: options.faceBbox || null,
         padInfo: { padTop, padBottom, padLeft, padRight, paddedW, paddedH },
         hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight },
-        faceRect: { left: faceLeft, top: faceTop, width: faceWidth, height: faceHeight },
+        silhouetteFillPixels: fillPixels,
       } : null,
     };
   } else {
