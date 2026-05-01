@@ -77,7 +77,7 @@ function getStoryHelpers() {
 }
 
 // Character photo helpers
-const { getFacePhoto } = require('./characterPhotos');
+const { getFacePhoto, loadVbReferenceBytes } = require('./characterPhotos');
 
 /**
  * Call Grok vision API for image analysis (OpenAI-compatible chat completions with images).
@@ -5592,32 +5592,46 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
 
-    const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
+    // Phase 2 R2 reader: a VB entry is "available" when it has either inline
+    // base64 OR an R2 URL. loadVbReferenceBytes returns the bytes from
+    // whichever is present (URL fetched on-demand).
+    const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
+    const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbAnimal) {
-      referenceImages.push(vbAnimal.referenceImageData);
-      referenceImageSources.push(`vb-animal:${missing.item}`);
-      log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
-      continue;
+      const bytes = await loadVbReferenceBytes(vbAnimal);
+      if (bytes) {
+        referenceImages.push(`data:image/jpeg;base64,${bytes}`);
+        referenceImageSources.push(`vb-animal:${missing.item}`);
+        log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
+        continue;
+      }
     }
-    const vbChar = visualBible?.secondaryCharacters?.find(c => (c.name?.toLowerCase() === itemName || c.id?.toLowerCase() === itemName) && c.referenceImageData);
+    const vbChar = visualBible?.secondaryCharacters?.find(c => (c.name?.toLowerCase() === itemName || c.id?.toLowerCase() === itemName) && hasRef(c));
     if (vbChar) {
-      referenceImages.push(vbChar.referenceImageData);
-      referenceImageSources.push(`vb-char:${missing.item}`);
-      log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item}"`);
-      continue;
+      const bytes = await loadVbReferenceBytes(vbChar);
+      if (bytes) {
+        referenceImages.push(`data:image/jpeg;base64,${bytes}`);
+        referenceImageSources.push(`vb-char:${missing.item}`);
+        log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item}"`);
+        continue;
+      }
     }
-    const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && a.referenceImageData);
+    const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbArtifact) {
-      referenceImages.push(vbArtifact.referenceImageData);
-      referenceImageSources.push(`vb-artifact:${missing.item}`);
-      log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item}"`);
-      continue;
+      const bytes = await loadVbReferenceBytes(vbArtifact);
+      if (bytes) {
+        referenceImages.push(`data:image/jpeg;base64,${bytes}`);
+        referenceImageSources.push(`vb-artifact:${missing.item}`);
+        log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item}"`);
+        continue;
+      }
     }
     if (characters) {
       const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
       if (mainChar) {
         const pageClothing = clothingFor(mainChar.name);
-        const avatar = getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
+        const avatar = await getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
         const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
         if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image') && !referenceImages.includes(photoUrl)) {
           referenceImages.push(photoUrl);
@@ -6591,7 +6605,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
         const rawImg = rawImages.find(img => img.pageNumber === pageNumber);
         const clothingCategory = rawImg?.perCharClothing?.[fix.charName] || 'standard';
-        const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+        const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
         const avatarPhoto = styledAvatar || getFacePhoto(character);
         const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';
 
@@ -8854,20 +8868,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const figWidth  = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const figHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Step 3 — magenta crosshatch hugs the body bbox (no safety margin).
-    // Earlier we padded by 12% so the crosshatch always covered limb tips,
-    // but the extra fill space let Grok scale the repainted figure up and
-    // it consistently read as "moved forward". Drop to 0 — the silhouette
-    // is small but Grok stays inside it.
-    const HATCH_SAFETY = 0;
+    // Step 3 — shape-aware magenta crosshatch.
+    //
+    // The crosshatch is drawn on TRANSPARENT background (only the lines have
+    // colour), then masked by the figure's silhouette so only the figure
+    // gets crosshatched. The rectangle outside the silhouette stays
+    // untouched. The model sees one signal: "repaint the magenta-marked
+    // region" — and that region is the figure's exact shape, no rectangle
+    // to fill, no room to scale up.
+    //
+    // If the silhouette fetch fails, fall back to a rectangular crosshatch.
     const HATCH_STROKE = 2;
     const HATCH_COLOR = '#FF00FF';
-    const hatchMarginX = Math.round(figWidth * HATCH_SAFETY);
-    const hatchMarginY = Math.round(figHeight * HATCH_SAFETY);
-    const hatchLeft   = Math.max(0, figLeft - hatchMarginX);
-    const hatchTop    = Math.max(0, figTop - hatchMarginY);
-    const hatchRight  = Math.min(paddedW, figLeft + figWidth + hatchMarginX);
-    const hatchBottom = Math.min(paddedH, figTop + figHeight + hatchMarginY);
+    const hatchLeft   = figLeft;
+    const hatchTop    = figTop;
+    const hatchRight  = Math.min(paddedW, figLeft + figWidth);
+    const hatchBottom = Math.min(paddedH, figTop + figHeight);
     const hatchWidth  = hatchRight - hatchLeft;
     const hatchHeight = hatchBottom - hatchTop;
     const hatchSpacing = Math.max(16, Math.round(Math.min(hatchWidth, hatchHeight) * 0.06));
@@ -8881,25 +8897,14 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   </defs>
   <rect x="0" y="0" width="${hatchWidth}" height="${hatchHeight}" fill="url(#h)"/>
 </svg>`;
-    // Hatch region — extract → paint hatch SVG → keep as PNG buffer for the
-    // final composite (avoid intermediate JPEG encoding here, the lossy step
-    // is what compounded blur across rounds).
-    const hatchRegion = await sharp(paddedScene)
-      .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
-      .composite([{ input: Buffer.from(hatchSvg), top: 0, left: 0 }])
-      .png().toBuffer();
+    // Crosshatch on transparent canvas — SVG patterns leave gaps between
+    // strokes transparent by default, so this PNG has alpha only on the
+    // magenta line pixels.
+    const hatchOnly = await sharp(Buffer.from(hatchSvg)).png().toBuffer();
 
-    // Step 4 — silhouette FILL overlay. Crop the (pre-mask) scene to the
-    // hatch box, send to the Python service which runs rembg → returns a
-    // transparent PNG with the figure's interior filled solid blue. We
-    // composite that ON TOP of the magenta crosshatch. The model sees two
-    // signals:
-    //   - magenta crosshatch = "this rectangular region is being repainted"
-    //   - solid blue fill    = "the figure must stay EXACTLY inside this
-    //                            shape — no bigger, no smaller, no leaks"
-    // The solid magenta face block is gone — the blue fill already covers
-    // the face area, and we don't need a second face-only signal.
-    let fillOverlayBuf = null;
+    // Fetch the figure's silhouette mask (rembg, alpha=255 inside figure,
+    // 0 outside). Used to clip the crosshatch to the figure shape.
+    let silhouetteMaskBuf = null;
     let fillPixels = 0;
     try {
       const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
@@ -8911,7 +8916,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: `data:image/jpeg;base64,${hatchCrop.toString('base64')}`,
-          color: [0, 200, 255], // bright blue — complementary to magenta
+          color: [255, 255, 255], // colour irrelevant — only the alpha is used as a clip mask
           alpha: 255,
         }),
         signal: AbortSignal.timeout(15_000),
@@ -8921,28 +8926,29 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         if (edgeJson?.success && edgeJson.image) {
           fillPixels = edgeJson.fill_pixels || edgeJson.edge_pixels || 0;
           const m = edgeJson.image.match(/^data:image\/\w+;base64,(.+)$/);
-          if (m) fillOverlayBuf = Buffer.from(m[1], 'base64');
+          if (m) silhouetteMaskBuf = Buffer.from(m[1], 'base64');
         }
       } else {
-        log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge endpoint returned ${edgeRes.status}`);
+        log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge returned ${edgeRes.status} — falling back to rectangular hatch`);
       }
     } catch (edgeErr) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — proceeding without fill`);
+      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — falling back to rectangular hatch`);
     }
 
-    // Composite: crosshatch + (optional) blue silhouette fill. No face block.
-    const composites = [
-      { input: hatchRegion, top: hatchTop, left: hatchLeft },
-    ];
-    if (fillOverlayBuf) {
-      composites.push({ input: fillOverlayBuf, top: hatchTop, left: hatchLeft });
-    }
+    // Clip the crosshatch to the silhouette via dest-in: keeps hatch line
+    // pixels only where the silhouette alpha is set.
+    const hatchRegion = silhouetteMaskBuf
+      ? await sharp(hatchOnly)
+          .composite([{ input: silhouetteMaskBuf, blend: 'dest-in' }])
+          .png().toBuffer()
+      : hatchOnly;
+
     const masked = await sharp(paddedScene)
-      .composite(composites)
+      .composite([{ input: hatchRegion, top: hatchTop, left: hatchLeft }])
       .png()
       .toBuffer();
 
-    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); silhouette fill ${fillOverlayBuf ? `${fillPixels}px` : 'OFF'}`);
+    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); shape-aware ${silhouetteMaskBuf ? `(silhouette ${fillPixels}px)` : 'OFF (rect fallback)'}`);
 
     // Step 5 — build action context (expression / pose / gaze / holding).
     // This is what stops repaired characters defaulting to "smiling at the
@@ -8968,7 +8974,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
             if (h.length) parts.push(`Holding: ${h.join(', ')}`);
           }
           if (parts.length) {
-            actionContext = `\n\n${charName} in this scene (the repainted figure MUST match this exactly):\n- ${parts.join('\n- ')}`;
+            actionContext = `\n\n${parts.join(' · ')}`;
           }
         }
       } catch { /* fall through */ }
@@ -12512,16 +12518,21 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   };
   const allElements = [];
 
-  // Add VB elements (secondary chars, animals, artifacts, vehicles, locations)
-  for (const el of vbElements) {
-    if (el.referenceImageData) {
+  // Add VB elements (secondary chars, animals, artifacts, vehicles, locations).
+  // Phase 2 R2 reader: loadVbReferenceBytes pulls bytes from referenceImageUrl
+  // (R2) or falls back to inline referenceImageData. Wrap as a data URI so
+  // the downstream grid composer treats every entry uniformly.
+  await Promise.all(vbElements.map(async (el) => {
+    if (!el.referenceImageData && !el.referenceImageUrl) return;
+    const bytes = await loadVbReferenceBytes(el);
+    if (bytes) {
       allElements.push({
         name: el.name,
         type: el.type,
-        imageData: el.referenceImageData
+        imageData: `data:image/jpeg;base64,${bytes}`,
       });
     }
-  }
+  }));
 
   // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo)
   for (const lm of secondaryLandmarks) {

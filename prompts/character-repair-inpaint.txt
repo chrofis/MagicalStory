@@ -1,17 +1,5 @@
-Inpaint task: paint {charName} into this children's book illustration. A solid BLUE shape (at the {regionDesc}) marks the EXACT silhouette {charName} must occupy — head, shoulders, arms, legs, feet all live inside the blue. A magenta crosshatch surrounds the blue and shows the rectangular region being repainted.{actionContext}
+Replace the figure under the magenta crosshatch with {charName} from the reference photo. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
 
-The figure must stay within the blue. Paint {charName} so the body fills the blue edge-to-edge — same exact size, same exact shape. Do not paint outside the blue. Do not paint a smaller figure floating inside the blue. Do not paint a bigger figure that overflows the blue. Match the silhouette precisely.
+Face: match the reference photo (face shape, eyes, hair, skin tone).
 
-CRITICAL — match the action above exactly. The repainted figure must be DOING what the scene calls for, with the right expression and gaze. Never default to "standing still and smiling at the camera". Do not face the camera unless the original was facing the camera.
-
-Invent the face from the reference photo — match the face shape, eyes, nose, mouth, hair, and skin tone exactly. The face lands at the top of the blue silhouette.
-
-Keep the original pose, body language, hand positions, and held items — infer these from the silhouette shape and from the action description above.
-
-PRESERVE THE FRAMING. Do not zoom in or crop. {charName} occupies the same area of the frame in the output as the blue silhouette in the input. Buildings, cobblestones, lampposts, and other background stay in the same positions.
-
-Only ONE figure should appear inside the blue. If a partial figure pokes outside the blue, absorb it into {charName} — do not paint a second character.
-
-Pixels outside the blue stay unchanged. The magenta crosshatch around the blue should become normal background. Other characters in the scene stay unchanged — same faces, same clothing, same poses, same positions. Do not touch a single pixel outside the blue silhouette except to clear the magenta crosshatch back to background.
-
-Match the art style of the surrounding illustration exactly — same brush technique, same level of stylization, same color palette. Do not push toward photorealism, anime, or cartoon.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
+Pixels outside the crosshatch stay unchanged.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
