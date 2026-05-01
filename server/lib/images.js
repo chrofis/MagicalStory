@@ -8072,6 +8072,40 @@ async function detectGrokBorder(buffer) {
 }
 
 /**
+ * Run rembg on a JPEG crop via the Python photo_analyzer service and return
+ * the figure-silhouette PNG (white-on-transparent, alpha=255 inside, 0
+ * outside). Returns null on any failure — callers fall back to a non-shape
+ * path so the pipeline never blocks on a Python outage.
+ *
+ * Used by both the inpaint repair (clips the magenta crosshatch to the
+ * figure shape) and the blended repair (clips the face blur to the face
+ * shape). One source of truth for "fetch a silhouette mask"; future
+ * tweaks to colour, alpha, or transport go in one place.
+ */
+async function fetchSilhouettePng(cropJpegBuffer) {
+  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  try {
+    const res = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
+        color: [255, 255, 255],
+        alpha: 255,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+    if (!j?.success || !m) return null;
+    return Buffer.from(m[1], 'base64');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resize a Grok edit-API output buffer to the source scene's exact dims.
  * Handles aspect-ratio mismatches: Grok sometimes returns the closest preset
  * (e.g. 1024×1024 for a 3:4 ask). Same aspect → proportional `fit:fill`
@@ -8278,8 +8312,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const FACE_BLUR_RADIUS_FACTOR = 0.03; // 3% of face width — very slight blur, enough to signal "redraw this"
     const FACE_PADDING = 0.2; // 20% padding around face bbox
 
-    // Helper: blur a single face region
-    const blurFace = async (faceCoords, label) => {
+    // Helper: blur a single face region.
+    // When `shapeAware: true`, run rembg on the cropped region first and
+    // clip the blur to the figure's silhouette — only the face/head pixels
+    // are softened, the rectangle's surrounding scene stays sharp. The
+    // model gets a cleaner signal about WHAT to redraw and the seam at the
+    // crop edge disappears (no rectangular blur halo around the face).
+    // Falls back to a plain rectangle blur if rembg fails or shapeAware
+    // is off.
+    const blurFace = async (faceCoords, label, opts = {}) => {
+      const shapeAware = opts.shapeAware === true;
       const [fymin, fxmin, fymax, fxmax] = faceCoords;
       const fW = fxmax - fxmin, fH = fymax - fymin;
       const padXmin = Math.max(0, fxmin - fW * FACE_PADDING);
@@ -8292,12 +8334,30 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const fHeight = Math.max(1, Math.min(Math.ceil((padYmax - padYmin) * sceneMeta.height), sceneMeta.height - fTop));
       const blurRadius = Math.max(10, Math.round(fWidth * FACE_BLUR_RADIUS_FACTOR));
       try {
-        const blurred = await sharp(sceneBuffer)
+        const cropJpeg = await sharp(sceneBuffer)
           .extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight })
-          .blur(blurRadius)
+          .jpeg({ quality: 90 })
           .toBuffer();
-        composites.push({ input: blurred, left: fLeft, top: fTop });
-        log.info(`👤 [CHAR REPAIR GROK] Blur ${label}: ${fWidth}x${fHeight} at (${fLeft},${fTop}), radius ${blurRadius}`);
+        const blurred = await sharp(cropJpeg).blur(blurRadius).toBuffer();
+        let composite = { input: blurred, left: fLeft, top: fTop };
+        let mode = 'rect';
+        if (shapeAware) {
+          // Same shared helper the inpaint branch uses — one source of truth.
+          const silhouettePng = await fetchSilhouettePng(cropJpeg);
+          if (silhouettePng) {
+            const blurredWithAlpha = await sharp(blurred)
+              .ensureAlpha()
+              .composite([{ input: silhouettePng, blend: 'dest-in' }])
+              .png()
+              .toBuffer();
+            composite = { input: blurredWithAlpha, left: fLeft, top: fTop };
+            mode = 'shape-aware';
+          } else {
+            mode = 'rect (silhouette unavailable)';
+          }
+        }
+        composites.push(composite);
+        log.info(`👤 [CHAR REPAIR GROK] Blur ${label}: ${fWidth}x${fHeight} at (${fLeft},${fTop}), radius ${blurRadius}, ${mode}`);
       } catch (err) {
         log.warn(`⚠️ [CHAR REPAIR GROK] Blur ${label} failed: ${err.message}`);
       }
@@ -8331,8 +8391,14 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     } else {
       // Face repair: blur only the target face + other characters' faces.
+      // Target face uses shape-aware (silhouette-clipped) blur — only the
+      // face/head pixels are softened, not the surrounding rectangle. Gives
+      // Grok a cleaner "redraw THIS shape" signal and removes the
+      // rectangle blur halo that was bleeding into the scene.
+      // Other-character faces stay rectangle-blurred — we WANT their
+      // surroundings hidden so Grok can't trait-bleed from neighbours.
       if (faceBbox) {
-        await blurFace(faceBbox, `target face (${charName})`);
+        await blurFace(faceBbox, `target face (${charName})`, { shapeAware: true });
       }
       for (const pf of protectedFacesForGrok) {
         await blurFace(pf, 'other face');
@@ -8917,37 +8983,15 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // magenta line pixels.
     const hatchOnly = await sharp(Buffer.from(hatchSvg)).png().toBuffer();
 
-    // Fetch the figure's silhouette mask (rembg, alpha=255 inside figure,
-    // 0 outside). Used to clip the crosshatch to the figure shape.
-    let silhouetteMaskBuf = null;
-    let fillPixels = 0;
-    try {
-      const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-      const hatchCrop = await sharp(paddedScene)
-        .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
-        .jpeg({ quality: 90 }).toBuffer();
-      const edgeRes = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: `data:image/jpeg;base64,${hatchCrop.toString('base64')}`,
-          color: [255, 255, 255], // colour irrelevant — only the alpha is used as a clip mask
-          alpha: 255,
-        }),
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (edgeRes.ok) {
-        const edgeJson = await edgeRes.json();
-        if (edgeJson?.success && edgeJson.image) {
-          fillPixels = edgeJson.fill_pixels || edgeJson.edge_pixels || 0;
-          const m = edgeJson.image.match(/^data:image\/\w+;base64,(.+)$/);
-          if (m) silhouetteMaskBuf = Buffer.from(m[1], 'base64');
-        }
-      } else {
-        log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge returned ${edgeRes.status} — falling back to rectangular hatch`);
-      }
-    } catch (edgeErr) {
-      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge failed (${edgeErr.message}) — falling back to rectangular hatch`);
+    // Fetch the figure's silhouette mask via the shared helper (rembg,
+    // alpha=255 inside figure, 0 outside). Used to clip the crosshatch to
+    // the figure shape.
+    const hatchCrop = await sharp(paddedScene)
+      .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+      .jpeg({ quality: 90 }).toBuffer();
+    const silhouetteMaskBuf = await fetchSilhouettePng(hatchCrop);
+    if (!silhouetteMaskBuf) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge unavailable — falling back to rectangular hatch`);
     }
 
     // Clip the crosshatch to the silhouette via dest-in: keeps hatch line
@@ -8963,7 +9007,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .png()
       .toBuffer();
 
-    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); shape-aware ${silhouetteMaskBuf ? `(silhouette ${fillPixels}px)` : 'OFF (rect fallback)'}`);
+    log.info(`👤 [CHAR REPAIR GROK] Inpaint canvas ${paddedW}x${paddedH} (pad t${padTop} b${padBottom} l${padLeft} r${padRight}); hatch ${hatchWidth}x${hatchHeight} @ (${hatchLeft},${hatchTop}); shape-aware ${silhouetteMaskBuf ? 'ON' : 'OFF (rect fallback)'}`);
 
     // Step 5 — build action context (expression / pose / gaze / holding).
     // This is what stops repaired characters defaulting to "smiling at the
@@ -9070,43 +9114,28 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       let canFeather = false;
       let leakRatio = null;
       try {
-        const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
         const grokHatchCrop = await sharp(grokAtSourceDims)
           .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
           .jpeg({ quality: 90 }).toBuffer();
-        const newSilRes = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: `data:image/jpeg;base64,${grokHatchCrop.toString('base64')}`,
-            color: [255, 255, 255],
-            alpha: 255,
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (newSilRes.ok) {
-          const j = await newSilRes.json();
-          const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
-          if (j?.success && m) {
-            const newSilBuf = Buffer.from(m[1], 'base64');
-            const oldAlpha = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
-            const newAlpha = await sharp(newSilBuf).extractChannel(3).raw().toBuffer();
-            // Both buffers are at hatchWidth × hatchHeight so lengths match.
-            let oldPx = 0, newOnly = 0;
-            const len = Math.min(oldAlpha.length, newAlpha.length);
-            for (let i = 0; i < len; i++) {
-              const oldSet = oldAlpha[i] > 128;
-              const newSet = newAlpha[i] > 128;
-              if (oldSet) oldPx++;
-              if (newSet && !oldSet) newOnly++;
-            }
-            // Threshold: up to 15% of the old silhouette can leak outside
-            // before we declare the feather unsafe. Tune in
-            // docs/char-repair-decisions.md if false-positives appear.
-            const FEATHER_LEAK_THRESHOLD = 0.15;
-            leakRatio = oldPx > 0 ? newOnly / oldPx : 1;
-            canFeather = leakRatio < FEATHER_LEAK_THRESHOLD;
+        const newSilBuf = await fetchSilhouettePng(grokHatchCrop);
+        if (newSilBuf) {
+          const oldAlpha = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
+          const newAlpha = await sharp(newSilBuf).extractChannel(3).raw().toBuffer();
+          // Both buffers are at hatchWidth × hatchHeight so lengths match.
+          let oldPx = 0, newOnly = 0;
+          const len = Math.min(oldAlpha.length, newAlpha.length);
+          for (let i = 0; i < len; i++) {
+            const oldSet = oldAlpha[i] > 128;
+            const newSet = newAlpha[i] > 128;
+            if (oldSet) oldPx++;
+            if (newSet && !oldSet) newOnly++;
           }
+          // Threshold: up to 15% of the old silhouette can leak outside
+          // before we declare the feather unsafe. Tune in
+          // docs/char-repair-decisions.md if false-positives appear.
+          const FEATHER_LEAK_THRESHOLD = 0.15;
+          leakRatio = oldPx > 0 ? newOnly / oldPx : 1;
+          canFeather = leakRatio < FEATHER_LEAK_THRESHOLD;
         }
       } catch (checkErr) {
         log.warn(`⚠️ [CHAR REPAIR GROK] Feather fitness check failed (${checkErr.message}) — using Grok verbatim`);
@@ -9181,7 +9210,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         faceBbox: options.faceBbox || null,
         padInfo: { padTop, padBottom, padLeft, padRight, paddedW, paddedH },
         hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight },
-        silhouetteFillPixels: fillPixels,
+        silhouetteUsed: !!silhouetteMaskBuf,
       } : null,
     };
   } else {

@@ -42,7 +42,8 @@ Status legend: ✅ kept · ❌ rejected · 🟡 conditional/dev-toggle.
 | 4 | Solid magenta block over face | ❌ | Originally added so Grok knows what to repaint; superseded once the silhouette became the primary signal | `059d7763` |
 | 5 | Cyan outline overlay tracing the silhouette | ❌ | Outline alone wasn't strong enough — Aurora still scaled the figure | `059d7763` |
 | 6 | Solid blue interior fill on the silhouette | ❌ | Strong size signal but eval scores cratered (95→50%); model fought the colour as much as honoured it | `0e50d6a4` |
-| 7 | **Shape-aware crosshatch** — magenta hatch SVG drawn on transparent canvas, then `dest-in` masked by the silhouette | ✅ | One unambiguous signal ("repaint the magenta region"), the magenta region IS the figure's exact shape, no rectangle to fill, no second colour to interpret | `0e50d6a4` |
+| 7 | **Shape-aware crosshatch** (inpaint mode) — magenta hatch SVG drawn on transparent canvas, then `dest-in` masked by the silhouette | ✅ | One unambiguous signal ("repaint the magenta region"), the magenta region IS the figure's exact shape, no rectangle to fill, no second colour to interpret | `0e50d6a4` |
+| 7b | **Shape-aware face blur** (blended mode) — target face crop is rembg'd; the blur is clipped to the silhouette so only the face/head pixels are softened | ✅ | Mirrors decision #7 for the face-mode path. Removes the rectangular blur halo that was bleeding into the scene around the face. Other-character faces stay rectangle-blurred so Grok can't trait-bleed from their unblurred surroundings | `<this commit>` |
 
 ### Grok output handling
 
