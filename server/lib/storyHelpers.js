@@ -2660,7 +2660,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         const fallbacks = clothingFallbackOrder[resolvedClothing] || ['standard', 'summer', 'winter'];
 
         // Check unstyled avatars only (styling applied later via cache).
-        // Phase 2: cache fallback when inline is null but R2 bytes were preloaded.
+        // Cache fallback covers the URL-only post-migration shape.
         for (const fallbackCategory of fallbacks) {
           const inlineFallback = avatars[fallbackCategory];
           const cachedFallback = avatarBytesCache?.get(`${char.id}:${fallbackCategory}`);
@@ -3602,7 +3602,7 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
     // Legacy behavior: show all available avatars
     const available = [];
 
-    // Standard categories — accept either inline base64 or R2 URL (Phase 2).
+    // Standard categories — accept either inline base64 or R2 URL.
     if (avatars.standard || avatars.standardUrl) available.push('standard');
     if (avatars.winter   || avatars.winterUrl)   available.push('winter');
     if (avatars.summer   || avatars.summerUrl)   available.push('summer');

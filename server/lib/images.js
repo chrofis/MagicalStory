@@ -12444,9 +12444,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     maxPerBatch = 4,
     imageModel = null,
     maxElements = null,
-    storyId = null,    // Phase 1d R2 migration: when present, each reference
-                       // image is uploaded to R2 and the URL is stored on the
-                       // VB entry alongside the inline base64.
+    storyId = null,    // when present, each generated reference image is
+                       // uploaded to R2 and the URL is stored on the VB entry.
   } = options;
   const { saveVbReferenceToR2 } = storyId ? require('../services/database') : { saveVbReferenceToR2: null };
 
@@ -12563,7 +12562,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
 
       // Update Visual Bible with extracted references. When storyId is set,
       // each reference is also uploaded to R2 in parallel; the URL lands on
-      // the VB entry as referenceImageUrl alongside the inline base64.
+      // the VB entry as referenceImageUrl.
       const r2Uploads = saveVbReferenceToR2
         ? await Promise.all(batch.map(async (element, i) => {
             const refImage = references[i];
