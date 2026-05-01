@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery } = require('../services/database');
+const { logActivity, dbQuery, saveAvatarToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
@@ -2489,9 +2489,33 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const generationPromises = Object.keys(clothingCategories).map(cat => generateSingleAvatarForJob(cat));
     const generatedAvatars = await Promise.all(generationPromises);
 
-    // Store images in results
+    // Upload to R2 in parallel — Phase 1 of the avatar→R2 migration. Stores
+    // the public URL on results[`${category}Url`] alongside the inline base64.
+    // Readers will prefer the URL once Phase 2 wires loadAvatarBytes(); inline
+    // stays for backwards-compat until Phase 4 cleanup. R2 misconfig or upload
+    // failure → URL stays null, inline path keeps working unchanged.
+    const r2UploadPromises = generatedAvatars
+      .filter(a => a.imageData && job.userId && characterId)
+      .map(async ({ category, imageData }) => {
+        const url = await saveAvatarToR2(job.userId, characterId, category, imageData);
+        return { category, url };
+      });
+    const r2Results = await Promise.all(r2UploadPromises);
+    const urlByCategory = new Map();
+    for (const { category, url } of r2Results) {
+      if (url) urlByCategory.set(category, url);
+    }
+    if (urlByCategory.size > 0) {
+      log.info(`☁️  [AVATAR JOB ${jobId}] R2 uploaded ${urlByCategory.size}/${generatedAvatars.length} avatars`);
+    } else if (generatedAvatars.some(a => a.imageData)) {
+      log.debug(`☁️  [AVATAR JOB ${jobId}] R2 not configured or all uploads failed — falling back to inline storage only`);
+    }
+
+    // Store images in results — both inline base64 (legacy path) and Url (R2)
     for (const { category, imageData } of generatedAvatars) {
       if (imageData) results[category] = imageData;
+      const url = urlByCategory.get(category);
+      if (url) results[`${category}Url`] = url;
     }
 
     job.progress = 70;
@@ -2928,6 +2952,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               ...(results.standard && { standard: results.standard }),
               ...(results.winter && { winter: results.winter }),
               ...(results.summer && { summer: results.summer }),
+              // Phase 1 R2 migration: persist Url fields so loadAvatarBytes can
+              // prefer them in Phase 2. Inline base64 above stays for backwards
+              // compat until Phase 4 nulls them out via migration.
+              ...(results.standardUrl && { standardUrl: results.standardUrl }),
+              ...(results.winterUrl && { winterUrl: results.winterUrl }),
+              ...(results.summerUrl && { summerUrl: results.summerUrl }),
               ...(results.clothing && { clothing: results.clothing }),
             };
 
