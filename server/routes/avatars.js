@@ -2489,11 +2489,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const generationPromises = Object.keys(clothingCategories).map(cat => generateSingleAvatarForJob(cat));
     const generatedAvatars = await Promise.all(generationPromises);
 
-    // Upload to R2 in parallel — Phase 1 of the avatar→R2 migration. Stores
-    // the public URL on results[`${category}Url`] alongside the inline base64.
-    // Readers will prefer the URL once Phase 2 wires loadAvatarBytes(); inline
-    // stays for backwards-compat until Phase 4 cleanup. R2 misconfig or upload
-    // failure → URL stays null, inline path keeps working unchanged.
+    // Upload each avatar to R2 in parallel and store the public URL on
+    // results[`${category}Url`]. R2 misconfig or upload failure leaves the
+    // URL undefined; the writer below then persists inline as the fallback.
     const r2UploadPromises = generatedAvatars
       .filter(a => a.imageData && job.userId && characterId)
       .map(async ({ category, imageData }) => {
@@ -2534,8 +2532,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     }
 
     // Extract face/body thumbnails from 2x2 grids — ALL in parallel.
-    // Each thumbnail is also uploaded to R2 (Phase 1 dual-write) so the
-    // Url fields land alongside the inline base64 in the persisted shape.
+    // Each thumbnail is also uploaded to R2; the URL lands in
+    // results.faceThumbnailsUrl / .bodyThumbnailsUrl.
     const avatarsWithImages = generatedAvatars.filter(a => a.imageData);
     const splitPromises = avatarsWithImages.map(async ({ category, imageData }) => {
       try {
@@ -3676,10 +3674,9 @@ These corrections OVERRIDE what is visible in the reference photo.
     const generationTime = Date.now() - generationStart;
     log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
-    // Phase 1 R2 dual-write — upload main avatars + thumbnails to R2 in
-    // parallel. URL fields land alongside inline base64; readers can prefer
-    // URL once Phase 2 wires loadAvatarBytes. Failure → URL absent, inline
-    // path keeps working unchanged.
+    // Upload main avatars + thumbnails to R2 in parallel. R2 misconfig or
+    // upload failure leaves URL undefined; the writer below then persists
+    // inline as the fallback.
     const r2Uploads = [];
     if (req.user?.id && validCharacterId) {
       for (const { category, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {

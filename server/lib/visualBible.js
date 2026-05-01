@@ -1796,9 +1796,6 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
   if (!visualBible) return [];
 
-  // Phase 2 R2 reader: an entry is usable if EITHER inline base64 OR R2 URL
-  // is set. Carry both fields through so downstream loadVbReferenceBytes can
-  // pick the URL when present.
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
 
   const refs = [];
@@ -1841,14 +1838,12 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
 function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) {
   if (!visualBible) return [];
 
-  // Phase 2 R2 reader: same dual-field check as getEmptySceneElementReferences.
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
 
   const relevantRefs = [];
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
-      // Must have reference image (inline OR R2 URL) and appear on this page
       if (!hasRef(entry)) continue;
       if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
 
@@ -1904,7 +1899,6 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
 function getElementReferenceImagesByIds(visualBible, elementIds) {
   if (!visualBible || !elementIds || elementIds.length === 0) return [];
 
-  // Phase 2 R2 reader: dual-field presence check; carry both fields through.
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
 
   const results = [];

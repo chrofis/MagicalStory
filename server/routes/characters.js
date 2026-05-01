@@ -13,25 +13,16 @@ const { normalizePhotos, stripLegacyPhotoFields } = require('../lib/characterPho
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
-// Merge inline thumbnail slots with their R2 URL counterparts. After Phase 4
-// cleanup, faceThumbnails.{slot} is null and the URL lives in
-// faceThumbnailsUrl.{slot}; the frontend uses the value as <img src> which
-// accepts both data: URIs and https URLs. Returns a lean object the client
-// already understands (faceThumbnails / bodyThumbnails only).
+// Reduce a row to the shape the client expects: faceThumbnails /
+// bodyThumbnails objects keyed by slot, holding the R2 URL string. The DB
+// stores the URLs in faceThumbnailsUrl / bodyThumbnailsUrl. <img src=> on
+// the frontend uses the value directly.
 function mergeThumbs(t) {
   if (!t) return t;
-  const merge = (inline, urls) => {
-    if (!inline && !urls) return undefined;
-    const out = {};
-    for (const k of new Set([...Object.keys(inline || {}), ...Object.keys(urls || {})])) {
-      out[k] = (inline && inline[k]) || (urls && urls[k]) || null;
-    }
-    return out;
-  };
   return {
     id: t.id,
-    faceThumbnails: merge(t.faceThumbnails, t.faceThumbnailsUrl),
-    bodyThumbnails: merge(t.bodyThumbnails, t.bodyThumbnailsUrl),
+    faceThumbnails: t.faceThumbnailsUrl || undefined,
+    bodyThumbnails: t.bodyThumbnailsUrl || undefined,
   };
 }
 

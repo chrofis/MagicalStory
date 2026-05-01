@@ -2460,9 +2460,9 @@ function parseSceneHintMetadata(sceneHint) {
  * @returns {Array} Array of objects with character name and photo type used
  */
 /**
- * Phase 2 R2 reader helper: pre-load avatar bytes for a list of characters
- * so the synchronous getCharacterPhotoDetails() can resolve URL-only avatars
- * by looking up the cache instead of needing await.
+ * Pre-load avatar bytes for a list of characters so the synchronous
+ * getCharacterPhotoDetails() can resolve URL-only avatars from a cache
+ * instead of needing await.
  *
  * Returns a Map keyed by `${charId}:${slot}` → base64 string (no data: prefix).
  * Caller should await this BEFORE calling getCharacterPhotoDetails and pass
@@ -2606,10 +2606,8 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
           log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${resolvedClothing} for styled avatar`);
         }
       }
-      // Fall back to unstyled clothing avatar (standard, winter, summer)
-      // Phase 2 R2 reader: usable when EITHER inline base64 OR R2 URL exists.
-      // When inline is null but cache has bytes (from prefetchAvatarBytesForCharacters),
-      // wrap as data URI so downstream consumers see the same shape as before.
+      // Fall back to unstyled clothing avatar (standard, winter, summer).
+      // Usable when inline base64, R2 URL, or prefetched cache bytes exist.
       else if (resolvedClothing && resolvedClothing !== 'costumed' && avatars &&
                (avatars[resolvedClothing] || avatars[`${resolvedClothing}Url`] || avatarBytesCache?.has(`${char.id}:${resolvedClothing}`))) {
         photoType = `clothing-${resolvedClothing}`;

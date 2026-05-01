@@ -5592,9 +5592,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
 
-    // Phase 2 R2 reader: a VB entry is "available" when it has either inline
-    // base64 OR an R2 URL. loadVbReferenceBytes returns the bytes from
-    // whichever is present (URL fetched on-demand).
     const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
 
     const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
@@ -12686,9 +12683,8 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   const allElements = [];
 
   // Add VB elements (secondary chars, animals, artifacts, vehicles, locations).
-  // Phase 2 R2 reader: loadVbReferenceBytes pulls bytes from referenceImageUrl
-  // (R2) or falls back to inline referenceImageData. Wrap as a data URI so
-  // the downstream grid composer treats every entry uniformly.
+  // loadVbReferenceBytes returns base64; wrap as a data URI so the grid
+  // composer treats every entry uniformly.
   await Promise.all(vbElements.map(async (el) => {
     if (!el.referenceImageData && !el.referenceImageUrl) return;
     const bytes = await loadVbReferenceBytes(el);

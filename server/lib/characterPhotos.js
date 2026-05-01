@@ -13,11 +13,9 @@
  *   bodyBox?: BoundingBox
  * }
  *
- * Avatars + Visual Bible reference images are migrating from inline base64
- * (in characters.data and stories.data) to R2. The loaders below return base64
- * regardless of where the bytes physically live — checking the *Url field
- * first (R2), falling back to the inline base64 (legacy). Callers stay
- * shape-agnostic during the migration.
+ * Avatars + Visual Bible reference images live on Cloudflare R2. The loaders
+ * below fetch the bytes from the public R2 URL stored in the *Url / *ImageUrl
+ * field and return base64 ready for sharp/Buffer decode.
  */
 
 const { fetchImageBytes } = require('./r2');
