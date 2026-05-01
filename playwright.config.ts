@@ -103,6 +103,16 @@ export default defineConfig({
       testMatch: /repair-tile-visibility\.spec\.ts/,
     },
 
+    // Dev-panel UI checks (admin JWT injected, no full auth dep). Used to
+    // verify dev-only buttons/dropdowns render after a deploy.
+    {
+      name: 'dev-panel',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /test-models-flags-visible\.spec\.ts/,
+    },
+
     // Responsive screenshot harness — drives the site at a matrix of viewport
     // sizes and writes screenshots to test-output/responsive/. No auth, no
     // assertions. Viewport is set per-test inside the spec.
