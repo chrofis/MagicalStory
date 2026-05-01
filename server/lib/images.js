@@ -8072,6 +8072,32 @@ async function detectGrokBorder(buffer) {
 }
 
 /**
+ * Resize a Grok edit-API output buffer to the source scene's exact dims.
+ * Handles aspect-ratio mismatches: Grok sometimes returns the closest preset
+ * (e.g. 1024×1024 for a 3:4 ask). Same aspect → proportional `fit:fill`
+ * (no distortion). Different aspect → centred cover-crop. Used by both the
+ * blended and inpaint repair branches; keeping it in one place stops the
+ * two branches drifting on aspect-handling logic.
+ */
+async function resizeGrokToSceneDims(grokBuffer, sceneWidth, sceneHeight) {
+  const grokMeta = await sharp(grokBuffer).metadata();
+  if (grokMeta.width === sceneWidth && grokMeta.height === sceneHeight) {
+    return grokBuffer;
+  }
+  const grokAspect = grokMeta.width / grokMeta.height;
+  const sceneAspect = sceneWidth / sceneHeight;
+  const aspectMatches = Math.abs(grokAspect - sceneAspect) / sceneAspect < 0.02;
+  log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneWidth}x${sceneHeight} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
+  if (aspectMatches) {
+    return sharp(grokBuffer).resize(sceneWidth, sceneHeight, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  }
+  return sharp(grokBuffer)
+    .resize(sceneWidth, sceneHeight, { fit: 'cover', position: 'center' })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+}
+
+/**
  * Detect a border that Grok ADDED to its output that wasn't in the input.
  * Compares border of both images — returns content box only when output has
  * significantly more border than input.
@@ -8389,25 +8415,8 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // C. Decode Grok result. Resize to scene dimensions aspect-preserving
     // (fit:'inside') and letterbox-crop if Grok returned a slightly
     // different aspect. Never fit:'fill' — that stretches the image.
-    const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
-    let grokBuffer = Buffer.from(grokBase64, 'base64');
-    const grokMeta = await sharp(grokBuffer).metadata();
-    if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
-      const grokAspect = grokMeta.width / grokMeta.height;
-      const sceneAspect = sceneMeta.width / sceneMeta.height;
-      const aspectMatches = Math.abs(grokAspect - sceneAspect) / sceneAspect < 0.02;
-      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height} (aspect ${grokAspect.toFixed(3)}), scene ${sceneMeta.width}x${sceneMeta.height} (aspect ${sceneAspect.toFixed(3)}), aspect ${aspectMatches ? 'matches' : 'MISMATCH'} — ${aspectMatches ? 'proportional resize' : 'cover-crop to recover'}`);
-      if (aspectMatches) {
-        // Same aspect → simple proportional resize, no distortion
-        grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
-      } else {
-        // Different aspect → center-crop to scene aspect (fit:'cover'), then resize
-        grokBuffer = await sharp(grokBuffer)
-          .resize(sceneMeta.width, sceneMeta.height, { fit: 'cover', position: 'center' })
-          .jpeg({ quality: 95 })
-          .toBuffer();
-      }
-    }
+    let grokBuffer = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    grokBuffer = await resizeGrokToSceneDims(grokBuffer, sceneMeta.width, sceneMeta.height);
 
     // D. Calculate blend region: bbox + 10% padding (just enough for the edge feather).
     // Was 50% previously — that caused the blend rectangle to cover a huge chunk of
@@ -9050,11 +9059,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     if (silhouetteMaskBuf && featherEnabled) {
       // Resize Grok output to source dims so we can compare like-for-like
-      // and (later) composite at scene dims.
-      const grokAtSourceDims = await sharp(grokRawBuf)
-        .resize(sceneMeta.width, sceneMeta.height, { fit: 'fill', kernel: 'lanczos3' })
-        .png()
-        .toBuffer();
+      // and (later) composite at scene dims. Aspect-aware — same helper
+      // the blended branch uses.
+      const grokAtSourceDims = await resizeGrokToSceneDims(grokRawBuf, sceneMeta.width, sceneMeta.height);
 
       // Fitness check: rembg the Grok output's hatch crop → new silhouette.
       // Compare alpha pixel-by-pixel against the old silhouette. If a large
