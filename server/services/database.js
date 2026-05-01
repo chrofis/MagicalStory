@@ -2221,6 +2221,7 @@ module.exports = {
   buildStoryMetadata,
   saveStoryData,
   saveScenePageData,
+  stripInlineImagesFromStoryData,
   updateStoryDataOnly,
   upsertStory,
   // Image functions
