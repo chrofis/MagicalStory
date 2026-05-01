@@ -70,17 +70,24 @@ Apply CATASTROPHIC (-5) when ONE OR MORE of these holds:
 - A character is rendered as a fragment that no occlusion can explain (head with no body where no railing/desk/wall is in the way; body with no head; ghostly transparent figure; figure fused into the background).
 - The scene's central declared interaction is geometrically impossible in the image as composed (e.g. character A is supposed to be holding character B's body part, but the rendered distance/angle between them makes it physically unreachable and the contact is not depicted).
 - The narrative beat shown is the wrong moment of the action (image shows the result when the prose describes the attempt, or shows the attempt when the prose describes the resolution — and this is the central beat of the page, not a side detail).
-- **SCENE INTENT not depicted.** Read the SCENE INTENT line above. Is the action it names visible? Is every character it names present? If the intent is "X shoots Y" and Y is not in the image, or "X hands Z to Y" and the handover is not shown, this gate fires regardless of how polished the rest of the image looks.
+- A required character named in the SCENE INTENT or DECLARED INTERACTIONS is **entirely absent** from the image (no figure of that character anywhere — not just misplaced or rendered at the wrong scale).
 - A large unrequested geometric shape — white triangle, white wedge, diagonal slash, monochrome panel, blank rectangle — covers a significant portion of the image, breaking the scene composition.
 - Two or more characters are merged into each other (single body with two heads, faces fused, limbs of one extending out of the other).
-- Several MAJOR failures stack such that the image no longer represents the requested scene at all (you would tell the user "this needs to be redone from scratch").
 
-If none of these hold, do NOT apply CATASTROPHIC. Skip to the detail-level checks below — granular issues belong there with their own severities. CATASTROPHIC is the "this image cannot be published" gate, not a stack-the-deductions shortcut.
+**Do NOT apply CATASTROPHIC** when the issue is recoverable by repainting one figure within an existing region:
+- A character is present but in the wrong **position**, **depth**, or **scale** (e.g. should be far background but rendered in foreground; should be small but rendered large; should be on the left but appears on the right). These are CRITICAL position/scale issues, not catastrophic — flag them as `position_and_scale` or `composition` issues with their own severity in STEP 4.
+- A character is present but the wrong **identity / age / gender / hair / clothing**. These are CRITICAL character-identity issues, not catastrophic — handled by character repair.
+- A required object is in the wrong place or rendered as the wrong material (apple is purple, tree is a stone pillar). These are MAJOR object issues.
+- A non-central detail is missing (background prop, secondary character pose detail). MINOR/MODERATE.
+
+The reason for the carveout: misplaced or mis-scaled characters CAN be moved with a fresh inpaint pass (mask the old position with background, paint the figure at the new position with the correct scale). Forcing a from-scratch regen for those cases discards a usable image and gambles on Grok ignoring the same depth instruction it ignored the first time. Save CATASTROPHIC for breaks where inpaint genuinely cannot recover (fragment characters, fused bodies, missing characters, giant white wedges).
+
+If none of the catastrophic triggers hold, do NOT apply CATASTROPHIC. Skip to the detail-level checks below — granular issues belong there with their own severities. CATASTROPHIC is the "this image cannot be published" gate, not a stack-the-deductions shortcut.
 
 For every page add to the output:
   `"coherence_gate": { "applied": true | false, "reason": null | "<one short sentence naming what is fundamentally broken>" }`
 
-If applied, also add a single `fixable_issues` entry with `type: "image_coherence"`, `severity: "CATASTROPHIC"`, `description` naming the fundamental break, and `fix: "Regenerate the page from scratch — inpaint cannot recover from this."`
+If applied, also add a single `fixable_issues` entry with `type: "image_coherence"`, `severity: "CATASTROPHIC"`, `description` naming the fundamental break, and `fix` describing the concrete change required (e.g. *"Add a fragment-free full body to the head-only figure"*, *"Separate the two merged characters into distinct figures"*). Do NOT prescribe the recovery method (regen vs inpaint) — the pipeline picks that based on the issue type.
 
 ---
 
