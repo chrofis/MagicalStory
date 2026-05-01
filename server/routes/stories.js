@@ -1741,13 +1741,17 @@ router.get('/:id/reference-sheet-sources', authenticateToken, async (req, res) =
 
     // Pull each source grid from story_images. The image_type is
     // 'ref_sheet_source' and the page_number is the batch index.
+    // Post-R2 migration, image_data may be null and image_url holds the
+    // R2 public URL — the client uses the value as <img src=…> directly,
+    // which accepts both data: URIs and https URLs.
     const sources = [];
     for (const meta of batchMeta) {
       const img = await getStoryImage(id, 'ref_sheet_source', meta.batchIdx, 0);
-      if (img?.imageData) {
+      const src = img?.imageData || img?.imageUrl;
+      if (src) {
         sources.push({
           batchIdx: meta.batchIdx,
-          imageData: img.imageData,
+          imageData: src,
           elementNames: meta.elementNames || [],
           elementIds: meta.elementIds || [],
         });
