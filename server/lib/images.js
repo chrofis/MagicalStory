@@ -5655,8 +5655,20 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     'top-full': 'upper third (full width)',
     'bottom-full': 'lower third (full width)',
   };
+  // Pull the per-page textZoneDescription out of the scene metadata so the
+  // quiet-zone instruction names the actual surface ("deep grey November sky",
+  // "wet cobblestones") instead of just saying "calm". Without this Grok
+  // interprets "soft and calm" as "flat uniform color" and replaces the
+  // overcast sky with a uniform grey wash, losing all atmospheric detail.
+  let inpaintTextZoneDesc = null;
+  if (sceneDescription) {
+    try {
+      const meta = getStoryHelpers().extractSceneMetadata(sceneDescription);
+      inpaintTextZoneDesc = meta?.textZoneDescription || null;
+    } catch { /* fall through with null */ }
+  }
   const quietZoneSuffix = textPosition && TEXT_POSITION_DESC_INPAINT[textPosition]
-    ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} soft and visually calm — do not introduce faces, hats, patterns, or other high-contrast detail there. It is intentional negative space in the composition.`
+    ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} as ${inpaintTextZoneDesc ? `the established ${inpaintTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not introduce faces, hats, patterns, or other high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
   const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
@@ -8303,8 +8315,19 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     'bottom-full': 'lower third (full width)',
   };
   const textPositionDesc = options.textPosition ? TEXT_POSITION_DESC[options.textPosition] : null;
+  // Pull the per-page textZoneDescription so the quiet-zone instruction names
+  // the actual surface (sky / cobblestones / wall) instead of just saying
+  // "calm". Without this Grok interprets "soft and calm" as "uniform colour"
+  // and flattens the area, losing the atmospheric texture from v0.
+  let charRepairTextZoneDesc = null;
+  if (sceneDescription) {
+    try {
+      const meta = getStoryHelpers().extractSceneMetadata(sceneDescription);
+      charRepairTextZoneDesc = meta?.textZoneDescription || null;
+    } catch { /* fall through with null */ }
+  }
   const textPositionContext = textPositionDesc
-    ? `\n\nQuiet zone: keep the ${textPositionDesc} soft and visually calm — do not place the character's face or any high-contrast detail there. It is intentional negative space in the composition.`
+    ? `\n\nQuiet zone: keep the ${textPositionDesc} as ${charRepairTextZoneDesc ? `the established ${charRepairTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not place the character's face or any high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
 
   if (useBlended) {
