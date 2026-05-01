@@ -623,6 +623,24 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 2. **One signature element** - Unique and easy to recognize
 3. **Self-contained description** - Works without seeing other scenes
 
+**The `description` field is copied VERBATIM into every image prompt that uses this object.** Write it as image-prompt text, not as catalog metadata. Two patterns matter:
+
+**A. Geometric anatomy beats analogy and negation.** For objects the image model often confuses (crossbow, ladder, lancet, windsurf board, spinning wheel, butter churn, anvil, telescope, sextant, rope-and-pulley, cog, treadle, etc.), describe the SHAPE — name the parts and how they connect with words like *perpendicular*, *parallel*, *spans across*, *forms a T from above*, *mounted at right angles to*. Do NOT write *"like a rifle"*, *"resembles a tennis racket"*, *"NOT a longbow"* — analogies pull the model toward the wrong reference and negations are silently ignored or inverted.
+
+✓ Crossbow: "a forearm-length wooden crossbow held horizontally — the two short curved bow limbs are mounted PERPENDICULAR to the wooden stock at its front (forming a T-shape from above), with a taut gut bowstring spanning across the limbs and a wooden bolt resting in a groove on top of the stock; iron stirrup at the muzzle for foot-loading"
+
+✗ Crossbow: "a small medieval crossbow that looks like a wooden rifle, NOT a longbow"
+
+✓ Windsurf: "a long flat board on the water with a tall vertical mast rising from its center and a triangular fabric sail attached to the mast; the rider stands on the board gripping a horizontal boom across the sail"
+
+✗ Windsurf: "a windsurfing board, like a surfboard with a sail"
+
+✓ Ladder: "a wooden ladder — two parallel vertical side rails with horizontal wooden rungs spaced about a foot apart between them, leaning at a 70° angle against the wall"
+
+✗ Ladder: "a tall ladder you climb up, NOT stairs"
+
+**B. Mention every functional element.** If the object has a part the model commonly drops (crossbow string, ladder rungs, sail boom, telescope eyepiece) name it explicitly with its position and tension/state ("taut gut bowstring", "horizontal rungs every foot", "triangular sail tensioned by the boom").
+
 **Use unique identifiers:**
 - Secondary Characters: CHR001, CHR002...
 - Animals & Creatures: ANI001, ANI002...
