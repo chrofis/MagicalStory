@@ -103,6 +103,33 @@ export default defineConfig({
       testMatch: /repair-tile-visibility\.spec\.ts/,
     },
 
+    // R2 readers check — public shared URL, no auth required.
+    {
+      name: 'r2-readers',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /r2-readers-check\.spec\.ts/,
+    },
+
+    // Avatar render check after Phase 5 cleanup (admin JWT injected).
+    {
+      name: 'avatar-render',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /avatar-render-check\.spec\.ts/,
+    },
+
+    // Shared-viewer HAR capture (no auth — public share token).
+    {
+      name: 'shared-har',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /shared-viewer-har\.spec\.ts/,
+    },
+
     // Dev-panel UI checks (admin JWT injected, no full auth dep). Used to
     // verify dev-only buttons/dropdowns render after a deploy.
     {

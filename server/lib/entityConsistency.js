@@ -419,11 +419,36 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   // Helper to get fallback photo - uses centralized helper
   const getFallbackPhoto = () => getFacePhoto(character);
 
-  // Phase 2 R2 reader: when a base avatar slot has only the URL field set
-  // (post-migration shape), loadAvatarBytes fetches from R2; for legacy rows
-  // with inline base64 it returns the inline bytes. Returns base64 with no
-  // data: prefix, so we wrap before returning to preserve the contract that
-  // callers expect (data: URI or raw photo URL string).
+  // Resolve a styled-avatar slot value to a usable data: URI string. The
+  // Phase 1e backfill turned plain-string slots into objects of shape
+  // `{imageUrl, imageData}` where `imageData` is null after Phase 4. We
+  // accept three shapes and always return a `data:image/jpeg;base64,…`
+  // string so downstream callers (which buffer-decode it) keep working.
+  const { fetchImageBytes } = require('./r2');
+  const _styledFetchCache = {};
+  const resolveStyled = async (v) => {
+    if (!v) return null;
+    if (typeof v === 'string') {
+      // Legacy plain base64 (with or without data: prefix)
+      return v.startsWith('data:') ? v : `data:image/jpeg;base64,${v}`;
+    }
+    if (typeof v === 'object') {
+      if (typeof v.imageData === 'string' && v.imageData.length > 0) {
+        return v.imageData.startsWith('data:') ? v.imageData : `data:image/jpeg;base64,${v.imageData}`;
+      }
+      if (typeof v.imageUrl === 'string' && v.imageUrl) {
+        if (_styledFetchCache[v.imageUrl] !== undefined) return _styledFetchCache[v.imageUrl];
+        const buf = await fetchImageBytes(v.imageUrl);
+        const result = buf ? `data:image/jpeg;base64,${buf.toString('base64')}` : null;
+        _styledFetchCache[v.imageUrl] = result;
+        return result;
+      }
+    }
+    return null;
+  };
+
+  // Base avatars (standard/summer/winter) read via loadAvatarBytes which
+  // prefers the R2 URL field. Returns base64 — wrap as data URI for callers.
   const baseFromSlot = async (slot) => {
     const bytes = await loadAvatarBytes(avatars || {}, slot);
     return bytes ? `data:image/jpeg;base64,${bytes}` : null;
@@ -449,49 +474,52 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
     if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
       const firstCostume = Object.values(styledForArt.costumed)[0];
-      if (firstCostume) {
+      const r = await resolveStyled(firstCostume);
+      if (r) {
         log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found costumed avatar`);
-        return firstCostume;
+        return r;
       }
     }
-    // Fallback to standard styled if no costume found. This is a real clothing
-    // mismatch — the scene needed a costume but we're sending the standard
-    // avatar. Warn so it surfaces in logs and the repair can be diagnosed.
-    if (styledForArt.standard) {
+    // Fallback to standard styled if no costume found.
+    const r = await resolveStyled(styledForArt.standard);
+    if (r) {
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but no costumed avatars exist — sending standard (output will show standard clothing)`);
-      return styledForArt.standard;
+      return r;
     }
   }
 
   // Handle standard categories (standard, winter, summer)
-  const styledAvatar = styledForArt[clothingCategory];
-  if (styledAvatar) {
+  const styledAvatarRaw = styledForArt[clothingCategory];
+  const resolved = await resolveStyled(styledAvatarRaw);
+  if (resolved) {
     log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found ${clothingCategory} avatar`);
-    return styledAvatar;
+    return resolved;
   }
 
   // Fallback chain: requested → standard → any other styled avatar → original photo.
-  // Each of these is a real clothing-category mismatch — warn on the actual
-  // substitution so the repair pipeline's inputs are auditable.
-  if (styledForArt.standard) {
+  const std = await resolveStyled(styledForArt.standard);
+  if (std) {
     log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory}, sending standard (output will show standard clothing)`);
-    return styledForArt.standard;
+    return std;
   }
 
   // Try any other available styled avatar (winter, summer, or first costumed)
   for (const [key, value] of Object.entries(styledForArt)) {
-    if (key !== 'costumed' && value && typeof value === 'string') {
+    if (key === 'costumed') continue;
+    const r = await resolveStyled(value);
+    if (r) {
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but only ${key} exists — sending ${key} (output will show ${key} clothing)`);
-      return value;
+      return r;
     }
   }
 
   // Try first costumed avatar if available
   if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
     const firstCostume = Object.values(styledForArt.costumed)[0];
-    if (firstCostume) {
+    const r = await resolveStyled(firstCostume);
+    if (r) {
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but only costumed exists — sending costumed (output will show the costume)`);
-      return firstCostume;
+      return r;
     }
   }
 
