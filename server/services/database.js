@@ -1214,6 +1214,99 @@ async function upsertStory(storyId, userId, storyData) {
  * @param {string} imageData - Base64 encoded image data
  * @param {object} options - Additional options (qualityScore, generatedAt, versionIndex)
  */
+/**
+ * Upload an avatar slot to R2 and return the public URL. Stateless — does
+ * NOT update the characters table; caller is responsible for storing the URL
+ * on the avatar object alongside (or instead of) the inline base64.
+ *
+ * Returns null when R2 is not configured or upload fails — caller decides
+ * whether to fall back to inline storage.
+ *
+ * @param {string|number} userId
+ * @param {string|number} characterId
+ * @param {string} slot           - 'standard' | 'summer' | 'winter'
+ * @param {string} imageData      - base64 (with or without data: prefix)
+ * @returns {Promise<string|null>} public R2 URL, or null on failure
+ */
+async function saveAvatarToR2(userId, characterId, slot, imageData) {
+  if (!imageData || !userId || !characterId || !slot) return null;
+  try {
+    const r2 = require('../lib/r2');
+    if (!r2.isConfigured()) return null;
+    const key = r2.keyForCharacterAvatar(userId, characterId, slot);
+    return await r2.uploadImage(imageData, key);
+  } catch (err) {
+    console.warn(`[R2] saveAvatarToR2 upload skipped (${userId}/${characterId}/${slot}): ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Upload a styled avatar (per-clothing variant) to R2.
+ * Key format: characters/{userId}/{characterId}/avatars/styled/{key}.jpg
+ * @param {string|number} userId
+ * @param {string|number} characterId
+ * @param {string} key            - styled avatar key (e.g. 'medieval', 'modern-summer')
+ * @param {string} imageData      - base64
+ * @returns {Promise<string|null>}
+ */
+async function saveStyledAvatarToR2(userId, characterId, key, imageData) {
+  if (!imageData || !userId || !characterId || !key) return null;
+  try {
+    const r2 = require('../lib/r2');
+    if (!r2.isConfigured()) return null;
+    const r2Key = r2.keyForCharacterStyledAvatar(userId, characterId, key);
+    return await r2.uploadImage(imageData, r2Key);
+  } catch (err) {
+    console.warn(`[R2] saveStyledAvatarToR2 upload skipped (${userId}/${characterId}/${key}): ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Upload an avatar thumbnail (face or body) for a clothing slot.
+ * Key format: characters/{userId}/{characterId}/avatars/thumbs/{kind}-{slot}.jpg
+ * @param {string|number} userId
+ * @param {string|number} characterId
+ * @param {string} kind           - 'face' | 'body'
+ * @param {string} slot           - 'standard' | 'summer' | 'winter'
+ * @param {string} imageData      - base64
+ * @returns {Promise<string|null>}
+ */
+async function saveAvatarThumbToR2(userId, characterId, kind, slot, imageData) {
+  if (!imageData || !userId || !characterId || !kind || !slot) return null;
+  try {
+    const r2 = require('../lib/r2');
+    if (!r2.isConfigured()) return null;
+    const key = r2.keyForCharacterThumb(userId, characterId, kind, slot);
+    return await r2.uploadImage(imageData, key);
+  } catch (err) {
+    console.warn(`[R2] saveAvatarThumbToR2 upload skipped (${userId}/${characterId}/${kind}/${slot}): ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Upload a Visual Bible reference image to R2. Stateless.
+ * Key format: stories/{storyId}/vb/{entryId}.jpg
+ * @param {string} storyId
+ * @param {string} entryId        - VB entry id (e.g. 'ART003', 'CHR012')
+ * @param {string} imageData      - base64
+ * @returns {Promise<string|null>}
+ */
+async function saveVbReferenceToR2(storyId, entryId, imageData) {
+  if (!imageData || !storyId || !entryId) return null;
+  try {
+    const r2 = require('../lib/r2');
+    if (!r2.isConfigured()) return null;
+    const key = r2.keyForVbReference(storyId, entryId);
+    return await r2.uploadImage(imageData, key);
+  } catch (err) {
+    console.warn(`[R2] saveVbReferenceToR2 upload skipped (${storyId}/${entryId}): ${err.message}`);
+    return null;
+  }
+}
+
 async function saveStoryImage(storyId, imageType, pageNumber, imageData, options = {}) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
@@ -1973,6 +2066,10 @@ module.exports = {
   getStoryImage,
   imagesExistByType,
   imgBytesAsync,
+  saveAvatarToR2,
+  saveStyledAvatarToR2,
+  saveAvatarThumbToR2,
+  saveVbReferenceToR2,
   getStoryImageWithVersions,
   getAllStoryImages,
   getActiveStoryImages,

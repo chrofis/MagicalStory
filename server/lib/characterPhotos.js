@@ -12,7 +12,24 @@
  *   faceBox?: BoundingBox,
  *   bodyBox?: BoundingBox
  * }
+ *
+ * Avatars + Visual Bible reference images are migrating from inline base64
+ * (in characters.data and stories.data) to R2. The loaders below return base64
+ * regardless of where the bytes physically live — checking the *Url field
+ * first (R2), falling back to the inline base64 (legacy). Callers stay
+ * shape-agnostic during the migration.
  */
+
+const { fetchImageBytes } = require('./r2');
+
+const _avatarFetchCache = new Map();
+async function _getOrFetch(url) {
+  if (!url) return null;
+  if (_avatarFetchCache.has(url)) return _avatarFetchCache.get(url);
+  const bytes = await fetchImageBytes(url);
+  if (bytes) _avatarFetchCache.set(url, bytes);
+  return bytes;
+}
 
 /**
  * Get a specific photo type from a character
@@ -162,6 +179,69 @@ function normalizeAllPhotos(characters) {
   return characters;
 }
 
+/**
+ * Load avatar bytes for a slot. Prefers the R2 URL field if set (newer
+ * shape, post-migration), falls back to the inline base64 string (legacy
+ * shape, pre-migration). Returns base64 string suitable for sharp/Buffer
+ * decode, or null when nothing is available.
+ *
+ * Avatar object shape (post-migration target):
+ *   {
+ *     status, generatedAt, clothing,
+ *     standard: null,                 // legacy inline base64 (post-migration: nulled)
+ *     standardUrl: 'https://…/standard.jpg',
+ *     summer / summerUrl, winter / winterUrl,
+ *     styledAvatars: { …Url fields },
+ *     bodyThumbnails / faceThumbnails: { …Url fields },
+ *   }
+ *
+ * @param {Object} avatar - The avatars object from character.avatars
+ * @param {string} slot   - 'standard' | 'summer' | 'winter'
+ * @returns {Promise<string|null>} base64 string (no data: prefix) or null
+ */
+async function loadAvatarBytes(avatar, slot) {
+  if (!avatar || !slot) return null;
+  const url = avatar[`${slot}Url`];
+  if (url) {
+    const b = await _getOrFetch(url);
+    if (b) return b;
+    // R2 fetch failed — fall through to inline if present (defense in depth)
+  }
+  const inline = avatar[slot];
+  if (typeof inline === 'string' && inline.length > 0) {
+    return inline.replace(/^data:image\/\w+;base64,/, '');
+  }
+  return null;
+}
+
+/**
+ * Load Visual Bible reference image bytes. Same dual-shape pattern as
+ * loadAvatarBytes — prefers `referenceImageUrl` (R2), falls back to
+ * `referenceImageData` (legacy inline base64).
+ *
+ * VB entry shape (post-migration target):
+ *   {
+ *     id, name, extractedDescription, ...,
+ *     referenceImageData: null,
+ *     referenceImageUrl: 'https://…/vb/ART003.jpg'
+ *   }
+ *
+ * @param {Object} vbEntry - A single VB entry (character/animal/artifact/etc.)
+ * @returns {Promise<string|null>} base64 string (no data: prefix) or null
+ */
+async function loadVbReferenceBytes(vbEntry) {
+  if (!vbEntry) return null;
+  if (vbEntry.referenceImageUrl) {
+    const b = await _getOrFetch(vbEntry.referenceImageUrl);
+    if (b) return b;
+  }
+  const inline = vbEntry.referenceImageData;
+  if (typeof inline === 'string' && inline.length > 0) {
+    return inline.replace(/^data:image\/\w+;base64,/, '');
+  }
+  return null;
+}
+
 module.exports = {
   getPhoto,
   getPrimaryPhoto,
@@ -169,5 +249,7 @@ module.exports = {
   hasPhotos,
   normalizePhotos,
   stripLegacyPhotoFields,
-  normalizeAllPhotos
+  normalizeAllPhotos,
+  loadAvatarBytes,
+  loadVbReferenceBytes,
 };
