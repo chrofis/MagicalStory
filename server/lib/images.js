@@ -6053,6 +6053,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         usageTracker, // pass through so Haiku scene re-expansion + image gen are tracked
         evaluationFeedback: evalFeedback,
         sceneBackground: img.emptySceneImage || null,
+        // Repair-workflow iterate must preserve identity — don't let the run-level
+        // referenceMode='loose' silently drop character refs for non-close-up
+        // shots (the re-expansion can flip the shot type, flipping refs on/off
+        // and producing wildly different styles between V1 and V2+ of the same
+        // page). Force styled-only so refs are always attached during repair.
+        referenceMode: 'styled-only',
+        // Reuse the saved empty-scene plate via the explicit sceneBackground
+        // above; never regenerate a fresh plate during repair.
+        singlePassScene: !img.emptySceneImage,
       });
       // iteratePage tracks its own usage internally; nothing to add here
     } else if (img.pageNumber < 0 && storyData) {
