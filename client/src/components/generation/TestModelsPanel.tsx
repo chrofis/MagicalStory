@@ -53,6 +53,10 @@ export function TestModelsPanel({
   const [isRunning, setIsRunning] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [iterativePlacement, setIterativePlacement] = useState(false);
+  // Reference-mode + single-pass-scene flags. 'inherit' = use the run-level
+  // server default (set in server/config/models.js MODEL_DEFAULTS).
+  const [referenceMode, setReferenceMode] = useState<'inherit' | 'strict' | 'loose' | 'styled-only' | 'off'>('inherit');
+  const [singlePassScene, setSinglePassScene] = useState<'inherit' | 'on' | 'off'>('inherit');
 
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
@@ -93,14 +97,17 @@ export function TestModelsPanel({
     setResults({});
 
     const models = Array.from(selectedModels);
-    const options = iterativePlacement ? { iterativePlacement: true } : undefined;
+    const options: { iterativePlacement?: boolean; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean } = {};
+    if (iterativePlacement) options.iterativePlacement = true;
+    if (referenceMode !== 'inherit') options.referenceMode = referenceMode;
+    if (singlePassScene !== 'inherit') options.singlePassScene = singlePassScene === 'on';
 
     const promises = models.map(async (model) => {
       setResults(prev => ({ ...prev, [model]: { loading: true } }));
       const startTime = Date.now();
 
       try {
-        const response = await storyService.testModels(storyId, pageNumber, [model], options);
+        const response = await storyService.testModels(storyId, pageNumber, [model], Object.keys(options).length > 0 ? options : undefined);
         const result = response.results[model];
         const elapsedMs = Date.now() - startTime;
         setResults(prev => ({
@@ -130,7 +137,7 @@ export function TestModelsPanel({
 
     await Promise.allSettled(promises);
     setIsRunning(false);
-  }, [selectedModels, storyId, pageNumber, iterativePlacement]);
+  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -219,6 +226,37 @@ export function TestModelsPanel({
             <span className="text-sm text-orange-700 font-medium">Iterative Placement</span>
             <span className="text-[10px] text-gray-400">(2-pass: foreground first, then background)</span>
           </label>
+          {/* Reference Mode + Empty-Scene Plate flags */}
+          <div className="flex flex-wrap gap-3 mb-3 p-2 rounded-lg bg-orange-50 border border-orange-200">
+            <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
+              <span className="text-xs font-medium text-orange-700">Reference Mode</span>
+              <select
+                value={referenceMode}
+                onChange={e => setReferenceMode(e.target.value as typeof referenceMode)}
+                disabled={isRunning}
+                className="rounded border-gray-300 text-xs p-1"
+              >
+                <option value="inherit">inherit (server default)</option>
+                <option value="strict">strict — all refs + VB grid</option>
+                <option value="loose">loose — refs only on close-ups</option>
+                <option value="styled-only">styled-only — keep refs, no shot filter</option>
+                <option value="off">off — no character refs / landmarks</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
+              <span className="text-xs font-medium text-orange-700">Empty-Scene Plate</span>
+              <select
+                value={singlePassScene}
+                onChange={e => setSinglePassScene(e.target.value as typeof singlePassScene)}
+                disabled={isRunning}
+                className="rounded border-gray-300 text-xs p-1"
+              >
+                <option value="inherit">inherit (server default)</option>
+                <option value="off">use plate (two-pass)</option>
+                <option value="on">skip plate (single-pass)</option>
+              </select>
+            </label>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={allSelected ? deselectAll : selectAll}

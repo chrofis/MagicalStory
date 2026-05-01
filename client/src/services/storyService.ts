@@ -1274,7 +1274,7 @@ export const storyService = {
   },
 
   // Test multiple image models on the same page (admin only, no credits, ephemeral)
-  async testModels(storyId: string, pageNumber: number, models: string[], options?: { iterativePlacement?: boolean }): Promise<{
+  async testModels(storyId: string, pageNumber: number, models: string[], options?: { iterativePlacement?: boolean; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }): Promise<{
     results: Record<string, {
       imageData?: string;
       modelId: string;
@@ -1305,7 +1305,12 @@ export const storyService = {
       }>;
     }>(
       `/api/stories/${storyId}/test-models/${pageNumber}`,
-      { models, ...(options?.iterativePlacement && { iterativePlacement: true }) }
+      {
+        models,
+        ...(options?.iterativePlacement && { iterativePlacement: true }),
+        ...(options?.referenceMode && { referenceMode: options.referenceMode }),
+        ...(typeof options?.singlePassScene === 'boolean' && { singlePassScene: options.singlePassScene }),
+      }
     );
     return response;
   },

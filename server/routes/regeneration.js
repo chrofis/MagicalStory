@@ -861,7 +861,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { models, iterativePlacement } = req.body;
+    const { models, iterativePlacement, referenceMode, singlePassScene } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     // Admin only
@@ -908,23 +908,41 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       }
       prompt = buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
     }
-    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models${iterativePlacement ? ' (iterative placement)' : ''}`);
+    // Resolve dev flag effective values (per-page Test Models override)
+    const { applyReferenceMode, MODEL_DEFAULTS: DEFAULTS } = (() => {
+      const helpers = require('../lib/storyHelpers');
+      const cfg = require('../config/models');
+      return { applyReferenceMode: helpers.applyReferenceMode, MODEL_DEFAULTS: cfg.MODEL_DEFAULTS };
+    })();
+    const effRefMode = referenceMode || DEFAULTS.referenceMode || 'strict';
+    const effSinglePass = typeof singlePassScene === 'boolean'
+      ? singlePassScene
+      : DEFAULTS.singlePassScene === true;
+    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models (refMode=${effRefMode}, singlePass=${effSinglePass}${iterativePlacement ? ', iterative-placement' : ''})`);
     // Run all models in parallel
     const results = {};
     const settled = await Promise.allSettled(models.map(async (model) => {
       const start = Date.now();
       let result;
+      const refApplied = applyReferenceMode({
+        mode: effRefMode,
+        characterPhotos,
+        visualBibleGrid,
+        landmarkPhotos,
+        sceneBackground: null, // empty-scene plate is handled by iterativePlacement / two-pass paths only
+        sceneMetadata,
+      });
       if (iterativePlacement && sceneMetadata) {
         const { resolveArtStyle } = require('../lib/storyHelpers');
         const artStyleDesc = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[model].backend) || resolveArtStyle('pixar') || '';
-        result = await generateWithIterativePlacement(prompt, characterPhotos, sceneMetadata, {
+        result = await generateWithIterativePlacement(prompt, refApplied.characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-          landmarkPhotos, visualBibleGrid, pageNumber, artStyle: artStyleDesc,
+          landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, artStyle: artStyleDesc,
         });
       } else {
-        result = await generateImageOnly(prompt, characterPhotos, {
+        result = await generateImageOnly(prompt, refApplied.characterPhotos, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
-          landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+          landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, skipCache: true
         });
       }
       return {
