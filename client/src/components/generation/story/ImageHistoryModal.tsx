@@ -528,6 +528,27 @@ export function ImageHistoryModal({
                     </DetailBlock>
                   )}
 
+                  {/* 6b. THREE-STAGE — Stage 1 vision inventory + Stage 2 compliance.
+                       Stage 1 is the raw "what I see" text Gemini wrote BEFORE any
+                       comparison to the prompt; useful for debugging eval misses
+                       (e.g. a leap that read as "flying not jumping"). */}
+                  {detailVersion.threeStageResult?.visionInventory && (
+                    <DetailBlock label={language === 'de' ? 'Stage 1 — Bild-Inventar (Gemini Vision)' : 'Stage 1 — Vision inventory (Gemini Vision)'} color="purple">
+                      {detailVersion.threeStageResult.visionInventory}
+                    </DetailBlock>
+                  )}
+                  {detailVersion.threeStageResult?.complianceResult && (
+                    <DetailBlock label={language === 'de' ? 'Stage 2 — Konformitäts-Prüfung (Sonnet)' : 'Stage 2 — Prompt compliance (Sonnet)'} color="purple">
+                      {(() => {
+                        try {
+                          return JSON.stringify(detailVersion.threeStageResult.complianceResult, null, 2);
+                        } catch {
+                          return String(detailVersion.threeStageResult.complianceResult);
+                        }
+                      })()}
+                    </DetailBlock>
+                  )}
+
                   {/* 7. QUALITY REASONING — collapsed */}
                   {detailVersion.qualityReasoning && (
                     <DetailBlock label={language === 'de' ? 'Qualitäts-Begründung' : 'Quality reasoning'} color="gray">

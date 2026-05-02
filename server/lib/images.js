@@ -5028,6 +5028,11 @@ async function evaluateImageBatch(images, options = {}) {
         modelId: qualityResult?.modelId || null,
         // Semantic fidelity results (parallel evaluation when pageText provided)
         semanticResult: qualityResult?.semanticResult || null,
+        // Three-stage eval (vision-inventory + Sonnet compliance). Surfaced
+        // verbatim so the dev panel can show Stage-1's free-form "what I see"
+        // text and Stage-2's raw compliance JSON. Was being dropped before
+        // this — only the score + issuesSummary survived.
+        threeStageResult: qualityResult?.threeStageResult || null,
         // Text error info for covers
         textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
@@ -6896,6 +6901,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       rawQualityScore: v.evaluation?.qualityScore ?? null,      // raw visual eval
       semanticScore: v.evaluation?.semanticScore ?? null,
       semanticResult: v.evaluation?.semanticResult || null,
+      // Three-stage eval — Stage 1 vision inventory + Stage 2 Sonnet
+      // compliance JSON. Surfaced verbatim per version so the dev panel
+      // can show "what Gemini saw" alongside the eval scores.
+      threeStageResult: v.evaluation?.threeStageResult || null,
       entityPenalty: v.entityPenalty ?? 0,
       evaluatedAt: v.evaluatedAt || null,
       issuesSummary: v.evaluation?.issuesSummary || null,

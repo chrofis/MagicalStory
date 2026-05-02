@@ -5638,6 +5638,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           fixableIssues: img.fixableIssues || [],
           semanticResult: img.semanticResult || null,
           semanticScore: img.semanticScore ?? null,
+          // Three-stage evaluation: Stage 1 = vision inventory text, Stage 2 =
+          // Sonnet compliance JSON. Persisted so the dev-mode version picker
+          // can show what Gemini actually saw vs what Sonnet judged.
+          threeStageResult: img.threeStageResult || null,
           issuesSummary: img.issuesSummary || null,
           verdict: img.verdict || null,
           imageVersions: img.imageVersions || [],

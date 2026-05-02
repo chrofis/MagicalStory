@@ -666,6 +666,17 @@ export interface ImageVersion {
   rawQualityScore?: number | null;
   semanticScore?: number | null;
   semanticResult?: SemanticEvaluationResult | null;
+  // Three-stage eval — Stage 1 vision-inventory text + Stage 2 Sonnet
+  // compliance JSON. Stored verbatim per version so the dev panel can show
+  // what Gemini actually described in the image vs how Sonnet judged it.
+  threeStageResult?: {
+    score?: number;
+    rawScore?: number;
+    verdict?: string;
+    issuesSummary?: string;
+    visionInventory?: string;
+    complianceResult?: Record<string, unknown> | null;
+  } | null;
   entityPenalty?: number;
   evaluatedAt?: string;
   issuesSummary?: string;
@@ -719,6 +730,17 @@ export interface SceneImage {
   qualityModelId?: string;  // Model used for quality evaluation
   semanticScore?: number | null;  // Semantic fidelity score (0-100)
   semanticResult?: SemanticEvaluationResult | null;  // Full semantic evaluation result
+  // Three-stage eval (vision-inventory + Sonnet compliance). Stored verbatim
+  // so the dev panel can surface what Gemini actually described in the image
+  // (Stage 1) and how Sonnet judged it against the prompt (Stage 2).
+  threeStageResult?: {
+    score?: number;
+    rawScore?: number;
+    verdict?: string;
+    issuesSummary?: string;
+    visionInventory?: string;
+    complianceResult?: Record<string, unknown> | null;
+  } | null;
   verdict?: string;  // PASS / SOFT_FAIL / FAIL from quality gate
   issuesSummary?: string;  // One-line summary of issues from evaluation
   fixTargets?: Array<{  // Bounding boxes for auto-repair from quality evaluation
