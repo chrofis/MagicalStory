@@ -5916,7 +5916,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
-      checkObjects: true,
+      // Objects (LOC/ART/VEH/ANI) are NOT cross-page identity entities — a boat
+      // appears on one page, a marketplace on another, and "consistency" of a
+      // single-page object is meaningless. Per-page presence/correctness is
+      // already covered by quality eval + semantic eval. Leaving objects on
+      // here turns "boat missing on p7" into a CRITICAL entity-consistency
+      // issue that pollutes every version of every page.
+      checkObjects: false,
       saveGrids: false,
       onHeartbeat: pingHeartbeat
     }).catch(err => {
@@ -6616,7 +6622,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const [freshEntityResult, evalsResult] = await Promise.allSettled([
         runEntityConsistencyChecks(freshEntityCheckData, characters, {
           checkCharacters: true,
-          checkObjects: true,
+          // Objects intentionally off — see comment at the initial-pass call
+          // site above. Per-page presence is the quality/semantic eval's job.
+          checkObjects: false,
           saveGrids: false,
           onHeartbeat: pingHeartbeat
         }),
