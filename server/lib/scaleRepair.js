@@ -46,7 +46,22 @@ function needsScaleRepair(sceneMetadata) {
   if (!Array.isArray(chars) || chars.length < 2) return false;
   const bg = chars.filter(c => (c.depth || '').toLowerCase() === 'background');
   const nonBg = chars.filter(c => (c.depth || '').toLowerCase() !== 'background');
-  return bg.length > 0 && nonBg.length > 0;
+  if (bg.length === 0 || nonBg.length === 0) return false;
+
+  // Don't run when the bg characters are inside a SHARED VESSEL that ties
+  // them spatially to the foreground action — boat / cart / wagon / carriage.
+  // Page 7 of the Tell story is the canonical bad case: Roger leaps FROM
+  // the boat the soldiers are gripping. Shrinking the soldiers shrinks the
+  // boat, which widens the leap distance — the opposite of what we want.
+  //
+  // Only match "inside the / aboard the / in the [vessel]" phrases. Personal
+  // mounts ("mounted on a horse", "on horseback") are NOT a shared vessel —
+  // they're a single bg figure on their own animal, which is exactly what
+  // scale-repair handles best (page 9: Gessler on horse, distant on path).
+  const SHARED_VESSEL_RE = /\b(?:inside (?:the|a|its)|aboard (?:the|a)|in (?:the|a) (?:tilting )?(?:boat|raft|ship|vessel|cart|wagon|carriage|coach|sleigh|train|car|carriage|coach))\b/i;
+  if (bg.some(c => SHARED_VESSEL_RE.test(c.position || ''))) return false;
+
+  return true;
 }
 
 /**
@@ -115,15 +130,19 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   if (!currentImage) return null;
   if (!needsScaleRepair(sceneMetadata)) return null;
 
+  const { MODEL_DEFAULTS } = require('../config/models');
   const {
     pageNumber,
     sceneBackground = null,
     backgroundCharacterRefs = [],
     artStyleDescription = null,
     imageModelOverride = 'grok-imagine',
-    aspectRatio = null,
+    // No aspect → Grok edit crops the input to square. Always default to the
+    // configured page aspect so the result lands on the page at the right shape.
+    aspectRatio: aspectRatioIn = null,
     usageTracker = null,
   } = options;
+  const aspectRatio = aspectRatioIn || MODEL_DEFAULTS.pageAspect || '3:4';
 
   const chars = sceneMetadata.fullData?.characters || sceneMetadata.characters;
   const bgChars = chars.filter(c => (c.depth || '').toLowerCase() === 'background');
