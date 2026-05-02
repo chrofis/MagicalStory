@@ -363,45 +363,65 @@ export function ImageHistoryModal({
                     </div>
                   )}
 
-                  {/* 4. FINAL SCORE + PENALTIES (each evaluator's deduction, same scale) */}
+                  {/* 4. FINAL SCORE + PER-EVALUATOR PENALTIES (4 cards: one per evaluator) */}
                   {detailVersion.qualityScore != null && (() => {
-                    const rawQ = detailVersion.rawQualityScore ?? detailVersion.qualityScore;
-                    const qualityPenalty = Math.max(0, 100 - rawQ);
+                    // Severity → 0-100 deduction (same rubric as backend SEVERITY_PENALTY × 10).
+                    const SEV_PEN: Record<string, number> = { catastrophic: 50, critical: 30, major: 20, moderate: 10, minor: 5 };
+                    const sumPenalty = (items: Array<{ severity?: string }>): number =>
+                      items.reduce((s, i) => s + (SEV_PEN[String(i.severity || '').toLowerCase()] ?? 10), 0);
+
+                    const fixable = detailVersion.fixableIssues || [];
+                    // Quality-eval issues = explicit source='quality eval' OR untagged
+                    // (legacy data didn't tag the source; untagged items are from the
+                    // main Gemini quality evaluator).
+                    const qualityIssues = fixable.filter(i => !i.source || i.source === 'quality eval');
+                    const complianceIssues = fixable.filter(i => i.source === 'three-stage');
+
+                    const qualityPenalty = sumPenalty(qualityIssues);
+                    const compliancePenalty = sumPenalty(complianceIssues);
                     const semanticPenalty = detailVersion.semanticScore != null ? Math.max(0, 100 - detailVersion.semanticScore) : null;
                     const entityPenalty = detailVersion.entityPenalty || 0;
-                    const penaltyClass = (p: number) => p === 0 ? 'text-green-600' : p >= 30 ? 'text-red-600' : p >= 15 ? 'text-orange-600' : 'text-yellow-600';
+                    const totalPenalty = qualityPenalty + compliancePenalty + (semanticPenalty || 0) + entityPenalty;
+
+                    const penaltyClass = (p: number | null) => p == null ? 'text-gray-400' : p === 0 ? 'text-green-600' : p >= 30 ? 'text-red-600' : p >= 15 ? 'text-orange-600' : 'text-yellow-600';
+                    const fmt = (p: number | null) => p == null ? 'n/a' : p === 0 ? '0' : `-${p}`;
+
                     return (
                       <div className="space-y-2">
+                        {/* Final headline */}
                         <div className="flex flex-wrap items-center gap-3 text-sm">
                           <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
                           <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
                             {detailVersion.qualityScore}%
                           </span>
+                          <span className="text-xs text-gray-500">
+                            ({language === 'de' ? 'gesamt Abzug' : 'total deductions'} <span className={`font-semibold ${penaltyClass(totalPenalty)}`}>−{totalPenalty}</span>)
+                          </span>
                           {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
                             <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
                           )}
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
+                        {/* 4 cards: one per evaluator, all on same penalty scale */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                            <div className="text-gray-500 font-medium mb-0.5">{language === 'de' ? 'Qualitäts-Eval' : 'Quality eval'}</div>
-                            <div className={`font-bold text-base ${penaltyClass(qualityPenalty)}`}>
-                              {qualityPenalty === 0 ? '0' : `-${qualityPenalty}`}
-                            </div>
-                            <div className="text-gray-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                            <div className="text-gray-500 font-medium mb-0.5">{language === 'de' ? 'Qualität' : 'Quality'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(qualityPenalty)}`}>{fmt(qualityPenalty)}</div>
+                            <div className="text-gray-400">{language === 'de' ? 'Gemini Vision' : 'Gemini vision'}</div>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                            <div className="text-blue-500 font-medium mb-0.5">{language === 'de' ? 'Compliance' : 'Compliance'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(compliancePenalty)}`}>{fmt(compliancePenalty)}</div>
+                            <div className="text-blue-400">{language === 'de' ? 'Sonnet 2-stage' : 'Sonnet 2-stage'}</div>
                           </div>
                           <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
                             <div className="text-indigo-500 font-medium mb-0.5">{language === 'de' ? 'Semantik' : 'Semantic'}</div>
-                            <div className={`font-bold text-base ${semanticPenalty == null ? 'text-gray-400' : penaltyClass(semanticPenalty)}`}>
-                              {semanticPenalty == null ? 'n/a' : (semanticPenalty === 0 ? '0' : `-${semanticPenalty}`)}
-                            </div>
-                            <div className="text-indigo-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(semanticPenalty)}`}>{fmt(semanticPenalty)}</div>
+                            <div className="text-indigo-400">{language === 'de' ? 'Prompt-Match' : 'prompt match'}</div>
                           </div>
                           <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
                             <div className="text-orange-500 font-medium mb-0.5">{language === 'de' ? 'Entität+Checks' : 'Entity+checks'}</div>
-                            <div className={`font-bold text-base ${penaltyClass(entityPenalty)}`}>
-                              {entityPenalty === 0 ? '0' : `-${entityPenalty}`}
-                            </div>
-                            <div className="text-orange-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(entityPenalty)}`}>{fmt(entityPenalty)}</div>
+                            <div className="text-orange-400">{language === 'de' ? 'Konsistenz' : 'consistency'}</div>
                           </div>
                         </div>
                       </div>
