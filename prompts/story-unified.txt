@@ -263,7 +263,7 @@ A reader comparing SCENE and `emptyScenePrompt` side by side must see the same g
 - **BACK VIEW** — Character walking away from camera into a landscape. Use `"perspective": "back view"`.
 - **BIRD'S EYE** — Looking down at tiny characters in a large space. Use `"shot": "ultra-wide"`.
 - **REACTION CLOSE-UP** — Just the face filling the frame, strong emotion. 1 character only.
-- **DISTANCE SHOT** — Two characters far apart with empty space between them. Either pairing works: one `foreground` + one `background`, OR both `background` (tiny figures across an open square / field / hall — preferred for aiming, shooting, throwing, calling, watching across distance).
+- **DISTANCE SHOT** — Two characters far apart with empty space between them. **Strongly prefer one `foreground` + one `background`** (large hero close to camera, tiny target figure across the square / field / hall). The fg character anchors the composition and the post-render scale-repair pass can keep the foreground intact while shrinking the bg figure — both-background renders force a full regeneration that Grok handles poorly. Use both-background only when the dramatic intent specifically requires a wide-open empty middle with neither character as a hero anchor (e.g. an aerial / God's-eye view of two distant antagonists). Default for aiming, shooting, throwing, calling, watching across distance: pick the active character (the one taking the action) as `foreground`, the target as `background`.
 - **For any beat where two characters interact across open distance (aim, shoot, throw, call, watch from afar), use DISTANCE SHOT — never two `foreground` characters at the same depth band.**
 
 **Scene Types That DON'T WORK (avoid):**
