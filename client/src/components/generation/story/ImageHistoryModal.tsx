@@ -20,6 +20,10 @@ interface ImageHistoryModalProps {
   onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
   grokRefImages?: string[] | null;  // Scene-level fallback for active version
+  // Entity-consistency issues for this page (from finalChecksReport.entity).
+  // These are page-scoped and apply to every version of the page — they're
+  // not stored per-version, but they explain the entityPenalty deduction.
+  entityIssues?: Array<{ name: string; severity: string; description: string; source: string }>;
 }
 
 export function ImageHistoryModal({
@@ -31,6 +35,7 @@ export function ImageHistoryModal({
   onSelectVersion,
   developerMode = false,
   grokRefImages: sceneLevelGrokRefImages,
+  entityIssues: pageEntityIssues,
 }: ImageHistoryModalProps) {
   const { language } = useLanguage();
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
@@ -409,7 +414,17 @@ export function ImageHistoryModal({
                     const semanticOnly = (detailVersion.semanticResult?.semanticIssues || [])
                       .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes((s.problem || '').slice(0, 30).toLowerCase())))
                       .map(s => ({ description: s.problem, severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
-                    const allIssues: any[] = [...fixable, ...semanticOnly];
+                    // Entity issues are page-scoped (from finalChecksReport.entity), shared
+                    // across all versions of the page. They explain the entityPenalty.
+                    const entityFromPage = (pageEntityIssues || []).map(e => ({
+                      description: e.description,
+                      severity: e.severity,
+                      source: 'entity check',
+                      type: e.source,
+                      fix: '',
+                      character: e.name,
+                    }));
+                    const allIssues: any[] = [...fixable, ...semanticOnly, ...entityFromPage];
                     if (allIssues.length === 0) return null;
 
                     const sevRank = (s: string) => {
