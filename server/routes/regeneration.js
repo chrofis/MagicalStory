@@ -1092,25 +1092,19 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
         error: 'Scene does not need scale repair (no depth=background characters declared in metadata).',
       });
     }
-    // Resolve avatar refs for background characters only.
+    // Background character refs INTENTIONALLY OMITTED. Sending an avatar
+    // attaches a face reference — Grok then renders the bg character at a
+    // size big enough to show the face, defeating "tiny in the background"
+    // (the whole point of the pass). Description-only is enough: Grok has
+    // a physical description and the foreground composition stays put from
+    // the source image.
     const helpers = require('../lib/storyHelpers');
-    const { applyStyledAvatars } = require('../lib/styledAvatars');
     const allChars = sceneMetadata.fullData?.characters || [];
     const bgNames = new Set(allChars
       .filter(c => (c.depth || '').toLowerCase() === 'background')
       .map(c => (c.name || '').toLowerCase()));
     const bgCharObjs = (storyData.characters || []).filter(c =>
       bgNames.has((c.name || '').toLowerCase()));
-    let bgRefs = [];
-    if (bgCharObjs.length > 0) {
-      bgRefs = helpers.getCharacterPhotoDetails(
-        bgCharObjs,
-        null,
-        storyData.artStyle,
-        storyData.clothingRequirements || null,
-      );
-      bgRefs = applyStyledAvatars(bgRefs, storyData.artStyle);
-    }
     // Physical descriptions for bg chars — Grok needs to be told who
     // "Gessler" looks like; the name alone is meaningless to the model.
     const bgDescriptions = bgCharObjs.map(c => ({
@@ -1127,7 +1121,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
     const result = await runScaleRepair(scene.imageData, sceneMetadata, {
       pageNumber,
       sceneBackground: plate,
-      backgroundCharacterRefs: bgRefs,
+      backgroundCharacterRefs: [],  // intentionally empty — see comment above
       backgroundCharacterDescriptions: bgDescriptions,
       artStyleDescription: helpers.resolveArtStyle(storyData.artStyle, 'grok') || null,
       aspectRatio: scene.imageAspect || null,

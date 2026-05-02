@@ -5179,19 +5179,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     .map(c => (c.name || '').toLowerCase()));
                   const bgCharObjs = (inputData.characters || []).filter(c =>
                     bgNames.has((c.name || '').toLowerCase()));
-                  let bgRefs = [];
-                  if (bgCharObjs.length > 0) {
-                    bgRefs = helpers.getCharacterPhotoDetails(
-                      bgCharObjs,
-                      // Pass null clothingCategory — the runtime clothing
-                      // resolver matches on _currentClothing in
-                      // effectiveClothingRequirements (built per scene).
-                      null,
-                      inputData.artStyle,
-                      pageData.perCharClothing || null,
-                    );
-                    bgRefs = applyStyledAvatars(bgRefs, inputData.artStyle);
-                  }
+                  // Background character avatars INTENTIONALLY NOT ATTACHED.
+                  // A face avatar tells Grok "render this person identifiably"
+                  // and the model upsizes the figure to fit a recognisable
+                  // face — directly contradicting "tiny in the background".
+                  // Description-only is enough; the foreground composition
+                  // is preserved from the source image so no foreground
+                  // avatar is needed either.
                   // Physical descriptions — Grok has no idea who "Gessler" is
                   // by name. Build a hair/face/clothing line for each bg char
                   // so the prompt can describe them.
@@ -5202,7 +5196,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
                     pageNumber: pageData.pageNumber,
                     sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
-                    backgroundCharacterRefs: bgRefs,
+                    backgroundCharacterRefs: [],  // intentionally empty — see comment above
                     backgroundCharacterDescriptions: bgDescriptions,
                     artStyleDescription: helpers.resolveArtStyle(inputData.artStyle, 'grok') || null,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
