@@ -332,6 +332,8 @@ export function StoryDisplay({
   const [isPreviewingPrompt, setIsPreviewingPrompt] = useState(false);
   // Test Models panel: which page is showing the comparison
   const [testModelsPage, setTestModelsPage] = useState<number | null>(null);
+  // Scale-repair loading set (per-page) — Skala-Reparatur button
+  const [scaleRepairingPages, setScaleRepairingPages] = useState<Set<number>>(new Set());
   // Style consistency check (dev): loading state + last result + visibility
   const [styleCheckLoading, setStyleCheckLoading] = useState(false);
   const [styleCheckResult, setStyleCheckResult] = useState<{
@@ -5007,6 +5009,29 @@ export function StoryDisplay({
                               <Images size={14} />
                               Test Models
                             </button>
+                            {/* Scale-repair button — Grok edit shrinks the depth=background character(s) */}
+                            <button
+                              disabled={!storyId || scaleRepairingPages.has(pageNumber)}
+                              onClick={async () => {
+                                if (!storyId) return;
+                                setScaleRepairingPages(prev => new Set(prev).add(pageNumber));
+                                try {
+                                  await storyService.scaleRepair(storyId, pageNumber);
+                                  if (onRefreshStory) await onRefreshStory();
+                                } catch (err) {
+                                  console.error('Scale repair failed:', err);
+                                  alert('Scale repair failed: ' + (err instanceof Error ? err.message : String(err)));
+                                } finally {
+                                  setScaleRepairingPages(prev => { const n = new Set(prev); n.delete(pageNumber); return n; });
+                                }
+                              }}
+                              className={`w-full mt-2 bg-teal-600 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${scaleRepairingPages.has(pageNumber) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-teal-700'}`}
+                              title="Hintergrund-Figur verkleinern (Grok Edit)"
+                            >
+                              {scaleRepairingPages.has(pageNumber)
+                                ? <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Repariere…' : 'Repairing…'}</>
+                                : <><RotateCcw size={14} /> {language === 'de' ? 'Skala-Reparatur (Dev)' : 'Scale Repair (Dev)'}</>}
+                            </button>
                             {testModelsPage === pageNumber && storyId && (
                               <TestModelsPanel
                                 storyId={storyId}
@@ -5661,6 +5686,29 @@ export function StoryDisplay({
                             >
                               <Images size={14} />
                               Test Models
+                            </button>
+                            {/* Scale-repair button — Grok edit shrinks the depth=background character(s) */}
+                            <button
+                              disabled={!storyId || scaleRepairingPages.has(pageNumber)}
+                              onClick={async () => {
+                                if (!storyId) return;
+                                setScaleRepairingPages(prev => new Set(prev).add(pageNumber));
+                                try {
+                                  await storyService.scaleRepair(storyId, pageNumber);
+                                  if (onRefreshStory) await onRefreshStory();
+                                } catch (err) {
+                                  console.error('Scale repair failed:', err);
+                                  alert('Scale repair failed: ' + (err instanceof Error ? err.message : String(err)));
+                                } finally {
+                                  setScaleRepairingPages(prev => { const n = new Set(prev); n.delete(pageNumber); return n; });
+                                }
+                              }}
+                              className={`w-full mt-2 bg-teal-600 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${scaleRepairingPages.has(pageNumber) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-teal-700'}`}
+                              title="Hintergrund-Figur verkleinern (Grok Edit)"
+                            >
+                              {scaleRepairingPages.has(pageNumber)
+                                ? <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Repariere…' : 'Repairing…'}</>
+                                : <><RotateCcw size={14} /> {language === 'de' ? 'Skala-Reparatur (Dev)' : 'Scale Repair (Dev)'}</>}
                             </button>
                             {testModelsPage === pageNumber && storyId && (
                               <TestModelsPanel
