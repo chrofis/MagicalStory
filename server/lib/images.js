@@ -5703,17 +5703,29 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 }
 
 /**
- * Unified repair pipeline — evaluates, inpaints/iterates bad pages, picks best,
- * then runs character repair on final images.
+ * Unified repair pipeline — evaluates, picks ONE repair method per page per
+ * round (skip / inpaint / iterate / char-fix), runs them in parallel, picks
+ * best across all rounds, then runs the style-consistency audit.
  *
  * Flow:
- *   1. Evaluate all images + entity consistency (parallel)
- *   2. Round loop (1 to maxPasses): for each bad page, chooseRepairStrategy() → inpaint or iterate
- *   3. Pick best versions
- *   4. Entity consistency check (on picked images)
- *   5. Character repair (on final images)
- *   6. Evaluate character-repaired pages
- *   7. Final pick best
+ *   1. Evaluate all images: quality + semantic + entity (one parallel batch)
+ *   2. Round loop (1 to maxPasses):
+ *        - decideRepairMethod() per bad page → ONE method (or skip)
+ *        - dispatch to executeIterateAction / executeInpaintAction /
+ *          executeCharFixAction in parallel
+ *        - re-evaluate every repaired page: quality + semantic + entity
+ *          (entity included so rounds can compare scores like-for-like)
+ *        - inpaint↔iterate flip on regression (lastRepairRegressed); char-fix
+ *          stays char-fix when entity issues persist
+ *   3. Pick best version per page (single pass over ALL rounds + original)
+ *   4. Post-repair calm-zone recovery
+ *   5. Style-consistency audit across the picked images
+ *   6. Build final results
+ *
+ * Char-fix runs INSIDE the round loop as a per-page method choice — there is
+ * no separate post-loop character-repair stage anymore. Entity consistency
+ * is checked exactly once per round (Step 1's initial + Step 2's per-round)
+ * and not separately at the end.
  *
  * @param {Array<Object>} rawImages - Array from Phase 5a, each with imageData, prompt, characterPhotos, etc.
  * @param {Object} context
@@ -6165,8 +6177,185 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     return result;
   };
 
+  // Per-character debug Map for the dev panel — populated by char-fix
+  // calls inside the round loop. Hoisted above executeCharFixAction so the
+  // closure can mutate it; serialised at the end of the function.
+  const charFixDetails = new Map();
+
+  // Char-fix as a per-page round method. Same shape as executeIterate /
+  // executeInpaint so the round-body parallel runner dispatches uniformly.
+  // Body extracted from the (deleted) Step 5 character-repair pass; bbox
+  // tier-search + avatar lookup logic preserved verbatim. Char-fix is
+  // scene-only — covers fall through to iterate via decideRepairMethod.
+  const executeCharFixAction = async (img, decision, roundNum) => {
+    const pageNumber = img.pageNumber;
+    if (pageNumber <= 0) {
+      return { pageNumber, imageData: null, error: 'char-fix not applicable to covers' };
+    }
+    const charName = decision.charName;
+    if (!charName) {
+      return { pageNumber, imageData: null, error: 'no charName in decision' };
+    }
+
+    const versions = pageVersions.get(pageNumber) || [];
+    const best = selectBestVersion(versions);
+    const currentImageData = best?.imageData || img.imageData;
+    const bestEval = best?.evaluation;
+
+    // Bbox tier-search (4 tiers, matches former Step 5 logic).
+    let faceBbox = null;
+    let bodyBbox = null;
+    if (bestEval?.bboxDetection?.figures) {
+      const figure = bestEval.bboxDetection.figures.find(f =>
+        f.name?.toLowerCase() === charName.toLowerCase() ||
+        f.label?.toLowerCase().includes(charName.toLowerCase())
+      );
+      if (figure) {
+        if (figure.faceBox) faceBbox = figure.faceBox;
+        if (figure.bodyBox) bodyBbox = figure.bodyBox;
+      }
+    }
+    if (!faceBbox && !bodyBbox && currentEntityReport?.characters?.[charName]?.byClothing) {
+      for (const clothingData of Object.values(currentEntityReport.characters[charName].byClothing)) {
+        const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+        if (app?.faceBox) {
+          faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
+        }
+        if (app?.bodyBox) {
+          bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
+        }
+        if (faceBbox || bodyBbox) break;
+      }
+    }
+    if (!faceBbox && !bodyBbox && bestEval?.matches) {
+      const charMatch = bestEval.matches.find(m =>
+        m.name?.toLowerCase() === charName.toLowerCase() ||
+        m.character?.toLowerCase() === charName.toLowerCase()
+      );
+      if (charMatch?.face_bbox) faceBbox = charMatch.face_bbox;
+      if (charMatch?.bbox) bodyBbox = charMatch.bbox;
+    }
+    if (!faceBbox && !bodyBbox) {
+      try {
+        const detection = await detectAllBoundingBoxes(currentImageData, {
+          expectedCharacters: [{ name: charName }]
+        });
+        const charFigure = detection?.figures?.find(f =>
+          f.name?.toLowerCase() === charName.toLowerCase()
+        );
+        if (charFigure) {
+          faceBbox = charFigure.faceBox || null;
+          bodyBbox = charFigure.bodyBox || null;
+        }
+      } catch (detectErr) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${roundNum} char-fix: bbox detection failed for ${charName}: ${detectErr.message}`);
+      }
+    }
+    if (!faceBbox && !bodyBbox) {
+      return { pageNumber, imageData: null, error: `no bbox for ${charName}` };
+    }
+
+    const character = characters.find(c => c.name === charName);
+    if (!character) {
+      return { pageNumber, imageData: null, error: `character ${charName} not found` };
+    }
+
+    const clothingCategory = img.perCharClothing?.[charName] || 'standard';
+    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+    const avatarPhoto = styledAvatar || getFacePhoto(character);
+    const avatarPhotoType = styledAvatar
+      ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)
+      : 'face';
+    if (!avatarPhoto) {
+      return { pageNumber, imageData: null, error: `no avatar photo for ${charName}` };
+    }
+
+    const issueText = (decision.issueDescription || '').toLowerCase();
+    const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
+    const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
+    const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
+    const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
+
+    const protectedFaces = [];
+    const protectedBodies = [];
+    const bboxFigures = bestEval?.bboxDetection?.figures || [];
+    const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
+    for (const fig of bboxFigures) {
+      if (!fig.name || fig.name === 'UNKNOWN') continue;
+      if (fig.name.toLowerCase() === charName.toLowerCase()) continue;
+      if (fig.faceBox) protectedFaces.push(toRect(fig.faceBox));
+      if (fig.bodyBox) protectedBodies.push(toRect(fig.bodyBox));
+    }
+
+    const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
+    const sceneDesc = img.sceneDescription || img.text || '';
+    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
+
+    log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
+    let repairResult;
+    try {
+      repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, {
+        imageBackend: 'grok',
+        issueDescription: decision.issueDescription,
+        clothingDescription: clothingDesc,
+        photoType: avatarPhotoType,
+        sceneDescription: sceneDesc,
+        faceBbox,
+        protectedFaces,
+        protectedBodies,
+        whiteoutTarget: useFaceOnly ? 'face' : 'body',
+        textPosition: pageTextPosition,
+        includeDebug: true,
+      });
+    } catch (err) {
+      return { pageNumber, imageData: null, error: err.message };
+    }
+
+    if (!repairResult?.imageData || repairResult.imageData.length < 1000) {
+      return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
+    }
+
+    if (repairResult.usage && usageTracker) {
+      usageTracker('gemini_image', {
+        input_tokens: repairResult.usage.inputTokens || 0,
+        output_tokens: repairResult.usage.outputTokens || 0
+      }, 'unified_pipeline_char_fix', repairResult.usage.model);
+    }
+
+    // Stash dev-panel debug data on charFixDetails so the dev panel still
+    // shows the per-character before/after/blackout/cutout/grok-raw thumbnails.
+    if (!charFixDetails.has(charName)) charFixDetails.set(charName, new Map());
+    charFixDetails.get(charName).set(pageNumber, {
+      before: currentImageData,
+      after: repairResult.imageData,
+      blackoutImage: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
+      cutoutSent: repairResult.cutoutSent || repairResult.comparison?.cutoutSent || null,
+      grokRawResult: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
+      blendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
+      croppedAvatar: repairResult.croppedAvatar || repairResult.comparison?.croppedAvatar || null,
+      method: repairResult.method || 'grok_blended',
+      prompt: repairResult.debug?.prompt || null,
+      avatarSent: repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
+      bbox: repairResult.debug?.bbox || null,
+    });
+
+    return {
+      pageNumber,
+      imageData: repairResult.imageData,
+      source: `char-fix-round-${roundNum}`,
+      modelId: `grok-imagine (${repairResult.method || 'grok_blended'})`,
+      grokRefImages: null,
+      inpaintInstruction: repairResult.debug?.prompt || null,
+      inpaintReferenceImages: [
+        repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
+        repairResult.debug?.sceneSent || repairResult.blackoutImage || null,
+      ].filter(Boolean),
+    };
+  };
+
   // =========================================================================
-  // Step 2: Round loop (1 to maxPasses) — inpaint or iterate per bad page
+  // Step 2: Round loop (1 to maxPasses) — per-page repair-method decision
+  //         (skip / inpaint / iterate / char-fix) via decideRepairMethod
   // =========================================================================
   // Score terminology (THREE dimensions feed the round-loop decisions):
   //   visual    = raw vision-model quality score (qualityScore in evaluation)
@@ -6181,66 +6370,49 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   //   final     = image - entity
   //               the score findBadPages compares to regenThreshold
   //
-  // Page classification:
-  //   final >= regenThreshold                                  → ok                 (no action)
-  //   image < regenThreshold                                   → BAD-image          → iterate/inpaint (visual or semantic broken)
-  //   image in [regenThreshold, HIGH_IMAGE_FLOOR) AND final<thr → BAD-mixed         → iterate/inpaint
-  //   image >= HIGH_IMAGE_FLOOR AND final < regenThreshold     → ENTITY-ONLY        → defer to Step 5 (character repair)
+  // Per-round per-page method (decideRepairMethod):
+  //   final >= regenThreshold                          → ok            (no action)
+  //   visual < 50 OR semantic < 30                     → iterate       (catastrophic)
+  //   major/critical entity issue on this page         → char-fix
+  //   has fixable quality/semantic content             → inpaint
+  //   otherwise                                        → skip
   //
-  // Rationale: a high-quality image with high semantic match but only entity drift
-  // should NOT be redone — Step 5 surgically repairs the character (~$0.02) instead of
-  // regenerating the whole image (~$0.05+) which produces a different image with
-  // different micro-issues (the convergence loop). But if visual OR semantic is low,
-  // the image itself is the problem and a full redo is justified.
-  const HIGH_IMAGE_FLOOR = 90;
+  // The flip logic below (lastRepairRegressed / forcedStrategyAfterFailures /
+  // bothStrategiesTriedAndRegressed) only flips inpaint↔iterate. char-fix is
+  // not flipped — if it failed last round, the next round's decideRepairMethod
+  // sees the still-failing entity report and re-picks char-fix anyway.
 
   let currentEntityReport = entityReport;
-  let upgradedCount = 0;
+
+  const { decideRepairMethod } = require('./repairLogic');
 
   for (let round = 1; round <= maxRegenAttempts; round++) {
     // Build eval map for this round using best versions so far. Each entry now
     // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
-    // finalScore so bad-page detection and strategy choice can read each dimension
-    // directly without mutating the existing qualityScore field (300+ call sites).
+    // finalScore so bad-page detection and the per-page method decision can
+    // read each dimension directly without mutating the existing qualityScore
+    // field (300+ call sites).
+    //
+    // Entity-only pages — images with strong visual+semantic but a character
+    // drift — are NOT skipped. They fall through to decideRepairMethod which
+    // returns char-fix as the per-page method. This collapses the old Step 5
+    // separate character-repair pass into the round loop itself.
     const roundEvalPages = {};
-    const entityOnlyPages = [];
     for (const img of rawImages) {
       if (!img.imageData) continue;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       if (bestSoFar && bestSoFar.score != null) {
-        // bestSoFar.evaluation.qualityScore = raw visual (no penalties)
-        // bestSoFar.score                   = visual - semanticPenalty (image score)
         const visualScore = bestSoFar.evaluation?.qualityScore ?? bestSoFar.score;
         const imageScore = bestSoFar.score;
         const semanticPenalty = Math.max(0, visualScore - imageScore);
         const entityPenalty = getEntityPenalty(img.pageNumber, currentEntityReport);
         const finalScore = Math.max(0, imageScore - entityPenalty);
 
-        // Entity-only = image (visual+semantic combined) is good, only entity drags
-        const isEntityOnly =
-          imageScore >= HIGH_IMAGE_FLOOR &&
-          finalScore < regenThreshold;
-
-        const verdict =
-          finalScore >= regenThreshold ? 'ok'
-          : isEntityOnly ? 'ENTITY-ONLY → defer to Step 5'
-          : 'BAD → iterate/inpaint';
-
-        log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore} → ${verdict}`);
-
-        if (isEntityOnly) {
-          // Skip from this round's bad-page list — Step 5 character repair
-          // handles the character drift surgically. Don't iterate.
-          entityOnlyPages.push(img.pageNumber);
-          continue;
-        }
+        log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore}`);
 
         roundEvalPages[img.pageNumber] = {
           ...bestSoFar.evaluation,
-          // Explicit score fields — readers should use these instead of
-          // the ambiguous qualityScore which we leave untouched at the raw
-          // visual value.
           visualScore,
           semanticPenalty,
           imageScore,
@@ -6250,15 +6422,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
     }
 
-    if (entityOnlyPages.length > 0) {
-      log.info(`👤 [UNIFIED PIPELINE] Round ${round}: ${entityOnlyPages.length} entity-only page(s) deferred to Step 5: [${entityOnlyPages.join(', ')}]`);
-    }
-
     const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
     const badPages = rawImages.filter(img => badPageNums.includes(img.pageNumber));
 
     if (badPages.length === 0) {
-      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, skipping remaining rounds`);
+      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, stopping repair loop`);
       break;
     }
 
@@ -6266,12 +6434,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const progressBase = 35 + Math.floor((round - 1) / maxRegenAttempts * 25);
     await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
 
-    // Choose strategy for each bad page. If the last two repair rounds on
-    // this page both used the same approach and didn't fix it, force a flip
-    // — doing inpaint a third time rarely succeeds where two already failed.
-    // If BOTH strategies have already been tried and neither improved on the
-    // pre-repair best, skip the page entirely — we're just duplicating earlier
-    // attempts on the same bestSoFar canvas.
+    // Per-page decision: ONE method per page per round.
+    //   1. catastrophic visual/semantic → iterate
+    //   2. major/critical entity issue → char-fix
+    //   3. otherwise inpaintable → inpaint
+    //   4. nothing actionable → skip
+    // The flip logic (inpaint↔iterate) below overrides #3 when the last
+    // repair regressed or both have been tried — that's still useful for
+    // inpaint/iterate. char-fix decisions are NOT flipped — if char-fix
+    // didn't help in round N, the next round's decideRepairMethod sees
+    // the still-failing entity report and picks char-fix again, potentially
+    // on the iterated/inpainted result of a prior round.
     const pageStrategies = badPages.map(img => {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
@@ -6279,36 +6452,42 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       if (bothStrategiesTriedAndRegressed(versions)) {
         log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
-        return { img, strategy: null, latestEval, skipped: true };
+        return { img, method: null, latestEval, skipped: true };
       }
 
-      const regressedFlip = lastRepairRegressed(versions);
-      const forced = forcedStrategyAfterFailures(versions);
-      let strategy, reason;
-      if (regressedFlip) {
-        strategy = regressedFlip;
-        const prevStrat = regressedFlip === 'inpaint' ? 'iterate' : 'inpaint';
-        reason = `forced ${regressedFlip} — last ${prevStrat} regressed the score, flipping strategy`;
-      } else if (forced) {
-        strategy = forced;
-        reason = `forced ${forced} — last two rounds both used ${forced === 'inpaint' ? 'iterate' : 'inpaint'} without fixing it`;
-      } else {
-        const chosen = chooseRepairStrategy(latestEval || {});
-        strategy = chosen.strategy;
-        reason = chosen.reason;
-      }
-      log.info(`  📋 [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: ${strategy} (${reason})`);
+      const decision = decideRepairMethod(img.pageNumber, latestEval || {}, currentEntityReport);
+      let method = decision.method;
+      let reason = decision.reason;
 
-      return { img, strategy, latestEval };
+      // Inpaint↔iterate flip logic — only applies when the chosen method
+      // is one of those two AND prior rounds with the same method failed.
+      if (method === 'inpaint' || method === 'iterate') {
+        const regressedFlip = lastRepairRegressed(versions);
+        const forced = forcedStrategyAfterFailures(versions);
+        if (regressedFlip) {
+          method = regressedFlip;
+          const prevStrat = regressedFlip === 'inpaint' ? 'iterate' : 'inpaint';
+          reason = `forced ${regressedFlip} — last ${prevStrat} regressed, flipping`;
+        } else if (forced) {
+          method = forced;
+          reason = `forced ${forced} — last two rounds both used ${forced === 'inpaint' ? 'iterate' : 'inpaint'} without fixing it`;
+        }
+      }
+
+      log.info(`  📋 [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: ${method} (${reason})${decision.charName ? ` [${decision.charName}]` : ''}`);
+      return { img, method, latestEval, decision };
     });
 
-    const inpaintCount = pageStrategies.filter(p => p.strategy === 'inpaint').length;
-    const iterateCount = pageStrategies.filter(p => p.strategy === 'iterate').length;
-    const skippedCount = pageStrategies.filter(p => p.skipped).length;
-    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${inpaintCount} inpaint, ${iterateCount} iterate${skippedCount ? `, ${skippedCount} skipped` : ''}`);
+    const counts = pageStrategies.reduce((acc, p) => {
+      const k = p.skipped ? 'skipped' : (p.method || 'skip');
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${counts.iterate || 0} iterate, ${counts.inpaint || 0} inpaint, ${counts['char-fix'] || 0} char-fix${counts.skipped ? `, ${counts.skipped} skipped` : ''}${counts.skip ? `, ${counts.skip} no-op` : ''}`);
 
-    if (inpaintCount + iterateCount === 0) {
-      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: all remaining bad pages have exhausted both strategies, stopping repair loop`);
+    const repairableCount = (counts.iterate || 0) + (counts.inpaint || 0) + (counts['char-fix'] || 0);
+    if (repairableCount === 0) {
+      log.info(`✅ [UNIFIED PIPELINE] Round ${round}: nothing actionable, stopping repair loop`);
       break;
     }
 
@@ -6331,11 +6510,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     let roundResults;
     try {
       roundResults = await Promise.all(
-      pageStrategies.map(({ img, strategy, latestEval, skipped }) => repairLimit(async () => {
+      pageStrategies.map(({ img, method, latestEval, decision, skipped }) => repairLimit(async () => {
         const pageNumber = img.pageNumber;
-        if (skipped) return { pageNumber, imageData: null, skipped: true };
+        if (skipped || method === 'skip' || method == null) {
+          return { pageNumber, imageData: null, skipped: true };
+        }
         try {
-          if (strategy === 'inpaint') {
+          if (method === 'inpaint') {
             const inpaintResult = await executeInpaintAction(img, latestEval, round);
             if (inpaintResult.repaired && inpaintResult.imageData) {
               return {
@@ -6351,8 +6532,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               };
             }
             return { pageNumber, imageData: null, error: 'inpaint produced no result' };
-          } else {
-            // iterate
+          }
+          if (method === 'iterate') {
             const result = await executeIterateAction(img, latestEval);
             if (result?.imageData) {
               return {
@@ -6375,8 +6556,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             }
             return { pageNumber, imageData: null, error: 'iterate produced no result' };
           }
+          if (method === 'char-fix') {
+            const result = await executeCharFixAction(img, decision, round);
+            if (result?.imageData) {
+              return result;
+            }
+            return { pageNumber, imageData: null, error: result?.error || 'char-fix produced no result' };
+          }
+          return { pageNumber, imageData: null, error: `unknown method ${method}` };
         } catch (err) {
-          log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${strategy} failed for page ${pageNumber}: ${err.message}`);
+          log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${method} failed for page ${pageNumber}: ${err.message}`);
           return { pageNumber, imageData: null, error: err.message };
         }
       }))
@@ -6476,423 +6665,35 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
-  // Step 3: Pick best versions (across all rounds)
+  // Step 3: Pick best version per page across all rounds + original
   // =========================================================================
+  // Single pick-best pass. Sees every version produced by the round loop
+  // (originals, inpaint/iterate/char-fix per round). Replaces the former
+  // two-stage Step 3 → Step 7 picks; the round loop now handles char-fix
+  // inline so there's no need for a second pick after a separate
+  // character-repair stage.
   await updateProgress(63, 'Selecting best versions...');
   log.info(`📊 [UNIFIED PIPELINE] Step 3: Selecting best version per page...`);
 
-  const bestPerPage = new Map();
-  for (const [pageNumber, versions] of pageVersions) {
-    const best = selectBestVersion(versions);
-    bestPerPage.set(pageNumber, best);
-    if (best.source !== 'original') {
-      upgradedCount++;
-      log.debug(`📊 [UNIFIED PIPELINE] Page ${pageNumber}: selected ${best.source} (score ${best.score}) over original (score ${versions[0].score})`);
-    }
-  }
-  log.info(`✅ [UNIFIED PIPELINE] Step 3: ${upgradedCount} pages upgraded from repair rounds`);
-
-  // =========================================================================
-  // Step 4: Entity consistency check on picked images
-  // =========================================================================
-  await updateProgress(65, 'Running entity consistency on final images...');
-  log.info(`🔍 [UNIFIED PIPELINE] Step 4: Entity consistency check on picked images...`);
-
-  let finalEntityReport = currentEntityReport;
-  {
-    const pickedImages = rawImages.filter(img => img.imageData).map(img => {
-      const best = bestPerPage.get(img.pageNumber);
-      return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
-    });
-    const finalEntityCheckData = buildEntityCheckData(pickedImages);
-    try {
-      finalEntityReport = await runEntityConsistencyChecks(finalEntityCheckData, characters, {
-        checkCharacters: true,
-        checkObjects: true,
-        saveGrids: false,
-        onHeartbeat: pingHeartbeat
-      });
-      if (finalEntityReport?.tokenUsage && usageTracker) {
-        usageTracker('gemini_quality', {
-          input_tokens: finalEntityReport.tokenUsage.inputTokens || 0,
-          output_tokens: finalEntityReport.tokenUsage.outputTokens || 0
-        }, 'entity_consistency_final', finalEntityReport.tokenUsage.model || 'gemini-2.5-flash');
-      }
-      log.info(`✅ [UNIFIED PIPELINE] Step 4: Entity consistency: ${finalEntityReport.totalIssues} issues`);
-    } catch (entityErr) {
-      log.warn(`⚠️ [UNIFIED PIPELINE] Step 4: Entity consistency failed: ${entityErr.message}`);
-      finalEntityReport = currentEntityReport;
-    }
-  }
-
-  // =========================================================================
-  // Step 5: Character repair (on final picked images)
-  // =========================================================================
-  const charFixResults = new Map();
-  const charFixDetails = new Map();
-
-  if (finalEntityReport && finalEntityReport.totalIssues > 0) {
-    await updateProgress(68, 'Fixing character consistency...');
-    log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${finalEntityReport.totalIssues} entity issues)...`);
-
-    const pageScores = new Map();
-    for (const [pageNumber, best] of bestPerPage) {
-      pageScores.set(pageNumber, best?.score ?? 100);
-    }
-
-    const maxCharTasks = bestPerPage.size; // all story + cover pages
-    const { tasks: fixTasks, dropped } = selectCharRepairTasks(finalEntityReport, { pageScores, maxTasks: maxCharTasks });
-    log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages (cap ${maxCharTasks})`);
-    if (dropped > 0) {
-      log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${maxCharTasks}).`);
-    }
-
-    const fixesByPage = new Map();
-    for (const task of fixTasks) {
-      if (!fixesByPage.has(task.pageNumber)) {
-        fixesByPage.set(task.pageNumber, []);
-      }
-      fixesByPage.get(task.pageNumber).push(task);
-    }
-
-    const charFixLimit = pLimit(50);
-    await Promise.all([...fixesByPage.entries()].map(([pageNumber, pageFixes]) => charFixLimit(async () => {
-      const best = bestPerPage.get(pageNumber);
-      if (!best?.imageData) {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: no image data for character fix, skipping`);
-        return;
-      }
-
-      let currentImageData = best.imageData;
-      let anyFixApplied = false;
-
-      for (const fix of pageFixes) {
-        let faceBbox = null;
-        let bodyBbox = null;
-        const bestEval = best.evaluation;
-
-        // Tier 1: bboxDetection on the scene
-        if (bestEval?.bboxDetection?.figures) {
-          const figure = bestEval.bboxDetection.figures.find(f =>
-            f.name?.toLowerCase() === fix.charName.toLowerCase() ||
-            f.label?.toLowerCase().includes(fix.charName.toLowerCase())
-          );
-          if (figure) {
-            if (figure.faceBox) faceBbox = figure.faceBox;
-            if (figure.bodyBox) bodyBbox = figure.bodyBox;
-          }
-        }
-
-        // Tier 2: entity report appearances
-        if (!faceBbox && !bodyBbox && finalEntityReport?.characters?.[fix.charName]?.byClothing) {
-          for (const clothingData of Object.values(finalEntityReport.characters[fix.charName].byClothing)) {
-            const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-            if (app?.faceBox) {
-              faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
-            }
-            if (app?.bodyBox) {
-              bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
-            }
-            if (faceBbox || bodyBbox) break;
-          }
-        }
-
-        // Tier 3: quality eval matches
-        if (!faceBbox && !bodyBbox && bestEval?.matches) {
-          const charMatch = bestEval.matches.find(m =>
-            m.name?.toLowerCase() === fix.charName.toLowerCase() ||
-            m.character?.toLowerCase() === fix.charName.toLowerCase()
-          );
-          if (charMatch?.face_bbox) faceBbox = charMatch.face_bbox;
-          if (charMatch?.bbox) bodyBbox = charMatch.bbox;
-        }
-
-        if (!faceBbox && !bodyBbox) {
-          // Tier 4: fresh detection
-          log.info(`🔍 [UNIFIED PIPELINE] No stored bbox for ${fix.charName} on page ${pageNumber}, running fresh detection...`);
-          try {
-            const detection = await detectAllBoundingBoxes(currentImageData, {
-              expectedCharacters: [{ name: fix.charName }]
-            });
-            const charFigure = detection?.figures?.find(f =>
-              f.name?.toLowerCase() === fix.charName.toLowerCase()
-            );
-            if (charFigure) {
-              faceBbox = charFigure.faceBox || null;
-              bodyBbox = charFigure.bodyBox || null;
-            }
-          } catch (detectErr) {
-            log.warn(`⚠️ [UNIFIED PIPELINE] Fresh bbox detection failed for ${fix.charName}: ${detectErr.message}`);
-          }
-        }
-
-        if (!faceBbox && !bodyBbox) {
-          log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}, ${fix.charName}: no bbox found, skipping character fix`);
-          continue;
-        }
-
-        const character = characters.find(c => c.name === fix.charName);
-        if (!character) {
-          log.warn(`⚠️ [UNIFIED PIPELINE] Character ${fix.charName} not found, skipping`);
-          continue;
-        }
-
-        const rawImg = rawImages.find(img => img.pageNumber === pageNumber);
-        const clothingCategory = rawImg?.perCharClothing?.[fix.charName] || 'standard';
-        const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
-        const avatarPhoto = styledAvatar || getFacePhoto(character);
-        const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';
-
-        if (!avatarPhoto) {
-          log.warn(`⚠️ [UNIFIED PIPELINE] No avatar photo for ${fix.charName}, skipping character fix`);
-          continue;
-        }
-
-        try {
-          const issueText = (fix.issueDescription || '').toLowerCase();
-          const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
-          const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
-
-          const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
-          const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
-
-          // Collect both face AND body bboxes for every OTHER detected character.
-          //   - Face repair: we blur just other faces; protectedFaces drives the mask restore.
-          //   - Body repair: we blur other characters' FULL BODIES (not just faces) so Grok
-          //     can't trait-bleed their hair, clothing, skin tone, etc. into the target;
-          //     protectedBodies drives the mask restore.
-          const protectedFaces = [];
-          const protectedBodies = [];
-          const bboxFigures = bestEval?.bboxDetection?.figures || [];
-          const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
-          for (const fig of bboxFigures) {
-            if (!fig.name || fig.name === 'UNKNOWN') continue;
-            if (fig.name.toLowerCase() === fix.charName.toLowerCase()) continue;
-            if (fig.faceBox) protectedFaces.push(toRect(fig.faceBox));
-            if (fig.bodyBox) protectedBodies.push(toRect(fig.bodyBox));
-          }
-
-          const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
-          const sceneDesc = rawImg?.sceneDescription || rawImg?.text || '';
-
-          // Look up the page's locked text-overlay position so the repair
-          // prompt can warn Grok not to land the redrawn figure in that zone.
-          const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
-
-          log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} (bbox: [${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
-          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, fix.charName, {
-            imageBackend: 'grok',
-            issueDescription: fix.issueDescription,
-            clothingDescription: clothingDesc,
-            photoType: avatarPhotoType,
-            sceneDescription: sceneDesc,
-            faceBbox,
-            protectedFaces,
-            protectedBodies,
-            whiteoutTarget: useFaceOnly ? 'face' : 'body',
-            textPosition: pageTextPosition,
-            includeDebug: true,  // Returns prompt + sceneSent + avatarSent for version-viewer inspection
-          });
-
-          if (repairResult?.imageData) {
-            if (repairResult.imageData.length < 1000) {
-              log.warn(`⚠️ [UNIFIED PIPELINE] Character fix for ${fix.charName} on page ${pageNumber} produced too-small image (${repairResult.imageData.length} chars), rejecting`);
-              continue;
-            }
-
-            const beforeImageData = currentImageData;
-            currentImageData = repairResult.imageData;
-            anyFixApplied = true;
-
-            if (!charFixDetails.has(fix.charName)) charFixDetails.set(fix.charName, new Map());
-            charFixDetails.get(fix.charName).set(pageNumber, {
-              before: beforeImageData,
-              after: currentImageData,
-              blackoutImage: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
-              cutoutSent: repairResult.cutoutSent || repairResult.comparison?.cutoutSent || null,
-              grokRawResult: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
-              blendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
-              croppedAvatar: repairResult.croppedAvatar || repairResult.comparison?.croppedAvatar || null,
-              method: repairResult.method || 'grok_blended',
-              prompt: repairResult.debug?.prompt || null,
-              avatarSent: repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
-              bbox: repairResult.debug?.bbox || null,
-            });
-
-            if (repairResult.usage && usageTracker) {
-              usageTracker('gemini_image', {
-                input_tokens: repairResult.usage.inputTokens || 0,
-                output_tokens: repairResult.usage.outputTokens || 0
-              }, 'unified_pipeline_char_fix', repairResult.usage.model);
-            }
-
-            // Per-character intermediate stays in `charFixDetails` (above)
-            // for the dev-panel debug view. We do NOT push it as its own
-            // imageVersions row — when only one character on a page needs
-            // a fix, the intermediate is byte-identical to the final
-            // composite pushed in Step 6 (line ~6862), and storing both
-            // produces two version rows for the same image with
-            // mismatched scoring states (one null, one scored).
-            // See docs/char-repair-decisions.md and the bug report on
-            // job_1777701999612_we3rb9u7b page 2 (v1 == v2 by md5).
-          }
-        } catch (repairErr) {
-          log.error(`❌ [UNIFIED PIPELINE] Character fix failed for ${fix.charName} on page ${pageNumber}: ${repairErr.message}`);
-        }
-      }
-
-      if (anyFixApplied) {
-        const preFixScore = bestPerPage.get(pageNumber)?.score ?? 0;
-        // Capture repair info per fix for the version-viewer dev panel, so every
-        // character-fix step is visible: what we asked, what avatar we sent.
-        const perCharRepairs = pageFixes
-          .map(pf => {
-            const d = charFixDetails.get(pf.charName)?.get(pageNumber);
-            if (!d) return null;
-            return { character: pf.charName, prompt: d.prompt, avatarSent: d.avatarSent, bbox: d.bbox, method: d.method };
-          })
-          .filter(Boolean);
-        const combinedPrompt = perCharRepairs
-          .map(r => `[${r.character}${r.method ? ' · ' + r.method : ''}]\n${r.prompt || '(no prompt captured)'}`)
-          .join('\n\n');
-        const avatarsSent = perCharRepairs.map(r => r.avatarSent).filter(Boolean);
-        const lastMethod = perCharRepairs[perCharRepairs.length - 1]?.method || null;
-        const modelLabel = lastMethod ? `grok-imagine (${lastMethod})` : 'grok-imagine';
-        charFixResults.set(pageNumber, {
-          imageData: currentImageData,
-          source: 'character-fix',
-          modelId: modelLabel,
-          method: lastMethod || null,
-          repairPrompt: combinedPrompt || null,
-          repairAvatars: avatarsSent.length > 0 ? avatarsSent : null,
-          repairs: perCharRepairs,
-        });
-        if (preFixScore >= 85) {
-          log.info(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied to high-score page (pre-fix: ${preFixScore}%), monitor for quality regression`);
-        } else {
-          log.info(`✅ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied (pre-fix score: ${preFixScore}%)`);
-        }
-      }
-    })));
-
-    log.info(`✅ [UNIFIED PIPELINE] Step 5: ${charFixResults.size} pages had character fixes applied`);
-  } else {
-    log.info(`✅ [UNIFIED PIPELINE] Step 5: No entity issues, skipping character fix`);
-  }
-
-  // =========================================================================
-  // Step 6: Evaluate character-repaired pages
-  //   - quality + semantic eval (evaluateImageBatch)
-  //   - entity consistency RE-RUN on the repaired images (was previously
-  //     skipped — meant a character-fix that regressed clothing/identity got
-  //     a clean entityPenalty=0 and could win pick-best, propagating the
-  //     regression. Now the penalty is recomputed against the new image.)
-  // =========================================================================
-  if (charFixResults.size > 0) {
-    await updateProgress(70, `Evaluating ${charFixResults.size} character-repaired pages...`);
-    log.info(`🔍 [UNIFIED PIPELINE] Step 6: Evaluating ${charFixResults.size} character-repaired pages...`);
-
-    const charFixEntries = [...charFixResults.entries()].map(([pageNumber, fix]) => ({
-      imageData: fix.imageData,
-      pageNumber,
-    }));
-
-    // Run quality+semantic eval and a fresh entity check in parallel — the
-    // pages aren't related, so there's no ordering benefit and the entity
-    // grid call dominates wall time.
-    const charFixEvalInputs = buildEvalInputs(charFixEntries);
-    const charFixEntityCheckData = buildEntityCheckData(charFixEntries);
-
-    const [charFixEvals, charFixEntityReport] = await Promise.all([
-      evaluateImageBatch(charFixEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
-      (async () => {
-        try {
-          const report = await runEntityConsistencyChecks(charFixEntityCheckData, characters, {
-            checkCharacters: true,
-            checkObjects: true,
-            saveGrids: false,
-            onHeartbeat: pingHeartbeat
-          });
-          if (report?.tokenUsage && usageTracker) {
-            usageTracker('gemini_quality', {
-              input_tokens: report.tokenUsage.inputTokens || 0,
-              output_tokens: report.tokenUsage.outputTokens || 0
-            }, 'entity_consistency_charfix', report.tokenUsage.model || 'gemini-2.5-flash');
-          }
-          log.info(`✅ [UNIFIED PIPELINE] Step 6: Entity consistency on char-fix: ${report?.totalIssues ?? 0} issues`);
-          return report;
-        } catch (entityErr) {
-          log.warn(`⚠️ [UNIFIED PIPELINE] Step 6: Entity consistency on char-fix failed: ${entityErr.message}`);
-          return null;
-        }
-      })(),
-    ]);
-
-    for (const ev of charFixEvals) {
-      if (ev.usage && usageTracker) {
-        usageTracker('gemini_quality', ev.usage, 'unified_pipeline_charfix_eval', ev.modelId);
-      }
-      const versions = pageVersions.get(ev.pageNumber);
-      const fix = charFixResults.get(ev.pageNumber);
-      if (versions && fix) {
-        // Apply the fresh entity penalty so a char-fix that regressed clothing
-        // or identity gets a worse final score than the pre-fix best — and
-        // pick-best correctly rejects it. Without this, char-fix regressions
-        // silently win.
-        const entityPenalty = charFixEntityReport
-          ? getEntityPenalty(ev.pageNumber, charFixEntityReport)
-          : 0;
-        const visualScore = ev.score ?? ev.qualityScore ?? null;
-        const finalScore = visualScore != null ? Math.max(0, visualScore - entityPenalty) : null;
-
-        versions.push({
-          imageData: fix.imageData,
-          score: finalScore,
-          source: 'character-fix',
-          evaluation: ev,
-          modelId: fix.modelId || null,
-          grokRefImages: null,
-          // Reuse the same viewer fields as inpaint: these are the Grok repair
-          // prompt and avatar(s) sent as references for the character-fix step.
-          inpaintInstruction: fix.repairPrompt || null,
-          inpaintReferenceImages: fix.repairAvatars || null,
-          entityPenalty,
-          entityReport: charFixEntityReport || null,
-          evaluatedAt: new Date().toISOString(),
-        });
-        fix.afterScore = finalScore;
-        fix.entityPenalty = entityPenalty;
-      }
-    }
-
-    // Update the running entity report so Step 4's "final" report (already
-    // run on pre-charfix picks) gets superseded for the pages we touched.
-    // Other pages keep their existing entity status.
-    if (charFixEntityReport) {
-      currentEntityReport = charFixEntityReport;
-    }
-  }
-
-  // =========================================================================
-  // Step 7: Final pick best (including character repair versions)
-  // =========================================================================
-  await updateProgress(72, 'Selecting final best versions...');
-  log.info(`📊 [UNIFIED PIPELINE] Step 7: Final pick best (including character repair versions)...`);
-
   const finalBestPerPage = new Map();
   let finalUpgradedCount = 0;
-
   for (const [pageNumber, versions] of pageVersions) {
     const best = selectBestVersion(versions);
     finalBestPerPage.set(pageNumber, best);
     if (best.source !== 'original') {
       finalUpgradedCount++;
+      log.debug(`📊 [UNIFIED PIPELINE] Page ${pageNumber}: selected ${best.source} (score ${best.score}) over original (score ${versions[0].score})`);
     }
   }
-  log.info(`✅ [UNIFIED PIPELINE] Step 7: ${finalUpgradedCount} pages upgraded total`);
+  log.info(`✅ [UNIFIED PIPELINE] Step 3: ${finalUpgradedCount} pages upgraded total`);
+
+  // The most recent entity report from the round loop is the FINAL entity
+  // verdict — no separate end-of-flow entity check fires anymore. Aliased
+  // here for the per-page entityReport field built into results below.
+  const finalEntityReport = currentEntityReport;
 
   // =========================================================================
-  // Step 7.5: Post-repair calm-zone recovery
+  // Step 4: Post-repair calm-zone recovery
   // =========================================================================
   // Iterate / inpaint / character-fix can shift content into the text-overlay
   // polygon, undoing the calm zone established at initial generation. Re-run
@@ -6995,7 +6796,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
-  // Step 8: Style consistency audit on the picked images
+  // Step 5: Style consistency audit on the picked images
   // =========================================================================
   // Cross-page style check: builds a thumbnail grid of every picked image
   // (front cover + all pages) and asks Gemini whether they cluster into one
@@ -7021,12 +6822,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     };
     if (stylePages.filter(p => p.imageData).length >= 2) {
       styleConsistency = await checkStoryStyleConsistency(styleInput, { usageTracker });
-      log.info(`🎨 [UNIFIED PIPELINE] Step 8: style verdict=${styleConsistency.verdict} (cluster=${styleConsistency.dominantCluster?.length || 0}, outliers=${styleConsistency.outliers?.length || 0})`);
+      log.info(`🎨 [UNIFIED PIPELINE] Step 5: style verdict=${styleConsistency.verdict} (cluster=${styleConsistency.dominantCluster?.length || 0}, outliers=${styleConsistency.outliers?.length || 0})`);
     } else {
-      log.info(`🎨 [UNIFIED PIPELINE] Step 8: skipped (need ≥2 images, got ${stylePages.length})`);
+      log.info(`🎨 [UNIFIED PIPELINE] Step 5: skipped (need ≥2 images, got ${stylePages.length})`);
     }
   } catch (styleErr) {
-    log.warn(`⚠️ [UNIFIED PIPELINE] Step 8: style consistency check failed: ${styleErr.message}`);
+    log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style consistency check failed: ${styleErr.message}`);
     styleConsistency = null;
   }
 
@@ -7067,7 +6868,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
     const best = finalBestPerPage.get(pageNumber) || versions[0];
-    const charFix = charFixResults.get(pageNumber);
+    // Char-fix used to be a separate Map; the round loop now writes char-fix
+    // versions into pageVersions like every other repair, so we derive the
+    // "was character fixed" flag from the picked version's source.
+    const wasCharFixed = typeof best?.source === 'string'
+      && (best.source.startsWith('char-fix-') || best.source === 'character-fix' || best.source.startsWith('character-fix:'));
 
     // Final image: best version (which may be original, inpaint, iterate, or character-fix)
     const finalImageData = best?.imageData || img.imageData;
@@ -7162,13 +6967,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       retryHistory,
       entityReport: finalEntityReport || null,
       wasRegenerated: best?.source !== 'original',
-      wasCharacterFixed: !!charFix,
+      wasCharacterFixed: wasCharFixed,
       wasInpainted: best?.source?.startsWith('inpaint') || false,
       bestSource: best?.source || 'original'
     };
   });
 
-  log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${finalUpgradedCount} upgraded, ${charFixResults.size} character-fixed`);
+  const charFixedCount = results.filter(r => r.wasCharacterFixed).length;
+  log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${finalUpgradedCount} upgraded, ${charFixedCount} character-fixed`);
 
   // Convert charFixDetails Map to plain object for serialization.
   // Image fields can arrive in three shapes after R2 migration:
