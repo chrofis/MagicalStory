@@ -56,21 +56,34 @@ function needsScaleRepair(sceneMetadata) {
  */
 function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription }) {
   const lines = [];
-  lines.push(`Edit this image to fix character placement and scale. The composition is a ${shot || 'wide'} shot — the vast distance between foreground and background figures must be visually obvious.`);
+  lines.push(`Render this same ${shot || 'wide'} scene with the foreground composition unchanged, but add the following figures as tiny distant figures far away in the background.`);
   lines.push('');
-  lines.push('KEEP AS RENDERED (do not change pose, size, face, clothing, or position):');
+  lines.push('Foreground / midground stays as in the input image:');
   for (const c of fgChars) {
-    const pos = c.position ? ` (${c.position})` : '';
+    const pos = c.position ? ` — ${c.position}` : '';
     lines.push(`- ${c.name}${pos}`);
   }
   lines.push('');
-  lines.push('SHRINK AND REPLACE — these characters MUST appear as TINY DISTANT FIGURES, much smaller than the foreground:');
+  lines.push('Tiny background figures to add (clearly smaller than the foreground figures):');
   for (const c of bgChars) {
-    const pos = c.position ? ` Place at: ${c.position}.` : '';
-    lines.push(`- ${c.name}: redraw as a tiny silhouette occupying roughly 1/6 to 1/8 of frame height. Body language only — no facial detail.${pos}`);
+    // Each bg figure needs three things in one line:
+    //   1. a clear name handle for the model,
+    //   2. a physical description so Grok knows WHO to draw — name alone
+    //      ("Gessler") means nothing to the model,
+    //   3. a position phrase telling Grok where in the frame.
+    // No fractional sizes ("1/6 of frame height") — Grok ignores them.
+    // No "body language only / no facial detail" — that phrasing produced
+    // black silhouettes. Just say "tiny in the background".
+    const desc = (c.physicalDescription || '').trim();
+    const pos = c.position ? `, ${c.position}` : '';
+    if (desc) {
+      lines.push(`- ${c.name} (${desc}): tiny in the background${pos}.`);
+    } else {
+      lines.push(`- ${c.name}: tiny in the background${pos}.`);
+    }
   }
   lines.push('');
-  lines.push('Do not add new characters. Do not enlarge any background figure. Do not move the foreground figures. Maintain the existing lighting, palette, and composition.');
+  lines.push('Keep the input image\'s lighting, palette, and overall composition. Do not enlarge the background figures. Do not add other people.');
   if (artStyleDescription) {
     lines.push('');
     lines.push(`ART STYLE: ${artStyleDescription}`);
@@ -87,6 +100,9 @@ function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription })
  * @param {number} options.pageNumber
  * @param {string|null} options.sceneBackground         - empty-scene plate (data URL); optional
  * @param {Array}  options.backgroundCharacterRefs      - [{ name, photoUrl }] avatar refs for bg chars
+ * @param {Array}  options.backgroundCharacterDescriptions - [{ name, description }] physical-trait
+ *                                                         descriptions; the model doesn't know
+ *                                                         who "Gessler" is — describe him.
  * @param {string|null} options.artStyleDescription     - resolved art-style prose (optional)
  * @param {string|null} options.imageModelOverride      - default 'grok-imagine'
  * @param {string|null} options.aspectRatio
@@ -114,7 +130,17 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   const fgChars = chars.filter(c => (c.depth || '').toLowerCase() !== 'background');
   const shot = sceneMetadata.fullData?.shot || sceneMetadata.shot || '';
 
-  const prompt = buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription });
+  // Splice in caller-provided physical descriptions for background characters
+  // so Grok knows WHO to draw — the model has no idea who "Gessler" or
+  // "Werner" are, only what we describe.
+  const descByName = (options.backgroundCharacterDescriptions || [])
+    .reduce((m, x) => { if (x?.name && x?.description) m[x.name.toLowerCase()] = x.description; return m; }, {});
+  const bgCharsWithDesc = bgChars.map(c => ({
+    ...c,
+    physicalDescription: descByName[(c.name || '').toLowerCase()] || c.physicalDescription || null,
+  }));
+
+  const prompt = buildScaleRepairPrompt({ bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription });
   log.info(`📐 [SCALE-REPAIR] Page ${pageNumber}: ${fgChars.length} fg / ${bgChars.length} bg | shot=${shot} | bg refs attached: ${backgroundCharacterRefs.length}`);
 
   // generateImageOnly handles the Grok-edit path when previousImage is set.

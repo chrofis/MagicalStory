@@ -5192,10 +5192,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     );
                     bgRefs = applyStyledAvatars(bgRefs, inputData.artStyle);
                   }
+                  // Physical descriptions — Grok has no idea who "Gessler" is
+                  // by name. Build a hair/face/clothing line for each bg char
+                  // so the prompt can describe them.
+                  const bgDescriptions = bgCharObjs.map(c => ({
+                    name: c.name,
+                    description: helpers.buildCharacterPhysicalDescription(c) || '',
+                  })).filter(x => x.description);
                   scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
                     pageNumber: pageData.pageNumber,
                     sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
                     backgroundCharacterRefs: bgRefs,
+                    backgroundCharacterDescriptions: bgDescriptions,
                     artStyleDescription: helpers.resolveArtStyle(inputData.artStyle, 'grok') || null,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     usageTracker: addUsage,

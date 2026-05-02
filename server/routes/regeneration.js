@@ -1111,6 +1111,12 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       );
       bgRefs = applyStyledAvatars(bgRefs, storyData.artStyle);
     }
+    // Physical descriptions for bg chars — Grok needs to be told who
+    // "Gessler" looks like; the name alone is meaningless to the model.
+    const bgDescriptions = bgCharObjs.map(c => ({
+      name: c.name,
+      description: helpers.buildCharacterPhysicalDescription(c) || '',
+    })).filter(x => x.description);
     // Load empty-scene plate from R2 if available
     let plate = null;
     try {
@@ -1122,6 +1128,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       pageNumber,
       sceneBackground: plate,
       backgroundCharacterRefs: bgRefs,
+      backgroundCharacterDescriptions: bgDescriptions,
       artStyleDescription: helpers.resolveArtStyle(storyData.artStyle, 'grok') || null,
       aspectRatio: scene.imageAspect || null,
     });
