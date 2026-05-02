@@ -343,6 +343,24 @@ export function StoryDisplay({
     gridImage: string;
   } | null>(null);
 
+  // Auto-pipeline now runs Step 8 (style audit) on every story generation;
+  // the verdict lands on finalChecksReport.styleConsistency. Mirror it into
+  // styleCheckResult so the panel shows the auto verdict without the user
+  // having to click "Style Check (DEV)". Manual click still overrides.
+  useEffect(() => {
+    const auto = (finalChecksReport as any)?.styleConsistency;
+    if (auto && !styleCheckResult) {
+      setStyleCheckResult({
+        verdict: auto.verdict,
+        dominantCluster: auto.dominantCluster || [],
+        anchorPage: auto.anchorPage,
+        outliers: auto.outliers || [],
+        reasoning: auto.reasoning || '',
+        gridImage: auto.gridImage || '',
+      });
+    }
+  }, [finalChecksReport, styleCheckResult]);
+
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
 

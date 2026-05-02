@@ -6726,29 +6726,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               }, 'unified_pipeline_char_fix', repairResult.usage.model);
             }
 
-            // Surface this per-character inpaint as its own version so the
-            // viewer can rewind through L → M → R and see which step degraded
-            // the page. Score is null — the eval only runs on the final
-            // composite (Step 6), and pick-best ignores unscored versions.
-            const versions = pageVersions.get(pageNumber);
-            if (versions) {
-              // Surface BOTH inputs Grok received: the avatar reference AND
-              // the masked scene (magenta crosshatch over the body, solid
-              // block over the face). The masked scene is what Grok actually
-              // edits; without it the version history can't explain "why
-              // did character X get repainted in the wrong place".
-              const sceneSent = repairResult.debug?.sceneSent || repairResult.blackoutImage || null;
-              const avatarSent = repairResult.debug?.avatarSent || repairResult.croppedAvatar || null;
-              versions.push({
-                imageData: repairResult.imageData,
-                score: null,
-                source: `character-fix:${fix.charName}`,
-                modelId: `grok-imagine (${repairResult.method || 'unknown'})`,
-                grokRefImages: null,
-                inpaintInstruction: repairResult.debug?.prompt || null,
-                inpaintReferenceImages: [avatarSent, sceneSent].filter(Boolean),
-              });
-            }
+            // Per-character intermediate stays in `charFixDetails` (above)
+            // for the dev-panel debug view. We do NOT push it as its own
+            // imageVersions row — when only one character on a page needs
+            // a fix, the intermediate is byte-identical to the final
+            // composite pushed in Step 6 (line ~6862), and storing both
+            // produces two version rows for the same image with
+            // mismatched scoring states (one null, one scored).
+            // See docs/char-repair-decisions.md and the bug report on
+            // job_1777701999612_we3rb9u7b page 2 (v1 == v2 by md5).
           }
         } catch (repairErr) {
           log.error(`❌ [UNIFIED PIPELINE] Character fix failed for ${fix.charName} on page ${pageNumber}: ${repairErr.message}`);
@@ -7008,6 +6994,42 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
   }
 
+  // =========================================================================
+  // Step 8: Style consistency audit on the picked images
+  // =========================================================================
+  // Cross-page style check: builds a thumbnail grid of every picked image
+  // (front cover + all pages) and asks Gemini whether they cluster into one
+  // visual style. Returns a verdict + the outliers; we surface it on the
+  // response so the UI can flag inconsistent stories for manual repair.
+  // The dedicated /api/stories/:id/style-check endpoint still exists for
+  // ad-hoc reruns, but auto-running it here avoids the user having to click
+  // a button to discover that page 4 is in a different art style.
+  await updateProgress(72, 'Style consistency audit...');
+  let styleConsistency = null;
+  try {
+    const { checkStoryStyleConsistency } = require('./styleConsistency');
+    // Build a minimal storyData-shaped object from finalBestPerPage so we
+    // never accidentally feed pre-repair pixels to the audit.
+    const stylePages = [...finalBestPerPage.entries()]
+      .filter(([pn]) => pn > 0)
+      .sort((a, b) => a[0] - b[0])
+      .map(([pageNumber, best]) => ({ pageNumber, imageData: best?.imageData }));
+    const frontCoverFromInputs = (storyData?.coverImages?.frontCover?.imageData) || null;
+    const styleInput = {
+      sceneImages: stylePages,
+      coverImages: frontCoverFromInputs ? { frontCover: { imageData: frontCoverFromInputs } } : {},
+    };
+    if (stylePages.filter(p => p.imageData).length >= 2) {
+      styleConsistency = await checkStoryStyleConsistency(styleInput, { usageTracker });
+      log.info(`🎨 [UNIFIED PIPELINE] Step 8: style verdict=${styleConsistency.verdict} (cluster=${styleConsistency.dominantCluster?.length || 0}, outliers=${styleConsistency.outliers?.length || 0})`);
+    } else {
+      log.info(`🎨 [UNIFIED PIPELINE] Step 8: skipped (need ≥2 images, got ${stylePages.length})`);
+    }
+  } catch (styleErr) {
+    log.warn(`⚠️ [UNIFIED PIPELINE] Step 8: style consistency check failed: ${styleErr.message}`);
+    styleConsistency = null;
+  }
+
   await updateProgress(73, 'Finalizing repair results...');
 
   // =========================================================================
@@ -7180,7 +7202,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
-  return { results, charFixDetails: charFixDetailsObj };
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency };
 }
 
 // ============================================================================

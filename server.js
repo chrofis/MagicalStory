@@ -4554,6 +4554,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let allImages;
     let pipelineEntityReport = null;
     let pipelineCharFixDetails = null;
+    let pipelineStyleConsistency = null;
 
     {
       // =======================================================================
@@ -5155,14 +5156,69 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
             }
 
+            // Scale-repair pass — UNCONDITIONAL on any page where the
+            // outline declared one or more characters with depth=background
+            // alongside foreground/midground characters. Grok consistently
+            // fails to render the tiny-figure-in-distance composition; the
+            // eval flags it but the regular repair workflow can't shrink
+            // figures, only fix identity. This pass runs Grok edit on the
+            // just-rendered image with a focused "shrink the bg figure"
+            // prompt + the bg character's avatar attached.
+            // No threshold, no eval — outline intent is the trigger.
+            let scaleRepairResult = null;
+            if (genResult.imageData && pageData.sceneMetadata) {
+              try {
+                const { needsScaleRepair, runScaleRepair } = require('./server/lib/scaleRepair');
+                if (needsScaleRepair(pageData.sceneMetadata)) {
+                  // Resolve avatar refs only for the background characters.
+                  const helpers = require('./server/lib/storyHelpers');
+                  const { applyStyledAvatars } = require('./server/lib/styledAvatars');
+                  const allChars = pageData.sceneMetadata.fullData?.characters || [];
+                  const bgNames = new Set(allChars
+                    .filter(c => (c.depth || '').toLowerCase() === 'background')
+                    .map(c => (c.name || '').toLowerCase()));
+                  const bgCharObjs = (inputData.characters || []).filter(c =>
+                    bgNames.has((c.name || '').toLowerCase()));
+                  let bgRefs = [];
+                  if (bgCharObjs.length > 0) {
+                    bgRefs = helpers.getCharacterPhotoDetails(
+                      bgCharObjs,
+                      // Pass null clothingCategory — the runtime clothing
+                      // resolver matches on _currentClothing in
+                      // effectiveClothingRequirements (built per scene).
+                      null,
+                      inputData.artStyle,
+                      pageData.perCharClothing || null,
+                    );
+                    bgRefs = applyStyledAvatars(bgRefs, inputData.artStyle);
+                  }
+                  scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
+                    pageNumber: pageData.pageNumber,
+                    sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+                    backgroundCharacterRefs: bgRefs,
+                    artStyleDescription: helpers.resolveArtStyle(inputData.artStyle, 'grok') || null,
+                    aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                    usageTracker: addUsage,
+                  });
+                }
+              } catch (e) {
+                log.warn(`⚠️ [SCALE-REPAIR] Page ${pageData.pageNumber} failed: ${e.message}`);
+              }
+            }
+
+            // Promote the scale-repaired image to the active version when it succeeded.
+            // The pre-repair image is preserved as a separate version on the scene.
+            const activeImageData = scaleRepairResult?.imageData || genResult.imageData;
+            const activeModelId = scaleRepairResult?.modelId || genResult.modelId;
+
             // Save checkpoint for progressive display
-            if (genResult.imageData) {
+            if (activeImageData) {
               await saveCheckpoint(jobId, 'partial_page', {
                 pageNumber: pageData.pageNumber,
                 text: pageData.scene.text,
                 sceneDescription: pageData.scene.sceneDescription,
-                imageData: genResult.imageData,
-                modelId: genResult.modelId
+                imageData: activeImageData,
+                modelId: activeModelId
               }, pageData.pageNumber);
             }
 
@@ -5490,7 +5546,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -5524,6 +5580,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Hoist pipeline data for use outside this block (finalChecksReport)
         pipelineEntityReport = pipelineResult[0]?.entityReport || null;
         pipelineCharFixDetails = charFixDetails;
+        pipelineStyleConsistency = styleConsistency || null;
 
         // Map pipeline results to allImages format
         allImages = pipelineResult.map(img => ({
@@ -5785,6 +5842,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           cellsRepaired: Object.keys(charData.pages).length
         };
       }
+    }
+
+    // Style consistency audit (Step 8) — surface the verdict on the same
+    // finalChecksReport that the StoryDisplay reads, so the dev panel can
+    // show the cross-page style cluster + outliers without a separate fetch.
+    if (pipelineStyleConsistency) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.styleConsistency = pipelineStyleConsistency;
     }
 
     let originalStoryText = null;
