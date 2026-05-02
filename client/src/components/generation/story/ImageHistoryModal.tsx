@@ -430,9 +430,16 @@ export function ImageHistoryModal({
                       'entity check':  { label: language === 'de' ? 'Charakter-Konsistenz'           : 'Entity consistency',            subtitle: language === 'de' ? 'entityConsistency.js'  : 'from entityConsistency.js',  bg: 'bg-orange-50',  border: 'border-orange-300',  labelColor: 'text-orange-700' },
                       'image checks':  { label: language === 'de' ? 'Bild-Checks'                    : 'Image checks',                  subtitle: language === 'de' ? 'Text-Overlay & Ränder' : 'text overlay & borders',     bg: 'bg-amber-50',   border: 'border-amber-300',   labelColor: 'text-amber-700' },
                     };
+                    // Issues stored on a version's fixableIssues come straight from the
+                    // per-image Gemini quality evaluator — they carry `type` (composition,
+                    // scale, hair, …) but no `source` field; that's only attached at the
+                    // orchestration layer when issues from multiple evaluators are merged.
+                    // So when `source` is missing, the issue is from the quality eval.
+                    // Semantic issues (added via the merge above) and entity/image-check
+                    // issues (added by the orchestrator) DO carry `source`.
                     const grouped = new Map<string, any[]>();
                     for (const it of allIssues) {
-                      const src = it.source || it.type || 'unknown';
+                      const src = it.source || 'quality eval';
                       if (!grouped.has(src)) grouped.set(src, []);
                       grouped.get(src)!.push(it);
                     }
