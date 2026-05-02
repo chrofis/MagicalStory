@@ -4106,19 +4106,26 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       draftSceneDescription = shortSceneDesc;
     }
 
-    // Build preview feedback section (from cheap preview before scene expansion)
-    // This shows what the image generator ACTUALLY produced from the scene hint
+    // Build preview feedback section. Two inputs may be present:
+    //   - composition: vision-model analysis of the rendered image
+    //   - fixIssues: evaluator-flagged bullets (quality + semantic)
+    // Both feed Claude only — never the image API. Claude integrates them
+    // into the corrected scene prose; the image model sees just the prose.
     let previewFeedbackText = '';
-    if (previewFeedback && previewFeedback.composition) {
-      previewFeedbackText = `This is what rendered when the scene hint was sent to the image generator:
-${previewFeedback.composition}
-
-Compare this against the scene hint above. Your job is to:
-1. Identify mismatches (position, direction, missing characters)
-2. Note what worked well
-3. Output a corrected scene description that will render better`;
+    if (previewFeedback && (previewFeedback.composition || previewFeedback.fixIssues?.length)) {
+      const parts = [];
+      if (previewFeedback.composition) {
+        parts.push(`Rendered preview analysis (what the image generator produced):\n${previewFeedback.composition}`);
+      }
+      if (previewFeedback.fixIssues?.length > 0) {
+        const bullets = previewFeedback.fixIssues.map(s => `- ${s}`).join('\n');
+        const scoreLine = previewFeedback.previousScore != null ? ` (previous score: ${previewFeedback.previousScore})` : '';
+        parts.push(`Evaluator findings on the previous render${scoreLine} — diagnose the root cause of each, then write the corrected scene prose so the image model fixes them implicitly. Do NOT pass these bullets to the image model:\n${bullets}`);
+      }
+      parts.push(`Your job:\n1. Identify mismatches (position, facing, missing characters, wrong setting)\n2. Diagnose root causes for each evaluator finding\n3. Output one corrected scene prose paragraph + metadata that will render better`);
+      previewFeedbackText = parts.join('\n\n');
     } else {
-      previewFeedbackText = '(No preview available - create scene from hint, run all 17 checks)';
+      previewFeedbackText = '(No preview available - create scene from hint, run all checks)';
     }
 
     // Format expected clothing for the prompt (tells Claude which clothing to use during iteration)

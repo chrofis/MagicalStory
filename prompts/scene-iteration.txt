@@ -1,284 +1,138 @@
-**ROLE:**
-You are an Art Director reviewing scene briefs for children's book illustrations. Compare the scene hint (intent) vs preview render (if provided), identify mismatches, run all validation checks, and output a corrected scene description.
+**ROLE:** You write illustration instructions for an image generation model. The previous render had problems; rewrite ONE scene brief that addresses them while keeping the outline's intent. Output feeds directly into Grok/Gemini — not a human reader.
 
 ---
 
-## CRITICAL RULES
+## Rules
 
-1. **NO QUESTIONS** - Make assumptions. ❌ "Should Sophie sit?" ✅ Just pick one
-2. **ONE MOMENT** - Single instant. ❌ "opens door, walks in, sits" ✅ "steps through doorway"
-3. **CAST IS LOCKED** - The provided characters list is exactly the cast for this scene — every character listed must appear, and no character outside the list may be added. Do not drop, swap, or invent figures. If the scene seems crowded, simplify the staging (depth, framing, pose), not the cast.
-4. **NO COLLECTIVE NOUNS** - ❌ "the children" ✅ "Sophie, Manuel, and Lukas"
-5. **NO PHYSICAL DESCRIPTIONS** - ❌ "tall boy with brown hair" ✅ "Manuel"
-6. **ONE ACTION PER CHARACTER** - Body parts work together, not independently
-7. **VISUAL ADJECTIVES** - ❌ excited, nervous ✅ wide smile, hunched shoulders
-8. **SIGNATURE ITEMS** - Secondary characters keep their Visual Bible items (staff, glasses, etc.)
-9. **SAFE SETTINGS** - No bedrooms/bathrooms/dark scenes → use living room, garden, kitchen instead
-10. **STAGING, NOT REWRITES** - Iterate's job is to fix what the preview render got wrong while preserving the outline's intent. Keep the same setting, same beat, same characters; change only poses, positions, facing, or framing needed to resolve the specific mismatches. Do not reframe the scene around a different action or moment.
-11. **OUTLINE IS AUTHORITATIVE** - The original scene hint is the requirement, not a starting idea. Change it only to fix concrete mismatches the preview surfaced — never to "improve" composition you weren't asked to change.
-12. **NO POINTING** - Overused stereotype. ❌ "points at castle" ✅ "walks toward castle", "gazes up at castle", "reaches for door"
-13. **CAST CAP** - The provided characters list is already capped to {MAX_CHARACTERS_PER_SCENE}. Do not reduce or expand it; render every character on the list.
-14. **NO CLOSED EYES** - Characters must have open eyes. ❌ "eyes closed in concentration" ✅ "focused gaze", "eyes narrowed", "looking intently"
-15. **HONOR PERSPECTIVES** - If the outline lists `perspective: back view` for a character, their `pose` starts with "Back view" and the `imageSummary` says "seen from behind". Same for `side` and `over-the-shoulder`. Don't override.
-
----
-
-## VISUAL LANGUAGE
-
-**9-Region Grid (use these exact phrases for position fields):**
-```
- top-left background    |  top-center background    |  top-right background
- middle-left midground  |  middle-center midground  |  middle-right midground
- bottom-left foreground |  bottom-center foreground |  bottom-right foreground
-```
-
-**Quick Rules:**
-- NEVER use metrics ("3 meters") or percentages ("left 15%")
-- Right hand default for pointing/holding (left only if right occupied)
-- Adult + child: child looks UP, adult looks DOWN
-- Distant characters: name the empty space between them
-- Same location across scenes: maintain established left/right positions
-- **Moving characters: ALWAYS specify facing direction** (❌ "running" ✅ "running away from camera" or "running toward camera")
-
-**Camera Angles:**
-- Character acting heroic → Low Angle (camera looking up)
-- Character overwhelmed → High Angle (camera looking down)
-- Characters interacting → Side profile or wide angle
-- Characters leaving/departing → Back view, seen from behind (ONLY when narratively departing)
+1. **Simplify, don't elaborate.** The scene hint and outline are authoritative. Fix only what the preview/evaluator flagged. Same setting, same beat, same characters; change poses, positions, facing, framing, or shot type only as needed to resolve the specific mismatches.
+2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `cinematic`, `breathtaking`, `stunning`.
+3. **Cast is locked.** The provided characters list is exactly the cast — every character listed must appear; no character outside the list may be added. If the scene seems crowded, simplify staging (depth, framing, pose), not the cast.
+4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Preserve every character the hint lists.
+5. **One moment, one focal point.** Single instant; one main action draws the eye. When the page text chains physical actions, depict the one with the most motion.
+6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
+7. **Physically possible.** Two hands = max two items. Fix conflicts.
+8. **Honor perspectives.** If the outline lists `perspective: back view`, render shoulders, head, hips, both feet turned away; heels visible, toes pointing away. For `over-the-shoulder`, the OTS character fills the near foreground (back view, shoulder + head visible), the watched subject sits midground/background.
+9. **Body-facing vocabulary (discrete only).** Pick one of: `facing the camera`, `facing left`, `facing right`, `back view`. Never write fractional turns ("three-quarters", "two-thirds toward", "45-degree", "angled three-quarters"). For a glance back, write `back view, glancing over the shoulder toward [target]`.
+10. **Position language is relational.** Describe positions by what the character touches, faces, or is near (`on the boat`, `behind the desk`, `at the doorway`, `beside the tree`, `in the foreground`, `in the background`). Reach for `left`/`right` only when the action genuinely demands it — pointing/aiming/reaching at a specific target across the frame, the textPosition rule below, distance separation in an ultra-wide shot, or when cross-page continuity must be preserved (same location, characters were on the same side last scene).
+11. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age boy`, `teenager`, `middle-aged man`). Never numeric years.
+12. **No collective nouns.** ❌ "the children" ✅ name each character, or "all three", "the group".
+13. **No closed eyes, no pointing-as-cliché.** Open eyes; use looking, walking toward, reaching, discovering instead of pointing.
+14. **No closed pose for the calm zone.** The page's `textPosition` is locked from first generation. The corner it names must read as calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground). Do NOT place a named character, an active figure, a weapon, or a busy crowd in that corner. If the previous render put a figure there, move that figure to a different region in the rewrite.
+15. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood.
 
 ---
 
 ## INPUT
 
-**SCENE HINT (your starting point):**
+**Scene hint (your starting point — do not reinvent):**
 {DRAFT_SCENE_DESCRIPTION}
 
-**PREVIEW RENDER ANALYSIS:**
+**Preview / evaluator feedback:**
 {PREVIEW_FEEDBACK}
 
-**CONTEXT:**
+**Context (previous scenes):**
 {PREVIOUS_SCENES}
 
-**CURRENT SCENE (Page {PAGE_NUMBER}):**
+**Current scene (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
 {SCENE_CONTEXT}
 **Story Text:**
 {PAGE_CONTENT}
 
-**Available Avatars (YOU MUST SELECT FROM THESE):**
+**Available avatars (select clothing only from these):**
 {AVAILABLE_AVATARS}
 
-IMPORTANT CLOTHING RULES:
-- Select clothing for each character ONLY from their available avatars listed above
-- Never assign a costume that isn't in the character's available list
-- If a `costumed:...` entry appears in a character's available list, prefer it for every page of this story unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume — the whole story takes place in the same costumed world
+Clothing rules:
+- Select clothing for each character ONLY from their available avatars listed above.
+- If a `costumed:...` entry appears in a character's available list, prefer it for every page unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume.
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
-**Main Characters:**
+**Main characters:**
 {CHARACTERS}
 
-**Recurring Visual Elements (copy IDs exactly):**
+**Recurring visual elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
 {CORRECTION_NOTES}
 
 ---
 
-## VALIDATION CHECKS (Complete ALL in output)
+## DRAFT-THEN-VALIDATE
 
-### Critical Checks (most common failures)
+**Step 1 — Diagnose.** For each evaluator finding and each preview mismatch, name the root cause in one short sentence. (Example: "Evaluator: extra figure in upper right. Cause: prose said 'soldiers approach' without specifying count — model invented one.")
 
-**1. Scale Feasibility**
-One scale per scene: HUMAN SCALE (expressions visible) OR OBJECT SCALE (buildings/vehicles), never both.
-❌ "Entire church tower with Sophie's sparkling eyes" → At tower scale, faces are dots
-✅ "Sophie in foreground, church tower rises behind her" → Human scale, tower partial
+**Step 2 — Draft the corrected prose.** One continuous paragraph. Open with the main subject and main action. Weave each named character's appearance on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. State where each character is positioned (relational language; see Rule 10), what they hold, how they face. Name the setting, time of day, weather, lighting, mood. Name recurring Visual Bible elements with their identifying detail. Note shot type (close-up / medium / wide / ultra-wide / aerial) if not obvious from the action.
 
-**4. Character Positioning & Pointing Geometry**
-Pointing/gaze direction MUST match the vector from character region → target region.
-❌ Sophie bottom-right, tower top-left, arm points RIGHT (tower is LEFT of her!)
-✅ Sophie bottom-right, tower top-left, arm extends UP-LEFT toward tower
+**Step 3 — Validate the draft for internal consistency:**
+- Pose vs action: a `back view` character cannot be "looking at" something between them and the camera.
+- Holding vs action: a hand holding X cannot simultaneously do another action.
+- Calm zone: scan the prose — no named character, weapon, or crowd in the textPosition corner.
+- Face count: count visible faces; reduce via depth/back-view/object/cropping if over the cap.
+- One focal point: one main action draws the eye; if the prose has two equally weighted moments, cut one.
 
-**6. Character Differentiation**
-Each character MUST have UNIQUE pose and action. Never identical gestures.
-❌ "All children wave excitedly"
-✅ "Sophie waves, Lukas runs mid-stride, Emma stands watching"
-
-**8. Weather & Indoor/Outdoor**
-INDOOR: weather only visible through windows. OUTDOOR: weather affects scene directly.
-❌ "Snow falling" + indoor setting
-✅ "Snow visible through frost-covered window" (indoor) OR "Snow falling on characters" (outdoor)
-
-**17. Character Count (HARD CAP: {MAX_CHARACTERS_PER_SCENE} VISIBLE FACES)**
-Count characters with visible faces. 1-3 is ideal for image quality. Up to {MAX_CHARACTERS_PER_SCENE} is allowed when the page narratively needs it (family reunion, group welcome, classroom). If more than {MAX_CHARACTERS_PER_SCENE}, you MUST reduce — for EACH extra character, choose the best-fitting option:
-
-| Option | When to use | Example |
-|--------|------------|---------|
-| **A. Remove entirely** | Character has no dialogue/action on this page | Simply omit them from the scene |
-| **B. Distant/small** | Character is present but not central | "Emma, a small figure in the far background" |
-| **C. Hidden behind object** | Scene has furniture, trees, doorways, or other characters | "Lukas half-hidden behind the bookshelf", "partly obscured behind Sophie" |
-| **D. Cropped by frame** | Character is beside the focal action | "Manuel's arm and shoulder visible at the left edge" |
-| **E. Head turned away** | Character stays with the group but looks sideways/down | "Lukas walks alongside, head turned to look at the river", "Emma glances down at her bag" |
-| **F. Carrying something large** | Character holds an object that covers their face | "Manuel carries a tall stack of books", "Emma hugs a big stuffed bear to her chest" |
-| **G. Bending down** | Character is crouching, picking something up, petting an animal | "Lukas kneels to tie his shoe", "Emma bends down to pick up a shell" |
-| **H. Face in object** | Character is reading, looking into a bag, studying a map | "Manuel reads the map, face hidden behind it", "Emma peers into her backpack" |
-| **I. Back view** | Character is NARRATIVELY walking away, leaving, or looking into the distance ahead | "Sophie walks away down the path, seen from behind" |
-
-❌ NEVER turn a character around just to hide their face. If 4 people walk forward together, they ALL face forward — remove one instead.
-❌ "4 children running toward the castle, one facing backward" — makes no sense
-✅ "Sophie and Manuel run toward the castle. Emma watches from the garden fence behind them."
-✅ "Three children crowd around the treasure chest. Behind them, the cave entrance frames the scene."
-
-**Decision process:** For each extra character, ask: "Does this character DO something on this page?" If no → option A (remove). If yes → pick B-I based on what fits the scene's physical layout.
-
-**18. Composition & Simplicity**
-The scene hint is a STARTING IDEA - change it freely if composition doesn't work. One focal point only.
-- **Large objects**: Place in background with characters in foreground, OR place in foreground with characters looking up at it.
-- **Avoid stereotype actions**: No pointing. Use looking, walking toward, reaching, discovering instead.
-- **When in doubt**: Simpler is better. Cut elements rather than cramming them in.
-
-### Standard Checks (one-liner each)
-
-| # | Check | Rule |
-|---|-------|------|
-| 2 | Object Placement | Every object needs explicit position: horizontal (left/center/right) + depth (fore/mid/back) |
-| 3 | Action Compatibility | Actions must match object orientation (pulling vertical door ≠ lifting floor hatch) |
-| 5 | Camera View | Back view = no expressions; facing camera / facing left / facing right = expressions OK. Use those four discrete facings only — never `three-quarter`, `two-thirds`, or fractional turns. |
-| 7 | Physics | Ropes taut, heavy objects = straining posture, distinct materials where objects touch |
-| 9 | Distance Separation | CRITICAL: Image models draw all characters the same size. When characters must be far apart: (1) set distant character position to "far background (tiny figure, 1/5 size)" — NEVER both "foreground", (2) in imageSummary write "Roger appears tiny in the far distance", (3) in depthLayers describe the gap "wide empty plaza fills center between them". If both characters say "foreground" they WILL be drawn side by side. |
-| 10 | Location Continuity | Same location as previous scene unless story explicitly says they moved |
-| 11 | Story Fidelity | Match spatial terms exactly: "vor" = in front of, "neben" = beside, not behind |
-| 12 | Linear Space | Path orientation (lengthwise/crosswise) determines positioning. Characters moving along path MUST have explicit facing direction in pose (e.g., "running away from camera", "back view moving into distance", "sprinting toward camera") |
-| 13 | Shared Objects | When 2+ characters hold same object, define each character's grip point |
-| 14 | Obstacle Logic | If object blocks passage, explain WHY (spans width, wedged, too large) |
-| 15 | Holding Inventory | Track leftHand/rightHand per character, no conflicts, include signature items |
-| 16 | Background Feasibility | Don't show more through windows than viewport realistically allows |
-
----
-
-## DRAFT-THEN-VALIDATE PROCESS
-
-**Step 1: Draft the corrected scene** based on checks and issues found.
-
-**Step 2: Validate the draft** for internal consistency:
-- **Pose vs Action**: If character has "back view" or "seen from behind", they CANNOT be "looking at" something in front of them (toward camera). Back view = facing away from camera.
-- **Position vs Gaze**: Character in position A looking at target in position B - verify the geometry works (e.g., bottom-right looking at top-left = looking UP-LEFT, not down-right).
-- **Holding vs Action**: If hand is "holding X", that hand cannot simultaneously do another action.
-- **Camera vs Expression**: Back view or distant characters = no detailed expressions visible.
-- **Face count recheck**: Count characters with visible faces in the final draft. If still >3, apply Check 17 options again.
-
-**Step 3: Fix any contradictions** found in Step 2 before finalizing.
-
-Common contradiction patterns to catch:
-- ❌ "seen from behind, looking down at siblings in foreground" (if siblings are closer to camera, character would face camera to see them)
-- ✅ "seen from behind, looking into the distance ahead" OR "profile view, head turned toward siblings"
-- ❌ "back view with worried expression" (can't see face from behind)
-- ✅ "back view, shoulders hunched" OR "side profile with worried expression"
-
-**Output the validation in `draftValidation` field** showing what was checked and any fixes applied.
+**Step 4 — Fix any contradictions** before writing the metadata block.
 
 ---
 
 ## OUTPUT FORMAT
 
-Output one continuous paragraph of prose, followed by a metadata block. No markdown headers, no code fences, no preamble — start directly with the prose.
+Output one continuous paragraph of prose, then `---METADATA---`, then a single JSON object. No markdown headers, no code fences, no preamble — start directly with the prose.
 
-**Step A — prose paragraph:**
-
-Describe the corrected scene as an illustrator would paint it. Open with the main subject and main action. Weave each named character's appearance on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing category — as flowing language, not a labeled list. Include where each character is positioned (left/right/center, foreground/midground/background), what they hold, how they face. Name the setting, time of day, weather, lighting, mood. Name recurring Visual Bible elements with their identifying detail. Note shot type (close-up / medium / wide) if not obvious from the action.
-
-The prose is the scene brief that feeds the image model — text that isn't in the prose doesn't reach the image. Keep it one flowing paragraph, no bullets, no headers.
-
-**Distance rule:** when characters must be far apart, describe the size difference explicitly: "the main character fills the centre foreground while the secondary character is a tiny figure in the far distance on the right, roughly a sixth their size."
+**Distance rule:** when characters must be far apart, describe the size difference explicitly: "the main character fills the centre foreground while the secondary character is a tiny figure in the far distance, roughly a sixth their size."
 
 **Example prose:**
 
-Sophie — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the bottom-right foreground of a snowy town plaza, her right arm extended up-left toward the ancient clock tower that rises in the top-left background with its blue face glowing faintly against grey clouds. Beside her in the bottom-left foreground walks Manuel, a slim ten-year-old in a navy parka and snow boots, body angled toward Sophie and face tilted upward in curiosity. Light snow falls directly onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
+Sophie — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the foreground of a snowy town plaza, her gaze lifted toward the ancient clock tower that rises in the background with its blue face glowing faintly against grey clouds. Beside her walks Manuel, a slim ten-year-old in a navy parka and snow boots, body angled toward Sophie and face tilted upward in curiosity. Light snow falls onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
 
-**Step B — metadata block:**
+**Metadata block:**
 
 After the prose, emit exactly `---METADATA---` on its own line, then a single JSON object:
 
 ```
 {
-  "previewMismatches": ["Intent: Sophie pointing LEFT. Preview: arm extended RIGHT."],
-  "checks": {
-    "check1_scaleFeasibility": "MEDIUM shot, expressions OK. YES",
-    "check2_objectPlacement": "Tower: VERTICAL, top-left background. CONSISTENT",
-    "check3_actionCompatibility": "Sophie pointing at distant tower = arm extended. VALID",
-    "check4_characterPositioning": "Sophie: bottom-right, facing left. Manuel: bottom-left, facing right. YES",
-    "check5_cameraView": "Three-quarter front = expressions OK. YES",
-    "check6_differentiation": "Sophie: pointing. Manuel: walking. UNIQUE. YES",
-    "check7_physics": "N/A - no ropes or heavy objects",
-    "check8_weather": "OUTDOOR. Light snow directly on scene. YES",
-    "check9_distanceSeparation": "Characters together foreground, tower distant. Gap: snowy plaza. ADEQUATE",
-    "check10_locationContinuity": "N/A - first scene at this location",
-    "check11_storyFidelity": "Story: discovering tower. Scene: pointing at tower. YES",
-    "check12_linearSpace": "N/A - no path with moving characters",
-    "check13_sharedObjects": "N/A - no shared objects",
-    "check14_obstacleLogic": "N/A - no obstacles",
-    "check15_holdingInventory": "Sophie L:empty R:pointing. Manuel L:empty R:empty. NO CONFLICTS",
-    "check16_backgroundFeasibility": "Outdoor scene, tower visible. FEASIBLE",
-    "check17_characterCount": "2 main characters. PASS",
-    "check18_compositionSimplicity": "2 characters, one focal point (tower). No pointing overuse. PASS"
-  },
-  "issues": ["Pointing geometry wrong - arm pointed RIGHT but tower is LEFT"],
-  "corrections": ["Fixed Sophie's arm direction to UP-LEFT toward tower"],
+  "diagnosis": ["Evaluator: extra soldier in upper-right. Cause: prose said 'soldiers approach' without count — model invented one."],
+  "previewMismatches": ["Intent: hero faces target. Preview: hero faced away."],
+  "issues": ["short bullets describing problems found"],
+  "corrections": ["short bullets describing the fixes applied to the prose"],
   "draftValidation": {
-    "poseActionCheck": "Sophie: standing facing left + pointing left = CONSISTENT",
-    "positionGazeCheck": "Sophie bottom-right looks up-left at tower top-left = VALID geometry",
+    "poseActionCheck": "...",
+    "calmZoneCheck": "textPosition=top-right; upper-right corner contains only sky → OK",
     "contradictionsFound": [],
     "fixesApplied": []
   },
   "characters": [
-    {"name": "Sophie", "clothing": "winter", "position": "bottom-right foreground"},
-    {"name": "Manuel", "clothing": "winter", "position": "bottom-left foreground"}
+    {"name": "Sophie", "clothing": "winter", "position": "foreground"},
+    {"name": "Manuel", "clothing": "winter", "position": "beside Sophie"}
   ],
   "objects": ["LOC001"],
   "interactions": [
-    {"character": "Sophie", "object": "tower", "where": "right arm extended up-left, pointing toward it"}
+    {"character": "Sophie", "object": "tower", "where": "gazes up at"}
   ],
-  "textPosition": "top-right",
   "reuseEmptyScene": true,
-  "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
-  "translatedSummary": "Sophie steht im Vordergrund und zeigt auf den entfernten Turm..."
+  "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background, its blue face visible against grey clouds. Light snow falls on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
+  "translatedSummary": "..."
 }
 ```
 
 ### Field rules
 
-**Checks and mismatches — keep them as output:**
-- `previewMismatches`: array of strings, one per real mismatch between intent and preview. Empty array if preview matches intent. Format: `"Intent: X. Preview: Y."`.
-- `checks`: object with all 18 keys (`check1_scaleFeasibility` through `check18_compositionSimplicity`). Each value is a short verdict with reasoning.
-- `issues`: short bullets describing problems found. Empty array if none.
-- `corrections`: short bullets describing the fixes you applied to the prose. Empty array if none.
-- `draftValidation`: the internal consistency check on your draft (see DRAFT-THEN-VALIDATE section above).
-
-**Scene fields (structural descriptors for the image pipeline):**
-
-- `characters[]`: one entry per character. Always `name`, `clothing`, `position`.
-  - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
-  - `clothing` must match the outline exactly — if the outline says `costumed:wizard`, write `costumed:wizard`, not `standard`. Also describe the costume in the prose.
-  - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.
-  - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.
-
-- `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible in the scene. For landmarks with photo variants, use `LOC003.2` format — pick the variant matching the scene's perspective.
-
-- `interactions[]`: one entry per character-to-object contact visible in the scene (held, worn, in a pocket, climbed, stood on, gripped, passed through, leaned against, touched). `{character, object, where}`. Every entry must also be described in the prose — prose and metadata must agree. Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind.
-
-- `textPosition`: read verbatim from the scene hint. Do not change it. Write the prose so the chosen corner naturally contains calm, uncluttered content (smooth sky, unbroken wall, open water, foliage, ground).
-
-- `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused as style anchor. `false` if the setting / location / camera angle / lighting changed significantly.
-
-- `emptyScenePrompt`: 2-3 sentences describing only the background. EXCLUDE named characters, tracked animals, handheld artifacts (swords, books, crossbows — those are composited with the character). INCLUDE location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). Describe anonymous extras (crowds, soldiers, villagers) with density/distance/silhouette only, kept away from the zone reserved for named characters. Use "open foreground", "uncluttered centre", "empty space" — never "where children would stand". The corner matching `textPosition` should read as calm, uncluttered scene content — saturation is fine, clutter is not.
-
-- `translatedSummary`: one-line translation of the prose summary into the target language below, for frontend display.
+- `diagnosis[]`: one entry per evaluator finding or preview mismatch. Each entry names the root cause in one short sentence — not the symptom. Empty array if there were no findings.
+- `previewMismatches[]`: array of `"Intent: X. Preview: Y."` strings. Empty array if preview matched intent.
+- `issues[]`, `corrections[]`: short bullets. Empty arrays if none.
+- `draftValidation`: must include `calmZoneCheck` confirming no named character / weapon / crowd in the textPosition corner.
+- `characters[]`: one entry per character. Always `name`, `clothing`, `position`. `position` is a short relational phrase matching the prose (`on the boat`, `behind Roger`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures.
+- `clothing` must match the outline exactly — if the outline says `costumed:wizard`, write `costumed:wizard`, not `standard`. Also describe the costume in the prose.
+- `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. For landmarks with photo variants use `LOC003.2` format — pick the variant matching the scene's perspective.
+- `interactions[]`: one entry per character-to-object contact (held, worn, climbed, stood on, gripped, leaned against). `{character, object, where}`. Pose details (neck angle, gaze direction) stay in the prose, not in `where`. Distance verbs (`shoots`, `aims at`, `calls to`) require an explicit separation phrase in `where` (`across the room`, `down the valley`); for these scenes the shot must be `ultra-wide` and the prose must place each figure at the correct end of the frame.
+- `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused. `false` if setting / location / camera angle / lighting changed significantly.
+- `emptyScenePrompt`: 2-3 sentences describing only the background — location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). EXCLUDE named characters, tracked animals, handheld artifacts. Describe anonymous extras with density/distance/silhouette only, kept away from the zone reserved for named characters. The corner matching `textPosition` must read as calm, uncluttered scene content.
+- `translatedSummary`: one-line translation of the prose summary into the target language, for frontend display.
 
 ---
 
 ## LANGUAGE RULES
 
-**All prose and metadata fields in English**, except:
-- `translatedSummary` → translate to target language below.
+All prose and metadata fields in English, except `translatedSummary` which translates to the target language below.
 
 **Target Language for translatedSummary:**
 {LANGUAGE_INSTRUCTION}

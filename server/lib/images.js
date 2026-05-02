@@ -7215,9 +7215,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const imageDescription = await analyzeGeneratedImage(imageData, characters, visualBible, clothingRequirements);
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
 
-  // Step 2: Build previewFeedback from the image analysis
+  // Step 2: Build previewFeedback from the image analysis.
+  // Eval bullets from the previous round (if any) are routed here too so
+  // Claude integrates them into the corrected scene — they must NOT go to
+  // the image API, which can't reason about evaluator feedback.
   const previewFeedback = {
-    composition: imageDescription.description
+    composition: imageDescription.description,
+    fixIssues: (() => {
+      if (!evaluationFeedback) return [];
+      const src = evaluationFeedback.fixableIssues || [];
+      return src.slice(0, 10).map(i => i?.description || i?.issue || String(i));
+    })(),
+    previousScore: evaluationFeedback?.score ?? null,
   };
 
   // Build previous scenes context
@@ -7537,34 +7546,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // uses only the prose for the image prompt — no JSON-scene extraction needed.
   let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos, { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition });
 
-  // Append evaluation feedback if provided
-  if (evaluationFeedback) {
-    if (usageTracker) {
-      // Pipeline caller — append the actionable bullets only. The full
-      // parsedJson reasoning string runs 3-5k chars and gets truncated by
-      // Grok's 7500-char cap, often cutting off the bullets that follow.
-      // The bullets already encode the same issues in compact form.
-      if (evaluationFeedback.fixableIssues?.length > 0) {
-        const bullets = evaluationFeedback.fixableIssues.slice(0, 10)
-          .map(i => `- ${i.description || i.issue || i}`).join('\n');
-        imagePrompt = `${imagePrompt}\n\nIMPORTANT — fix these issues from the previous generation:\n${bullets}`;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${evaluationFeedback.fixableIssues.length} feedback bullets (score: ${evaluationFeedback.score ?? 'N/A'})`);
-      }
-    } else {
-      // UI route caller — only keep critical issues (missing/wrong elements)
-      const criticalIssues = (evaluationFeedback.fixableIssues || [])
-        .filter(i => {
-          const desc = (i.description || i.issue || '').toLowerCase();
-          return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
-            || desc.includes('wrong setting') || desc.includes('wrong location');
-        });
-      if (criticalIssues.length > 0) {
-        const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
-          criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
-        imagePrompt = `${imagePrompt}\n\n${feedbackText}`;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${criticalIssues.length} critical issues as positive instructions (score: ${evaluationFeedback.score ?? 'N/A'})`);
-      }
-    }
+  // Eval feedback was already routed to Claude via previewFeedback.fixIssues
+  // (see Step 2 above). The image API gets a prose-only prompt — it cannot
+  // reason about evaluator bullets, and stacking them on the prose led to
+  // cherry-picking and prompt-leak text artifacts.
+  if (evaluationFeedback?.fixableIssues?.length > 0) {
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: ${evaluationFeedback.fixableIssues.length} eval bullets routed to scene re-expansion (score: ${evaluationFeedback.score ?? 'N/A'})`);
   }
 
   // Preview mode: return prompt + mismatches without generating image
