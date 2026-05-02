@@ -342,8 +342,15 @@ export function ImageHistoryModal({
                     )}
                   </div>
 
-                  {/* 2. REPAIR INSTRUCTION — what was sent to Grok to PRODUCE this version */}
-                  {detailVersion.inpaintInstruction && (
+                  {/* 2. WHAT WAS SENT TO GROK TO PRODUCE THIS VERSION
+                       Inpaint repairs use a short imperative instruction
+                       (consolidator output). Iterate repairs send the FULL
+                       re-rendered unified prompt — that's the source-of-truth
+                       for what Grok received and why the regeneration drifted
+                       the way it did. Promote both to the same prominent slot
+                       so the dev can see the input verbatim without hunting in
+                       a collapsed section at the bottom of the panel. */}
+                  {detailVersion.inpaintInstruction ? (
                     <div>
                       <div className="text-xs font-medium text-amber-700 mb-1">
                         {language === 'de' ? 'Reparatur-Anweisung (an Grok)' : language === 'fr' ? 'Instruction de réparation (à Grok)' : 'Repair instruction (to Grok)'}
@@ -352,7 +359,16 @@ export function ImageHistoryModal({
                         {detailVersion.inpaintInstruction}
                       </p>
                     </div>
-                  )}
+                  ) : detailVersion.prompt && (detailVersion.type === 'repair' || detailVersion.type === 'iteration' || detailVersion.type === 'regeneration') ? (
+                    <div>
+                      <div className="text-xs font-medium text-amber-700 mb-1">
+                        {language === 'de' ? 'Iterations-Prompt (an Grok)' : language === 'fr' ? 'Prompt d\'itération (à Grok)' : 'Iterate prompt (to Grok)'}
+                      </div>
+                      <pre className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {detailVersion.prompt}
+                      </pre>
+                    </div>
+                  ) : null}
 
                   {/* 3. REFERENCE IMAGES — what Grok received as visual context */}
                   {detailVersion.inpaintReferenceImages && detailVersion.inpaintReferenceImages.length > 0 && (
