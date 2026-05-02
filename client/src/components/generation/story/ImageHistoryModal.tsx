@@ -286,9 +286,9 @@ export function ImageHistoryModal({
                     </div>
                     <div className="text-[9px] sm:text-[11px] text-gray-300 mt-0.5">
                       {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
-                      {version.type && version.type !== 'original' && (
-                        <span className="ml-1 text-gray-400">({version.type})</span>
-                      )}
+                      {(version.source && version.source !== 'original') || (version.type && version.type !== 'original') ? (
+                        <span className="ml-1 text-gray-400">({formatMethod(version.source, version.type)})</span>
+                      ) : null}
                     </div>
                   </div>
 
