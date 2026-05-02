@@ -143,4 +143,105 @@ function selectCharRepairTasks(entityReport, options = {}) {
   return { tasks: selectedTasks, repairs, dropped };
 }
 
-module.exports = { findBadPages, selectCharRepairTasks };
+/**
+ * Decide ONE repair method for a single page based on its evaluation +
+ * the entity consistency report. Single source of truth for the per-page
+ * decision; replaces the historical split between `chooseRepairStrategy`
+ * (inpaint vs iterate) and `selectCharRepairTasks` (char-fix as a
+ * separate post-loop pass).
+ *
+ * Decision order:
+ *   1. Catastrophic visual / semantic break    → iterate (regenerate)
+ *   2. Major/critical entity (character) issue → char-fix
+ *   3. Has fixable quality / semantic content   → inpaint
+ *   4. Otherwise                                → skip
+ *
+ * Catastrophic outranks entity intentionally: a visually broken image
+ * fails entity checks for the wrong reason (the figure isn't recognisable
+ * yet). Iterate first; if the next round still has identity issues,
+ * char-fix on the iterated result.
+ *
+ * Char-fix is scene-only (covers don't get char-fix). Cover pages with
+ * entity issues — rare — fall through to inpaint/iterate.
+ *
+ * @param {number} pageNumber - Page number; negative for covers (-1/-2/-3)
+ * @param {Object} evaluation - Per-page eval with qualityScore, semanticScore, fixableIssues, etc.
+ * @param {Object} entityReport - Story-level entity consistency report
+ * @param {Object} [options]
+ * @param {Function} [options.chooseRepairStrategy] - Helper to pick inpaint/iterate when entity isn't the answer (DI for testability)
+ * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueDescription?: string}}
+ */
+function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
+  const evaluator = evaluation || {};
+  const visualScore = evaluator.qualityScore ?? evaluator.rawQualityScore ?? 100;
+  const semanticScore = evaluator.semanticScore ?? 100;
+
+  // 1. Catastrophic — iterate immediately (figure unrecognisable).
+  if (visualScore < 50) {
+    return { method: 'iterate', reason: `image visually broken (visual=${visualScore})` };
+  }
+  if (semanticScore < 30) {
+    return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
+  }
+
+  // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
+  if (pageNumber > 0 && entityReport?.characters) {
+    let worst = null; // {severity, charName, issue}
+    const sevRank = (s) => (s === 'critical' ? 4 : s === 'major' ? 3 : s === 'moderate' ? 2 : s === 'minor' ? 1 : 0);
+    for (const [charName, charResult] of Object.entries(entityReport.characters)) {
+      const allIssues = [...(charResult.issues || [])];
+      if (charResult.byClothing) {
+        for (const cr of Object.values(charResult.byClothing)) {
+          for (const i of (cr.issues || [])) {
+            if (!allIssues.some(x => x.id === i.id)) allIssues.push(i);
+          }
+        }
+      }
+      for (const issue of allIssues) {
+        if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
+        const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
+        if (!pages.includes(pageNumber)) continue;
+        if (!worst || sevRank(issue.severity) > sevRank(worst.severity)) {
+          worst = { severity: issue.severity, charName, issue };
+        }
+      }
+    }
+    if (worst) {
+      return {
+        method: 'char-fix',
+        reason: `entity ${worst.severity} on ${worst.charName}`,
+        charName: worst.charName,
+        severity: worst.severity,
+        issueDescription: worst.issue.description || worst.issue.fixInstruction || '',
+      };
+    }
+  }
+
+  // 3. Inpaint when there's something inpaintable.
+  if (typeof options.chooseRepairStrategy === 'function') {
+    return mapStrategyToMethod(options.chooseRepairStrategy(evaluator));
+  }
+  // Inline fallback when chooseRepairStrategy isn't injected (tests).
+  const fixableCount = evaluator.fixableIssues?.length || 0;
+  const enrichedCount = evaluator.enrichedFixTargets?.length || 0;
+  const fixTargetCount = evaluator.fixTargets?.length || 0;
+  const semanticIssueCount = (evaluator.semanticResult?.issues?.length
+    || evaluator.semanticResult?.semanticIssues?.length || 0);
+  if (fixableCount + enrichedCount + fixTargetCount + semanticIssueCount > 0) {
+    const parts = [];
+    if (fixableCount) parts.push(`${fixableCount} quality`);
+    if (semanticIssueCount) parts.push(`${semanticIssueCount} semantic`);
+    if (enrichedCount || fixTargetCount) parts.push(`${enrichedCount + fixTargetCount} targets`);
+    return { method: 'inpaint', reason: parts.join(', ') || 'default' };
+  }
+
+  // 4. Nothing actionable.
+  return { method: 'skip', reason: 'no repair needed' };
+}
+
+function mapStrategyToMethod(s) {
+  if (!s) return { method: 'skip', reason: 'no strategy' };
+  return { method: s.strategy || 'skip', reason: s.reason || '' };
+}
+
+module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod };
