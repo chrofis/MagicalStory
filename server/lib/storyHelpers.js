@@ -2661,28 +2661,6 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
       }
 
-      // COSTUMED LEAK GUARD — when caller wanted costumed but no styled
-      // costumed avatar resolved, the next fallback would send the unstyled
-      // standard avatar (modern clothes) to Grok. Image input is a stronger
-      // signal than text, so the rendered scene then shows modern clothing
-      // (orange polo on a medieval guard) which the eval correctly flags.
-      // Send the face thumbnail only — preserves identity, no torso/clothing
-      // to leak. The costume description set above drives the body rendering.
-      if (!photoUrl && resolvedClothing === 'costumed' && avatars) {
-        const faceThumb = avatars.faceThumbnailsUrl?.standard
-          || avatars.faceThumbnails?.standard
-          || avatars.faceThumbnailsUrl?.summer
-          || avatars.faceThumbnails?.summer
-          || avatars.faceThumbnailsUrl?.winter
-          || avatars.faceThumbnails?.winter;
-        if (faceThumb) {
-          photoType = 'face-only-costumed-fallback';
-          photoUrl = faceThumb;
-          actualClothingUsed = 'costumed-no-body';
-          log.warn(`🧥 [AVATAR] ${char.name}: wanted costumed but no styled avatar resolved — sending face thumbnail only (avoids modern-clothing leak from standard avatar)`);
-        }
-      }
-
       // Try fallback clothing avatars before falling back to body photo
       // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars
       // applyStyledAvatars() will convert to target style via fresh cache

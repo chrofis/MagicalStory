@@ -744,6 +744,12 @@ function buildStoryMetadata(story) {
 function stripInlineImagesFromStoryData(data) {
   if (!data || typeof data !== 'object') return;
 
+  // Strip per-character bytes that DUPLICATE the characters table (photos
+  // and unstyled avatars/thumbnails are canonical there). Leave styledAvatars
+  // and costumed in place — they are per-story specific (this story's art
+  // style + this story's costume), so the embedded snapshot is the ONLY
+  // place they live. Stripping them caused image gen to fall back to the
+  // unstyled standard avatar, leaking modern clothing into costumed scenes.
   const stripCharSnapshot = (c) => {
     if (!c || typeof c !== 'object') return;
     if (c.photos && typeof c.photos === 'object') {
@@ -753,8 +759,8 @@ function stripInlineImagesFromStoryData(data) {
       for (const k of ['standard', 'summer', 'winter', 'formal']) c.avatars[k] = undefined;
       c.avatars.faceThumbnails = undefined;
       c.avatars.bodyThumbnails = undefined;
-      c.avatars.styledAvatars = undefined;
-      c.avatars.costumed = undefined;
+      // DO NOT strip c.avatars.styledAvatars — per-story data, no other source.
+      // DO NOT strip c.avatars.costumed   — per-story data, no other source.
     }
   };
 
