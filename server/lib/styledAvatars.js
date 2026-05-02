@@ -768,7 +768,19 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     // Use the same convertAvatarToStyle path as standard avatars — routes through
     // callGeminiAPIForImage which respects imageModelOverride (Grok, Gemini, etc.)
     const avatars = char.avatars || char.clothingAvatars;
-    const originalAvatar = avatars?.standard || getPrimaryPhoto(char);
+    // Resolve standard avatar via inline OR R2 URL. Post-Phase-4 the inline
+    // field is null and the bytes live at standardUrl. Without resolveAvatarBytes
+    // the fallback to getPrimaryPhoto() returns the raw bodyNoBg/body photo
+    // (modern clothes) which Grok then renders into the costumed scene — and
+    // there was no warning, so the failure was invisible.
+    let originalAvatar = await resolveAvatarBytes(avatars, 'standard');
+    if (!originalAvatar) {
+      const fallback = getPrimaryPhoto(char);
+      if (fallback) {
+        log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}) — falling back to raw photo for costumed:${costumeType}. This will leak the raw photo's clothing/background into the costume render.`);
+        originalAvatar = fallback;
+      }
+    }
     const facePhoto = getFacePhoto(char);
     const costumeDescription = costumeConfig.description || `${costumeType} costume`;
 
@@ -856,7 +868,17 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       const fallbackKey = getAvatarCacheKey(charName, 'standard', artStyle);
       if (styledAvatarCache.has(fallbackKey)) continue;
       const avatars = char.avatars || char.clothingAvatars;
-      const originalAvatar = avatars?.standard || getPrimaryPhoto(char);
+      // Same resolveAvatarBytes pattern — handles inline + R2 URL. Without it,
+      // post-Phase-4 character rows silently fall back to getPrimaryPhoto (raw
+      // body photo) and the styled avatar inherits the raw photo's clothing.
+      let originalAvatar = await resolveAvatarBytes(avatars, 'standard');
+      if (!originalAvatar) {
+        const fallback = getPrimaryPhoto(char);
+        if (fallback) {
+          log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}) — falling back to raw photo for standard fallback. Costume failed AND base avatar missing.`);
+          originalAvatar = fallback;
+        }
+      }
       const facePhoto = getFacePhoto(char);
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         fallbackPromises.push(
