@@ -5426,6 +5426,13 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // path uses. Without this, inpaint can paint a face/hat into the calm
     // zone when the bbox happens to overlap it.
     textPosition = null,
+    // Cover text that the original cover prompt rendered into the image.
+    // When set, inpaint appends a "PRESERVE these texts verbatim" suffix so
+    // Grok keeps the title / dedication / branding intact while fixing the
+    // requested issues. Without this, inpaint regenerates the modified area
+    // and the title text disappears.
+    //   { title?: string, dedication?: string, branding?: string }
+    coverText = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -5695,7 +5702,21 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   const quietZoneSuffix = textPosition && TEXT_POSITION_DESC_INPAINT[textPosition]
     ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} as ${inpaintTextZoneDesc ? `the established ${inpaintTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not introduce faces, hats, patterns, or other high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}`;
+
+  // Cover text preservation: when the original cover prompt rendered title /
+  // dedication / branding into the image, list those exact strings here so
+  // Grok keeps them intact while fixing the requested issues. Without this
+  // the title disappears on every cover inpaint.
+  let coverTextSuffix = '';
+  if (coverText && (coverText.title || coverText.dedication || coverText.branding)) {
+    const lines = [];
+    if (coverText.title) lines.push(`- Title text "${coverText.title}" rendered in the upper third of the image — keep its exact spelling, position, lettering style, and three-dimensional rendering.`);
+    if (coverText.dedication) lines.push(`- Dedication text "${coverText.dedication}" — keep its exact spelling, position, and lettering style.`);
+    if (coverText.branding) lines.push(`- Branding text "${coverText.branding}" inset from the bottom-left corner — keep its exact spelling, position, and lettering style.`);
+    coverTextSuffix = `\n\nPRESERVE EXISTING TEXT — CRITICAL: this image is a book cover. Do NOT modify, remove, distort, or re-letter the following pre-existing text:\n${lines.join('\n')}\nWhile fixing the issues listed above, leave every letter of these texts pixel-perfect. If a fix would overlap the text area, work around it.`;
+  }
+
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}${coverTextSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -6178,6 +6199,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Look up the page's locked text-overlay corner so inpaint can warn
     // Grok not to paint high-contrast detail in that zone.
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
+    // Cover text preservation: when inpainting a cover (pageNumber<=0), tell
+    // Grok to keep the title / dedication / "magicalstory.ch" branding that
+    // the original cover prompt rendered into the image. Without this, every
+    // cover inpaint regenerates the modified area and the text disappears.
+    //   page -1 = frontCover  → title text in upper third
+    //   page -2 = initialPage → dedication (when set)
+    //   page -3 = backCover   → "magicalstory.ch" in bottom-left
+    let coverText = null;
+    if (img.pageNumber === -1) {
+      coverText = { title: storyData?.title || null };
+    } else if (img.pageNumber === -2) {
+      const dedication = storyData?.dedication
+        || storyData?.coverImages?.initialPage?.dedication
+        || null;
+      if (dedication) coverText = { dedication };
+    } else if (img.pageNumber === -3) {
+      coverText = { branding: 'magicalstory.ch' };
+    }
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
@@ -6186,6 +6225,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneDescription: img.sceneDescription || img.description || '',
       artStyle: storyData?.artStyle || artStyle || null,
       characterClothing: pageCharacterClothing,
+      coverText,
       // Thread storyId + round so consolidator calls get persisted
       storyId: storyData?.id || jobId || null,
       round: roundNum,
