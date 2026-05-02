@@ -159,7 +159,10 @@ function parseCharacterClothingBlock(content) {
 // ============================================================================
 
 // Terminator lookahead for TEXT/SCENE inside a page block.
-const PAGE_SECTION_END = '(?=SCENE:|METADATA:|SCENE HINT:|---\\s*(?:Page|Seite|Página|Pagina)|^#\\s+FINAL|^#\\s+\\w|$)';
+// End-of-string is expressed as `(?![\s\S])` rather than `$`, because `$` under
+// the `m` flag matches end-of-LINE — which combined with lazy `[\s\S]*?` truncates
+// any TEXT/SCENE patch at its first line break (only paragraph 1 was being kept).
+const PAGE_SECTION_END = '(?=SCENE:|METADATA:|SCENE HINT:|---\\s*(?:Page|Seite|Página|Pagina)|^#\\s+FINAL|^#\\s+\\w|(?![\\s\\S]))';
 
 const TEXT_RE = new RegExp(`TEXT:\\s*([\\s\\S]*?)${PAGE_SECTION_END}`, 'im');
 const SCENE_RE = new RegExp(`SCENE:\\s*([\\s\\S]*?)${PAGE_SECTION_END}`, 'im');
