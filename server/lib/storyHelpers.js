@@ -2541,6 +2541,16 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         resolvedClothing = 'costumed';
       }
 
+      // Resolve a styled-avatar slot value to an image src string. The Phase 1e
+      // backfill converted plain-string slots into {imageUrl, imageData} objects
+      // (with imageData nulled post Phase 4). Accept all three shapes.
+      const resolveStyled = (v) => {
+        if (!v) return null;
+        if (typeof v === 'string') return v;
+        if (typeof v === 'object') return v.imageUrl || v.imageData || null;
+        return null;
+      };
+
       // Handle costumed category — one costume per story, just grab the first
       if (resolvedClothing === 'costumed') {
         // Check styled costumed avatars first (generated during this story's creation)
@@ -2548,10 +2558,10 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
           const costumeEntries = Object.entries(avatars.styledAvatars[artStyle].costumed);
           if (costumeEntries.length > 0) {
             const [key, data] = costumeEntries[0];
-            photoUrl = (typeof data === 'object' && data.imageData) ? data.imageData : data;
+            photoUrl = resolveStyled(data);
             photoType = `costumed-${key}`;
             actualClothingUsed = 'costumed';
-            log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${key}"`);
+            log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${key}" (src=${photoUrl ? (photoUrl.startsWith('http')?'URL':'data:') : 'NULL'})`);
 
             // Get clothing description from avatars.clothing.costumed
             if (avatars?.clothing?.costumed) {
@@ -2588,11 +2598,9 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       // Check styled avatars first (with signature items from this story)
       else if (resolvedClothing && resolvedClothing !== 'costumed' &&
                artStyle && avatars?.styledAvatars?.[artStyle]?.[resolvedClothing]) {
-        // Handle legacy object format {imageData, clothing} if present
+        // Accepts string, {imageData}, or {imageUrl, imageData:null} shapes.
         const styledData = avatars.styledAvatars[artStyle][resolvedClothing];
-        photoUrl = (typeof styledData === 'object' && styledData.imageData)
-          ? styledData.imageData
-          : styledData;
+        photoUrl = resolveStyled(styledData);
         photoType = `styled-${resolvedClothing}`;
         actualClothingUsed = resolvedClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${resolvedClothing} for ${artStyle}`);
@@ -2653,6 +2661,28 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
       }
 
+      // COSTUMED LEAK GUARD — when caller wanted costumed but no styled
+      // costumed avatar resolved, the next fallback would send the unstyled
+      // standard avatar (modern clothes) to Grok. Image input is a stronger
+      // signal than text, so the rendered scene then shows modern clothing
+      // (orange polo on a medieval guard) which the eval correctly flags.
+      // Send the face thumbnail only — preserves identity, no torso/clothing
+      // to leak. The costume description set above drives the body rendering.
+      if (!photoUrl && resolvedClothing === 'costumed' && avatars) {
+        const faceThumb = avatars.faceThumbnailsUrl?.standard
+          || avatars.faceThumbnails?.standard
+          || avatars.faceThumbnailsUrl?.summer
+          || avatars.faceThumbnails?.summer
+          || avatars.faceThumbnailsUrl?.winter
+          || avatars.faceThumbnails?.winter;
+        if (faceThumb) {
+          photoType = 'face-only-costumed-fallback';
+          photoUrl = faceThumb;
+          actualClothingUsed = 'costumed-no-body';
+          log.warn(`🧥 [AVATAR] ${char.name}: wanted costumed but no styled avatar resolved — sending face thumbnail only (avoids modern-clothing leak from standard avatar)`);
+        }
+      }
+
       // Try fallback clothing avatars before falling back to body photo
       // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars
       // applyStyledAvatars() will convert to target style via fresh cache
@@ -2681,8 +2711,12 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
             // Only fill clothingDescription if not already set. The costumed branch
             // above may have set it from clothingRequirements — don't overwrite the
             // costume description with the standard one just because the photo fell back.
+            // ALSO: if the original request was costumed and we have NO description
+            // anywhere, leave it empty rather than leak standard clothing description
+            // into a costumed scene (better to have no clothing guidance than wrong).
             const descriptionPreservedFromCostumed = !!clothingDescription;
-            if (!clothingDescription && avatars.clothing && avatars.clothing[fallbackCategory]) {
+            if (!clothingDescription && resolvedClothing !== 'costumed'
+                && avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
               clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
             }

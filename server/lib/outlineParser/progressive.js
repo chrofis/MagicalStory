@@ -181,26 +181,50 @@ class ProgressiveUnifiedParser {
     if (!this._hasMarker('TITLE')) return;
     if (!this._hasMarker('CLOTHING REQUIREMENTS') && !this._hasMarker('VISUAL BIBLE')) return;
 
-    // Scan only the TITLE section so we can pick the FINAL TITLE: line and
-    // ignore the TITLE_CANDIDATES: list header Sonnet emits above it.
     const sectionMatch = this.fullText.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*(?:CLOTHING|VISUAL))/i);
     const section = sectionMatch ? sectionMatch[1] : null;
-    // TITLE(?!_) negative-lookahead excludes TITLE_CANDIDATES:.
-    const titleLineMatch = section ? section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im) : null;
-    if (titleLineMatch) {
-      const title = titleLineMatch[1].trim()
-        .replace(/^\*{1,2}|\*{1,2}$/g, '')
-        .replace(/^"|"$/g, '')
-        .trim();
-      this.emitted.title = true;
-      log.debug(`🌊 [STREAM-UNIFIED] Title detected: "${title}"`);
+    if (!section) return;
 
-      if (this.callbacks.onTitle) {
-        this.callbacks.onTitle(title);
+    let title = null;
+
+    // Prefer TITLE_CANDIDATES list and pick one at random — same logic as the
+    // unified parser. The model would otherwise converge on the most-iconic
+    // candidate every run, and even when it does emit a TITLE: line we want
+    // server-side variety, not its preference.
+    const candidatesMatch = section.match(/TITLE_CANDIDATES\s*:\s*([\s\S]+?)(?=\n\s*(?:TITLE\s*:|---|$))/i);
+    if (candidatesMatch) {
+      const candidates = candidatesMatch[1]
+        .split('\n')
+        .map(l => l.match(/^\s*\d+[.)]\s*(.+?)\s*$/))
+        .filter(Boolean)
+        .map(m => m[1].trim()
+          .replace(/^\*{1,2}|\*{1,2}$/g, '')
+          .replace(/^"|"$/g, '')
+          .replace(/^\[|\]$/g, '')
+          .trim())
+        .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
+      if (candidates.length > 0) {
+        title = candidates[Math.floor(Math.random() * candidates.length)];
+        log.info(`🌊 [STREAM-UNIFIED] Title picked at random from ${candidates.length} candidates: "${title}"`);
       }
-      if (this.callbacks.onProgress) {
-        this.callbacks.onProgress('title', `Story title: "${title}"`);
+    }
+
+    // Fallback: legacy `TITLE: <value>` line (older runs / partial outputs).
+    if (!title) {
+      const titleLineMatch = section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im);
+      if (titleLineMatch) {
+        title = titleLineMatch[1].trim()
+          .replace(/^\*{1,2}|\*{1,2}$/g, '')
+          .replace(/^"|"$/g, '')
+          .trim();
+        log.debug(`🌊 [STREAM-UNIFIED] Title (legacy single-line): "${title}"`);
       }
+    }
+
+    if (title) {
+      this.emitted.title = true;
+      if (this.callbacks.onTitle) this.callbacks.onTitle(title);
+      if (this.callbacks.onProgress) this.callbacks.onProgress('title', `Story title: "${title}"`);
     }
   }
 
