@@ -154,8 +154,8 @@ METADATA:
   ],
   "objects": ["LOC001", "ANI001"],
   "interactions": [
-    { "character": "Name", "object": "wooden ladder", "where": "climbs" },
-    { "character": "Other", "object": "ART001", "where": "gazes at" }
+    { "character": "Name", "object": "wooden ladder", "where": "climbs the wooden ladder, both hands gripping the third rung" },
+    { "character": "Other", "object": "ART001", "where": "gazes at the dragon a few paces apart" }
   ],
   "background": "busy crowd in hats and coats",
   "setting": "indoor|outdoor",

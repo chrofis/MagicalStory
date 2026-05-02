@@ -4614,14 +4614,40 @@ function buildExactPosesBlock(interactions) {
     if (!i || typeof i !== 'object') continue;
     const who = (i.character || '').trim();
     const where = (i.where || '').trim();
+    const object = (i.object || '').trim();
     if (!who || !where) continue;
-    // Per story-unified.txt schema: `where` is now a complete English
-    // sentence with the object's human name already embedded
-    // ("holds the stuffed elephant in lap"). No prefix glue needed.
-    // Older-story metadata may still have bare verb phrases like
-    // "holds in lap" — they pass through unchanged (object lost) but
-    // that's a one-time backward-compat acceptance.
-    lines.push(`- ${who}: ${where}`);
+
+    // The schema asks for `where` to be a complete sentence with the object
+    // name already embedded ("holds the stuffed elephant in lap"). In
+    // practice Sonnet often emits bare verb/adjective phrases like
+    //   { object: "Rogers Armbrust", where: "holds horizontal, aims across the square" }
+    //   { object: "Der Apfel",       where: "balanced on top of head" }
+    // and the object name silently drops out of the EXACT POSES block — the
+    // image model receives an unintelligible line ("Roger: holds horizontal,
+    // aims across the square") and renders the wrong (or no) prop.
+    //
+    // Defensive fix: if `object` is set and `where` doesn't already mention
+    // it, append the object name to the line so the model always sees it.
+    let finalWhere = where;
+    if (object) {
+      // Visual Bible IDs (ART001 / LOC003 / CHR007 / VEH002 / ANI004) are
+      // opaque handles — the human name lives in the prose / VB grid label,
+      // not the ID itself. Skip the "object name in where" check for IDs.
+      const isVbId = /^(ART|LOC|CHR|VEH|ANI)\d+/i.test(object);
+      if (!isVbId) {
+        const objLower = object.toLowerCase();
+        const whereLower = where.toLowerCase();
+        // Match the full object name OR (for multi-word names like
+        // "wooden ladder") any salient ≥4-char token from the name.
+        const tokens = object.split(/[\s\-_/]+/).filter(t => t.length >= 4);
+        const mentioned = whereLower.includes(objLower)
+          || tokens.some(tok => whereLower.includes(tok.toLowerCase()));
+        if (!mentioned) {
+          finalWhere = `${where} — ${object}`;
+        }
+      }
+    }
+    lines.push(`- ${who}: ${finalWhere}`);
   }
   if (lines.length === 0) return '';
   return `EXACT POSES:\n${lines.join('\n')}`;

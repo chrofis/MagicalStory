@@ -293,197 +293,54 @@ export function ImageHistoryModal({
                   </button>
                 </div>
                 <div className="p-4 space-y-3">
-                  {detailVersion.qualityScore != null && (
-                    <div className="space-y-2">
-                      {/* Score breakdown as separate rows */}
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span className="font-semibold text-gray-700">Final:</span>
-                        <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
-                          {detailVersion.qualityScore}%
-                        </span>
-                        {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
-                          <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
-                        )}
-                        {detailVersion.evaluatedAt && (
-                          <span className="text-xs text-gray-400 ml-auto">
-                            {new Date(detailVersion.evaluatedAt).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      {/* Individual score components */}
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        {/* Quality */}
-                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                          <div className="text-gray-500 font-medium mb-0.5">Quality</div>
-                          <div className={`font-bold text-base ${scoreColor(detailVersion.rawQualityScore ?? detailVersion.qualityScore)}`}>
-                            {detailVersion.rawQualityScore ?? detailVersion.qualityScore}%
-                          </div>
-                          <div className="text-gray-400">visual eval</div>
-                        </div>
-                        {/* Semantic */}
-                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
-                          <div className="text-indigo-500 font-medium mb-0.5">Semantic</div>
-                          <div className={`font-bold text-base ${detailVersion.semanticScore != null ? (detailVersion.semanticScore >= 80 ? 'text-green-600' : detailVersion.semanticScore >= 60 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-400'}`}>
-                            {detailVersion.semanticScore != null ? `${detailVersion.semanticScore}%` : 'n/a'}
-                          </div>
-                          <div className="text-indigo-400">prompt match</div>
-                        </div>
-                        {/* Entity */}
-                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
-                          <div className="text-orange-500 font-medium mb-0.5">Entity</div>
-                          <div className={`font-bold text-base ${detailVersion.entityPenalty ? 'text-orange-600' : 'text-green-600'}`}>
-                            {detailVersion.entityPenalty ? `-${detailVersion.entityPenalty}` : '0'}
-                          </div>
-                          <div className="text-orange-400">penalty</div>
-                        </div>
-                      </div>
-                      {/* Penalty details — show entity/image-check issues that contributed to penalties */}
-                      {detailVersion.fixableIssues && detailVersion.fixableIssues.filter(i => i.source === 'entity check' || i.source === 'image checks').length > 0 && (
-                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
-                          <div className="text-xs font-medium text-orange-700 mb-1">Penalty details:</div>
-                          <div className="space-y-1">
-                            {detailVersion.fixableIssues.filter(i => i.source === 'entity check' || i.source === 'image checks').map((issue, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-xs">
-                                <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${
-                                  issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
-                                  issue.severity === 'major' ? 'bg-orange-200 text-orange-800' :
-                                  'bg-yellow-200 text-yellow-800'
-                                }`}>
-                                  {issue.severity === 'critical' ? '-30' : issue.severity === 'major' ? '-20' : '-10'}
-                                </span>
-                                <span className="text-gray-700">
-                                  {issue.character && <span className="font-medium">{issue.character}: </span>}
-                                  {issue.description}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {/* Semantic fidelity details — visible vs expected + per-issue list */}
-                      {detailVersion.semanticResult && (
-                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200 space-y-2">
-                          <div className="text-xs font-medium text-indigo-700">Semantic details:</div>
-                          {detailVersion.semanticResult.visible && (
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div className="bg-white p-2 rounded border border-indigo-200">
-                                <div className="font-medium text-indigo-800 mb-1">👁️ Visible</div>
-                                {(detailVersion.semanticResult.visible.characters?.length ?? 0) > 0 && (
-                                  <div><span className="text-gray-500">Characters:</span> {detailVersion.semanticResult.visible.characters?.join(', ')}</div>
-                                )}
-                                {(detailVersion.semanticResult.visible.objects?.length ?? 0) > 0 && (
-                                  <div><span className="text-gray-500">Objects:</span> {detailVersion.semanticResult.visible.objects?.join(', ')}</div>
-                                )}
-                                {detailVersion.semanticResult.visible.setting && (
-                                  <div><span className="text-gray-500">Setting:</span> {detailVersion.semanticResult.visible.setting}</div>
-                                )}
-                                {detailVersion.semanticResult.visible.action && (
-                                  <div><span className="text-gray-500">Action:</span> {detailVersion.semanticResult.visible.action}</div>
-                                )}
-                              </div>
-                              <div className="bg-white p-2 rounded border border-indigo-200">
-                                <div className="font-medium text-indigo-800 mb-1">🎯 Expected</div>
-                                {(detailVersion.semanticResult.expected?.characters?.length ?? 0) > 0 && (
-                                  <div><span className="text-gray-500">Characters:</span> {detailVersion.semanticResult.expected?.characters?.join(', ')}</div>
-                                )}
-                                {(detailVersion.semanticResult.expected?.objects?.length ?? 0) > 0 && (
-                                  <div><span className="text-gray-500">Objects:</span> {detailVersion.semanticResult.expected?.objects?.join(', ')}</div>
-                                )}
-                                {detailVersion.semanticResult.expected?.setting && (
-                                  <div><span className="text-gray-500">Setting:</span> {detailVersion.semanticResult.expected.setting}</div>
-                                )}
-                                {detailVersion.semanticResult.expected?.action && (
-                                  <div><span className="text-gray-500">Action:</span> {detailVersion.semanticResult.expected.action}</div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {(detailVersion.semanticResult.semanticIssues?.length ?? 0) > 0 && (
-                            <ul className="bg-white p-2 rounded border border-indigo-200 space-y-1 text-xs">
-                              {detailVersion.semanticResult.semanticIssues.map((issue, idx) => (
-                                <li key={idx} className="flex items-start gap-2">
-                                  <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${
-                                    issue.severity === 'CRITICAL' ? 'bg-red-200 text-red-800' :
-                                    issue.severity === 'MAJOR' ? 'bg-orange-200 text-orange-800' :
-                                    'bg-yellow-200 text-yellow-800'
-                                  }`}>
-                                    {issue.severity}
-                                  </span>
-                                  <span className="text-gray-700">{issue.problem}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
+                  {/* 1. METHOD HEADER — what produced this version */}
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs uppercase tracking-wide font-semibold text-gray-500">
+                        {language === 'de' ? 'Methode' : language === 'fr' ? 'Méthode' : 'Method'}
+                      </span>
+                      <span className="text-sm font-bold text-gray-800 uppercase">
+                        {detailVersion.type || 'original'}
+                      </span>
+                      {detailVersion.modelId && (
+                        <code className="text-xs bg-gray-100 px-1 rounded text-gray-600">{detailVersion.modelId}</code>
                       )}
                     </div>
-                  )}
-                  {detailVersion.issuesSummary && (
-                    <div className="text-sm text-gray-600 italic bg-yellow-50 p-2 rounded border border-yellow-200">
-                      {detailVersion.issuesSummary}
-                    </div>
-                  )}
-                  {detailVersion.modelId && (
-                    <div className="text-sm text-gray-500">Model: <code className="bg-gray-100 px-1 rounded">{detailVersion.modelId}</code></div>
-                  )}
-                  {detailVersion.textSpaceCoveragePct != null && (
-                    <div className="text-sm text-gray-500">
-                      Text-space coverage: <span className="font-semibold text-gray-700">{detailVersion.textSpaceCoveragePct}%</span>
-                      {detailVersion.textSpacePosition && <span className="ml-1 text-gray-400">({detailVersion.textSpacePosition})</span>}
-                    </div>
-                  )}
-                  {detailVersion.userInput && (
-                    <DetailBlock
-                      label={language === 'de' ? 'Benutzer-Eingabe' : language === 'fr' ? 'Entrée utilisateur' : 'User Input'}
-                      color="purple"
-                    >
-                      {detailVersion.userInput}
-                    </DetailBlock>
-                  )}
-                  {detailVersion.description && (
-                    <DetailBlock
-                      label={language === 'de' ? 'Erweiterte Szene' : language === 'fr' ? 'Scène étendue' : 'Expanded Scene'}
-                      color="amber"
-                    >
-                      {detailVersion.description}
-                    </DetailBlock>
-                  )}
-                  {detailVersion.prompt && (
-                    <DetailBlock
-                      label={language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                      color="blue"
-                    >
-                      {detailVersion.prompt}
-                    </DetailBlock>
-                  )}
-                  {detailVersion.qualityReasoning && (
-                    <DetailBlock label="Quality Reasoning" color="gray">
-                      {detailVersion.qualityReasoning}
-                    </DetailBlock>
-                  )}
-                  {detailVersion.fixTargets && detailVersion.fixTargets.length > 0 && (
+                    {detailVersion.evaluatedAt && (
+                      <span className="text-xs text-gray-400">{new Date(detailVersion.evaluatedAt).toLocaleString()}</span>
+                    )}
+                  </div>
+
+                  {/* 2. REPAIR INSTRUCTION — what was sent to Grok to PRODUCE this version */}
+                  {detailVersion.inpaintInstruction && (
                     <div>
-                      <div className="text-sm font-semibold text-orange-700 mb-1">
-                        Fix Targets ({detailVersion.fixTargets.length}):
+                      <div className="text-xs font-medium text-amber-700 mb-1">
+                        {language === 'de' ? 'Reparatur-Anweisung (an Grok)' : language === 'fr' ? 'Instruction de réparation (à Grok)' : 'Repair instruction (to Grok)'}
                       </div>
-                      <ul className="text-sm text-gray-600 list-disc list-inside space-y-0.5">
-                        {detailVersion.fixTargets.map((ft, ftIdx) => (
-                          <li key={ftIdx}>{ft.issue}</li>
-                        ))}
-                      </ul>
+                      <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
+                        {detailVersion.inpaintInstruction}
+                      </p>
                     </div>
                   )}
-                  {detailVersion.referencePhotoNames && detailVersion.referencePhotoNames.length > 0 && (
-                    <div className="text-sm text-gray-500">
-                      Avatars: {detailVersion.referencePhotoNames.map(p => p.name).join(', ')}
+
+                  {/* 3. REFERENCE IMAGES — what Grok received as visual context */}
+                  {detailVersion.inpaintReferenceImages && detailVersion.inpaintReferenceImages.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-orange-700 mb-1">
+                        {language === 'de' ? 'Referenzbilder (Reparatur)' : 'Reference images (repair)'} ({detailVersion.inpaintReferenceImages.length})
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {detailVersion.inpaintReferenceImages.map((img, idx) => (
+                          <img key={idx} src={img} alt={`Ref ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
+                        ))}
+                      </div>
                     </div>
                   )}
                   {(() => {
-                    // Use version-specific refs if available, fall back to scene-level for active version
                     const refs = detailVersion.grokRefImages || (detailVersion.isActive ? sceneLevelGrokRefImages : null);
                     if (!refs || refs.length === 0) return null;
                     return (
-                      <div className="mt-2">
+                      <div>
                         <div className="text-xs font-medium text-orange-600 mb-1">
                           {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'} ({refs.length}/3 slots)
                         </div>
@@ -495,29 +352,182 @@ export function ImageHistoryModal({
                       </div>
                     );
                   })()}
-                  {/* Repair instruction (inpaint or character-fix) */}
-                  {detailVersion.inpaintInstruction && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium text-amber-700 mb-1">
-                        {language === 'de' ? 'Reparatur-Anweisung' : 'Repair Instruction'}
-                      </div>
-                      <p className="text-xs text-gray-600 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
-                        {detailVersion.inpaintInstruction}
-                      </p>
+                  {detailVersion.referencePhotoNames && detailVersion.referencePhotoNames.length > 0 && (
+                    <div className="text-xs text-gray-500">
+                      Avatars: {detailVersion.referencePhotoNames.map(p => p.name).join(', ')}
                     </div>
                   )}
-                  {detailVersion.inpaintReferenceImages && detailVersion.inpaintReferenceImages.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium text-orange-700 mb-1">
-                        {language === 'de' ? 'An Grok gesendet (Repair-Referenzbilder)' : 'Sent to Grok (repair references)'} ({detailVersion.inpaintReferenceImages.length})
+
+                  {/* 4. SCORES */}
+                  {detailVersion.qualityScore != null && (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
+                        <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
+                          {detailVersion.qualityScore}%
+                        </span>
+                        {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
+                          <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
+                        )}
                       </div>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {detailVersion.inpaintReferenceImages.map((img, idx) => (
-                          <img key={idx} src={img} alt={`Ref ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
-                        ))}
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                          <div className="text-gray-500 font-medium mb-0.5">Quality</div>
+                          <div className={`font-bold text-base ${scoreColor(detailVersion.rawQualityScore ?? detailVersion.qualityScore)}`}>
+                            {detailVersion.rawQualityScore ?? detailVersion.qualityScore}%
+                          </div>
+                          <div className="text-gray-400">visual eval</div>
+                        </div>
+                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
+                          <div className="text-indigo-500 font-medium mb-0.5">Semantic</div>
+                          <div className={`font-bold text-base ${detailVersion.semanticScore != null ? (detailVersion.semanticScore >= 80 ? 'text-green-600' : detailVersion.semanticScore >= 60 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-400'}`}>
+                            {detailVersion.semanticScore != null ? `${detailVersion.semanticScore}%` : 'n/a'}
+                          </div>
+                          <div className="text-indigo-400">prompt match</div>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                          <div className="text-orange-500 font-medium mb-0.5">Entity</div>
+                          <div className={`font-bold text-base ${detailVersion.entityPenalty ? 'text-orange-600' : 'text-green-600'}`}>
+                            {detailVersion.entityPenalty ? `-${detailVersion.entityPenalty}` : '0'}
+                          </div>
+                          <div className="text-orange-400">penalty</div>
+                        </div>
                       </div>
                     </div>
                   )}
+
+                  {/* 5. ALL FLAGGED ISSUES — every source, severity badges */}
+                  {(() => {
+                    const fixable = detailVersion.fixableIssues || [];
+                    const semanticOnly = (detailVersion.semanticResult?.semanticIssues || [])
+                      .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes((s.problem || '').slice(0, 30).toLowerCase())))
+                      .map(s => ({ description: s.problem, severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
+                    const allIssues = [...fixable, ...semanticOnly];
+                    if (allIssues.length === 0) return null;
+                    const sevRank = (s: string) => {
+                      const v = String(s || '').toLowerCase();
+                      if (v === 'critical') return 4;
+                      if (v === 'major') return 3;
+                      if (v === 'moderate') return 2;
+                      if (v === 'minor') return 1;
+                      return 0;
+                    };
+                    const sorted = [...allIssues].sort((a, b) => sevRank(b.severity) - sevRank(a.severity));
+                    return (
+                      <div className="bg-white rounded-lg border border-gray-200">
+                        <div className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-700">
+                          {language === 'de' ? 'Gefundene Probleme' : language === 'fr' ? 'Problèmes détectés' : 'Issues found'} ({sorted.length})
+                        </div>
+                        <ul className="px-3 pb-3 space-y-1.5">
+                          {sorted.map((issue: any, idx: number) => {
+                            const sev = String(issue.severity || '').toLowerCase();
+                            const cls = sev === 'critical' ? 'bg-red-200 text-red-800'
+                              : sev === 'major' ? 'bg-orange-200 text-orange-800'
+                              : sev === 'moderate' ? 'bg-yellow-200 text-yellow-800'
+                              : sev === 'minor' ? 'bg-gray-200 text-gray-700'
+                              : 'bg-gray-200 text-gray-700';
+                            return (
+                              <li key={idx} className="flex items-start gap-2 text-xs">
+                                <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase ${cls}`}>
+                                  {issue.severity || 'unknown'}
+                                </span>
+                                <span className="text-gray-700">
+                                  {issue.character && <span className="font-medium">{issue.character}: </span>}
+                                  {issue.description}
+                                  {(issue.source || issue.type) && (
+                                    <span className="text-gray-400 ml-1">({issue.source || issue.type})</span>
+                                  )}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 6. SEMANTIC DETAILS — collapsed (visible vs expected grids) */}
+                  {detailVersion.semanticResult?.visible && (
+                    <DetailBlock label={language === 'de' ? 'Semantik-Details' : 'Semantic details'} color="purple">
+                      {[
+                        '👁️ VISIBLE',
+                        (detailVersion.semanticResult.visible.characters?.length ?? 0) > 0 ? `  Characters: ${detailVersion.semanticResult.visible.characters?.join(', ')}` : null,
+                        (detailVersion.semanticResult.visible.objects?.length ?? 0) > 0 ? `  Objects: ${detailVersion.semanticResult.visible.objects?.join(', ')}` : null,
+                        detailVersion.semanticResult.visible.setting ? `  Setting: ${detailVersion.semanticResult.visible.setting}` : null,
+                        detailVersion.semanticResult.visible.action ? `  Action: ${detailVersion.semanticResult.visible.action}` : null,
+                        '',
+                        '🎯 EXPECTED',
+                        (detailVersion.semanticResult.expected?.characters?.length ?? 0) > 0 ? `  Characters: ${detailVersion.semanticResult.expected?.characters?.join(', ')}` : null,
+                        (detailVersion.semanticResult.expected?.objects?.length ?? 0) > 0 ? `  Objects: ${detailVersion.semanticResult.expected?.objects?.join(', ')}` : null,
+                        detailVersion.semanticResult.expected?.setting ? `  Setting: ${detailVersion.semanticResult.expected.setting}` : null,
+                        detailVersion.semanticResult.expected?.action ? `  Action: ${detailVersion.semanticResult.expected.action}` : null,
+                      ].filter(Boolean).join('\n')}
+                    </DetailBlock>
+                  )}
+
+                  {/* 7. QUALITY REASONING — collapsed */}
+                  {detailVersion.qualityReasoning && (
+                    <DetailBlock label={language === 'de' ? 'Qualitäts-Begründung' : 'Quality reasoning'} color="gray">
+                      {detailVersion.qualityReasoning}
+                    </DetailBlock>
+                  )}
+
+                  {/* 8. ISSUES SUMMARY — short digest */}
+                  {detailVersion.issuesSummary && (
+                    <div className="text-sm text-gray-600 italic bg-yellow-50 p-2 rounded border border-yellow-200">
+                      {detailVersion.issuesSummary}
+                    </div>
+                  )}
+
+                  {/* Misc dev info, collapsed */}
+                  {detailVersion.userInput && (
+                    <DetailBlock label={language === 'de' ? 'Benutzer-Eingabe' : 'User input'} color="purple">
+                      {detailVersion.userInput}
+                    </DetailBlock>
+                  )}
+                  {detailVersion.description && (
+                    <DetailBlock label={language === 'de' ? 'Erweiterte Szene' : 'Expanded scene'} color="amber">
+                      {detailVersion.description}
+                    </DetailBlock>
+                  )}
+                  {detailVersion.prompt && (
+                    <DetailBlock label={language === 'de' ? 'API-Prompt' : 'API prompt'} color="blue">
+                      {detailVersion.prompt}
+                    </DetailBlock>
+                  )}
+                  {detailVersion.textSpaceCoveragePct != null && (
+                    <div className="text-xs text-gray-500">
+                      Text-space coverage: <span className="font-semibold text-gray-700">{detailVersion.textSpaceCoveragePct}%</span>
+                      {detailVersion.textSpacePosition && <span className="ml-1 text-gray-400">({detailVersion.textSpacePosition})</span>}
+                    </div>
+                  )}
+
+                  {/* 9. NEXT REPAIR — what was selected and sent for the next version */}
+                  {(() => {
+                    const next = versions[detailIndex + 1];
+                    if (!next) return null;
+                    const nextLabel = next.type ? String(next.type).toUpperCase() : 'REPAIR';
+                    return (
+                      <div className="mt-3 pt-3 border-t-2 border-dashed border-gray-300">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs uppercase tracking-wide font-semibold text-gray-500">
+                            {language === 'de' ? 'Nächste Runde' : language === 'fr' ? 'Prochain tour' : 'Next round'}
+                          </span>
+                          <span className="text-sm font-bold text-gray-800">→ {nextLabel}</span>
+                          {next.modelId && <code className="text-xs bg-gray-100 px-1 rounded text-gray-600">{next.modelId}</code>}
+                        </div>
+                        {next.inpaintInstruction ? (
+                          <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
+                            {next.inpaintInstruction}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">
+                            {language === 'de' ? '(volle Neugenerierung – kein Inpaint-Befehl)' : '(full re-render — no inpaint instruction)'}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
