@@ -438,12 +438,13 @@ export function ImageHistoryModal({
 
                     // Group by source. Order matters: quality eval first (broadest),
                     // then semantic, then entity, then image checks.
-                    const SOURCE_ORDER = ['quality eval', 'semantic', 'entity check', 'image checks'];
+                    const SOURCE_ORDER = ['quality eval', 'three-stage', 'semantic', 'entity check', 'image checks'];
                     const SOURCE_META: Record<string, { label: string; subtitle: string; bg: string; border: string; labelColor: string }> = {
-                      'quality eval':  { label: language === 'de' ? 'Qualitäts-Eval (Gemini Vision)' : 'Quality eval (Gemini vision)',  subtitle: language === 'de' ? 'image-evaluation.txt' : 'from image-evaluation.txt',  bg: 'bg-gray-50',    border: 'border-gray-300',    labelColor: 'text-gray-700' },
-                      'semantic':      { label: language === 'de' ? 'Semantik-Prüfung'              : 'Semantic check',                subtitle: language === 'de' ? 'image-semantic.txt'   : 'from image-semantic.txt',     bg: 'bg-indigo-50',  border: 'border-indigo-300',  labelColor: 'text-indigo-700' },
-                      'entity check':  { label: language === 'de' ? 'Charakter-Konsistenz'           : 'Entity consistency',            subtitle: language === 'de' ? 'entityConsistency.js'  : 'from entityConsistency.js',  bg: 'bg-orange-50',  border: 'border-orange-300',  labelColor: 'text-orange-700' },
-                      'image checks':  { label: language === 'de' ? 'Bild-Checks'                    : 'Image checks',                  subtitle: language === 'de' ? 'Text-Overlay & Ränder' : 'text overlay & borders',     bg: 'bg-amber-50',   border: 'border-amber-300',   labelColor: 'text-amber-700' },
+                      'quality eval':  { label: language === 'de' ? 'Qualitäts-Eval (Gemini Vision)'  : 'Quality eval (Gemini vision)',     subtitle: language === 'de' ? 'image-evaluation.txt'         : 'from image-evaluation.txt',                       bg: 'bg-gray-50',    border: 'border-gray-300',    labelColor: 'text-gray-700' },
+                      'three-stage':   { label: language === 'de' ? 'Compliance-Eval (Sonnet)'         : 'Compliance eval (Sonnet 2-stage)',  subtitle: language === 'de' ? 'image-vision-inventory + image-prompt-compliance.txt' : 'image-vision-inventory + image-prompt-compliance.txt', bg: 'bg-blue-50',    border: 'border-blue-300',    labelColor: 'text-blue-700' },
+                      'semantic':      { label: language === 'de' ? 'Semantik-Prüfung'                 : 'Semantic check',                    subtitle: language === 'de' ? 'image-semantic.txt'           : 'from image-semantic.txt',                          bg: 'bg-indigo-50',  border: 'border-indigo-300',  labelColor: 'text-indigo-700' },
+                      'entity check':  { label: language === 'de' ? 'Charakter-Konsistenz'              : 'Entity consistency',                subtitle: language === 'de' ? 'entityConsistency.js'         : 'from entityConsistency.js',                        bg: 'bg-orange-50',  border: 'border-orange-300',  labelColor: 'text-orange-700' },
+                      'image checks':  { label: language === 'de' ? 'Bild-Checks'                       : 'Image checks',                      subtitle: language === 'de' ? 'Text-Overlay & Ränder'        : 'text overlay & borders',                           bg: 'bg-amber-50',   border: 'border-amber-300',   labelColor: 'text-amber-700' },
                     };
                     // Issues stored on a version's fixableIssues come straight from the
                     // per-image Gemini quality evaluator — they carry `type` (composition,

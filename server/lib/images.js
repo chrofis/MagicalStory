@@ -1107,7 +1107,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     return null;
   }
 
-  // Parse fixable issues from compliance result
+  // Parse fixable issues from compliance result. Tag with `source: 'three-stage'`
+  // so downstream UI can group them separately from the main quality eval — the
+  // two evaluators run independently and Sonnet's compliance check often finds
+  // different defects than Gemini's quality eval.
   let fixableIssues = [];
   if (Array.isArray(complianceResult.fixable_issues)) {
     fixableIssues = complianceResult.fixable_issues
@@ -1116,7 +1119,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         description: i.description,
         severity: i.severity || 'MODERATE',
         type: i.type || 'default',
-        fix: i.fix || `Fix: ${i.description}`
+        fix: i.fix || `Fix: ${i.description}`,
+        source: 'three-stage'
       }));
   }
 
