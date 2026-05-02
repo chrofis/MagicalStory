@@ -358,52 +358,60 @@ export function ImageHistoryModal({
                     </div>
                   )}
 
-                  {/* 4. SCORES */}
-                  {detailVersion.qualityScore != null && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
-                        <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
-                          {detailVersion.qualityScore}%
-                        </span>
-                        {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
-                          <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
-                        )}
+                  {/* 4. FINAL SCORE + PENALTIES (each evaluator's deduction, same scale) */}
+                  {detailVersion.qualityScore != null && (() => {
+                    const rawQ = detailVersion.rawQualityScore ?? detailVersion.qualityScore;
+                    const qualityPenalty = Math.max(0, 100 - rawQ);
+                    const semanticPenalty = detailVersion.semanticScore != null ? Math.max(0, 100 - detailVersion.semanticScore) : null;
+                    const entityPenalty = detailVersion.entityPenalty || 0;
+                    const penaltyClass = (p: number) => p === 0 ? 'text-green-600' : p >= 30 ? 'text-red-600' : p >= 15 ? 'text-orange-600' : 'text-yellow-600';
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                          <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
+                          <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
+                            {detailVersion.qualityScore}%
+                          </span>
+                          {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
+                            <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                            <div className="text-gray-500 font-medium mb-0.5">{language === 'de' ? 'Qualitäts-Eval' : 'Quality eval'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(qualityPenalty)}`}>
+                              {qualityPenalty === 0 ? '0' : `-${qualityPenalty}`}
+                            </div>
+                            <div className="text-gray-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                          </div>
+                          <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
+                            <div className="text-indigo-500 font-medium mb-0.5">{language === 'de' ? 'Semantik' : 'Semantic'}</div>
+                            <div className={`font-bold text-base ${semanticPenalty == null ? 'text-gray-400' : penaltyClass(semanticPenalty)}`}>
+                              {semanticPenalty == null ? 'n/a' : (semanticPenalty === 0 ? '0' : `-${semanticPenalty}`)}
+                            </div>
+                            <div className="text-indigo-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                          </div>
+                          <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                            <div className="text-orange-500 font-medium mb-0.5">{language === 'de' ? 'Entität+Checks' : 'Entity+checks'}</div>
+                            <div className={`font-bold text-base ${penaltyClass(entityPenalty)}`}>
+                              {entityPenalty === 0 ? '0' : `-${entityPenalty}`}
+                            </div>
+                            <div className="text-orange-400">{language === 'de' ? 'Abzug' : 'penalty'}</div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                          <div className="text-gray-500 font-medium mb-0.5">Quality</div>
-                          <div className={`font-bold text-base ${scoreColor(detailVersion.rawQualityScore ?? detailVersion.qualityScore)}`}>
-                            {detailVersion.rawQualityScore ?? detailVersion.qualityScore}%
-                          </div>
-                          <div className="text-gray-400">visual eval</div>
-                        </div>
-                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
-                          <div className="text-indigo-500 font-medium mb-0.5">Semantic</div>
-                          <div className={`font-bold text-base ${detailVersion.semanticScore != null ? (detailVersion.semanticScore >= 80 ? 'text-green-600' : detailVersion.semanticScore >= 60 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-400'}`}>
-                            {detailVersion.semanticScore != null ? `${detailVersion.semanticScore}%` : 'n/a'}
-                          </div>
-                          <div className="text-indigo-400">prompt match</div>
-                        </div>
-                        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
-                          <div className="text-orange-500 font-medium mb-0.5">Entity</div>
-                          <div className={`font-bold text-base ${detailVersion.entityPenalty ? 'text-orange-600' : 'text-green-600'}`}>
-                            {detailVersion.entityPenalty ? `-${detailVersion.entityPenalty}` : '0'}
-                          </div>
-                          <div className="text-orange-400">penalty</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
-                  {/* 5. ALL FLAGGED ISSUES — every source, severity badges */}
+                  {/* 5. ALL FLAGGED ISSUES — grouped by source, severity badges */}
                   {(() => {
                     const fixable = detailVersion.fixableIssues || [];
                     const semanticOnly = (detailVersion.semanticResult?.semanticIssues || [])
                       .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes((s.problem || '').slice(0, 30).toLowerCase())))
                       .map(s => ({ description: s.problem, severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
-                    const allIssues = [...fixable, ...semanticOnly];
+                    const allIssues: any[] = [...fixable, ...semanticOnly];
                     if (allIssues.length === 0) return null;
+
                     const sevRank = (s: string) => {
                       const v = String(s || '').toLowerCase();
                       if (v === 'critical') return 4;
@@ -412,36 +420,68 @@ export function ImageHistoryModal({
                       if (v === 'minor') return 1;
                       return 0;
                     };
-                    const sorted = [...allIssues].sort((a, b) => sevRank(b.severity) - sevRank(a.severity));
+
+                    // Group by source. Order matters: quality eval first (broadest),
+                    // then semantic, then entity, then image checks.
+                    const SOURCE_ORDER = ['quality eval', 'semantic', 'entity check', 'image checks'];
+                    const SOURCE_META: Record<string, { label: string; subtitle: string; bg: string; border: string; labelColor: string }> = {
+                      'quality eval':  { label: language === 'de' ? 'Qualitäts-Eval (Gemini Vision)' : 'Quality eval (Gemini vision)',  subtitle: language === 'de' ? 'image-evaluation.txt' : 'from image-evaluation.txt',  bg: 'bg-gray-50',    border: 'border-gray-300',    labelColor: 'text-gray-700' },
+                      'semantic':      { label: language === 'de' ? 'Semantik-Prüfung'              : 'Semantic check',                subtitle: language === 'de' ? 'image-semantic.txt'   : 'from image-semantic.txt',     bg: 'bg-indigo-50',  border: 'border-indigo-300',  labelColor: 'text-indigo-700' },
+                      'entity check':  { label: language === 'de' ? 'Charakter-Konsistenz'           : 'Entity consistency',            subtitle: language === 'de' ? 'entityConsistency.js'  : 'from entityConsistency.js',  bg: 'bg-orange-50',  border: 'border-orange-300',  labelColor: 'text-orange-700' },
+                      'image checks':  { label: language === 'de' ? 'Bild-Checks'                    : 'Image checks',                  subtitle: language === 'de' ? 'Text-Overlay & Ränder' : 'text overlay & borders',     bg: 'bg-amber-50',   border: 'border-amber-300',   labelColor: 'text-amber-700' },
+                    };
+                    const grouped = new Map<string, any[]>();
+                    for (const it of allIssues) {
+                      const src = it.source || it.type || 'unknown';
+                      if (!grouped.has(src)) grouped.set(src, []);
+                      grouped.get(src)!.push(it);
+                    }
+                    const orderedSources = [
+                      ...SOURCE_ORDER.filter(s => grouped.has(s)),
+                      ...[...grouped.keys()].filter(s => !SOURCE_ORDER.includes(s)),
+                    ];
+
                     return (
                       <div className="bg-white rounded-lg border border-gray-200">
                         <div className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-700">
-                          {language === 'de' ? 'Gefundene Probleme' : language === 'fr' ? 'Problèmes détectés' : 'Issues found'} ({sorted.length})
+                          {language === 'de' ? 'Gefundene Probleme' : language === 'fr' ? 'Problèmes détectés' : 'Issues found'} ({allIssues.length})
                         </div>
-                        <ul className="px-3 pb-3 space-y-1.5">
-                          {sorted.map((issue: any, idx: number) => {
-                            const sev = String(issue.severity || '').toLowerCase();
-                            const cls = sev === 'critical' ? 'bg-red-200 text-red-800'
-                              : sev === 'major' ? 'bg-orange-200 text-orange-800'
-                              : sev === 'moderate' ? 'bg-yellow-200 text-yellow-800'
-                              : sev === 'minor' ? 'bg-gray-200 text-gray-700'
-                              : 'bg-gray-200 text-gray-700';
+                        <div className="px-3 pb-3 space-y-3">
+                          {orderedSources.map((src) => {
+                            const meta = SOURCE_META[src] || { label: src, subtitle: '', bg: 'bg-gray-50', border: 'border-gray-300', labelColor: 'text-gray-700' };
+                            const items = [...grouped.get(src)!].sort((a, b) => sevRank(b.severity) - sevRank(a.severity));
                             return (
-                              <li key={idx} className="flex items-start gap-2 text-xs">
-                                <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase ${cls}`}>
-                                  {issue.severity || 'unknown'}
-                                </span>
-                                <span className="text-gray-700">
-                                  {issue.character && <span className="font-medium">{issue.character}: </span>}
-                                  {issue.description}
-                                  {(issue.source || issue.type) && (
-                                    <span className="text-gray-400 ml-1">({issue.source || issue.type})</span>
-                                  )}
-                                </span>
-                              </li>
+                              <div key={src} className={`${meta.bg} ${meta.border} border rounded p-2`}>
+                                <div className={`text-[11px] font-bold uppercase tracking-wide ${meta.labelColor} mb-1.5 flex items-baseline gap-2`}>
+                                  <span>{meta.label}</span>
+                                  <span className="text-[10px] font-normal normal-case tracking-normal text-gray-500">{meta.subtitle}</span>
+                                  <span className="text-[10px] font-normal text-gray-400 ml-auto">{items.length}</span>
+                                </div>
+                                <ul className="space-y-1">
+                                  {items.map((issue: any, idx: number) => {
+                                    const sev = String(issue.severity || '').toLowerCase();
+                                    const cls = sev === 'critical' ? 'bg-red-200 text-red-800'
+                                      : sev === 'major' ? 'bg-orange-200 text-orange-800'
+                                      : sev === 'moderate' ? 'bg-yellow-200 text-yellow-800'
+                                      : sev === 'minor' ? 'bg-gray-200 text-gray-700'
+                                      : 'bg-gray-200 text-gray-700';
+                                    return (
+                                      <li key={idx} className="flex items-start gap-2 text-xs">
+                                        <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase ${cls}`}>
+                                          {issue.severity || 'unknown'}
+                                        </span>
+                                        <span className="text-gray-700">
+                                          {issue.character && <span className="font-medium">{issue.character}: </span>}
+                                          {issue.description}
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
                             );
                           })}
-                        </ul>
+                        </div>
                       </div>
                     );
                   })()}
