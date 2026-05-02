@@ -18,6 +18,7 @@ import {
   Square,
   Trophy,
   Paintbrush,
+  Eye,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
@@ -71,6 +72,7 @@ const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.Compo
   'round-3': { label: 'Round 3', icon: Wrench, description: 'Last chance: inpaint only' },
   'evaluate': { label: 'Evaluate', icon: CheckCircle, description: 'Run quality evaluation on all pages' },
   'pick-best': { label: 'Pick Best', icon: Trophy, description: 'Select the best version for each page across all attempts' },
+  'style-audit': { label: 'Style Audit', icon: Eye, description: 'Cross-page art-style consistency check (cluster + outliers)' },
   'final-pick': { label: 'Final Pick', icon: Trophy, description: 'Final version selection including character repairs' },
 };
 

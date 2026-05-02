@@ -66,8 +66,10 @@ function createInitialState(): RepairWorkflowState {
       'round-3': 'pending',
       'evaluate': 'pending',
       'pick-best': 'pending',
+      'style-audit': 'pending',
       'final-pick': 'pending',
     },
+    styleAuditResult: null,
     collectedFeedback: {
       pages: {},
       totalIssues: 0,
@@ -112,6 +114,7 @@ const STEP_ORDER: RepairWorkflowStep[] = [
   'round-3',
   'evaluate',
   'pick-best',
+  'style-audit',
   'final-pick',
 ];
 
@@ -1444,6 +1447,36 @@ export function useRepairWorkflow({
           console.warn('[RepairWorkflow] Post-repair evaluation failed:', err);
         }
         completeStep('evaluate');
+      }
+
+      // Style consistency audit — runs across ALL picked images (front cover
+      // + every page) once repairs settle. The auto-pipeline (Step 5)
+      // already runs this on every story generation; here we re-run it after
+      // the manual workflow's repairs in case picks changed the visual mix.
+      checkAborted();
+      onProgress?.('style-audit', 'Style consistency audit...');
+      startStep('style-audit');
+      try {
+        const r = await storyService.styleCheck(storyId);
+        console.log(`[RepairWorkflow] Style audit: verdict=${r.verdict}, ${r.dominantCluster.length} in cluster, ${r.outliers.length} outlier(s)`);
+        // Stash the result on workflowState so the panel can render it
+        // alongside the entity-consistency report.
+        setWorkflowState(prev => ({
+          ...prev,
+          styleAuditResult: {
+            verdict: r.verdict,
+            dominantCluster: r.dominantCluster,
+            anchorPage: r.anchorPage,
+            outliers: r.outliers,
+            reasoning: r.reasoning,
+            gridImage: r.gridImage,
+          },
+        }));
+        completeStep('style-audit');
+      } catch (err) {
+        console.error('[RepairWorkflow] Style audit failed:', err);
+        // Non-fatal — surface as failed but continue to final-pick.
+        failStep('style-audit', err instanceof Error ? err.message : 'Style audit failed');
       }
 
       // Final pick best (including character repair versions)

@@ -998,6 +998,7 @@ export type RepairWorkflowStep =
   | 'round-3'
   | 'evaluate'
   | 'pick-best'
+  | 'style-audit'
   | 'final-pick';
 
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
@@ -1136,4 +1137,14 @@ export interface RepairWorkflowState {
       results: Record<number, { success: boolean; newScore?: number; previousScore?: number }>;
     };
   };
+  // Result of the style-audit step (cross-page art-style consistency check).
+  // Optional — populated only after the workflow runs the style-audit step.
+  styleAuditResult?: {
+    verdict: 'consistent' | 'mixed' | 'fragmented';
+    dominantCluster: number[];
+    anchorPage: number;
+    outliers: Array<{ page: number; severity: 'major' | 'moderate' | 'minor'; differences: string[] }>;
+    reasoning: string;
+    gridImage: string;
+  } | null;
 }
