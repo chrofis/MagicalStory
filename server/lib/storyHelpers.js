@@ -2507,11 +2507,24 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       let clothingDescription = null;
       let actualClothingUsed = null;
 
-      // Check for per-character clothing from scene (_currentClothing field)
-      // This overrides the defaultClothing for this specific character
+      // Check for per-character clothing from scene (_currentClothing field).
+      // This overrides defaultClothing for this specific character. We accept
+      // two shapes:
+      //   1. clothingRequirements[name] is a full object with _currentClothing
+      //      (built by the page-generation path at server.js:4660ish)
+      //   2. clothingRequirements[name] is a bare string clothing label, e.g.
+      //      "costumed:medieval" — the shape produced by parseCharacterClothing
+      //      and stored on scene.characterClothing / pageData.perCharClothing.
+      //      Pre-fix this path silently fell through to defaultClothing → null
+      //      → "standard", which then missed the styled-standard cache and
+      //      fell back to the raw user photo (modern clothes leak into the
+      //      costumed scene). Accepting the bare-string shape here closes that.
       let resolvedClothing = defaultClothing;
       const charReqs = clothingRequirements?.[char.name];
-      if (charReqs?._currentClothing) {
+      if (typeof charReqs === 'string' && charReqs.length > 0) {
+        resolvedClothing = charReqs;
+        log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing (flat-map) = ${resolvedClothing}`);
+      } else if (charReqs?._currentClothing) {
         resolvedClothing = charReqs._currentClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
       } else {

@@ -6055,16 +6055,61 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const pageVersions = new Map();
   for (const img of rawImages) {
     const ev = evalMap.get(img.pageNumber);
-    const baseVersion = {
-      imageData: img.imageData,
-      score: ev?.score ?? ev?.qualityScore ?? null,
-      source: 'original',
-      evaluation: ev || null,
-      modelId: img.modelId,
-      grokRefImages: img.grokRefImages || null,
-      entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
-      evaluatedAt: new Date().toISOString(),
-    };
+
+    // When scale-repair ran, server.js sets img.preScaleRepairImage to the
+    // first Grok call's output (before scale-repair), and img.imageData to the
+    // scale-repair output. Surface both as separate versions so the dev panel
+    // shows the input image, the input prompt + refs, the scale-repair prompt
+    // + refs, and the output. Without this, only the post-scale-repair image
+    // is stored, but its grokRefImages field is the FIRST call's refs — a
+    // mismatch that hides which avatar was actually attached when Grok
+    // produced the visible image.
+    const hasScaleRepair = !!img.preScaleRepairImage
+      && img.preScaleRepairImage !== img.imageData;
+
+    const baseVersion = hasScaleRepair
+      ? {
+          // v0 = original first generation (pre-scale-repair). No eval ran on
+          // this image — eval ran on the scale-repair output, so we only carry
+          // the inputs (prompt, refs) and the image bytes.
+          imageData: img.preScaleRepairImage,
+          score: null,
+          source: 'original',
+          type: 'original',
+          evaluation: null,
+          modelId: img.preScaleRepairModelId || img.modelId,
+          grokRefImages: img.grokRefImages || null,
+          prompt: img.prompt || null,
+          entityPenalty: 0,
+          evaluatedAt: new Date().toISOString(),
+        }
+      : {
+          imageData: img.imageData,
+          score: ev?.score ?? ev?.qualityScore ?? null,
+          source: 'original',
+          evaluation: ev || null,
+          modelId: img.modelId,
+          grokRefImages: img.grokRefImages || null,
+          entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
+          evaluatedAt: new Date().toISOString(),
+        };
+
+    // Build the scale-repair version (v1) when scale-repair ran. Carries its
+    // own prompt + refs, plus the eval that actually scored this image.
+    const scaleRepairVersion = hasScaleRepair
+      ? {
+          imageData: img.imageData,
+          score: ev?.score ?? ev?.qualityScore ?? null,
+          source: 'scale-repair',
+          type: 'repair',
+          evaluation: ev || null,
+          modelId: img.modelId,
+          grokRefImages: img.scaleRepairGrokRefImages || null,
+          inpaintInstruction: img.scaleRepairPrompt || null,
+          entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
+          evaluatedAt: new Date().toISOString(),
+        }
+      : null;
 
     // If the text-space repair ran, it already produced multiple candidates
     // (the truly-original image plus 1–2 repair attempts). Expand them into
@@ -6101,9 +6146,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           textSpacePosition: c.position,
         };
       });
-      pageVersions.set(img.pageNumber, allVersions);
+      // Prepend pre-scale-repair version when applicable. The text-space
+      // candidates ran AFTER scale-repair, so the scale-repair output is the
+      // input baseline of the text-space cascade. Insert original first, then
+      // scale-repair, then text-space candidates.
+      const final = hasScaleRepair
+        ? [baseVersion, scaleRepairVersion, ...allVersions]
+        : allVersions;
+      pageVersions.set(img.pageNumber, final);
     } else {
-      pageVersions.set(img.pageNumber, [baseVersion]);
+      const final = hasScaleRepair
+        ? [baseVersion, scaleRepairVersion]
+        : [baseVersion];
+      pageVersions.set(img.pageNumber, final);
     }
   }
 
