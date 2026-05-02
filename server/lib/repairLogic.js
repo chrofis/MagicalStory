@@ -217,30 +217,17 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
   }
 
-  // 3. Inpaint when there's something inpaintable — but NEVER for covers.
-  // The original cover prompt renders the title text and "MagicalStory"
-  // branding into the image. Grok inpainting regenerates the modified
-  // area without re-injecting that text → title disappears. Covers
-  // must use iterate (which re-runs the full cover prompt and renders
-  // the title back) or skip when nothing's actionable.
-  const isCover = pageNumber <= 0;
+  // 3. Inpaint when there's something inpaintable.
+  if (typeof options.chooseRepairStrategy === 'function') {
+    return mapStrategyToMethod(options.chooseRepairStrategy(evaluator));
+  }
+  // Inline fallback when chooseRepairStrategy isn't injected (tests).
   const fixableCount = evaluator.fixableIssues?.length || 0;
   const enrichedCount = evaluator.enrichedFixTargets?.length || 0;
   const fixTargetCount = evaluator.fixTargets?.length || 0;
   const semanticIssueCount = (evaluator.semanticResult?.issues?.length
     || evaluator.semanticResult?.semanticIssues?.length || 0);
-  const totalIssues = fixableCount + enrichedCount + fixTargetCount + semanticIssueCount;
-
-  if (isCover) {
-    if (totalIssues === 0) return { method: 'skip', reason: 'no repair needed' };
-    return { method: 'iterate', reason: `cover repair → iterate (preserves title text); ${totalIssues} issues` };
-  }
-
-  if (typeof options.chooseRepairStrategy === 'function') {
-    return mapStrategyToMethod(options.chooseRepairStrategy(evaluator));
-  }
-  // Inline fallback when chooseRepairStrategy isn't injected (tests).
-  if (totalIssues > 0) {
+  if (fixableCount + enrichedCount + fixTargetCount + semanticIssueCount > 0) {
     const parts = [];
     if (fixableCount) parts.push(`${fixableCount} quality`);
     if (semanticIssueCount) parts.push(`${semanticIssueCount} semantic`);
