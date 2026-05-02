@@ -5699,7 +5699,13 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       inpaintTextZoneDesc = meta?.textZoneDescription || null;
     } catch { /* fall through with null */ }
   }
-  const quietZoneSuffix = textPosition && TEXT_POSITION_DESC_INPAINT[textPosition]
+  // Quiet zone is a SCENE-page concept: text is overlaid client-side onto a
+  // calm region of the page. Covers render their text baked into the image
+  // (title upper-third, branding bottom-left) and have no reserved calm
+  // area — applying a quiet-zone instruction here would falsely tell Grok
+  // to keep e.g. the upper-left soft, which conflicts with the title.
+  const isCover = typeof pageNumber === 'number' && pageNumber <= 0;
+  const quietZoneSuffix = !isCover && textPosition && TEXT_POSITION_DESC_INPAINT[textPosition]
     ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} as ${inpaintTextZoneDesc ? `the established ${inpaintTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not introduce faces, hats, patterns, or other high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
 
