@@ -20,6 +20,43 @@ const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
 const { generateStyledCostumedAvatar, evaluateAvatarFaceMatch } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
+const { fetchImageBytes } = require('./r2');
+
+/**
+ * Resolve an avatar's bytes for one of the standard categories. After the R2
+ * migration `avatars[category]` is null and the bytes live at
+ * `avatars[`${category}Url`]` only — calling code that read `avatars.standard`
+ * directly used to silently fall through to the raw photo.
+ *
+ * Returns a `data:image/...;base64,...` data URL or null.
+ *
+ * @param {Object} avatars - the character's avatars object (char.avatars)
+ * @param {string} category - 'standard' | 'winter' | 'summer' | 'formal' (legacy)
+ */
+async function resolveAvatarBytes(avatars, category) {
+  if (!avatars || !category) return null;
+  // Inline data URL — always wins.
+  const inline = avatars[category];
+  if (typeof inline === 'string' && inline.startsWith('data:image')) return inline;
+  if (inline && typeof inline === 'object' && typeof inline.imageData === 'string'
+      && inline.imageData.startsWith('data:image')) {
+    return inline.imageData;
+  }
+  // Fallback to R2.
+  const url = avatars[`${category}Url`];
+  if (typeof url !== 'string' || !/^https?:\/\//.test(url)) return null;
+  try {
+    const buf = await fetchImageBytes(url);
+    if (!buf) return null;
+    const mime = buf[0] === 0x89 && buf[1] === 0x50 ? 'image/png'
+               : buf[0] === 0xFF && buf[1] === 0xD8 ? 'image/jpeg'
+               : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch (err) {
+    log.warn(`[STYLED AVATARS] resolveAvatarBytes(${category}) R2 fetch failed: ${err.message}`);
+    return null;
+  }
+}
 
 // Quality gate constants for styled avatar evaluation
 const MAX_STYLED_AVATAR_RETRIES = 2;
@@ -578,34 +615,17 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // Skip if already pending costumed generation
       if (pendingCostumedGenerations.some(p => p.cacheKey === cacheKey)) continue;
 
-      // For costumed avatars, check if styled version already exists in character data
-      // (generateStyledCostumedAvatar creates styled versions directly)
-      // NOTE: With fresh avatars per story, styledAvatars is cleared at job start,
-      // so these checks should not match. Keeping for defensive coding.
-      if (clothingCategory.startsWith('costumed:')) {
-        const costumeType = clothingCategory.split(':')[1];
-        const existingStyledCostumed = char.avatars?.styledAvatars?.[artStyle]?.costumed;
-        if (existingStyledCostumed) {
-          // Check for exact match or any costume that starts with this type
-          const matchingKey = Object.keys(existingStyledCostumed).find(key =>
-            key === costumeType || key.startsWith(costumeType) || costumeType.startsWith(key)
-          );
-          if (matchingKey && existingStyledCostumed[matchingKey]) {
-            // Ensure cache is populated even if setStyledAvatar was missed
-            // Extract imageData if legacy object format {imageData, clothing}
-            if (!styledAvatarCache.has(cacheKey)) {
-              const avatarValue = existingStyledCostumed[matchingKey];
-              const avatarString = (typeof avatarValue === 'object' && avatarValue.imageData) ? avatarValue.imageData : avatarValue;
-              styledAvatarCache.set(cacheKey, avatarString);
-              log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (costumed)`);
-            }
-            log.debug(`⏭️ [STYLED AVATARS] Skipping ${charName}:${clothingCategory} - already has styled costumed avatar`);
-            continue;
-          }
-        }
-      }
+      // STYLED AVATARS ARE ALWAYS FRESH PER STORY.
+      // Earlier code reused styled avatars from char.avatars.styledAvatars when
+      // present — but the architecture is "always regenerate per run", and the
+      // reuse branches contradicted that. Removed so the only path forward is
+      // a fresh conversion through neededAvatars / pendingCostumedGenerations.
 
-      // Get original avatar for this clothing category
+      // Get original avatar for this clothing category. After the R2 migration
+      // the inline `avatars[cat]` field is null and the bytes live at
+      // `avatars[`${cat}Url`]`; resolveAvatarBytes handles both. Without this
+      // every styled-avatar conversion silently fell through to the raw photo
+      // (getPrimaryPhoto), which is NOT the locked standard avatar — Bug #1.
       const avatars = char.avatars || char.clothingAvatars;
       let originalAvatar = null;
 
@@ -614,20 +634,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // If the costumed avatar doesn't exist, skip it - don't fall back to standard
       if (clothingCategory.startsWith('costumed:')) {
         const costumeType = clothingCategory.split(':')[1];
+        // Costumed avatars don't have a `*Url` sibling field today, so fall back
+        // to inline-only resolution. Future migration will need a similar helper.
         originalAvatar = avatars?.costumed?.[costumeType];
-        // Also check if already styled (generateStyledCostumedAvatar creates styled directly)
-        const existingStyled = avatars?.styledAvatars?.[artStyle]?.costumed?.[costumeType];
-        if (existingStyled) {
-          // Ensure cache is populated even if setStyledAvatar was missed
-          // Extract imageData if legacy object format {imageData, clothing}
-          if (!styledAvatarCache.has(cacheKey)) {
-            const avatarString = (typeof existingStyled === 'object' && existingStyled.imageData) ? existingStyled.imageData : existingStyled;
-            styledAvatarCache.set(cacheKey, avatarString);
-            log.debug(`📥 [STYLED AVATARS] ${charName}: costumed:${costumeType} - populated cache from character data`);
-          }
-          log.debug(`⏭️ [STYLED AVATARS] ${charName}: costumed:${costumeType} already styled, skipping`);
-          continue;
-        }
+        // No reuse of styledAvatars.costumed — always regenerate this run.
         if (!originalAvatar) {
           // Costumed avatar doesn't exist - collect for PARALLEL generation
           let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
@@ -648,32 +658,28 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           // Don't continue - let it fall through to neededAvatars with standard avatar
         }
       } else {
-        // Check if this category was already generated with signature items
-        // (generateStyledAvatarWithSignature creates styled versions directly)
-        if (char.avatars?.signatures?.[clothingCategory]) {
-          const existingStyled = avatars?.styledAvatars?.[artStyle]?.[clothingCategory];
-          if (existingStyled) {
-            // Ensure cache is populated even if setStyledAvatar was missed
-            // Extract imageData if legacy object format {imageData, clothing}
-            if (!styledAvatarCache.has(cacheKey)) {
-              const avatarString = (typeof existingStyled === 'object' && existingStyled.imageData) ? existingStyled.imageData : existingStyled;
-              styledAvatarCache.set(cacheKey, avatarString);
-              log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (signature avatar)`);
-            }
-            log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} already styled with signature, skipping`);
-            continue;
-          }
-        }
-        originalAvatar = avatars?.[clothingCategory];
+        // No reuse of styledAvatars[clothingCategory] — always regenerate.
+        // Standard / winter / summer — these are R2-migrated, so resolve
+        // through the inline-or-R2 helper. Without this `originalAvatar` is
+        // null after the migration even when a perfectly good avatar exists
+        // in R2, and the pipeline silently uses the raw photo instead.
+        originalAvatar = await resolveAvatarBytes(avatars, clothingCategory);
       }
 
       // Avatars are always strings (clothing stored separately)
 
-      // Fallback chain (only for non-costumed avatars)
+      // Fallback chain (only for non-costumed avatars). Standard → formal →
+      // raw photo. The first two also go through resolveAvatarBytes so an
+      // R2-migrated record still produces a usable data URL.
       if (!originalAvatar) {
-        originalAvatar = avatars?.standard ||
-                         avatars?.formal ||  // Legacy backwards compat
-                         getPrimaryPhoto(char);  // Uses canonical photos.* with legacy fallback
+        originalAvatar = (await resolveAvatarBytes(avatars, 'standard'))
+                      || (await resolveAvatarBytes(avatars, 'formal'))  // legacy
+                      || getPrimaryPhoto(char);  // last-resort raw photo
+        if (originalAvatar && (await resolveAvatarBytes(avatars, 'standard'))) {
+          log.debug(`[STYLED AVATARS] ${charName}: standard avatar resolved from R2 fallback`);
+        } else if (originalAvatar) {
+          log.warn(`⚠️ [STYLED AVATARS] ${charName}:${clothingCategory} — fell back to raw photo (no usable standard avatar inline OR in R2)`);
+        }
       }
 
       // Get high-resolution face photo for identity preservation

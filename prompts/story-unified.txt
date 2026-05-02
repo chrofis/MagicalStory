@@ -39,7 +39,18 @@ Your task is to create a COMPLETE story including:
 
 # CHARACTER DETAILS (source of truth for physical description)
 
-The following block lists each character's ACTUAL physical traits. When you describe a character in SCENE prose you MUST use these values verbatim. Do not invent traits, do not drop traits, and do not contradict them. If `Glasses:` is listed, the character wears glasses in every scene. If `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` is listed, the character has no facial hair in any scene. If `Hair:` names a specific style (ponytail, braids, buzz cut), use that style — do not substitute a different one. Age, build, eye color, distinctive marks: same rule.
+The following block lists each character's ACTUAL physical traits. When you describe a character in SCENE prose you MUST use these values verbatim. Do not invent traits, do not drop traits, and do not contradict them.
+
+**LOCK these strings to the page-image renderer.** The same description that produced the character's avatar reference photo must appear in every SCENE that includes the character — otherwise the page image will drift away from the avatar. Specifically:
+
+- **Hair**: copy the `Hair:` value WORD FOR WORD (colour, type, length, styling, parting). Do not paraphrase. ✗ "Hair: brown, wavy, shoulder-length, ponytail, side part left" → "dark hair greying at the temples". ✗ "shoulder-length wavy brown hair" → "salt-and-pepper hair". ✗ Drop the styling ("ponytail" must stay).
+- **Facial hair**: when `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` is listed, the character has no facial hair in ANY scene. Never write "weathered face", "stubbled jaw", "grizzled beard", or imply age via facial hair. The negation is part of the lock.
+- **Glasses**: when `Glasses:` is listed, the character wears them in every scene. Use the listed name verbatim (e.g. "schwarze Brille"), do not translate or substitute ("dark spectacles" is wrong if the source says "schwarze Brille").
+- **Age cues**: copy the `Looks:` / `Age cues:` block verbatim. Do NOT paraphrase "adult" as "middle-aged", "weathered", "elderly", or "ageing". The avatar was generated for the listed age bucket; using a different age word produces a face mismatch the eval will flag.
+- **Distinctive marks**: any entry on the `Distinctive marks:` line MUST be visible in every scene where that character's face/body is rendered.
+- **Build / eye colour / face shape**: same verbatim rule.
+
+The mood of the scene (medieval, Wilhelm Tell, fantasy battle, peaceful village) does NOT change a character's appearance. If the scene mood pulls you toward "grizzled" / "weathered" / "ageing" / "salt-and-pepper", suppress that pull — write the action and setting in mood-language, but the character's traits stay verbatim from CHARACTER DETAILS.
 
 {CHARACTER_PHYSICAL_BLOCK}
 
@@ -437,6 +448,13 @@ Probes (apply to every character):
 18. **Action match** — Does each scene hint's action match what the page text narrates?
 19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
 19a. **Position phrase matches depth** — The depth word inside `position` (`foreground` / `midground` / `background`) MUST equal the separate `depth` field. Flag any character where they disagree, e.g. `Page 4: Roger position='far left foreground' but depth='background' → position='far left background'`.
+19b. **Physical-trait fidelity (CHARACTER DETAILS lock)** — For every character mentioned in any SCENE prose, scan the prose for that character's appearance words and compare to the `CHARACTER DETAILS` block. The prose MUST use the `Hair:`, `Facial hair:`, `Glasses:`, `Looks:`/`Age cues:`, `Distinctive marks:` values from that block character-for-character — paraphrase counts as a violation. Common drift to watch for:
+    - Hair colour swapped (e.g. CHARACTER DETAILS says `Hair: brown, ...` but the prose says "dark hair greying at the temples", "salt-and-pepper", "silvered", "snow-white").
+    - Hair length / styling dropped or altered (e.g. `Hair: ..., shoulder-length, ponytail, ...` rendered as just "shoulder-length brown hair" — the ponytail/braids/buzz/parting MUST stay).
+    - Facial-hair lock violated (e.g. `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` rendered as "weathered face", "stubbled jaw", "grizzled beard", "bearded man").
+    - Glasses dropped or substituted (e.g. `Glasses: schwarze Brille` rendered as bare-eyed, or translated to "dark spectacles").
+    - Age word drift (e.g. `Looks: adult` rendered as "middle-aged", "elderly", "ageing").
+    Emit ONE fix line per violation, naming the page, the character, the offending phrase, and the verbatim replacement. Example: `Page 1: SCENE: Roger described as "dark hair greying at the temples" but CHARACTER DETAILS says "Hair: brown, wavy, shoulder-length, ponytail, side part left" → replace with "brown wavy shoulder-length hair tied in a ponytail with a side part on the left".`
 20. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
     - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
     - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
