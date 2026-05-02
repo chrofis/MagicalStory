@@ -33,20 +33,42 @@ class UnifiedStoryParser {
   extractTitle() {
     if (this._cache.title !== undefined) return this._cache.title;
 
-    // Find the final TITLE: line inside the ---TITLE--- section. Sonnet
-    // outputs a TITLE_CANDIDATES: list followed by "TITLE: <chosen>", so we
-    // must anchor on a TITLE: that is NOT followed by an underscore (which
-    // would match TITLE_CANDIDATES:). Scan only the TITLE section so we don't
-    // accidentally pick up stray lines.
     const sectionMatch = this.response.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i);
     const section = sectionMatch ? sectionMatch[1] : '';
+
+    // Prefer the TITLE_CANDIDATES list and pick one at random — the model
+    // would otherwise converge on the most "iconic" candidate every run
+    // (e.g. always "Der zweite Bolzen" for any Tell story). Random pick
+    // delivers the variety the prompt asked the model to produce.
+    const candidatesMatch = section.match(/TITLE_CANDIDATES\s*:\s*([\s\S]+?)(?=\n\s*(?:TITLE\s*:|---|$))/i);
+    if (candidatesMatch) {
+      const candidates = candidatesMatch[1]
+        .split('\n')
+        .map(l => l.match(/^\s*\d+[.)]\s*(.+?)\s*$/))
+        .filter(Boolean)
+        .map(m => m[1].trim()
+          .replace(/^\*{1,2}|\*{1,2}$/g, '')
+          .replace(/^"|"$/g, '')
+          .replace(/^\[|\]$/g, '')
+          .trim())
+        .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
+      if (candidates.length > 0) {
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        this._cache.title = pick;
+        log.info(`[UNIFIED-PARSER] Picked title at random from ${candidates.length} candidates: "${pick}"`);
+        return pick;
+      }
+    }
+
+    // Fallback: legacy `TITLE: <value>` line for older runs / partial outputs
+    // where TITLE_CANDIDATES is missing.
     const titleLineMatch = section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im);
     if (titleLineMatch) {
       this._cache.title = titleLineMatch[1].trim()
         .replace(/^\*{1,2}|\*{1,2}$/g, '')
         .replace(/^"|"$/g, '')
         .trim();
-      log.debug(`[UNIFIED-PARSER] Title: "${this._cache.title}"`);
+      log.debug(`[UNIFIED-PARSER] Title (legacy single-line): "${this._cache.title}"`);
       return this._cache.title;
     }
 

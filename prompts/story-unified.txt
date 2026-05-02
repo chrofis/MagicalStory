@@ -503,7 +503,7 @@ The ---STORY PAGES--- section below emits PATCHES for the pages and sections you
 
 
 ---TITLE---
-Now that you have written and analyzed the full story, propose 5 distinct title candidates and select the strongest.
+Now that you have written and analyzed the full story, propose 5 distinct title candidates. The server picks one at random — your job is to make every option strong enough to ship, with genuinely different angles.
 
 Each candidate must:
 - Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
@@ -512,7 +512,14 @@ Each candidate must:
 - Avoid clichés like "The [Adjective] [Noun]" patterns
 - Work well in {LANGUAGE}
 
-Vary angle across the 5 — different characters, locations, objects, or beats.
+VARY ANGLE — each of the 5 must hit a different facet:
+1. character-focused (a name + a verb or stake)
+2. location/setting-focused
+3. object/artifact-focused
+4. emotion/relationship-focused
+5. pivotal-moment or unexpected-detail focused
+
+Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (e.g. "Der zweite Bolzen" for a Tell story, "Apfel und Bolzen" for the same), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
 
 TITLE_CANDIDATES:
 1. [first candidate]
@@ -520,8 +527,6 @@ TITLE_CANDIDATES:
 3. [third candidate]
 4. [fourth candidate]
 5. [fifth candidate]
-
-TITLE: [the strongest candidate — copy verbatim from the list above]
 
 
 ---CLOTHING REQUIREMENTS---
