@@ -132,7 +132,21 @@ export default function SharedStoryViewer() {
   // The fullscreen viewer receives URLs that already have ?token=... from BookViewer,
   // so don't double-append. Only use this where we build URLs from scratch.
   const authToken = localStorage.getItem('auth_token');
-  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+  // Email-link signed key from the current URL. When present, it grants
+  // read-only access to this one shareToken — required when the recipient
+  // is not logged in (e.g. owner opening their own email link on iPhone).
+  // Forward to every API/image fetch so the backend's signedLink-OK gate
+  // matches and the story loads instead of 404'ing to login.
+  const signedKey = (() => {
+    try { return new URLSearchParams(window.location.search).get('key') || ''; }
+    catch { return ''; }
+  })();
+  const tokenParam = (() => {
+    const parts: string[] = [];
+    if (authToken) parts.push(`token=${encodeURIComponent(authToken)}`);
+    if (signedKey) parts.push(`key=${encodeURIComponent(signedKey)}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+  })();
 
   useEffect(() => {
     if (!shareToken) {
@@ -167,8 +181,13 @@ export default function SharedStoryViewer() {
       setLoading(false);
     };
 
+    // Forward email-link ?key= to the API so signed-link-only access (e.g.
+    // owner opening their own email on iPhone, not logged in) loads the
+    // story instead of 404'ing.
+    const apiQuery = signedKey ? `?key=${encodeURIComponent(signedKey)}` : '';
+
     // Phase 1
-    fetch(`/api/shared/${shareToken}/header`, { headers })
+    fetch(`/api/shared/${shareToken}/header${apiQuery}`, { headers })
       .then(async r => {
         if (cancelled) return;
         if (!r.ok) { handle404(r.status); return; }
@@ -180,7 +199,7 @@ export default function SharedStoryViewer() {
         // them; when BookViewer mounts later it'll hit the cache and render
         // without waiting on Sharp.
         for (let p = 1; p <= h.pageCount; p++) {
-          fetch(`/api/shared/${shareToken}/text-overlay/${p}`, {
+          fetch(`/api/shared/${shareToken}/text-overlay/${p}${apiQuery}`, {
             method: 'POST',
             headers: { ...headers, 'Content-Type': 'application/json' },
           }).catch(() => { /* best-effort */ });
@@ -189,7 +208,7 @@ export default function SharedStoryViewer() {
       .catch(() => { /* fall through to full fetch error handling */ });
 
     // Phase 2 — fat request in parallel with the header.
-    fetch(`/api/shared/${shareToken}`, { headers })
+    fetch(`/api/shared/${shareToken}${apiQuery}`, { headers })
       .then(async r => {
         if (cancelled) return;
         if (!r.ok) { handle404(r.status); return; }
