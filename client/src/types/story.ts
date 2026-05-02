@@ -661,7 +661,19 @@ export interface ImageVersion {
   modelId?: string;
   createdAt: string;
   isActive?: boolean;  // DEPRECATED: kept for backward compat with old blob data. Use page.activeVersion instead.
-  type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
+  type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair' | 'scale-repair' | 'text-space-repair';
+  // Specific method that produced this version. Finer-grained than `type`:
+  //   - "original"
+  //   - "iterate-round-{N}"   (full regen with eval feedback)
+  //   - "inpaint-round-{N}"   (Grok inpaint)
+  //   - "char-fix-round-{N}"  (legacy character-fix naming)
+  //   - "character-fix:{CharName}"  (targeted Grok blended on one character)
+  //   - "character-fix"        (generic, final pass)
+  //   - "entity-repair"
+  //   - "scale-repair"         (tiny-bg-figure repair)
+  //   - "post-repair-text-space"
+  //   - "edit"
+  source?: string;
   qualityScore?: number;
   rawQualityScore?: number | null;
   semanticScore?: number | null;

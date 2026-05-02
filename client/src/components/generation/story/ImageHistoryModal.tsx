@@ -67,6 +67,32 @@ export function ImageHistoryModal({
 
   const versionLabel = (idx: number) => idx === 0 ? 'Original' : `V${idx + 1}`;
 
+  // Map the version's stored `source` string to a friendly method label.
+  // The persisted `source` is finer-grained than `type` (e.g. distinguishes
+  // iterate-round-1 from inpaint-round-1) — surface it directly so the user
+  // can see WHICH repair pass produced this version.
+  const formatMethod = (source?: string, type?: string): string => {
+    if (!source) {
+      if (!type || type === 'original') return language === 'de' ? 'Original' : 'Original';
+      return type;
+    }
+    if (source === 'original') return language === 'de' ? 'Original' : 'Original';
+    let m = source.match(/^iterate-round-(\d+)/);
+    if (m) return language === 'de' ? `Iteration (Runde ${m[1]})` : language === 'fr' ? `Itération (tour ${m[1]})` : `Iterate (round ${m[1]})`;
+    m = source.match(/^inpaint-round-(\d+)/);
+    if (m) return language === 'de' ? `Inpaint (Runde ${m[1]})` : language === 'fr' ? `Inpaint (tour ${m[1]})` : `Inpaint (round ${m[1]})`;
+    m = source.match(/^char-fix-round-(\d+)/);
+    if (m) return language === 'de' ? `Charakter-Fix (Runde ${m[1]})` : language === 'fr' ? `Correction perso. (tour ${m[1]})` : `Character fix (round ${m[1]})`;
+    m = source.match(/^character-fix:(.+)$/);
+    if (m) return language === 'de' ? `Charakter-Fix: ${m[1]}` : language === 'fr' ? `Correction perso. : ${m[1]}` : `Character fix: ${m[1]}`;
+    if (source === 'character-fix') return language === 'de' ? 'Charakter-Fix' : language === 'fr' ? 'Correction perso.' : 'Character fix';
+    if (source === 'entity-repair') return language === 'de' ? 'Entitäts-Reparatur' : language === 'fr' ? 'Réparation entité' : 'Entity repair';
+    if (source === 'scale-repair') return language === 'de' ? 'Skala-Reparatur' : language === 'fr' ? 'Réparation d\'échelle' : 'Scale repair';
+    if (source === 'post-repair-text-space') return language === 'de' ? 'Text-Bereich-Reparatur' : language === 'fr' ? 'Réparation zone texte' : 'Text-space repair';
+    if (source === 'edit') return language === 'de' ? 'Manuelle Bearbeitung' : language === 'fr' ? 'Modification manuelle' : 'Edit';
+    return source;
+  };
+
   const scoreBgColor = (score: number) =>
     score >= 80 ? 'bg-green-600' : score >= 60 ? 'bg-yellow-600' : 'bg-red-600';
 
@@ -304,8 +330,8 @@ export function ImageHistoryModal({
                       <span className="text-xs uppercase tracking-wide font-semibold text-gray-500">
                         {language === 'de' ? 'Methode' : language === 'fr' ? 'Méthode' : 'Method'}
                       </span>
-                      <span className="text-sm font-bold text-gray-800 uppercase">
-                        {detailVersion.type || 'original'}
+                      <span className="text-sm font-bold text-gray-800">
+                        {formatMethod(detailVersion.source, detailVersion.type)}
                       </span>
                       {detailVersion.modelId && (
                         <code className="text-xs bg-gray-100 px-1 rounded text-gray-600">{detailVersion.modelId}</code>
