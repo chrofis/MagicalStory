@@ -5224,12 +5224,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Detect calm region for text overlay (~30ms, non-blocking)
             let calmRegion = null;
-            if (genResult.imageData) {
+            if (activeImageData) {
               try {
                 const { detectCalmRegion } = require('./server/lib/calmRegion');
                 const textPos = enforceSpreadTextPosition(pageData.sceneMetadata?.textPosition || null, pageData.pageNumber);
                 if (textPos) {
-                  const imgBuf = Buffer.from(genResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                  const imgBuf = Buffer.from(activeImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
                   calmRegion = await detectCalmRegion(imgBuf, textPos).catch(() => null);
                 }
               } catch (e) { /* calm region detection is optional */ }
@@ -5240,8 +5240,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             return {
               pageNumber: pageData.pageNumber,
-              imageData: genResult.imageData,
-              modelId: genResult.modelId,
+              imageData: activeImageData,
+              modelId: activeModelId,
+              // When scale-repair ran, the original image is preserved as a
+              // pre-repair version so the version picker shows both.
+              preScaleRepairImage: scaleRepairResult ? genResult.imageData : null,
+              preScaleRepairModelId: scaleRepairResult ? genResult.modelId : null,
+              scaleRepairPrompt: scaleRepairResult ? scaleRepairResult.prompt : null,
+              scaleRepairGrokRefImages: scaleRepairResult ? scaleRepairResult.grokRefImages : null,
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
               prompt: pageData.prompt,

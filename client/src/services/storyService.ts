@@ -1370,6 +1370,21 @@ export const storyService = {
     return response;
   },
 
+  // Run the scale-repair pass on a single page that's already rendered.
+  // Grok edit shrinks any character with depth=background to a tiny figure
+  // while preserving the foreground character(s). Admin only.
+  async scaleRepair(storyId: string, pageNumber: number): Promise<{
+    success: boolean;
+    pageNumber: number;
+    imageData: string;
+    modelId: string;
+    prompt: string;
+    grokRefImages: string[] | null;
+    versionIndex: number;
+  }> {
+    return api.post(`/api/stories/${storyId}/scale-repair/${pageNumber}`, {});
+  },
+
   // Cross-page style consistency check (ADMIN ONLY). Sends a thumbnail grid
   // of every page + cover to Gemini, returns the dominant style cluster and
   // any outliers. Detection only — repair is a separate action.

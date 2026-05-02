@@ -1054,6 +1054,128 @@ router.post('/:id/style-check', authenticateToken, async (req, res) => {
   }
 });
 
+// Scale-repair (ADMIN ONLY).
+// Run the "tiny background figure" repair on a single page that's already
+// been rendered. Builds a focused Grok-edit prompt that asks the model to
+// keep the foreground character(s) as rendered and shrink the
+// depth=background characters to 1/6–1/8 frame height. No eval needed —
+// the trigger is purely the outline metadata (depth=background present).
+router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+    // Admin-only
+    const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+    // Load story + rehydrate
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    const scene = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+    if (!scene || !scene.imageData) {
+      return res.status(400).json({ error: `No active image for page ${pageNumber}` });
+    }
+    const sceneMetadata = extractSceneMetadata(scene.sceneDescription || scene.description || '');
+    const { needsScaleRepair, runScaleRepair } = require('../lib/scaleRepair');
+    if (!needsScaleRepair(sceneMetadata)) {
+      return res.status(400).json({
+        error: 'Scene does not need scale repair (no depth=background characters declared in metadata).',
+      });
+    }
+    // Resolve avatar refs for background characters only.
+    const helpers = require('../lib/storyHelpers');
+    const { applyStyledAvatars } = require('../lib/styledAvatars');
+    const allChars = sceneMetadata.fullData?.characters || [];
+    const bgNames = new Set(allChars
+      .filter(c => (c.depth || '').toLowerCase() === 'background')
+      .map(c => (c.name || '').toLowerCase()));
+    const bgCharObjs = (storyData.characters || []).filter(c =>
+      bgNames.has((c.name || '').toLowerCase()));
+    let bgRefs = [];
+    if (bgCharObjs.length > 0) {
+      bgRefs = helpers.getCharacterPhotoDetails(
+        bgCharObjs,
+        null,
+        storyData.artStyle,
+        storyData.clothingRequirements || null,
+      );
+      bgRefs = applyStyledAvatars(bgRefs, storyData.artStyle);
+    }
+    // Load empty-scene plate from R2 if available
+    let plate = null;
+    try {
+      const row = await getStoryImage(id, 'empty_scene', pageNumber, 0);
+      if (row?.imageData) plate = row.imageData;
+    } catch { /* optional */ }
+
+    const result = await runScaleRepair(scene.imageData, sceneMetadata, {
+      pageNumber,
+      sceneBackground: plate,
+      backgroundCharacterRefs: bgRefs,
+      artStyleDescription: helpers.resolveArtStyle(storyData.artStyle, 'grok') || null,
+      aspectRatio: scene.imageAspect || null,
+    });
+    if (!result?.imageData) {
+      return res.status(500).json({ error: 'Scale-repair returned no image' });
+    }
+
+    // Save as a new version. Use the existing imageVersions array shape.
+    scene.imageVersions = scene.imageVersions || [];
+    const newVersion = {
+      imageData: result.imageData,
+      type: 'scale-repair',
+      modelId: result.modelId,
+      prompt: result.prompt,
+      createdAt: new Date().toISOString(),
+      grokRefImages: result.grokRefImages || null,
+    };
+    scene.imageVersions.push(newVersion);
+    // Promote it to the active image
+    scene.imageData = result.imageData;
+    scene.modelId = result.modelId;
+    scene.prompt = result.prompt;
+    scene.wasScaleRepaired = true;
+    // Persist
+    const dbVersionIndex = (await dbQuery(
+      `SELECT COALESCE(MAX(version_index), -1) AS m
+       FROM story_images
+       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2`,
+      [id, pageNumber]
+    ))[0]?.m;
+    const newVersionIndex = (dbVersionIndex ?? -1) + 1;
+    await saveStoryImage(id, 'scene', pageNumber, result.imageData, {
+      generatedAt: newVersion.createdAt,
+      versionIndex: newVersionIndex,
+    });
+    newVersion._alreadySaved = true;
+    await setActiveVersion(id, `${pageNumber}`, newVersionIndex);
+    await saveStoryData(id, storyData);
+
+    res.json({
+      success: true,
+      pageNumber,
+      imageData: result.imageData,
+      modelId: result.modelId,
+      prompt: result.prompt,
+      grokRefImages: result.grokRefImages || null,
+      versionIndex: newVersionIndex,
+    });
+  } catch (err) {
+    log.error('Error in scale-repair:', err);
+    res.status(500).json({ error: 'Scale repair failed: ' + err.message });
+  }
+});
+
 // Style transfer: re-render current page image in the story's art style using a different model (admin only)
 router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
   try {
