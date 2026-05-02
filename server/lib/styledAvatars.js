@@ -929,13 +929,34 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
     log.warn(`⚠️ [STYLED-AVATAR] No cache scope set for lookup "${cacheKey}" — code path escaped runInCacheScope()`);
   }
 
-  if (!styledAvatar) {
-    // Canonical keys on both sides mean any miss is a genuine cache-miss bug,
-    // NOT a naming variant. Log as ERROR so it surfaces loudly.
-    log.error(`❌ [STYLED-AVATAR] CACHE MISS — quality will degrade: ${cacheKey} (canonical: ${normalizeClothingCategory(clothingCategory)})`);
-    return null;
+  if (styledAvatar) return styledAvatar;
+
+  // Pre-fallback: caller asked for a bucket we don't have for this character
+  // (e.g. story is medieval-only → only `costumed` was generated, but a
+  // scene/cover defaulted to `standard`). Substitute another available
+  // styled bucket for the same character before falling back to raw photo —
+  // a styled avatar in the wrong-but-available bucket is still infinitely
+  // better than a raw modern-day photo for a medieval scene (the latter
+  // leaks modern clothing into the rendered image).
+  //
+  // Preference order: costumed > standard > winter > summer (costumed wins
+  // because it's the strongest signal for "this is the only outfit this
+  // character has in this story").
+  const requestedCanonical = normalizeClothingCategory(clothingCategory);
+  const fallbackOrder = ['costumed', 'standard', 'winter', 'summer'];
+  for (const bucket of fallbackOrder) {
+    if (bucket === requestedCanonical) continue;
+    const altKey = getAvatarCacheKey(characterName, bucket, artStyle);
+    const alt = styledAvatarCache.get(altKey);
+    if (alt) {
+      log.warn(`🧥 [STYLED-AVATAR] Bucket substitution: ${cacheKey} not in cache → using ${altKey} (only available variant for this character)`);
+      return alt;
+    }
   }
-  return styledAvatar;
+
+  // Genuine miss — character has no styled avatar in any bucket.
+  log.error(`❌ [STYLED-AVATAR] CACHE MISS — quality will degrade: ${cacheKey} (canonical: ${requestedCanonical}); no alternate bucket available either`);
+  return null;
 }
 
 /**
