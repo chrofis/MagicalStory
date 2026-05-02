@@ -5266,25 +5266,41 @@ function buildRegenFeedback(evaluation) {
  * @returns {{ strategy: 'inpaint'|'iterate', reason: string }}
  */
 function chooseRepairStrategy(evaluation) {
-  const VISUAL_BROKEN_FLOOR = 50;     // below this, the image is visually total crap
-  const SEMANTIC_BROKEN_FLOOR = 30;   // below this, the image shows the wrong scene
+  // Severity-driven repair routing:
+  //   ≥1 CRITICAL  → iterate  (structural defect — missing character/object,
+  //                            inverted leap direction, wrong setting; full
+  //                            regen with fresh context has a real shot.
+  //                            Inpaint chains 3 atomic-action instructions and
+  //                            Grok regenerates the masked region from scratch,
+  //                            usually losing other elements of the scene.)
+  //   No CRITICAL  → inpaint  (cosmetic only — hair colour, ponytail, armor
+  //                            material, facing direction. Targeted region
+  //                            edits with explicit visual identifiers land
+  //                            far more reliably than re-rolling the whole
+  //                            scene and hoping the cosmetic drift goes away.)
+  //
+  // Counts CRITICALs across every source on the version: quality eval,
+  // three-stage compliance, semantic. Severity casing varies by source
+  // ('CRITICAL' / 'critical') so the match is case-insensitive.
+  const isCritical = (s) => String(s || '').toLowerCase() === 'critical';
+  const fixable = evaluation.fixableIssues || [];
+  const semIssues = evaluation.semanticResult?.semanticIssues
+    || evaluation.semanticResult?.issues
+    || [];
+  const criticalCount = fixable.filter(i => isCritical(i.severity)).length
+    + semIssues.filter(i => isCritical(i.severity)).length;
 
-  const visualScore = evaluation.qualityScore ?? 100;
-  const semanticScore = evaluation.semanticScore ?? 100;
-
-  // Inpaint can act on quality fixableIssues, enriched/fix targets, OR semantic issues.
-  const fixableCount = evaluation.fixableIssues?.length || 0;
+  // Inpaint needs SOMETHING to act on — fixable issues, enriched targets,
+  // raw fix targets, or semantic issues. If the version has none of these,
+  // there's nothing to inpaint and we fall back to a full regen.
+  const fixableCount = fixable.length;
   const enrichedCount = evaluation.enrichedFixTargets?.length || 0;
   const fixTargetCount = evaluation.fixTargets?.length || 0;
-  const semanticIssueCount = (evaluation.semanticResult?.issues?.length
-    || evaluation.semanticResult?.semanticIssues?.length || 0);
+  const semanticIssueCount = semIssues.length;
   const hasInpaintableContent = fixableCount + enrichedCount + fixTargetCount + semanticIssueCount > 0;
 
-  if (visualScore < VISUAL_BROKEN_FLOOR) {
-    return { strategy: 'iterate', reason: `image visually broken (visual=${visualScore})` };
-  }
-  if (semanticScore < SEMANTIC_BROKEN_FLOOR) {
-    return { strategy: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
+  if (criticalCount > 0) {
+    return { strategy: 'iterate', reason: `${criticalCount} CRITICAL — full regen` };
   }
   if (!hasInpaintableContent) {
     return { strategy: 'iterate', reason: 'no inpaintable content' };
@@ -5294,7 +5310,7 @@ function chooseRepairStrategy(evaluation) {
   if (fixableCount) parts.push(`${fixableCount} quality`);
   if (semanticIssueCount) parts.push(`${semanticIssueCount} semantic`);
   if (enrichedCount || fixTargetCount) parts.push(`${enrichedCount + fixTargetCount} targets`);
-  return { strategy: 'inpaint', reason: parts.join(', ') || 'default' };
+  return { strategy: 'inpaint', reason: `no CRITICAL — ${parts.join(', ') || 'cosmetic'}` };
 }
 
 /**
