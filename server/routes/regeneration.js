@@ -1263,7 +1263,12 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
           };
           cover.imageVersions.push(newVersion);
           newVersionIndex = cover.imageVersions.length - 1;
-          await saveStoryImage(id, coverType, null, newVersionIndex, result.imageData);
+          // saveStoryImage(storyId, imageType, pageNumber, imageData, options).
+          // Pass versionIndex via options — without it, the default 0
+          // OVERWRITES the original. Bytes go to R2 + image_url; image_data
+          // stays null when R2 succeeds.
+          await saveStoryImage(id, coverType, null, result.imageData, { versionIndex: newVersionIndex });
+          await setActiveVersion(id, coverType, newVersionIndex);
         }
       } else {
         // Scene page
@@ -1288,7 +1293,11 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
           };
           sceneImage.imageVersions.push(newVersion);
           newVersionIndex = sceneImage.imageVersions.length - 1;
-          await saveStoryImage(id, 'scene', pageNumber, newVersionIndex, result.imageData);
+          // Same arg-order discipline as the cover branch above. Without
+          // versionIndex in options, the new bytes silently overwrote v0 in
+          // story_images and the modal couldn't find the new version row.
+          await saveStoryImage(id, 'scene', pageNumber, result.imageData, { versionIndex: newVersionIndex });
+          await setActiveVersion(id, `${pageNumber}`, newVersionIndex);
         }
       }
       // Persist updated blob + version index
