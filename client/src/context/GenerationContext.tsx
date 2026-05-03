@@ -36,6 +36,7 @@ interface GenerationState {
   progress: GenerationProgress;
   isComplete: boolean;
   completedStoryId: string | null;
+  completedShareToken: string | null;
   hasUnviewedCompletion: boolean;
   error: string | null;
 }
@@ -81,6 +82,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<GenerationProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [completedStoryId, setCompletedStoryId] = useState<string | null>(null);
+  const [completedShareToken, setCompletedShareToken] = useState<string | null>(null);
   const [hasUnviewedCompletion, setHasUnviewedCompletion] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +105,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       setActiveJob(null);
       setIsComplete(false);
       setCompletedStoryId(null);
+      setCompletedShareToken(null);
       setError(null);
       storage.removeItem(ACTIVE_JOB_KEY);
     }
@@ -194,6 +197,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
         // because activeJob is now null.
         setIsComplete(true);
         setCompletedStoryId(status.result.storyId);
+        setCompletedShareToken(status.result.shareToken || null);
         setHasUnviewedCompletion(true);
         setProgress({ current: 100, total: 100, message: 'Complete!' });
         cleanupAfterTerminalState();
@@ -284,6 +288,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
             setActiveJob(job);
             setIsComplete(false);
             setCompletedStoryId(null);
+            setCompletedShareToken(null);
             setError(null);
           } catch {
             // Invalid data
@@ -315,6 +320,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     setActiveJob(job);
     setIsComplete(false);
     setCompletedStoryId(null);
+    setCompletedShareToken(null);
     setHasUnviewedCompletion(false);
     setError(null);
     setProgress({ current: 0, total: 100, message: 'Starting...' });
@@ -353,6 +359,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
         progress,
         isComplete,
         completedStoryId,
+        completedShareToken,
         hasUnviewedCompletion,
         error,
         startTracking,

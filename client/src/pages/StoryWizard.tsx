@@ -127,7 +127,7 @@ export default function StoryWizard() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
-  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion, error: contextGenerationError, clearError: clearContextError } = useGeneration();
+  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, completedShareToken, markCompletionViewed, hasUnviewedCompletion, error: contextGenerationError, clearError: clearContextError } = useGeneration();
 
   // Show claim modal for trial users without a password
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -779,8 +779,13 @@ export default function StoryWizard() {
     // Guard: only auto-nav if user is on step 6 (viewing generation), not if they reset to step 1
     log.debug('Auto-nav check:', { generationComplete, completedStoryId, urlStoryId, hasActiveJob: !!activeJob, step });
     if (generationComplete && completedStoryId && !urlStoryId && step === 6) {
-      log.info('Generation completed, navigating to story:', completedStoryId);
-      setSearchParams({ storyId: completedStoryId }, { replace: true });
+      if (completedShareToken) {
+        log.info('Generation completed, navigating to reader view:', completedShareToken);
+        navigate(`/shared/${completedShareToken}`, { replace: true });
+      } else {
+        log.info('Generation completed, navigating to story (no share token):', completedStoryId);
+        setSearchParams({ storyId: completedStoryId }, { replace: true });
+      }
     }
 
     // If activeJob was cleared (abandoned/failed/404) while we were showing generation view,
@@ -791,7 +796,7 @@ export default function StoryWizard() {
       setIsGenerating(false);
       setStep(1);
     }
-  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages, step, isGenerating]);
+  }, [activeJob, generationComplete, completedStoryId, completedShareToken, searchParams, setSearchParams, navigate, pages, step, isGenerating]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
@@ -4179,10 +4184,13 @@ export default function StoryWizard() {
           // Stop tracking in global context
           stopTracking();
 
-          // Navigate directly to the story — don't rely on GenerationContext auto-nav
-          // because stopTracking() kills its polling before it detects completion.
-          // This triggers loadSavedStory which fetches images from story_images table.
-          if (status.result.storyId) {
+          // Navigate directly to the reader view — don't rely on GenerationContext
+          // auto-nav because stopTracking() kills its polling before it detects
+          // completion. Fall back to /create?storyId= when shareToken is missing
+          // (legacy stories created before share_token was issued at INSERT time).
+          if (status.result.shareToken) {
+            navigate(`/shared/${status.result.shareToken}`, { replace: true });
+          } else if (status.result.storyId) {
             setSearchParams({ storyId: status.result.storyId }, { replace: true });
           }
         } else if (status.status === 'failed') {
