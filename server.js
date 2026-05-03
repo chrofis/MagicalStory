@@ -1987,6 +1987,23 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_style_lab_story ON style_lab_images(story_id)`);
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
 
+    // R2 dual-write migrations — the writers (saveStyleLabImage, story_images
+    // write path) set image_data=null when the bytes succeed at uploading to
+    // R2, with the URL stored in image_url. Original CREATE TABLE blocks
+    // declared image_data NOT NULL, so URL-only inserts crashed with
+    // "null value in column image_data violates not-null constraint" — most
+    // visibly in the Style Lab UI as both Grok and Gemini cards showing the
+    // constraint error in place of the rendered image. Migrations live HERE
+    // (not in server/services/database.js) because that file's
+    // initializeDatabase isn't on the startup path in prod — see the comment
+    // on the referral block below for the same lesson.
+    await dbPool.query(`ALTER TABLE story_images       ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await dbPool.query(`ALTER TABLE story_retry_images ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await dbPool.query(`ALTER TABLE style_lab_images   ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await dbPool.query(`ALTER TABLE story_images       ALTER COLUMN image_data DROP NOT NULL`);
+    await dbPool.query(`ALTER TABLE story_retry_images ALTER COLUMN image_data DROP NOT NULL`);
+    await dbPool.query(`ALTER TABLE style_lab_images   ALTER COLUMN image_data DROP NOT NULL`);
+
     // Referral system — separate from the legacy DDL block so it always runs on
     // startup and can be added to existing prod databases. Previously these
     // were only in server/services/database.js which isn't on the startup path,

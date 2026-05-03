@@ -2184,17 +2184,7 @@ async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData,
     console.warn(`[R2] style-lab upload skipped: ${err.message}`);
   }
 
-  // Store the bytes in image_data even when R2 succeeded. The R2 migration's
-  // DROP NOT NULL only applies once the new initialiseDatabase has run on the
-  // live server; until then, URL-only inserts crash with "null value in column
-  // image_data violates not-null constraint" — visible in the Style Lab UI as
-  // both model cards showing the constraint error in place of the rendered
-  // image. Writing both fields keeps the writer working in both schemas:
-  //   - old schema (NOT NULL): bytes satisfy the constraint, image_url is
-  //     populated for readers that prefer R2.
-  //   - new schema (nullable): bytes are redundant but harmless; can be
-  //     nulled later by a backfill job once every environment has the
-  //     migration applied.
+  const persistedImageData = imageUrl ? null : imageData;
   await dbQuery(
     `INSERT INTO style_lab_images (story_id, page_number, run_id, model_id, image_data, image_url, thumbnail, style_prompt, elapsed_ms)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -2203,7 +2193,7 @@ async function saveStyleLabImage(storyId, pageNumber, runId, modelId, imageData,
                    thumbnail = EXCLUDED.thumbnail,
                    style_prompt = EXCLUDED.style_prompt, elapsed_ms = EXCLUDED.elapsed_ms,
                    created_at = CURRENT_TIMESTAMP`,
-    [storyId, pageNumber, runId, modelId, imageData, imageUrl, thumbnail, stylePrompt, elapsedMs]
+    [storyId, pageNumber, runId, modelId, persistedImageData, imageUrl, thumbnail, stylePrompt, elapsedMs]
   );
 }
 
