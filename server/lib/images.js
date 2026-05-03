@@ -12920,36 +12920,61 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
  * keeping all characters, positions, and scene composition identical.
  */
 async function applyStyleTransfer(imageData, artStyle, options = {}) {
-  const { imageModelOverride, imageBackendOverride, characterPhotos = [] } = options;
+  const { imageModelOverride, imageBackendOverride } = options;
   const { resolveArtStyle } = require('./storyHelpers');
 
   // artStyle can be: a preset key ("pixar"), or a custom description string
   const styleDescription = resolveArtStyle(artStyle, imageBackendOverride) || artStyle;
 
-  const withAvatars = characterPhotos.length > 0;
-  const prompt = withAvatars
-    ? `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style. Use the provided character reference photos to ensure faces remain accurate and recognizable.
+  // Style transfer: input image is the ONLY reference. No avatars — they cause
+  // the model to redraw faces from the avatar (which often look photo-real),
+  // defeating the whole point of restyling.
+  //
+  // Prompt design notes:
+  //   - "Layout reference" framing tells the model the input is COMPOSITION
+  //     ONLY, not rendering. Without this, Grok/Gemini treat the previous
+  //     image as authoritative and barely restyle (or restyle backgrounds
+  //     while leaving faces photo-real, which is the #1 user complaint).
+  //   - Style is at the TOP, before composition rules — earlier tokens get
+  //     more weight.
+  //   - Explicit per-element enforcement (faces, skin, hair, clothing, sky,
+  //     ground) closes the loophole where the model styles backgrounds but
+  //     leaves figures in source rendering.
+  //   - Anti-photo banner addresses the recurring "figures look like photos"
+  //     case directly.
+  const prompt = `**ART STYLE — APPLIES TO EVERY PIXEL OF THE OUTPUT:**
+${styleDescription}
 
-Art Style: ${styleDescription}
+**TASK:** Redraw the input image in the art style above. Treat the input as a
+LAYOUT REFERENCE only: copy character positions, body sizes, gestures, gaze
+direction, object placement, and background composition. Re-render every pixel
+from scratch in the target art style — including faces, skin, hair, eyes,
+clothing textures, walls, ground, sky, and all other surfaces.
 
-CRITICAL:
-- Same characters in same positions — use reference photos to preserve facial features
-- Same scene composition and background
-- Same objects and landmarks
-- Only the rendering style changes (colors, brush strokes, texture, shading)`
-    : `Redraw this illustration in the following art style. Keep ALL characters, their positions, sizes, actions, and the scene layout EXACTLY the same. Only change the visual art style.
+**STYLE ENFORCEMENT (mandatory):**
+- The output is a styled illustration. NOT a photograph. NOT a photo-realistic
+  render. NOT a 3D render. NOT a digital airbrush.
+- Faces, skin, and hair are rendered in the same medium and brush technique as
+  the rest of the image. No photographic skin texture, no photoreal pores, no
+  realistic hair strands. Use the style's brushwork for every facial feature.
+- All background surfaces (walls, ground, sky, water, fabric, foliage) carry
+  the style's texture, edge softness, and brushwork.
+- If the input image's existing rendering conflicts with the target style, the
+  target style WINS. Override every pixel of the input that does not match the
+  target medium.
 
-Art Style: ${styleDescription}
+**KEEP:** composition, character positions, body sizes, gestures, gaze, object
+placement, background layout.
 
-CRITICAL:
-- Same characters in same positions
-- Same scene composition and background
-- Same objects and landmarks
-- Only the rendering style changes (colors, brush strokes, texture, shading)`;
+**CHANGE:** every aspect of rendering — medium, brush, texture, edges, palette,
+shading, line work, paper grain. The output should look like a different artist
+made the same scene in the target style.`;
 
-  log.info(`🎨 [STYLE TRANSFER] ${withAvatars ? `With ${characterPhotos.length} avatar references` : 'Without avatars'}, target: ${artStyle}, model: ${imageModelOverride || 'default'}`);
+  log.info(`🎨 [STYLE TRANSFER] target: ${artStyle}, model: ${imageModelOverride || 'default'} (no avatars — input image is sole reference)`);
 
-  return generateImageOnly(prompt, characterPhotos, {
+  // characterPhotos intentionally omitted — see comment above. The previousImage
+  // is the only reference attached, so the model can't drift toward an avatar.
+  return generateImageOnly(prompt, [], {
     imageModelOverride,
     imageBackendOverride,
     previousImage: imageData,

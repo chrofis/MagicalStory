@@ -1181,7 +1181,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
 router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { targetModel, withAvatars, styleDescription: customStyle } = req.body;
+    const { targetModel, styleDescription: customStyle } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     if (!targetModel) return res.status(400).json({ error: 'targetModel required' });
@@ -1214,36 +1214,96 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
       currentImageData = sceneImage.imageData;
     }
 
-    // Build character photos if requested (helps preserve facial details)
-    let characterPhotos = [];
-    if (withAvatars) {
-      const characters = storyData.characters || [];
-      const sceneImage = pageNumber > 0 ? (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber) : null;
-      const sceneDesc = sceneImage?.description || '';
-      const sceneChars = getCharactersInScene(sceneDesc, characters);
-      const charsToUse = sceneChars.length > 0 ? sceneChars : characters;
-      const clothingReqs = convertClothingToCurrentFormat(storyData.clothingRequirements);
-      characterPhotos = getCharacterPhotoDetails(charsToUse, 'standard', artStyle, clothingReqs);
-      characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
-      log.info(`🎨 [STYLE-TRANSFER] Including ${characterPhotos.length} avatar references`);
-    }
-
-    log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}${withAvatars ? ' (with avatars)' : ''}`);
+    // Avatars are intentionally NOT attached. Style transfer's contract is
+    // "input image in, restyled image out" — passing avatar refs causes the
+    // model to redraw faces from the avatar (often photo-real) and the
+    // figures shift. The previousImage is the only reference.
+    log.info(`🎨 [STYLE-TRANSFER] Story ${id}, page ${pageNumber}: transferring to ${targetModel}`);
     const start = Date.now();
-    // Use custom style description if provided, otherwise use story's art style
     const effectiveStyle = customStyle || artStyle;
     const result = await applyStyleTransfer(currentImageData, effectiveStyle, {
       imageModelOverride: targetModel,
       imageBackendOverride: IMAGE_MODELS[targetModel].backend,
-      characterPhotos,
     });
     const elapsed = Date.now() - start;
     log.info(`🎨 [STYLE-TRANSFER] Completed in ${elapsed}ms`);
+
+    if (!result?.imageData) {
+      return res.status(500).json({ error: 'Style transfer returned no image' });
+    }
+
+    // Auto-save as a new version. Style transfer was previously fire-and-forget
+    // (the result was returned for preview only and the user had to click
+    // "Use This" to persist it — most attempts were lost). Now every run lands
+    // as a new version with source='style-transfer:{model}', visible in the
+    // Bild-wählen modal alongside iterate / inpaint / scale-repair versions.
+    let newVersionIndex = null;
+    try {
+      if (pageNumber < 0) {
+        // Cover
+        const coverType = getCoverType(pageNumber);
+        const cover = storyData.coverImages?.[coverType];
+        if (cover) {
+          if (!cover.imageVersions) {
+            cover.imageVersions = [{
+              imageData: cover.imageData,
+              modelId: cover.modelId || null,
+              createdAt: cover.createdAt || new Date().toISOString(),
+              type: 'original',
+              source: 'original',
+            }];
+          }
+          const newVersion = {
+            imageData: result.imageData,
+            modelId: result.modelId || targetModel,
+            createdAt: new Date().toISOString(),
+            type: 'edit',
+            source: `style-transfer:${targetModel}`,
+            prompt: effectiveStyle,
+          };
+          cover.imageVersions.push(newVersion);
+          newVersionIndex = cover.imageVersions.length - 1;
+          await saveStoryImage(id, coverType, null, newVersionIndex, result.imageData);
+        }
+      } else {
+        // Scene page
+        const sceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+        if (sceneImage) {
+          if (!sceneImage.imageVersions) {
+            sceneImage.imageVersions = [{
+              imageData: sceneImage.imageData,
+              modelId: sceneImage.modelId || null,
+              createdAt: sceneImage.createdAt || new Date().toISOString(),
+              type: 'original',
+              source: 'original',
+            }];
+          }
+          const newVersion = {
+            imageData: result.imageData,
+            modelId: result.modelId || targetModel,
+            createdAt: new Date().toISOString(),
+            type: 'edit',
+            source: `style-transfer:${targetModel}`,
+            prompt: effectiveStyle,
+          };
+          sceneImage.imageVersions.push(newVersion);
+          newVersionIndex = sceneImage.imageVersions.length - 1;
+          await saveStoryImage(id, 'scene', pageNumber, newVersionIndex, result.imageData);
+        }
+      }
+      // Persist updated blob + version index
+      await saveStoryData(id, storyData);
+      log.info(`💾 [STYLE-TRANSFER] Saved new version ${newVersionIndex} for ${pageNumber < 0 ? getCoverType(pageNumber) : `page ${pageNumber}`}`);
+    } catch (saveErr) {
+      log.error(`⚠️ [STYLE-TRANSFER] Save failed: ${saveErr.message}`);
+      // Don't fail the request — return the image so the UI can still display it
+    }
 
     res.json({
       success: true,
       imageData: result.imageData,
       modelId: result.modelId || targetModel,
+      versionIndex: newVersionIndex,
       elapsed,
     });
   } catch (err) {
