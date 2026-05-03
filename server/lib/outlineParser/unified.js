@@ -53,9 +53,15 @@ class UnifiedStoryParser {
           .trim())
         .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
       if (candidates.length > 0) {
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        // Deterministic pick: stableCandidateIndex hashes the candidates and
+        // picks the same index here as the streaming parser does. Without
+        // this, two independent Math.random() calls produced two different
+        // titles — cover gen used the streaming pick, story save used the
+        // parser pick, and they diverged.
+        const { stableCandidateIndex } = require('./shared');
+        const pick = candidates[stableCandidateIndex(candidates)];
         this._cache.title = pick;
-        log.info(`[UNIFIED-PARSER] Picked title at random from ${candidates.length} candidates: "${pick}"`);
+        log.info(`[UNIFIED-PARSER] Picked title (stable) from ${candidates.length} candidates: "${pick}"`);
         return pick;
       }
     }

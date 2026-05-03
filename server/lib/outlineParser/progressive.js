@@ -204,8 +204,13 @@ class ProgressiveUnifiedParser {
           .trim())
         .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
       if (candidates.length > 0) {
-        title = candidates[Math.floor(Math.random() * candidates.length)];
-        log.info(`🌊 [STREAM-UNIFIED] Title picked at random from ${candidates.length} candidates: "${title}"`);
+        // Deterministic pick — see comment in unified.js. Both parsers must
+        // pick the same title or the cover image (built from this pick) and
+        // the saved story title (built from the unified parser's pick) will
+        // diverge.
+        const { stableCandidateIndex } = require('./shared');
+        title = candidates[stableCandidateIndex(candidates)];
+        log.info(`🌊 [STREAM-UNIFIED] Title picked (stable) from ${candidates.length} candidates: "${title}"`);
       }
     }
 

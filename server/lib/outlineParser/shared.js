@@ -211,6 +211,32 @@ function extractBalancedJsonObject(text, startIdx = 0) {
 }
 
 /**
+ * Pick a stable index into a candidates list using a hash of the joined
+ * candidates as the seed. The progressive (streaming) parser and the final
+ * unified parser both read the SAME `TITLE_CANDIDATES` block, but each used
+ * `Math.random()` independently — so they picked different titles. The cover
+ * gen used the streaming pick; the saved story title used the parser pick;
+ * the cover and the title diverged.
+ *
+ * djb2 hash of `candidates.join('|')` → modulo length. Same input → same
+ * output across both call sites and across replays. Different candidate lists
+ * (different stories) still produce different picks, so the variety the
+ * randomised pick was added for is preserved.
+ *
+ * @param {string[]} candidates - non-empty array
+ * @returns {number} index in [0, candidates.length)
+ */
+function stableCandidateIndex(candidates) {
+  const seed = candidates.join('|');
+  let h = 5381;
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) + h) + seed.charCodeAt(i);
+    h = h & h;  // force 32-bit
+  }
+  return Math.abs(h) % candidates.length;
+}
+
+/**
  * Parse a labeled patch page block (TEXT / SCENE / METADATA, any subset).
  * Empty string for any section absent from the patch — the caller should
  * fall back to the draft for those sections.
@@ -523,6 +549,7 @@ module.exports = {
   parsePatchSections,
   parseDraftSections,
   extractDraftPagesFromText,
+  stableCandidateIndex,
   keywordPattern,
   createPageHeaderPattern,
   createSectionPattern,
