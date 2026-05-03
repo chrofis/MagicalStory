@@ -5240,6 +5240,113 @@ Your "name" can be creative, but "landmarkQuery" MUST match the original name ex
 }
 
 // ============================================================================
+// LOCATION VANTAGES (canvas-per-vantage pipeline)
+// ============================================================================
+
+/**
+ * Extract the page's primary location vantage from scene metadata.
+ *
+ * Convention: the FIRST `LOC###` (or `LOC###.N`) entry in `metadata.objects[]`
+ * is the page's primary backdrop. The N suffix names a vantage on that LOC.
+ *
+ * Returns the resolved vantage object (with `id`, `name`, `shot`, `description`,
+ * plus a `locId` and `locationName` from the parent), or null when the page
+ * has no LOC reference or the LOC has no vantages defined (legacy stories).
+ *
+ * @param {Object} sceneMetadata - per-page metadata, expected to have `objects: []`
+ * @param {Object} visualBible   - story-level visual bible with `locations[]`
+ * @returns {Object|null} { locId, locationName, vantageId, name, shot, description, location } or null
+ */
+function getPrimaryVantageForPage(sceneMetadata, visualBible) {
+  if (!sceneMetadata?.objects || !Array.isArray(sceneMetadata.objects)) return null;
+  if (!visualBible?.locations) return null;
+
+  // Find the first LOC###(.N) reference in objects[]. objects can be strings
+  // ("LOC001.2", "Burgruine Stein [LOC002]") or objects ({id: "LOC001"}).
+  const extractLoc = (raw) => {
+    if (!raw) return null;
+    const str = typeof raw === 'string' ? raw : (raw.id || raw.name || '');
+    const m = str.match(/LOC(\d+)(?:\.(\d+))?/i);
+    if (!m) return null;
+    return { locId: `LOC${m[1].padStart(3, '0')}`, vantageNum: m[2] ? parseInt(m[2], 10) : null };
+  };
+
+  let parsed = null;
+  for (const obj of sceneMetadata.objects) {
+    parsed = extractLoc(obj);
+    if (parsed) break;
+  }
+  if (!parsed) return null;
+
+  const location = visualBible.locations.find(l => (l.id || '').toUpperCase() === parsed.locId);
+  if (!location) return null;
+
+  // Pick the vantage. If page specified .N → look it up by id. If page only
+  // gave the bare LOC, default to vantage 1. If the location has no vantages
+  // defined (legacy outline), return a synthetic single-vantage entry so the
+  // canvas grouping still works.
+  const vantages = Array.isArray(location.vantages) ? location.vantages : [];
+  let vantage = null;
+  if (parsed.vantageNum && vantages.length > 0) {
+    vantage = vantages.find(v => {
+      const m = (v.id || '').match(/\.(\d+)$/);
+      return m && parseInt(m[1], 10) === parsed.vantageNum;
+    });
+  }
+  if (!vantage && vantages.length > 0) {
+    vantage = vantages[0];
+  }
+  if (!vantage) {
+    // Legacy: synthesize a default vantage from the LOC's own description.
+    vantage = {
+      id: `${parsed.locId}.1`,
+      name: location.name || 'default view',
+      shot: 'wide',
+      description: location.description
+        || [location.setting, location.colors, location.features, location.signatureElement]
+            .filter(Boolean).join('. '),
+    };
+  }
+
+  return {
+    locId: parsed.locId,
+    locationName: location.name,
+    vantageId: vantage.id || `${parsed.locId}.1`,
+    name: vantage.name,
+    shot: vantage.shot || 'wide',
+    description: vantage.description || '',
+    location, // full LOC entry for landmark photo lookup, attribution, etc.
+    vantage,  // raw vantage entry (in case caller needs canvasImage etc.)
+  };
+}
+
+/**
+ * Group page numbers by primary vantage ID. Pages without a primary vantage
+ * are returned in the special `__unassigned__` bucket.
+ *
+ * @param {Array<{pageNumber, sceneMetadata}>} pageDataArray
+ * @param {Object} visualBible
+ * @returns {Map<string, {vantage, pageNumbers: number[]}>}
+ *   key = vantageId, value = { vantage: getPrimaryVantageForPage result, pageNumbers }
+ *   plus a `__unassigned__` entry { vantage: null, pageNumbers }
+ */
+function groupPagesByVantage(pageDataArray, visualBible) {
+  const groups = new Map();
+  const unassigned = [];
+  for (const pd of pageDataArray) {
+    const v = getPrimaryVantageForPage(pd.sceneMetadata, visualBible);
+    if (!v) { unassigned.push(pd.pageNumber); continue; }
+    const key = v.vantageId;
+    if (!groups.has(key)) groups.set(key, { vantage: v, pageNumbers: [] });
+    groups.get(key).pageNumbers.push(pd.pageNumber);
+  }
+  if (unassigned.length > 0) {
+    groups.set('__unassigned__', { vantage: null, pageNumbers: unassigned });
+  }
+  return groups;
+}
+
+// ============================================================================
 // POSITION NORMALIZATION
 // ============================================================================
 
@@ -5475,6 +5582,10 @@ module.exports = {
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   buildAvailableLandmarksSection,
+
+  // Location vantages (canvas-per-vantage pipeline)
+  getPrimaryVantageForPage,
+  groupPagesByVantage,
 
   // Position utilities
   expandPositionAbbreviations,

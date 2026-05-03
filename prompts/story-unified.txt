@@ -187,7 +187,7 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 - `depth` (optional, default `foreground`): camera distance, NOT frame position. `foreground` = large and close, filling ~1/3+ of frame height. `midground` = head and torso visible, middle band. `background` = small/distant; a tiny silhouette roughly 1/6 of frame height or less. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size, `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is named as a single distant figure, `depth` MUST be `background`.
 - `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder`.
 
-**objects[]** — Visual Bible IDs. **When a landmark has numbered photo variants** (e.g. `LOC003.1`, `LOC003.2`, `LOC003.3`), emit the specific variant whose description matches the scene's `shot` and perspective — not the bare `LOC003`. Default to `.1` only if no variant is a clear match.
+**objects[]** — Visual Bible IDs. **For every page, the FIRST `LOC###` ID is the page's primary location and MUST be a vantage (e.g. `LOC001.2`, not bare `LOC001`).** The vantage you pick must be the one whose `pages: []` array includes this page number — i.e. the assignment you made in the Visual Bible. The pipeline reads this to attach the right pre-rendered canvas. If a real landmark also has numbered photo variants, use the same dotted form: the vantage and the photo variant are the same numbering.
 
 **interactions[]** — one entry per essential character-to-object or character-to-character contact. Each entry has three fields: `character` (the subject), `object` (the target — Visual Bible ID, character name, or plain noun), `where` (a complete short English sentence with the object's HUMAN NAME embedded, e.g. "holds the stuffed elephant in lap", "gazes at the dragon a few paces apart", "leans against the cobblestone wall", "sits on the wooden bench"). The `where` sentence is read as-is by the image model — it must already contain the object's name in natural English so the model knows what to render. Bare verb phrases like "holds in lap" are wrong because they leave the object unnamed. Pose details — neck angle, gaze direction, body-part positioning — do NOT belong in `where`; leave them in the prose. Include every contact the plot depends on: what the character holds, wears, or carries; what surface they stand, sit, kneel, crouch, climb, push off, or land on; a weapon being gripped; a pivotal hand on another character. If the text describes movement FROM one thing TO another, BOTH origin and destination get an entry. Omit incidental contact. Test: could the story be told identically without the contact being visible? If yes, leave it out. Every person named in `interactions[]` must appear in this scene's `characters[]`.
 
@@ -719,7 +719,16 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "features": "[distinctive visual elements]",
       "signatureElement": "[ONE unique detail]",
       "isRealLandmark": false,
-      "landmarkQuery": null
+      "landmarkQuery": null,
+      "vantages": [
+        {
+          "id": "LOC001.1",
+          "name": "[short label, e.g. 'exterior view from upstream', 'on the bridge deck', 'under the bridge from the riverbank']",
+          "shot": "wide|medium|close-up|wide-low|aerial",
+          "description": "[2-3 sentences naming what the camera sees from this vantage — the building/landscape elements visible, the angle, the foreground band where characters will be composited later. No characters here, only setting.]",
+          "pages": [X, Y]
+        }
+      ]
     }
   ],
   "vehicles": [],
@@ -732,6 +741,24 @@ For famous buildings, monuments, or locations that exist in reality:
 - Set `"isRealLandmark": true`
 - Set `"landmarkQuery"` to the EXACT landmark name for photo lookup
 - This helps us show accurate landmark photos in illustrations
+
+**LOCATION VANTAGES:**
+Every location MUST have a `vantages[]` array — at least one entry. A vantage is one camera position into the location: a single canvas image is rendered for it once and reused across every page that uses that vantage. Pages reference a vantage with the dotted form `LOC001.2` in their `objects[]` (vantage 2 of LOC001).
+
+**When to split into multiple vantages.** Use a separate vantage entry whenever the same location is shown from a fundamentally different camera position or framing — different enough that one canvas image cannot serve both shots. Common splits:
+- Exterior of a building / interior of the same building (`LOC###.1` outside the church, `LOC###.2` inside the nave)
+- On a structure / under or beside it (`LOC###.1` on the bridge deck, `LOC###.2` under the bridge from the riverbank)
+- Wide vista / close-up of one element (`LOC###.1` whole castle from below, `LOC###.2` close on the broken battlement)
+- Approach view / arrival view (`LOC###.1` path leading to it, `LOC###.2` standing in front of the entrance)
+
+Do NOT make a separate vantage for: lighting changes, weather changes, time of day, or different characters present. One vantage handles all of those — the canvas is generic location backdrop, the per-page render adjusts the lighting and characters.
+
+Each vantage entry has:
+- `id` (required): `LOC###.N` where N starts at 1.
+- `name` (required): short human-readable label (3–8 words).
+- `shot` (required): `wide` / `medium` / `close-up` / `wide-low` / `aerial`. Drives the camera angle for the canvas.
+- `description` (required): 2–3 sentences naming what the camera sees — building/landscape elements, angle, the empty foreground band where characters will be composited later. Background only, no figures.
+- `pages` (required): list of page numbers that use this vantage. Every page in `LOC###.pages` must appear in exactly one vantage's `pages`.
 
 {AVAILABLE_LANDMARKS_SECTION}
 

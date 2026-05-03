@@ -4799,8 +4799,101 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         : MODEL_DEFAULTS.singlePassScene === true;
       log.info(`🎛️ [UNIFIED] referenceMode=${runReferenceMode} singlePassScene=${runSinglePassScene}`);
 
+      // Phase 5a-pre-vantage: render ONE backdrop canvas per Visual Bible
+      // location vantage and reuse it across every page that uses that vantage.
+      // Runs regardless of singlePassScene — the canvas is shared, so the cost
+      // is bounded by the number of distinct vantages (typically 2-5 per story)
+      // and the win is location consistency across pages.
+      if (modelOverrides.generateEmptyScenes !== false && visualBible?.locations?.length > 0) {
+        const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
+        const groups = groupPagesByVantage(pageDataArray, visualBible);
+        const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
+        if (realGroups.length > 0) {
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) for ${pageDataArray.length} page(s)`);
+          const vStart = Date.now();
+          const vLimit = pLimit(20);
+          const { getTextAreaMask } = require('./server/lib/textMasks');
+          await Promise.all(realGroups.map(([vantageId, group]) => vLimit(async () => {
+            await checkCancellation();
+            const v = group.vantage;
+            // Pull a representative page so we can inherit aspect / model / landmark refs.
+            const repPageNum = group.pageNumbers[0];
+            const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
+            if (!repPageData) return;
+            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
+            const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
+            // Vantage canvas is GENERIC — no character-space hints (the canvas
+            // serves multiple pages with different cast/positions), no calm-zone
+            // (text overlay zone differs per page via spread rule). The per-page
+            // image render handles those.
+            const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
+            const shotPrefix = v.shot ? `**SHOT:** ${v.shot}\n\n` : '';
+            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
+            const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
+            // Pull landmark photos for the LOC if real — used as a strict
+            // visual reference for the Wikimedia-photo case.
+            const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
+              ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
+              : (repPageData.landmarkPhotos || []);
+            const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+              STYLE_DESCRIPTION: artStyleDesc,
+              EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
+              CHARACTER_SPACE: characterSpace,
+              TEXT_AREA_INSTRUCTION: '',
+              ERA_GUARD: eraGuard,
+            });
+            try {
+              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
+              const emptySceneVbGridDataUrl = emptySceneVbGrid
+                ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
+                : null;
+              const result = await generateImageOnly(emptyPrompt, [], {
+                aspectRatio: layoutAspect,
+                imageModelOverride: repPageData.pageImageModel,
+                imageBackendOverride: repPageData.pageImageBackend,
+                landmarkPhotos,
+                visualBibleGrid: emptySceneVbGrid,
+                pageNumber: repPageNum,
+                skipCache: true,
+                pageContext: `vantage-${vantageId}`,
+              });
+              if (result?.usage) {
+                const isRunware = result.modelId?.startsWith('runware:');
+                const isGrok = result.modelId?.startsWith('grok-imagine');
+                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+                addUsage(provider, result.usage, 'page_images', result.modelId);
+              }
+              if (!result?.imageData) {
+                log.warn(`⚠️ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) produced no image`);
+                return;
+              }
+              // Fan out the same canvas to every page in the group.
+              for (const pn of group.pageNumbers) {
+                if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
+                sceneBackgrounds[pn] = {
+                  imageData: result.imageData,
+                  prompt: emptyPrompt,
+                  textAreaMask: null,
+                  emptySceneVbGrid: emptySceneVbGridDataUrl,
+                  vantageId,
+                  vantageName: v.name,
+                  locationName: v.locationName,
+                };
+              }
+              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
+            } catch (err) {
+              log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
+            }
+          })));
+          const vElapsed = ((Date.now() - vStart) / 1000).toFixed(1);
+          const covered = Object.keys(sceneBackgrounds).length;
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} canvases → ${covered} pages covered in ${vElapsed}s (saved ${Math.max(0, covered - realGroups.length)} redundant generations)`);
+        }
+      }
+
       // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
       // Note: sceneBackgrounds may already have entries from trial mode early generation
+      // OR from Phase 5a-pre-vantage above (vantage canvas covers most pages).
       if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene) {
         log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
         const bgStartTime = Date.now();
