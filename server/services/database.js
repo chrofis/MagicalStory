@@ -591,6 +591,17 @@ async function initializeDatabase() {
     await dbPool.query(`ALTER TABLE story_retry_images ADD COLUMN IF NOT EXISTS image_url TEXT`);
     await dbPool.query(`ALTER TABLE style_lab_images   ADD COLUMN IF NOT EXISTS image_url TEXT`);
 
+    // R2 migration (Phase 1b): the writers set image_data=null once the bytes
+    // live in R2 (saveStyleLabImage / story_images write path). The original
+    // CREATE TABLE declared image_data NOT NULL, so any URL-only insert dies
+    // with "null value in column ... violates not-null constraint" — visible
+    // in the Style Lab UI as both Grok and Gemini cards showing the error
+    // text in place of the rendered image. Drop NOT NULL on all three R2
+    // dual-write tables. IF EXISTS guards make this safe to re-run.
+    await dbPool.query(`ALTER TABLE story_images       ALTER COLUMN image_data DROP NOT NULL`);
+    await dbPool.query(`ALTER TABLE story_retry_images ALTER COLUMN image_data DROP NOT NULL`);
+    await dbPool.query(`ALTER TABLE style_lab_images   ALTER COLUMN image_data DROP NOT NULL`);
+
     // Historical locations table (pre-fetched photos for historical stories)
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS historical_locations (
