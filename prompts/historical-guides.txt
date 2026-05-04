@@ -2032,14 +2032,21 @@ PERIOD COSTUMES:
 - Soldiers: Chain mail or leather armor, Habsburg colors
 - Boatmen: Simple wool tunics, leather vests, bare arms for rowing
 
-KEY LOCATIONS: Altdorf town square (apple shot), Lake Lucerne (storm escape), Tellsplatte
-(the rock where Tell leaped), Tellskapelle (chapel marking the escape), Hohle Gasse near
-Küssnacht (assassination), Schächenbach river (Tell's death)
+KEY LOCATIONS: Altdorf Panorama (village + Pfarrkirche St. Martin + Bristen mountain),
+Marktplatz Altdorf (medieval square with Gessler's hat on the pole), Apple Shot Scene
+(the marketplace with Walter under the lime tree), Lake Uri storm crossing (boat in
+stormy weather before the leap), Tellsplatte (the flat rock where Tell leaped from
+the boat), Hohle Gasse Küssnacht (V-shape ravine where Tell ambushed Gessler),
+Tellshaus Bürglen (Tell's traditional home in the alpine village)
 
 LOCATION_REFERENCES:
-- Tell Monument | Wilhelm Tell Monument Altdorf | Monument
-- Tellskapelle | Tellskapelle Lake Lucerne | Chapel
-- Hohle Gasse | Hohle Gasse Küssnacht | Historic
+- Altdorf Panorama | Altdorf, Uri, Switzerland — panoramic view | Town
+- Marktplatz Altdorf | Marktplatz Altdorf — medieval town square | Square
+- Apple Shot Scene (Altdorf) | Apple shot scene, Altdorf marketplace | Scene
+- Lake Uri storm crossing | Lake Uri (Urnersee) in storm | Lake
+- Tellsplatte (boat jump) | Tellsplatte rock, Lake Uri | Landmark
+- Hohle Gasse Küssnacht | Hohle Gasse near Küssnacht — sunken forest road | Historic
+- Tellshaus Bürglen | Tellshaus Bürglen — Wilhelm Tell's house | House
 
 STORY ANGLES:
 - The tension of the apple shot from Walter's perspective

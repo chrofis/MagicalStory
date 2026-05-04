@@ -3530,9 +3530,12 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
       if (historicalLocations?.length > 0) {
         locationsSection = `
 
-**PRE-POPULATED LOCATIONS (reference images available for these):**
+**PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
 ${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
-Include these locations in the story when appropriate - we have reference photos for accurate image generation.`;
+RULES for these locations:
+1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants — the name is the lookup key for the reference photo.
+2. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
+3. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
         log.debug(`[PROMPT] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
@@ -3541,9 +3544,12 @@ Include these locations in the story when appropriate - we have reference photos
       if (historicalObjects?.length > 0) {
         objectsSection = `
 
-**PRE-POPULATED OBJECTS (reference images available for these period objects):**
+**PRE-POPULATED OBJECTS (canonical reference images for these period objects — USE AS-IS):**
 ${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
-Reference these objects by their exact names in scene descriptions when relevant — reference photos are stored so the image pipeline renders them consistently across the story.`;
+RULES for these objects:
+1. Use the EXACT name shown above whenever you mention one of these objects (scene descriptions, the Visual Bible artifacts list, cover hints). The name is the lookup key for the reference photo.
+2. When you write the Visual Bible entry for one of these objects, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT invent alternative shapes, parts, or details — the reference photo was painted to match this exact description and any divergence will produce a different-looking object on the page.
+3. Do not create a parallel artifact entry with a different name for the same physical object.`;
         log.debug(`[PROMPT] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
       }
 
@@ -4888,9 +4894,12 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
       if (historicalLocations?.length > 0) {
         locationsSection = `
 
-**PRE-POPULATED LOCATIONS (reference images available for these):**
+**PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
 ${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
-Include these locations in the story when appropriate - we have reference photos for accurate image generation.`;
+RULES for these locations:
+1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants — the name is the lookup key for the reference photo.
+2. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
+3. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
         log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
@@ -4899,9 +4908,12 @@ Include these locations in the story when appropriate - we have reference photos
       if (historicalObjects?.length > 0) {
         objectsSection = `
 
-**PRE-POPULATED OBJECTS (reference images available for these period objects):**
+**PRE-POPULATED OBJECTS (canonical reference images for these period objects — USE AS-IS):**
 ${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
-Reference these objects by their exact names in scene descriptions when relevant — reference photos are stored so the image pipeline renders them consistently across the story.`;
+RULES for these objects:
+1. Use the EXACT name shown above whenever you mention one of these objects (scene descriptions, the Visual Bible artifacts list, cover hints). The name is the lookup key for the reference photo.
+2. When you write the Visual Bible entry for one of these objects, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT invent alternative shapes, parts, or details — the reference photo was painted to match this exact description and any divergence will produce a different-looking object on the page.
+3. Do not create a parallel artifact entry with a different name for the same physical object.`;
         log.debug(`[UNIFIED] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
       }
 
