@@ -39,6 +39,24 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
    - Never exceed 3, even if every issue is CRITICAL. A fourth CRITICAL goes into `dropped_issues` — the next pass will catch it once the first three are fixed.
    - CRITICAL/MAJOR issues that DON'T make the top 3 are still dropped with the "capped" reason — this is the one case where rule "never drop CRITICAL/MAJOR" is overridden, because asking Grok to fix 4+ things makes the repair effectively useless.
 
+## Final score (0–100) — single source of truth for redo decisions
+
+9. After deduplication, compute `final_score` as the page's overall quality on a 0–100 scale. The downstream pipeline uses this number — and only this number — to decide whether the page gets regenerated. Do not return raw evaluator sums; we already know those.
+
+   **Rules:**
+   - Score AFTER deduplicating across evaluators. The same physical problem flagged by quality, semantic, and entity is ONE issue, deducted ONCE.
+   - **Be tolerant of small things.** A loose strand of hair, a colour shifted half a tone, a finger held slightly differently — these are minor cosmetic deviations from the prompt and should NOT tank the score. Most renders of a children's book scene contain a few of these and shipping them is fine.
+   - Severity-based deduction (apply once per *unique* problem, not once per evaluator that flagged it):
+     * CRITICAL: −30 (figure missing, wrong character entirely, scene fundamentally wrong)
+     * MAJOR: −15 (clearly wrong clothing or pose, visible anatomy bug, wrong landmark)
+     * MODERATE: −7 (noticeable but not story-breaking — wrong hair tie, missing accessory)
+     * MINOR: −2 (cosmetic — slight colour drift, tiny anatomy quirk, faint texture artifact)
+   - Floor at 0, ceiling at 100. If there are no issues at all, return 100.
+   - Pages that ship as-is in a finished book should land at 70+. Pages that need redo should be ≤55. The grey zone 55–70 is for "noticeable but acceptable".
+   - Apply the same dedupe/tolerance philosophy to the dropped issues (rule 7 / "requires_char_fix_not_inpaint" / etc.) — those count toward the score even though they're not in the fix list.
+
+10. Also return `final_score_reason`: a one-sentence explanation of what drove the score (which 1-2 issues hurt most, or "no significant issues" if 100).
+
 ## Fix-instruction shape
 
 For every `per_character_fixes[]` entry AND for `scene_fix.instruction` you MUST emit three fields, in this order:
@@ -105,7 +123,9 @@ Final: `"Open the eyes wide."`
   },
   "dropped_issues": [
     {"issue": "hair color slightly too light", "reason": "trivial — quality score already acceptable on this"}
-  ]
+  ],
+  "final_score": 78,
+  "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable."
 }
 ```
 

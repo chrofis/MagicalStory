@@ -34,9 +34,19 @@ function findBadPages(evalPages, options = {}) {
     const pageNum = parseInt(pageNumStr, 10);
     if (isNaN(pageNum)) continue;
 
-    // Prefer the explicit finalScore (set by unified pipeline round loop).
-    // Fall back to the ambiguous score/qualityScore fields for legacy callers.
-    const score = result.finalScore ?? result.score ?? result.qualityScore ?? null;
+    // Prefer the consolidator's deduplicated, tolerant final_score — single
+    // source of truth that already merged the same physical issue across
+    // quality / semantic / entity evaluators. Without this, a single moderate
+    // problem flagged by all three got triple-counted toward redo gating.
+    // Currently the consolidator only runs during inpaint execution; this
+    // field is forward-compatible for when it's promoted to eval-phase too.
+    // Falls back to finalScore (unified pipeline round loop) and the
+    // ambiguous score / qualityScore fields for legacy callers.
+    const score = result.consolidatorFinalScore
+      ?? result.finalScore
+      ?? result.score
+      ?? result.qualityScore
+      ?? null;
     const issueCount = result.fixableIssues?.length ?? 0;
 
     // Skip pages with no score data

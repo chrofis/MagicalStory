@@ -262,6 +262,19 @@ async function consolidateFeedback({
     }
     if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
 
+    // Final score (0-100) — the consolidator's deduplicated, tolerant judgment.
+    // Authoritative for redo decisions; replaces the old practice of summing
+    // raw evaluator penalties (which double-counted the same physical issue
+    // when quality + semantic + entity all flagged it). Coerce to integer in
+    // [0, 100] and default to a passing score when the LLM omits the field
+    // (defensive — the prompt requires it, but old replays may not have it).
+    if (typeof plan.final_score === 'number' && Number.isFinite(plan.final_score)) {
+      plan.final_score = Math.max(0, Math.min(100, Math.round(plan.final_score)));
+    } else {
+      plan.final_score = null;
+    }
+    if (typeof plan.final_score_reason !== 'string') plan.final_score_reason = '';
+
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
     // empirically a 6-fix inpaint often changes nothing. Cap severity-first and
