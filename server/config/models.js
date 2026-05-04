@@ -257,9 +257,15 @@ const IMAGE_MODELS = {
   }
 };
 
-// Repair workflow thresholds — single source of truth for server-side pipeline
+// Repair workflow thresholds — single source of truth for server-side pipeline.
+// scoreThreshold was previously 80, calibrated when Gemini quality eval was the
+// only scorer. Now finalScore subtracts THREE penalties (qualityScore −
+// semanticPenalty − entityPenalty), so a single moderate issue flagged by all
+// three evaluators triple-counts to −30 from a perfect 100 → 70 < 80 → redo.
+// Lowered to 60 so a single moderate issue stays above the bar; only genuinely
+// bad pages (multiple issues OR one critical penalty) trip a regenerate.
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 80,       // Pages scoring below this need redo (0-100)
+  scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: 3,             // Global passes over all pages
   maxCharRepairPages: 50,   // Max pages to character-repair per run (effectively uncapped; pipeline passes actual page count)
