@@ -5504,8 +5504,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // Pass full character objects so the consolidator can build authoritative
   // physical descriptions (with glasses, facial hair, etc.) — which override
   // any stale/incomplete scene descriptions or false eval flags.
+  // Text-only consolidator: no image. Sonnet's job is to dedupe / sort / trim
+  // evaluator findings, not to run its own vision pass. Without this, Sonnet
+  // would invent fixes (e.g. "Replace the face") that no evaluator flagged.
   const consolidation = await consolidateFeedback({
-    imageDataUri: imageData,
     sceneDescription,
     evaluation,
     entityReport,

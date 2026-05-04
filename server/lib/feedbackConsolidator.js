@@ -144,8 +144,14 @@ function flattenEntityIssues(entityReport) {
 /**
  * Consolidate all feedback for a page into a clean repair plan.
  *
+ * Text-only: the consolidator dedupes / sorts / trims evaluator findings,
+ * it does NOT see the page image. Removing the vision pass eliminates the
+ * "Sonnet invents a fix that no evaluator flagged" failure mode (e.g. cover
+ * inpaint asking Grok to "Replace the face" / "Remove the beard" because
+ * Sonnet's own image observation disagreed with the character profile, even
+ * though the quality / semantic / entity evaluators raised neither issue).
+ *
  * @param {object} args
- * @param {string} args.imageDataUri - current page image (data:image/...;base64,...)
  * @param {string} args.sceneDescription - intended scene description
  * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection }
  * @param {object} [args.entityReport] - entity consistency report (whole story) — only entries for this page are used
@@ -154,7 +160,6 @@ function flattenEntityIssues(entityReport) {
  * @returns {Promise<{plan: object|null, usage: object|null, error: string|null}>}
  */
 async function consolidateFeedback({
-  imageDataUri,
   sceneDescription,
   evaluation = {},
   entityReport = null,
@@ -235,12 +240,12 @@ async function consolidateFeedback({
 
     const fullPrompt = `${template}\n\n---\n\n${userInput}`;
 
-    const callOptions = imageDataUri ? { images: [imageDataUri] } : {};
-
+    // Text-only — no image passed. The consolidator's job is to dedupe / sort /
+    // trim what evaluators already flagged, not to run its own vision pass.
     // Sonnet — Haiku padded fix instructions with adjectives and negations
     // ("show effort", "rather than X") that Grok cannot execute, and was
     // soft on the "drop trivial flags" rules. Sonnet follows the policy.
-    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', callOptions);
+    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', {});
     if (!result?.text) {
       return { plan: null, usage: result?.usage || null, error: 'no text in consolidator response' };
     }
