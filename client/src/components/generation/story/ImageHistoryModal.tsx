@@ -424,6 +424,17 @@ export function ImageHistoryModal({
                     const semanticPenalty = detailVersion.semanticScore != null ? Math.max(0, 100 - detailVersion.semanticScore) : null;
                     const entityPenalty = detailVersion.entityPenalty || 0;
                     const totalPenalty = qualityPenalty + compliancePenalty + (semanticPenalty || 0) + entityPenalty;
+                    // The headline must reconcile with the per-evaluator cards below.
+                    // detailVersion.qualityScore from the backend already folds in
+                    // the Gemini quality + semantic penalties but NOT the entity
+                    // penalty (entity is applied at pick-best ranking time only).
+                    // Showing qualityScore as the "final" while summing all four
+                    // deductions made the math look broken (e.g. 25% with -95 total).
+                    // Compute the effective score from the same penalties shown so
+                    // the breakdown adds up.
+                    const effectiveScore = Math.max(0, 100 - totalPenalty);
+                    const backendScoreDiffers = detailVersion.qualityScore != null
+                      && detailVersion.qualityScore !== effectiveScore;
 
                     const penaltyClass = (p: number | null) => p == null ? 'text-gray-400' : p === 0 ? 'text-green-600' : p >= 30 ? 'text-red-600' : p >= 15 ? 'text-orange-600' : 'text-yellow-600';
                     const fmt = (p: number | null) => p == null ? 'n/a' : p === 0 ? '0' : `-${p}`;
@@ -433,12 +444,17 @@ export function ImageHistoryModal({
                         {/* Final headline */}
                         <div className="flex flex-wrap items-center gap-3 text-sm">
                           <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
-                          <span className={`font-bold text-lg ${scoreColor(detailVersion.qualityScore)}`}>
-                            {detailVersion.qualityScore}%
+                          <span className={`font-bold text-lg ${scoreColor(effectiveScore)}`}>
+                            {effectiveScore}%
                           </span>
                           <span className="text-xs text-gray-500">
                             ({language === 'de' ? 'gesamt Abzug' : 'total deductions'} <span className={`font-semibold ${penaltyClass(totalPenalty)}`}>−{totalPenalty}</span>)
                           </span>
+                          {backendScoreDiffers && (
+                            <span className="text-xs text-gray-400" title={language === 'de' ? 'Backend qualityScore (vor Konsistenz-Abzug)' : 'backend qualityScore (before entity penalty)'}>
+                              {language === 'de' ? `Backend-Score: ${detailVersion.qualityScore}%` : `backend: ${detailVersion.qualityScore}%`}
+                            </span>
+                          )}
                           {detailVersion.totalAttempts != null && detailVersion.totalAttempts > 1 && (
                             <span className="text-gray-400">({detailVersion.totalAttempts} attempts)</span>
                           )}
