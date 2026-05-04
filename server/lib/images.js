@@ -8517,6 +8517,61 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
     const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
 
+    // E2. Compute the TARGET FIGURE silhouette inside the blend region. Outside
+    // the silhouette, blend alpha is forced to 0 — Grok's pixels never replace
+    // background sky / wall / cobblestones / hat-pole etc. With a tight figure
+    // mask, only the head (face mode) or full body (body mode) is repainted;
+    // the surrounding rectangle inside the blend region stays byte-exact from
+    // the original. Falls back to "no silhouette gate" (rectangle behaviour)
+    // if rembg is unavailable, preserving the previous output exactly.
+    let silhouetteAlphaInBlend = null;
+    try {
+      const targetCropForSilhouette = whiteoutTarget === 'face' && faceBbox
+        ? (() => {
+            const [fyMin, fxMin, fyMax, fxMax] = faceBbox;
+            const fW = fxMax - fxMin, fH = fyMax - fyMin;
+            return [
+              Math.max(0, fyMin - fH * FACE_PADDING),
+              Math.max(0, fxMin - fW * FACE_PADDING),
+              Math.min(1, fyMax + fH * FACE_PADDING),
+              Math.min(1, fxMax + fW * FACE_PADDING),
+            ];
+          })()
+        : [ymin, xmin, ymax, xmax];
+      const tCropLeft   = Math.max(0, Math.floor(targetCropForSilhouette[1] * sceneMeta.width));
+      const tCropTop    = Math.max(0, Math.floor(targetCropForSilhouette[0] * sceneMeta.height));
+      const tCropRight  = Math.min(sceneMeta.width,  Math.ceil(targetCropForSilhouette[3] * sceneMeta.width));
+      const tCropBottom = Math.min(sceneMeta.height, Math.ceil(targetCropForSilhouette[2] * sceneMeta.height));
+      const tCropWidth  = tCropRight - tCropLeft;
+      const tCropHeight = tCropBottom - tCropTop;
+      const cropForSilhouette = await sharp(sceneBuffer)
+        .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      const silhouettePng = await fetchSilhouettePng(cropForSilhouette);
+      if (silhouettePng) {
+        // Place the silhouette on a black scene-sized canvas, then crop to
+        // the blend region so each pixel of `silhouetteAlphaInBlend` lines up
+        // with `grokRegion`/`origRegion`.
+        const sceneSilhouetteRGBA = await sharp({
+          create: { width: sceneMeta.width, height: sceneMeta.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+        })
+          .composite([{ input: silhouettePng, top: tCropTop, left: tCropLeft }])
+          .png()
+          .toBuffer();
+        silhouetteAlphaInBlend = await sharp(sceneSilhouetteRGBA)
+          .extractChannel(3)
+          .extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight })
+          .raw()
+          .toBuffer();
+        log.info(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: silhouette-gated composite ON (only figure pixels repainted)`);
+      } else {
+        log.info(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: silhouette unavailable — falling back to rectangular blend (legacy behaviour)`);
+      }
+    } catch (silErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Silhouette gate failed (${silErr.message}) — using rectangular blend`);
+    }
+
     // Pre-compute protected rects in blend-region pixel coords.
     // Other characters must NEVER be changed regardless of whether we're fixing
     // a face or a body — always restore BOTH their faces AND their bodies from
@@ -8593,7 +8648,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
       const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
       const edgeAlpha = dMin >= FEATHER_PX ? 1 : dMin / FEATHER_PX;
-      const alpha = edgeAlpha * protectedAlpha;
+      // Silhouette gate: outside the target figure, force alpha to 0 so the
+      // blend keeps the original pixels (background sky / wall / cobblestones
+      // around the head are byte-exact). Inside the silhouette, full strength.
+      // 0/255 hard mask is acceptable here because the surrounding edgeAlpha
+      // (rectangle-edge feather, 30 px) already smooths the rectangular zone;
+      // the silhouette just punches out the non-figure pixels inside it. If
+      // rembg was unreachable (silhouetteAlphaInBlend == null), this collapses
+      // to 1 — preserving the legacy rectangular blend behaviour.
+      const silAlpha = silhouetteAlphaInBlend ? (silhouetteAlphaInBlend[i] > 128 ? 1 : 0) : 1;
+      const alpha = edgeAlpha * protectedAlpha * silAlpha;
       maskPixels[i] = Math.round(alpha * 255);
       const idx = i * 3;
       blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + grokRegion[idx]     * alpha);
