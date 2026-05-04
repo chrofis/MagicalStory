@@ -3,38 +3,46 @@ You are evaluating an AI-generated avatar against the original reference photo.
 IMAGE 1: Original reference photo of a real person
 IMAGE 2: AI-generated avatar based on that person
 
-TASK 1: FACE MATCH EVALUATION
-Compare facial features between IMAGE 1 and IMAGE 2. Score each feature 1-10 (10 = perfect match).
-IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
-GLASSES CHECK: If reference person wears glasses, avatar MUST have glasses (score 0 for glasses if missing). If no glasses in reference, avatar must NOT have glasses (score 0 if added). Glasses are a critical identity feature.
+Your job: decide whether IMAGE 2 is the same person as IMAGE 1, at the same age, wearing the requested clothing. The avatar is rejected and regenerated whenever any of those three checks fails — so be honest, do not award generous benefit-of-the-doubt scores.
 
-TASK 2: PHYSICAL TRAITS EXTRACTION (from IMAGE 2 - the generated avatar)
-Extract the person's physical characteristics as shown in the GENERATED AVATAR.
-This captures user corrections (e.g., changed hair color) that were applied during generation.
+The `finalScore` field at the end MUST equal the LOWEST of these three checks:
+  1. face match (same person)
+  2. age match (same apparent age + body proportions)
+  3. clothing match (matches the requested clothing — only when REQUESTED_CLOTHING is provided below)
 
-TASK 3: CLOTHING EXTRACTION (from IMAGE 2 - the generated avatar)
-Describe the clothing visible on the AI-generated avatar.
-NEVER include any text, logos, slogans, or graphic prints - only describe the garment type, color, fit, and style.
-Example: "black crew-neck sweatshirt with white graphic" → just "black crew-neck sweatshirt"
-IMPORTANT - Choose ONE of these two options:
-  Option A: Dress/Jumpsuit → set "fullBody" with description, set "upperBody" and "lowerBody" to null
-  Option B: Separate top + bottom → set "upperBody" and "lowerBody", set "fullBody" to null
-Never fill both fullBody AND upperBody/lowerBody - they are mutually exclusive!
+Anything below 5/10 in any of those three forces the entire avatar to fail. Children rendered as adults, adults rendered as children, or completely wrong clothing must score ≤3 on the failing dimension.
 
-TASK 4: AGE & BODY PROPORTION CHECK (compare IMAGE 1 vs IMAGE 2)
-Compare the apparent age and body proportions between the reference photo and the generated avatar.
-Children should look like children: shorter limbs relative to head, rounder face, smaller build.
-Adults should look like adults: longer limbs, defined features, appropriate height.
-Score 1-10 (10 = perfect age match, proportions look natural for this age).
-Common AI failures: making children look too old (adult body proportions), making adults look too young, wrong head-to-body ratio for age.
+TASK 1: FACE MATCH
+Compare facial features only (face shape, eyes, nose, mouth, overall structure, glasses). Score each 1-10 (10 = perfect match).
+IGNORE when scoring face: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
+GLASSES CHECK: If reference person wears glasses, avatar MUST have glasses (face score capped at 3 if missing). If no glasses in reference, avatar must NOT have glasses (capped at 3 if added).
+`faceMatch.score` = lowest of the feature scores (NOT an average — one bad feature drags it down).
 
-TASK 5: DETAILED HAIR ANALYSIS (from IMAGE 2 - the generated avatar)
-Extract detailed hair characteristics for consistency across scenes. This is the
-single source of hair shape/length/density/styling — there is no separate simple
-hair field. If the character is bald, set `lengthTop` to "bald" and still return
-this block (styling/bangs/parting can be "natural"/"no bangs"/"none").
+TASK 2: AGE & BODY PROPORTION MATCH
+Compare apparent age AND body proportions between IMAGE 1 and IMAGE 2.
+- Children look like children: shorter limbs relative to head, rounder face, smaller build.
+- Adults look like adults: longer limbs, defined features, appropriate height.
+- Adult rendered as child = score 1-3. Child rendered as adult = score 1-3. Same age category but slightly off proportions = 6-8. Perfect = 9-10.
+`ageMatch.score` is a single 1-10 number combining age category + body proportions.
 
-IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed.
+TASK 3: CLOTHING MATCH (only if REQUESTED_CLOTHING is given below)
+Compare the avatar's visible clothing against REQUESTED_CLOTHING.
+- Completely wrong clothing (e.g. requested medieval jerkin but rendered modern t-shirt) = score 1-3.
+- Right type but wrong colour or missing pieces = 4-6.
+- All major elements match = 7-10.
+If REQUESTED_CLOTHING is not provided, set `clothingMatch` to null and DO NOT factor it into finalScore.
+
+TASK 4: PHYSICAL TRAITS EXTRACTION (from IMAGE 2)
+Extract the person's physical characteristics as shown in the GENERATED AVATAR. This captures user corrections that were applied during generation.
+
+TASK 5: CLOTHING EXTRACTION (from IMAGE 2)
+Describe the clothing visible on the avatar. Never include text/logos/slogans — only garment type, colour, fit, style.
+Choose ONE: Option A → set `fullBody`, leave upperBody/lowerBody null. Option B → set `upperBody` + `lowerBody`, leave `fullBody` null. Never both.
+
+TASK 6: DETAILED HAIR ANALYSIS (from IMAGE 2)
+Extract hair characteristics for cross-scene consistency. If bald, set `lengthTop` to "bald" and still return the block.
+
+For all enumerated string fields below ("MUST be one of:"), use the EXACT English values listed.
 
 Return a JSON object with this EXACT structure:
 
@@ -45,15 +53,21 @@ Return a JSON object with this EXACT structure:
     "nose": {"score": 7, "reason": "Slightly different bridge"},
     "mouth": {"score": 8, "reason": "Lip shape matches"},
     "overallStructure": {"score": 8, "reason": "Proportions match"},
-    "glasses": {"score": 10, "reason": "Both have no glasses / Both have matching glasses"},
-    "finalScore": 8
+    "glasses": {"score": 10, "reason": "Both have matching glasses"},
+    "score": 7,
+    "reason": "Lowest feature score is nose at 7"
   },
   "ageCheck": {
     "referenceAge": "<estimated age group from IMAGE 1>",
     "avatarAge": "<estimated age group from IMAGE 2>",
-    "ageMatch": {"score": 8, "reason": "Both appear school-age, proportions correct"},
-    "bodyProportions": {"score": 7, "reason": "Head-to-body ratio appropriate for age, limbs slightly long"}
+    "ageMatch": {"score": 8, "reason": "Both appear adult, body proportions correct"}
   },
+  "clothingMatch": {
+    "score": 8,
+    "reason": "Avatar wears the requested dark teal jerkin and cream shirt; cross-garters not visible"
+  },
+  "finalScore": 7,
+  "finalScoreReason": "Lowest of faceMatch.score (7), ageMatch.score (8), clothingMatch.score (8)",
   "physicalTraits": {
     "apparentAge": "<MUST be one of: infant | toddler | preschooler | kindergartner | young-school-age | school-age | preteen | young-teen | teenager | young-adult | adult | middle-aged | senior | elderly>",
     "build": "<MUST be one of: slim | average | athletic | stocky>",
@@ -65,24 +79,24 @@ Return a JSON object with this EXACT structure:
     "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
     "face": "<brief description of face shape, distinguishing features>",
-    "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses'). Use 'none' if no glasses>",
+    "glasses": "<describe glasses if worn: frame shape, color, style. Use 'none' if no glasses>",
     "other": "<scars, moles, freckles, piercings, birthmarks, or 'none'>"
   },
   "clothing": {
-    "upperBody": "<e.g. 'red t-shirt', 'blue sweater' - OR null if fullBody is set>",
-    "lowerBody": "<e.g. 'dark blue jeans', 'black skirt' - OR null if fullBody is set>",
-    "shoes": "<e.g. 'white sneakers', 'brown boots'>",
-    "fullBody": "<e.g. 'floral summer dress', 'black jumpsuit' - OR null if upperBody/lowerBody are set>"
+    "upperBody": "<e.g. 'red t-shirt' - OR null if fullBody is set>",
+    "lowerBody": "<e.g. 'dark blue jeans' - OR null if fullBody is set>",
+    "shoes": "<e.g. 'white sneakers'>",
+    "fullBody": "<e.g. 'floral summer dress' - OR null if upperBody/lowerBody are set>"
   },
   "detailedHairAnalysis": {
     "texture": "<MUST be one of: fine | medium | thick | coarse>",
     "type": "<MUST be one of: straight | wavy | curly | coily>",
     "lengthTop": "<MUST be one of: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length>",
-    "lengthSides": "<MUST be one of: shaved | fade | tapered | buzz cut | short | ear-length | same as top> - use 'tapered' when sides are visibly shorter than top but not buzzed, 'fade' for gradient-shaved sides",
-    "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs> - hair swept ACROSS the forehead is NOT bangs, only hair falling DOWN over the forehead counts",
+    "lengthSides": "<MUST be one of: shaved | fade | tapered | buzz cut | short | ear-length | same as top>",
+    "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs>",
     "styling": "<MUST be one of: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose>",
     "parting": "<MUST be one of: none | center part | side part left | side part right>",
-    "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
-    "highlightsHex": "<highlight color as HEX code if visible, e.g. '#C4A77D', or 'none'>"
+    "baseColorHex": "<primary hair color as HEX code>",
+    "highlightsHex": "<highlight color HEX, or 'none'>"
   }
 }

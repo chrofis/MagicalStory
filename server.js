@@ -3470,23 +3470,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Resolve landmark photos for the cover — same pipeline as pages.
-        // Primary source: metadata from scene expansion (same JSON block pages produce).
-        // Fallback: LOC### IDs parsed from the outline's Objects: line.
-        // Only real landmarks have reference photos — filter to LOC IDs with isRealLandmark.
+        // Always merge LOC IDs from the outline's hint.objects into the scene
+        // metadata, regardless of whether scene expansion already produced
+        // some objects. Cover scene expansion typically emits ART IDs only
+        // (hat, elephant, crossbow) — without this merge the explicit
+        // landmark from the outline would be silently dropped because the
+        // metadata's objects list is non-empty.
         let coverSceneMetadata = coverExpandedMetadata;
-        if ((!coverSceneMetadata || !coverSceneMetadata.objects?.length)
-            && hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
-          const matchedObjects = [];
-          for (const locId of hint.objects.filter(id => id.startsWith('LOC'))) {
+        if (hint.objects && hint.objects.length > 0 && streamingVisualBible?.locations) {
+          const matchedLocs = [];
+          for (const locId of hint.objects.filter(id => /^LOC\d+/i.test(id))) {
             const loc = streamingVisualBible.locations.find(l => l.id && l.id.toUpperCase() === locId.toUpperCase());
             if (loc && loc.isRealLandmark) {
-              matchedObjects.push(`${loc.name} [${loc.id}]`);
+              matchedLocs.push(`${loc.name} [${loc.id}]`);
             } else if (loc) {
               log.warn(`⚠️ [COVER] ${coverLabel}: outline picked ${loc.id} (${loc.name}) but it's not a real landmark — no photo available`);
             }
           }
-          if (matchedObjects.length > 0) {
-            coverSceneMetadata = { ...(coverSceneMetadata || {}), objects: matchedObjects };
+          if (matchedLocs.length > 0) {
+            // Merge with existing objects from scene expansion — keep ART/CHR
+            // IDs alongside the landmark refs so element-grid lookup still works.
+            const existing = (coverSceneMetadata?.objects || []).filter(o => o);
+            const existingLocSet = new Set(
+              existing
+                .map(o => (typeof o === 'string' ? o : o?.id || '').match(/LOC\d+/i)?.[0]?.toUpperCase())
+                .filter(Boolean)
+            );
+            const toAppend = matchedLocs.filter(m => !existingLocSet.has(m.match(/LOC\d+/i)?.[0]?.toUpperCase()));
+            coverSceneMetadata = {
+              ...(coverSceneMetadata || {}),
+              objects: [...existing, ...toAppend],
+            };
           }
         }
         const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, coverSceneMetadata);
@@ -4037,6 +4051,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Parse the unified response (full parse for complete data)
     const parser = new UnifiedStoryParser(unifiedResponse);
     const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
+    const titleCandidates = parser.extractTitleCandidates();
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
@@ -6047,6 +6062,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const storyData = {
       id: storyId,
       title: title,
+      titleCandidates: titleCandidates || null, // Full list the model produced; null if legacy single-line TITLE
       storyType: inputData.storyType || '',
       storyTypeName: inputData.storyTypeName || '', // Display name for story type
       storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational

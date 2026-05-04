@@ -61,6 +61,7 @@ class UnifiedStoryParser {
         const { stableCandidateIndex } = require('./shared');
         const pick = candidates[stableCandidateIndex(candidates)];
         this._cache.title = pick;
+        this._cache.titleCandidates = candidates;
         log.info(`[UNIFIED-PARSER] Picked title (stable) from ${candidates.length} candidates: "${pick}"`);
         return pick;
       }
@@ -74,12 +75,24 @@ class UnifiedStoryParser {
         .replace(/^\*{1,2}|\*{1,2}$/g, '')
         .replace(/^"|"$/g, '')
         .trim();
+      this._cache.titleCandidates = null;
       log.debug(`[UNIFIED-PARSER] Title (legacy single-line): "${this._cache.title}"`);
       return this._cache.title;
     }
 
     this._cache.title = null;
+    this._cache.titleCandidates = null;
     return null;
+  }
+
+  /**
+   * Returns the full list of title candidates the model produced (or null
+   * if the outline used the legacy single `TITLE:` line). Triggers parsing
+   * on first call so the cache is populated.
+   */
+  extractTitleCandidates() {
+    if (this._cache.titleCandidates === undefined) this.extractTitle();
+    return this._cache.titleCandidates ?? null;
   }
 
   /**

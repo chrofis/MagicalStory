@@ -3741,13 +3741,19 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   }
 
   // Add PRIMARY landmark reference photo only (1st landmark as separate image)
-  // Secondary landmarks (2nd+) go into the Visual Bible grid instead
+  // Secondary landmarks (2nd+) go into the Visual Bible grid instead.
+  // Accept both `data:image/...;base64,XXXX` and raw base64 — historical_locations
+  // rows can carry the raw form; the previous strict prefix check silently
+  // dropped the curated photo before it reached the image model.
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    if (primaryLandmark.photoData && primaryLandmark.photoData.startsWith('data:image')) {
-      const base64Data = primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '');
-      const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
-        primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    if (primaryLandmark.photoData) {
+      const isDataUri = typeof primaryLandmark.photoData === 'string' && primaryLandmark.photoData.startsWith('data:');
+      const base64Data = isDataUri
+        ? primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '')
+        : primaryLandmark.photoData;
+      const mimeMatch = isDataUri ? primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) : null;
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
       // Add name label before the image (avoid numbered format to prevent "character sheet" generation)
       parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
@@ -3762,6 +3768,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       if (landmarkPhotos.length > 1) {
         log.debug(`🌍 [IMAGE GEN] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
       }
+    } else {
+      log.warn(`⚠️ [IMAGE GEN] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
     }
   }
 
@@ -4408,13 +4416,20 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
   }
 
-  // Add PRIMARY landmark reference photo only
+  // Add PRIMARY landmark reference photo only.
+  // Accept both `data:image/...;base64,XXXX` and raw base64 strings — rows
+  // inserted directly into historical_locations carry the raw form (no
+  // prefix), and the previous strict `startsWith('data:image')` check
+  // silently dropped the curated photo before it reached Grok.
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    if (primaryLandmark.photoData && primaryLandmark.photoData.startsWith('data:image')) {
-      const base64Data = primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '');
-      const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
-        primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    if (primaryLandmark.photoData) {
+      const isDataUri = typeof primaryLandmark.photoData === 'string' && primaryLandmark.photoData.startsWith('data:');
+      const base64Data = isDataUri
+        ? primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '')
+        : primaryLandmark.photoData;
+      const mimeMatch = isDataUri ? primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) : null;
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
       parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
       parts.push({
@@ -4425,6 +4440,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       });
       currentImageIndex++;
       log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
+    } else {
+      log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
     }
   }
 
@@ -9135,15 +9152,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         log.warn(`⚠️ [CHAR REPAIR GROK] Feather fitness check failed (${checkErr.message}) — using Grok verbatim`);
       }
 
-      if (canFeather) {
-        // Build a feathered single-channel mask at scene dims and composite.
-        // Sharp's `create` requires 3 or 4 channels — build a 3-channel black
-        // canvas, paste the silhouette PNG, blur, extract one channel.
-        const FEATHER_PX = 6;
+      const FEATHER_PX = 6;
+
+      // Helper: build a feathered alpha mask from an arbitrary silhouette PNG
+      // pasted at (left, top) on a scene-sized canvas, then composite Grok on
+      // top of sceneBuffer. Outside the silhouette = byte-exact original scene.
+      const compositeWithMask = async (silhouettePng, top, left) => {
         const featheredRGB = await sharp({
           create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } },
         })
-          .composite([{ input: silhouetteMaskBuf, top: hatchTop, left: hatchLeft }])
+          .composite([{ input: silhouettePng, top, left }])
           .blur(FEATHER_PX)
           .png()
           .toBuffer();
@@ -9153,16 +9171,55 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           .joinChannel(featheredMask)
           .png()
           .toBuffer();
-        finalBuf = await sharp(sceneBuffer)
+        return sharp(sceneBuffer)
           .composite([{ input: grokWithAlpha, top: 0, left: 0, blend: 'over' }])
           .jpeg({ quality: 95 })
           .toBuffer();
+      };
+
+      if (canFeather) {
+        finalBuf = await compositeWithMask(silhouetteMaskBuf, hatchTop, hatchLeft);
         featherDecision = `ON (newOnly ${(leakRatio * 100).toFixed(1)}%, feather ${FEATHER_PX}px)`;
       } else {
-        finalBuf = grokRawBuf;
-        featherDecision = leakRatio == null
-          ? 'OFF (fitness check failed)'
-          : `OFF (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% — figure moved)`;
+        // Fitness check failed: figure drifted enough that the OLD silhouette
+        // alone would clip the new figure. Don't fall back to using Grok's
+        // whole-image bytes (kills the entire scene). Instead build a UNION
+        // mask of old silhouette + new silhouette → feather over the union.
+        // Result: figure intact (covered by both old + new), background outside
+        // the union still byte-exact from sceneBuffer.
+        try {
+          const grokHatchCrop = await sharp(grokAtSourceDims)
+            .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+            .jpeg({ quality: 90 }).toBuffer();
+          const newSilBuf = await fetchSilhouettePng(grokHatchCrop);
+          if (newSilBuf) {
+            // Union via add: pixel-wise OR of two alpha channels. Use sharp's
+            // composite blend:'add' on the alpha layer.
+            const oldAlphaPng = await sharp(silhouetteMaskBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
+            const newAlphaPng = await sharp(newSilBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
+            const unionAlpha = await sharp(oldAlphaPng)
+              .composite([{ input: newAlphaPng, blend: 'add' }])
+              .png()
+              .toBuffer();
+            // Re-attach an opaque RGB so it behaves like the original silhouette
+            // PNG (3 colour channels + alpha = the union mask).
+            const unionSilhouette = await sharp({
+              create: { width: hatchWidth, height: hatchHeight, channels: 3, background: { r: 255, g: 0, b: 255 } }
+            })
+              .joinChannel(unionAlpha)
+              .png()
+              .toBuffer();
+            finalBuf = await compositeWithMask(unionSilhouette, hatchTop, hatchLeft);
+            featherDecision = `ON-UNION (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% — feathered over old∪new silhouette, background preserved)`;
+          } else {
+            finalBuf = grokRawBuf;
+            featherDecision = `OFF-VERBATIM (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% AND new silhouette unavailable for union)`;
+          }
+        } catch (unionErr) {
+          log.warn(`⚠️ [CHAR REPAIR GROK] Union mask build failed (${unionErr.message}) — using Grok verbatim`);
+          finalBuf = grokRawBuf;
+          featherDecision = `OFF-VERBATIM (union mask error: ${unionErr.message})`;
+        }
       }
     } else if (silhouetteMaskBuf && !featherEnabled) {
       finalBuf = grokRawBuf;

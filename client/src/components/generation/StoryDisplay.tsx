@@ -2789,11 +2789,21 @@ export function StoryDisplay({
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
                             </div>
                           )}
-                          {/* Landmark reference photo */}
-                          {entry.referencePhotoData && (
+                          {/* Landmark reference photo. Accept both `data:image/...;base64,XXXX`
+                              and raw base64 — historical_locations rows store raw bytes
+                              and the strict image src needed the data URI prefix to render. */}
+                          {(entry.referencePhotoUrl || entry.referencePhotoData) && (
                             <div className="mt-2 border border-amber-200 rounded overflow-hidden">
                               <img
-                                src={entry.referencePhotoData}
+                                src={
+                                  entry.referencePhotoUrl?.startsWith('http')
+                                    ? entry.referencePhotoUrl
+                                    : entry.referencePhotoData
+                                      ? (entry.referencePhotoData.startsWith('data:')
+                                          ? entry.referencePhotoData
+                                          : `data:image/jpeg;base64,${entry.referencePhotoData}`)
+                                      : ''
+                                }
                                 alt={`${entry.name} reference`}
                                 className="w-full max-h-32 object-contain bg-gray-50"
                               />
