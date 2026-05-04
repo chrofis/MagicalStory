@@ -9157,7 +9157,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       // Helper: build a feathered alpha mask from an arbitrary silhouette PNG
       // pasted at (left, top) on a scene-sized canvas, then composite Grok on
       // top of sceneBuffer. Outside the silhouette = byte-exact original scene.
+      //
+      // IMPORTANT: a previous version used .joinChannel(featheredMask) to
+      // attach the mask as alpha — that silently produced a 3-channel buffer
+      // (Sharp dropped the joined mask) and the resulting "feather composite"
+      // had no transparency at all, so every round was effectively a full
+      // Grok-verbatim paste-over and the background degraded on every char-fix.
+      // The reliable construction is: build an RGBA mask explicitly (R=255,
+      // G=0, B=255, A=feather), then `composite([{ input: rgbaMask, blend:
+      // 'dest-in' }])` to weight the Grok image by the mask's alpha channel.
       const compositeWithMask = async (silhouettePng, top, left) => {
+        // Build the feathered single-channel alpha at scene dims.
         const featheredRGB = await sharp({
           create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } },
         })
@@ -9165,12 +9175,27 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           .blur(FEATHER_PX)
           .png()
           .toBuffer();
-        const featheredMask = await sharp(featheredRGB).extractChannel(0).png().toBuffer();
+        const featheredAlpha = await sharp(featheredRGB).extractChannel(0).raw().toBuffer();
+
+        // Build an RGBA mask: opaque-magenta colour everywhere, alpha = feather.
+        const W = sceneMeta.width, H = sceneMeta.height;
+        const rgba = Buffer.alloc(W * H * 4);
+        for (let i = 0; i < W * H; i++) {
+          rgba[i * 4 + 0] = 255;
+          rgba[i * 4 + 1] = 255;
+          rgba[i * 4 + 2] = 255;
+          rgba[i * 4 + 3] = featheredAlpha[i];
+        }
+        const rgbaMaskPng = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+
+        // Weight Grok by the mask's alpha (dest-in keeps Grok pixels where
+        // the mask alpha is set, fully transparent elsewhere).
         const grokWithAlpha = await sharp(grokAtSourceDims)
-          .removeAlpha()
-          .joinChannel(featheredMask)
+          .ensureAlpha(1)
+          .composite([{ input: rgbaMaskPng, blend: 'dest-in' }])
           .png()
           .toBuffer();
+
         return sharp(sceneBuffer)
           .composite([{ input: grokWithAlpha, top: 0, left: 0, blend: 'over' }])
           .jpeg({ quality: 95 })
