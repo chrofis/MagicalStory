@@ -248,6 +248,8 @@ const {
   stripSceneMetadata,
   getHistoricalLocations,
   preloadHistoricalLocations,
+  getHistoricalObjects,
+  preloadHistoricalObjects,
   convertClothingToCurrentFormat,
   getPageText,
   updatePageText,
@@ -7122,6 +7124,8 @@ async function initialize() {
 
       // Preload historical locations from DB into memory cache
       await preloadHistoricalLocations();
+      // Preload historical objects (period weapons/symbols/artifacts) into memory cache
+      await preloadHistoricalObjects();
       // Load trial counters from DB so they survive deploys
       if (trialRoutes.loadTrialCountersFromDb) {
         await trialRoutes.loadTrialCountersFromDb();

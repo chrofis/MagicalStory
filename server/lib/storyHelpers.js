@@ -1886,6 +1886,74 @@ function getHistoricalLocations(eventId) {
   }).filter(loc => loc.hasPhoto);
 }
 
+// ============================================================================
+// Historical Objects Databank (parallel to historical_locations)
+// Stores period objects (weapons, symbols, artifacts) referenced in a story
+// so the outline prompt knows about them and the image pipeline can use them.
+// ============================================================================
+
+let historicalObjectsCache = null;
+
+async function preloadHistoricalObjects() {
+  try {
+    const { dbQuery, isDatabaseMode } = require('../services/database');
+    if (!isDatabaseMode()) {
+      log.info('[OBJECTS] Not in database mode — skipping DB preload');
+      return;
+    }
+
+    const rows = await dbQuery(
+      'SELECT * FROM historical_objects ORDER BY event_id, object_name'
+    );
+
+    if (!rows || rows.length === 0) {
+      log.warn('[OBJECTS] DB table historical_objects is empty');
+      historicalObjectsCache = {};
+      return;
+    }
+
+    const databank = {};
+    for (const row of rows) {
+      if (!databank[row.event_id]) databank[row.event_id] = { objects: [] };
+      databank[row.event_id].objects.push({
+        name: row.object_name,
+        type: row.object_type,
+        aliases: row.aliases || [],
+        photoUrl: row.photo_url,
+        photoData: row.photo_data,
+        attribution: row.photo_attribution,
+        description: row.photo_description,
+      });
+    }
+
+    historicalObjectsCache = databank;
+    const eventIds = Object.keys(databank);
+    log.info(`[OBJECTS] Loaded historical objects databank from DB with ${eventIds.length} events (${rows.length} rows)`);
+  } catch (err) {
+    log.warn(`[OBJECTS] DB preload failed (${err.message}) — historical_objects unavailable`);
+    historicalObjectsCache = {};
+  }
+}
+
+function getHistoricalObjects(eventId) {
+  if (!eventId) return [];
+  if (historicalObjectsCache === null) {
+    log.debug(`[OBJECTS] Cache not initialised — returning empty list for ${eventId}`);
+    return [];
+  }
+  const eventData = historicalObjectsCache[eventId];
+  if (!eventData?.objects?.length) return [];
+  return eventData.objects.map(obj => ({
+    name: obj.name,
+    type: obj.type,
+    description: obj.description,
+    photoUrl: obj.photoUrl,
+    photoData: obj.photoData,
+    attribution: obj.attribution,
+    hasPhoto: !!(obj.photoData || obj.photoUrl),
+  }));
+}
+
 /**
  * Get adventure theme guide directly (for always including in story ideas)
  * @param {string} themeId - The adventure theme ID (e.g., 'pirate', 'knight', 'wizard')
@@ -3452,6 +3520,7 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
     const historicalEvent = getEventById(storyTopic);
     // Get pre-fetched location photos
     const historicalLocations = getHistoricalLocations(storyTopic);
+    const historicalObjects = getHistoricalObjects(storyTopic);
     if (historicalGuide) {
       const eventName = historicalEvent?.name || storyTopic;
       const eventYear = historicalEvent?.year || '';
@@ -3467,12 +3536,23 @@ Include these locations in the story when appropriate - we have reference photos
         log.debug(`[PROMPT] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
+      // Build objects (Visual Bible) section if period objects are available
+      let objectsSection = '';
+      if (historicalObjects?.length > 0) {
+        objectsSection = `
+
+**PRE-POPULATED OBJECTS (reference images available for these period objects):**
+${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
+Reference these objects by their exact names in scene descriptions when relevant — reference photos are stored so the image pipeline renders them consistently across the story.`;
+        log.debug(`[PROMPT] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
+      }
+
       categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-${historicalGuide}${locationsSection}
+${historicalGuide}${locationsSection}${objectsSection}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
@@ -4798,6 +4878,7 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
     const historicalEvent = getEventById(storyTopic);
     // Get pre-fetched location photos (unified prompt)
     const historicalLocations = getHistoricalLocations(storyTopic);
+    const historicalObjects = getHistoricalObjects(storyTopic);
     if (historicalGuide) {
       const eventName = historicalEvent?.name || storyTopic;
       const eventYear = historicalEvent?.year || '';
@@ -4813,12 +4894,23 @@ Include these locations in the story when appropriate - we have reference photos
         log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
+      // Build objects (Visual Bible) section if period objects are available
+      let objectsSection = '';
+      if (historicalObjects?.length > 0) {
+        objectsSection = `
+
+**PRE-POPULATED OBJECTS (reference images available for these period objects):**
+${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
+Reference these objects by their exact names in scene descriptions when relevant — reference photos are stored so the image pipeline renders them consistently across the story.`;
+        log.debug(`[UNIFIED] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
+      }
+
       categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-${historicalGuide}${locationsSection}
+${historicalGuide}${locationsSection}${objectsSection}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
@@ -5577,6 +5669,10 @@ module.exports = {
   // Historical locations
   preloadHistoricalLocations,
   getHistoricalLocations,
+
+  // Historical objects (Visual Bible — period objects)
+  preloadHistoricalObjects,
+  getHistoricalObjects,
 
   // Landmark helpers
   getLandmarkPhotosForPage,
