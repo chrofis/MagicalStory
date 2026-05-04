@@ -296,40 +296,48 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
 
   // --- Generate empty scene for style anchoring ---
+  // Respect MODEL_DEFAULTS.singlePassScene: when true (the default), pages render
+  // in a single pass with no plate. Covers must follow the same rule — otherwise
+  // initial gen (server.js streaming path) and iterate (here) silently spend an
+  // extra image-gen call the user has already turned off.
   const { generateImageOnly } = require('./images');
   const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
   let coverSceneBackground = null;
-  try {
-    // Use the anatomy-stripped style description for empty scenes — explicit eye/face
-    // details in the style prompt cause stray faces to appear in empty backgrounds.
-    const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar')
-      || resolveArtStyle(storyData.artStyle || 'pixar')
-      || '';
-    const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
-    const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-      STYLE_DESCRIPTION: artStyleDesc,
-      EMPTY_SCENE_DESCRIPTION: emptyDesc,
-      CHARACTER_SPACE: '',
-      REQUIRED_OBJECTS: '',
-      TEXT_AREA_INSTRUCTION: ''
-    });
-    // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
-    // (chars/animals/artifacts excluded — they belong on the populated cover).
-    const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, coverLandmarkPhotos);
-    const emptyResult = await generateImageOnly(emptyPrompt, [], {
-      landmarkPhotos: coverLandmarkPhotos,
-      visualBibleGrid: emptySceneVbGrid,
-      skipCache: true,
-      // Use the configured cover aspect so the empty-scene style anchor matches
-      // the final cover shape. One source of truth in MODEL_DEFAULTS.coverAspect.
-      aspectRatio: MODEL_DEFAULTS.coverAspect
-    });
-    if (emptyResult?.imageData) {
-      coverSceneBackground = emptyResult.imageData;
-      log.info(`🎬 [COVER-ITERATE] ${coverLabel}: empty scene generated for style anchoring`);
+  if (MODEL_DEFAULTS.singlePassScene === true) {
+    log.info(`🎛️ [COVER-ITERATE] ${coverLabel}: singlePassScene=true — skipping empty-scene plate`);
+  } else {
+    try {
+      // Use the anatomy-stripped style description for empty scenes — explicit eye/face
+      // details in the style prompt cause stray faces to appear in empty backgrounds.
+      const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar')
+        || resolveArtStyle(storyData.artStyle || 'pixar')
+        || '';
+      const emptyDesc = `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+      const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+        STYLE_DESCRIPTION: artStyleDesc,
+        EMPTY_SCENE_DESCRIPTION: emptyDesc,
+        CHARACTER_SPACE: '',
+        REQUIRED_OBJECTS: '',
+        TEXT_AREA_INSTRUCTION: ''
+      });
+      // Empty scene gets a FILTERED VB grid: vehicles + non-landmark locations only
+      // (chars/animals/artifacts excluded — they belong on the populated cover).
+      const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, coverLandmarkPhotos);
+      const emptyResult = await generateImageOnly(emptyPrompt, [], {
+        landmarkPhotos: coverLandmarkPhotos,
+        visualBibleGrid: emptySceneVbGrid,
+        skipCache: true,
+        // Use the configured cover aspect so the empty-scene style anchor matches
+        // the final cover shape. One source of truth in MODEL_DEFAULTS.coverAspect.
+        aspectRatio: MODEL_DEFAULTS.coverAspect
+      });
+      if (emptyResult?.imageData) {
+        coverSceneBackground = emptyResult.imageData;
+        log.info(`🎬 [COVER-ITERATE] ${coverLabel}: empty scene generated for style anchoring`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [COVER-ITERATE] ${coverLabel}: empty scene failed: ${err.message}`);
     }
-  } catch (err) {
-    log.warn(`⚠️ [COVER-ITERATE] ${coverLabel}: empty scene failed: ${err.message}`);
   }
 
   // Build VB grid — aligned with regular page logic (preparePageData in server.js

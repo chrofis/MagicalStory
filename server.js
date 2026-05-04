@@ -3511,9 +3511,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const COVER_PAGE_NUMBERS = { titlePage: -1, frontCover: -1, initialPage: -2, backCover: -3 };
         const coverPageNumber = COVER_PAGE_NUMBERS[coverType] ?? -1;
 
-        // Generate empty scene background for style anchoring (same as regular pages)
+        // Generate empty scene background for style anchoring (same as regular pages).
+        // Respect MODEL_DEFAULTS.singlePassScene first — when true (the default),
+        // pages and covers both render in a single pass with no plate. The legacy
+        // generateEmptyScenes flag is kept as a secondary opt-out for callers that
+        // pass it explicitly.
         let coverSceneBackground = null;
-        if (modelOverrides.generateEmptyScenes !== false) {
+        const coverSinglePass = typeof modelOverrides.singlePassScene === 'boolean'
+          ? modelOverrides.singlePassScene
+          : MODEL_DEFAULTS.singlePassScene === true;
+        if (coverSinglePass) {
+          log.info(`🎛️ [STREAM-COVER] ${coverLabel}: singlePassScene=true — skipping empty-scene plate`);
+        } else if (modelOverrides.generateEmptyScenes !== false) {
           try {
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', coverImageBackend) || resolveArtStyle('pixar') || '';
             // Prefer the structured emptyScenePrompt from scene expansion (same as pages).
