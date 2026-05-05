@@ -3260,7 +3260,14 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
       }
     }
 
-    if (!text || !text.trim()) {
+    // Coerce non-string fallback shapes (parseStoryPages can return
+    // {text, lines, ...} objects for some layouts) before calling .trim().
+    // Without this the route 500s with "text.trim is not a function"
+    // instead of returning a clean 400.
+    if (text && typeof text !== 'string') {
+      text = text.text || (Array.isArray(text.lines) ? text.lines.join('\n') : '') || '';
+    }
+    if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'No text available for this page' });
     }
 
