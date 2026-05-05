@@ -783,12 +783,24 @@ async function packReferences(refs = {}, options = {}) {
     }
   }
 
-  // Extract landmark photo buffers
+  // Extract landmark photo buffers. Accept BOTH `data:image/...;base64,XXXX`
+  // and raw base64 — historical_locations rows store raw bytes without a
+  // `data:` prefix, and the previous strict `startsWith('data:image')` check
+  // silently dropped every curated landmark before it reached Grok. Result:
+  // empty-scene plates were generated WITHOUT the landmark, so even though
+  // packReferences correctly skips landmarks "already in scene background"
+  // at the slot stage, that scene background never had the landmark baked in.
   const landmarkBuffers = [];
   for (const lm of landmarkPhotos) {
-    if (lm.photoData && lm.photoData.startsWith('data:image')) {
-      const base64 = lm.photoData.replace(/^data:image\/\w+;base64,/, '');
+    if (!lm?.photoData || typeof lm.photoData !== 'string') continue;
+    const isDataUri = lm.photoData.startsWith('data:');
+    const base64 = isDataUri
+      ? lm.photoData.replace(/^data:image\/\w+;base64,/, '')
+      : lm.photoData;
+    try {
       landmarkBuffers.push(Buffer.from(base64, 'base64'));
+    } catch (err) {
+      log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": invalid base64 (${err.message})`);
     }
   }
 
