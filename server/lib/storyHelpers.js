@@ -1877,6 +1877,12 @@ function getHistoricalLocations(eventId) {
       name: loc.name,
       type: loc.type,
       query: loc.query,
+      // Stable lookup slug for DB linking. The outline writer copies this
+      // verbatim into each VB location's `dbKey` field, and the linker
+      // matches on it before falling back to fuzzy name matching. This
+      // eliminates substring-collision risk (e.g. "Altdorf Panorama" vs
+      // "Marktplatz Altdorf" both containing "Altdorf").
+      dbKey: locationNameToDbKey(loc.name),
       description: randomPhoto.description,
       photoUrl: randomPhoto.photoUrl,
       photoData: randomPhoto.photoData,
@@ -1884,6 +1890,30 @@ function getHistoricalLocations(eventId) {
       hasPhoto: true
     };
   }).filter(loc => loc.hasPhoto);
+}
+
+/**
+ * Deterministic slug from a canonical location name. Used as the cross-pipeline
+ * lookup key between historical_locations rows and Visual Bible entries.
+ *
+ * Examples:
+ *   "Marktplatz Altdorf"             → "marktplatz-altdorf"
+ *   "Hohle Gasse Küssnacht"          → "hohle-gasse-kuessnacht"
+ *   "Tellsplatte (boat jump)"        → "tellsplatte-boat-jump"
+ *   "Apple Shot Scene (Altdorf)"     → "apple-shot-scene-altdorf"
+ */
+function locationNameToDbKey(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^\w\s-]/g, ' ')   // strip punctuation/parens
+    .replace(/\s+/g, '-')         // spaces → dashes
+    .replace(/-+/g, '-')          // collapse repeats
+    .replace(/^-|-$/g, '');       // trim leading/trailing dashes
 }
 
 // ============================================================================
@@ -3531,11 +3561,12 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
         locationsSection = `
 
 **PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
-${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
+${historicalLocations.map(loc => `- [dbKey: ${loc.dbKey}] ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
 RULES for these locations:
-1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants — the name is the lookup key for the reference photo.
-2. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-3. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
+1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
+2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
+3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
+4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
         log.debug(`[PROMPT] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
@@ -4895,11 +4926,12 @@ ${teachingGuide}` : `- The story should teach children about: <user_input>${stor
         locationsSection = `
 
 **PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
-${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
+${historicalLocations.map(loc => `- [dbKey: ${loc.dbKey}] ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
 RULES for these locations:
-1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants — the name is the lookup key for the reference photo.
-2. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-3. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
+1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
+2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
+3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
+4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
         log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 

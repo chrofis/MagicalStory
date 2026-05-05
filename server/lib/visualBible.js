@@ -1600,6 +1600,12 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
     const allLocNames = [loc.name.toLowerCase(), ...locAliases.map(a => a.toLowerCase())];
 
     const existingIndex = visualBible.locations.findIndex(existing => {
+      // Stable lookup key — the outline writer copies `dbKey` verbatim from
+      // the prompt's PRE-POPULATED LOCATIONS injection. Exact match on this
+      // slug eliminates substring-collision risk (e.g. "Altdorf Panorama"
+      // and "Marktplatz Altdorf" both contain "Altdorf"). Falls through to
+      // the legacy name fuzzy match for VBs written before dbKey existed.
+      if (loc.dbKey && existing.dbKey && existing.dbKey === loc.dbKey) return true;
       const existingNameLower = existing.name.toLowerCase();
       // Exact match on name or aliases
       if (allLocNames.includes(existingNameLower)) return true;
@@ -1617,6 +1623,12 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
     const locationEntry = {
       id: generateId('LOC', maxLocNum - 1),
       name: loc.name,
+      // Stable cross-pipeline lookup key — see locationNameToDbKey in
+      // storyHelpers.js. Carrying it on the VB entry lets future linker
+      // calls match by slug instead of fuzzy name and lets downstream
+      // code (e.g. inspectors, repair planning) identify which DB row
+      // a VB location came from.
+      dbKey: loc.dbKey || null,
       appearsInPages: [], // Will be filled during story generation
       description: loc.description || `Historic ${loc.type}: ${loc.name}`,
       setting: 'outdoor',
