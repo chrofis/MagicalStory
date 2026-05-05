@@ -835,6 +835,22 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
   }
 
+  // Curated landmark photo from historical_locations becomes the SCENE ANCHOR
+  // when no scene background was generated (empty-scene gen disabled). This
+  // gives Grok the curated photo straight from the DB as slot 1, so the
+  // character composites that follow get composited onto the right scenery.
+  // When a scene background already exists, the landmark is assumed to be
+  // baked into it (the empty-scene gen path uses the landmark as input) and
+  // we skip — see the scene-bg slot above and the duplicate-skip log below.
+  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
+    const resized = await sharp(landmarkBuffers[0])
+      .resize({ height: 1024, withoutEnlargement: true })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo (DB scene anchor)`);
+  }
+
   // Layout strategy (all char groups go through buildCharacterGroupSlot which
   // picks the best shape based on count and aspect ratio):
   //
@@ -851,8 +867,16 @@ async function packReferences(refs = {}, options = {}) {
   // Visual Bible elements: bundle them INTO the last character slot (as a row
   // of cells below the char composite) so the scene stays clean. Filter out
   // location elements since those are already painted in the scene background.
+  // Location elements NEVER ride in the character-row VB strip — they should
+  // be the standalone scene reference, either via the scene background slot
+  // (when empty-scene gen is on) or via the landmark slot below. Bundling a
+  // landmark into the character composite shrinks it to a tiny cell beside
+  // the avatars and Grok treats it as another character prop instead of the
+  // scene anchor. Previously the filter only ran when hasSceneBackground was
+  // true, so disabling empty-scene gen routed the landmark into the character
+  // slot. Now it's filtered unconditionally.
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
-    ? visualBibleGrid.rawElements.filter(e => !(hasSceneBackground && e.type === 'location'))
+    ? visualBibleGrid.rawElements.filter(e => e.type !== 'location')
     : [];
 
   // Pack character photos — ONE char per slot when space allows. Bundle only
@@ -904,13 +928,10 @@ async function packReferences(refs = {}, options = {}) {
     await pushCharSlot(charGroups[i], i === charGroups.length - 1);
   }
 
-  // Landmark: only when there's no scene background (rare — scene bg already
-  // has the landmark baked in).
-  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
-    const resized = await sharp(landmarkBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
-    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo`);
-  } else if (landmarkBuffers.length > 0 && hasSceneBackground) {
+  // Landmark already inserted above as a top-level scene anchor (slot 1 when
+  // no scene background) — nothing more to do here. Log the skip in the
+  // scene-background case for parity with the old debug trail.
+  if (landmarkBuffers.length > 0 && hasSceneBackground) {
     log.debug(`🎨 ${tag} Skipping ${landmarkBuffers.length} landmark(s) — already in scene background`);
   }
 

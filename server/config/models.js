@@ -121,7 +121,11 @@ const MODEL_DEFAULTS = {
   enableQualityRetry: false,           // Quality retry: regenerate images scoring below threshold
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
-  generateEmptyScenes: true,           // Pre-generate empty scene backgrounds for style anchoring
+  generateEmptyScenes: false,          // Off by default — page generation takes the curated landmark
+                                       // photo straight from historical_locations as its scene anchor
+                                       // (slot 1 in packReferences). Set to true to re-enable the
+                                       // old "generate an empty AI scene first, then re-render with
+                                       // characters" flow.
   // Reference mode for character refs / VB grid attached to page generation.
   //   'strict'      — photo + costumed + styled avatars; full VB grid (current default)
   //   'loose'       — costumed + styled; photo only on close-ups; identity cells without grid frame
