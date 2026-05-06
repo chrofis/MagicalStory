@@ -411,7 +411,7 @@ ${landmarkEntries}`;
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
-      log.info(`[LANDMARK] ⚠️ No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
+      log.info(`[LANDMARK] No landmarks available for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
     // Use shared prompt builder
@@ -636,7 +636,7 @@ ${landmarkEntries}`;
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
-      log.info(`[LANDMARK] ⚠️ [STREAM] No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
+      log.info(`[LANDMARK] [STREAM] No landmarks available for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
     // Use shared prompt builder

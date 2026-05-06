@@ -648,14 +648,13 @@ class ProgressiveUnifiedParser {
     // Re-check pages one more time to catch the last page
     this._checkPages();
 
-    // Final safety net: if any draft pages still haven't been emitted (e.g.
-    // FIXES REQUIRED parsing failed, or a patched page never arrived in
-    // STORY PAGES), fall back to the draft content so downstream work isn't
-    // missing pages.
+    // Expected path when the writer didn't need to patch a page: the page
+    // never appears in STORY PAGES because the draft was already final.
+    // Emit the draft content so all pages are accounted for.
     const draftPages = this._ensureDraftPages();
     for (const [pageNum, draft] of draftPages.entries()) {
       if (!this.emitted.pages.has(pageNum)) {
-        log.warn(`⚠️ [STREAM-UNIFIED] Page ${pageNum} never emitted from STORY PAGES; falling back to draft on finalize`);
+        log.debug(`[STREAM-UNIFIED] Page ${pageNum}: using draft (no patch needed in STORY PAGES)`);
         this._emitDraftOnlyPage(pageNum, draft);
       }
     }

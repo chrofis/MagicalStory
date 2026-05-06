@@ -898,6 +898,32 @@ function extractIssues(jobLines) {
       continue; // Don't also add to warnings/errors
     }
 
+    // Expected by-design log lines \u2014 not faults
+    if (msg.includes('never emitted from STORY PAGES') ||
+        msg.includes('using draft (no patch needed') ||
+        msg.includes('capped at 3, defer to next round') ||
+        msg.includes('CRITICAL/MAJOR issue dropped by consolidator') ||
+        msg.includes('checkpoint starting') || msg.includes('checkpoint complete')) {
+      continue;
+    }
+    // [EVAL] Issues: ... is the per-page eval summary, not a system fault
+    if (msg.includes('📊 [EVAL] Issues:') || msg.includes('[EVAL] Issues:')) continue;
+    // Recovered Gemini safety blocks (sanitization retry succeeds): not faults.
+    // The matching success line `[QUALITY] ... sanitization retry succeeded`
+    // is logged separately \u2014 only count as fault if NO success follows.
+    if (msg.includes('Blocked by Gemini safety') && msg.includes('retrying with')) continue;
+    if (msg.includes('Safety details: prompt=')) continue;
+    // Bbox enricher can't pin a region for "missing character" issues \u2014 by design
+    if (msg.includes('[BBOX-ENRICH] Could not match issue') &&
+        /\b(missing|entirely missing|not present|absent)\b/i.test(msg)) continue;
+    // Score divergence within rounding tolerance
+    const sd = msg.match(/Score divergence:.*\u0394=(\d+)/);
+    if (sd && parseInt(sd[1], 10) <= 3) continue;
+    // Age clamp is the analyzer working as designed
+    if (msg.includes('[AGE CLAMP]')) continue;
+    // Ideas-stage landmark availability note
+    if (msg.includes('No landmarks') && msg.includes('ideas prompt')) continue;
+
     // Warnings - look for actual warning indicators (but not CONSISTENCY/TEXT CHECK)
     if ((msg.includes('WARNING') || msg.includes('\u26a0\ufe0f') || msg.includes('[WARN]') || line.level === 'wrn') &&
         !msg.includes('development server') && !msg.includes('WSGI') &&

@@ -1469,8 +1469,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const candFinish = data.candidates?.[0]?.finishReason || 'none';
       const candSafety = data.candidates?.[0]?.safetyRatings?.map(r => `${r.category}:${r.probability}${r.blocked ? '(BLOCKED)' : ''}`).join(', ') || 'none';
       const reason = promptBlockReason || candFinish;
-      log.warn(`⚠️ [QUALITY] ${pageLabel}Blocked by Gemini safety (${reason}), retrying with full sanitization...`);
-      log.debug(`⚠️ [QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
+      log.info(`[QUALITY] ${pageLabel}Gemini safety block (${reason}), retrying with sanitization...`);
+      log.debug(`[QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
       // Step 1: Retry with full sanitization (strips all gender/age nouns)
       const fullSanitized = sanitizeForGemini(originalPrompt, 'full');
@@ -1666,8 +1666,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const score = rawScore * 10; // 0-100 for compatibility
 
       const scoreDelta = Math.abs(modelRawScore - rawScore);
-      if (scoreDelta >= 1) {
+      if (scoreDelta > 3) {
         log.warn(`📊 [EVAL] Score divergence: model=${modelRawScore}/10, computed-from-issues=${rawScore}/10 (Δ=${scoreDelta}). Using computed.`);
+      } else if (scoreDelta >= 1) {
+        log.debug(`[EVAL] Score divergence: model=${modelRawScore}/10, computed=${rawScore}/10 (Δ=${scoreDelta}). Using computed.`);
       }
       log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100) [computed from ${fixableIssues.length} issues; model said ${modelRawScore}/10], Verdict: ${verdict}`);
       const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
@@ -3330,7 +3332,15 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       });
       log.verbose(`📊 [EVAL] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
     } else {
-      log.warn(`⚠️ [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
+      // Missing-character/element issues have no bbox by definition — that's
+      // the issue. Only warn when we expected to find a region.
+      const isMissing = issue.type === 'missing_character' || issue.type === 'missing_element' ||
+        /\b(missing|entirely missing|not present|absent)\b/i.test(issue.description || '');
+      if (isMissing) {
+        log.debug(`[BBOX-ENRICH] No bbox for missing-element issue: ${issue.description.substring(0, 50)}...`);
+      } else {
+        log.warn(`[BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
+      }
     }
   }
 
@@ -5608,28 +5618,28 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // still attached below for "missing" issues where the figure isn't in the
     // page yet.
 
-    log.info(`[INPAINT PAGE] Using consolidated plan: ${consolidatedPlan.per_character_fixes.length} per-char + scene=${consolidatedPlan.scene_fix?.severity || 'NONE'}, ${consolidatedPlan.dropped_issues?.length || 0} dropped`);
+    const droppedAll = consolidatedPlan.dropped_issues || [];
+    const deferred = droppedAll.filter(d => /capped at 3/i.test(d.reason || ''));
+    const trueDrops = droppedAll.filter(d => !/capped at 3/i.test(d.reason || ''));
 
-    // Audit: which issues did Haiku drop? A dropped CRITICAL/MAJOR is a
-    // pipeline bug — the repair instruction we send to Grok will ignore the
-    // actual problem and the next eval round will re-detect it.
-    const dropped = consolidatedPlan.dropped_issues || [];
-    for (const d of dropped) {
+    log.info(`[INPAINT PAGE] P${pageNumber}: plan = ${consolidatedPlan.per_character_fixes.length} per-char + scene=${consolidatedPlan.scene_fix?.severity || 'NONE'}, ${deferred.length} deferred (cap=3), ${trueDrops.length} consolidated`);
+
+    // Only flag drops that aren't the intentional cap-at-3 deferral. A
+    // CRITICAL/MAJOR consolidated away (e.g. as a duplicate) is fine; one
+    // dropped for an unrecognized reason is worth a warn.
+    for (const d of trueDrops) {
       const issueText = d.issue || d.description || JSON.stringify(d);
       const reason = d.reason || '(no reason)';
-      // Cross-check against the original CRITICAL/MAJOR set so we can flag
-      // when a high-severity issue is silently discarded.
-      const originalCritical = (evaluation.fixableIssues || []).some(i => {
-        const sev = String(i.severity || '').toUpperCase();
-        if (sev !== 'CRITICAL' && sev !== 'MAJOR') return false;
-        const orig = (i.description || i.issue || '').toLowerCase();
-        return orig && issueText.toLowerCase().includes(orig.slice(0, 30));
-      });
-      if (originalCritical) {
-        log.error(`🚨 [INPAINT PAGE] P${pageNumber}: CRITICAL/MAJOR issue dropped by consolidator — "${issueText}" (reason: ${reason})`);
+      const sev = String(d.severity || '').toUpperCase();
+      if (sev === 'CRITICAL' || sev === 'MAJOR') {
+        log.info(`[INPAINT PAGE] P${pageNumber}: ${sev} consolidated — "${issueText}" (${reason})`);
       } else {
         log.debug(`[INPAINT PAGE] P${pageNumber}: dropped — "${issueText}" (${reason})`);
       }
+    }
+    for (const d of deferred) {
+      const issueText = d.issue || d.description || JSON.stringify(d);
+      log.debug(`[INPAINT PAGE] P${pageNumber}: deferred to next round — "${issueText}"`);
     }
   } else {
     // Fallback: legacy concat

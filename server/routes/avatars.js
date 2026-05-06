@@ -2693,11 +2693,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             || null;
           const clampResult = clampApparentAge(consensusResult.apparentAge, age, photoConfidence);
           if (clampResult.clamped) {
-            log.warn(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+            log.info(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
             consensusResult.apparentAge = clampResult.category;
             sources.apparentAge = `${sources.apparentAge || 'photo'} → clamped`;
           } else {
-            log.debug(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+            log.debug(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
           }
 
           // Log consensus decisions where photo won (highlights "beautification" corrections)
@@ -3848,11 +3848,11 @@ These corrections OVERRIDE what is visible in the reference photo.
           || null;
         const clampResult = clampApparentAge(consensusResult.apparentAge, age, photoConfidence);
         if (clampResult.clamped) {
-          log.warn(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+          log.info(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
           consensusResult.apparentAge = clampResult.category;
           sources.apparentAge = `${sources.apparentAge || 'photo'} → clamped`;
         } else {
-          log.debug(`⚖️ [AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
+          log.debug(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
         }
 
         for (const [field, source] of Object.entries(sources)) {
