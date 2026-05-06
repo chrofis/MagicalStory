@@ -45,7 +45,7 @@ const LOCATIONS = [
     location_query: 'Apple shot scene, Altdorf marketplace',
     location_type: 'Scene',
     aliases: ['Apfelschuss', 'apple-shot scene'],
-    description: 'The apple-shot scene at Altdorf. A small child stands with his back against a tall lime tree in the right background, an apple balanced on his head. A scattered, market-like crowd of medieval Swiss observers fills the left side of the square; the foreground cobblestones and the area around the tree are empty, waiting for the archer.',
+    description: 'The apple-shot scene at Altdorf. A small child stands with his back against a tall tree in the right background, an apple balanced on his head. A scattered, market-like crowd of medieval Swiss observers fills the left side of the square; the foreground cobblestones and the area around the tree are empty, waiting for the archer.',
   },
   {
     folder: 'lake-uri-storm-boat',
