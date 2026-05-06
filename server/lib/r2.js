@@ -108,6 +108,59 @@ function keyForVbReference(storyId, entryId) {
   return `stories/${storyId}/vb/${entryId}.jpg`;
 }
 
+// ─── Debug-image keys ───────────────────────────────────────────────────────
+// All under stories/{storyId}/debug/… so a future retention sweep can
+// enumerate and prune them in one prefix delete.
+
+function keyForGrokRef(storyId, pageNumber, versionIndex, slot) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/v${versionIndex ?? 0}/grok-ref-${slot}.jpg`;
+}
+
+function keyForInpaintRef(storyId, pageNumber, versionIndex, slot) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/v${versionIndex ?? 0}/inpaint-ref-${slot}.jpg`;
+}
+
+function keyForEntityGrid(storyId, pageNumber, gridIndex) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/entity-grid-${gridIndex}.jpg`;
+}
+
+function keyForCharGrid(storyId, pageNumber, charKey, clothing, gridIndex) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  const cleanChar = String(charKey || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanClothing = String(clothing || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const idxSuffix = gridIndex != null ? `-${gridIndex}` : '';
+  return `stories/${storyId}/debug/${pageSlug}/char-grid-${cleanChar}-${cleanClothing}${idxSuffix}.jpg`;
+}
+
+function keyForBboxOverlay(storyId, pageNumber, versionIndex) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/bbox-overlay-v${versionIndex ?? 0}.jpg`;
+}
+
+function keyForVbGrid(storyId, pageNumber) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/vb-grid.jpg`;
+}
+
+function keyForRepairCompare(storyId, charKey, pageNumber, kind) {
+  const cleanChar = String(charKey || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanKind = String(kind || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `stories/${storyId}/debug/repair/${cleanChar}/p${pageNumber}/${cleanKind}.jpg`;
+}
+
+function keyForStyledAvatarInput(storyId, entryIndex, field) {
+  const cleanField = String(field || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `stories/${storyId}/debug/styled-avatar/${entryIndex}/${cleanField}.jpg`;
+}
+
+function keyForLandmarkPhoto(storyId, pageNumber, slot) {
+  const pageSlug = pageNumber != null ? `p${pageNumber}` : 'cover';
+  return `stories/${storyId}/debug/${pageSlug}/landmark-${slot}.jpg`;
+}
+
 function publicUrlForKey(key) {
   if (!process.env.R2_PUBLIC_URL) return null;
   const base = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
@@ -188,4 +241,13 @@ module.exports = {
   keyForCharacterStyledAvatar,
   keyForCharacterThumb,
   keyForVbReference,
+  keyForGrokRef,
+  keyForInpaintRef,
+  keyForEntityGrid,
+  keyForCharGrid,
+  keyForBboxOverlay,
+  keyForVbGrid,
+  keyForRepairCompare,
+  keyForStyledAvatarInput,
+  keyForLandmarkPhoto,
 };

@@ -1,6 +1,8 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
 const { arrayToDbIndex } = require('../lib/versionManager');
+const r2 = require('../lib/r2');
+const { log } = require('../utils/logger');
 
 let dbPool = null;
 
@@ -730,6 +732,310 @@ function buildStoryMetadata(story) {
 }
 
 /**
+ * Walk a story-data subtree and push every inline base64 / data: URI image
+ * payload to R2, replacing the inline value with the R2 URL. Runs BEFORE
+ * stripInlineImagesFromStoryData so anything that successfully uploads
+ * survives the strip as a real URL.
+ *
+ * Idempotent: only touches strings that look like base64 / data: URIs;
+ * existing http(s) URLs are left as-is. Missing R2 config or upload
+ * failures leave the original inline value in place — the strip then
+ * removes it (matching the historical behaviour).
+ *
+ * Mutates `data` in place.
+ *
+ * @param {string} storyId
+ * @param {object} data    storyData blob (or response shape mirroring it)
+ */
+async function extractInlineImagesToR2(storyId, data) {
+  if (!data || typeof data !== 'object') return;
+  if (!r2.isConfigured()) return;  // graceful no-op; strip will still drop bytes
+
+  const looksLikeBytes = (s) =>
+    typeof s === 'string'
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'))
+    && s.length > 1024;
+
+  const upload = async (input, key) => {
+    try {
+      return await r2.uploadImage(input, key);
+    } catch (err) {
+      log.warn(`[R2-extract] upload failed for ${key}: ${err.message}`);
+      return null;
+    }
+  };
+
+  // sceneImages — per-page debug images
+  if (Array.isArray(data.sceneImages)) {
+    for (const s of data.sceneImages) {
+      if (!s || typeof s !== 'object') continue;
+      const pageNum = s.pageNumber;
+
+      if (looksLikeBytes(s.bboxOverlayImage)) {
+        const url = await upload(s.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, 0));
+        if (url) s.bboxOverlayImage = url;
+      }
+      if (looksLikeBytes(s.visualBibleGrid)) {
+        const url = await upload(s.visualBibleGrid, r2.keyForVbGrid(storyId, pageNum));
+        if (url) s.visualBibleGrid = url;
+      }
+      if (Array.isArray(s.grokRefImages)) {
+        for (let k = 0; k < s.grokRefImages.length; k++) {
+          if (looksLikeBytes(s.grokRefImages[k])) {
+            const url = await upload(s.grokRefImages[k], r2.keyForGrokRef(storyId, pageNum, 0, k));
+            if (url) s.grokRefImages[k] = url;
+          }
+        }
+      }
+      if (Array.isArray(s.imageVersions)) {
+        for (let i = 0; i < s.imageVersions.length; i++) {
+          const v = s.imageVersions[i];
+          if (!v) continue;
+          if (looksLikeBytes(v.bboxOverlayImage)) {
+            const url = await upload(v.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, i));
+            if (url) v.bboxOverlayImage = url;
+          }
+          if (Array.isArray(v.grokRefImages)) {
+            for (let k = 0; k < v.grokRefImages.length; k++) {
+              if (looksLikeBytes(v.grokRefImages[k])) {
+                const url = await upload(v.grokRefImages[k], r2.keyForGrokRef(storyId, pageNum, i, k));
+                if (url) v.grokRefImages[k] = url;
+              }
+            }
+          }
+          if (Array.isArray(v.inpaintReferenceImages)) {
+            for (let k = 0; k < v.inpaintReferenceImages.length; k++) {
+              if (looksLikeBytes(v.inpaintReferenceImages[k])) {
+                const url = await upload(v.inpaintReferenceImages[k], r2.keyForInpaintRef(storyId, pageNum, i, k));
+                if (url) v.inpaintReferenceImages[k] = url;
+              }
+            }
+          }
+        }
+      }
+      if (Array.isArray(s.landmarkPhotos)) {
+        for (let k = 0; k < s.landmarkPhotos.length; k++) {
+          const lp = s.landmarkPhotos[k];
+          if (lp && typeof lp === 'object' && looksLikeBytes(lp.photoData)) {
+            const url = await upload(lp.photoData, r2.keyForLandmarkPhoto(storyId, pageNum, k));
+            if (url) {
+              lp.photoUrl = url;
+              lp.photoData = undefined;
+            }
+          }
+        }
+      }
+      if (s.entityReport && typeof s.entityReport === 'object') {
+        if (Array.isArray(s.entityReport.grids)) {
+          for (let k = 0; k < s.entityReport.grids.length; k++) {
+            const g = s.entityReport.grids[k];
+            if (g && looksLikeBytes(g.gridImage)) {
+              const url = await upload(g.gridImage, r2.keyForEntityGrid(storyId, pageNum, k));
+              if (url) g.gridImage = url;
+            }
+          }
+        }
+        if (s.entityReport.characters && typeof s.entityReport.characters === 'object') {
+          for (const [charName, charReport] of Object.entries(s.entityReport.characters)) {
+            if (!charReport?.byClothing || typeof charReport.byClothing !== 'object') continue;
+            for (const [clothing, clothingReport] of Object.entries(charReport.byClothing)) {
+              if (!clothingReport) continue;
+              if (looksLikeBytes(clothingReport.gridImage)) {
+                const url = await upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, pageNum, charName, clothing, null));
+                if (url) clothingReport.gridImage = url;
+              }
+              if (Array.isArray(clothingReport.gridImages)) {
+                for (let k = 0; k < clothingReport.gridImages.length; k++) {
+                  if (looksLikeBytes(clothingReport.gridImages[k])) {
+                    const url = await upload(clothingReport.gridImages[k], r2.keyForCharGrid(storyId, pageNum, charName, clothing, k));
+                    if (url) clothingReport.gridImages[k] = url;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // coverImages — same families of debug images
+  if (data.coverImages && typeof data.coverImages === 'object') {
+    for (const kind of ['frontCover', 'initialPage', 'backCover']) {
+      const cv = data.coverImages[kind];
+      if (!cv || typeof cv !== 'object') continue;
+      const pageMarker = kind;  // covers use the kind as their slug
+
+      if (looksLikeBytes(cv.bboxOverlayImage)) {
+        const url = await upload(cv.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v0.jpg`);
+        if (url) cv.bboxOverlayImage = url;
+      }
+      if (looksLikeBytes(cv.visualBibleGrid)) {
+        const url = await upload(cv.visualBibleGrid, `stories/${storyId}/debug/${pageMarker}/vb-grid.jpg`);
+        if (url) cv.visualBibleGrid = url;
+      }
+      if (Array.isArray(cv.grokRefImages)) {
+        for (let k = 0; k < cv.grokRefImages.length; k++) {
+          if (looksLikeBytes(cv.grokRefImages[k])) {
+            const url = await upload(cv.grokRefImages[k], `stories/${storyId}/debug/${pageMarker}/v0/grok-ref-${k}.jpg`);
+            if (url) cv.grokRefImages[k] = url;
+          }
+        }
+      }
+      if (Array.isArray(cv.imageVersions)) {
+        for (let i = 0; i < cv.imageVersions.length; i++) {
+          const v = cv.imageVersions[i];
+          if (!v) continue;
+          if (looksLikeBytes(v.bboxOverlayImage)) {
+            const url = await upload(v.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v${i}.jpg`);
+            if (url) v.bboxOverlayImage = url;
+          }
+          if (Array.isArray(v.grokRefImages)) {
+            for (let k = 0; k < v.grokRefImages.length; k++) {
+              if (looksLikeBytes(v.grokRefImages[k])) {
+                const url = await upload(v.grokRefImages[k], `stories/${storyId}/debug/${pageMarker}/v${i}/grok-ref-${k}.jpg`);
+                if (url) v.grokRefImages[k] = url;
+              }
+            }
+          }
+          if (Array.isArray(v.inpaintReferenceImages)) {
+            for (let k = 0; k < v.inpaintReferenceImages.length; k++) {
+              if (looksLikeBytes(v.inpaintReferenceImages[k])) {
+                const url = await upload(v.inpaintReferenceImages[k], `stories/${storyId}/debug/${pageMarker}/v${i}/inpaint-ref-${k}.jpg`);
+                if (url) v.inpaintReferenceImages[k] = url;
+              }
+            }
+          }
+        }
+      }
+      if (Array.isArray(cv.landmarkPhotos)) {
+        for (let k = 0; k < cv.landmarkPhotos.length; k++) {
+          const lp = cv.landmarkPhotos[k];
+          if (lp && typeof lp === 'object' && looksLikeBytes(lp.photoData)) {
+            const url = await upload(lp.photoData, `stories/${storyId}/debug/${pageMarker}/landmark-${k}.jpg`);
+            if (url) {
+              lp.photoUrl = url;
+              lp.photoData = undefined;
+            }
+          }
+        }
+      }
+      if (Array.isArray(cv.referencePhotos)) {
+        for (let k = 0; k < cv.referencePhotos.length; k++) {
+          const rp = cv.referencePhotos[k];
+          if (!rp || typeof rp !== 'object') continue;
+          if (looksLikeBytes(rp.photoUrl)) {
+            const url = await upload(rp.photoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}.jpg`);
+            if (url) rp.photoUrl = url;
+          }
+          if (looksLikeBytes(rp.originalPhotoUrl)) {
+            const url = await upload(rp.originalPhotoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-orig.jpg`);
+            if (url) rp.originalPhotoUrl = url;
+          }
+        }
+      }
+    }
+  }
+
+  // visualBible.locations — Wikimedia ref bytes
+  if (data.visualBible && typeof data.visualBible === 'object'
+      && Array.isArray(data.visualBible.locations)) {
+    for (const loc of data.visualBible.locations) {
+      if (!loc || typeof loc !== 'object') continue;
+      const entryId = loc.id || loc.dbKey || loc.name;
+      if (!entryId) continue;
+      if (looksLikeBytes(loc.referencePhotoData)) {
+        const url = await upload(loc.referencePhotoData, r2.keyForVbReference(storyId, String(entryId).replace(/[^a-zA-Z0-9_-]/g, '_')));
+        if (url) {
+          loc.referencePhotoUrl = url;
+          loc.referencePhotoData = undefined;
+        }
+      }
+    }
+  }
+
+  // finalChecksReport — entity grids + repair comparison images
+  if (data.finalChecksReport && typeof data.finalChecksReport === 'object') {
+    const fcr = data.finalChecksReport;
+    if (fcr.entity?.grids && Array.isArray(fcr.entity.grids)) {
+      for (let k = 0; k < fcr.entity.grids.length; k++) {
+        const g = fcr.entity.grids[k];
+        if (g && looksLikeBytes(g.gridImage)) {
+          const url = await upload(g.gridImage, `stories/${storyId}/debug/final-checks/entity-grid-${k}.jpg`);
+          if (url) g.gridImage = url;
+        }
+      }
+    }
+    if (fcr.entity?.characters && typeof fcr.entity.characters === 'object') {
+      for (const [charName, charReport] of Object.entries(fcr.entity.characters)) {
+        if (!charReport?.byClothing || typeof charReport.byClothing !== 'object') continue;
+        for (const [clothing, clothingReport] of Object.entries(charReport.byClothing)) {
+          if (!clothingReport) continue;
+          if (looksLikeBytes(clothingReport.gridImage)) {
+            const url = await upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, null));
+            if (url) clothingReport.gridImage = url;
+          }
+          if (Array.isArray(clothingReport.gridImages)) {
+            for (let k = 0; k < clothingReport.gridImages.length; k++) {
+              if (looksLikeBytes(clothingReport.gridImages[k])) {
+                const url = await upload(clothingReport.gridImages[k], r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, k));
+                if (url) clothingReport.gridImages[k] = url;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object'
+        && looksLikeBytes(fcr.styleConsistency.gridImage)) {
+      const url = await upload(fcr.styleConsistency.gridImage, `stories/${storyId}/debug/final-checks/style-consistency-grid.jpg`);
+      if (url) fcr.styleConsistency.gridImage = url;
+    }
+    if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
+      for (const [charName, charRepair] of Object.entries(fcr.entityRepairs)) {
+        if (!charRepair?.pages || typeof charRepair.pages !== 'object') continue;
+        for (const [pageKey, pageRepair] of Object.entries(charRepair.pages)) {
+          if (!pageRepair?.comparison || typeof pageRepair.comparison !== 'object') continue;
+          for (const k of ['before', 'after', 'grokRawResult', 'blackoutImage', 'blendMask', 'croppedAvatar', 'cutoutSent']) {
+            if (looksLikeBytes(pageRepair.comparison[k])) {
+              const url = await upload(pageRepair.comparison[k], r2.keyForRepairCompare(storyId, charName, pageKey, k));
+              if (url) pageRepair.comparison[k] = url;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // styledAvatarGeneration / costumedAvatarGeneration — entry inputs
+  for (const arrName of ['styledAvatarGeneration', 'costumedAvatarGeneration']) {
+    if (!Array.isArray(data[arrName])) continue;
+    for (let i = 0; i < data[arrName].length; i++) {
+      const e = data[arrName][i];
+      if (!e || typeof e !== 'object') continue;
+      if (e.inputs && typeof e.inputs === 'object') {
+        for (const [field, slot] of Object.entries(e.inputs)) {
+          if (slot && typeof slot === 'object' && looksLikeBytes(slot.imageData)) {
+            const url = await upload(slot.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, field));
+            if (url) {
+              slot.imageUrl = url;
+              slot.imageData = undefined;
+            }
+          }
+        }
+      }
+      if (e.output && typeof e.output === 'object' && looksLikeBytes(e.output.imageData)) {
+        const url = await upload(e.output.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, 'output'));
+        if (url) {
+          e.output.imageUrl = url;
+          e.output.imageData = undefined;
+        }
+      }
+    }
+  }
+}
+
+/**
  * Strip every inline base64 / data: URI image payload from a story-data
  * subtree. Source of truth lives elsewhere (characters table for character
  * photos+avatars, story_images for scene/cover bytes, R2 for reference
@@ -761,6 +1067,22 @@ function buildStoryMetadata(story) {
 function stripInlineImagesFromStoryData(data) {
   if (!data || typeof data !== 'object') return;
 
+  // Helpers — these preserve real http(s) URLs (left in place for readers)
+  // and only clear values that are still inline base64 / data: URIs.
+  // After extractInlineImagesToR2 runs, most fields hold URLs; keepUrl is
+  // the dominant path. The undefined branch only fires when R2 was
+  // unreachable or the field never went through extract.
+  const keepUrl = (s) =>
+    (typeof s === 'string' && s.length > 0 && !s.startsWith('data:') && !s.startsWith('/9j/')
+      && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD'))
+      ? s
+      : undefined;
+  const filterUrlArray = (arr) => Array.isArray(arr)
+    ? arr.filter(s => typeof s === 'string' && s.length > 0
+        && !s.startsWith('data:') && !s.startsWith('/9j/')
+        && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD'))
+    : undefined;
+
   // Strip per-character bytes that DUPLICATE the characters table (photos
   // and unstyled avatars/thumbnails are canonical there). Leave styledAvatars
   // and costumed in place — they are per-story specific (this story's art
@@ -785,17 +1107,17 @@ function stripInlineImagesFromStoryData(data) {
   if (Array.isArray(data.sceneImages)) {
     for (const s of data.sceneImages) {
       if (!s || typeof s !== 'object') continue;
-      s.bboxOverlayImage = undefined;
-      s.grokRefImages = undefined;
+      s.bboxOverlayImage = keepUrl(s.bboxOverlayImage);
+      s.grokRefImages = filterUrlArray(s.grokRefImages);
       s.originalImage = undefined;
       s.preEntityRepairImage = undefined;
-      s.visualBibleGrid = undefined;
+      s.visualBibleGrid = keepUrl(s.visualBibleGrid);
       if (Array.isArray(s.imageVersions)) {
         for (const v of s.imageVersions) {
           if (!v) continue;
-          v.grokRefImages = undefined;
-          v.inpaintReferenceImages = undefined;
-          v.bboxOverlayImage = undefined;
+          v.grokRefImages = filterUrlArray(v.grokRefImages);
+          v.inpaintReferenceImages = filterUrlArray(v.inpaintReferenceImages);
+          v.bboxOverlayImage = keepUrl(v.bboxOverlayImage);
         }
       }
       if (Array.isArray(s.sceneCharacters)) {
@@ -803,30 +1125,31 @@ function stripInlineImagesFromStoryData(data) {
       }
       if (Array.isArray(s.landmarkPhotos)) {
         for (const lp of s.landmarkPhotos) {
-          if (lp && typeof lp === 'object') lp.photoData = undefined;
+          if (lp && typeof lp === 'object') {
+            lp.photoData = undefined;
+            lp.photoUrl = keepUrl(lp.photoUrl);
+          }
         }
       }
-      // referencePhotos[].photoUrl/originalPhotoUrl sometimes carries a data: URI
-      // instead of a real http URL. Drop only the data: variants — keep real URLs.
       if (Array.isArray(s.referencePhotos)) {
         for (const rp of s.referencePhotos) {
           if (!rp || typeof rp !== 'object') continue;
-          if (typeof rp.photoUrl === 'string' && rp.photoUrl.startsWith('data:')) rp.photoUrl = undefined;
-          if (typeof rp.originalPhotoUrl === 'string' && rp.originalPhotoUrl.startsWith('data:')) rp.originalPhotoUrl = undefined;
+          rp.photoUrl = keepUrl(rp.photoUrl);
+          rp.originalPhotoUrl = keepUrl(rp.originalPhotoUrl);
         }
       }
       if (s.entityReport && typeof s.entityReport === 'object') {
         if (Array.isArray(s.entityReport.grids)) {
-          for (const g of s.entityReport.grids) if (g) g.gridImage = undefined;
+          for (const g of s.entityReport.grids) if (g) g.gridImage = keepUrl(g.gridImage);
         }
         if (s.entityReport.characters && typeof s.entityReport.characters === 'object') {
           for (const charReport of Object.values(s.entityReport.characters)) {
             if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
               for (const clothing of Object.values(charReport.byClothing)) {
                 if (!clothing) continue;
-                clothing.gridImage = undefined;
+                clothing.gridImage = keepUrl(clothing.gridImage);
                 if (Array.isArray(clothing.gridImages)) {
-                  for (let i = 0; i < clothing.gridImages.length; i++) clothing.gridImages[i] = undefined;
+                  clothing.gridImages = clothing.gridImages.map(keepUrl);
                 }
               }
             }
@@ -841,22 +1164,22 @@ function stripInlineImagesFromStoryData(data) {
     for (const kind of ['frontCover', 'initialPage', 'backCover']) {
       const cv = data.coverImages[kind];
       if (!cv || typeof cv !== 'object') continue;
-      cv.bboxOverlayImage = undefined;
-      cv.grokRefImages = undefined;
-      cv.visualBibleGrid = undefined;
+      cv.bboxOverlayImage = keepUrl(cv.bboxOverlayImage);
+      cv.grokRefImages = filterUrlArray(cv.grokRefImages);
+      cv.visualBibleGrid = keepUrl(cv.visualBibleGrid);
       if (Array.isArray(cv.imageVersions)) {
         for (const v of cv.imageVersions) {
           if (!v) continue;
-          v.grokRefImages = undefined;
-          v.inpaintReferenceImages = undefined;
-          v.bboxOverlayImage = undefined;
+          v.grokRefImages = filterUrlArray(v.grokRefImages);
+          v.inpaintReferenceImages = filterUrlArray(v.inpaintReferenceImages);
+          v.bboxOverlayImage = keepUrl(v.bboxOverlayImage);
         }
       }
       if (Array.isArray(cv.retryHistory)) {
         for (const r of cv.retryHistory) {
           if (!r) continue;
           r.imageData = undefined;
-          r.bboxOverlayImage = undefined;
+          r.bboxOverlayImage = keepUrl(r.bboxOverlayImage);
           r.originalImage = undefined;
           r.annotatedOriginal = undefined;
         }
@@ -864,13 +1187,16 @@ function stripInlineImagesFromStoryData(data) {
       if (Array.isArray(cv.referencePhotos)) {
         for (const rp of cv.referencePhotos) {
           if (!rp || typeof rp !== 'object') continue;
-          if (typeof rp.photoUrl === 'string' && rp.photoUrl.startsWith('data:')) rp.photoUrl = undefined;
-          if (typeof rp.originalPhotoUrl === 'string' && rp.originalPhotoUrl.startsWith('data:')) rp.originalPhotoUrl = undefined;
+          rp.photoUrl = keepUrl(rp.photoUrl);
+          rp.originalPhotoUrl = keepUrl(rp.originalPhotoUrl);
         }
       }
       if (Array.isArray(cv.landmarkPhotos)) {
         for (const lp of cv.landmarkPhotos) {
-          if (lp && typeof lp === 'object') lp.photoData = undefined;
+          if (lp && typeof lp === 'object') {
+            lp.photoData = undefined;
+            lp.photoUrl = keepUrl(lp.photoUrl);
+          }
         }
       }
     }
@@ -880,7 +1206,9 @@ function stripInlineImagesFromStoryData(data) {
   if (data.visualBible && typeof data.visualBible === 'object'
       && Array.isArray(data.visualBible.locations)) {
     for (const loc of data.visualBible.locations) {
-      if (loc && typeof loc === 'object') loc.referencePhotoData = undefined;
+      if (!loc || typeof loc !== 'object') continue;
+      loc.referencePhotoData = undefined;
+      loc.referencePhotoUrl = keepUrl(loc.referencePhotoUrl);
     }
   }
 
@@ -888,24 +1216,23 @@ function stripInlineImagesFromStoryData(data) {
   if (data.finalChecksReport && typeof data.finalChecksReport === 'object') {
     const fcr = data.finalChecksReport;
     if (fcr.entity?.grids && Array.isArray(fcr.entity.grids)) {
-      for (const g of fcr.entity.grids) if (g) g.gridImage = undefined;
+      for (const g of fcr.entity.grids) if (g) g.gridImage = keepUrl(g.gridImage);
     }
-    // Per-character per-clothing grid montages — same shape as scene entityReport
     if (fcr.entity?.characters && typeof fcr.entity.characters === 'object') {
       for (const charReport of Object.values(fcr.entity.characters)) {
         if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
           for (const clothing of Object.values(charReport.byClothing)) {
             if (!clothing) continue;
-            clothing.gridImage = undefined;
+            clothing.gridImage = keepUrl(clothing.gridImage);
             if (Array.isArray(clothing.gridImages)) {
-              for (let i = 0; i < clothing.gridImages.length; i++) clothing.gridImages[i] = undefined;
+              clothing.gridImages = clothing.gridImages.map(keepUrl);
             }
           }
         }
       }
     }
     if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object') {
-      fcr.styleConsistency.gridImage = undefined;
+      fcr.styleConsistency.gridImage = keepUrl(fcr.styleConsistency.gridImage);
     }
     if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
       for (const charRepair of Object.values(fcr.entityRepairs)) {
@@ -913,7 +1240,7 @@ function stripInlineImagesFromStoryData(data) {
           for (const pageRepair of Object.values(charRepair.pages)) {
             if (pageRepair?.comparison && typeof pageRepair.comparison === 'object') {
               for (const k of ['before', 'after', 'grokRawResult', 'blackoutImage', 'blendMask', 'croppedAvatar', 'cutoutSent']) {
-                pageRepair.comparison[k] = undefined;
+                pageRepair.comparison[k] = keepUrl(pageRepair.comparison[k]);
               }
             }
           }
@@ -922,30 +1249,24 @@ function stripInlineImagesFromStoryData(data) {
     }
   }
 
-  // styledAvatarGeneration
-  if (Array.isArray(data.styledAvatarGeneration)) {
-    for (const e of data.styledAvatarGeneration) {
+  // styledAvatarGeneration / costumedAvatarGeneration — extract leaves a URL on
+  // slot.imageUrl and clears slot.imageData. Strip ensures whatever path didn't
+  // make it through extract (R2 outage etc.) gets cleared too.
+  for (const arrName of ['styledAvatarGeneration', 'costumedAvatarGeneration']) {
+    if (!Array.isArray(data[arrName])) continue;
+    for (const e of data[arrName]) {
       if (!e) continue;
       if (e.inputs && typeof e.inputs === 'object') {
         for (const v of Object.values(e.inputs)) {
-          if (v && typeof v === 'object' && 'imageData' in v) v.imageData = undefined;
+          if (v && typeof v === 'object') {
+            if ('imageData' in v) v.imageData = undefined;
+            if ('imageUrl' in v) v.imageUrl = keepUrl(v.imageUrl);
+          }
         }
       }
-      if (e.output && typeof e.output === 'object' && 'imageData' in e.output) {
-        e.output.imageData = undefined;
-      }
-    }
-  }
-  if (Array.isArray(data.costumedAvatarGeneration)) {
-    for (const e of data.costumedAvatarGeneration) {
-      if (!e) continue;
-      if (e.inputs && typeof e.inputs === 'object') {
-        for (const v of Object.values(e.inputs)) {
-          if (v && typeof v === 'object' && 'imageData' in v) v.imageData = undefined;
-        }
-      }
-      if (e.output && typeof e.output === 'object' && 'imageData' in e.output) {
-        e.output.imageData = undefined;
+      if (e.output && typeof e.output === 'object') {
+        if ('imageData' in e.output) e.output.imageData = undefined;
+        if ('imageUrl' in e.output) e.output.imageUrl = keepUrl(e.output.imageUrl);
       }
     }
   }
@@ -1087,11 +1408,15 @@ async function saveStoryData(storyId, storyData) {
     }
   }
 
-  // Strip every other inline base64 payload (entityReport grids, scene-
-  // character snapshots, grokRefImages, debug overlays, finalChecksReport
-  // comparison images, styledAvatarGeneration debug, top-level character
-  // snapshot photos+avatars). Source of truth lives in characters table,
-  // story_images, and R2.
+  // Push every remaining inline image (debug overlays, Grok/inpaint refs,
+  // entity grids, repair comparison images, landmark photos, VB-location
+  // refs, styled-avatar inputs) up to R2 first, replacing the inline base64
+  // with the public R2 URL. The strip below then preserves URLs and clears
+  // anything that didn't make the round-trip (R2 outage / unconfigured).
+  await extractInlineImagesToR2(storyId, dataForStorage);
+
+  // Strip every other inline base64 payload. Source of truth lives in the
+  // characters table, story_images, and R2.
   stripInlineImagesFromStoryData(dataForStorage);
 
   const metadata = buildStoryMetadata(storyData);
@@ -1172,11 +1497,15 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   }
   delete dataForStorage.emptySceneImage;
 
-  // Strip the same inline payloads as saveStoryData (entityReport grids,
-  // sceneCharacters snapshots, grokRefImages, debug overlays). The data
-  // in scope here is a single sceneImages entry, so we wrap it in the
-  // shape the sanitizer expects and let it walk just this subtree.
-  stripInlineImagesFromStoryData({ sceneImages: [dataForStorage] });
+  // Push every remaining inline image to R2 first (Grok/inpaint refs,
+  // entity grids, debug overlays, landmark photos), replacing inline
+  // base64 with the R2 URL. Then strip preserves URLs and clears anything
+  // that didn't upload successfully. Same flow as saveStoryData.
+  // The data in scope here is a single sceneImages entry, so we wrap it
+  // in the shape both walkers expect.
+  const wrappedForExtract = { sceneImages: [dataForStorage] };
+  await extractInlineImagesToR2(storyId, wrappedForExtract);
+  stripInlineImagesFromStoryData(wrappedForExtract);
 
   if (imagesSaved > 0) {
     console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
@@ -2311,6 +2640,7 @@ module.exports = {
   saveStoryData,
   saveScenePageData,
   stripInlineImagesFromStoryData,
+  extractInlineImagesToR2,
   updateStoryDataOnly,
   upsertStory,
   // Image functions
