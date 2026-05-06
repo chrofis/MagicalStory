@@ -57,6 +57,12 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 10. Also return `final_score_reason`: a one-sentence explanation of what drove the score (which 1-2 issues hurt most, or "no significant issues" if 100).
 
+11. Also return `deduped_issues[]`: the full deduplicated issue list used to compute `final_score`, NOT capped at 3. One entry per unique physical problem regardless of how many evaluators flagged it. This is the list the UI shows to the reader. Each entry has:
+   - `description`: short, plain English. Reuse the evaluator wording when accurate; tighten when not.
+   - `severity`: `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR` (the post-dedupe severity — when evaluators disagreed, take the highest).
+   - `sources`: array of evaluator names that flagged this problem (subset of `["quality","semantic","entity","final_checks"]`). At least one entry. When dedupe merged 3 raw flags into one, all 3 source names appear here.
+   - Order by severity (CRITICAL first, MINOR last). Items also present in `per_character_fixes[]` / `scene_fix` are still listed here — this list is for display, the fix list is for execution.
+
 ## Fix-instruction shape
 
 For every `per_character_fixes[]` entry AND for `scene_fix.instruction` you MUST emit three fields, in this order:
@@ -125,7 +131,13 @@ Final: `"Open the eyes wide."`
     {"issue": "hair color slightly too light", "reason": "trivial — quality score already acceptable on this"}
   ],
   "final_score": 78,
-  "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable."
+  "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable.",
+  "deduped_issues": [
+    {"description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"]},
+    {"description": "Roger's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
+    {"description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"]},
+    {"description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"]}
+  ]
 }
 ```
 

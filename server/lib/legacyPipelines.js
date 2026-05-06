@@ -869,6 +869,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           ? allCharacters.filter(c => !c.isMainCharacter)
           : allCharacters;
         let referencePhotos;
+        let selectedCoverCharacters;
 
         if (coverType === 'titlePage') {
           // Front cover: main characters only (or all capped if none flagged)
@@ -877,6 +878,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             log.info(`📕 [STREAM-COVER] Capping front cover characters from ${charactersToUse.length} to ${MAX_COVER_CHARACTERS}`);
             charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
           }
+          selectedCoverCharacters = charactersToUse;
           referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, artStyleId, convertedClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}`);
         } else {
@@ -893,6 +895,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             extras = nonMainCharacters.slice(halfPoint).slice(0, extraSlots);
           }
           const coverCharacters = [...mainCapped, ...extras];
+          selectedCoverCharacters = coverCharacters;
           referencePhotos = getCharacterPhotoDetails(coverCharacters, clothing, artStyleId, convertedClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ${coverCharacters.map(c => c.name).join(', ')} (${referencePhotos.length} chars), clothing: ${clothing}`);
         }
@@ -959,8 +962,34 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Generate the image (use coverImageModel for covers)
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-        const streamCoverLabel = coverType === 'front' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides, streamCoverLabel, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode });
+        const streamCoverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+
+        // Cover references (landmark photos, empty-scene plate, VB grid) — same
+        // helper iterate uses, so v0 and iterate get identical anchors.
+        const { buildCoverReferences } = require('./coverIterate');
+        const coverKeyForRefs = coverType === 'titlePage' ? 'frontCover' : coverType === 'initialPage' ? 'initialPage' : 'backCover';
+        const coverRefs = await buildCoverReferences({
+          coverKey: coverKeyForRefs,
+          visualBible: streamingVisualBible,
+          artStyle: artStyleId,
+          sceneDescription,
+          coverHint: null,
+          logLabel: streamCoverLabel,
+        });
+
+        const result = await generateImageWithQualityRetry(
+          coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null,
+          coverModelOverrides,
+          streamCoverLabel,
+          {
+            isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode,
+            landmarkPhotos: coverRefs.landmarkPhotos,
+            visualBibleGrid: coverRefs.visualBibleGrid,
+            sceneCharacters: selectedCoverCharacters,
+            sceneMetadata: coverRefs.sceneMetadata,
+            sceneBackground: coverRefs.sceneBackground,
+          }
+        );
 
         // Track scene rewrite usage if a safety block triggered a rewrite
         if (result?.rewriteUsage) {

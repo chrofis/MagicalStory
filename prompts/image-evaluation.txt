@@ -121,6 +121,7 @@ For each animal, landmark, vehicle, or notable object the prompt mentions:
 
 - Identify it in the image, note position (left/center/right) and visual appearance, match to the reference name from the prompt.
 - **Key landmark or object entirely missing from the image** → **MAJOR**.
+- **Object rendering quality** — when a reference image is provided for the object (visual bible reference, landmark photo) and the rendered shape is fundamentally wrong against that reference (a crossbow with impossible limbs or no string and no tiller, a sword rendered as a bent curve, a lantern as an amorphous blob, a building with the wrong silhouette) → **MAJOR**, type: `object_quality`. Description names the object and what is wrong; fix names what the correct shape should look like. Stylistic differences in brushwork, colour mood, or finish do NOT count — only fundamental shape / structure errors. If no reference image is provided for the object, skip this check.
 
 ---
 
@@ -216,8 +217,9 @@ Check for AI artifacts and physics violations.
 - Apply whether or not the object is in DECLARED INTERACTIONS. Skip when the object is explicitly sized in the prose ("a giant apple", "a miniature book").
 
 **RENDERED TEXT** (model hallucination, common on atmospheric scenes):
-- Any readable text painted into the artwork that wasn't requested → **MAJOR**, set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
-- Story-text OVERLAY (the white-on-image story sentence shown via the calm zone) is composited AFTER generation by the renderer — it is NOT in the image you are evaluating. If you see text inside the image content itself, it's a defect.
+- If a `⚠️ TEXT RULES FOR THIS IMAGE` block at the top of this prompt names an allowed text string, that exact text is permitted in the image (typically the cover title or a dedication). Do NOT flag it. Apply the rest of this rule to anything else.
+- Any OTHER readable text painted into the artwork that wasn't requested → **MAJOR**, set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
+- Story-text OVERLAY (the white-on-image story sentence shown via the calm zone) is composited AFTER generation by the renderer — it is NOT in the image you are evaluating. So when no TEXT RULES block is present, any text inside the image content itself is a defect.
 - Add a `fixable_issues` entry with `type: "rendered_text"`, severity MAJOR, `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
 
 **FACES:**

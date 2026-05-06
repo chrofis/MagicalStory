@@ -7134,6 +7134,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       modelId: best?.modelId || img.modelId,
       thinkingText: img.thinkingText || null,
       qualityScore: best?.score ?? finalEval?.qualityScore ?? null,
+      // Single score the UI shows. Falls back to derive from quality - entity
+      // when the round loop didn't stamp it (cover paths, post-repair-text-space
+      // before round 1).
+      finalScore: best?.finalScore != null
+        ? best.finalScore
+        : (best?.score != null ? Math.max(0, best.score - (best.entityPenalty || 0)) : null),
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,

@@ -275,6 +275,20 @@ async function consolidateFeedback({
     }
     if (typeof plan.final_score_reason !== 'string') plan.final_score_reason = '';
 
+    // Full deduplicated issue list — what the UI displays. Not capped at 3.
+    // Falls back to an empty array when the consolidator omits it (older replays).
+    if (!Array.isArray(plan.deduped_issues)) {
+      plan.deduped_issues = [];
+    } else {
+      plan.deduped_issues = plan.deduped_issues
+        .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
+        .map(i => ({
+          description: String(i.description || i.problem || i.issue || '').trim(),
+          severity: String(i.severity || 'MODERATE').toUpperCase(),
+          sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
+        }));
+    }
+
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
     // empirically a 6-fix inpaint often changes nothing. Cap severity-first and

@@ -675,6 +675,8 @@ export interface ImageVersion {
   //   - "edit"
   source?: string;
   qualityScore?: number;
+  /** Single score the UI displays = qualityScore − entityPenalty. Set by the backend. */
+  finalScore?: number | null;
   rawQualityScore?: number | null;
   semanticScore?: number | null;
   semanticResult?: SemanticEvaluationResult | null;
@@ -738,6 +740,8 @@ export interface SceneImage {
   description?: string;
   prompt?: string;  // The actual prompt sent to image generation API
   qualityScore?: number;
+  /** Single score the UI displays = qualityScore − entityPenalty. Set by the backend. */
+  finalScore?: number | null;
   qualityReasoning?: string;
   qualityModelId?: string;  // Model used for quality evaluation
   semanticScore?: number | null;  // Semantic fidelity score (0-100)
@@ -851,6 +855,8 @@ export interface CoverImageData {
   translatedDescription?: string;  // Scene description in story's language (for display in edit modal)
   prompt?: string;       // The actual prompt sent to image generation API
   qualityScore?: number;
+  /** Single score the UI displays = qualityScore − entityPenalty. Set by the backend. */
+  finalScore?: number | null;
   qualityReasoning?: string;
   qualityModelId?: string;  // Model used for quality evaluation
   // Regeneration info (for dev mode)
