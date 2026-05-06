@@ -14,6 +14,7 @@
 const sharp = require('sharp');
 const { createCanvas } = require('canvas');
 const { log } = require('../utils/logger');
+const r2 = require('./r2');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -790,17 +791,19 @@ async function packReferences(refs = {}, options = {}) {
   // empty-scene plates were generated WITHOUT the landmark, so even though
   // packReferences correctly skips landmarks "already in scene background"
   // at the slot stage, that scene background never had the landmark baked in.
+  // Accept landmark bytes from any source: photoUrl (R2 URL post-Phase-2),
+  // photoData base64 (legacy + historical_locations rows), or raw base64.
   const landmarkBuffers = [];
   for (const lm of landmarkPhotos) {
-    if (!lm?.photoData || typeof lm.photoData !== 'string') continue;
-    const isDataUri = lm.photoData.startsWith('data:');
-    const base64 = isDataUri
-      ? lm.photoData.replace(/^data:image\/\w+;base64,/, '')
-      : lm.photoData;
+    if (!lm) continue;
+    const source = lm.photoUrl || lm.photoData;
+    if (!source || typeof source !== 'string') continue;
     try {
-      landmarkBuffers.push(Buffer.from(base64, 'base64'));
+      const buf = await r2.bytesFromAnyImage(source);
+      if (buf) landmarkBuffers.push(buf);
+      else log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": no bytes loaded`);
     } catch (err) {
-      log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": invalid base64 (${err.message})`);
+      log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": ${err.message}`);
     }
   }
 

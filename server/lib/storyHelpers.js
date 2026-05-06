@@ -5195,13 +5195,14 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
   return visualBible.locations
     .filter(loc =>
       loc.isRealLandmark &&
-      loc.referencePhotoData &&
+      (loc.referencePhotoUrl || loc.referencePhotoData) &&
       loc.photoFetchStatus === 'success' &&
       loc.appearsInPages?.includes(pageNumber)
     )
     .map(loc => ({
       name: loc.name,
-      photoData: loc.referencePhotoData,
+      photoUrl: loc.referencePhotoUrl || null,
+      photoData: loc.referencePhotoData || null,
       attribution: loc.photoAttribution,
       source: loc.photoSource
     }));
@@ -5307,11 +5308,13 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
         log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${requestedVariant})`);
       }
     }
-    // Fall back to existing referencePhotoData (already fetched)
-    else if (loc.referencePhotoData && loc.photoFetchStatus === 'success') {
+    // Fall back to existing reference photo (referencePhotoUrl post-Phase-2,
+    // referencePhotoData on legacy entries).
+    else if ((loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success') {
       results.push({
         name: loc.name,
-        photoData: loc.referencePhotoData,
+        photoUrl: loc.referencePhotoUrl || null,
+        photoData: loc.referencePhotoData || null,
         attribution: loc.photoAttribution,
         source: loc.photoSource,
         variantNumber: 1

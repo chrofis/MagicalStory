@@ -19,6 +19,7 @@ const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersIn
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
+const r2 = require('./r2');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -1242,9 +1243,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // Get image dimensions for normalization (from sharp if available, else estimate)
           let imgW = 1024, imgH = 1024;
           try {
-            const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
-            imgW = meta.width || 1024;
-            imgH = meta.height || 1024;
+            const buf = await r2.bytesFromAnyImage(imageData);
+            if (buf) {
+              const meta = await sharp(buf).metadata();
+              imgW = meta.width || 1024;
+              imgH = meta.height || 1024;
+            }
           } catch { /* use defaults */ }
 
           figures = await mergeCascadeFacesWithGemini(figures, cascadeFaces, imgW, imgH);
@@ -1582,9 +1586,8 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
   const { forRegeneration = false, asymmetricPadding = null } = options;
 
   try {
-    // Handle data URI prefix
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imgBuffer = Buffer.from(base64Data, 'base64');
+    const imgBuffer = await r2.bytesFromAnyImage(imageData);
+    if (!imgBuffer) return null;
 
     // Get image dimensions
     const metadata = await sharp(imgBuffer).metadata();
@@ -1684,17 +1687,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
   // Add reference photo as first cell if available
   if (referencePhoto) {
     try {
-      let refBuffer;
-      if (referencePhoto.startsWith('data:')) {
-        const base64Data = referencePhoto.replace(/^data:image\/\w+;base64,/, '');
-        refBuffer = Buffer.from(base64Data, 'base64');
-      } else if (referencePhoto.startsWith('http')) {
-        // Fetch from URL - would need to implement fetch
-        // For now, skip URL-based reference photos
-        log.warn(`⚠️  [ENTITY-GRID] URL-based reference photos not yet supported`);
-      } else {
-        refBuffer = Buffer.from(referencePhoto, 'base64');
-      }
+      const refBuffer = await r2.bytesFromAnyImage(referencePhoto);
 
       if (refBuffer) {
         cells.push({
@@ -2338,9 +2331,8 @@ async function saveEntityGrids(grids, outputDir) {
   const paths = [];
 
   for (const grid of grids) {
-    // Extract buffer from data URI
-    const base64Data = grid.gridImage.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+    const buffer = await r2.bytesFromAnyImage(grid.gridImage);
+    if (!buffer) continue;
 
     const savedPath = await saveEntityGrid(
       buffer,
@@ -2895,13 +2887,10 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
 
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Using styled avatar for ${clothingCategory}`);
 
-    // Prepare avatar image
-    let avatarBuffer;
-    if (styledAvatar.startsWith('data:')) {
-      const base64Data = styledAvatar.replace(/^data:image\/\w+;base64,/, '');
-      avatarBuffer = Buffer.from(base64Data, 'base64');
-    } else {
-      avatarBuffer = Buffer.from(styledAvatar, 'base64');
+    // Prepare avatar image — accepts data: URI, raw base64, or http(s) URL.
+    const avatarBuffer = await r2.bytesFromAnyImage(styledAvatar);
+    if (!avatarBuffer) {
+      throw new Error('Failed to load styledAvatar bytes for repair');
     }
 
     // Prepare the target image for repair (dynamic upscale + pad)

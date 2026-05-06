@@ -16,6 +16,7 @@ const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
+const r2Lib = require('./r2');
 
 // Maps callGeminiAPIForImage's evaluationType to a stable function-name tag
 // for the analyze-story-log cost rollup.
@@ -3752,31 +3753,27 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Add PRIMARY landmark reference photo only (1st landmark as separate image)
   // Secondary landmarks (2nd+) go into the Visual Bible grid instead.
-  // Accept both `data:image/...;base64,XXXX` and raw base64 — historical_locations
-  // rows can carry the raw form; the previous strict prefix check silently
-  // dropped the curated photo before it reached the image model.
+  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy base64).
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    if (primaryLandmark.photoData) {
-      const isDataUri = typeof primaryLandmark.photoData === 'string' && primaryLandmark.photoData.startsWith('data:');
-      const base64Data = isDataUri
-        ? primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '')
-        : primaryLandmark.photoData;
-      const mimeMatch = isDataUri ? primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) : null;
-      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-
-      // Add name label before the image (avoid numbered format to prevent "character sheet" generation)
-      parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
-      parts.push({
-        inline_data: {
-          mime_type: mimeType,
-          data: base64Data
+    const source = primaryLandmark.photoUrl || primaryLandmark.photoData;
+    if (source) {
+      const buf = await r2Lib.bytesFromAnyImage(source);
+      if (buf) {
+        parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
+        parts.push({
+          inline_data: {
+            mime_type: 'image/jpeg',
+            data: buf.toString('base64')
+          }
+        });
+        currentImageIndex++;
+        log.info(`🌍 [IMAGE GEN] Added primary landmark reference: ${primaryLandmark.name}`);
+        if (landmarkPhotos.length > 1) {
+          log.debug(`🌍 [IMAGE GEN] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
         }
-      });
-      currentImageIndex++;
-      log.info(`🌍 [IMAGE GEN] Added primary landmark reference: ${primaryLandmark.name}`);
-      if (landmarkPhotos.length > 1) {
-        log.debug(`🌍 [IMAGE GEN] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
+      } else {
+        log.warn(`⚠️ [IMAGE GEN] Landmark "${primaryLandmark.name}": failed to load bytes — skipping`);
       }
     } else {
       log.warn(`⚠️ [IMAGE GEN] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
@@ -4427,29 +4424,25 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   }
 
   // Add PRIMARY landmark reference photo only.
-  // Accept both `data:image/...;base64,XXXX` and raw base64 strings — rows
-  // inserted directly into historical_locations carry the raw form (no
-  // prefix), and the previous strict `startsWith('data:image')` check
-  // silently dropped the curated photo before it reached Grok.
+  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy base64).
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    if (primaryLandmark.photoData) {
-      const isDataUri = typeof primaryLandmark.photoData === 'string' && primaryLandmark.photoData.startsWith('data:');
-      const base64Data = isDataUri
-        ? primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '')
-        : primaryLandmark.photoData;
-      const mimeMatch = isDataUri ? primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) : null;
-      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-
-      parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
-      parts.push({
-        inline_data: {
-          mime_type: mimeType,
-          data: base64Data
-        }
-      });
-      currentImageIndex++;
-      log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
+    const source = primaryLandmark.photoUrl || primaryLandmark.photoData;
+    if (source) {
+      const buf = await r2Lib.bytesFromAnyImage(source);
+      if (buf) {
+        parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
+        parts.push({
+          inline_data: {
+            mime_type: 'image/jpeg',
+            data: buf.toString('base64')
+          }
+        });
+        currentImageIndex++;
+        log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
+      } else {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}": failed to load bytes — skipping`);
+      }
     } else {
       log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
     }
@@ -6096,6 +6089,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const hasScaleRepair = !!img.preScaleRepairImage
       && img.preScaleRepairImage !== img.imageData;
 
+    // finalScore = imageScore − entityPenalty. Single number the frontend
+    // reads — replaces the per-evaluator recompute that produced two
+    // disagreeing scores in the UI.
+    const baseScore = ev?.score ?? ev?.qualityScore ?? null;
+    const baseEntityPenalty = getEntityPenalty(img.pageNumber, entityReport);
+    const baseFinalScore = baseScore != null ? Math.max(0, baseScore - baseEntityPenalty) : null;
+
     const baseVersion = hasScaleRepair
       ? {
           // v0 = original first generation (pre-scale-repair). No eval ran on
@@ -6103,6 +6103,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the inputs (prompt, refs) and the image bytes.
           imageData: img.preScaleRepairImage,
           score: null,
+          finalScore: null,
           source: 'original',
           type: 'original',
           evaluation: null,
@@ -6114,12 +6115,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       : {
           imageData: img.imageData,
-          score: ev?.score ?? ev?.qualityScore ?? null,
+          score: baseScore,
+          finalScore: baseFinalScore,
           source: 'original',
           evaluation: ev || null,
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
-          entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
+          entityPenalty: baseEntityPenalty,
           evaluatedAt: new Date().toISOString(),
         };
 
@@ -6128,14 +6130,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const scaleRepairVersion = hasScaleRepair
       ? {
           imageData: img.imageData,
-          score: ev?.score ?? ev?.qualityScore ?? null,
+          score: baseScore,
+          finalScore: baseFinalScore,
           source: 'scale-repair',
           type: 'repair',
           evaluation: ev || null,
           modelId: img.modelId,
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
-          entityPenalty: getEntityPenalty(img.pageNumber, entityReport),
+          entityPenalty: baseEntityPenalty,
           evaluatedAt: new Date().toISOString(),
         }
       : null;
@@ -6805,9 +6808,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const versions = pageVersions.get(ev.pageNumber);
         const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
         if (versions && repairResult) {
+          const evScore = ev.score ?? ev.qualityScore ?? null;
+          const evEntityPenalty = getEntityPenalty(ev.pageNumber, currentEntityReport);
           versions.push({
             imageData: repairResult.imageData,
-            score: ev.score ?? ev.qualityScore ?? null,
+            score: evScore,
+            finalScore: evScore != null ? Math.max(0, evScore - evEntityPenalty) : null,
             source: repairResult.source,
             evaluation: ev,
             modelId: repairResult.modelId,
@@ -6819,7 +6825,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
             description: repairResult.description || null,
-            entityPenalty: getEntityPenalty(ev.pageNumber, currentEntityReport),
+            entityPenalty: evEntityPenalty,
             evaluatedAt: new Date().toISOString(),
           });
         }
@@ -6941,6 +6947,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const newVersion = {
           imageData: w.imageData,
           score: best.score,
+          finalScore: best.finalScore != null
+            ? best.finalScore
+            : (best.score != null ? Math.max(0, best.score - (best.entityPenalty || 0)) : null),
           source: 'post-repair-text-space',
           evaluation: best.evaluation || null,
           modelId: w.modelId || best.modelId,
@@ -7052,6 +7061,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const buildVersionEntry = (v) => ({
       imageData: v.imageData,
       qualityScore: v.score,                                    // combined final (visual − semantic penalty)
+      // finalScore = qualityScore − entityPenalty. Single number the frontend
+      // shows; no client-side recompute. Falls back to score when the round
+      // loop didn't stamp it (e.g. v0 before entity report is ready).
+      finalScore: v.finalScore != null
+        ? v.finalScore
+        : (v.score != null ? Math.max(0, v.score - (v.entityPenalty || 0)) : null),
       rawQualityScore: v.evaluation?.qualityScore ?? null,      // raw visual eval
       semanticScore: v.evaluation?.semanticScore ?? null,
       semanticResult: v.evaluation?.semanticResult || null,
@@ -12830,15 +12845,18 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
     }
   }));
 
-  // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo)
+  // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo).
+  // Accept photoUrl (R2 URL post-Phase-2) or photoData (legacy data: URI / raw base64).
   for (const lm of secondaryLandmarks) {
-    if (lm.photoData && lm.photoData.startsWith('data:image')) {
-      allElements.push({
-        name: lm.name,
-        type: 'landmark',
-        imageData: lm.photoData
-      });
-    }
+    const source = lm?.photoUrl || lm?.photoData;
+    if (!source) continue;
+    const buf = await r2Lib.bytesFromAnyImage(source);
+    if (!buf) continue;
+    allElements.push({
+      name: lm.name,
+      type: 'landmark',
+      imageData: `data:image/jpeg;base64,${buf.toString('base64')}`
+    });
   }
 
   if (allElements.length === 0) {

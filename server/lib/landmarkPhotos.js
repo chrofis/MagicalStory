@@ -10,6 +10,7 @@ const { compressImageToJPEG } = require('./images');
 const { getPool } = require('../services/database');
 const { callAnthropicAPI } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
+const r2 = require('./r2');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -862,18 +863,17 @@ async function analyzeLandmarkPhoto(photoData, landmarkName, landmarkType) {
     return null;
   }
 
-  if (!photoData || !photoData.startsWith('data:image/')) {
-    return null;
-  }
+  if (!photoData) return null;
 
   try {
-    // Extract base64 data and mime type
-    const matches = photoData.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!matches) {
-      log.debug('[LANDMARK-ANALYZE] Invalid photo data format');
+    // Accept data: URI, raw base64, or http(s) URL (post-Phase-2).
+    const buf = await r2.bytesFromAnyImage(photoData);
+    if (!buf) {
+      log.debug('[LANDMARK-ANALYZE] No bytes loadable from photoData');
       return null;
     }
-    const [, mimeType, base64Data] = matches;
+    const mimeType = 'image/jpeg';
+    const base64Data = buf.toString('base64');
 
     const prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
 
@@ -2072,8 +2072,9 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   for (let i = 0; i < validLandmarks.length; i += ANALYZE_BATCH_SIZE) {
     const batch = validLandmarks.slice(i, i + ANALYZE_BATCH_SIZE);
     await Promise.allSettled(batch.map(async (landmark) => {
-      if (landmark.photoData) {
-        const description = await analyzeLandmarkPhoto(landmark.photoData, landmark.name, landmark.type);
+      const source = landmark.photoUrl || landmark.photoData;
+      if (source) {
+        const description = await analyzeLandmarkPhoto(source, landmark.name, landmark.type);
         if (description) {
           landmark.photoDescription = description;
         }

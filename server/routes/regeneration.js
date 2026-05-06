@@ -85,6 +85,7 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
+const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
 const COVER_PAGE_MAP = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
@@ -3659,15 +3660,17 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         { inline_data: { mime_type: mimeType, data: base64Data } }
       ];
 
-      // Add reference images (compressed)
+      // Add reference images (compressed). Accept inline data: URI OR R2 URL.
       for (const ref of characterPhotos) {
-        const photoUrl = ref.photoUrl;
-        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
-          const compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
-          parts.push({ text: `Reference: ${ref.name}` });
-          parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
-        }
+        const photoSrc = ref.photoUrl || ref.photoData;
+        if (!photoSrc || typeof photoSrc !== 'string') continue;
+        const refBuf = await r2.bytesFromAnyImage(photoSrc);
+        if (!refBuf) continue;
+        const dataUri = `data:image/jpeg;base64,${refBuf.toString('base64')}`;
+        const compressed = await compressImageToJPEG(dataUri, 85, 768);
+        const compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+        parts.push({ text: `Reference: ${ref.name}` });
+        parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
       }
 
       // Get the filled prompt for visibility
@@ -4546,18 +4549,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               const clothingCategory = appearance.clothing || 'standard';
               const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
-              if (!styledAvatar) {
-                log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
+              const sceneBuffer = styledAvatar ? await r2.bytesFromAnyImage(sceneImage.imageData) : null;
+              const avatarBuffer = styledAvatar ? await r2.bytesFromAnyImage(styledAvatar) : null;
+              if (!styledAvatar || !sceneBuffer || !avatarBuffer) {
+                if (!styledAvatar) {
+                  log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
+                } else {
+                  log.warn(`[REPAIR-WORKFLOW] Missing bytes for ${characterName} on page ${pageNumber} (scene=${!!sceneBuffer}, avatar=${!!avatarBuffer}), falling back to Gemini`);
+                }
                 repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
               } else {
-                const sceneBuffer = Buffer.from(
-                  sceneImage.imageData.replace(/^data:image\/\w+;base64,/, ''),
-                  'base64'
-                );
-                const avatarBuffer = styledAvatar.startsWith('data:')
-                  ? Buffer.from(styledAvatar.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-                  : Buffer.from(styledAvatar, 'base64');
-
                 const bbox = appearance.faceBox || appearance.bodyBox;
                 const hairConfig = {
                   color: character.physical?.hairColor,

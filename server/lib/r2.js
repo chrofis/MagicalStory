@@ -206,6 +206,35 @@ async function uploadImage(input, key, contentType = 'image/jpeg') {
 }
 
 /**
+ * Universal image-bytes loader. Accepts:
+ *   - http(s) URL          → fetched from R2/CDN
+ *   - data:image/...;base64,XYZ → decoded
+ *   - raw base64 (/9j/, iVBOR…) → decoded
+ *   - Buffer               → returned as-is
+ *   - null/undefined/empty → null
+ *
+ * Use everywhere a field could now hold either a URL (post-Phase-2) or
+ * inline base64 (legacy / R2 outage fallback).
+ *
+ * Returns Buffer on success, null on failure.
+ */
+async function bytesFromAnyImage(value) {
+  if (!value) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (/^https?:\/\//i.test(value)) {
+    return await fetchImageBytes(value);
+  }
+  const stripped = value.replace(/^data:image\/\w+;base64,/, '');
+  try {
+    return Buffer.from(stripped, 'base64');
+  } catch (err) {
+    log.warn(`[R2] bytesFromAnyImage decode failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Fetch image bytes from a public R2 URL. Used when an endpoint needs the
  * actual bytes (e.g. text-overlay compositing, PDF rendering) but the row's
  * image_data column has been cleared post-migration.
@@ -232,6 +261,7 @@ module.exports = {
   isConfigured,
   uploadImage,
   fetchImageBytes,
+  bytesFromAnyImage,
   publicUrlForKey,
   keyForStoryImage,
   keyForRetryImage,

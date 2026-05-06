@@ -520,6 +520,9 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             versionIndex: row.version_index,
             hasImage: true,
             qualityScore: row.quality_score,
+            finalScore: versionMeta.finalScore != null
+              ? versionMeta.finalScore
+              : (row.quality_score != null ? Math.max(0, row.quality_score - (versionMeta.entityPenalty || 0)) : null),
             generatedAt: versionDate,
             createdAt: versionDate,  // ImageHistoryModal reads createdAt
             // Dev mode metadata from data blob
@@ -844,6 +847,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             createdAt: v.createdAt || null,
             type: v.type || v.source || null,
             qualityScore: v.qualityScore ?? null,
+            finalScore: v.finalScore ?? (v.qualityScore != null ? Math.max(0, v.qualityScore - (v.entityPenalty || 0)) : null),
             rawQualityScore: v.rawQualityScore ?? null,
             semanticScore: v.semanticScore ?? null,
             semanticResult: v.semanticResult || null,
@@ -1583,12 +1587,14 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
       }
 
       case 'landmark':
-        // Return all landmark photos with their image data
+        // Return all landmark photos. After R2 migration the bytes live at
+        // photoUrl; legacy entries may still carry inline photoData.
         result = {
           landmarkPhotos: (sceneImage.landmarkPhotos || []).map(p => ({
             name: p.name,
             attribution: p.attribution,
             source: p.source,
+            photoUrl: p.photoUrl || null,
             photoData: p.photoData || null
           }))
         };
@@ -1676,35 +1682,36 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
     const entry = entries[idx];
     let result = {};
 
-    // Return specific field or all fields
+    // After R2 migration the bytes live behind imageUrl (post-Phase-2). Fall back
+    // to imageData for older entries that were saved before the migration.
+    const slotSrc = (slot) => slot?.imageUrl || slot?.imageData || null;
     if (field) {
       switch (field) {
         case 'facePhoto':
-          result = { facePhoto: entry.inputs?.facePhoto?.imageData || null };
+          result = { facePhoto: slotSrc(entry.inputs?.facePhoto) };
           break;
         case 'originalAvatar':
-          result = { originalAvatar: entry.inputs?.originalAvatar?.imageData || null };
+          result = { originalAvatar: slotSrc(entry.inputs?.originalAvatar) };
           break;
         case 'styleSample':
-          result = { styleSample: entry.inputs?.styleSample?.imageData || null };
+          result = { styleSample: slotSrc(entry.inputs?.styleSample) };
           break;
         case 'standardAvatar':
-          result = { standardAvatar: entry.inputs?.standardAvatar?.imageData || null };
+          result = { standardAvatar: slotSrc(entry.inputs?.standardAvatar) };
           break;
         case 'output':
-          result = { output: entry.output?.imageData || null };
+          result = { output: slotSrc(entry.output) };
           break;
         default:
           return res.status(400).json({ error: `Unknown field: ${field}` });
       }
     } else {
-      // Return all images for this entry
       result = {
-        facePhoto: entry.inputs?.facePhoto?.imageData || null,
-        originalAvatar: entry.inputs?.originalAvatar?.imageData || null,
-        styleSample: entry.inputs?.styleSample?.imageData || null,
-        standardAvatar: entry.inputs?.standardAvatar?.imageData || null,
-        output: entry.output?.imageData || null
+        facePhoto: slotSrc(entry.inputs?.facePhoto),
+        originalAvatar: slotSrc(entry.inputs?.originalAvatar),
+        styleSample: slotSrc(entry.inputs?.styleSample),
+        standardAvatar: slotSrc(entry.inputs?.standardAvatar),
+        output: slotSrc(entry.output)
       };
     }
 
@@ -2463,10 +2470,17 @@ router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, 
       return res.status(404).json({ error: 'Element not found' });
     }
 
-    // VB ref bytes via R2; referencePhotoData is a separate legacy field
-    // used for some location entries — kept as a fallback.
+    // VB ref bytes via R2; referencePhotoUrl/referencePhotoData are legacy fallbacks
+    // used for some location entries.
     let bytes = await loadVbReferenceBytes(foundElement);
-    let imageData = bytes ? `data:image/jpeg;base64,${bytes}` : foundElement.referencePhotoData;
+    let imageData = bytes ? `data:image/jpeg;base64,${bytes}` : null;
+    if (!imageData) {
+      const fallbackSource = foundElement.referencePhotoUrl || foundElement.referencePhotoData;
+      if (fallbackSource) {
+        const buf = await require('../lib/r2').bytesFromAnyImage(fallbackSource);
+        if (buf) imageData = `data:image/jpeg;base64,${buf.toString('base64')}`;
+      }
+    }
     if (!imageData) {
       return res.status(404).json({ error: 'No reference image for this element' });
     }
