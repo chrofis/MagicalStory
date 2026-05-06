@@ -61,7 +61,13 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     ssl: process.env.DATABASE_URL?.includes('railway.app') ? { rejectUnauthorized: false } : false,
   });
 
-  // Find candidate stories.
+  // Find candidate stories. We require BOTH:
+  //   (a) the blob is over the size threshold (cheap pg_column_size check),
+  //   (b) the JSON actually contains an inline data: URI somewhere.
+  // Without (b), stories that are naturally large (lots of metadata) but
+  // already have no inline bytes would loop forever as 'candidates' even
+  // though there's nothing left to extract.
+  const HAS_DATA_URI = `jsonb_path_exists(data, '$.** ? (@.type() == "string" && @ starts with "data:image")')`;
   let candidateRows;
   if (SINGLE_ID) {
     candidateRows = await pool.query(
@@ -74,6 +80,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       `SELECT id, pg_column_size(data) AS bytes
        FROM stories
        WHERE pg_column_size(data) > $1
+         AND ${HAS_DATA_URI}
        ORDER BY pg_column_size(data) DESC${limitClause}`,
       [THRESHOLD_KB * 1024]
     );

@@ -865,6 +865,9 @@ router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (re
     const sleepMs = Math.max(0, parseInt(req.body?.sleepMs, 10) || 100);
 
     const pool = getPool();
+    // Require both 'big enough' AND 'actually has inline data: URI bytes' so
+    // already-clean large stories don't keep coming up as candidates.
+    const HAS_DATA_URI = `jsonb_path_exists(data, '$.** ? (@.type() == "string" && @ starts with "data:image")')`;
     let candidates;
     if (singleId) {
       candidates = await pool.query(
@@ -876,6 +879,7 @@ router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (re
         `SELECT id, pg_column_size(data) AS bytes
          FROM stories
          WHERE pg_column_size(data) > $1
+           AND ${HAS_DATA_URI}
          ORDER BY pg_column_size(data) DESC
          LIMIT $2`,
         [thresholdBytes, limit]
