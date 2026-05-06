@@ -756,13 +756,21 @@ async function extractInlineImagesToR2(storyId, data) {
     && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'))
     && s.length > 1024;
 
-  const upload = async (input, key) => {
-    try {
-      return await r2.uploadImage(input, key);
-    } catch (err) {
-      log.warn(`[R2-extract] upload failed for ${key}: ${err.message}`);
-      return null;
-    }
+  // Two-phase design:
+  // 1) Walk the data synchronously, queueing { input, key, apply } tasks.
+  //    `apply(url)` is the callback that writes the URL back into the data.
+  // 2) Run the queue in a parallel batch pool. Hundreds of small R2 PUTs at
+  //    a time of 12 take seconds instead of minutes (was sequential before).
+  const tasks = [];
+  /**
+   * Queue one R2 upload. No-op if `input` isn't actual byte data.
+   * @param {string} input  — base64 / data: URI, or anything else (skipped).
+   * @param {string} key    — R2 object key.
+   * @param {(url:string)=>void} apply — writes URL back into the blob.
+   */
+  const upload = (input, key, apply) => {
+    if (!looksLikeBytes(input)) return;
+    tasks.push({ input, key, apply });
   };
 
   // sceneImages — per-page debug images
@@ -771,44 +779,29 @@ async function extractInlineImagesToR2(storyId, data) {
       if (!s || typeof s !== 'object') continue;
       const pageNum = s.pageNumber;
 
-      if (looksLikeBytes(s.bboxOverlayImage)) {
-        const url = await upload(s.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, 0));
-        if (url) s.bboxOverlayImage = url;
-      }
-      if (looksLikeBytes(s.visualBibleGrid)) {
-        const url = await upload(s.visualBibleGrid, r2.keyForVbGrid(storyId, pageNum));
-        if (url) s.visualBibleGrid = url;
-      }
+      upload(s.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, 0), (url) => { s.bboxOverlayImage = url; });
+      upload(s.visualBibleGrid, r2.keyForVbGrid(storyId, pageNum), (url) => { s.visualBibleGrid = url; });
       if (Array.isArray(s.grokRefImages)) {
         for (let k = 0; k < s.grokRefImages.length; k++) {
-          if (looksLikeBytes(s.grokRefImages[k])) {
-            const url = await upload(s.grokRefImages[k], r2.keyForGrokRef(storyId, pageNum, 0, k));
-            if (url) s.grokRefImages[k] = url;
-          }
+          const idx = k;
+          upload(s.grokRefImages[idx], r2.keyForGrokRef(storyId, pageNum, 0, idx), (url) => { s.grokRefImages[idx] = url; });
         }
       }
       if (Array.isArray(s.imageVersions)) {
         for (let i = 0; i < s.imageVersions.length; i++) {
           const v = s.imageVersions[i];
           if (!v) continue;
-          if (looksLikeBytes(v.bboxOverlayImage)) {
-            const url = await upload(v.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, i));
-            if (url) v.bboxOverlayImage = url;
-          }
+          upload(v.bboxOverlayImage, r2.keyForBboxOverlay(storyId, pageNum, i), (url) => { v.bboxOverlayImage = url; });
           if (Array.isArray(v.grokRefImages)) {
             for (let k = 0; k < v.grokRefImages.length; k++) {
-              if (looksLikeBytes(v.grokRefImages[k])) {
-                const url = await upload(v.grokRefImages[k], r2.keyForGrokRef(storyId, pageNum, i, k));
-                if (url) v.grokRefImages[k] = url;
-              }
+              const idx = k;
+              upload(v.grokRefImages[idx], r2.keyForGrokRef(storyId, pageNum, i, idx), (url) => { v.grokRefImages[idx] = url; });
             }
           }
           if (Array.isArray(v.inpaintReferenceImages)) {
             for (let k = 0; k < v.inpaintReferenceImages.length; k++) {
-              if (looksLikeBytes(v.inpaintReferenceImages[k])) {
-                const url = await upload(v.inpaintReferenceImages[k], r2.keyForInpaintRef(storyId, pageNum, i, k));
-                if (url) v.inpaintReferenceImages[k] = url;
-              }
+              const idx = k;
+              upload(v.inpaintReferenceImages[idx], r2.keyForInpaintRef(storyId, pageNum, i, idx), (url) => { v.inpaintReferenceImages[idx] = url; });
             }
           }
         }
@@ -816,48 +809,33 @@ async function extractInlineImagesToR2(storyId, data) {
       if (Array.isArray(s.landmarkPhotos)) {
         for (let k = 0; k < s.landmarkPhotos.length; k++) {
           const lp = s.landmarkPhotos[k];
-          if (lp && typeof lp === 'object' && looksLikeBytes(lp.photoData)) {
-            const url = await upload(lp.photoData, r2.keyForLandmarkPhoto(storyId, pageNum, k));
-            if (url) {
-              lp.photoUrl = url;
-              lp.photoData = undefined;
-            }
-          }
+          if (!lp || typeof lp !== 'object') continue;
+          upload(lp.photoData, r2.keyForLandmarkPhoto(storyId, pageNum, k), (url) => {
+            lp.photoUrl = url;
+            lp.photoData = undefined;
+          });
         }
       }
       // Scene-level referencePhotos can carry inline data: URIs in photoUrl
-      // and originalPhotoUrl (legacy storage), or in photoData. Push to R2
-      // and rewrite the URL. Without this the strip (which drops data: URIs)
-      // would leave the entry with no photo at all.
+      // and originalPhotoUrl (legacy storage), or in photoData.
       if (Array.isArray(s.referencePhotos)) {
         for (let k = 0; k < s.referencePhotos.length; k++) {
           const rp = s.referencePhotos[k];
           if (!rp || typeof rp !== 'object') continue;
-          if (looksLikeBytes(rp.photoUrl)) {
-            const url = await upload(rp.photoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}.jpg`);
-            if (url) rp.photoUrl = url;
-          }
-          if (looksLikeBytes(rp.originalPhotoUrl)) {
-            const url = await upload(rp.originalPhotoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-orig.jpg`);
-            if (url) rp.originalPhotoUrl = url;
-          }
-          if (looksLikeBytes(rp.photoData)) {
-            const url = await upload(rp.photoData, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-data.jpg`);
-            if (url) {
-              rp.photoUrl = rp.photoUrl || url;  // prefer existing URL if any
-              rp.photoData = undefined;
-            }
-          }
+          upload(rp.photoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}.jpg`, (url) => { rp.photoUrl = url; });
+          upload(rp.originalPhotoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-orig.jpg`, (url) => { rp.originalPhotoUrl = url; });
+          upload(rp.photoData, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-data.jpg`, (url) => {
+            rp.photoUrl = rp.photoUrl || url;  // prefer existing URL if any
+            rp.photoData = undefined;
+          });
         }
       }
       if (s.entityReport && typeof s.entityReport === 'object') {
         if (Array.isArray(s.entityReport.grids)) {
           for (let k = 0; k < s.entityReport.grids.length; k++) {
             const g = s.entityReport.grids[k];
-            if (g && looksLikeBytes(g.gridImage)) {
-              const url = await upload(g.gridImage, r2.keyForEntityGrid(storyId, pageNum, k));
-              if (url) g.gridImage = url;
-            }
+            if (!g) continue;
+            upload(g.gridImage, r2.keyForEntityGrid(storyId, pageNum, k), (url) => { g.gridImage = url; });
           }
         }
         if (s.entityReport.characters && typeof s.entityReport.characters === 'object') {
@@ -865,16 +843,11 @@ async function extractInlineImagesToR2(storyId, data) {
             if (!charReport?.byClothing || typeof charReport.byClothing !== 'object') continue;
             for (const [clothing, clothingReport] of Object.entries(charReport.byClothing)) {
               if (!clothingReport) continue;
-              if (looksLikeBytes(clothingReport.gridImage)) {
-                const url = await upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, pageNum, charName, clothing, null));
-                if (url) clothingReport.gridImage = url;
-              }
+              upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, pageNum, charName, clothing, null), (url) => { clothingReport.gridImage = url; });
               if (Array.isArray(clothingReport.gridImages)) {
                 for (let k = 0; k < clothingReport.gridImages.length; k++) {
-                  if (looksLikeBytes(clothingReport.gridImages[k])) {
-                    const url = await upload(clothingReport.gridImages[k], r2.keyForCharGrid(storyId, pageNum, charName, clothing, k));
-                    if (url) clothingReport.gridImages[k] = url;
-                  }
+                  const idx = k;
+                  upload(clothingReport.gridImages[idx], r2.keyForCharGrid(storyId, pageNum, charName, clothing, idx), (url) => { clothingReport.gridImages[idx] = url; });
                 }
               }
             }
@@ -889,46 +862,31 @@ async function extractInlineImagesToR2(storyId, data) {
     for (const kind of ['frontCover', 'initialPage', 'backCover']) {
       const cv = data.coverImages[kind];
       if (!cv || typeof cv !== 'object') continue;
-      const pageMarker = kind;  // covers use the kind as their slug
+      const pageMarker = kind;
 
-      if (looksLikeBytes(cv.bboxOverlayImage)) {
-        const url = await upload(cv.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v0.jpg`);
-        if (url) cv.bboxOverlayImage = url;
-      }
-      if (looksLikeBytes(cv.visualBibleGrid)) {
-        const url = await upload(cv.visualBibleGrid, `stories/${storyId}/debug/${pageMarker}/vb-grid.jpg`);
-        if (url) cv.visualBibleGrid = url;
-      }
+      upload(cv.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v0.jpg`, (url) => { cv.bboxOverlayImage = url; });
+      upload(cv.visualBibleGrid, `stories/${storyId}/debug/${pageMarker}/vb-grid.jpg`, (url) => { cv.visualBibleGrid = url; });
       if (Array.isArray(cv.grokRefImages)) {
         for (let k = 0; k < cv.grokRefImages.length; k++) {
-          if (looksLikeBytes(cv.grokRefImages[k])) {
-            const url = await upload(cv.grokRefImages[k], `stories/${storyId}/debug/${pageMarker}/v0/grok-ref-${k}.jpg`);
-            if (url) cv.grokRefImages[k] = url;
-          }
+          const idx = k;
+          upload(cv.grokRefImages[idx], `stories/${storyId}/debug/${pageMarker}/v0/grok-ref-${idx}.jpg`, (url) => { cv.grokRefImages[idx] = url; });
         }
       }
       if (Array.isArray(cv.imageVersions)) {
         for (let i = 0; i < cv.imageVersions.length; i++) {
           const v = cv.imageVersions[i];
           if (!v) continue;
-          if (looksLikeBytes(v.bboxOverlayImage)) {
-            const url = await upload(v.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v${i}.jpg`);
-            if (url) v.bboxOverlayImage = url;
-          }
+          upload(v.bboxOverlayImage, `stories/${storyId}/debug/${pageMarker}/bbox-overlay-v${i}.jpg`, (url) => { v.bboxOverlayImage = url; });
           if (Array.isArray(v.grokRefImages)) {
             for (let k = 0; k < v.grokRefImages.length; k++) {
-              if (looksLikeBytes(v.grokRefImages[k])) {
-                const url = await upload(v.grokRefImages[k], `stories/${storyId}/debug/${pageMarker}/v${i}/grok-ref-${k}.jpg`);
-                if (url) v.grokRefImages[k] = url;
-              }
+              const idx = k;
+              upload(v.grokRefImages[idx], `stories/${storyId}/debug/${pageMarker}/v${i}/grok-ref-${idx}.jpg`, (url) => { v.grokRefImages[idx] = url; });
             }
           }
           if (Array.isArray(v.inpaintReferenceImages)) {
             for (let k = 0; k < v.inpaintReferenceImages.length; k++) {
-              if (looksLikeBytes(v.inpaintReferenceImages[k])) {
-                const url = await upload(v.inpaintReferenceImages[k], `stories/${storyId}/debug/${pageMarker}/v${i}/inpaint-ref-${k}.jpg`);
-                if (url) v.inpaintReferenceImages[k] = url;
-              }
+              const idx = k;
+              upload(v.inpaintReferenceImages[idx], `stories/${storyId}/debug/${pageMarker}/v${i}/inpaint-ref-${idx}.jpg`, (url) => { v.inpaintReferenceImages[idx] = url; });
             }
           }
         }
@@ -936,34 +894,23 @@ async function extractInlineImagesToR2(storyId, data) {
       if (Array.isArray(cv.landmarkPhotos)) {
         for (let k = 0; k < cv.landmarkPhotos.length; k++) {
           const lp = cv.landmarkPhotos[k];
-          if (lp && typeof lp === 'object' && looksLikeBytes(lp.photoData)) {
-            const url = await upload(lp.photoData, `stories/${storyId}/debug/${pageMarker}/landmark-${k}.jpg`);
-            if (url) {
-              lp.photoUrl = url;
-              lp.photoData = undefined;
-            }
-          }
+          if (!lp || typeof lp !== 'object') continue;
+          upload(lp.photoData, `stories/${storyId}/debug/${pageMarker}/landmark-${k}.jpg`, (url) => {
+            lp.photoUrl = url;
+            lp.photoData = undefined;
+          });
         }
       }
       if (Array.isArray(cv.referencePhotos)) {
         for (let k = 0; k < cv.referencePhotos.length; k++) {
           const rp = cv.referencePhotos[k];
           if (!rp || typeof rp !== 'object') continue;
-          if (looksLikeBytes(rp.photoUrl)) {
-            const url = await upload(rp.photoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}.jpg`);
-            if (url) rp.photoUrl = url;
-          }
-          if (looksLikeBytes(rp.originalPhotoUrl)) {
-            const url = await upload(rp.originalPhotoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-orig.jpg`);
-            if (url) rp.originalPhotoUrl = url;
-          }
-          if (looksLikeBytes(rp.photoData)) {
-            const url = await upload(rp.photoData, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-data.jpg`);
-            if (url) {
-              rp.photoUrl = rp.photoUrl || url;
-              rp.photoData = undefined;
-            }
-          }
+          upload(rp.photoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}.jpg`, (url) => { rp.photoUrl = url; });
+          upload(rp.originalPhotoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-orig.jpg`, (url) => { rp.originalPhotoUrl = url; });
+          upload(rp.photoData, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-data.jpg`, (url) => {
+            rp.photoUrl = rp.photoUrl || url;
+            rp.photoData = undefined;
+          });
         }
       }
     }
@@ -976,13 +923,11 @@ async function extractInlineImagesToR2(storyId, data) {
       if (!loc || typeof loc !== 'object') continue;
       const entryId = loc.id || loc.dbKey || loc.name;
       if (!entryId) continue;
-      if (looksLikeBytes(loc.referencePhotoData)) {
-        const url = await upload(loc.referencePhotoData, r2.keyForVbReference(storyId, String(entryId).replace(/[^a-zA-Z0-9_-]/g, '_')));
-        if (url) {
-          loc.referencePhotoUrl = url;
-          loc.referencePhotoData = undefined;
-        }
-      }
+      const safeId = String(entryId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      upload(loc.referencePhotoData, r2.keyForVbReference(storyId, safeId), (url) => {
+        loc.referencePhotoUrl = url;
+        loc.referencePhotoData = undefined;
+      });
     }
   }
 
@@ -992,10 +937,8 @@ async function extractInlineImagesToR2(storyId, data) {
     if (fcr.entity?.grids && Array.isArray(fcr.entity.grids)) {
       for (let k = 0; k < fcr.entity.grids.length; k++) {
         const g = fcr.entity.grids[k];
-        if (g && looksLikeBytes(g.gridImage)) {
-          const url = await upload(g.gridImage, `stories/${storyId}/debug/final-checks/entity-grid-${k}.jpg`);
-          if (url) g.gridImage = url;
-        }
+        if (!g) continue;
+        upload(g.gridImage, `stories/${storyId}/debug/final-checks/entity-grid-${k}.jpg`, (url) => { g.gridImage = url; });
       }
     }
     if (fcr.entity?.characters && typeof fcr.entity.characters === 'object') {
@@ -1003,36 +946,28 @@ async function extractInlineImagesToR2(storyId, data) {
         if (!charReport?.byClothing || typeof charReport.byClothing !== 'object') continue;
         for (const [clothing, clothingReport] of Object.entries(charReport.byClothing)) {
           if (!clothingReport) continue;
-          if (looksLikeBytes(clothingReport.gridImage)) {
-            const url = await upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, null));
-            if (url) clothingReport.gridImage = url;
-          }
+          upload(clothingReport.gridImage, r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, null), (url) => { clothingReport.gridImage = url; });
           if (Array.isArray(clothingReport.gridImages)) {
             for (let k = 0; k < clothingReport.gridImages.length; k++) {
-              if (looksLikeBytes(clothingReport.gridImages[k])) {
-                const url = await upload(clothingReport.gridImages[k], r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, k));
-                if (url) clothingReport.gridImages[k] = url;
-              }
+              const idx = k;
+              upload(clothingReport.gridImages[idx], r2.keyForCharGrid(storyId, null, `final-${charName}`, clothing, idx), (url) => { clothingReport.gridImages[idx] = url; });
             }
           }
         }
       }
     }
-    if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object'
-        && looksLikeBytes(fcr.styleConsistency.gridImage)) {
-      const url = await upload(fcr.styleConsistency.gridImage, `stories/${storyId}/debug/final-checks/style-consistency-grid.jpg`);
-      if (url) fcr.styleConsistency.gridImage = url;
+    if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object') {
+      upload(fcr.styleConsistency.gridImage, `stories/${storyId}/debug/final-checks/style-consistency-grid.jpg`, (url) => { fcr.styleConsistency.gridImage = url; });
     }
     if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
       for (const [charName, charRepair] of Object.entries(fcr.entityRepairs)) {
         if (!charRepair?.pages || typeof charRepair.pages !== 'object') continue;
         for (const [pageKey, pageRepair] of Object.entries(charRepair.pages)) {
           if (!pageRepair?.comparison || typeof pageRepair.comparison !== 'object') continue;
+          const comp = pageRepair.comparison;
           for (const k of ['before', 'after', 'grokRawResult', 'blackoutImage', 'blendMask', 'croppedAvatar', 'cutoutSent']) {
-            if (looksLikeBytes(pageRepair.comparison[k])) {
-              const url = await upload(pageRepair.comparison[k], r2.keyForRepairCompare(storyId, charName, pageKey, k));
-              if (url) pageRepair.comparison[k] = url;
-            }
+            const field = k;
+            upload(comp[field], r2.keyForRepairCompare(storyId, charName, pageKey, field), (url) => { comp[field] = url; });
           }
         }
       }
@@ -1047,24 +982,40 @@ async function extractInlineImagesToR2(storyId, data) {
       if (!e || typeof e !== 'object') continue;
       if (e.inputs && typeof e.inputs === 'object') {
         for (const [field, slot] of Object.entries(e.inputs)) {
-          if (slot && typeof slot === 'object' && looksLikeBytes(slot.imageData)) {
-            const url = await upload(slot.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, field));
-            if (url) {
-              slot.imageUrl = url;
-              slot.imageData = undefined;
-            }
-          }
+          if (!slot || typeof slot !== 'object') continue;
+          upload(slot.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, field), (url) => {
+            slot.imageUrl = url;
+            slot.imageData = undefined;
+          });
         }
       }
-      if (e.output && typeof e.output === 'object' && looksLikeBytes(e.output.imageData)) {
-        const url = await upload(e.output.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, 'output'));
-        if (url) {
+      if (e.output && typeof e.output === 'object') {
+        upload(e.output.imageData, r2.keyForStyledAvatarInput(storyId, `${arrName}-${i}`, 'output'), (url) => {
           e.output.imageUrl = url;
           e.output.imageData = undefined;
-        }
+        });
       }
     }
   }
+
+  // ─── Phase 2: drain the queue with bounded concurrency ────────────────
+  if (tasks.length === 0) return;
+  const PARALLEL = 12;
+  let nextTask = 0;
+  const workers = new Array(Math.min(PARALLEL, tasks.length)).fill(null).map(async () => {
+    while (true) {
+      const myIdx = nextTask++;
+      if (myIdx >= tasks.length) return;
+      const t = tasks[myIdx];
+      try {
+        const url = await r2.uploadImage(t.input, t.key);
+        if (url) t.apply(url);
+      } catch (err) {
+        log.warn(`[R2-extract] upload failed for ${t.key}: ${err.message}`);
+      }
+    }
+  });
+  await Promise.all(workers);
 }
 
 /**
