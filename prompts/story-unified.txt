@@ -200,8 +200,6 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with a real landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot. SCENE prose and `emptyScenePrompt` use the same relative phrasing.
 
-**Character orientation relative to landmark.** Default to characters *coming from* the landmark with it behind them — faces stay toward camera and the landmark anchors the background without being obscured. For groups of 4+, prefer the inverse: characters seen from behind walking *toward* the landmark, so every figure fits in frame and the landmark stays the focal point. Avoid mixed orientations (some toward, some away) in the same scene — the eye loses the through-line.
-
 The `emptyScenePrompt` MUST MIRROR the SCENE prose's composition geometry — do not reinvent it. The generated empty scene becomes the style anchor the main image composites onto, so if their geometries disagree, the main image will fail at compositing (aim directions, target placements, perspective lines won't line up). Carry across verbatim from SCENE:
 - **Direction of any path, river, road, corridor, shoreline, horizon, or major perspective line.** If SCENE says *"path stretches from lower-left foreground to upper-right background"*, the `emptyScenePrompt` uses the same direction phrasing.
 - **Vanishing point / opening location** as a concrete frame position (upper-right, center-right, lower-center, etc.), not a vague side.

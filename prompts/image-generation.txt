@@ -2,7 +2,7 @@
 
 Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.
 
-The attached reference photos define each character's IDENTITY only: face, hair, skin tone, build, and clothing. Copy those exactly. Do NOT copy the pose, framing, camera angle, or composition from the reference photos — the characters' positions, actions, body direction, and size in the scene come entirely from the scene description and the COMPOSITION rules below.
+When the FIRST reference photo shows a real location (architecture, landscape, no characters in it), render the scene IN that location — copy its setting, architecture, geography, and lighting. All OTHER reference photos define each character's IDENTITY only — face, hair, skin tone, build, and clothing — never their pose, framing, or composition. Characters' positions, actions, body direction, and size come entirely from the scene description and the COMPOSITION rules below.
 
 {CHARACTER_REFERENCE_LIST}
 
