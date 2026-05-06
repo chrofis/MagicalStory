@@ -843,6 +843,7 @@ function stripInlineImagesFromStoryData(data) {
       if (!cv || typeof cv !== 'object') continue;
       cv.bboxOverlayImage = undefined;
       cv.grokRefImages = undefined;
+      cv.visualBibleGrid = undefined;
       if (Array.isArray(cv.imageVersions)) {
         for (const v of cv.imageVersions) {
           if (!v) continue;
@@ -858,6 +859,18 @@ function stripInlineImagesFromStoryData(data) {
           r.bboxOverlayImage = undefined;
           r.originalImage = undefined;
           r.annotatedOriginal = undefined;
+        }
+      }
+      if (Array.isArray(cv.referencePhotos)) {
+        for (const rp of cv.referencePhotos) {
+          if (!rp || typeof rp !== 'object') continue;
+          if (typeof rp.photoUrl === 'string' && rp.photoUrl.startsWith('data:')) rp.photoUrl = undefined;
+          if (typeof rp.originalPhotoUrl === 'string' && rp.originalPhotoUrl.startsWith('data:')) rp.originalPhotoUrl = undefined;
+        }
+      }
+      if (Array.isArray(cv.landmarkPhotos)) {
+        for (const lp of cv.landmarkPhotos) {
+          if (lp && typeof lp === 'object') lp.photoData = undefined;
         }
       }
     }
@@ -876,6 +889,23 @@ function stripInlineImagesFromStoryData(data) {
     const fcr = data.finalChecksReport;
     if (fcr.entity?.grids && Array.isArray(fcr.entity.grids)) {
       for (const g of fcr.entity.grids) if (g) g.gridImage = undefined;
+    }
+    // Per-character per-clothing grid montages — same shape as scene entityReport
+    if (fcr.entity?.characters && typeof fcr.entity.characters === 'object') {
+      for (const charReport of Object.values(fcr.entity.characters)) {
+        if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
+          for (const clothing of Object.values(charReport.byClothing)) {
+            if (!clothing) continue;
+            clothing.gridImage = undefined;
+            if (Array.isArray(clothing.gridImages)) {
+              for (let i = 0; i < clothing.gridImages.length; i++) clothing.gridImages[i] = undefined;
+            }
+          }
+        }
+      }
+    }
+    if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object') {
+      fcr.styleConsistency.gridImage = undefined;
     }
     if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
       for (const charRepair of Object.values(fcr.entityRepairs)) {

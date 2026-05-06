@@ -466,15 +466,17 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               rawQualityScore: v.rawQualityScore ?? null,
               entityPenalty: v.entityPenalty ?? null,
               evaluatedAt: v.evaluatedAt || null,
-              hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
-              grokRefImageUrls: Array.isArray(v.grokRefImages)
+              // Keep field name; only expose real http(s) URLs. data: URIs and missing entries
+              // become empty arrays. After Phase 2 migration these always carry R2 URLs.
+              grokRefImages: Array.isArray(v.grokRefImages)
                 ? v.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
                 : [],
+              hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
               inpaintInstruction: v.inpaintInstruction || null,
-              hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
-              inpaintReferenceImageUrls: Array.isArray(v.inpaintReferenceImages)
+              inpaintReferenceImages: Array.isArray(v.inpaintReferenceImages)
                 ? v.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
                 : [],
+              hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
             })));
           }
         }
@@ -537,11 +539,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             rawQualityScore: versionMeta.rawQualityScore ?? null,
             entityPenalty: versionMeta.entityPenalty ?? null,
             evaluatedAt: versionMeta.evaluatedAt || null,
+            grokRefImages: versionMeta.grokRefImages || [],
             hasGrokRefImages: !!versionMeta.hasGrokRefImages,
-            grokRefImageUrls: versionMeta.grokRefImageUrls || [],
             inpaintInstruction: versionMeta.inpaintInstruction || null,
+            inpaintReferenceImages: versionMeta.inpaintReferenceImages || [],
             hasInpaintReferenceImages: !!versionMeta.hasInpaintReferenceImages,
-            inpaintReferenceImageUrls: versionMeta.inpaintReferenceImageUrls || [],
           });
           // Update main qualityScore and bboxDetection to reflect the ACTIVE version
           if (isActiveVersion) {
@@ -803,6 +805,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         fixTargets: img.fixTargets || [],
         fixableIssues: img.fixableIssues || [],
         hasVisualBibleGrid: !!img.visualBibleGrid,
+        grokRefImages: Array.isArray(img.grokRefImages)
+          ? img.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+          : [],
         hasGrokRefImages: Array.isArray(img.grokRefImages) && img.grokRefImages.length > 0,
         emptyScenePrompt: img.emptyScenePrompt || null,
         emptySceneQc: img.emptySceneQc || null,
@@ -873,6 +878,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.frontCover.visualBibleGrid,
+          grokRefImages: Array.isArray(story.coverImages.frontCover.grokRefImages)
+            ? story.coverImages.frontCover.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+            : [],
           hasGrokRefImages: Array.isArray(story.coverImages.frontCover.grokRefImages) && story.coverImages.frontCover.grokRefImages.length > 0,
           // Full retry history with repair/bbox details (same as page images)
           retryHistory: (story.coverImages.frontCover.retryHistory || []).map(r => ({
@@ -914,6 +922,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.initialPage.visualBibleGrid,
+          grokRefImages: Array.isArray(story.coverImages.initialPage.grokRefImages)
+            ? story.coverImages.initialPage.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+            : [],
           hasGrokRefImages: Array.isArray(story.coverImages.initialPage.grokRefImages) && story.coverImages.initialPage.grokRefImages.length > 0,
           retryHistory: (story.coverImages.initialPage.retryHistory || []).map(r => ({
             type: r.type,
@@ -954,6 +965,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.backCover.visualBibleGrid,
+          grokRefImages: Array.isArray(story.coverImages.backCover.grokRefImages)
+            ? story.coverImages.backCover.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+            : [],
           hasGrokRefImages: Array.isArray(story.coverImages.backCover.grokRefImages) && story.coverImages.backCover.grokRefImages.length > 0,
           retryHistory: (story.coverImages.backCover.retryHistory || []).map(r => ({
             type: r.type,
@@ -1971,17 +1985,17 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.entityPenalty = source.entityPenalty || 0;
         target.evaluatedAt = source.evaluatedAt || null;
         target.issuesSummary = source.issuesSummary || null;
-        // grokRefImages / inpaintReferenceImages: only flags + URLs, never inline base64.
-        // Bytes belong in R2 and load lazily through the dev-image endpoint.
-        target.hasGrokRefImages = Array.isArray(source.grokRefImages) && source.grokRefImages.length > 0;
-        target.grokRefImageUrls = Array.isArray(source.grokRefImages)
+        // grokRefImages / inpaintReferenceImages: only real URLs cross the wire, never base64.
+        // After Phase 2 migration these always carry R2 URLs; for now data: URIs get filtered out.
+        target.grokRefImages = Array.isArray(source.grokRefImages)
           ? source.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
           : [];
+        target.hasGrokRefImages = Array.isArray(source.grokRefImages) && source.grokRefImages.length > 0;
         target.inpaintInstruction = source.inpaintInstruction || null;
-        target.hasInpaintReferenceImages = Array.isArray(source.inpaintReferenceImages) && source.inpaintReferenceImages.length > 0;
-        target.inpaintReferenceImageUrls = Array.isArray(source.inpaintReferenceImages)
+        target.inpaintReferenceImages = Array.isArray(source.inpaintReferenceImages)
           ? source.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
           : [];
+        target.hasInpaintReferenceImages = Array.isArray(source.inpaintReferenceImages) && source.inpaintReferenceImages.length > 0;
         target.textSpaceCoveragePct = source.textSpaceCoveragePct ?? null;
         target.textSpacePosition = source.textSpacePosition || null;
         target.iterationFeedback = source.iterationFeedback || null;
