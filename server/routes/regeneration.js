@@ -1108,10 +1108,23 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       bgNames.has((c.name || '').toLowerCase()));
     // Physical descriptions for bg chars — Grok needs to be told who
     // "Gessler" looks like; the name alone is meaningless to the model.
-    const bgDescriptions = bgCharObjs.map(c => ({
-      name: c.name,
-      description: helpers.buildCharacterPhysicalDescription(c) || '',
-    })).filter(x => x.description);
+    // Per-page clothing override prevents the standard avatar slot
+    // (modern clothes) leaking into a costumed scene.
+    const clothingByName = new Map(allChars.map(c => [
+      (c.name || '').toLowerCase(),
+      c.clothing || null,
+    ]));
+    const clothingReqs = sceneMetadata.fullData?.clothingRequirements
+      || sceneMetadata.clothingRequirements
+      || null;
+    const bgDescriptions = bgCharObjs.map(c => {
+      const label = clothingByName.get((c.name || '').toLowerCase()) || null;
+      const override = helpers.resolveClothingForPage(c, label, clothingReqs);
+      return {
+        name: c.name,
+        description: helpers.buildCharacterPhysicalDescription(c, override) || '',
+      };
+    }).filter(x => x.description);
     // Load empty-scene plate from R2 if available
     let plate = null;
     try {

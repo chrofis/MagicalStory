@@ -5213,10 +5213,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // Physical descriptions — Grok has no idea who "Gessler" is
                   // by name. Build a hair/face/clothing line for each bg char
                   // so the prompt can describe them.
-                  const bgDescriptions = bgCharObjs.map(c => ({
-                    name: c.name,
-                    description: helpers.buildCharacterPhysicalDescription(c) || '',
-                  })).filter(x => x.description);
+                  // Per-page clothing override: the unified outline may have
+                  // declared `costumed:medieval` (or winter/summer) for this
+                  // page. Without an override the helper falls back to the
+                  // standard avatar slot — modern clothes leak into a
+                  // medieval scene.
+                  const clothingByName = new Map(allChars.map(c => [
+                    (c.name || '').toLowerCase(),
+                    c.clothing || null,
+                  ]));
+                  const clothingReqs = pageData.sceneMetadata?.fullData?.clothingRequirements
+                    || pageData.sceneMetadata?.clothingRequirements
+                    || null;
+                  const bgDescriptions = bgCharObjs.map(c => {
+                    const label = clothingByName.get((c.name || '').toLowerCase()) || null;
+                    const override = helpers.resolveClothingForPage(c, label, clothingReqs);
+                    return {
+                      name: c.name,
+                      description: helpers.buildCharacterPhysicalDescription(c, override) || '',
+                    };
+                  }).filter(x => x.description);
                   scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
                     pageNumber: pageData.pageNumber,
                     sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,

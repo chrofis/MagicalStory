@@ -3015,6 +3015,41 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  * @param {Object} char - Character object
  * @returns {string} Prose description
  */
+/**
+ * Resolve the page-level clothing label (e.g. "costumed:medieval", "winter",
+ * "summer", "standard") to a plain-text clothing description suitable as
+ * `clothingOverride` for buildCharacterPhysicalDescription. Mirrors the
+ * resolution priority used by buildScenePromptWithCharacters.
+ *
+ * @param {Object} char - Character object
+ * @param {string|null} clothingLabel - per-page clothing label (e.g. 'costumed:medieval')
+ * @param {Object|null} clothingRequirements - per-character clothing requirements
+ *                                             from the unified outline pass
+ * @returns {string|null} resolved clothing text, or null when nothing applies
+ */
+function resolveClothingForPage(char, clothingLabel, clothingRequirements = null) {
+  if (!char) return null;
+  const avatars = char.avatars || char.clothingAvatars || {};
+  const label = (clothingLabel || '').trim();
+  const isCostumed = label.startsWith('costumed');
+
+  if (isCostumed) {
+    if (avatars?.clothing?.costumed) {
+      const desc = Object.values(avatars.clothing.costumed)[0];
+      if (desc) return typeof desc === 'string' ? desc : formatClothingObject(desc);
+    }
+    const reqDesc = clothingRequirements?.[char.name]?.costumed?.description;
+    if (reqDesc) return reqDesc;
+    return null;
+  }
+
+  if (label && avatars?.clothing?.[label]) {
+    const desc = avatars.clothing[label];
+    return typeof desc === 'string' ? desc : formatClothingObject(desc);
+  }
+  return null;
+}
+
 function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   const p = extractCharacterVisualProfile(char, { clothingOverride });
   // Prefer the apparent-age categorical label (genderTerm derived from apparentAge)
@@ -5671,6 +5706,7 @@ module.exports = {
   getCharacterPhotoDetails,
   prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
+  resolveClothingForPage,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
