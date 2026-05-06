@@ -3601,7 +3601,8 @@ RULES for these locations:
 1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
 2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
 3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
+4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.
+5. **Per-scene composition must match the description.** When a page's primary location is one of these entries, copy the description verbatim into that page's \`landmarkContext\` metadata field, AND keep the page's character \`depth\` / \`position\` / prose composition consistent with what the description spells out. If the description says the child is "in the right background, against the tree", that page's matching character is \`depth: background\`, on the right — do not place them at midground or center. Re-read the description before composing each scene that uses it.`;
         log.debug(`[PROMPT] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 
@@ -4966,7 +4967,8 @@ RULES for these locations:
 1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
 2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
 3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.`;
+4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.
+5. **Per-scene composition must match the description.** When a page's primary location is one of these entries, copy the description verbatim into that page's \`landmarkContext\` metadata field, AND keep the page's character \`depth\` / \`position\` / prose composition consistent with what the description spells out. If the description says the child is "in the right background, against the tree", that page's matching character is \`depth: background\`, on the right — do not place them at midground or center. Re-read the description before composing each scene that uses it.`;
         log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
       }
 

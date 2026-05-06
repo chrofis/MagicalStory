@@ -167,6 +167,7 @@ METADATA:
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner (e.g. 'deep evening sky in rich indigo', 'dark green pine foliage', 'saturated wet cobblestones')",
   "era": "free-text era for THIS scene (e.g. 'medieval Switzerland, ~1300', 'present day Zurich', '1920s New York'). Same value for every page UNLESS the page is a flashback/dream/flash-forward — then write the page's own era and the rest of the metadata stays consistent with that override.",
+  "landmarkContext": "OPTIONAL. When the page's primary LOC### matches a PRE-POPULATED LOCATION (above), copy that location's description verbatim here. Omit when the page does not use a pre-populated location.",
   "emptyScenePrompt": "2–4 sentences describing the background environment only."
 }
 ```
