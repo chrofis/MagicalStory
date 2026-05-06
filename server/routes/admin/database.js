@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, getPool, isDatabaseMode, saveStoryImage, hasStorySeparateImages } = require('../../services/database');
+const { dbQuery, getPool, isDatabaseMode, saveStoryImage, hasStorySeparateImages, extractInlineImagesToR2, stripInlineImagesFromStoryData } = require('../../services/database');
 const { arrayToDbIndex } = require('../../lib/versionManager');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
@@ -827,6 +827,114 @@ router.post('/strip-migrated-image-data', authenticateToken, requireAdmin, async
     });
   } catch (err) {
     log.error('[STRIP] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/database/backfill-debug-images
+// Phase 4 backfill: walk every story whose data blob is still bloated with
+// inline base64 (debug overlays, Grok refs, entity grids, repair compares,
+// landmark photos, VB-location refs, styled-avatar inputs), push the bytes
+// to R2 with stable keys, strip the residue, UPDATE the row.
+//
+// Body: { dryRun?: boolean, limit?: number, thresholdKB?: number, storyId?: string, sleepMs?: number }
+// dryRun: list candidates without modifying anything
+// limit: cap on stories to process this call (default 5 — keep request <30s)
+// thresholdKB: only touch stories whose blob is larger than this (default 1024)
+// storyId: process exactly one story (overrides limit/threshold)
+// sleepMs: delay between stories to ease R2 load (default 100)
+//
+// Idempotent. Re-running picks up where it left off because the threshold
+// filter naturally skips already-processed stories. For the full migration,
+// invoke repeatedly until storiesProcessed === 0.
+router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'database mode required' });
+    }
+
+    const r2 = require('../../lib/r2');
+    if (!r2.isConfigured()) {
+      return res.status(400).json({ error: 'R2 not configured — cannot extract inline bytes' });
+    }
+
+    const dryRun = req.body?.dryRun === true;
+    const limit = Math.min(parseInt(req.body?.limit, 10) || 5, 50);
+    const thresholdBytes = (parseInt(req.body?.thresholdKB, 10) || 1024) * 1024;
+    const singleId = typeof req.body?.storyId === 'string' ? req.body.storyId : null;
+    const sleepMs = Math.max(0, parseInt(req.body?.sleepMs, 10) || 100);
+
+    const pool = getPool();
+    let candidates;
+    if (singleId) {
+      candidates = await pool.query(
+        "SELECT id, pg_column_size(data) AS bytes FROM stories WHERE id = $1",
+        [singleId]
+      );
+    } else {
+      candidates = await pool.query(
+        `SELECT id, pg_column_size(data) AS bytes
+         FROM stories
+         WHERE pg_column_size(data) > $1
+         ORDER BY pg_column_size(data) DESC
+         LIMIT $2`,
+        [thresholdBytes, limit]
+      );
+    }
+
+    if (dryRun) {
+      return res.json({
+        dryRun: true,
+        candidates: candidates.rows.map(r => ({ id: r.id, kb: Math.round(r.bytes / 1024) })),
+        thresholdKB: thresholdBytes / 1024,
+      });
+    }
+
+    if (candidates.rows.length === 0) {
+      return res.json({ done: true, message: 'no candidates', storiesProcessed: 0 });
+    }
+
+    const results = [];
+    let totalReclaimed = 0;
+    const startTime = Date.now();
+
+    for (let i = 0; i < candidates.rows.length; i++) {
+      const { id, bytes: beforeBytes } = candidates.rows[i];
+      try {
+        const r = await pool.query("SELECT data FROM stories WHERE id = $1", [id]);
+        if (r.rows.length === 0) {
+          results.push({ id, skipped: 'not_found' });
+          continue;
+        }
+        const data = r.rows[0].data;
+        await extractInlineImagesToR2(id, data);
+        stripInlineImagesFromStoryData(data);
+        await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(data), id]);
+        const v = await pool.query("SELECT pg_column_size(data) AS bytes FROM stories WHERE id = $1", [id]);
+        const afterBytes = v.rows[0].bytes;
+        const reclaimed = beforeBytes - afterBytes;
+        totalReclaimed += reclaimed;
+        results.push({ id, beforeKB: Math.round(beforeBytes / 1024), afterKB: Math.round(afterBytes / 1024), reclaimedKB: Math.round(reclaimed / 1024) });
+        log.info(`[BACKFILL] ${id}: ${Math.round(beforeBytes / 1024)} → ${Math.round(afterBytes / 1024)} KB`);
+      } catch (err) {
+        results.push({ id, error: err.message });
+        log.warn(`[BACKFILL] ${id} failed: ${err.message}`);
+      }
+      if (sleepMs > 0 && i + 1 < candidates.rows.length) {
+        await new Promise(r => setTimeout(r, sleepMs));
+      }
+    }
+
+    res.json({
+      done: candidates.rows.length < limit,
+      storiesProcessed: results.filter(r => !r.error && !r.skipped).length,
+      storiesFailed: results.filter(r => r.error).length,
+      totalReclaimedMB: (totalReclaimed / (1024 * 1024)).toFixed(2),
+      elapsedMs: Date.now() - startTime,
+      results,
+    });
+  } catch (err) {
+    log.error('[BACKFILL] route error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
