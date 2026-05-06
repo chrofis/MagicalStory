@@ -1774,6 +1774,15 @@ async function upsertStory(storyId, userId, storyData) {
     }
   }
 
+  // Push every remaining inline image (debug overlays, Grok/inpaint refs,
+  // entity grids, repair comparison images, landmark photos, VB-location
+  // refs, styled-avatar inputs) up to R2, replacing inline base64 with the
+  // public R2 URL. Then strip preserves URLs and clears anything that didn't
+  // make the round-trip. Same flow as saveStoryData — without this the
+  // unified-pipeline save kept the entire 100MB+ debug payload inline.
+  await extractInlineImagesToR2(storyId, dataForStorage);
+  stripInlineImagesFromStoryData(dataForStorage);
+
   // Now update the story with full data and final metadata
   const finalMetadata = buildStoryMetadata(storyData); // Use original for metadata (includes image counts)
   console.log(`💾 [UPSERT] Updating story ${storyId} with full data (${imagesSaved} images saved to story_images)`);
