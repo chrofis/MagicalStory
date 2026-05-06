@@ -657,6 +657,20 @@ router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
     const deletedCharacters = await pool.query('DELETE FROM characters WHERE user_id = $1 RETURNING id', [userIdToDelete]);
     const deletedFiles = await pool.query('DELETE FROM files WHERE user_id = $1 RETURNING id', [userIdToDelete]);
 
+    // Prune R2 artefacts for every story this user owned. Sequential to avoid
+    // hammering R2 with 100s of parallel ListObjects calls; each story's
+    // prune is itself batched in 1000-key chunks.
+    try {
+      const r2 = require('../../lib/r2');
+      let totalR2 = 0;
+      for (const row of deletedStories.rows) {
+        totalR2 += await r2.deleteStoryArtefacts(row.id);
+      }
+      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories`);
+    } catch (r2Err) {
+      log.warn(`[ADMIN] R2 cleanup partial: ${r2Err.message}`);
+    }
+
     let deletedLogsCount = 0;
     try {
       const deletedLogs = await pool.query('DELETE FROM activity_log WHERE user_id = $1 RETURNING id', [userIdToDelete]);

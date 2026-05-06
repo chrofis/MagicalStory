@@ -125,11 +125,25 @@ router.post('/cleanup-orphaned-data', authenticateToken, requireAdmin, async (re
       }
 
       if (orphanedStoriesCount > 0) {
+        // Capture ids first so we can prune R2 after the row delete.
+        const orphanIds = await dbQuery(
+          `SELECT id FROM stories WHERE user_id IS NULL OR user_id = ''`
+        );
         const deleteStoriesResult = await dbQuery(
           `DELETE FROM stories WHERE user_id IS NULL OR user_id = ''`
         );
         deletedStories = deleteStoriesResult.rowCount;
         console.log(`✓ Deleted ${deletedStories} orphaned stories`);
+        try {
+          const r2 = require('../../lib/r2');
+          let totalR2 = 0;
+          for (const row of orphanIds) {
+            totalR2 += await r2.deleteStoryArtefacts(row.id);
+          }
+          if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
+        } catch (r2Err) {
+          console.warn(`⚠️  R2 cleanup partial: ${r2Err.message}`);
+        }
       }
 
       res.json({

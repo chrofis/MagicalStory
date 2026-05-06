@@ -2684,6 +2684,17 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         log.warn(`Could not delete story_job ${id}:`, jobErr.message);
       }
 
+      // Prune every R2 artefact for the story (active images, debug refs,
+      // retry/style-lab outputs, VB references). Never throws — DB delete
+      // already won.
+      try {
+        const r2 = require('../lib/r2');
+        const removed = await r2.deleteStoryArtefacts(id);
+        if (removed > 0) console.log(`☁️  Deleted ${removed} R2 objects for story ${id}`);
+      } catch (r2Err) {
+        log.warn(`R2 cleanup failed for ${id}: ${r2Err.message}`);
+      }
+
       console.log(`✅ Successfully deleted story ${id}`);
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });

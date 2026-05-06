@@ -51,6 +51,18 @@ async function cleanupOrphanedData() {
         `DELETE FROM stories WHERE user_id IS NULL OR user_id = '' RETURNING id`
       );
       console.log(`✓ Deleted ${deleteStoriesResult.rowCount} orphaned stories`);
+
+      // Prune R2 prefixes for the orphans we just dropped.
+      try {
+        const r2 = require('../../server/lib/r2');
+        let totalR2 = 0;
+        for (const row of deleteStoriesResult.rows) {
+          totalR2 += await r2.deleteStoryArtefacts(row.id);
+        }
+        if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
+      } catch (r2Err) {
+        console.warn(`⚠️  R2 cleanup partial: ${r2Err.message}`);
+      }
     }
 
     console.log('\n✅ Cleanup complete!');

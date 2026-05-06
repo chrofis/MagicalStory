@@ -22,7 +22,7 @@
  * env vars land.
  */
 
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
 const { log } = require('../utils/logger');
 
 let _client = null;
@@ -235,6 +235,65 @@ async function bytesFromAnyImage(value) {
 }
 
 /**
+ * Delete every object under a given key prefix. Used by story-delete paths
+ * to prune all R2 artefacts for a story (active scenes/covers, debug refs,
+ * VB references, retry images, style-lab outputs — everything under
+ * `stories/{storyId}/`).
+ *
+ * Idempotent: missing objects / empty prefix are no-ops. Returns the number
+ * of objects actually deleted. Logs but does not throw on partial failure;
+ * callers should not rely on R2 cleanup blocking DB deletion.
+ *
+ * Safety: caller MUST pass a prefix specific enough to avoid collateral
+ * deletes. `stories/abc/` is fine; `stories/` would delete everything.
+ * The function refuses to run on prefixes shorter than 12 chars or that
+ * don't end with '/'.
+ *
+ * @param {string} prefix  e.g. "stories/job_1234.../"
+ * @returns {Promise<number>} count of objects deleted (0 when not configured)
+ */
+async function deleteByPrefix(prefix) {
+  if (!isConfigured()) return 0;
+  if (typeof prefix !== 'string' || prefix.length < 12 || !prefix.endsWith('/')) {
+    log.warn(`[R2] deleteByPrefix refused unsafe prefix: "${prefix}"`);
+    return 0;
+  }
+  const client = getClient();
+  const Bucket = process.env.R2_BUCKET;
+  let total = 0;
+  let ContinuationToken;
+  try {
+    do {
+      const listed = await client.send(new ListObjectsV2Command({
+        Bucket, Prefix: prefix, ContinuationToken, MaxKeys: 1000,
+      }));
+      const keys = (listed.Contents || []).map(o => ({ Key: o.Key }));
+      if (keys.length > 0) {
+        await client.send(new DeleteObjectsCommand({
+          Bucket, Delete: { Objects: keys, Quiet: true },
+        }));
+        total += keys.length;
+      }
+      ContinuationToken = listed.IsTruncated ? listed.NextContinuationToken : null;
+    } while (ContinuationToken);
+    if (total > 0) log.info(`☁️  [R2] deleted ${total} objects under "${prefix}"`);
+    return total;
+  } catch (err) {
+    log.warn(`[R2] deleteByPrefix(${prefix}) failed: ${err.message}`);
+    return total;
+  }
+}
+
+/**
+ * Convenience: delete every R2 artefact for a story. Equivalent to
+ * deleteByPrefix(`stories/{storyId}/`).
+ */
+async function deleteStoryArtefacts(storyId) {
+  if (!storyId || typeof storyId !== 'string' || storyId.length < 4) return 0;
+  return await deleteByPrefix(`stories/${storyId}/`);
+}
+
+/**
  * Fetch image bytes from a public R2 URL. Used when an endpoint needs the
  * actual bytes (e.g. text-overlay compositing, PDF rendering) but the row's
  * image_data column has been cleared post-migration.
@@ -262,6 +321,8 @@ module.exports = {
   uploadImage,
   fetchImageBytes,
   bytesFromAnyImage,
+  deleteByPrefix,
+  deleteStoryArtefacts,
   publicUrlForKey,
   keyForStoryImage,
   keyForRetryImage,
