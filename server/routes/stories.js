@@ -788,22 +788,25 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        // Reference photos — only expose real http(s) URLs, never base64 data: URIs.
-        // Dev panel can lazy-load bytes via a separate endpoint when hasPhoto is true.
+        // Reference photos — pass photoUrl through as-is. Real R2 URLs (post
+        // Phase-2) and inline data: URIs (legacy un-migrated stories) both
+        // render in <img>. They're small (~100 KB each, ≤21 per scene), so
+        // shipping the data: URI is fine for the dev panel display.
         referencePhotos: (img.referencePhotos || []).map(p => ({
           name: p.name,
           photoType: p.photoType,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
           hasPhoto: !!(p.photoUrl || p.photoData),
-          photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
+          photoUrl: p.photoUrl || p.photoData || null,
         })),
+        // Landmark photos use photoUrl post-Phase-2; legacy entries had photoData.
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
           attribution: p.attribution,
           source: p.source,
           hasPhoto: !!(p.photoData || p.photoUrl),
-          photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
+          photoUrl: p.photoUrl || p.photoData || null,
         })),
         fixTargets: img.fixTargets || [],
         fixableIssues: img.fixableIssues || [],
@@ -874,12 +877,12 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           referencePhotos: (story.coverImages.frontCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.frontCover.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source,
             hasPhoto: !!(p.photoData || p.photoUrl),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null,
           })),
           hasVisualBibleGrid: !!story.coverImages.frontCover.visualBibleGrid,
           grokRefImages: Array.isArray(story.coverImages.frontCover.grokRefImages)
@@ -918,12 +921,12 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           referencePhotos: (story.coverImages.initialPage.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.initialPage.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source,
             hasPhoto: !!(p.photoData || p.photoUrl),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null
           })),
           hasVisualBibleGrid: !!story.coverImages.initialPage.visualBibleGrid,
           grokRefImages: Array.isArray(story.coverImages.initialPage.grokRefImages)
@@ -961,12 +964,12 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           referencePhotos: (story.coverImages.backCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null
           })),
           landmarkPhotos: (story.coverImages.backCover.landmarkPhotos || []).map(p => ({
             name: p.name, attribution: p.attribution, source: p.source,
             hasPhoto: !!(p.photoData || p.photoUrl),
-            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
+            photoUrl: p.photoUrl || p.photoData || null
           })),
           hasVisualBibleGrid: !!story.coverImages.backCover.visualBibleGrid,
           grokRefImages: Array.isArray(story.coverImages.backCover.grokRefImages)
@@ -2010,15 +2013,15 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
       };
 
-      // referencePhotos in the blob carry inline base64 in photoData / data: URIs in
-      // photoUrl. Strip both before sending to the client; expose only metadata + real URLs.
+      // referencePhotos: pass photoUrl through (can be R2 URL or legacy data: URI).
+      // They're small (~100 KB each) so the inline form is acceptable on the wire.
       const sanitizeReferencePhotos = (refs) => (Array.isArray(refs) ? refs.map(p => ({
         name: p?.name,
         photoType: p?.photoType,
         clothingCategory: p?.clothingCategory,
         clothingDescription: p?.clothingDescription,
         hasPhoto: !!(p?.photoUrl || p?.photoData),
-        photoUrl: (typeof p?.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
+        photoUrl: p?.photoUrl || p?.photoData || null,
       })) : []);
 
       if (!activeOnly) {

@@ -825,6 +825,31 @@ async function extractInlineImagesToR2(storyId, data) {
           }
         }
       }
+      // Scene-level referencePhotos can carry inline data: URIs in photoUrl
+      // and originalPhotoUrl (legacy storage), or in photoData. Push to R2
+      // and rewrite the URL. Without this the strip (which drops data: URIs)
+      // would leave the entry with no photo at all.
+      if (Array.isArray(s.referencePhotos)) {
+        for (let k = 0; k < s.referencePhotos.length; k++) {
+          const rp = s.referencePhotos[k];
+          if (!rp || typeof rp !== 'object') continue;
+          if (looksLikeBytes(rp.photoUrl)) {
+            const url = await upload(rp.photoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}.jpg`);
+            if (url) rp.photoUrl = url;
+          }
+          if (looksLikeBytes(rp.originalPhotoUrl)) {
+            const url = await upload(rp.originalPhotoUrl, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-orig.jpg`);
+            if (url) rp.originalPhotoUrl = url;
+          }
+          if (looksLikeBytes(rp.photoData)) {
+            const url = await upload(rp.photoData, `stories/${storyId}/debug/p${pageNum}/ref-photo-${k}-data.jpg`);
+            if (url) {
+              rp.photoUrl = rp.photoUrl || url;  // prefer existing URL if any
+              rp.photoData = undefined;
+            }
+          }
+        }
+      }
       if (s.entityReport && typeof s.entityReport === 'object') {
         if (Array.isArray(s.entityReport.grids)) {
           for (let k = 0; k < s.entityReport.grids.length; k++) {
@@ -931,6 +956,13 @@ async function extractInlineImagesToR2(storyId, data) {
           if (looksLikeBytes(rp.originalPhotoUrl)) {
             const url = await upload(rp.originalPhotoUrl, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-orig.jpg`);
             if (url) rp.originalPhotoUrl = url;
+          }
+          if (looksLikeBytes(rp.photoData)) {
+            const url = await upload(rp.photoData, `stories/${storyId}/debug/${pageMarker}/ref-photo-${k}-data.jpg`);
+            if (url) {
+              rp.photoUrl = rp.photoUrl || url;
+              rp.photoData = undefined;
+            }
           }
         }
       }
