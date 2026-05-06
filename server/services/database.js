@@ -737,13 +737,19 @@ function buildStoryMetadata(story) {
  *
  * Targets identified from production audit (per ~150MB story):
  *   - sceneImages[*].entityReport.grids[*].gridImage              (Gemini eval grids)
- *   - sceneImages[*].entityReport.characters.*.byClothing.*.gridImage
+ *   - sceneImages[*].entityReport.characters.*.byClothing.*.gridImage(s)
  *   - sceneImages[*].sceneCharacters[*].photos.*                  (snapshot)
  *   - sceneImages[*].sceneCharacters[*].avatars.{standard,summer,winter,faceThumbnails,bodyThumbnails,styledAvatars}
  *   - sceneImages[*].imageVersions[*].grokRefImages[*]            (Grok inputs)
+ *   - sceneImages[*].imageVersions[*].inpaintReferenceImages[*]   (inpaint refs)
  *   - sceneImages[*].grokRefImages[*]
  *   - sceneImages[*].bboxOverlayImage                             (debug overlay)
+ *   - sceneImages[*].visualBibleGrid                              (debug grid)
+ *   - sceneImages[*].landmarkPhotos[*].photoData                  (Wikimedia bytes)
+ *   - sceneImages[*].referencePhotos[*].{photoUrl,originalPhotoUrl} when data: URI
  *   - coverImages.{front,initial,back}Cover.{retryHistory,grokRefImages,bboxOverlayImage}
+ *   - coverImages.*.imageVersions[*].{grokRefImages,inpaintReferenceImages,bboxOverlayImage}
+ *   - visualBible.locations[*].referencePhotoData                 (Wikimedia bytes)
  *   - finalChecksReport.entity.grids[*].gridImage
  *   - finalChecksReport.entityRepairs.*.pages.*.comparison.{before,after,grokRawResult,blackoutImage,blendMask,croppedAvatar,cutoutSent}
  *   - styledAvatarGeneration[*].inputs.*.imageData / .output.imageData
@@ -783,15 +789,31 @@ function stripInlineImagesFromStoryData(data) {
       s.grokRefImages = undefined;
       s.originalImage = undefined;
       s.preEntityRepairImage = undefined;
+      s.visualBibleGrid = undefined;
       if (Array.isArray(s.imageVersions)) {
         for (const v of s.imageVersions) {
           if (!v) continue;
           v.grokRefImages = undefined;
+          v.inpaintReferenceImages = undefined;
           v.bboxOverlayImage = undefined;
         }
       }
       if (Array.isArray(s.sceneCharacters)) {
         for (const c of s.sceneCharacters) stripCharSnapshot(c);
+      }
+      if (Array.isArray(s.landmarkPhotos)) {
+        for (const lp of s.landmarkPhotos) {
+          if (lp && typeof lp === 'object') lp.photoData = undefined;
+        }
+      }
+      // referencePhotos[].photoUrl/originalPhotoUrl sometimes carries a data: URI
+      // instead of a real http URL. Drop only the data: variants — keep real URLs.
+      if (Array.isArray(s.referencePhotos)) {
+        for (const rp of s.referencePhotos) {
+          if (!rp || typeof rp !== 'object') continue;
+          if (typeof rp.photoUrl === 'string' && rp.photoUrl.startsWith('data:')) rp.photoUrl = undefined;
+          if (typeof rp.originalPhotoUrl === 'string' && rp.originalPhotoUrl.startsWith('data:')) rp.originalPhotoUrl = undefined;
+        }
       }
       if (s.entityReport && typeof s.entityReport === 'object') {
         if (Array.isArray(s.entityReport.grids)) {
@@ -801,7 +823,11 @@ function stripInlineImagesFromStoryData(data) {
           for (const charReport of Object.values(s.entityReport.characters)) {
             if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
               for (const clothing of Object.values(charReport.byClothing)) {
-                if (clothing) clothing.gridImage = undefined;
+                if (!clothing) continue;
+                clothing.gridImage = undefined;
+                if (Array.isArray(clothing.gridImages)) {
+                  for (let i = 0; i < clothing.gridImages.length; i++) clothing.gridImages[i] = undefined;
+                }
               }
             }
           }
@@ -817,6 +843,14 @@ function stripInlineImagesFromStoryData(data) {
       if (!cv || typeof cv !== 'object') continue;
       cv.bboxOverlayImage = undefined;
       cv.grokRefImages = undefined;
+      if (Array.isArray(cv.imageVersions)) {
+        for (const v of cv.imageVersions) {
+          if (!v) continue;
+          v.grokRefImages = undefined;
+          v.inpaintReferenceImages = undefined;
+          v.bboxOverlayImage = undefined;
+        }
+      }
       if (Array.isArray(cv.retryHistory)) {
         for (const r of cv.retryHistory) {
           if (!r) continue;
@@ -826,6 +860,14 @@ function stripInlineImagesFromStoryData(data) {
           r.annotatedOriginal = undefined;
         }
       }
+    }
+  }
+
+  // visualBible.locations[].referencePhotoData — Wikimedia bytes copied per story
+  if (data.visualBible && typeof data.visualBible === 'object'
+      && Array.isArray(data.visualBible.locations)) {
+    for (const loc of data.visualBible.locations) {
+      if (loc && typeof loc === 'object') loc.referencePhotoData = undefined;
     }
   }
 

@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -466,9 +466,15 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               rawQualityScore: v.rawQualityScore ?? null,
               entityPenalty: v.entityPenalty ?? null,
               evaluatedAt: v.evaluatedAt || null,
-              grokRefImages: v.grokRefImages || null,
+              hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
+              grokRefImageUrls: Array.isArray(v.grokRefImages)
+                ? v.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+                : [],
               inpaintInstruction: v.inpaintInstruction || null,
-              inpaintReferenceImages: v.inpaintReferenceImages || null,
+              hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
+              inpaintReferenceImageUrls: Array.isArray(v.inpaintReferenceImages)
+                ? v.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+                : [],
             })));
           }
         }
@@ -531,9 +537,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             rawQualityScore: versionMeta.rawQualityScore ?? null,
             entityPenalty: versionMeta.entityPenalty ?? null,
             evaluatedAt: versionMeta.evaluatedAt || null,
-            grokRefImages: versionMeta.grokRefImages || null,
+            hasGrokRefImages: !!versionMeta.hasGrokRefImages,
+            grokRefImageUrls: versionMeta.grokRefImageUrls || [],
             inpaintInstruction: versionMeta.inpaintInstruction || null,
-            inpaintReferenceImages: versionMeta.inpaintReferenceImages || null,
+            hasInpaintReferenceImages: !!versionMeta.hasInpaintReferenceImages,
+            inpaintReferenceImageUrls: versionMeta.inpaintReferenceImageUrls || [],
           });
           // Update main qualityScore and bboxDetection to reflect the ACTIVE version
           if (isActiveVersion) {
@@ -642,6 +650,10 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       console.log(`📖 [SLOW] mainCharacters: ${JSON.stringify(metadata.mainCharacters)}`);
     }
 
+    // Defensive: strip any inline image bytes that slipped through manual field selection
+    // (slow path uses ...spread, dev mode merges per-version meta from blob, old stories
+    // may carry fields whose write predates the strip rule for that field).
+    stripInlineImagesFromStoryData(metadata);
     res.json(metadata);
   } catch (err) {
     console.error('❌ Error fetching story metadata:', err);
@@ -771,25 +783,27 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        // Reference photos - include actual photo data for dev mode display
+        // Reference photos — only expose real http(s) URLs, never base64 data: URIs.
+        // Dev panel can lazy-load bytes via a separate endpoint when hasPhoto is true.
         referencePhotos: (img.referencePhotos || []).map(p => ({
           name: p.name,
           photoType: p.photoType,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
           hasPhoto: !!(p.photoUrl || p.photoData),
-          photoUrl: p.photoUrl || p.photoData || null,
+          photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
           attribution: p.attribution,
           source: p.source,
-          hasPhoto: !!p.photoData
+          hasPhoto: !!(p.photoData || p.photoUrl),
+          photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
         })),
         fixTargets: img.fixTargets || [],
         fixableIssues: img.fixableIssues || [],
         hasVisualBibleGrid: !!img.visualBibleGrid,
-        grokRefImages: img.grokRefImages || null,
+        hasGrokRefImages: Array.isArray(img.grokRefImages) && img.grokRefImages.length > 0,
         emptyScenePrompt: img.emptyScenePrompt || null,
         emptySceneQc: img.emptySceneQc || null,
         // Fall back to the deterministic static mask when not stored on the
@@ -836,7 +850,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             fixTargets: v.fixTargets || [],
             totalAttempts: v.totalAttempts || null,
             referencePhotoNames: v.referencePhotoNames || [],
-            grokRefImages: v.grokRefImages || null,
+            hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
+            hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
             bboxDetection: v.bboxDetection || null,
           }));
         })(),
@@ -849,13 +864,16 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
           referencePhotos: (story.coverImages.frontCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           landmarkPhotos: (story.coverImages.frontCover.landmarkPhotos || []).map(p => ({
-            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+            name: p.name, attribution: p.attribution, source: p.source,
+            hasPhoto: !!(p.photoData || p.photoUrl),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.frontCover.visualBibleGrid,
-          grokRefImages: story.coverImages.frontCover.grokRefImages || null,
+          hasGrokRefImages: Array.isArray(story.coverImages.frontCover.grokRefImages) && story.coverImages.frontCover.grokRefImages.length > 0,
           // Full retry history with repair/bbox details (same as page images)
           retryHistory: (story.coverImages.frontCover.retryHistory || []).map(r => ({
             type: r.type,
@@ -887,13 +905,16 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
           referencePhotos: (story.coverImages.initialPage.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           landmarkPhotos: (story.coverImages.initialPage.landmarkPhotos || []).map(p => ({
-            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+            name: p.name, attribution: p.attribution, source: p.source,
+            hasPhoto: !!(p.photoData || p.photoUrl),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.initialPage.visualBibleGrid,
-          grokRefImages: story.coverImages.initialPage.grokRefImages || null,
+          hasGrokRefImages: Array.isArray(story.coverImages.initialPage.grokRefImages) && story.coverImages.initialPage.grokRefImages.length > 0,
           retryHistory: (story.coverImages.initialPage.retryHistory || []).map(r => ({
             type: r.type,
             score: r.score,
@@ -924,13 +945,16 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
           referencePhotos: (story.coverImages.backCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData), photoUrl: p.photoUrl || p.photoData || null
+            clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           landmarkPhotos: (story.coverImages.backCover.landmarkPhotos || []).map(p => ({
-            name: p.name, attribution: p.attribution, source: p.source, hasPhoto: !!p.photoData
+            name: p.name, attribution: p.attribution, source: p.source,
+            hasPhoto: !!(p.photoData || p.photoUrl),
+            photoUrl: (typeof p.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null
           })),
           hasVisualBibleGrid: !!story.coverImages.backCover.visualBibleGrid,
-          grokRefImages: story.coverImages.backCover.grokRefImages || null,
+          hasGrokRefImages: Array.isArray(story.coverImages.backCover.grokRefImages) && story.coverImages.backCover.grokRefImages.length > 0,
           retryHistory: (story.coverImages.backCover.retryHistory || []).map(r => ({
             type: r.type,
             score: r.score,
@@ -1139,6 +1163,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
     };
 
     console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries, styledAvatars: ${devMetadata.styledAvatarGeneration?.length || 0}, costumedAvatars: ${devMetadata.costumedAvatarGeneration?.length || 0}`);
+    // Defensive: catch any inline image bytes that slipped past manual filtering.
+    // The strip walker uses the same blob field paths so it works on this response too.
+    stripInlineImagesFromStoryData(devMetadata);
     res.json(devMetadata);
   } catch (err) {
     console.error('❌ Error fetching dev metadata:', err);
@@ -1944,9 +1971,17 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.entityPenalty = source.entityPenalty || 0;
         target.evaluatedAt = source.evaluatedAt || null;
         target.issuesSummary = source.issuesSummary || null;
-        target.grokRefImages = source.grokRefImages || null;
+        // grokRefImages / inpaintReferenceImages: only flags + URLs, never inline base64.
+        // Bytes belong in R2 and load lazily through the dev-image endpoint.
+        target.hasGrokRefImages = Array.isArray(source.grokRefImages) && source.grokRefImages.length > 0;
+        target.grokRefImageUrls = Array.isArray(source.grokRefImages)
+          ? source.grokRefImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+          : [];
         target.inpaintInstruction = source.inpaintInstruction || null;
-        target.inpaintReferenceImages = source.inpaintReferenceImages || null;
+        target.hasInpaintReferenceImages = Array.isArray(source.inpaintReferenceImages) && source.inpaintReferenceImages.length > 0;
+        target.inpaintReferenceImageUrls = Array.isArray(source.inpaintReferenceImages)
+          ? source.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
+          : [];
         target.textSpaceCoveragePct = source.textSpaceCoveragePct ?? null;
         target.textSpacePosition = source.textSpacePosition || null;
         target.iterationFeedback = source.iterationFeedback || null;
@@ -1954,11 +1989,22 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
       };
 
+      // referencePhotos in the blob carry inline base64 in photoData / data: URIs in
+      // photoUrl. Strip both before sending to the client; expose only metadata + real URLs.
+      const sanitizeReferencePhotos = (refs) => (Array.isArray(refs) ? refs.map(p => ({
+        name: p?.name,
+        photoType: p?.photoType,
+        clothingCategory: p?.clothingCategory,
+        clothingDescription: p?.clothingDescription,
+        hasPhoto: !!(p?.photoUrl || p?.photoData),
+        photoUrl: (typeof p?.photoUrl === 'string' && !p.photoUrl.startsWith('data:')) ? p.photoUrl : null,
+      })) : []);
+
       if (!activeOnly) {
         // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
         const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
           'regenerationCount', 'previousScore', 'previousReasoning',
-          'originalScore', 'originalReasoning', 'referencePhotos',
+          'originalScore', 'originalReasoning',
           'regeneratedAt', 'bboxDetection'];
 
         for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
@@ -1969,6 +2015,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 covers[coverType][field] = blobCover[field];
               }
             }
+            covers[coverType].referencePhotos = sanitizeReferencePhotos(blobCover.referencePhotos);
             // Merge per-version metadata — same fields as scenes
             if (blobCover.imageVersions && covers[coverType].imageVersions) {
               for (let i = 0; i < covers[coverType].imageVersions.length; i++) {
@@ -2066,6 +2113,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       const mode = activeOnly ? 'FAST' : 'BATCH';
       console.log(`📷 [${mode}] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Math.round(totalSize/1024)}KB, ${Date.now() - startTime}ms`);
 
+      // Defensive strip — `images`/`covers` mirror sceneImages/coverImages structure,
+      // so the walker drops any base64 still piggybacked through mergeFields.
+      stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers });
       return res.json({ images, covers });
     }
 
@@ -2123,6 +2173,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
     console.log(`📷 [BATCH-FALLBACK] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Date.now() - startTime}ms`);
 
+    stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers });
     return res.json({ images, covers });
 
   } catch (err) {
