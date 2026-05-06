@@ -61,13 +61,11 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     ssl: process.env.DATABASE_URL?.includes('railway.app') ? { rejectUnauthorized: false } : false,
   });
 
-  // Find candidate stories. We require BOTH:
-  //   (a) the blob is over the size threshold (cheap pg_column_size check),
-  //   (b) the JSON actually contains an inline data: URI somewhere.
-  // Without (b), stories that are naturally large (lots of metadata) but
-  // already have no inline bytes would loop forever as 'candidates' even
-  // though there's nothing left to extract.
-  const HAS_DATA_URI = `jsonb_path_exists(data, '$.** ? (@.type() == "string" && @ starts with "data:image")')`;
+  // Find candidate stories: big enough AND not already marked as backfilled.
+  // After a successful backfill we set data.r2BackfilledAt; that flag is the
+  // single authoritative signal for 'this story has been through the
+  // extract+strip pipeline'. The size filter is just a perf hint to skip
+  // tiny rows; the marker is what prevents re-processing.
   let candidateRows;
   if (SINGLE_ID) {
     candidateRows = await pool.query(
@@ -80,7 +78,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       `SELECT id, pg_column_size(data) AS bytes
        FROM stories
        WHERE pg_column_size(data) > $1
-         AND ${HAS_DATA_URI}
+         AND NOT (data ? 'r2BackfilledAt')
        ORDER BY pg_column_size(data) DESC${limitClause}`,
       [THRESHOLD_KB * 1024]
     );
@@ -124,6 +122,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       const tExtract = Date.now() - t1;
 
       stripInlineImagesFromStoryData(data);
+
+      // Mark as backfilled so subsequent runs skip this story.
+      data.r2BackfilledAt = new Date().toISOString();
 
       // Save back
       const newJson = JSON.stringify(data);

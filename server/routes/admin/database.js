@@ -865,9 +865,8 @@ router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (re
     const sleepMs = Math.max(0, parseInt(req.body?.sleepMs, 10) || 100);
 
     const pool = getPool();
-    // Require both 'big enough' AND 'actually has inline data: URI bytes' so
-    // already-clean large stories don't keep coming up as candidates.
-    const HAS_DATA_URI = `jsonb_path_exists(data, '$.** ? (@.type() == "string" && @ starts with "data:image")')`;
+    // Skip stories already through the pipeline — flag is set after a
+    // successful backfill (see processing block below). Cheap and definitive.
     let candidates;
     if (singleId) {
       candidates = await pool.query(
@@ -879,7 +878,7 @@ router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (re
         `SELECT id, pg_column_size(data) AS bytes
          FROM stories
          WHERE pg_column_size(data) > $1
-           AND ${HAS_DATA_URI}
+           AND NOT (data ? 'r2BackfilledAt')
          ORDER BY pg_column_size(data) DESC
          LIMIT $2`,
         [thresholdBytes, limit]
@@ -913,6 +912,7 @@ router.post('/backfill-debug-images', authenticateToken, requireAdmin, async (re
         const data = r.rows[0].data;
         await extractInlineImagesToR2(id, data);
         stripInlineImagesFromStoryData(data);
+        data.r2BackfilledAt = new Date().toISOString();
         await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(data), id]);
         const v = await pool.query("SELECT pg_column_size(data) AS bytes FROM stories WHERE id = $1", [id]);
         const afterBytes = v.rows[0].bytes;
