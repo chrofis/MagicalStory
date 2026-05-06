@@ -38,6 +38,10 @@ const LAYOUTS = {
 /**
  * Resolve the page layout for a story.
  *
+ *   - '1st-grade' (very short text) → a4-overlay (text on image, calm-zone reserved)
+ *   - 'standard'  (middle text)     → square-below (square image + text strip below)
+ *   - 'advanced'  (long text)       → square-below (square image + text strip below)
+ *
  * @param {string} languageLevel - Story-wide reading level ('1st-grade' | 'standard' | 'advanced').
  * @param {LayoutOverride} [override='auto'] - Developer override. 'auto' (default) follows the languageLevel mapping.
  * @returns {LayoutResult}
@@ -46,11 +50,11 @@ function resolveLayout(languageLevel, override = 'auto') {
   if (override && override !== 'auto' && LAYOUTS[override]) {
     return { ...LAYOUTS[override] };
   }
-  if (languageLevel === 'advanced') {
-    return { ...LAYOUTS['square-below'] };
+  if (languageLevel === '1st-grade') {
+    return { ...LAYOUTS['a4-overlay'] };
   }
-  // 1st-grade, standard, and any unknown value → A4 + overlay (safe default).
-  return { ...LAYOUTS['a4-overlay'] };
+  // standard, advanced, and any unknown value → square image + text below.
+  return { ...LAYOUTS['square-below'] };
 }
 
 /**

@@ -5407,8 +5407,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const { ensureCalmZone } = require('./server/lib/textSpaceRepair');
       const textRegionResults = {}; // pageNumber → { winnerImage, position, report }
       // Skip the entire phase for layouts where text isn't overlaid on the
-      // image (advanced/square+below renders text in a separate strip).
-      const skipTextRegionPhase = inputData?.layout?.textInImage === false;
+      // image (advanced/square+below renders text in a separate strip), OR
+      // when the global enableTextOverlay flag is false.
+      const skipTextRegionPhase = MODEL_DEFAULTS.enableTextOverlay === false
+        || inputData?.layout?.textInImage === false;
       try {
         if (skipTextRegionPhase) {
           log.info(`📝 [TEXT-REGION] Skipped (layout.textInImage=false — text rendered below image)`);

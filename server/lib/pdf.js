@@ -377,11 +377,11 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   if (isPictureBook) {
     // Picture-book text area scales with languageLevel (1st-grade=15%,
     // standard=20%, advanced=35%). Target font: 14pt for 1st-grade, 12pt
-    // for the others. Min font: 10pt floor. When textInImage=false the image
-    // is square and the text strip becomes a fixed ~30% (1/3 of page).
+    // for the others. Min font: 10pt floor. When textInImage=false the strip
+    // height adapts to the actual text length (#4 — variable text area).
     const textRatio = textInImage
       ? getPictureBookTextRatio(storyData.languageLevel)
-      : 0.30;  // square image fills top 70% (210×208mm), text strip bottom 30%
+      : computeTextBelowRatio(storyPages, storyData.languageLevel);
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
     const textMargin = mmToPoints(3);
     const textWidth = pageWidth - (textMargin * 2);
@@ -465,6 +465,35 @@ function getPictureBookTextRatio(languageLevel) {
     case '1st-grade':
     default:         return 0.15;
   }
+}
+
+/**
+ * Variable text-strip ratio for the text-below layout. Picks the strip height
+ * from the LONGEST page's word count so all pages share one ratio (consistent
+ * font + image position) but stories with shorter text get more image area.
+ * Min ratio = 0.18 (~50mm strip on A4) so even a one-line page has a usable
+ * baseline. Max = 0.40 (~112mm) for very long advanced stories.
+ *
+ * @param {Array} pages
+ * @param {string} languageLevel
+ * @returns {number} ratio in [0.18, 0.40]
+ */
+function computeTextBelowRatio(pages, languageLevel) {
+  const wordCounts = (pages || [])
+    .map(p => (p?.text || '').trim().split(/\s+/).filter(Boolean).length);
+  const maxWords = wordCounts.length ? Math.max(...wordCounts) : 0;
+  // Bucket by longest-page word count.
+  let ratio;
+  if (maxWords <= 30)       ratio = 0.18;
+  else if (maxWords <= 80)  ratio = 0.22;
+  else if (maxWords <= 150) ratio = 0.28;
+  else if (maxWords <= 250) ratio = 0.34;
+  else                      ratio = 0.40;
+  // Clamp to languageLevel's expected band so a one-page outlier doesn't
+  // distort the whole book.
+  if (languageLevel === '1st-grade') ratio = Math.min(ratio, 0.24);
+  if (languageLevel === 'advanced')  ratio = Math.max(ratio, 0.30);
+  return ratio;
 }
 
 /**
@@ -693,7 +722,12 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   // no text strip below. textInImage=false keeps the legacy layout.
   const addStoryContentPages = async (storyData, storyPages) => {
     const textMarginMm = mmToPoints(3);
-    const textRatio = getPictureBookTextRatio(storyData.languageLevel);
+    const layoutFromLevel = resolveLayout(storyData.languageLevel);
+    const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
+    const textInImageForRatio = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
+    const textRatio = textInImageForRatio
+      ? getPictureBookTextRatio(storyData.languageLevel)
+      : computeTextBelowRatio(storyPages, storyData.languageLevel);
     const imageHeight = pageHeight * (1 - textRatio);
     const textAreaHeight = pageHeight * textRatio;
     const textWidth = pageWidth - (textMarginMm * 2);
@@ -701,9 +735,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const lineGap = -2;
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
 
-    const layoutFromLevel = resolveLayout(storyData.languageLevel);
-    const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
-    const textInImage = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
+    const textInImage = textInImageForRatio;
 
     for (let index = 0; index < storyPages.length; index++) {
       const pageText = storyPages[index];
@@ -994,13 +1026,15 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   log.debug(`📄 [VIEW PDF] Generating with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard 2-page'}`);
 
   if (isPictureBook) {
-    const textRatio = getPictureBookTextRatio(storyData.languageLevel);
+    const textRatio = textOverlay
+      ? getPictureBookTextRatio(storyData.languageLevel)
+      : computeTextBelowRatio(storyPages, storyData.languageLevel);
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
     const textMargin = mmToPoints(3);
     const textWidth = pageWidth - (textMargin * 2);
     const textAreaHeight = pageHeight * textRatio;
     const availableTextHeight = textAreaHeight - textMargin;
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, 'center');
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, textOverlay ? 'center' : 'left');
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, textOverlay);
   } else {
     const marginOuter = 20;

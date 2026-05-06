@@ -126,6 +126,14 @@ const MODEL_DEFAULTS = {
                                        // (slot 1 in packReferences). Set to true to re-enable the
                                        // old "generate an empty AI scene first, then re-render with
                                        // characters" flow.
+  enableTextOverlay: true,             // Global kill switch for the text-overlay pipeline. ON by
+                                       // default — `1st-grade` stories use the a4-overlay layout
+                                       // (text composited onto image, calm-zone reserved). Set to
+                                       // false to disable the entire post-gen text-region phase
+                                       // for every story regardless of layout. The per-story
+                                       // `inputData.layout.textInImage === false` (set by
+                                       // resolveLayout for `standard`/`advanced`) is the normal
+                                       // route to skip overlay; this flag is the kill switch.
   // Reference mode for character refs / VB grid attached to page generation.
   //   'strict'      — photo + costumed + styled avatars; full VB grid (current default)
   //   'loose'       — costumed + styled; photo only on close-ups; identity cells without grid frame

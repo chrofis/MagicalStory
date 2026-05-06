@@ -29,10 +29,11 @@ export function resolveLayout(languageLevel: LanguageLevel | string | undefined,
   if (override && override !== 'auto' && LAYOUTS[override as LayoutMode]) {
     return { ...LAYOUTS[override as LayoutMode] };
   }
-  if (languageLevel === 'advanced') {
-    return { ...LAYOUTS['square-below'] };
+  if (languageLevel === '1st-grade') {
+    return { ...LAYOUTS['a4-overlay'] };
   }
-  return { ...LAYOUTS['a4-overlay'] };
+  // standard, advanced, and any unknown value → square image + text below.
+  return { ...LAYOUTS['square-below'] };
 }
 
 /**
