@@ -468,21 +468,33 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
       return res.status(404).json({ error: 'Page image not found' });
     }
 
-    // Get text and textPosition from story data
+    // Caller-provided text/textPosition wins — client already has both from
+    // /api/shared/:token, so this avoids the per-page blob read.
     let text = req.body?.text;
-    let textPosition = null;
+    let textPosition = (typeof req.body?.textPosition === 'string') ? req.body.textPosition : null;
 
-    const metaRows = await dbQuery(
-      `SELECT scene->>'textPosition' as text_position, scene->>'text' as page_text
-       FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
-       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
-      [storyId, pageNum]
-    );
+    if (!text || !textPosition) {
+      // Targeted projection (jsonb_path_query_first short-circuits without
+      // unpacking the full sceneImages array — saves ~10s per call on
+      // un-migrated stories).
+      const metaRows = await dbQuery(
+        `SELECT
+          jsonb_path_query_first(data, '$.sceneImages[*] ? (@.pageNumber == $pn).textPosition', jsonb_build_object('pn', $2::int))::text AS text_position,
+          jsonb_path_query_first(data, '$.sceneImages[*] ? (@.pageNumber == $pn).text', jsonb_build_object('pn', $2::int))::text AS page_text
+         FROM stories WHERE id = $1`,
+        [storyId, pageNum]
+      );
 
-    if (metaRows.length > 0) {
-      textPosition = metaRows[0].text_position || null;
-      if (!text) {
-        text = metaRows[0].page_text || '';
+      const stripJsonStr = (s) => {
+        if (s == null || typeof s !== 'string') return s ?? null;
+        if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+          try { return JSON.parse(s); } catch { return s.slice(1, -1); }
+        }
+        return s;
+      };
+      if (metaRows.length > 0) {
+        if (!textPosition) textPosition = stripJsonStr(metaRows[0].text_position);
+        if (!text) text = stripJsonStr(metaRows[0].page_text);
       }
     }
 

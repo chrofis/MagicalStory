@@ -3290,7 +3290,10 @@ router.delete('/:id/share', authenticateToken, async (req, res) => {
 // ============================================
 
 // POST /api/stories/:id/text-overlay/:pageNum - Render text overlay for a page
-// Body: { text?: string } — optional override, defaults to stored page text
+// Body: { text?: string, textPosition?: string } — both optional;
+//   when client supplies them, the server skips the blob round-trip entirely
+//   (saves ~10s per call for stories whose blob hasn't yet been migrated to
+//   the slim shape).
 // Returns: { overlayImage: "data:image/png;base64,..." }
 router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) => {
   try {
@@ -3319,27 +3322,41 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
       return res.status(404).json({ error: 'Page image not found' });
     }
 
-    // Get text: use provided text or fall back to stored story text
+    // Caller-provided text/textPosition wins — client already has both from
+    // /metadata, so this avoids re-loading the (still potentially large) blob.
     let text = req.body?.text;
-    let textPosition = null;
+    let textPosition = (typeof req.body?.textPosition === 'string') ? req.body.textPosition : null;
 
-    // Get textPosition from scene image metadata in story data
-    const metaRows = await dbQuery(
-      `SELECT scene->>'textPosition' as text_position, scene->>'text' as page_text
-       FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
-       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
-      [id, pageNumber]
-    );
+    if (!text || !textPosition) {
+      // Targeted jsonb projection: fetch only this page's textPosition + text.
+      // jsonb_path_query_first short-circuits without materializing the entire
+      // sceneImages array, unlike the previous jsonb_array_elements pattern
+      // which copied ~100MB of TOASTed data per call on un-migrated stories.
+      const metaRows = await dbQuery(
+        `SELECT
+          jsonb_path_query_first(data, '$.sceneImages[*] ? (@.pageNumber == $pn).textPosition', jsonb_build_object('pn', $2::int))::text AS text_position,
+          jsonb_path_query_first(data, '$.sceneImages[*] ? (@.pageNumber == $pn).text', jsonb_build_object('pn', $2::int))::text AS page_text
+         FROM stories WHERE id = $1`,
+        [id, pageNumber]
+      );
 
-    if (metaRows.length > 0) {
-      textPosition = metaRows[0].text_position || null;
-      if (!text) {
-        text = metaRows[0].page_text || '';
+      if (metaRows.length > 0) {
+        // jsonb_path_query_first returns quoted strings; strip the JSON quotes.
+        const stripJsonStr = (s) => {
+          if (s == null) return null;
+          if (typeof s !== 'string') return s;
+          if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+            try { return JSON.parse(s); } catch { return s.slice(1, -1); }
+          }
+          return s;
+        };
+        if (!textPosition) textPosition = stripJsonStr(metaRows[0].text_position);
+        if (!text) text = stripJsonStr(metaRows[0].page_text);
       }
     }
 
     if (!text) {
-      // Last fallback: parse story text
+      // Last fallback: parse story text from the full blob.
       const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
       if (dataRows.length > 0) {
         const storyData = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;

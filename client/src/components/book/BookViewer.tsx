@@ -162,7 +162,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       let cancelled = false;
       story.pages.forEach(page => {
         if (!page.text?.trim() || overlayImages[page.pageNumber]) return;
-        storyService.getSharedTextOverlay(shareToken, page.pageNumber).then(result => {
+        // Pass cached text + textPosition so the server skips the per-page
+        // blob round-trip.
+        storyService.getSharedTextOverlay(shareToken, page.pageNumber, page.text, (page as any).textPosition).then(result => {
           if (!cancelled) {
             setOverlayImages(prev => ({ ...prev, [page.pageNumber]: result.overlayImage }));
           }

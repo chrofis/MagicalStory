@@ -2098,20 +2098,28 @@ export const storyService = {
       }));
   },
 
-  // Text overlay — server-rendered overlay image for a page
-  async getTextOverlay(storyId: string, pageNumber: number, text?: string): Promise<{ overlayImage: string }> {
-    return api.post<{ overlayImage: string }>(`/api/stories/${storyId}/text-overlay/${pageNumber}`, text ? { text } : {});
+  // Text overlay — server-rendered overlay image for a page.
+  // Pass text+textPosition (from already-loaded /metadata) so the server
+  // skips a ~10s blob round-trip per page on un-migrated stories.
+  async getTextOverlay(storyId: string, pageNumber: number, text?: string, textPosition?: string): Promise<{ overlayImage: string }> {
+    const body: { text?: string; textPosition?: string } = {};
+    if (text) body.text = text;
+    if (textPosition) body.textPosition = textPosition;
+    return api.post<{ overlayImage: string }>(`/api/stories/${storyId}/text-overlay/${pageNumber}`, body);
   },
 
   // Text overlay for shared stories (no auth required)
-  async getSharedTextOverlay(shareToken: string, pageNumber: number, text?: string): Promise<{ overlayImage: string }> {
+  async getSharedTextOverlay(shareToken: string, pageNumber: number, text?: string, textPosition?: string): Promise<{ overlayImage: string }> {
     const token = localStorage.getItem('auth_token');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
+    const body: { text?: string; textPosition?: string } = {};
+    if (text) body.text = text;
+    if (textPosition) body.textPosition = textPosition;
     const response = await fetch(`/api/shared/${shareToken}/text-overlay/${pageNumber}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(text ? { text } : {}),
+      body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error('Failed to get text overlay');
     return response.json();

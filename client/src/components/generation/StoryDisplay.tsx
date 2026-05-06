@@ -1323,10 +1323,13 @@ export function StoryDisplay({
     let cancelled = false;
     pages.forEach((pageNum: number) => {
       const pageText = storyPages[pageNum - 1]?.trim();
-      const hasImage = sceneImages.some(img => img.pageNumber === pageNum && img.imageData);
+      const sceneImage = sceneImages.find(img => img.pageNumber === pageNum);
+      const hasImage = !!sceneImage?.imageData;
       if (!pageText || !hasImage || overlayImages[pageNum] || overlayLoading.has(pageNum)) return;
       setOverlayLoading(prev => new Set(prev).add(pageNum));
-      storyService.getTextOverlay(storyId, pageNum).then(result => {
+      // Pass cached text + textPosition so the server can skip a ~10s blob
+      // round-trip per call.
+      storyService.getTextOverlay(storyId, pageNum, pageText, sceneImage?.textPosition).then(result => {
         if (!cancelled) {
           setOverlayImages(prev => ({ ...prev, [pageNum]: result.overlayImage }));
         }
