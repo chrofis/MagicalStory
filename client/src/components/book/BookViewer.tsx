@@ -334,7 +334,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             maxHeight={1200}
             showCover={true}
             flippingTime={800}
-            usePortrait={true}
+            // Mobile (< 1024 px) renders one page at a time (portrait). On
+            // desktop we want the 2-page book spread, which requires
+            // usePortrait={false}. Hardcoding true forced single-page on every
+            // device — the desktop "print preview" was broken.
+            usePortrait={isMobile}
             mobileScrollSupport={true}
             maxShadowOpacity={0.4}
             drawShadow={true}
@@ -357,7 +361,12 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               const idx = physicalToLogical.indexOf(initialLogicalPage);
               return idx >= 0 ? idx : 0;
             })()}
-            autoSize={true}
+            // autoSize OVERRIDES size="fixed" with parent-container measurements,
+            // re-flowing pages to a different size after the initial render.
+            // Symptom: A4 covers paint at the computed dims, then visibly grow
+            // and get clipped by the viewport. We compute A4 dims explicitly
+            // in updateDimensions(); fixed is the right mode, no autoSize.
+            autoSize={false}
           >
             {bookPages}
           </HTMLFlipBook>
