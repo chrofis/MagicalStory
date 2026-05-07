@@ -3753,12 +3753,17 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Add PRIMARY landmark reference photo only (1st landmark as separate image)
   // Secondary landmarks (2nd+) go into the Visual Bible grid instead.
-  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy base64).
+  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy / curated
+  // upload). Try URL first; fall back to inline data when the URL can't be
+  // loaded (e.g. synthetic magicalstory:// schemes from tell-curated upload).
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    const source = primaryLandmark.photoUrl || primaryLandmark.photoData;
-    if (source) {
-      const buf = await r2Lib.bytesFromAnyImage(source);
+    const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
+    if (candidates.length > 0) {
+      let buf = null;
+      for (const source of candidates) {
+        try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
+      }
       if (buf) {
         parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
         parts.push({
@@ -4424,12 +4429,16 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   }
 
   // Add PRIMARY landmark reference photo only.
-  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy base64).
+  // Try photoUrl first, fall back to photoData when URL can't be loaded
+  // (e.g. synthetic magicalstory:// schemes from tell-curated upload).
   if (landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
-    const source = primaryLandmark.photoUrl || primaryLandmark.photoData;
-    if (source) {
-      const buf = await r2Lib.bytesFromAnyImage(source);
+    const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
+    if (candidates.length > 0) {
+      let buf = null;
+      for (const source of candidates) {
+        try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
+      }
       if (buf) {
         parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
         parts.push({
@@ -4441,10 +4450,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         currentImageIndex++;
         log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
       } else {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}": failed to load bytes — skipping`);
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}": failed to load bytes from any source — skipping`);
       }
     } else {
-      log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
+      log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}" has no source — skipping`);
     }
   }
 
@@ -12852,11 +12861,14 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   }));
 
   // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo).
-  // Accept photoUrl (R2 URL post-Phase-2) or photoData (legacy data: URI / raw base64).
+  // Try photoUrl first, fall back to photoData when URL can't be loaded.
   for (const lm of secondaryLandmarks) {
-    const source = lm?.photoUrl || lm?.photoData;
-    if (!source) continue;
-    const buf = await r2Lib.bytesFromAnyImage(source);
+    const candidates = [lm?.photoUrl, lm?.photoData].filter(s => typeof s === 'string' && s.length > 0);
+    if (candidates.length === 0) continue;
+    let buf = null;
+    for (const source of candidates) {
+      try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
+    }
     if (!buf) continue;
     allElements.push({
       name: lm.name,

@@ -2072,11 +2072,14 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   for (let i = 0; i < validLandmarks.length; i += ANALYZE_BATCH_SIZE) {
     const batch = validLandmarks.slice(i, i + ANALYZE_BATCH_SIZE);
     await Promise.allSettled(batch.map(async (landmark) => {
-      const source = landmark.photoUrl || landmark.photoData;
-      if (source) {
-        const description = await analyzeLandmarkPhoto(source, landmark.name, landmark.type);
+      // Try photoUrl first; fall back to photoData when URL is a non-fetchable
+      // synthetic scheme (e.g. magicalstory://tell-curated/...).
+      const candidates = [landmark.photoUrl, landmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
+      for (const source of candidates) {
+        const description = await analyzeLandmarkPhoto(source, landmark.name, landmark.type).catch(() => null);
         if (description) {
           landmark.photoDescription = description;
+          break;
         }
       }
     }));

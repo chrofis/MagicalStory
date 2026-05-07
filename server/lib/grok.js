@@ -796,15 +796,22 @@ async function packReferences(refs = {}, options = {}) {
   const landmarkBuffers = [];
   for (const lm of landmarkPhotos) {
     if (!lm) continue;
-    const source = lm.photoUrl || lm.photoData;
-    if (!source || typeof source !== 'string') continue;
-    try {
-      const buf = await r2.bytesFromAnyImage(source);
-      if (buf) landmarkBuffers.push(buf);
-      else log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": no bytes loaded`);
-    } catch (err) {
-      log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": ${err.message}`);
+    // Try photoUrl first; if it can't be loaded (e.g. synthetic
+    // magicalstory:// URLs from the tell-curated upload), fall back to
+    // inline photoData.
+    const candidates = [lm.photoUrl, lm.photoData].filter(s => typeof s === 'string' && s.length > 0);
+    if (candidates.length === 0) continue;
+    let buf = null;
+    for (const source of candidates) {
+      try {
+        buf = await r2.bytesFromAnyImage(source);
+        if (buf) break;
+      } catch (err) {
+        log.warn(`⚠️ ${tag} Landmark "${lm.name || 'unknown'}" load failed for "${String(source).slice(0, 40)}...": ${err.message}`);
+      }
     }
+    if (buf) landmarkBuffers.push(buf);
+    else log.warn(`⚠️ ${tag} Skipped landmark "${lm.name || 'unknown'}": no bytes loaded from any source`);
   }
 
   // Count how many character slots we need (max 3 total reference slots for Grok)

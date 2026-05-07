@@ -225,9 +225,29 @@ async function bytesFromAnyImage(value) {
   if (/^https?:\/\//i.test(value)) {
     return await fetchImageBytes(value);
   }
-  const stripped = value.replace(/^data:image\/\w+;base64,/, '');
+  if (value.startsWith('data:')) {
+    const stripped = value.replace(/^data:image\/\w+;base64,/, '');
+    try {
+      return Buffer.from(stripped, 'base64');
+    } catch (err) {
+      log.warn(`[R2] bytesFromAnyImage data: decode failed: ${err.message}`);
+      return null;
+    }
+  }
+  // Reject any other URL scheme (e.g. magicalstory://tell-curated/...) — these
+  // are synthetic identifiers that no fetcher knows how to resolve. Falling
+  // through to `Buffer.from(string, 'base64')` would silently produce garbage
+  // bytes that look like a Buffer downstream, then crash sharp with
+  // "Input buffer contains unsupported image format" on every reader.
+  // Callers must fall back to a different field (e.g. photoData) when this
+  // returns null.
+  if (/^[a-z][a-z0-9+.\-]*:\/\//i.test(value)) {
+    log.warn(`[R2] bytesFromAnyImage: unsupported URL scheme "${value.slice(0, 40)}..." — returning null`);
+    return null;
+  }
+  // Otherwise treat as raw base64
   try {
-    return Buffer.from(stripped, 'base64');
+    return Buffer.from(value, 'base64');
   } catch (err) {
     log.warn(`[R2] bytesFromAnyImage decode failed: ${err.message}`);
     return null;
