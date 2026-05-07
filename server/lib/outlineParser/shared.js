@@ -307,7 +307,15 @@ function parseDraftSections(content) {
   return { text, sceneProse, sceneHint };
 }
 
-const DRAFT_HEADER_RE = /^\s*(?:#{1,3}\s*)?\*{0,2}\s*Draft\s*\[?\s*(\d+)\s*\]?\s*\*{0,2}\s*$/gim;
+// Match draft headers in any of these shapes the unified writer has emitted:
+//   `Draft 1`              `**Draft 1**`          `### Draft 1`
+//   `Draft Page 1`         `**Draft Page 1**`     `### Draft Page 1`
+//   `Draft Seite 1`        `**Draft Seite 1**`    (DE/IT/ES variants)
+// The "Page/Seite/Página/Pagina" word between Draft and the number is
+// optional. Without this tolerance the regex matched zero drafts on stories
+// where Sonnet wrote `**Draft Page N**`, dropping every draft section and
+// causing pages with no patch to vanish from the final story.
+const DRAFT_HEADER_RE = /^\s*(?:#{1,3}\s*)?\*{0,2}\s*Draft\s*(?:Page|Seite|Página|Pagina)?\s*\[?\s*(\d+)\s*\]?\s*[:\-—]?\s*\*{0,2}\s*$/gim;
 
 /**
  * Extract draft-section pages from a full unified-story response.
