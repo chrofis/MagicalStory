@@ -99,6 +99,13 @@ function keyForHistoricalLocationPhoto(rowId, slug) {
   return `landmarks/historical/${rowId}-${cleanSlug}.jpg`;
 }
 
+// User order PDFs (book-N-stories.pdf delivered to print-on-demand). The IDs
+// are random UUIDs so the public R2 URL is effectively private.
+function keyForOrderPdf(fileId) {
+  const safe = String(fileId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `orders/${safe}.pdf`;
+}
+
 // Account-scoped avatar keys (Phase 0 of the avatar→R2 migration). The
 // existing keyForCharacterPhoto above is *story-scoped* and is for the
 // per-story photo uploads. Avatars live on the characters table, so they
@@ -392,4 +399,5 @@ module.exports = {
   keyForStoryCostumedAvatar,
   keyForUserCharacterPhoto,
   keyForHistoricalLocationPhoto,
+  keyForOrderPdf,
 };

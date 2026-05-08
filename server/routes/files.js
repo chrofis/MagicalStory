@@ -104,14 +104,20 @@ router.get('/:fileId', optionalAuth, async (req, res) => {
 
     if (isDatabaseMode()) {
       // Files have unique random IDs - allow access without strict ownership check
-      // This enables <img src> tags to work without auth headers
-      const rows = await dbQuery('SELECT mime_type, file_data, filename FROM files WHERE id = $1', [fileId]);
+      // This enables <img src> tags to work without auth headers.
+      // R2 migration: prefer file_url when set; redirect rather than re-stream.
+      const rows = await dbQuery('SELECT mime_type, file_data, file_url, filename FROM files WHERE id = $1', [fileId]);
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'File not found' });
       }
 
       const file = rows[0];
+
+      // Migrated rows: redirect to R2 URL. Cloudflare CDN serves it from edge.
+      if (file.file_url) {
+        return res.redirect(302, file.file_url);
+      }
 
       res.set('Content-Type', file.mime_type);
 

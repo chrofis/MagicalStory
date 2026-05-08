@@ -219,6 +219,11 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_story_id ON files(story_id)`);
+    // R2 migration: file_data was bytea-only; file_url holds the R2 public URL
+    // after backfill. Reader prefers file_url and falls back to file_data.
+    // Drop NOT NULL on file_data so post-migration rows can hold URL only.
+    await dbPool.query(`ALTER TABLE files ADD COLUMN IF NOT EXISTS file_url TEXT`);
+    await dbPool.query(`ALTER TABLE files ALTER COLUMN file_data DROP NOT NULL`).catch(() => {});
 
     // Gelato products table
     await dbPool.query(`
