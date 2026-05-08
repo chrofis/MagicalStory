@@ -760,27 +760,34 @@ async function packReferences(refs = {}, options = {}) {
 
   // Extract character photo buffers as raw data — the layout function decides
   // how to crop/compose based on character count and aspect ratio.
+  // Accept any of: data: URI, raw base64, http(s) R2 URL, or wrapped objects
+  // ({imageData}, {imageUrl}, [data, ...]). r2.bytesFromAnyImage handles the
+  // string variants; we still drill through the object wrappers first.
   const rawCharData = [];
   for (const photoData of characterPhotos) {
     let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
     const charName = typeof photoData === 'object' ? photoData?.name : null;
-    // Handle nested object formats: {data: "..."}, {imageData: "..."}, or arrays
     if (photoUrl && typeof photoUrl === 'object') {
       if (Array.isArray(photoUrl)) {
         photoUrl = photoUrl[0];
+      } else if (photoUrl.imageUrl) {
+        photoUrl = photoUrl.imageUrl;
       } else if (photoUrl.data) {
         photoUrl = photoUrl.data;
       } else if (photoUrl.imageData) {
         photoUrl = photoUrl.imageData;
       }
     }
-    if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-      const base64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
-      const rawBuffer = Buffer.from(base64, 'base64');
-      const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
-      rawCharData.push({ rawBuffer, photoType, charName });
+    if (photoUrl && typeof photoUrl === 'string') {
+      const rawBuffer = await r2.bytesFromAnyImage(photoUrl);
+      if (rawBuffer) {
+        const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
+        rawCharData.push({ rawBuffer, photoType, charName });
+      } else if (charName) {
+        log.warn(`⚠️ ${tag} Skipped character "${charName}": failed to load photo bytes`);
+      }
     } else if (charName) {
-      log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
+      log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'}`);
     }
   }
 

@@ -916,6 +916,60 @@ async function extractInlineImagesToR2(storyId, data) {
     }
   }
 
+  // Per-story styled avatars (sceneCharacters[].avatars.styledAvatars + top-level
+  // characters[].avatars.styledAvatars). These are the per-art-style + per-costume
+  // avatars the strip historically preserved as inline base64 because there was
+  // no other home. Now extract uploads them to R2 and replaces the value with
+  // { imageUrl } — entityConsistency.resolveStyled() already accepts that
+  // shape (alongside legacy bare strings).
+  const walkStyledAvatars = (avatars, charKey) => {
+    if (!avatars || typeof avatars !== 'object') return;
+    if (!avatars.styledAvatars || typeof avatars.styledAvatars !== 'object') return;
+    for (const [artStyle, perArt] of Object.entries(avatars.styledAvatars)) {
+      if (!perArt || typeof perArt !== 'object') continue;
+      for (const [clothing, slot] of Object.entries(perArt)) {
+        if (!slot) continue;
+        if (clothing === 'costumed' && typeof slot === 'object' && !Array.isArray(slot)) {
+          // Per-costume sub-map: { 'medieval swiss huntsman': bytes-or-{imageUrl}, ... }
+          for (const [costumeName, val] of Object.entries(slot)) {
+            const inline = (typeof val === 'string')
+              ? val
+              : (val && typeof val === 'object' && typeof val.imageData === 'string') ? val.imageData : null;
+            if (!inline || !looksLikeBytes(inline)) continue;
+            upload(inline, r2.keyForStoryCostumedAvatar(storyId, charKey, artStyle, costumeName), (url) => {
+              slot[costumeName] = { imageUrl: url };
+            });
+          }
+        } else {
+          // Plain category: 'standard' | 'summer' | 'winter' | 'formal'
+          const inline = (typeof slot === 'string')
+            ? slot
+            : (typeof slot.imageData === 'string') ? slot.imageData : null;
+          if (!inline || !looksLikeBytes(inline)) continue;
+          upload(inline, r2.keyForStoryStyledAvatar(storyId, charKey, artStyle, clothing), (url) => {
+            perArt[clothing] = { imageUrl: url };
+          });
+        }
+      }
+    }
+  };
+
+  if (Array.isArray(data.characters)) {
+    for (const c of data.characters) {
+      if (!c || typeof c !== 'object') continue;
+      walkStyledAvatars(c.avatars, c.id || c.name);
+    }
+  }
+  if (Array.isArray(data.sceneImages)) {
+    for (const s of data.sceneImages) {
+      if (!s || !Array.isArray(s.sceneCharacters)) continue;
+      for (const c of s.sceneCharacters) {
+        if (!c || typeof c !== 'object') continue;
+        walkStyledAvatars(c.avatars, c.id || c.name);
+      }
+    }
+  }
+
   // visualBible.locations — Wikimedia ref bytes
   if (data.visualBible && typeof data.visualBible === 'object'
       && Array.isArray(data.visualBible.locations)) {

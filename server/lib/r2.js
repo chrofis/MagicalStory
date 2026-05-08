@@ -161,6 +161,22 @@ function keyForLandmarkPhoto(storyId, pageNumber, slot) {
   return `stories/${storyId}/debug/${pageSlug}/landmark-${slot}.jpg`;
 }
 
+// Per-story styled avatar (the snapshot inside stories.data — distinct from
+// the canonical character-table avatar). Used by the per-story strip walker.
+function keyForStoryStyledAvatar(storyId, charKey, artStyle, clothingCategory) {
+  const cleanChar = String(charKey || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanArt = String(artStyle || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanClothing = String(clothingCategory || 'standard').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `stories/${storyId}/styled-avatars/${cleanChar}/${cleanArt}/${cleanClothing}.jpg`;
+}
+
+function keyForStoryCostumedAvatar(storyId, charKey, artStyle, costumeName) {
+  const cleanChar = String(charKey || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanArt = String(artStyle || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanCostume = String(costumeName || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `stories/${storyId}/styled-avatars/${cleanChar}/${cleanArt}/costumed-${cleanCostume}.jpg`;
+}
+
 function publicUrlForKey(key) {
   if (!process.env.R2_PUBLIC_URL) return null;
   const base = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
@@ -361,4 +377,6 @@ module.exports = {
   keyForRepairCompare,
   keyForStyledAvatarInput,
   keyForLandmarkPhoto,
+  keyForStoryStyledAvatar,
+  keyForStoryCostumedAvatar,
 };

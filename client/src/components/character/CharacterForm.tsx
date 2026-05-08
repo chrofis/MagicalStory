@@ -1891,7 +1891,10 @@ export function CharacterForm({
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {Object.entries(character.avatars.costumed).map(([costumeType, avatarData]) => {
-              const imageUrl = typeof avatarData === 'string' ? avatarData : avatarData?.imageData;
+              // Accept legacy string, {imageUrl} (post-Phase-2 R2), or {imageData} (legacy inline).
+              const imageUrl = typeof avatarData === 'string'
+                ? avatarData
+                : (avatarData?.imageUrl || avatarData?.imageData);
               const clothing = typeof avatarData === 'object' ? avatarData?.clothing : undefined;
               return (
                 <div key={costumeType} className="text-center">
@@ -1973,7 +1976,10 @@ export function CharacterForm({
                   {/* Standard clothing avatars */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     {clothingOrder.map((category) => {
-                      const avatar = avatars[category];
+                      const raw = avatars[category];
+                      const avatar = typeof raw === 'string'
+                        ? raw
+                        : (raw && typeof raw === 'object' ? ((raw as any).imageUrl || (raw as any).imageData) : null);
                       return (
                         <div key={category} className="text-center">
                           <div className="text-[10px] text-gray-500 mb-1">
@@ -2005,7 +2011,10 @@ export function CharacterForm({
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {costumeTypes.map((costumeType) => {
-                          const avatar = costumedAvatars![costumeType];
+                          const raw = costumedAvatars![costumeType];
+                          const avatar = typeof raw === 'string'
+                            ? raw
+                            : (raw && typeof raw === 'object' ? ((raw as any).imageUrl || (raw as any).imageData) : null);
                           return (
                             <div key={costumeType} className="text-center">
                               <div className="text-[10px] text-orange-500 mb-1 truncate" title={costumeType}>

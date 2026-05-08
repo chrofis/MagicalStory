@@ -2300,7 +2300,10 @@ function getCharacterPhotos(characters, clothingCategory = null) {
   const extractUrl = (avatarData) => {
     if (!avatarData) return null;
     if (typeof avatarData === 'string') return avatarData;
-    if (typeof avatarData === 'object' && avatarData.imageData) return avatarData.imageData;
+    if (typeof avatarData === 'object') {
+      // Prefer imageUrl (post-Phase-2 R2-migrated) over imageData (legacy inline base64).
+      return avatarData.imageUrl || avatarData.imageData || null;
+    }
     return null;
   };
 

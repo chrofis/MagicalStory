@@ -124,19 +124,25 @@ export interface FaceMatchResult {
   arcface?: ArcFaceResult | null;  // ArcFace identity comparison (style-invariant, optional)
 }
 
+// One styled avatar slot. Legacy stories carry a bare string (URL or data: URI);
+// after R2 migration the value is { imageUrl } (URL only) or { imageData } (legacy
+// inline form). Code that reads these should handle all three shapes.
+export type StyledAvatarSlot = string | { imageUrl?: string; imageData?: string; clothing?: string };
+
 // Styled avatar set for a specific art style (includes standard clothing + costumed)
 export interface StyledAvatarSet {
-  winter?: string;
-  standard?: string;
-  summer?: string;
-  formal?: string;
-  costumed?: Record<string, string>; // Key: costume type (e.g., "Cowboy"), Value: avatar URL
+  winter?: StyledAvatarSlot;
+  standard?: StyledAvatarSlot;
+  summer?: StyledAvatarSlot;
+  formal?: StyledAvatarSlot;
+  costumed?: Record<string, StyledAvatarSlot>; // Key: costume type (e.g., "Cowboy")
 }
 
 // Costumed avatar data (for non-styled costumed avatars)
 export interface CostumedAvatarData {
-  imageData: string;  // Avatar URL/data
-  clothing: string;   // Clothing description used
+  imageData?: string;  // Legacy inline form (R2-migrated entries store imageUrl instead)
+  imageUrl?: string;   // R2 URL post-Phase-2 migration
+  clothing: string;    // Clothing description used
 }
 
 // Generated avatars for each clothing category
