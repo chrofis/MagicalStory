@@ -4273,13 +4273,20 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         continue;
       }
 
-      // Find version with highest qualityScore (skip null/unevaluated versions)
+      // Find version with the best COMPOSITE score, matching the priority
+      // chain that findBadPages uses (consolidatorFinalScore → finalScore →
+      // score → qualityScore). Picking by raw qualityScore alone allowed a
+      // version with high quality but heavy entity penalty to win over a
+      // lower-quality version with no penalty — opposite of what the redo
+      // gate decided.
+      const pickScore = (v) =>
+        v?.consolidatorFinalScore ?? v?.finalScore ?? v?.score ?? v?.qualityScore ?? null;
       let bestIndex = -1;
       let bestScore = -1;
       const pickVersionKey = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
       const activeIndex = await getActiveVersion(id, pickVersionKey);
       for (let i = 0; i < scene.imageVersions.length; i++) {
-        const score = scene.imageVersions[i].qualityScore;
+        const score = pickScore(scene.imageVersions[i]);
         if (score != null && score > bestScore) {
           bestScore = score;
           bestIndex = i;

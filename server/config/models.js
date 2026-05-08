@@ -85,8 +85,12 @@ const MODEL_DEFAULTS = {
   idea: 'claude-sonnet',               // Story idea generation
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'claude-haiku',     // Initial scene expansion (better instruction following for clothing/format)
-  sceneIteration: 'claude-haiku',       // Scene iteration/retry (better instruction following for clothing/format)
+  sceneDescription: 'claude-sonnet',    // Initial scene expansion — Sonnet only. Haiku produced
+                                        // unstable clothing labels (e.g. "costumed:medieval swiss
+                                        // huntsman" instead of the canonical "costumed:medieval")
+                                        // and inconsistent metadata. Unified mode normally skips
+                                        // this call entirely; only used when prose is missing.
+  sceneIteration: 'claude-sonnet',      // Scene iteration/retry — Sonnet only, same reason.
 
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)

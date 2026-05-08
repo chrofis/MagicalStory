@@ -260,19 +260,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               />
             );
             physicalToLogical.push(i);
-            // forceTextBelow stories are self-contained per page (image +
-            // text on the same page). Pairing two of them into a spread
-            // shows two different scenes at once, which isn't the intended
-            // reading experience. On desktop we insert a blank companion
-            // so each story page occupies its own spread. On mobile the
-            // flipbook is already locked to portrait/single-page mode
-            // (pageWidth = containerWidth forces it), so a blank companion
-            // would just show up as an empty page between scenes as the
-            // user flips — worse UX. Desktop only.
-            if (forceTextBelow && !isMobile) {
-              bookPages.push(<BlankPage key={`story-${storyPage.pageNumber}-blank`} />);
-              physicalToLogical.push(i);
-            }
+            // forceTextBelow stories: each page is image+text-below. On
+            // desktop we let consecutive pages pair into a real book spread
+            // (page N on left, page N+1 on right) — that's what an actual
+            // open book looks like. On mobile the flipbook is locked to
+            // single-page portrait mode by pageWidth=containerWidth.
           }
           break;
         }

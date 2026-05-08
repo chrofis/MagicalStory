@@ -1179,7 +1179,18 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             }
           }
 
-          const clothingCategory = charClothing[name] || 'standard';
+          // If the page didn't tag clothing for this character, prefer costumed
+          // when the character only has costumed avatars (historical stories).
+          // Hardcoded 'standard' default produced the AVATAR-LOOKUP warning
+          // "wanted standard but only costumed exists" and the eval ran with
+          // the wrong reference clothing.
+          const styledForArt = fullChar?.avatars?.styledAvatars?.[artStyle] || {};
+          const onlyHasCostumed = !!styledForArt.costumed
+            && !styledForArt.standard
+            && !styledForArt.winter
+            && !styledForArt.summer;
+          const fallbackCategory = onlyHasCostumed ? 'costumed' : 'standard';
+          const clothingCategory = charClothing[name] || fallbackCategory;
           // Resolve category to actual clothing description
           let clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
           if (!clothing && clothingCategory.startsWith('costumed:')) {
