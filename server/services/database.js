@@ -1131,6 +1131,17 @@ function stripInlineImagesFromStoryData(data) {
     if (c.photos && typeof c.photos === 'object') {
       for (const k of ['original', 'face', 'body', 'bodyNoBg']) c.photos[k] = undefined;
     }
+    // Legacy snake_case top-level fields used by older stories. Same data as
+    // c.photos.* — bytes are the canonical character row's responsibility, not
+    // this snapshot. Inline data: URIs of ~100-1500 KB per char per scene
+    // historically slipped past the strip because only the camelCase paths
+    // were covered.
+    for (const k of ['photo_url', 'body_photo_url', 'body_no_bg_url', 'thumbnail_url',
+                     'face_photo_url', 'face_thumbnail_url', 'body_thumbnail_url']) {
+      if (typeof c[k] === 'string' && c[k].length > 200 && c[k].startsWith('data:')) {
+        c[k] = undefined;
+      }
+    }
     if (c.avatars && typeof c.avatars === 'object') {
       for (const k of ['standard', 'summer', 'winter', 'formal']) c.avatars[k] = undefined;
       c.avatars.faceThumbnails = undefined;
