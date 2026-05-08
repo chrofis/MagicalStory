@@ -3630,6 +3630,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Initialize main characters from inputData.characters
         initializeVisualBibleMainCharacters(streamingVisualBible, inputData.characters);
 
+        // Inject historical locations into the STREAMING VB so cover gen and
+        // page gen (which both read streamingVisualBible, not the finalize-time
+        // visualBible) can resolve LOC ids to the curated photo. Without this,
+        // covers/pages logged "[LANDMARK-SCENE] matched but has no photos
+        // (variants=0, fetchStatus=none)" — the entry was in the streaming VB
+        // (added by Sonnet) but the photo bytes only landed on the finalize-time
+        // visualBible at line 4023, which is a separate object.
+        if (inputData.storyCategory === 'historical' && inputData.storyTopic) {
+          const historicalLocations = getHistoricalLocations(inputData.storyTopic);
+          if (historicalLocations?.length > 0) {
+            injectHistoricalLocations(streamingVisualBible, historicalLocations);
+            log.info(`📍 [STREAM] Injected ${historicalLocations.length} pre-fetched historical location(s) into streaming VB`);
+          }
+        }
+
         // Link pre-discovered landmarks and load photo variant descriptions
         // This must happen BEFORE scene expansion so variants are available in the prompt
         if (inputData.availableLandmarks?.length > 0) {
