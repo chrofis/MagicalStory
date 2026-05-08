@@ -94,6 +94,11 @@ function keyForUserCharacterPhoto(userId, characterId, slot) {
   return `characters/${userId}/${characterId}/photos/${slot}.jpg`;
 }
 
+function keyForHistoricalLocationPhoto(rowId, slug) {
+  const cleanSlug = String(slug || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+  return `landmarks/historical/${rowId}-${cleanSlug}.jpg`;
+}
+
 // Account-scoped avatar keys (Phase 0 of the avatar→R2 migration). The
 // existing keyForCharacterPhoto above is *story-scoped* and is for the
 // per-story photo uploads. Avatars live on the characters table, so they
@@ -386,4 +391,5 @@ module.exports = {
   keyForStoryStyledAvatar,
   keyForStoryCostumedAvatar,
   keyForUserCharacterPhoto,
+  keyForHistoricalLocationPhoto,
 };
