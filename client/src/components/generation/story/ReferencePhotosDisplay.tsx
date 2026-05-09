@@ -5,7 +5,8 @@ import storyService from '@/services/storyService';
 
 interface LandmarkPhoto {
   name: string;
-  photoData?: string;  // May be stripped in dev-metadata response
+  photoData?: string;  // Inline data URI (legacy / pre-R2)
+  photoUrl?: string;   // R2 URL (post-Phase-2 migration); browser loads directly
   hasPhoto?: boolean;  // Flag when photoData is stripped
   attribution?: string;
   source?: string;
@@ -484,7 +485,13 @@ export function ReferencePhotosDisplay({
             📍 {language === 'de' ? 'Wahrzeichen-Referenzfotos' : language === 'fr' ? 'Photos de monuments' : 'Landmark Reference Photos'}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {displayLandmarkPhotos!.map((landmark, idx) => (
+            {displayLandmarkPhotos!.map((landmark, idx) => {
+              // Prefer inline data URI; fall back to R2 URL (post-migration). Reject
+              // synthetic schemes the browser can't load (e.g. magicalstory://).
+              const urlIsLoadable = typeof landmark.photoUrl === 'string'
+                && /^(https?:|data:)/i.test(landmark.photoUrl);
+              const src = landmark.photoData || (urlIsLoadable ? landmark.photoUrl! : null);
+              return (
               <div key={idx} className="bg-amber-50 rounded-lg p-2 border border-amber-200">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-xs text-gray-800 truncate">{landmark.name}</span>
@@ -492,14 +499,14 @@ export function ReferencePhotosDisplay({
                     📍 LANDMARK
                   </span>
                 </div>
-                {landmark.photoData ? (
+                {src ? (
                   <>
                     <div className="relative">
                       <img
-                        src={landmark.photoData}
+                        src={src}
                         alt={`${landmark.name} landmark`}
                         className="w-full max-h-32 object-contain rounded border border-amber-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setLightboxImage(landmark.photoData!)}
+                        onClick={() => setLightboxImage(src)}
                         title="Click to enlarge"
                       />
                     </div>
@@ -520,7 +527,8 @@ export function ReferencePhotosDisplay({
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

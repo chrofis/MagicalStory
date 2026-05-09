@@ -53,7 +53,7 @@ export interface TestModelsInputSnapshot {
     clothingDescription?: string;
     photoUrl?: string | null;
   }>;
-  landmarkPhotos: Array<{ name: string; photoData: string | null }>;
+  landmarkPhotos: Array<{ name: string; photoData: string | null; photoUrl?: string | null; attribution?: string | null; source?: string | null }>;
   visualBibleGrid: string | null;
   sceneBackground: string | null;
 }
