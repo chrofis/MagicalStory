@@ -1480,6 +1480,21 @@ async function saveStoryData(storyId, storyData) {
     'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
     [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
   );
+
+  // Recompute the canonical active version for every scene + cover from the
+  // current scoreBreakdown / finalScore on each version. Without this hook,
+  // the regen routes' "stamp newest as active" calls would survive past the
+  // eval that scored the new version, leaving an unevaluated or low-score
+  // version active. See server/lib/scoring.js for the picker.
+  try {
+    const { recomputeAllActiveVersions } = require('../lib/scoring');
+    const summary = await recomputeAllActiveVersions(storyId, dataForStorage);
+    if (summary.switches > 0) {
+      console.log(`🏆 [SAVE] Active version recomputed: ${summary.scenes} scenes, ${summary.covers} covers`);
+    }
+  } catch (err) {
+    console.warn(`⚠️  [SAVE] Active version recompute failed for ${storyId}: ${err.message}`);
+  }
 }
 
 /**
@@ -1591,6 +1606,18 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   if ((result.rowCount ?? 0) === 0) {
     console.warn(`⚠️ [SAVE-SCENE] Page ${pageNumber} not found in sceneImages for story ${storyId}, falling back to full save`);
     return false; // Signal caller to fall back to saveStoryData
+  }
+
+  // Recompute active version for THIS scene (atomic save → atomic recompute).
+  // Same hook as saveStoryData; keeps the canonical pick consistent across
+  // both the bulk and per-scene save paths.
+  try {
+    const { recomputeActiveVersion } = require('../lib/scoring');
+    if (Array.isArray(dataForStorage.imageVersions) && dataForStorage.imageVersions.length > 0) {
+      await recomputeActiveVersion(storyId, pageNumber, dataForStorage.imageVersions, 'scene');
+    }
+  } catch (err) {
+    console.warn(`⚠️  [SAVE-SCENE] Active version recompute failed for page ${pageNumber}: ${err.message}`);
   }
   return true;
 }
@@ -1844,6 +1871,20 @@ async function upsertStory(storyId, userId, storyData) {
     'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
     [JSON.stringify(dataForStorage), JSON.stringify(finalMetadata), storyId]
   );
+
+  // Same active-version recompute as saveStoryData. The unified pipeline
+  // pushes versions through here; without this hook the picker sees scores
+  // but the activeVersion marker would still point at the last-pushed
+  // (typically lowest-scoring) version.
+  try {
+    const { recomputeAllActiveVersions } = require('../lib/scoring');
+    const summary = await recomputeAllActiveVersions(storyId, dataForStorage);
+    if (summary.switches > 0) {
+      console.log(`🏆 [UPSERT] Active version recomputed: ${summary.scenes} scenes, ${summary.covers} covers`);
+    }
+  } catch (err) {
+    console.warn(`⚠️  [UPSERT] Active version recompute failed: ${err.message}`);
+  }
 
   console.log(`✅ [UPSERT] Story ${storyId} saved successfully`);
 }

@@ -5,51 +5,36 @@
  * Used by:
  *   - server/lib/images.js (unified pipeline)
  *   - server/routes/regeneration.js (repair workflow endpoints)
+ *
+ * Scoring is delegated to lib/scoring.js. This module just decides which
+ * pages need redo based on the canonical finalScore + fixableIssues count.
  */
 
 const { REPAIR_DEFAULTS } = require('../config/models');
+const { computeFinalScore, SCORE_THRESHOLDS } = require('./scoring');
 
 /**
- * Identify pages that need redo based on score and issue count thresholds.
+ * Identify pages that need redo. Reads the canonical finalScore via
+ * computeFinalScore() — same chain as pickBestVersionIndex / shouldRedo.
+ * No more per-site priority chains.
  *
- * The score field read by this function (in priority order) is:
- *   1. `finalScore` — entity-penalty-adjusted, set explicitly by the unified
- *      pipeline round loop. PREFERRED — distinguishes itself from raw visual.
- *   2. `score` / `qualityScore` — legacy fields, may be either raw visual or
- *      adjusted depending on the call site. Used as fallback for endpoints
- *      that haven't migrated to finalScore yet.
- *
- * @param {Object} evalPages - Map of pageNumber → { finalScore?, score?, qualityScore?, fixableIssues? }
+ * @param {Object} evalPages - Map of pageNumber → version-shaped object
  * @param {Object} [options]
  * @param {number} [options.scoreThreshold] - Pages scoring below this need redo
  * @param {number} [options.issueThreshold] - Pages with >= this many fixable issues need redo
  * @returns {number[]} Sorted page numbers needing redo
  */
 function findBadPages(evalPages, options = {}) {
-  const scoreThreshold = options.scoreThreshold ?? REPAIR_DEFAULTS.scoreThreshold;
-  const issueThreshold = options.issueThreshold ?? REPAIR_DEFAULTS.issueThreshold;
+  const scoreThreshold = options.scoreThreshold ?? REPAIR_DEFAULTS.scoreThreshold ?? SCORE_THRESHOLDS.REDO;
+  const issueThreshold = options.issueThreshold ?? REPAIR_DEFAULTS.issueThreshold ?? SCORE_THRESHOLDS.ISSUES;
 
   const bad = [];
   for (const [pageNumStr, result] of Object.entries(evalPages || {})) {
     const pageNum = parseInt(pageNumStr, 10);
     if (isNaN(pageNum)) continue;
 
-    // Prefer the consolidator's deduplicated, tolerant final_score — single
-    // source of truth that already merged the same physical issue across
-    // quality / semantic / entity evaluators. Without this, a single moderate
-    // problem flagged by all three got triple-counted toward redo gating.
-    // Currently the consolidator only runs during inpaint execution; this
-    // field is forward-compatible for when it's promoted to eval-phase too.
-    // Falls back to finalScore (unified pipeline round loop) and the
-    // ambiguous score / qualityScore fields for legacy callers.
-    const score = result.consolidatorFinalScore
-      ?? result.finalScore
-      ?? result.score
-      ?? result.qualityScore
-      ?? null;
+    const score = computeFinalScore(result);
     const issueCount = result.fixableIssues?.length ?? 0;
-
-    // Skip pages with no score data
     if (score == null) continue;
 
     if (score < scoreThreshold || issueCount >= issueThreshold) {

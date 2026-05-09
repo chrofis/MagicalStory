@@ -4273,28 +4273,16 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         continue;
       }
 
-      // Find version with the best COMPOSITE score, matching the priority
-      // chain that findBadPages uses (consolidatorFinalScore → finalScore →
-      // score → qualityScore). Picking by raw qualityScore alone allowed a
-      // version with high quality but heavy entity penalty to win over a
-      // lower-quality version with no penalty — opposite of what the redo
-      // gate decided.
-      const pickScore = (v) =>
-        v?.consolidatorFinalScore ?? v?.finalScore ?? v?.score ?? v?.qualityScore ?? null;
-      let bestIndex = -1;
-      let bestScore = -1;
+      // Canonical pick — same helper as auto-activation and findBadPages
+      // (server/lib/scoring.js). One scoring rule, no per-site divergence.
+      const { pickBestVersionIndex, computeFinalScore } = require('../lib/scoring');
       const pickVersionKey = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
       const activeIndex = await getActiveVersion(id, pickVersionKey);
-      for (let i = 0; i < scene.imageVersions.length; i++) {
-        const score = pickScore(scene.imageVersions[i]);
-        if (score != null && score > bestScore) {
-          bestScore = score;
-          bestIndex = i;
-        }
-      }
+      const bestIndex = pickBestVersionIndex(scene.imageVersions);
+      const bestScore = bestIndex >= 0 ? computeFinalScore(scene.imageVersions[bestIndex]) : null;
 
       const activeVersionEntry = activeIndex >= 0 ? scene.imageVersions[activeIndex] : null;
-      const isUnevaluatedRepair = activeVersionEntry?.type === 'entity-repair' && activeVersionEntry?.qualityScore == null;
+      const isUnevaluatedRepair = activeVersionEntry?.type === 'entity-repair' && computeFinalScore(activeVersionEntry) == null;
 
       if (isUnevaluatedRepair && bestIndex < 0) {
         // Entity-repair has no score AND no scored alternatives — keep it (no basis for comparison)

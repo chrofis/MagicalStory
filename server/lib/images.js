@@ -5255,9 +5255,11 @@ function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
   if (versions.length === 1) return versions[0];
 
-  return versions.reduce((best, v) =>
-    (v.score != null && (best.score == null || v.score > best.score)) ? v : best
-  , versions[0]);
+  // Delegate to the canonical picker. One scoring rule, no per-site
+  // divergence (the old impl used `score` only and ignored entity penalty).
+  const { pickBestVersionIndex } = require('./scoring');
+  const idx = pickBestVersionIndex(versions);
+  return idx >= 0 ? versions[idx] : versions[0];
 }
 
 /**
