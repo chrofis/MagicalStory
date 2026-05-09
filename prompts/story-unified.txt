@@ -191,7 +191,35 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 
 **objects[]** — Visual Bible IDs. **For every page, the FIRST `LOC###` ID is the page's primary location and MUST be a vantage (e.g. `LOC001.2`, not bare `LOC001`).** The vantage you pick must be the one whose `pages: []` array includes this page number — i.e. the assignment you made in the Visual Bible. The pipeline reads this to attach the right pre-rendered canvas. If a real landmark also has numbered photo variants, use the same dotted form: the vantage and the photo variant are the same numbering.
 
-**interactions[]** — one entry per essential character-to-object or character-to-character contact. Each entry has three fields: `character` (the subject), `object` (the target — Visual Bible ID, character name, or plain noun), `where` (a complete short English sentence with the object's HUMAN NAME embedded, e.g. "holds the stuffed elephant in lap", "gazes at the dragon a few paces apart", "leans against the cobblestone wall", "sits on the wooden bench"). The `where` sentence is read as-is by the image model — it must already contain the object's name in natural English so the model knows what to render. Bare verb phrases like "holds in lap" are wrong because they leave the object unnamed. Pose details — neck angle, gaze direction, body-part positioning — do NOT belong in `where`; leave them in the prose. Include every contact the plot depends on: what the character holds, wears, or carries; what surface they stand, sit, kneel, crouch, climb, push off, or land on; a weapon being gripped; a pivotal hand on another character. If the text describes movement FROM one thing TO another, BOTH origin and destination get an entry. Omit incidental contact. Test: could the story be told identically without the contact being visible? If yes, leave it out. Every person named in `interactions[]` must appear in this scene's `characters[]`.
+**interactions[]** — only the contacts that CARRY the story beat on this page. Default to omitting; include only when the test below passes.
+
+The image model treats every entry here as a hard requirement and the evaluator deducts when an entry isn't visible. Every spurious entry costs you a downgrade. Be ruthless.
+
+**Priority of what to include, in order:**
+  1. **Character ↔ character** when the beat IS the relationship moment — talking face-to-face, looking at each other, handing X to Y, hugging, gripping each other, blocking each other.
+  2. **Character ↔ plot object** when the object IS the story beat — the McGuffin being held, the weapon being raised, the letter being read, the key being turned. The object must already appear in this page's `objects[]` as a Visual Bible ID, or be named in `sceneIntent`.
+  3. **Character ↔ surface** ONLY when the surface is the action — climbing the ladder TO ESCAPE, kneeling at the altar TO PRAY, sitting on the throne TO RULE, balancing on the rope TO CROSS. Sitting on a bench / standing on a path / leaning on a wall is **incidental contact** — leave it for the prose.
+
+**Inclusion test (apply to every candidate entry):**
+  - "Could the story be told identically if the reader did NOT see this contact?" If yes → OMIT.
+  - "Is this person sitting/standing/leaning/walking on something just because everyone has to be somewhere?" If yes → OMIT. The bench, the floor, the path, the wall: not interactions. The prose says so; the metadata doesn't repeat it.
+  - "Is the object part of the scene furniture and not the plot?" If yes → OMIT.
+
+**Field shape.** Three fields per entry: `character` (subject), `object` (target — VB ID, character name, or plain noun), `where` (a complete short English sentence with the object's HUMAN NAME embedded so the image model knows what to render: "holds the stuffed elephant", "gazes at the dragon a few paces apart", "hands the letter to Manuel"). Bare verb phrases like "holds in lap" are wrong because the object is unnamed.
+
+**`where` is object-CONTACT only.** No body-part positioning, no neck angle, no gaze precision, no leaning verbs, no "both hands", "pressed flat", "fingers curled", "leans toward". Those belong in the prose. ✗ `"presses both hands on the edge of the bench seat, leaning toward the map"` (pose detail; also bench is incidental). ✓ `"reads the parchment map over Hans's shoulder"` (object-contact, story-relevant).
+
+**Cap.** Aim for 1-3 entries per page. 4 is allowed when a page genuinely has multiple plot-relevant contacts (e.g. holds a sword in one hand AND a torch in the other AND faces the dragon). 5+ almost always means you've included incidental contact — re-read and cut.
+
+**Examples** (all from foreground close-ups, 2-character pages):
+  - Page beat: Hans reads the map; Emma watches over his shoulder.
+    ✓ `[{character:"Hans", object:"ART002 (map)", where:"holds the parchment map close to his face"}, {character:"Emma", object:"Hans", where:"reads the map over Hans's shoulder"}]`
+    ✗ Adding `{character:"Emma", object:"wooden bench", where:"stands beside the bench"}` — bench is furniture; the relationship is between Emma and the map.
+  - Page beat: Tell aims his crossbow at Gessler down the path.
+    ✓ `[{character:"Tell", object:"ART001 (crossbow)", where:"aims the crossbow down the path"}, {character:"Tell", object:"Gessler", where:"sights Gessler at the far end of the path, a hundred paces apart"}]`
+    ✗ Adding `{character:"Tell", object:"cobblestones", where:"stands on the cobblestone path"}` — incidental ground contact.
+
+Every person named in `interactions[]` must appear in this scene's `characters[]`. If the text describes movement FROM one thing TO another and both endpoints are plot-relevant, both get an entry; otherwise just the destination.
 
 **Interactions at a distance.** When the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'runs toward across', 'gestures across', 'looks at' over distance), `where` must include an explicit separation phrase: 'across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley', 'from one rooftop to another'. Without it the image renders the two figures inside touching distance and the dramatic moment collapses. For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly in the frame at the named separation, and the prose must place each figure at the correct end of the frame.
 

@@ -112,14 +112,26 @@ Then a single-line JSON object:
 - Include every recurring visual element visible in the scene.
 - For landmarks with photo variants, use `LOC003.2` format. Default to `.1` if unsure. Pick the variant matching the scene's perspective.
 
-**`interactions[]`**
-- One entry per character-to-object contact visible in the scene. Each entry is a simple A-verb-B form.
-- `character` (subject), `object` (target — VB ID, character name, or plain noun like "rope", "ladder", "stairs"), `where` (a short verb phrase, 1-4 words: 'climbs', 'gazes at', 'holds', 'sits on', 'in pocket', 'around neck', 'leans against').
-- Pose details — neck angle, gaze direction, body-part positioning ('arms at sides', 'fingers curled', 'feet on third rung') — do NOT belong in `where`; leave them in the prose.
-- Omit entries for characters who aren't touching anything.
-- Every entry must also be described in the prose as the same physical contact. When the prose disagrees with the interaction list, the image follows the prose — so the two must agree.
-- Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side. Never hold objects against the chest or front when the camera sees the back.
-- Distance rule: when the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly at the named separation, and the prose must place each figure at the correct end of the frame.
+**`interactions[]`** — only the contacts that CARRY the story beat. Default to omitting; the evaluator deducts per missing entry, so a spurious one costs you a downgrade.
+
+Priority of what to include:
+  1. Character ↔ character (looking at, talking to, handing X to, hugging, blocking).
+  2. Character ↔ plot object (the McGuffin, the weapon, the letter, the key — must already be in `objects[]` or named in the prose's main beat).
+  3. Character ↔ surface ONLY when the surface IS the action (climbing the ladder TO ESCAPE, kneeling at the altar TO PRAY). Sitting on a bench / standing on a path / leaning on a wall is incidental — leave it in the prose.
+
+Test before adding any entry: "Could the story be told identically without the reader seeing this contact?" If yes, omit. The bench, the floor, the wall — the prose says where the character is; the metadata doesn't repeat it.
+
+Field shape: `character` (subject), `object` (VB ID, character name, or plain noun), `where` (a short verb phrase, 1-4 words: 'climbs', 'gazes at', 'holds', 'hands to', 'reads').
+
+`where` is object-CONTACT only. No body-part positioning, no pose details. ✗ "presses both hands on the edge of the bench seat, leaning toward the map". ✓ "reads the map over Hans's shoulder".
+
+Cap: aim for 1-3 entries per page. 5+ usually means incidental contact slipped in — re-read and cut.
+
+Every entry must also appear in the prose as the same physical contact. Prose wins ties; the image follows prose.
+
+Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side.
+
+Distance rule: when the verb implies action across a gap ('shoots', 'aims at', 'throws at', 'calls to', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly, and the prose must place each figure at the correct end of the frame.
 
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
