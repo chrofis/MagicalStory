@@ -237,7 +237,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   ],
   "objects": ["LOC001"],
   "interactions": [
-    {"character": "Sophie", "object": "tower", "where": "right arm extended up-left, pointing toward it"}
+    {"character": "Sophie", "object": "tower", "where": "points up at the clock tower", "storyRelevant": true}
   ],
   "textPosition": "top-right",
   "reuseEmptyScene": true,
@@ -266,7 +266,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible in the scene. For landmarks with photo variants, use `LOC003.2` format — pick the variant matching the scene's perspective.
 
-- `interactions[]`: only contacts that CARRY the story beat. Priority: character↔character (looking at, talking to, handing to), character↔plot-object (held McGuffin, raised weapon, read letter), and character↔surface ONLY when the surface IS the action (climbing the ladder TO ESCAPE, kneeling at the altar TO PRAY). Sitting on a bench / standing on a path / leaning on a wall is incidental — keep in prose. Test: "could the story be told identically without showing this contact?" If yes, omit. Aim 1-3 entries; 5+ usually means incidental slipped in. `{character, object, where}` where `where` is object-contact only — no body-part positioning, no pose details ("both hands", "leans toward", "fingers curled"). Every entry must also appear in the prose — prose wins ties. Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind.
+- `interactions[]`: visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`. Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`. Omit entirely: pure ground/floor/path contact, leaning on walls, sitting on generic chairs. Field shape `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action — no body-part positioning, no pose details. Cap: 1–4 entries, 0–2 with `storyRelevant: true`. Every entry must also appear in the prose. Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind.
 
 - `textPosition`: read verbatim from the scene hint. Do not change it. Write the prose so the chosen corner naturally contains calm, uncluttered content (smooth sky, unbroken wall, open water, foliage, ground).
 

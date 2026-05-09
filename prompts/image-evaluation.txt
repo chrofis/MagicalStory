@@ -36,7 +36,6 @@ Only deduct when the image fails on one of these axes:
 - **Anatomy** — extra limbs, fused or melted fingers, missing hand, figure floating, body fused into furniture, eyes pointing different directions.
 - **Figure completeness** — a character drawn as a partial figure when the prompt expects the whole body in frame: floating head with no torso, body with no head, missing torso, transparent or ghostly limbs, half the figure fading into the background. Crops at the frame edge are fine; missing parts inside the frame are not.
 - **Face direction** — front-facing when prompt says back view, or vice versa.
-- **Half-frame placement** — character described "left" rendered in the right half (or vice versa).
 - **Rendered text** — any readable writing painted into the artwork that wasn't requested: captions, banners, signs on walls, book titles, decorative inscriptions, embroidered words, sky-writing, garbled letterforms. The story-text overlay is composited later by the renderer and is NOT in the input image.
 
 Everything else is stylistic flavor — descriptive intent for the image generator, not a contract for the evaluator. Never deduct for it.
@@ -49,7 +48,7 @@ The image is allowed to differ from the prompt in these ways. Do NOT lower the s
 
 - Specific facial expressions not matching ("calm surprise" vs "curious" — image generators can't render fine expression deltas).
 - Precise hand positions or gestures.
-- Position correct half — only opposite-half placement is wrong (described left, rendered right, or vice versa).
+- Character left/right placement in the frame (left-foreground vs right-foreground, etc.). Treat horizontal placement as a mirror — never deduct.
 - Left↔right body facing direction. A character described as "facing left" but rendered facing right (or vice versa) is a mirror equivalent. The face still reads, the emotional beat survives. Do not deduct, even when this contradicts the declared interaction's direction.
 - Left/right mirror differences in interactions (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) — equivalent.
 - Hidden/occluded parts. Only flag VISIBLE errors.
@@ -201,15 +200,18 @@ Check for AI artifacts and physics violations.
 - If a character bullet says `holding: X` OR the Objects line binds an item to a character (`in X's pocket`, `in X's arms`, `held by X`, `on X's back`, `around X's neck`, `carried by X`), that item must be in contact with the named character.
 - Item floating separately from its declared owner → **MAJOR**, set `physics_ok: false`. List the mismatch in `rendering.issues` as `"<item> should be <held/in pocket/etc> with <character> but is detached/floating"` and add a `fixable_issues` entry with `type: physics`.
 
-**DECLARED INTERACTIONS** (from scene metadata — authoritative):
-- The DECLARED INTERACTIONS block at the top lists each character-to-object contact the scene requires (e.g. "Eli in left jacket pocket as tiny silhouette", "rope gripped in both hands while climbing", "feet on third rung of ladder").
-- For EACH declared interaction:
-  1. **Object missing entirely from the image** → **CRITICAL**, set `physics_ok: false`.
-  2. **Object in a different category from declared** (pocket vs hand vs on-back vs floating) → **CRITICAL**, set `physics_ok: false`.
-  3. **Object at wrong size** ("tiny silhouette" rendered as a large held plush) → **MAJOR**, set `physics_ok: false`.
-- Add a `fixable_issues` entry with `type: physics` describing the mismatch.
-- Interaction checks use ONLY the DECLARED INTERACTIONS block. See §4 for what NOT to deduct (prose pose details, mirror differences, populated-setting extras).
-- If DECLARED INTERACTIONS is empty, skip this sub-check entirely.
+**DECLARED INTERACTIONS** (from scene metadata):
+
+Only enforce entries with `storyRelevant: true`. For those:
+- Object missing → **CRITICAL**, `physics_ok: false`.
+- Object in a different category than declared (pocket vs hand vs on-back) → **CRITICAL**, `physics_ok: false`.
+- Object at wrong size → **MAJOR**, `physics_ok: false`.
+- Wrong target → **CRITICAL**.
+Each defect gets a `fixable_issues` entry with `type: physics`.
+
+For `storyRelevant: false` entries: no deduction on pose, position, or styling differences. Only flag if the object is completely missing AND the absence breaks the visible scene narrative — then **MAJOR**.
+
+Skip this sub-check if DECLARED INTERACTIONS is empty. Entries without a `storyRelevant` field default to `true`.
 
 **OBJECT SCALE** (everyday objects in the scene):
 - Reference scales for common objects: apple ≈ fist-sized, cup/coffee mug ≈ palm-sized, book ≈ forearm-length, crossbow ≈ arm-length, arrow ≈ arm-length, lantern ≈ head-sized, bowl ≈ two-palms-wide, loaf ≈ forearm-length, sword ≈ arm-length.

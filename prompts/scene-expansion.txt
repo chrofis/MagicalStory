@@ -90,8 +90,8 @@ Then a single-line JSON object:
   ],
   "objects": ["LOC001", "ART002"],
   "interactions": [
-    {"character": "CharacterA", "object": "an item", "where": "in pocket"},
-    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs"}
+    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false},
+    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "storyRelevant": true}
   ],
   "emptyScenePrompt": "..."
 }
@@ -112,22 +112,17 @@ Then a single-line JSON object:
 - Include every recurring visual element visible in the scene.
 - For landmarks with photo variants, use `LOC003.2` format. Default to `.1` if unsure. Pick the variant matching the scene's perspective.
 
-**`interactions[]`** — only the contacts that CARRY the story beat. Default to omitting; the evaluator deducts per missing entry, so a spurious one costs you a downgrade.
+**`interactions[]`** — visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`.
 
-Priority of what to include:
-  1. Character ↔ character (looking at, talking to, handing X to, hugging, blocking).
-  2. Character ↔ plot object (the McGuffin, the weapon, the letter, the key — must already be in `objects[]` or named in the prose's main beat).
-  3. Character ↔ surface ONLY when the surface IS the action (climbing the ladder TO ESCAPE, kneeling at the altar TO PRAY). Sitting on a bench / standing on a path / leaning on a wall is incidental — leave it in the prose.
+Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`.
 
-Test before adding any entry: "Could the story be told identically without the reader seeing this contact?" If yes, omit. The bench, the floor, the wall — the prose says where the character is; the metadata doesn't repeat it.
+Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `character` (subject), `object` (VB ID, character name, or plain noun), `where` (a short verb phrase, 1-4 words: 'climbs', 'gazes at', 'holds', 'hands to', 'reads').
+Field shape: `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail.
 
-`where` is object-CONTACT only. No body-part positioning, no pose details. ✗ "presses both hands on the edge of the bench seat, leaning toward the map". ✓ "reads the map over Hans's shoulder".
+Cap: 1–4 entries, 0–2 with `storyRelevant: true`.
 
-Cap: aim for 1-3 entries per page. 5+ usually means incidental contact slipped in — re-read and cut.
-
-Every entry must also appear in the prose as the same physical contact. Prose wins ties; the image follows prose.
+Every entry must also appear in the prose as the same physical contact.
 
 Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side.
 
