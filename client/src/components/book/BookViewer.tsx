@@ -1,10 +1,34 @@
-import React, { useRef, useState, useEffect, useCallback, useImperativeHandle } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, useLayoutEffect } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import BookCoverPage from './BookCoverPage';
 import BookStoryPage from './BookStoryPage';
 import BookTextPage from './BookTextPage';
 import BookEndPage from './BookEndPage';
 import storyService from '@/services/storyService';
+
+// react-pageflip registers window-level touchmove / wheel listeners that
+// call e.preventDefault(). Modern browsers default those listeners to
+// passive, so the call is rejected and Chrome logs:
+//   "Unable to preventDefault inside passive event listener invocation."
+// We can't reach into the lib to fix the registration, so we shim
+// EventTarget.prototype.addEventListener for the duration of BookViewer's
+// mount and force passive:false for the touch/wheel events the lib uses.
+// Applied at the top-level so HTMLFlipBook's child-mount-time listener
+// registrations land inside the patched window. Restored on unmount.
+const PASSIVE_FORCE_TYPES = new Set(['touchstart', 'touchmove', 'wheel', 'mousewheel']);
+function installPassiveForceShim(): () => void {
+  const orig = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (type: string, listener: any, options?: any) {
+    if (PASSIVE_FORCE_TYPES.has(type)) {
+      const opts = typeof options === 'boolean'
+        ? { capture: options, passive: false }
+        : { ...(options || {}), passive: false };
+      return orig.call(this, type, listener, opts);
+    }
+    return orig.call(this, type, listener, options);
+  };
+  return () => { EventTarget.prototype.addEventListener = orig; };
+}
 
 interface SharedStoryPage {
   pageNumber: number;
@@ -86,6 +110,19 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
+
+    // Install the addEventListener shim BEFORE HTMLFlipBook mounts so its
+    // touchmove / wheel registrations get { passive: false } applied.
+    // useLayoutEffect runs synchronously before paint and (since this is the
+    // parent component) before children's effects — safe to install here.
+    // Children mount lazily after `shimReady` flips true on the first render
+    // pass, guaranteeing react-pageflip never registers a passive listener.
+    const [shimReady, setShimReady] = useState(false);
+    useLayoutEffect(() => {
+      const restore = installPassiveForceShim();
+      setShimReady(true);
+      return () => { restore(); };
+    }, []);
     // Mobile breakpoint 1024: iPads in portrait (820), large phones in
     // landscape, and narrow desktops all need the single-page layout. The
     // old 768 threshold let iPads and rotated phones through to the
@@ -314,7 +351,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
         className="w-full h-full flex items-center justify-center"
         style={{ minHeight: 300 }}
       >
-        {dimensions.width > 0 && (
+        {dimensions.width > 0 && shimReady && (
           <HTMLFlipBook
             ref={bookRef}
             width={dimensions.width}
