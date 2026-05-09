@@ -377,8 +377,18 @@ export function StoryDisplay({
   // PDF format selection dropdown
   const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('A4');
   const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
-  // Text overlay toggle — text on image (children's book style) vs text below image (classic)
-  const [textOverlay, setTextOverlay] = useState(true);
+  // Text overlay toggle — text on image (children's book style) vs text below image (classic).
+  // Default OFF for stories whose layout renders text below the image (textInImage=false on
+  // any persisted sceneImage, OR languageLevel != '1st-grade'). Without this guard the
+  // frontend pre-fetched text-overlay PNGs for every page of a square-below story even
+  // though they were never displayed — wasted server CPU and produced "[TEXT-OVERLAY]"
+  // log spam for stories that don't use overlay.
+  const initialTextOverlay = (() => {
+    const sceneTextInImage = sceneImages?.find(s => typeof (s as any).textInImage === 'boolean');
+    if (sceneTextInImage) return (sceneTextInImage as any).textInImage === true;
+    return languageLevel === '1st-grade';
+  })();
+  const [textOverlay, setTextOverlay] = useState(initialTextOverlay);
   // Server-rendered text overlay images, keyed by pageNumber
   const [overlayImages, setOverlayImages] = useState<Record<number, string>>({});
   const [overlayLoading, setOverlayLoading] = useState<Set<number>>(new Set());

@@ -198,11 +198,20 @@ export default function SharedStoryViewer() {
         // Phase 3 — fire-and-forget overlay POSTs, one per page. Server caches
         // them; when BookViewer mounts later it'll hit the cache and render
         // without waiting on Sharp.
-        for (let p = 1; p <= h.pageCount; p++) {
-          fetch(`/api/shared/${shareToken}/text-overlay/${p}${apiQuery}`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-          }).catch(() => { /* best-effort */ });
+        // Skip when the story doesn't use overlay (square-below layout — text
+        // is rendered below the image, no overlay PNG needed). Without this
+        // guard the server logged "[TEXT-OVERLAY]" for every page on every
+        // load, even though the renders were never displayed.
+        const headerUsesOverlay = h.layout?.textInImage !== false
+          && h.languageLevel !== 'advanced'
+          && h.languageLevel !== 'standard';
+        if (headerUsesOverlay) {
+          for (let p = 1; p <= h.pageCount; p++) {
+            fetch(`/api/shared/${shareToken}/text-overlay/${p}${apiQuery}`, {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+            }).catch(() => { /* best-effort */ });
+          }
         }
       })
       .catch(() => { /* fall through to full fetch error handling */ });

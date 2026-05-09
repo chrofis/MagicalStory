@@ -195,7 +195,11 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const [overlayImages, setOverlayImages] = useState<Record<number, string>>({});
 
     useEffect(() => {
-      if (!showTextOverlay || !story.pages?.length) return;
+      // Skip when overlay is off OR the story renders text BELOW the image
+      // (square-below layout / advanced level). Without the forceTextBelow
+      // gate we fetched overlay PNGs for every page even though they were
+      // never displayed — wasted server CPU and "[TEXT-OVERLAY]" log spam.
+      if (!showTextOverlay || forceTextBelow || !story.pages?.length) return;
       let cancelled = false;
       story.pages.forEach(page => {
         if (!page.text?.trim() || overlayImages[page.pageNumber]) return;
@@ -209,7 +213,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       });
       return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showTextOverlay, shareToken, story.pages?.length]);
+    }, [showTextOverlay, forceTextBelow, shareToken, story.pages?.length]);
 
     // Build image URL helpers — append auth token as query param so owners
     // can view their own private (unshared) stories. <img> tags can't send
