@@ -3366,13 +3366,21 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Collect ALL issues for this page (quality eval + entity + imageChecks + retries)
         const allIssues = collectAllIssuesForPage(scene, storyData, pageNumber);
 
-        // Compute entity/image-check penalties (quality eval issues already reflected in score)
+        // Compute entity/image-check penalties + collect the issues that
+        // produced them so the dev panel can list them.
         let entityPenalty = 0;
+        const entityIssues = [];
         for (const issue of allIssues) {
           if (issue.source === 'entity check' || issue.source === 'image checks') {
             if (issue.severity === 'critical') entityPenalty += 30;
             else if (issue.severity === 'major') entityPenalty += 20;
             else entityPenalty += 10;
+            entityIssues.push({
+              name: issue.character || issue.element || '',
+              severity: issue.severity,
+              description: issue.description || issue.problem || '',
+              source: issue.source === 'entity check' ? 'character' : 'image-checks',
+            });
           }
         }
         const adjustedScore = Math.max(0, evaluation.score - entityPenalty);
@@ -3413,6 +3421,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           activeVersion.rawQualityScore = evaluation.qualityScore ?? evaluation.score;
           activeVersion.semanticScore = evaluation.semanticScore ?? null;
           activeVersion.entityPenalty = entityPenalty || 0;
+          activeVersion.entityIssues = entityIssues;
           activeVersion.evaluatedAt = new Date().toISOString();
           activeVersion.issuesSummary = evaluation.issuesSummary || '';
           activeVersion.bboxDetection = scene.bboxDetection || null;

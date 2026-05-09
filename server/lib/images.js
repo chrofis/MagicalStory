@@ -6070,19 +6070,45 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Shared helpers for the round loop
   // =========================================================================
   const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 };
-  const getEntityPenalty = (pageNumber, report) => {
-    if (!report?.characters) return 0;
-    let penalty = 0;
-    for (const charData of Object.values(report.characters)) {
-      const issues = charData.issues || [];
-      for (const issue of issues) {
-        if (issue.pages?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          penalty += ENTITY_PENALTIES[issue.severity] || 0;
+  // Returns { penalty, issues } so callers can persist BOTH the number AND the
+  // source issues on each version. Without the issues, the dev panel shows a
+  // mysterious "−N" deduction that the user can't drill into.
+  const getEntityPenaltyAndIssues = (pageNumber, report) => {
+    const out = { penalty: 0, issues: [] };
+    if (!report?.characters) return out;
+    for (const [charName, charData] of Object.entries(report.characters)) {
+      const charIssues = charData.issues || [];
+      for (const issue of charIssues) {
+        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+          out.penalty += ENTITY_PENALTIES[issue.severity] || 0;
+          out.issues.push({
+            name: charName,
+            severity: issue.severity,
+            description: issue.description || issue.problem || '',
+            source: 'character',
+          });
         }
       }
     }
-    return penalty;
+    // Also include object-level issues so the panel surfaces missing/wrong props.
+    for (const [objName, objData] of Object.entries(report.objects || {})) {
+      const objIssues = objData.issues || [];
+      for (const issue of objIssues) {
+        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+          out.penalty += ENTITY_PENALTIES[issue.severity] || 0;
+          out.issues.push({
+            name: objName,
+            severity: issue.severity,
+            description: issue.description || issue.problem || '',
+            source: 'object',
+          });
+        }
+      }
+    }
+    return out;
   };
+  // Backward-compat shim — existing callers that only need the number.
+  const getEntityPenalty = (pageNumber, report) => getEntityPenaltyAndIssues(pageNumber, report).penalty;
 
   // Track all versions per page: { pageNumber -> [{ imageData, score, source, evaluation, entityPenalty, evaluatedAt }] }
   const pageVersions = new Map();
@@ -6104,7 +6130,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // reads — replaces the per-evaluator recompute that produced two
     // disagreeing scores in the UI.
     const baseScore = ev?.score ?? ev?.qualityScore ?? null;
-    const baseEntityPenalty = getEntityPenalty(img.pageNumber, entityReport);
+    const baseEntityResult = getEntityPenaltyAndIssues(img.pageNumber, entityReport);
+    const baseEntityPenalty = baseEntityResult.penalty;
+    const baseEntityIssues = baseEntityResult.issues;
     const baseFinalScore = baseScore != null ? Math.max(0, baseScore - baseEntityPenalty) : null;
 
     const baseVersion = hasScaleRepair
@@ -6122,6 +6150,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.grokRefImages || null,
           prompt: img.prompt || null,
           entityPenalty: 0,
+          entityIssues: [],
           evaluatedAt: new Date().toISOString(),
         }
       : {
@@ -6133,6 +6162,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
           entityPenalty: baseEntityPenalty,
+          entityIssues: baseEntityIssues,
           evaluatedAt: new Date().toISOString(),
         };
 
@@ -6150,6 +6180,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
           entityPenalty: baseEntityPenalty,
+          entityIssues: baseEntityIssues,
           evaluatedAt: new Date().toISOString(),
         }
       : null;
@@ -6820,7 +6851,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
         if (versions && repairResult) {
           const evScore = ev.score ?? ev.qualityScore ?? null;
-          const evEntityPenalty = getEntityPenalty(ev.pageNumber, currentEntityReport);
+          const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+          const evEntityPenalty = evEntityResult.penalty;
           versions.push({
             imageData: repairResult.imageData,
             score: evScore,
@@ -6837,6 +6869,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             prompt: repairResult.prompt || null,
             description: repairResult.description || null,
             entityPenalty: evEntityPenalty,
+            entityIssues: evEntityResult.issues,
             evaluatedAt: new Date().toISOString(),
           });
         }

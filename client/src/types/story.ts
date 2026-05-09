@@ -692,6 +692,13 @@ export interface ImageVersion {
     complianceResult?: Record<string, unknown> | null;
   } | null;
   entityPenalty?: number;
+  /** Issues that produced this version's entityPenalty, captured at eval time. */
+  entityIssues?: Array<{
+    name: string;
+    severity: string;
+    description: string;
+    source: string;
+  }>;
   evaluatedAt?: string;
   issuesSummary?: string;
   qualityReasoning?: string;

@@ -465,6 +465,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               semanticResult: v.semanticResult || null,
               rawQualityScore: v.rawQualityScore ?? null,
               entityPenalty: v.entityPenalty ?? null,
+              entityIssues: v.entityIssues || null,
               evaluatedAt: v.evaluatedAt || null,
               // Keep field name; only expose real http(s) URLs. data: URIs and missing entries
               // become empty arrays. After Phase 2 migration these always carry R2 URLs.
@@ -541,6 +542,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             semanticResult: versionMeta.semanticResult || null,
             rawQualityScore: versionMeta.rawQualityScore ?? null,
             entityPenalty: versionMeta.entityPenalty ?? null,
+            entityIssues: versionMeta.entityIssues || null,
             evaluatedAt: versionMeta.evaluatedAt || null,
             grokRefImages: versionMeta.grokRefImages || [],
             hasGrokRefImages: !!versionMeta.hasGrokRefImages,

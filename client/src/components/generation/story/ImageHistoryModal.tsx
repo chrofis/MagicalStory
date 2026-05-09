@@ -438,9 +438,15 @@ export function ImageHistoryModal({
                     const semanticOnly = (detailVersion.semanticResult?.semanticIssues || [])
                       .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes((s.problem || '').slice(0, 30).toLowerCase())))
                       .map(s => ({ description: s.problem, severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
-                    // Entity issues are page-scoped (from finalChecksReport.entity), shared
-                    // across all versions of the page. They explain the entityPenalty.
-                    const entityFromPage = (pageEntityIssues || []).map(e => ({
+                    // Entity issues: prefer per-version (stored at eval time on
+                    // version.entityIssues — actual source of THIS version's
+                    // entityPenalty). Fall back to page-scoped finalChecksReport
+                    // entry for legacy versions / when re-running consistency.
+                    const versionEntity = (detailVersion as any).entityIssues as Array<{ name: string; severity: string; description: string; source: string }> | undefined;
+                    const entitySource = (versionEntity && versionEntity.length > 0)
+                      ? versionEntity
+                      : (pageEntityIssues || []);
+                    const entityFromPage = entitySource.map(e => ({
                       description: e.description,
                       severity: e.severity,
                       source: 'entity check',
