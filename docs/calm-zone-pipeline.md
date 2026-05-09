@@ -2,6 +2,34 @@
 
 How story text gets onto AI-generated page images, and how the pipeline keeps that overlay area legible.
 
+## Gating — when does any of this run?
+
+The text-overlay pipeline is governed by two flags. Both must be true; either one being false disables the entire pipeline for that story.
+
+| Flag | Where | Scope |
+|------|-------|-------|
+| `MODEL_DEFAULTS.enableTextOverlay` | `server/config/models.js` | **Global** kill switch |
+| `inputData.layout.textInImage` | story input data, set by `resolveLayout()` | **Per story** — `1st-grade` layout = true; `standard`/`advanced` = false |
+
+**Single source of truth**: `shouldUseTextOverlay(storyData)` in `server/lib/storyHelpers.js`. Every site that injects calm-zone language into a prompt must call this. `sceneImages[].textPosition` is stamped on every page regardless of layout (for diagnostic / future-restore reasons), so a raw `if (textPosition)` check is **not sufficient** — it leaks calm-zone language into prompts for non-overlay stories.
+
+| Stage | Site | Gate |
+|-------|------|------|
+| Outline (Sonnet picks textPosition) | `prompts/story-unified.txt` | Always emits — Sonnet outputs the field, but it's only consumed downstream when overlay is on |
+| Image gen (COPY SPACE in prompt) | `storyHelpers.js:4458` `buildImagePrompt` | `textInImage && textPosition` ✓ |
+| Empty-scene gen | `storyHelpers.js` `buildTextZoneInstruction` | only called from `buildImagePrompt` (gated) ✓ |
+| Text-region phase (calmness probe + lighten) | `server.js:5427` | `enableTextOverlay !== false && layout.textInImage !== false` ✓ |
+| Text-space repair loop | `textSpaceRepair.js` `ensureCalmZone` | only called from text-region phase (gated) ✓ |
+| Step 7.5 post-repair recovery | `images.js` | `textAreaMask` absent → skip; layout flag honoured ✓ |
+| Inpaint quiet-zone suffix | `images.js:5742` | `pageTextPosition` set at `executeInpaintAction` site uses `shouldUseTextOverlay(storyData)` ✓ |
+| Char-fix quiet-zone suffix | `images.js:8387` | `pageTextPosition` set at `executeCharFixAction` site uses `shouldUseTextOverlay(storyData)` ✓ |
+| Manual char-repair endpoint | `routes/regeneration.js:4818` | `shouldUseTextOverlay(storyData) ? sceneImage.textPosition : null` ✓ |
+| Iterate re-gen | `images.js` `iteratePageCore` | threads `lockedTextPosition` into `buildImagePrompt` (gated there) ✓ |
+| Browser overlay PNG | `routes/sharing.js` `/text-overlay` | client only requests for textInImage layouts; renderer is layout-agnostic |
+| PDF overlay | `pdf.js` | `sceneTextInImage \|\| layoutFromLevel.textInImage` ✓ |
+
+When `shouldUseTextOverlay()` returns false, every Grok / Gemini prompt — initial gen, inpaint, character repair, iteration — runs without any calm-zone language. The renderer and PDF skip overlay compositing. `textPosition` may still be present on the scene record (it's diagnostic), but downstream consumers must funnel through `shouldUseTextOverlay()` before honouring it.
+
 ## End-to-end flow
 
 ```

@@ -6332,8 +6332,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
       || null;
     // Look up the page's locked text-overlay corner so inpaint can warn
-    // Grok not to paint high-contrast detail in that zone.
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
+    // Grok not to paint high-contrast detail in that zone. Only honour it
+    // when the story actually uses the text-overlay layout — sceneImages[].textPosition
+    // is stamped on every page regardless of layout, so without this gate
+    // the quiet-zone instruction leaks into Grok prompts for standard /
+    // advanced layouts (text rendered beside the image, no calm zone needed).
+    const { shouldUseTextOverlay } = getStoryHelpers();
+    const pageTextPosition = shouldUseTextOverlay(storyData)
+      ? ((storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null)
+      : null;
     // Cover text preservation: when inpainting a cover (pageNumber<=0), tell
     // Grok to keep the title / dedication / "magicalstory.ch" branding that
     // the original cover prompt rendered into the image. Without this, every
@@ -6495,7 +6502,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
     const sceneDesc = img.sceneDescription || img.text || '';
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
+    const { shouldUseTextOverlay: shouldUseOverlayCharFix } = getStoryHelpers();
+    const pageTextPosition = shouldUseOverlayCharFix(storyData)
+      ? ((storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null)
+      : null;
 
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     let repairResult;
