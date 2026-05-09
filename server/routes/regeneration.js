@@ -42,7 +42,6 @@ const {
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
-  shouldUseTextOverlay,
   extractJsonFromText,
   stripSceneMetadata,
   extractCoverScenes,
@@ -4815,7 +4814,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,
               artStyle,
-              textPosition: shouldUseTextOverlay(storyData) ? (sceneImage.textPosition || null) : null,
+              textPosition: sceneImage.textPosition || null,
               // Dev toggle: when explicitly false, skip the silhouette mask
               // composite and use Grok's bytes verbatim. Default = true.
               ...(featherComposite === false ? { featherComposite: false } : {}),

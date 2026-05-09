@@ -5534,7 +5534,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           textAreaMask: img.textAreaMask || sceneBackgrounds[img.pageNumber]?.textAreaMask || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
-          textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
+          // textPosition is only meaningful for layouts that overlay text on
+          // the image (1st-grade). For standard/advanced layouts the text is
+          // rendered beside the image, so persisting a textPosition here would
+          // leak calm-zone language into downstream prompts (inpaint, char
+          // repair). Gate on the same flag the text-region phase uses so the
+          // two stay in lock-step.
+          textPosition: skipTextRegionPhase
+            ? null
+            : (textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber)),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
           textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,
@@ -5602,8 +5610,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // The page's locked text-overlay position. Used by iteratePageCore
             // (re-injected as COPY SPACE) and by character-repair (so Grok
             // doesn't drop the figure into the text zone during inpaint).
-            textPosition: textRegionResults[r.pageNumber]?.position
-              || enforceSpreadTextPosition(r.sceneMetadata?.textPosition || null, r.pageNumber),
+            // Only set for overlay layouts — see persistence note above.
+            textPosition: skipTextRegionPhase
+              ? null
+              : (textRegionResults[r.pageNumber]?.position
+                || enforceSpreadTextPosition(r.sceneMetadata?.textPosition || null, r.pageNumber)),
           })),
           coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
           coverHints,   // Needed by iterateCover for per-character clothing on covers
@@ -5698,7 +5709,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
-          textPosition: textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber),
+          // textPosition is only meaningful for layouts that overlay text on
+          // the image (1st-grade). For standard/advanced layouts the text is
+          // rendered beside the image, so persisting a textPosition here would
+          // leak calm-zone language into downstream prompts (inpaint, char
+          // repair). Gate on the same flag the text-region phase uses so the
+          // two stay in lock-step.
+          textPosition: skipTextRegionPhase
+            ? null
+            : (textRegionResults[img.pageNumber]?.position || enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber)),
           textRect: textRegionResults[img.pageNumber]?.rect || null,
           textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,

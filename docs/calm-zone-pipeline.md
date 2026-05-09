@@ -11,24 +11,41 @@ The text-overlay pipeline is governed by two flags. Both must be true; either on
 | `MODEL_DEFAULTS.enableTextOverlay` | `server/config/models.js` | **Global** kill switch |
 | `inputData.layout.textInImage` | story input data, set by `resolveLayout()` | **Per story** — `1st-grade` layout = true; `standard`/`advanced` = false |
 
-**Single source of truth**: `shouldUseTextOverlay(storyData)` in `server/lib/storyHelpers.js`. Every site that injects calm-zone language into a prompt must call this. `sceneImages[].textPosition` is stamped on every page regardless of layout (for diagnostic / future-restore reasons), so a raw `if (textPosition)` check is **not sufficient** — it leaks calm-zone language into prompts for non-overlay stories.
+**The single gate is at persistence.** `sceneImages[].textPosition` is set in `server.js` (~line 5537 / 5605 / 5701) only when `skipTextRegionPhase === false` (the same condition that runs the text-region phase). For non-overlay stories the field is `null`; for overlay stories it carries the locked corner. This means every downstream consumer can rely on a simple `if (textPosition)` check — a non-null value implies overlay is enabled.
 
-| Stage | Site | Gate |
-|-------|------|------|
-| Outline (Sonnet picks textPosition) | `prompts/story-unified.txt` | Always emits — Sonnet outputs the field, but it's only consumed downstream when overlay is on |
+| Stage | Site | Behaviour |
+|-------|------|-----------|
+| Outline (Sonnet picks textPosition) | `prompts/story-unified.txt` | Always emits — value is filtered out at persistence for non-overlay stories |
 | Image gen (COPY SPACE in prompt) | `storyHelpers.js:4458` `buildImagePrompt` | `textInImage && textPosition` ✓ |
 | Empty-scene gen | `storyHelpers.js` `buildTextZoneInstruction` | only called from `buildImagePrompt` (gated) ✓ |
-| Text-region phase (calmness probe + lighten) | `server.js:5427` | `enableTextOverlay !== false && layout.textInImage !== false` ✓ |
+| Text-region phase (calmness probe + lighten) | `server.js:5427` | `skipTextRegionPhase` gates entry ✓ |
+| Persistence (sceneImages[].textPosition) | `server.js:5537/5605/5701` | `skipTextRegionPhase ? null : ...` ✓ |
 | Text-space repair loop | `textSpaceRepair.js` `ensureCalmZone` | only called from text-region phase (gated) ✓ |
 | Step 7.5 post-repair recovery | `images.js` | `textAreaMask` absent → skip; layout flag honoured ✓ |
-| Inpaint quiet-zone suffix | `images.js:5742` | `pageTextPosition` set at `executeInpaintAction` site uses `shouldUseTextOverlay(storyData)` ✓ |
-| Char-fix quiet-zone suffix | `images.js:8387` | `pageTextPosition` set at `executeCharFixAction` site uses `shouldUseTextOverlay(storyData)` ✓ |
-| Manual char-repair endpoint | `routes/regeneration.js:4818` | `shouldUseTextOverlay(storyData) ? sceneImage.textPosition : null` ✓ |
-| Iterate re-gen | `images.js` `iteratePageCore` | threads `lockedTextPosition` into `buildImagePrompt` (gated there) ✓ |
-| Browser overlay PNG | `routes/sharing.js` `/text-overlay` | client only requests for textInImage layouts; renderer is layout-agnostic |
+| Inpaint quiet-zone suffix | `images.js:5742` | `if (textPosition)` ✓ — null on non-overlay stories |
+| Char-fix quiet-zone suffix | `images.js:8387` | `if (textPosition)` ✓ — null on non-overlay stories |
+| Manual char-repair endpoint | `routes/regeneration.js` | reads `sceneImage.textPosition`; null on non-overlay stories ✓ |
+| Iterate re-gen | `images.js` `iteratePageCore` | reads `savedScene.textPosition`; null on non-overlay stories ✓ |
+| Browser overlay PNG | `routes/sharing.js` `/text-overlay` | client only requests for overlay layouts |
 | PDF overlay | `pdf.js` | `sceneTextInImage \|\| layoutFromLevel.textInImage` ✓ |
 
-When `shouldUseTextOverlay()` returns false, every Grok / Gemini prompt — initial gen, inpaint, character repair, iteration — runs without any calm-zone language. The renderer and PDF skip overlay compositing. `textPosition` may still be present on the scene record (it's diagnostic), but downstream consumers must funnel through `shouldUseTextOverlay()` before honouring it.
+### Migrating old stories
+
+Stories generated before the persistence-side gate was introduced may have `sceneImages[].textPosition` populated even on `standard` / `advanced` layouts. To clear them, run:
+
+```sql
+UPDATE stories
+SET data = jsonb_set(
+  data,
+  '{sceneImages}',
+  (SELECT jsonb_agg(elem - 'textPosition' || jsonb_build_object('textPosition', null))
+   FROM jsonb_array_elements(data->'sceneImages') elem)
+)
+WHERE (data->'inputData'->'layout'->>'textInImage')::boolean IS FALSE
+  AND data->'sceneImages' IS NOT NULL;
+```
+
+Without this, repair runs on old non-overlay stories will still emit a quiet-zone suffix to Grok.
 
 ## End-to-end flow
 

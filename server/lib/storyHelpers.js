@@ -963,22 +963,6 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
   return out;
 }
 
-/**
- * Single source of truth for whether the text-overlay pipeline should run for
- * this story. Combines the global kill switch (MODEL_DEFAULTS.enableTextOverlay)
- * with the per-story layout flag (inputData.layout.textInImage). Every site
- * that injects calm-zone language into a prompt — outline, image generation,
- * inpaint, character repair, iteration — must call this before threading
- * textPosition through. Without it, sceneImages[].textPosition (stamped at
- * generation regardless of layout) leaks into prompts for non-overlay stories.
- */
-function shouldUseTextOverlay(storyData) {
-  const { MODEL_DEFAULTS } = require('../config/models');
-  if (MODEL_DEFAULTS.enableTextOverlay === false) return false;
-  if (storyData?.inputData?.layout?.textInImage === false) return false;
-  return true;
-}
-
 function enforceSpreadTextPosition(textPosition, pageNumber) {
   if (!textPosition || !pageNumber || pageNumber < 1) return textPosition;
   const isLeftPage = pageNumber % 2 === 1;  // odd = left in spread
@@ -5735,7 +5719,6 @@ module.exports = {
   getHeadBodyRatio,
 
   // Text position
-  shouldUseTextOverlay,
   enforceSpreadTextPosition,
   mirrorLeftRight,
   buildCharacterDescriptionsForBbox,
