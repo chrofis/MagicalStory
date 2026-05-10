@@ -6752,46 +6752,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               // this the dev panel can't distinguish a composite iterate from
               // a legacy iterate, and there's no way to inspect why pass 1
               // produced the wrong arms or why pass 2 lost the gaze.
-              const bufToDataUrl = (b, mime = 'image/jpeg') => {
-                if (!b) return null;
-                if (typeof b === 'string') return b.startsWith('data:') ? b : `data:${mime};base64,${b}`;
-                if (Buffer.isBuffer(b)) return `data:${mime};base64,${b.toString('base64')}`;
-                return null;
-              };
-              const compositeAttempts = result.compositeDebug
-                ? (result.compositeDebug.pass2Input
-                    ? [
-                        {
-                          pass: 1,
-                          input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
-                          vbGrid: bufToDataUrl(result.compositeDebug.pass1VbGrid, 'image/jpeg'),
-                          output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
-                          prompt: result.compositeDebug.pass1Prompt || null,
-                          modelId: result.compositeDebug.pass1ModelId || null,
-                          elapsedMs: result.compositeDebug.pass1ElapsedMs || null,
-                        },
-                        {
-                          pass: 2,
-                          input: bufToDataUrl(result.compositeDebug.pass2Input, 'image/jpeg'),
-                          output: bufToDataUrl(result.compositeDebug.pass2Output, 'image/jpeg'),
-                          prompt: result.compositeDebug.pass2Prompt || null,
-                          modelId: result.compositeDebug.pass2ModelId || null,
-                          elapsedMs: result.compositeDebug.pass2ElapsedMs || null,
-                        },
-                      ]
-                    : [
-                        // No-landmark variant: only pass 1 ran.
-                        {
-                          pass: 1,
-                          input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
-                          vbGrid: bufToDataUrl(result.compositeDebug.pass1VbGrid, 'image/jpeg'),
-                          output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
-                          prompt: result.compositeDebug.pass1Prompt || null,
-                          modelId: result.compositeDebug.pass1ModelId || null,
-                          elapsedMs: result.compositeDebug.pass1ElapsedMs || null,
-                        },
-                      ])
-                : null;
+              // Single source of truth for composite-debug → version shape.
+              // Defined once in coverComposite; both this unified-pipeline
+              // call site and the user-triggered iterate endpoint use it.
+              const { buildCompositeAttemptsFromDebug } = require('./coverComposite');
+              const compositeAttempts = buildCompositeAttemptsFromDebug(result.compositeDebug);
               return {
                 pageNumber,
                 imageData: result.imageData,

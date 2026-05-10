@@ -634,13 +634,19 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   // already painted into the input. Prose context helps the model match
   // atmosphere and reinforce gaze direction (without it pass-2 sometimes
   // "resets" gazes to camera-front during the texture pass). Strip metadata
-  // block; cap at 1200 chars to keep prompt size reasonable.
+  // block. The cap used to be 1200 chars which truncated the back cover's
+  // Emma+Noah prose mid-Noah ("...he s") — leaving the model with half a
+  // character description. Grok's effective prompt cap is ~7000 chars and
+  // the rest of pass-2's static text is ~700 chars, so a 5000-char window
+  // is safe and fits even 4-character multi-paragraph scenes. Truncation
+  // only fires when prose runs longer — typical single-cover prose is
+  // ~1500-2500 chars.
   const proseForPass2 = String(sceneDescription || '')
     .split(/\n*---\s*METADATA\s*---/i)[0]
     .replace(/```json[\s\S]*?```/gi, '')
     .replace(/\s+\n/g, '\n')
     .trim()
-    .slice(0, 1200);
+    .slice(0, 5000);
   const sceneSectionPass2 = proseForPass2
     ? `\n\nSTORY SCENE CONTEXT (do not change poses; this is for atmosphere matching only):\n${proseForPass2}`
     : '';
@@ -688,8 +694,54 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
   };
 }
 
+/**
+ * Build a serializable compositeAttempts array from the debug object
+ * generateCoverViaComposite returns. Single source of truth for how
+ * composite-debug Buffers turn into version-row fields — both the unified
+ * pipeline (images.js:6745) and the user-triggered iterate endpoint
+ * (regeneration.js:1720) MUST use this to build their version rows.
+ *
+ * Returns null when compositeDebug is absent (legacy iterate ran).
+ * Returns [pass1] (length 1) when there's no landmark (pass-2 was skipped).
+ * Returns [pass1, pass2] otherwise.
+ *
+ * @param {object|null|undefined} compositeDebug - from iterateCover result
+ * @returns {Array<object>|null}
+ */
+function buildCompositeAttemptsFromDebug(compositeDebug) {
+  if (!compositeDebug) return null;
+  const bufToDataUrl = (b, mime = 'image/jpeg') => {
+    if (!b) return null;
+    if (typeof b === 'string') return b.startsWith('data:') ? b : `data:${mime};base64,${b}`;
+    if (Buffer.isBuffer(b)) return `data:${mime};base64,${b.toString('base64')}`;
+    return null;
+  };
+  const pass1 = {
+    pass: 1,
+    input: bufToDataUrl(compositeDebug.pass1Input, 'image/jpeg'),
+    vbGrid: bufToDataUrl(compositeDebug.pass1VbGrid, 'image/jpeg'),
+    output: bufToDataUrl(compositeDebug.pass1Output, 'image/jpeg'),
+    prompt: compositeDebug.pass1Prompt || null,
+    modelId: compositeDebug.pass1ModelId || null,
+    elapsedMs: compositeDebug.pass1ElapsedMs || null,
+  };
+  if (!compositeDebug.pass2Input) {
+    return [pass1];
+  }
+  const pass2 = {
+    pass: 2,
+    input: bufToDataUrl(compositeDebug.pass2Input, 'image/jpeg'),
+    output: bufToDataUrl(compositeDebug.pass2Output, 'image/jpeg'),
+    prompt: compositeDebug.pass2Prompt || null,
+    modelId: compositeDebug.pass2ModelId || null,
+    elapsedMs: compositeDebug.pass2ElapsedMs || null,
+  };
+  return [pass1, pass2];
+}
+
 module.exports = {
   generateCoverViaComposite,
+  buildCompositeAttemptsFromDebug,
   // Exported for testing / reuse:
   sortByImportance,
   arrangeCenterOut,

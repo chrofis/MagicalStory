@@ -1766,52 +1766,13 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         log.debug(`🔄 [ITERATE] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
       }
 
-      // Build compositeAttempts when iterateCover ran the composite path
-      // (compositeDebug is present on the result). The previous version of
-      // this endpoint dropped that detail on the floor, so the dev panel
-      // saw the version as a plain "iteration" with no pass-1/pass-2
-      // breakdown — exactly the gap that hid the failure modes we just
-      // spent the day fixing. Mirror the unified-pipeline persistence
-      // (images.js:6745) so both code paths produce the same shape.
-      const bufToDataUrl = (b, mime = 'image/jpeg') => {
-        if (!b) return null;
-        if (typeof b === 'string') return b.startsWith('data:') ? b : `data:${mime};base64,${b}`;
-        if (Buffer.isBuffer(b)) return `data:${mime};base64,${b.toString('base64')}`;
-        return null;
-      };
-      const compositeAttempts = imageResult.compositeDebug
-        ? (imageResult.compositeDebug.pass2Input
-            ? [
-                {
-                  pass: 1,
-                  input: bufToDataUrl(imageResult.compositeDebug.pass1Input, 'image/jpeg'),
-                  vbGrid: bufToDataUrl(imageResult.compositeDebug.pass1VbGrid, 'image/jpeg'),
-                  output: bufToDataUrl(imageResult.compositeDebug.pass1Output, 'image/jpeg'),
-                  prompt: imageResult.compositeDebug.pass1Prompt || null,
-                  modelId: imageResult.compositeDebug.pass1ModelId || null,
-                  elapsedMs: imageResult.compositeDebug.pass1ElapsedMs || null,
-                },
-                {
-                  pass: 2,
-                  input: bufToDataUrl(imageResult.compositeDebug.pass2Input, 'image/jpeg'),
-                  output: bufToDataUrl(imageResult.compositeDebug.pass2Output, 'image/jpeg'),
-                  prompt: imageResult.compositeDebug.pass2Prompt || null,
-                  modelId: imageResult.compositeDebug.pass2ModelId || null,
-                  elapsedMs: imageResult.compositeDebug.pass2ElapsedMs || null,
-                },
-              ]
-            : [
-                {
-                  pass: 1,
-                  input: bufToDataUrl(imageResult.compositeDebug.pass1Input, 'image/jpeg'),
-                  vbGrid: bufToDataUrl(imageResult.compositeDebug.pass1VbGrid, 'image/jpeg'),
-                  output: bufToDataUrl(imageResult.compositeDebug.pass1Output, 'image/jpeg'),
-                  prompt: imageResult.compositeDebug.pass1Prompt || null,
-                  modelId: imageResult.compositeDebug.pass1ModelId || null,
-                  elapsedMs: imageResult.compositeDebug.pass1ElapsedMs || null,
-                },
-              ])
-        : null;
+      // Single source of truth for composite-debug → version shape. Defined
+      // once in coverComposite; both this user-triggered iterate endpoint
+      // and the unified-pipeline executeIterateAction (images.js:6745) use
+      // it. Previously the shape was hand-copied at both call sites, which
+      // is exactly how we ended up with one wired correctly and one not.
+      const { buildCompositeAttemptsFromDebug } = require('../lib/coverComposite');
+      const compositeAttempts = buildCompositeAttemptsFromDebug(imageResult.compositeDebug);
 
       // Create new version entry
       const timestamp = new Date().toISOString();
