@@ -446,15 +446,36 @@ async function buildCoverReferences({
   // landmark photo lookup picks them up (cover scene expansion typically
   // emits ART IDs only — without this merge the explicit landmark from the
   // outline would be silently dropped).
+  //
+  // Photo-bearing non-landmarks (curated locations like Limmatufer) need a
+  // separate channel: getLandmarkPhotosForScene gates on isRealLandmark and
+  // would drop them. Track them here and append directly to landmarkPhotos
+  // below so the composite-cover pipeline gets a backdrop.
+  const photoOnlyLocs = [];
   if (coverHint?.objects && coverHint.objects.length > 0 && visualBible?.locations) {
     const matchedLocs = [];
     for (const id of coverHint.objects) {
       if (typeof id !== 'string' || !/^LOC\d+/i.test(id)) continue;
       const loc = visualBible.locations.find(l => l.id && l.id.toUpperCase() === id.toUpperCase());
-      if (loc?.isRealLandmark) {
+      if (!loc) continue;
+      const hasPhoto = !!(loc.referenceImageUrl || loc.referenceImageData);
+      if (loc.isRealLandmark) {
         matchedLocs.push(`${loc.name} [${loc.id}]`);
-      } else if (loc) {
-        log.warn(`⚠️ [COVER-REFS] ${label}: outline picked ${loc.id} (${loc.name}) but it's not a real landmark — no photo available`);
+      } else if (hasPhoto) {
+        // Curated photo location — usable as a cover backdrop even though it's
+        // not a real Wikidata-sourced landmark. Don't go through
+        // getLandmarkPhotosForScene (which gates on isRealLandmark); load
+        // directly and append to landmarkPhotos.
+        photoOnlyLocs.push({
+          name: loc.name,
+          photoUrl: loc.referenceImageUrl || null,
+          photoData: loc.referenceImageData || null,
+          source: 'curated-non-landmark',
+          attribution: loc.attribution || null,
+        });
+        log.info(`🔗 [COVER-REFS] ${label}: using curated photo from ${loc.id} (${loc.name}) — not a real landmark but has a usable photo`);
+      } else {
+        log.warn(`⚠️ [COVER-REFS] ${label}: outline picked ${loc.id} (${loc.name}) but no photo available`);
       }
     }
     if (matchedLocs.length > 0) {
@@ -469,7 +490,14 @@ async function buildCoverReferences({
     }
   }
 
-  const landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+  let landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+  // Append curated non-landmark photos so the composite path's landmarkBuf
+  // resolves and pass 2 (watercolor + landmark) actually runs. Without this
+  // back covers whose outline picked a curated location (e.g. Limmatufer
+  // Baden) silently fell back to figures-on-white because pass 2 was skipped.
+  if (photoOnlyLocs.length > 0) {
+    landmarkPhotos = [...landmarkPhotos, ...photoOnlyLocs];
+  }
 
   // Cover page numbers follow the convention used across entityConsistency, repair
   // workflow, and the streaming generator: -1 frontCover, -2 initialPage, -3 backCover.

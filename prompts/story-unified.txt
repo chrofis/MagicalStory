@@ -786,7 +786,7 @@ Each vantage entry has:
 ---COVER SCENE HINTS---
 
 **COVER RULES (CRITICAL):**
-- **USE REAL LANDMARKS ONLY**: Each cover's background must be a Visual Bible location with `isRealLandmark: true` (one with photo references) — NEVER a story-local location. Covers reuse the same real landmark across front/initial/back when the story has only one real landmark. Pick the most iconic landmark for the front cover.
+- **USE REAL LANDMARKS ONLY**: Each cover's `objects` list must include exactly one LOC### whose Visual Bible entry satisfies BOTH conditions: (1) `isRealLandmark: true`, AND (2) its `landmarkQuery` value EXACTLY matches a name from the AVAILABLE LANDMARKS list above. You may NOT invent new locations for cover backdrops — every cover backdrop must trace back to that input list. Story-local non-landmark settings (riverbanks, town squares, family homes) are forbidden as cover backdrops, no matter how well they fit the closing story beat. Covers reuse the same real landmark across front/initial/back when the story has only one real landmark. Pick the most iconic landmark for the front cover.
 - **LIST BY NAME**: NEVER write "the family", "everyone", "the group" - list each character by name
 - **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
 - **ALWAYS USE COSTUMED for covers** — if the story has costumed clothing, ALL cover characters MUST use their `costumed:type` variant, not `standard`. The book cover should showcase the story's theme.
