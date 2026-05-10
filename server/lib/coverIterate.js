@@ -18,7 +18,10 @@ function getStoryHelpers() {
 
 /**
  * Iterate a cover page: rebuild prompt from templates, select characters,
- * build landmark/VB references, generate new image.
+ * build landmark/VB references, generate new image. The single entry point
+ * for every cover-render call site — unified-pipeline auto-repair, dev-mode
+ * iterate button, and user-triggered "regenerate cover" all funnel through
+ * here so there's exactly one place that decides composite vs direct.
  *
  * @param {string} coverKey - 'frontCover' | 'initialPage' | 'backCover'
  * @param {Object} storyData - Full story data (characters, visualBible, etc.)
@@ -29,6 +32,7 @@ function getStoryHelpers() {
  * @param {boolean} [options.blackoutIssues] - Black out issue regions
  * @param {Function} [options.usageTracker] - Usage tracking callback
  * @param {Array} [options.freshCharacters] - Fresh characters from DB (optional, for avatar merging)
+ * @param {Array<number>} [options.selectedCharacterIds] - Filter cover characters to this set of IDs (user-regenerate UI feature)
  * @returns {Promise<Object>} { imageData, score, reasoning, modelId, prompt, referencePhotos, landmarkPhotos, visualBibleGrid, grokRefImages }
  */
 async function iterateCover(coverKey, storyData, options = {}) {
@@ -39,6 +43,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     blackoutIssues = false,
     usageTracker = null,
     freshCharacters = null,
+    selectedCharacterIds = null,
   } = options;
 
   const {
@@ -161,6 +166,20 @@ async function iterateCover(coverKey, storyData, options = {}) {
         selectedCoverCharacters = [...mainCapped, ...extras];
       }
       selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
+    }
+  }
+
+  // User-supplied character filter (the "Regenerate cover" UI lets the user
+  // pick which characters appear). When provided, restrict selectedCover
+  // Characters to that set — overrides hint/scene-description selection.
+  if (Array.isArray(selectedCharacterIds) && selectedCharacterIds.length > 0) {
+    const filterSet = new Set(selectedCharacterIds);
+    const filtered = selectedCoverCharacters.filter(c => filterSet.has(c.id));
+    if (filtered.length > 0) {
+      const dropped = selectedCoverCharacters.filter(c => !filterSet.has(c.id)).map(c => c.name);
+      if (dropped.length > 0) log.info(`🔄 [COVER-ITERATE] ${coverKey}: User filter dropped: ${dropped.join(', ')}`);
+      selectedCoverCharacters = filtered;
       coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
     }
   }

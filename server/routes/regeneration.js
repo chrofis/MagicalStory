@@ -2247,11 +2247,19 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
   }
 });
 
-// Regenerate cover image (front, initialPage, or back)
+// Regenerate cover image (front, initialPage, or back).
+//
+// User-facing credit-charging endpoint. Funnels through `iterateCover` so
+// every cover-render path in the codebase (unified-pipeline auto-repair,
+// dev-mode iterate, this endpoint) shares one render function — no more
+// triple-implementation drift. The user-edit knobs (editedScene /
+// editedTitle / editedDedication / characterIds) are applied to storyData
+// before the iterateCover call so they flow through the standard pipeline.
+// customPrompt is deprecated — the structured outline IS the spec.
 router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, coverType } = req.params;
-    const { customPrompt, editedScene, characterIds, editedTitle, editedDedication } = req.body;
+    const { editedScene, characterIds, editedTitle, editedDedication } = req.body;
 
     // Accept both 'initial' and 'initialPage' for backwards compatibility
     const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
@@ -2300,84 +2308,26 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       ? JSON.parse(story.data)
       : story.data;
 
-    // Get art style (with per-backend variant for cover model)
-    const artStyleId = storyData.artStyle || 'pixar';
-    const { resolveArtStyle: resolveStyle } = require('../lib/storyHelpers');
-    const coverModelId = MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
-    const coverBackend = IMAGE_MODELS[coverModelId]?.backend || null;
-    const styleDescription = resolveStyle(artStyleId, coverBackend) || resolveStyle('pixar');
-
-    // Build character info with main character emphasis
-    let characterInfo = '';
-    if (storyData.characters && storyData.characters.length > 0) {
-      const mainCharacterIds = storyData.mainCharacters || [];
-      const mainChars = storyData.characters.filter(c => mainCharacterIds.includes(c.id));
-      const supportingChars = storyData.characters.filter(c => !mainCharacterIds.includes(c.id));
-
-      characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
-
-      mainChars.forEach((char) => {
-        const physicalDesc = buildCharacterPhysicalDescription(char);
-        characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
-      });
-
-      if (supportingChars.length > 0) {
-        characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
-        supportingChars.forEach((char) => {
-          const physicalDesc = buildCharacterPhysicalDescription(char);
-          characterInfo += `Supporting: ${physicalDesc}\n`;
-        });
-      }
-
-      characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
-    }
-
-    // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
-    const visualBible = storyData.visualBible || null;
-    const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
-
-    // Use edited title/dedication if provided, otherwise use story data
-    const storyTitle = editedTitle !== undefined ? editedTitle : (storyData.title || 'My Story');
-    const coverDedication = editedDedication !== undefined ? editedDedication : storyData.dedication;
-
-    // Determine scene description and clothing for this cover type
-    // Primary: use the stored description from initial generation (already correctly parsed)
-    // Fallback: re-parse from outline (for legacy stories without stored descriptions)
     const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
-    const storedDescription = storyData.coverImages?.[coverKey]?.description;
 
-    let sceneDescription;
-    let coverClothing;
-    if (storedDescription && storedDescription.length >= 20) {
-      // Use the stored description from initial generation — already correctly parsed
-      sceneDescription = storedDescription;
-      coverClothing = parseClothingCategory(storedDescription) || 'standard';
-      log.debug(`📕 [COVER REGEN] Using stored description for ${normalizedCoverType} (${storedDescription.length} chars)`);
-    } else {
-      // Fallback: parse from outline for legacy stories
-      const coverScenes = extractCoverScenes(storyData.outline || '');
-      if (normalizedCoverType === 'front') {
-        sceneDescription = coverScenes.titlePage?.scene || 'A beautiful, magical title page featuring the main characters.';
-        coverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
-      } else if (normalizedCoverType === 'initialPage') {
-        sceneDescription = coverScenes.initialPage?.scene || 'A warm, inviting dedication/introduction page.';
-        coverClothing = coverScenes.initialPage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
-      } else {
-        sceneDescription = coverScenes.backCover?.scene || 'A satisfying, conclusive ending scene.';
-        coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
-      }
-    }
-
-    // Override scene description with user-provided edit (like regular image regeneration)
+    // Apply user edits to storyData BEFORE calling iterateCover. The
+    // iterateCover function reads from storyData (title / dedication /
+    // coverImages[*].description) so mutating these fields makes the user's
+    // edits flow through the standard render pipeline. No duplicate prompt-
+    // building logic in this endpoint — iterateCover is the only place that
+    // builds cover prompts.
     if (editedScene && editedScene.trim()) {
-      log.debug(`📕 [COVER REGEN] Using user-provided scene description: "${editedScene.substring(0, 100)}..."`);
-      sceneDescription = editedScene.trim();
+      storyData.coverImages = storyData.coverImages || {};
+      storyData.coverImages[coverKey] = storyData.coverImages[coverKey] || {};
+      storyData.coverImages[coverKey].description = editedScene.trim();
+      log.debug(`📕 [COVER REGEN] Applied editedScene to ${coverKey}.description (${editedScene.trim().length} chars)`);
     }
-
-    // coverClothing passed directly — getCharacterPhotoDetails normalizes costumed:type internally
-    // Convert clothingRequirements to _currentClothing format for proper avatar lookup
-    // This ensures regenerated covers use the story's costumes (not 'standard' fallback)
-    const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
+    if (editedTitle !== undefined) {
+      storyData.title = editedTitle;
+    }
+    if (editedDedication !== undefined) {
+      storyData.dedication = editedDedication;
+    }
 
     // Fetch fresh avatar data from characters table (fallback for missing avatars)
     const freshCharResult = await getDbPool().query(
@@ -2387,130 +2337,10 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     const freshCharData = freshCharResult.rows[0]?.data || {};
     const freshCharacters = freshCharData.characters || [];
 
-    // Merge avatars: story avatars first, then fresh from characters table as fallback
-    const mergedCharacters = (storyData.characters || []).map(storyChar => {
-      // If story character already has avatars, use them
-      if (storyChar.avatars) {
-        return storyChar;
-      }
-      // Otherwise, try to get avatars from characters table
-      const freshChar = freshCharacters.find(fc =>
-        fc.id === storyChar.id || fc.name === storyChar.name
-      );
-      if (freshChar?.avatars) {
-        log.debug(`📕 [COVER REGEN] Using fresh avatars for ${storyChar.name} (missing in story)`);
-        return {
-          ...storyChar,
-          avatars: freshChar.avatars
-        };
-      }
-      return storyChar;
-    });
-
-    // Get character photos with correct clothing variant
-    let coverCharacterPhotos;
-    let selectedCoverCharacters;  // Track character objects for bbox detection
-
-    // Cap at 5 characters max — more than 5 almost always produces bad results
-    // Strategy: main characters appear on ALL covers, non-main are split across initial/back
-    const MAX_COVER_CHARACTERS = 5;
-    const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
-    // If no isMainCharacter flags, treat all as "extras" to split across covers
-    const nonMainChars = mainChars.length > 0
-      ? mergedCharacters.filter(c => !c.isMainCharacter)
-      : mergedCharacters;
-
-    // If user provided specific character IDs, use those (still capped)
-    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
-      selectedCoverCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
-      if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
-        log.info(`📕 [COVER REGEN] Capping selected characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
-        selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
-      }
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
-    } else if (normalizedCoverType === 'front') {
-      // Front cover: main characters only (capped)
-      selectedCoverCharacters = mainChars.length > 0 ? mainChars : mergedCharacters;
-      if (selectedCoverCharacters.length > MAX_COVER_CHARACTERS) {
-        log.info(`📕 [COVER REGEN] Capping front cover characters from ${selectedCoverCharacters.length} to ${MAX_COVER_CHARACTERS}`);
-        selectedCoverCharacters = selectedCoverCharacters.slice(0, MAX_COVER_CHARACTERS);
-      }
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] Front cover: ${mainChars.length > 0 ? 'MAIN: ' + mainChars.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
-    } else {
-      // Initial/Back: main characters + different non-main extras per cover
-      const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
-      const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
-      const halfPoint = Math.ceil(nonMainChars.length / 2);
-      let extras;
-      if (normalizedCoverType === 'initialPage') {
-        extras = nonMainChars.slice(0, halfPoint).slice(0, extraSlots);
-      } else {
-        // back cover gets the second half
-        extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
-      }
-      selectedCoverCharacters = [...mainCapped, ...extras];
-      coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ${selectedCoverCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
-    }
-    // Apply styled avatars for non-costumed characters
-    if (!coverClothing || !coverClothing.startsWith('costumed')) {
-      coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
-    }
-
-    // Build cover prompt
-    let coverPrompt;
-    if (customPrompt) {
-      coverPrompt = customPrompt;
-    } else {
-      if (normalizedCoverType === 'front') {
-        coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-          TITLE_PAGE_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-      } else if (normalizedCoverType === 'initialPage') {
-        coverPrompt = coverDedication
-          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-              INITIAL_PAGE_SCENE: sceneDescription,
-              STYLE_DESCRIPTION: styleDescription,
-              DEDICATION: coverDedication,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-              VISUAL_BIBLE: visualBiblePrompt
-            })
-          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-              INITIAL_PAGE_SCENE: sceneDescription,
-              STYLE_DESCRIPTION: styleDescription,
-              STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-              VISUAL_BIBLE: visualBiblePrompt
-            });
-      } else {
-        coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-          BACK_COVER_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-      }
-
-      // If user selected specific characters, add explicit restriction to prompt
-      if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
-        const selectedNames = coverCharacterPhotos.map(p => p.name);
-        const allNames = (storyData.characters || []).map(c => c.name);
-        const excludedNames = allNames.filter(n => !selectedNames.includes(n));
-
-        if (excludedNames.length > 0) {
-          coverPrompt += `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${selectedNames.join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
-          log.debug(`📕 [COVER REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
-        }
-      }
-    }
-
-    // Get the current cover image before regenerating (to store as previous version)
+    // Capture pre-regen cover state for the previous-version snapshot. Must
+    // happen BEFORE iterateCover so we have the OLD image data; iterateCover
+    // returns the new result but we also surface previousImage/previousScore
+    // in the response for the version-comparison UI.
     storyData.coverImages = storyData.coverImages || {};
     const existingCover = storyData.coverImages[coverKey] || {};
 
@@ -2559,27 +2389,49 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     log.debug(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, versions: ${existingCover.imageVersions?.length || 0})`);
 
-    // Clear the image cache for this prompt to force a new generation
-    const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
-    if (deleteFromImageCache(cacheKey)) {
-      log.debug(`[REGEN] Cleared cache for ${normalizedCoverType} cover to force new generation`);
-    }
-
-    // Generate new cover with quality retry (automatically retries on text errors)
-    // Use same model as initial generation for consistency
+    // Render via iterateCover — single entry for every cover render path in
+    // the codebase. iterateCover internally decides composite vs direct,
+    // selects characters, builds prompt, calls the image model, and returns
+    // a uniform result. Same function the unified-pipeline auto-repair and
+    // the dev-mode iterate endpoint use.
+    const { iterateCover } = require('../lib/coverIterate');
     const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
     const coverImageModelId = MODEL_DEFAULTS.coverImage;
-    const coverRegenSceneMetadata = extractSceneMetadata(sceneDescription);
-    const coverResult = await generateImageWithQualityRetry(
-      coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
-      { imageModel: coverImageModelId },
-      coverLabel,
-      { sceneCharacters: selectedCoverCharacters, sceneMetadata: coverRegenSceneMetadata }
-    );
+    const iterResult = await iterateCover(coverKey, storyData, {
+      imageModel: coverImageModelId,
+      freshCharacters,
+      selectedCharacterIds: Array.isArray(characterIds) && characterIds.length > 0 ? characterIds : null,
+    });
+
+    // Result mapping: keep the variable names the downstream save / response
+    // code expects so we don't have to rewrite that section too.
+    const coverResult = {
+      imageData: iterResult.imageData,
+      score: iterResult.score,
+      reasoning: iterResult.reasoning,
+      modelId: iterResult.modelId,
+      totalAttempts: iterResult.totalAttempts || 1,
+      retryHistory: iterResult.retryHistory || [],
+      fixTargets: iterResult.fixTargets || [],
+      bboxDetection: iterResult.bboxDetection || null,
+      bboxOverlayImage: iterResult.bboxOverlayImage || null,
+      compositeDebug: iterResult.compositeDebug || null,
+    };
+    const sceneDescription = storyData.coverImages?.[coverKey]?.description || '';
+    const coverPrompt = iterResult.prompt;
+    const coverCharacterPhotos = iterResult.referencePhotos || [];
 
     // Log API costs for this cover regeneration
-    const coverImageCost = calculateImageCost(coverImageModelId, coverResult.totalAttempts || 1);
-    log.info(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
+    const coverImageCost = iterResult.usage?.cost
+      ?? calculateImageCost(coverImageModelId, coverResult.totalAttempts);
+    log.info(`💰 [COVER REGEN] API Cost: $${coverImageCost.toFixed(4)} (${coverResult.totalAttempts} attempt(s), via iterateCover)`);
+
+    // Build compositeAttempts from compositeDebug (when iterateCover ran the
+    // composite render method). Single source of truth in
+    // server/lib/coverComposite.js → buildCompositeAttemptsFromDebug. Same
+    // helper the dev-mode iterate endpoint and unified-pipeline use.
+    const { buildCompositeAttemptsFromDebug } = require('../lib/coverComposite');
+    const compositeAttempts = buildCompositeAttemptsFromDebug(coverResult.compositeDebug);
 
     // Create new version entry
     const coverRegenTimestamp = new Date().toISOString();
@@ -2591,7 +2443,10 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       modelId: coverResult.modelId || coverImageModelId,
       createdAt: coverRegenTimestamp,
       generatedAt: coverRegenTimestamp,
-      type: 'regeneration'
+      type: 'regeneration',
+      method: compositeAttempts ? 'composite' : undefined,
+      source: compositeAttempts ? 'composite-regenerate' : 'regenerate',
+      compositeAttempts,
     };
 
     // Add new version
