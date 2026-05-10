@@ -1123,6 +1123,14 @@ function applyStyledAvatars(characterPhotos, artStyle) {
   let appliedCount = 0;
   const missed = [];
   const result = characterPhotos.map(photo => {
+    // Don't overwrite a costumed photoUrl. getCharacterPhotoDetails already
+    // resolved Noah's `styledAvatars.<style>.costumed.<key>.imageUrl` and set
+    // photoType='costumed-<key>'; restyling here would replace the pirate
+    // costume with a styled-standard image and silently break the contract
+    // "always use the costumed avatar when costumed:<key> is requested".
+    if (photo.photoType?.startsWith('costumed-')) {
+      return photo;
+    }
     const styledAvatar = getStyledAvatar(photo.name, photo.clothingCategory, artStyle);
     if (styledAvatar) {
       appliedCount++;

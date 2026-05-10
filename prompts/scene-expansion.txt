@@ -90,8 +90,8 @@ Then a single-line JSON object:
   ],
   "objects": ["LOC001", "ART002"],
   "interactions": [
-    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false},
-    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "storyRelevant": true}
+    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false, "priority": "low"},
+    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "storyRelevant": true, "priority": "essential"}
   ],
   "emptyScenePrompt": "..."
 }
@@ -118,9 +118,13 @@ Mark `storyRelevant: true` only when the contact is the page's plot beat, identi
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail.
+Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail.
 
-Cap: 1–4 entries, 0–2 with `storyRelevant: true`.
+`priority`: `"essential"` for the page's central action (held prop, traced line, key gesture), `"normal"` for supporting action, `"low"` for incidental gaze/pose. Optional — defaults to `"normal"`. The image generator orders EXACT POSES with essentials first.
+
+**Coverage:** every foreground/midground character should appear in `interactions[]` exactly once. If a character has no real action, give them a `priority: "low"` entry (e.g. `{character, object: "the campfire", where: "watches the campfire", storyRelevant: false, priority: "low"}`) — without it the image model defaults to a camera-facing portrait. Background characters exempt.
+
+Cap: 1–6 entries, 0–2 with `storyRelevant: true`.
 
 Every entry must also appear in the prose as the same physical contact.
 

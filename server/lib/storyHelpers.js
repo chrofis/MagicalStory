@@ -462,7 +462,17 @@ function sanitizeInteractions(rawInteractions, characterNames) {
       dropped.push(`${character}→${object} (target absent)`);
       continue;
     }
-    kept.push({ character, object, where });
+    // Preserve priority + storyRelevant verbatim — the EXACT POSES builder
+    // sorts essentials first, and the gaze-fill defaults uncovered fg/mg
+    // characters to a low-priority "not at the viewer" line.
+    const priority = ['essential', 'normal', 'low'].includes(String(i.priority || '').toLowerCase())
+      ? String(i.priority).toLowerCase()
+      : undefined;
+    const storyRelevant = (i.storyRelevant === true || i.storyRelevant === false) ? i.storyRelevant : undefined;
+    const out = { character, object, where };
+    if (priority !== undefined) out.priority = priority;
+    if (storyRelevant !== undefined) out.storyRelevant = storyRelevant;
+    kept.push(out);
   }
   if (dropped.length > 0) {
     log.info(`[SCENE META] Dropped ${dropped.length} invalid interaction(s): ${dropped.join(', ')}`);
@@ -4509,18 +4519,29 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       });
     }
 
-    // Each character is already named with their physical description in the
-    // SCENE prose, and each attached image carries a `[Name]:` label in the
-    // parts array. Verbose per-character description blocks here was a third
-    // mention of the same info — model overload + token waste. Just list the
-    // names so the model knows which images to expect (and how many).
-    if (clothingMap) { /* clothing already in prose; map kept for debug only */ }
-    const nameLine = sceneCharacters.map(c => `[${c.name}]`).join(', ');
+    // Clothing + heights are the load-bearing per-character signals.
+    // We used to also emit "**CHARACTER REFERENCE PHOTOS:** [Noah], [Hans],
+    // [Emma] — EXACTLY 3 characters, no more" but both halves were wrong:
+    //   - the [Name] listing duplicates the labels already burned into each
+    //     attached portrait,
+    //   - the strict "EXACTLY N, no more" guard suppressed legitimate
+    //     background figures (crowds, soldiers, secondary VB characters,
+    //     passersby) that the scene description explicitly called for.
+    // The named cast is governed by the scene prose; the attached portraits
+    // tell Grok who's who. We just need to anchor what the named characters
+    // wear and how tall they are relative to each other.
+    const clothingLines = sceneCharacters
+      .map(c => {
+        const desc = clothingMap[c.name?.toLowerCase()];
+        return desc ? `- ${c.name}: ${desc}` : null;
+      })
+      .filter(Boolean);
 
-    // Build relative height description (AI understands this better than cm values)
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
 
-    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below) — EXACTLY ${sceneCharacters.length} characters, no more:** ${nameLine}\nEvery person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.\n`;
+    if (clothingLines.length > 0) {
+      characterReferenceList += `\n**Clothing for each named character (must match the attached labeled portrait):**\n${clothingLines.join('\n')}\n`;
+    }
 
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;
@@ -4705,7 +4726,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // interactions buried mid-paragraph in the prose get dropped — declared props
   // (crossbows, held objects, barrier arms) go missing even when the reference
   // image is attached. Terse imperatives at the end re-anchor the pose.
-  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions);
+  // Pass scene characters (with per-character depth from metadata) so the
+  // builder can fill in default "not looking at the viewer" lines for any
+  // foreground/midground figure that has no declared interaction. This
+  // closes the gap where Sonnet writes one interaction per page but leaves
+  // other characters uncovered — those default to a camera-facing portrait.
+  const metaCharacters = Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
+    ? metadata.fullData.characters
+    : (Array.isArray(metadata?.characters) ? metadata.characters : []);
+  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters);
   const eraGuard = buildEraGuard(metadata?.era);
   const sceneIntentLine = metadata?.sceneIntent
     ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
@@ -4717,13 +4746,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   if (template) {
     log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
 
-    // Storybook mode + prose format: scene description already has character
-    // descriptions, setting, and Visual Bible elements woven in by scene-expansion.
-    // We prepend the art style verbatim (no point making Claude copy it).
+    // Storybook mode + prose format: scene prose carries character descriptions
+    // and setting woven in by Sonnet, but Sonnet drops clothing for some
+    // characters intermittently (observed: Emma's pirate costume missing on
+    // p2 of `Was unter der Holzbrücke lag` → Grok defaulted to yellow dress).
+    // Pass the explicit reference list / clothing / heights / required objects
+    // blocks too — redundant when the prose is complete, load-bearing when not.
     if (isStorybook && isProseFormat) {
       return appendExactPoses(fillTemplate(template, {
         STYLE_DESCRIPTION: styleDescription,
         SCENE_DESCRIPTION: cleanSceneDescription,
+        CHARACTER_REFERENCE_LIST: characterReferenceList,
+        REQUIRED_OBJECTS: requiredObjectsSection,
         TEXT_AREA_INSTRUCTION: textAreaInstruction,
         ERA_GUARD: eraGuard,
         SCENE_INTENT: sceneIntentLine,
@@ -4795,15 +4829,38 @@ Important:
  * @param {Array} interactions - metadata.interactions, array of {character, object, where}
  * @returns {string}
  */
-function buildExactPosesBlock(interactions) {
-  if (!Array.isArray(interactions) || interactions.length === 0) return '';
+function buildExactPosesBlock(interactions, sceneCharacters = []) {
+  const interactionList = Array.isArray(interactions) ? interactions : [];
+  // Even with zero declared interactions, we may still emit fill lines for
+  // uncovered fg/mg characters — so don't early-return on an empty list.
   const lines = [];
-  for (const i of interactions) {
+  const coveredNames = new Set();
+  // Sort essentials before normal/low so the most important poses lead the
+  // block. Image models weight prompt-tail content heavily — but within the
+  // EXACT POSES section, the first lines also carry stronger signal because
+  // longer blocks compete for attention.
+  const PRIORITY_RANK = { essential: 0, normal: 1, low: 2 };
+  const ranked = [...interactionList].sort((a, b) => {
+    const ra = PRIORITY_RANK[(a?.priority || 'normal').toLowerCase()] ?? 1;
+    const rb = PRIORITY_RANK[(b?.priority || 'normal').toLowerCase()] ?? 1;
+    return ra - rb;
+  });
+  for (const i of ranked) {
     if (!i || typeof i !== 'object') continue;
     const who = (i.character || '').trim();
     const where = (i.where || '').trim();
     const object = (i.object || '').trim();
     if (!who || !where) continue;
+    // Split multi-character interactions ("Hans + Emma + Noah") into one line
+    // per character with the shared `where`. Image models parse each EXACT
+    // POSES line as one figure; "Hans + Emma + Noah" gets read as a single
+    // weird label, not three figures, so the third figure drifts to "looking
+    // at viewer" by default. Allowed input separators: `+`, `&`, `and`, `,`.
+    const splitChars = who
+      .split(/\s*(?:\+|&|\band\b|,)\s*/i)
+      .map(s => s.trim())
+      .filter(Boolean);
+    const targets = splitChars.length > 1 ? splitChars : [who];
 
     // The schema asks for `where` to be a complete sentence with the object
     // name already embedded ("holds the stuffed elephant in lap"). In
@@ -4835,8 +4892,26 @@ function buildExactPosesBlock(interactions) {
         }
       }
     }
-    lines.push(`- ${who}: ${finalWhere}`);
+    for (const target of targets) {
+      lines.push(`- ${target}: ${finalWhere}`);
+      coveredNames.add(target.toLowerCase());
+    }
   }
+
+  // Fill: every foreground/midground scene character without a declared
+  // interaction gets a low-priority default line. Goal isn't a specific gaze
+  // direction — it's to break the model's default "look at the camera"
+  // portrait pose. Background characters skipped (tiny anyway).
+  for (const c of (sceneCharacters || [])) {
+    if (!c || typeof c !== 'object') continue;
+    const name = (c.name || '').trim();
+    if (!name) continue;
+    if (coveredNames.has(name.toLowerCase())) continue;
+    const depth = String(c.depth || '').toLowerCase();
+    if (depth === 'background') continue;
+    lines.push(`- ${name}: looking off into the scene, not at the viewer`);
+  }
+
   if (lines.length === 0) return '';
   return `EXACT POSES:\n${lines.join('\n')}`;
 }

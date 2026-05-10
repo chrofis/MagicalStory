@@ -170,6 +170,29 @@ interface StoryDisplayProps {
   onRefreshStory?: () => Promise<void>;
 }
 
+// Pull bbox + overlay from the active version of an image record. Falls back
+// to the latest version if activeVersion is missing, then to the page-level
+// fields. Without this the dev-mode Object Detection panel shows v0's bbox
+// even after the user switches to a later version in the Image History modal.
+function pickActiveVersion<T extends { imageVersions?: Array<unknown> | null; activeVersion?: number | null }>(
+  image: T | null | undefined
+): unknown | null {
+  if (!image?.imageVersions || image.imageVersions.length === 0) return null;
+  const lastIdx = image.imageVersions.length - 1;
+  const idx = image.activeVersion ?? lastIdx;
+  return image.imageVersions[Math.min(Math.max(0, idx), lastIdx)] || null;
+}
+
+function activeBboxDetection(image: any): BboxSceneDetection | null {
+  const v: any = pickActiveVersion(image);
+  return (v?.bboxDetection as BboxSceneDetection | undefined) ?? (image?.bboxDetection ?? null);
+}
+
+function activeBboxOverlay(image: any): string | null {
+  const v: any = pickActiveVersion(image);
+  return (v?.bboxOverlayImage as string | undefined) ?? (image?.bboxOverlayImage ?? null);
+}
+
 export function StoryDisplay({
   title,
   dedication,
@@ -4516,8 +4539,8 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={frontCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:front'] ?? frontCoverObj.bboxDetection}
-                  bboxOverlayImage={bboxOverrides['cover:front'] ? null : frontCoverObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:front'] ?? activeBboxDetection(frontCoverObj)}
+                  bboxOverlayImage={bboxOverrides['cover:front'] ? null : activeBboxOverlay(frontCoverObj)}
                   language={language}
                   storyId={storyId}
                   coverType="front"
@@ -4758,8 +4781,8 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={initialPageObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:initial'] ?? initialPageObj.bboxDetection}
-                  bboxOverlayImage={bboxOverrides['cover:initial'] ? null : initialPageObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:initial'] ?? activeBboxDetection(initialPageObj)}
+                  bboxOverlayImage={bboxOverrides['cover:initial'] ? null : activeBboxOverlay(initialPageObj)}
                   language={language}
                   storyId={storyId}
                   coverType="initial"
@@ -5474,8 +5497,8 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image?.retryHistory}
-                              bboxDetection={bboxOverrides[`page:${image?.pageNumber}`] ?? image?.bboxDetection}
-                              bboxOverlayImage={bboxOverrides[`page:${image?.pageNumber}`] ? null : image?.bboxOverlayImage}
+                              bboxDetection={bboxOverrides[`page:${image?.pageNumber}`] ?? activeBboxDetection(image)}
+                              bboxOverlayImage={bboxOverrides[`page:${image?.pageNumber}`] ? null : activeBboxOverlay(image)}
                               language={language}
                               storyId={storyId}
                               pageNumber={image?.pageNumber}
@@ -6150,8 +6173,8 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image.retryHistory}
-                              bboxDetection={bboxOverrides[`page:${image.pageNumber}`] ?? image.bboxDetection}
-                              bboxOverlayImage={bboxOverrides[`page:${image.pageNumber}`] ? null : image.bboxOverlayImage}
+                              bboxDetection={bboxOverrides[`page:${image.pageNumber}`] ?? activeBboxDetection(image)}
+                              bboxOverlayImage={bboxOverrides[`page:${image.pageNumber}`] ? null : activeBboxOverlay(image)}
                               language={language}
                               storyId={storyId}
                               pageNumber={image.pageNumber}
@@ -6445,8 +6468,8 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={backCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:back'] ?? backCoverObj.bboxDetection}
-                  bboxOverlayImage={bboxOverrides['cover:back'] ? null : backCoverObj.bboxOverlayImage}
+                  bboxDetection={bboxOverrides['cover:back'] ?? activeBboxDetection(backCoverObj)}
+                  bboxOverlayImage={bboxOverrides['cover:back'] ? null : activeBboxOverlay(backCoverObj)}
                   language={language}
                   storyId={storyId}
                   coverType="back"

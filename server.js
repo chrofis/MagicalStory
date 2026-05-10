@@ -4611,6 +4611,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           };
         }
         let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, inputData.artStyle, sceneClothingRequirements);
+        // applyStyledAvatars now skips costumed-* entries internally (see
+        // styledAvatars.js), so it's safe to call on a mixed-clothing scene.
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
         let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
         // over-the-shoulder: the target character is tiny, soft-focused, in the

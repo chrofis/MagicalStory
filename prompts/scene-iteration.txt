@@ -106,7 +106,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   ],
   "objects": ["LOC001"],
   "interactions": [
-    {"character": "Sophie", "object": "tower", "where": "gazes up at the clock tower", "storyRelevant": true}
+    {"character": "Sophie", "object": "tower", "where": "gazes up at the clock tower", "storyRelevant": true, "priority": "essential"}
   ],
   "reuseEmptyScene": true,
   "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background, its blue face visible against grey clouds. Light snow falls on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",

@@ -572,20 +572,27 @@ export function ReferencePhotosDisplay({
         </div>
       )}
 
-      {/* Grok API: exact packed images sent (max 3 slots) */}
-      {grokRefImages && grokRefImages.length > 0 && (
-        <div className={hasCharacterPhotos || hasLandmarkPhotos || hasVBGrid ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
-          <div className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
-            🎯 {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'}
-            <span className="text-[10px] font-normal text-orange-500">({grokRefImages.length}/3 slots)</span>
-          </div>
+      {/* Sent to image model: exact images that went to the API. Always rendered
+          so a missing/empty section is visible to dev-mode users (vs the prior
+          behavior of hiding the section when nothing was captured, which made
+          it impossible to tell whether the image-gen path didn't capture or
+          actually sent zero refs). Labels generalize from "Grok" to "image
+          model" since Gemini accepts more than 3 slots. */}
+      <div className={hasCharacterPhotos || hasLandmarkPhotos || hasVBGrid ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
+        <div className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
+          🎯 {language === 'de' ? 'An Bildmodell gesendet' : 'Sent to image model'}
+          {grokRefImages && grokRefImages.length > 0 && (
+            <span className="text-[10px] font-normal text-orange-500">({grokRefImages.length} {language === 'de' ? 'Bild' + (grokRefImages.length === 1 ? '' : 'er') : 'image' + (grokRefImages.length === 1 ? '' : 's')})</span>
+          )}
+        </div>
+        {grokRefImages && grokRefImages.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
             {grokRefImages.map((img, idx) => (
               <div key={idx} className="bg-orange-50 rounded-lg p-1 border border-orange-200">
                 <div className="text-[10px] text-orange-600 font-medium mb-1 text-center">Slot {idx + 1}</div>
                 <img
                   src={img}
-                  alt={`Grok ref slot ${idx + 1}`}
+                  alt={`Image-model ref slot ${idx + 1}`}
                   className="w-full object-contain rounded border border-orange-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
                   title="Click to enlarge"
@@ -593,8 +600,14 @@ export function ReferencePhotosDisplay({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-xs text-gray-500 italic py-2 px-3 bg-gray-100 rounded">
+            {language === 'de'
+              ? 'Keine Bilder erfasst (kein API-Aufruf für diese Version oder Erfassung nicht aktiviert)'
+              : 'No images captured (no API call for this version, or capture not wired up)'}
+          </div>
+        )}
+      </div>
 
       {/* Lightbox for enlarged view */}
       <ImageLightbox

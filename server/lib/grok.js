@@ -222,6 +222,21 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   }
 
   log.info(`🎨 [GROK] Starting edit (model: ${model}, refs: ${images.length}, aspect: ${aspectRatio})`);
+  // Per-slot identification — bytes + role hint when caller annotated images
+  // with a `_role` (the production callers tag each ref so the log shows which
+  // slot is the VB grid, costumed avatar, landmark, empty-scene, etc.).
+  // Fallback when callers haven't tagged: just byte size.
+  for (let i = 0; i < images.length; i++) {
+    try {
+      const url = typeof images[i] === 'string' ? images[i] : images[i]?.url || '';
+      const tag = (typeof images[i] === 'object' && images[i]?._role) ? images[i]._role : null;
+      const sizeKb = url.startsWith('data:')
+        ? Math.round((url.length - url.indexOf(',') - 1) * 0.75 / 1024)
+        : null;
+      const sizeStr = sizeKb != null ? `${sizeKb}KB` : '(remote URL)';
+      log.info(`🎨 [GROK] → slot ${i + 1}: ${tag || 'image'} ${sizeStr}`);
+    } catch { /* logging only */ }
+  }
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
   const body = {

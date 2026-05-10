@@ -12609,20 +12609,37 @@ function buildReferenceSheetPrompt(elements, styleDescription) {
   const cols = count === 4 ? 2 : 1;
   const rows = count === 4 ? 2 : count;
 
-  // Build grid layout description
+  // Build grid layout description.
+  // We deliberately omit el.name from the per-cell line. The model treats
+  // "Top-left: Erste Schatzkarte (artifact) - <description>" as a labeled
+  // cell and renders the name/type onto the artifact (e.g. "Erste Schatzkarte"
+  // gets painted on the parchment). Once that text is baked into the VB
+  // reference image, every page that uses that reference inherits the text.
+  // Pure visual prose — no labels, no IDs — keeps the cell intent clear to
+  // the model without giving it strings to render. Splitter still works on
+  // the grid borders.
   const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
   const gridLayoutLines = elements.map((el, i) => {
     const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
     const desc = el.extractedDescription || el.description;
-    return `${pos}: ${el.name} (${el.type}) - ${desc}`;
+    return `${pos}: ${desc}`;
   });
+
+  // Describe the grid in natural language. Passing literal digit-strings like
+  // "2x2" used to bake "2x2" onto the rendered image (the model treated it as
+  // a label). Use words for the count and an explicit row/column phrase so the
+  // model never sees a stringy template token to copy.
+  const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] || String(n);
+  const gridShapePhrase = (cols === 2 && rows === 2)
+    ? 'square grid with two rows and two columns (four cells total)'
+    : (cols === 1)
+      ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
+      : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
 
   const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
     STYLE_DESCRIPTION: styleDescription,
-    GRID_SIZE: `${cols}x${rows}`,
+    GRID_SHAPE_PHRASE: gridShapePhrase,
     GRID_LAYOUT: gridLayoutLines.join('\n'),
-    COLS: cols.toString(),
-    ROWS: rows.toString()
   });
 
   return prompt;

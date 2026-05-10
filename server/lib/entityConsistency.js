@@ -890,6 +890,18 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           const letter = String.fromCharCode(65 + i); // A, B, C...
           cellToPage.set(letter, groupAppearances[i].pageNumber);
         }
+        // Translate "Cell X" → "Cell X (page N)" in human-facing strings so
+        // log output and dev panels surface page numbers directly. The Gemini
+        // API call already happened on the grid image where the model saw
+        // bare cell letters — we're only rewriting the stored display strings.
+        const annotateCells = (text) => {
+          if (!text || typeof text !== 'string') return text;
+          return text.replace(/\bCell\s+([A-Z])\b(?!\s*\(page)/g, (match, letter) => {
+            const page = cellToPage.get(letter);
+            return page != null ? `${match} (page ${page})` : match;
+          });
+        };
+
         for (const issue of (evalResult.issues || [])) {
           let pageNumbers = groupPages;
           const desc = String(issue.description || issue.issue || '');
@@ -897,7 +909,25 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             .map(m => cellToPage.get(m[1]))
             .filter(n => n != null);
           if (cellMatches.length > 0) pageNumbers = [...new Set(cellMatches)];
-          report.characters[charName].issues.push({ ...issue, clothingCategory, pageNumbers });
+
+          // Build cell→page mapping for every cell letter mentioned in the issue.
+          const cellsMentioned = [...new Set([...desc.matchAll(/\bCell\s+([A-Z])\b/g)].map(m => m[1]))];
+          const cellsToPages = {};
+          for (const letter of cellsMentioned) {
+            const p = cellToPage.get(letter);
+            if (p != null) cellsToPages[letter] = p;
+          }
+
+          const annotated = {
+            ...issue,
+            clothingCategory,
+            pageNumbers,
+            cellsToPages,
+            description: annotateCells(issue.description),
+            issue: annotateCells(issue.issue),
+            fixInstruction: annotateCells(issue.fixInstruction),
+          };
+          report.characters[charName].issues.push(annotated);
         }
 
         if (evalResult.score < report.characters[charName].overallScore) {
@@ -1045,14 +1075,26 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
   for (const img of sceneImages) {
     const pageNumber = img.pageNumber;
-    const imageData = img.imageData;
+
+    // Resolve the active version. Each version stores its own imageData and
+    // bboxDetection — without this the grid was being composed from page-level
+    // imageData (almost always v0), so a page where v0 had Noah-as-elderly-man
+    // but v3 (active, score 95) had a correct young-boy still produced an
+    // "elderly man" finding. The active version is the source of truth.
+    const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
+    const lastIdx = versions.length - 1;
+    const activeIdx = (typeof img.activeVersion === 'number')
+      ? Math.max(0, Math.min(img.activeVersion, lastIdx))
+      : lastIdx;
+    const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
+    const imageData = activeVersion?.imageData || img.imageData;
+    const versionIndex = lastIdx >= 0 ? activeIdx : null;
 
     if (!imageData) continue;
 
-    // Use cached bboxDetection if available. Priority: sharedBboxDetection (from unified
-    // pipeline pre-step) > img.bboxDetection (from prior eval). Fresh detection runs below
-    // if neither is available.
-    let bboxDetection = img.sharedBboxDetection || img.bboxDetection || null;
+    // Priority: sharedBboxDetection (unified pipeline pre-step) > active version's
+    // bboxDetection > page-level fallback. Fresh detection runs below if all missing.
+    let bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
 
     // Get clothing info for this page - try multiple sources
     // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
@@ -1317,6 +1359,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         }
         appearances.get(charName).push({
           pageNumber,
+          versionIndex,
           imageData,
           faceBox: matchingFigure.faceBox || null,
           bodyBox: matchingFigure.bodyBox || null,
@@ -1445,14 +1488,21 @@ function collectObjectAppearances(sceneImages, visualBible = null) {
 
   for (const img of sceneImages) {
     const pageNumber = img.pageNumber;
-    const imageData = img.imageData;
+
+    // Active-version-aware: object crops come from the version the user is
+    // looking at, not whatever v0 happened to have stored at page level.
+    const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
+    const lastIdx = versions.length - 1;
+    const activeIdx = (typeof img.activeVersion === 'number')
+      ? Math.max(0, Math.min(img.activeVersion, lastIdx))
+      : lastIdx;
+    const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
+    const imageData = activeVersion?.imageData || img.imageData;
 
     if (!imageData) continue;
 
-    // Use cached bboxDetection if available. Priority: sharedBboxDetection (from unified
-    // pipeline pre-step) > img.bboxDetection (from prior eval). Fresh detection runs below
-    // if neither is available.
-    let bboxDetection = img.sharedBboxDetection || img.bboxDetection || null;
+    // Priority: sharedBboxDetection > active version bbox > page-level bbox.
+    let bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
 
     if (!bboxDetection?.objects) continue;
 
@@ -1555,6 +1605,7 @@ async function extractEntityCrops(appearances, options = {}) {
         const cropData = {
           buffer: cropResult.buffer,
           pageNumber: app.pageNumber,
+          versionIndex: app.versionIndex ?? null,
           cropType,
           clothing: app.clothing,
           position: app.position,
@@ -1727,6 +1778,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
       pageInfo: `P${crop.pageNumber}`,
       metadata: {
         pageNumber: crop.pageNumber,
+        versionIndex: crop.versionIndex ?? null,
         cropType: crop.cropType,
         clothing: crop.clothing,
         position: crop.position,
