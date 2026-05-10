@@ -6765,6 +6765,14 @@ async function _processStoryJobImpl(jobId) {
             }
           }
         }
+        // Shuffle so Sonnet doesn't keep reaching for the top score-sorted
+        // entries on every story (same Baden gives the same Stadtturm /
+        // Holzbrücke / Ruine Stein pick across every run). Trust Sonnet to
+        // pick fitness-by-description from a randomized order.
+        for (let i = landmarks.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [landmarks[i], landmarks[j]] = [landmarks[j], landmarks[i]];
+        }
         inputData.availableLandmarks = landmarks;
       } else {
         log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);
