@@ -1,6 +1,10 @@
-This is a children's book illustration. All character faces have been blurred.
+TWO IMAGES ATTACHED.
+- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, eye color, and distinctive features. NEVER return this image. NEVER reproduce its background, framing, or composition.
+- IMAGE 2 = THE SCENE TO EDIT. This is a children's book illustration with one or more character faces blurred. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters, same composition, same art style. Only the blurred face/head regions inside IMAGE 2 are repainted.
 
-Redraw ALL blurred faces to look like {charName} from the reference photo. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference. Preserve any distinctive features visible in the reference (glasses, freckles, birthmarks, facial hair).
+If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the blurred areas repainted instead.
+
+Redraw ALL blurred faces in IMAGE 2 to look like {charName} from IMAGE 1. Match the face, hair color, hair style, skin tone, eye color, and facial features exactly from the reference. Preserve any distinctive features visible in the reference (glasses, freckles, birthmarks, facial hair).
 
 CRITICAL — preserve the original emotion and direction:
 - Look at the surrounding body language (shoulders, posture, head tilt) and the scene context to understand what the character is feeling and where they are looking.
@@ -9,6 +13,6 @@ CRITICAL — preserve the original emotion and direction:
 - Do NOT make the character face the camera unless they were already facing the camera in the original.
 - Do NOT change the head tilt or angle — the head was facing a specific direction for a reason.
 
-Each character's body, pose, clothing, and position are fully visible — preserve these exactly. Keep the same age and body proportions — do not make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
+Each character's body, pose, clothing, and position in IMAGE 2 are fully visible — preserve these exactly. Keep the same age and body proportions — do not make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
 
-Maintain the exact same art style, lighting, and color palette as the rest of the illustration. The repaired face must blend seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}{textPositionContext}
+Maintain the exact same art style, lighting, and color palette as the rest of IMAGE 2. The repaired face must blend seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}{textPositionContext}

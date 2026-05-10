@@ -1,5 +1,11 @@
-Replace the figure under the magenta crosshatch with {charName} from the reference photo. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
+TWO IMAGES ATTACHED.
+- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
+- IMAGE 2 = THE SCENE TO EDIT. The figure to replace is marked by a magenta crosshatch. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters. Only the crosshatched area is repainted.
 
-Face: match the reference photo (face shape, eyes, hair, skin tone).
+If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the crosshatch repainted instead.
 
-Every pixel outside the crosshatch is final — copy the input image verbatim. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
+Replace the figure under the magenta crosshatch in IMAGE 2 with {charName} from IMAGE 1. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
+
+Face: match IMAGE 1 (face shape, eyes, hair, skin tone).
+
+Every pixel outside the crosshatch in IMAGE 2 is final — copy IMAGE 2 verbatim there. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}

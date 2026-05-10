@@ -1,4 +1,10 @@
-Inpaint task: repaint the area covered by the magenta crosshatch as {charName} from the reference photo. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
+TWO IMAGES ATTACHED.
+- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
+- IMAGE 2 = THE CUTOUT TO EDIT. A scene region with the figure marked by a magenta crosshatch. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same edges, same surrounding pixels. Only the crosshatched area is repainted.
+
+If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the crosshatch repainted instead.
+
+Inpaint task: repaint the area covered by the magenta crosshatch in IMAGE 2 as {charName} from IMAGE 1. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
 
 Match {charName}'s face, hair, skin tone, build, and clothing from the reference.
 
