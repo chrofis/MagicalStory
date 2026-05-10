@@ -78,6 +78,16 @@ function pickEntry(args, entries) {
   return entries[state.currentIndex % entries.length];
 }
 
+function advanceRotationState(entry, entries) {
+  let state = { currentIndex: 0, generatedStories: [] };
+  try { state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf-8')); } catch { /* default */ }
+  if (!Array.isArray(state.generatedStories)) state.generatedStories = [];
+  state.currentIndex = (state.currentIndex + 1) % entries.length;
+  state.generatedStories.push(`${entry.storyCategory}/${entry.storyTopic} (${entry.artStyle}) - ${new Date().toISOString()}`);
+  fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+  console.log(`Rotation advanced → next default index: ${state.currentIndex}`);
+}
+
 function verifyPhotosOnDisk(family) {
   const dir = path.join(PHOTOS_DIR, family.id);
   if (!fs.existsSync(dir)) {
@@ -193,6 +203,13 @@ async function main() {
   if (result.status !== 0) {
     console.error(`\nPlaywright exited with code ${result.status}.`);
     process.exit(result.status || 1);
+  }
+
+  // Only auto-advance when the rotation default was used. An explicit
+  // --entry=N is a manual override (debug, retry) and should not move
+  // the cursor.
+  if (args.entry === undefined) {
+    advanceRotationState(entry, entries);
   }
 
   console.log('\nShowcase complete. Story is generating server-side (5–10 min).');
