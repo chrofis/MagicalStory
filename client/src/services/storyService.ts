@@ -1707,8 +1707,6 @@ export const storyService = {
     relationships: RelationshipMap;
     relationshipTexts: RelationshipTextMap;
     skipImages?: boolean;
-    // Developer generation mode override (pictureBook = single prompt, outlineAndText = outline+text)
-    generationMode?: 'pictureBook' | 'outlineAndText';
     // Developer page-layout override (auto/undefined = derive from languageLevel via resolveLayout).
     // 'a4-overlay': force A4 + text overlay. 'square-below': force square image + text strip below.
     // 'legacy-square-2page': old image-page/text-page mode (currently a stub — see commit 4d953cba).
@@ -1784,7 +1782,6 @@ export const storyService = {
       relationships: data.relationships,
       relationshipTexts: data.relationshipTexts,
       skipImages: data.skipImages,
-      generationMode: data.generationMode,
       layoutOverride: data.layoutOverride,
       // Developer skip options
       skipOutline: data.skipOutline,

@@ -6,7 +6,7 @@ import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realis
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
-import type { GenerationMode, LayoutOverride } from '@/hooks/useDeveloperMode';
+import type { LayoutOverride } from '@/hooks/useDeveloperMode';
 
 // All story language options for display lookup (user-friendly names, no codes shown)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string }[] = [
@@ -95,8 +95,6 @@ interface WizardStep6Props {
   onEditStep: (step: number) => void;
   // Developer options
   developerMode: boolean;
-  generationMode?: GenerationMode;
-  onGenerationModeChange?: (mode: GenerationMode) => void;
   layoutOverride?: LayoutOverride;
   onLayoutOverrideChange?: (mode: LayoutOverride) => void;
 }
@@ -137,8 +135,6 @@ export function WizardStep6Summary({
   onUseDirectly,
   onEditStep,
   developerMode,
-  generationMode = 'auto',
-  onGenerationModeChange,
   layoutOverride = 'auto',
   onLayoutOverrideChange,
 }: WizardStep6Props) {
@@ -573,27 +569,6 @@ export function WizardStep6Summary({
           <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
             {language === 'de' ? 'Entwickler-Optionen' : language === 'fr' ? 'Options développeur' : 'Developer Options'}
           </h3>
-
-          {/* Generation Pipeline */}
-          {onGenerationModeChange && (
-            <div className="mt-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Generation Pipeline
-              </label>
-              <select
-                value={generationMode}
-                onChange={(e) => onGenerationModeChange(e.target.value as GenerationMode)}
-                className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-sm font-medium bg-white"
-              >
-                <option value="auto">Auto (based on reading level)</option>
-                <option value="pictureBook">Single Prompt (Picture Book)</option>
-                <option value="outlineAndText">Outline + Text (Standard)</option>
-              </select>
-              <p className="text-xs text-gray-600 mt-1">
-                Auto: 1st-grade uses single prompt, standard/advanced use outline+text.
-              </p>
-            </div>
-          )}
 
           {/* Layout Override */}
           {onLayoutOverrideChange && (

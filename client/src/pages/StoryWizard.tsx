@@ -201,7 +201,6 @@ export default function StoryWizard() {
   // Developer mode settings (extracted to hook)
   const {
     developerMode, setDeveloperMode,
-    generationMode, setGenerationMode,
     layoutOverride, setLayoutOverride,
     devSkipOutline, setDevSkipOutline,
     devSkipText, setDevSkipText,
@@ -3895,8 +3894,6 @@ export default function StoryWizard() {
         relationships,
         relationshipTexts,
         skipImages: overrides?.skipImages ?? devSkipImages,
-        // Developer generation mode override (auto = use reading level default)
-        generationMode: generationMode !== 'auto' ? generationMode : undefined,
         // Developer layout override (auto = derive from languageLevel via resolveLayout)
         layoutOverride: layoutOverride !== 'auto' ? layoutOverride : undefined,
         // Developer skip options
@@ -4451,8 +4448,6 @@ export default function StoryWizard() {
             onUseDirectly={() => generateStory()}
             onEditStep={safeSetStep}
             developerMode={developerMode}
-            generationMode={generationMode}
-            onGenerationModeChange={setGenerationMode}
             layoutOverride={layoutOverride}
             onLayoutOverrideChange={setLayoutOverride}
           />

@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ModelSelections } from '@/components/generation';
 
-// Generation mode: auto follows reading level, others force specific pipeline
-export type GenerationMode = 'auto' | 'pictureBook' | 'outlineAndText';
-
 // Layout override: dev-only force of the page-layout decision normally derived
 // from languageLevel. 'auto' uses the mapping (advanced ⇒ square+below, others
 // ⇒ A4 + text-overlay). 'legacy-square-2page' is a stub for the old image-page /
@@ -14,9 +11,6 @@ export type LayoutOverride = 'auto' | 'a4-overlay' | 'square-below' | 'legacy-sq
 interface DeveloperModeState {
   developerMode: boolean;
   setDeveloperMode: (enabled: boolean) => void;
-  // Generation pipeline mode (dev override for reading level behavior)
-  generationMode: GenerationMode;
-  setGenerationMode: (mode: GenerationMode) => void;
   // Page layout override (dev-only force; production uses 'auto')
   layoutOverride: LayoutOverride;
   setLayoutOverride: (mode: LayoutOverride) => void;
@@ -82,9 +76,6 @@ export function useDeveloperMode(): DeveloperModeState {
 
   const [developerMode, setDeveloperModeInternal] = useState(wasDevMode);
 
-  // Generation pipeline mode (override reading level behavior)
-  const [generationMode, setGenerationMode] = useState<GenerationMode>('auto');
-
   // Page layout override — only inspected when developerMode is true. Defaults
   // to 'auto' so production users always follow the languageLevel mapping.
   const [layoutOverride, setLayoutOverride] = useState<LayoutOverride>('auto');
@@ -141,8 +132,6 @@ export function useDeveloperMode(): DeveloperModeState {
   return {
     developerMode,
     setDeveloperMode,
-    generationMode,
-    setGenerationMode,
     layoutOverride,
     setLayoutOverride,
     devSkipOutline,

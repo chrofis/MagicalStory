@@ -259,7 +259,6 @@ const {
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
-const legacyPipelines = require('./server/lib/legacyPipelines');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
 const { generateSitemap } = require('./server/lib/seoMeta');
@@ -516,14 +515,6 @@ if (STORAGE_MODE === 'database') {
 
   // Initialize the modular database service pool as well
   initModularPool();
-
-  // Initialize legacy pipelines with server.js-local dependencies
-  legacyPipelines.init({
-    dbPool, log, email,
-    saveCheckpoint, getCheckpoint, deleteJobCheckpoints, getAllCheckpoints,
-    detectBboxOnCovers, buildCoverSceneImages,
-    IMAGE_GEN_MODE, STORAGE_MODE, STORY_BATCH_SIZE
-  });
 
   log.debug(`✓ Database pools initialized`);
 }
@@ -6824,25 +6815,11 @@ async function _processStoryJobImpl(jobId) {
       log.debug(`🔧 [PIPELINE] User overrides applied: ${JSON.stringify(filteredUserOverrides)}`);
     }
 
-    // Determine generation mode:
-    // - 'unified' (default): Single prompt + Art Director scene expansion (highest quality)
-    // - 'pictureBook': Combined text+scene in single prompt (faster, simpler)
-    // - 'outlineAndText': Separate outline + text prompts (legacy mode)
-    let generationMode;
-    if (inputData.generationMode === 'pictureBook') {
-      generationMode = 'pictureBook';
-      log.debug(`📚 [PIPELINE] Generation mode override: pictureBook (forced single prompt)`);
-    } else if (inputData.generationMode === 'outlineAndText') {
-      generationMode = 'outlineAndText';
-      log.debug(`📚 [PIPELINE] Generation mode override: outlineAndText (forced outline+text)`);
-    } else if (inputData.generationMode === 'unified') {
-      generationMode = 'unified';
-      log.debug(`📚 [PIPELINE] Generation mode: unified (single prompt + Art Director)`);
-    } else {
-      // Default: unified mode for all stories (best quality)
-      generationMode = 'unified';
-      log.debug(`📚 [PIPELINE] Generation mode: unified (default - single prompt + Art Director)`);
-    }
+    // Unified mode is the only generation pipeline. pictureBook / outlineAndText
+    // were removed along with legacyPipelines.js — single prompt + Art Director
+    // scene expansion is the canonical flow. Ignore any client-side
+    // generationMode field; it's a no-op now.
+    const generationMode = 'unified';
 
     // Get language for scene descriptions (use centralized config)
     const lang = inputData.language || 'en';
@@ -6877,20 +6854,8 @@ async function _processStoryJobImpl(jobId) {
       ['processing', 5, 'Starting story generation...', jobId]
     );
 
-    // Route to appropriate processing function based on generation mode
-    if (generationMode === 'unified') {
-      log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation);
-    }
-
-    if (generationMode === 'pictureBook') {
-      log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await legacyPipelines.processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin);
-    }
-
-    // outlineAndText mode (legacy): Separate outline + text generation
-    log.debug(`📚 [PIPELINE] OutlineAndText mode - using legacy outline+text pipeline`);
-    return await legacyPipelines.processOutlineAndTextJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin);
+    log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
+    return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation);
 
   } catch (error) {
     // Clear styled avatar cache on error too
