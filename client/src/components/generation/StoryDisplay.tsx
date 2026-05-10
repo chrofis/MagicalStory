@@ -6902,16 +6902,23 @@ export function StoryDisplay({
       )}
 
       {/* Cover History Modal (for cover images) */}
-      {coverHistoryModal && (
-        <ImageHistoryModal
-          coverType={coverHistoryModal.coverType}
-          versions={coverHistoryModal.versions}
-          activeVersionIndex={coverHistoryModal.activeVersionIndex}
-          onClose={() => setCoverHistoryModal(null)}
-          onSelectVersion={(coverType, versionIndex) => handleSelectCoverVersion(coverType as 'frontCover' | 'initialPage' | 'backCover', versionIndex)}
-          developerMode={developerMode}
-        />
-      )}
+      {coverHistoryModal && (() => {
+        const coverPageMap: Record<'frontCover' | 'initialPage' | 'backCover', number> = {
+          frontCover: -1, initialPage: -2, backCover: -3,
+        };
+        const coverPageNum = coverPageMap[coverHistoryModal.coverType];
+        return (
+          <ImageHistoryModal
+            coverType={coverHistoryModal.coverType}
+            versions={coverHistoryModal.versions}
+            activeVersionIndex={coverHistoryModal.activeVersionIndex}
+            onClose={() => setCoverHistoryModal(null)}
+            onSelectVersion={(coverType, versionIndex) => handleSelectCoverVersion(coverType as 'frontCover' | 'initialPage' | 'backCover', versionIndex)}
+            developerMode={developerMode}
+            entityIssues={getEntityIssuesForPage(coverPageNum)}
+          />
+        );
+      })()}
 
       {/* Enlarged Image Modal for single image viewing */}
       {enlargedImage && (

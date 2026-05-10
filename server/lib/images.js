@@ -1301,7 +1301,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
 
       if (expectedText) {
-        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE (HARD FAIL):\nAllowed text: "${expectedText}" — and NOTHING else.\nScore MUST be 0 if ANY of the following are true:\n- The allowed text is missing or misspelled (even one wrong letter).\n- The image shows ANY other text anywhere (character names, labels, watermarks, captions, extra words, stray letters on clothing or signs).\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\n${promptForEval}`;
+        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE (HARD FAIL):\nAllowed text: "${expectedText}" — and NOTHING else.\nScore MUST be 0 if ANY of the following are true:\n- The allowed text is missing or misspelled (even one wrong letter).\n- The image shows ANY other text anywhere (character names, labels, watermarks, captions, extra words, stray letters on clothing or signs).\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nWhen you flag a text issue, use these severities:\n- Title or expected text missing/misspelled (any character difference) → severity: CRITICAL.\n- Other unrequested text on the cover (random labels, signs, captions) → severity: MAJOR.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
       }
     }
 
