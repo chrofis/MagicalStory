@@ -9474,10 +9474,26 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
-  // Honour the page's actual aspect when the caller passes one (e.g. '1:1' for
-  // advanced/Jugendbuch). Falling back to the global page default crops square
-  // pages to 3:4 on every inpaint, silently rewriting the book's layout.
-  const aspectRatio = aspectRatioOverride || CONFIG_DEFAULTS.pageAspect;
+  // editWithGrok center-crops every input to match the requested aspect ratio.
+  // For an EDIT of an existing image the right output aspect is the source's
+  // own aspect — Grok's /edits endpoint returns at input aspect anyway. If we
+  // pass a different ratio (e.g. coverAspect='3:4'=0.75 vs the actual 880×1245
+  // cover at 0.707), the crop slices ~36px off the top and bottom of the cover
+  // before Grok ever sees it, cutting into the burned-in title text.
+  // Measure imageData and use its actual aspect; fall back to caller override
+  // or the global default when measurement fails.
+  let measuredAspect = null;
+  try {
+    if (typeof imageData === 'string') {
+      const m = imageData.match(/^data:image\/\w+;base64,(.+)$/);
+      const buf = m ? Buffer.from(m[1], 'base64') : null;
+      if (buf) {
+        const meta = await sharp(buf).metadata();
+        if (meta.width && meta.height) measuredAspect = `${meta.width}:${meta.height}`;
+      }
+    }
+  } catch { /* fall through */ }
+  const aspectRatio = measuredAspect || aspectRatioOverride || CONFIG_DEFAULTS.pageAspect;
 
   log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}" (model: ${modelId}, backend: ${backend}, refs: ${referenceImages.length}, aspect: ${aspectRatio})`);
 
