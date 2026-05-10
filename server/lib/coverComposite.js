@@ -1,0 +1,602 @@
+/**
+ * Composite-cover generation pipeline.
+ *
+ * When MODEL_DEFAULTS.compositeCovers is true, this module replaces the
+ * normal "build prompt → call generateImageWithQualityRetry" path for
+ * cover pages. Instead it:
+ *
+ *   1. Pulls the costumed styled-avatar for each story character.
+ *   2. Removes background via the Python rembg service (chroma-key fallback).
+ *   3. Computes a left-to-right placement using:
+ *        - explicit positions from coverHint.characters when provided
+ *        - else: gender-alternated centre-out arrangement (main → child → adult)
+ *   4. Composites figures + prop onto a WHITE canvas (pass 1 input).
+ *   5. Pass 1 → Grok edit, prompt = strict pose-redraw only.
+ *   6. Cuts the reposed figures from pass 1 via rembg.
+ *   7. Composites the cutout onto the landmark photo (pass 2 input).
+ *   8. Pass 2 → Grok edit, prompt = watercolor unification + ground repaint
+ *      + title rendering. Landmark architecture preserved.
+ *
+ * Returns the same { imageData, modelId, prompt, totalAttempts } shape that
+ * iterateCover/server.js expect from generateImageWithQualityRetry.
+ */
+
+const sharp = require('sharp');
+const { log } = require('../utils/logger');
+const { MODEL_DEFAULTS } = require('../config/models');
+
+const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const XAI_API_URL = 'https://api.x.ai/v1';
+
+// ─── Real-world heights by age (cm) — for figure scale ─────────────────
+const TARGET_TALLEST_PX = 920; // tallest adult on a 1024×1365 canvas
+function heightCm(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n)) return 175;
+  if (n <= 1) return 75;
+  if (n <= 3) return 95;
+  if (n <= 5) return 110;
+  if (n <= 7) return 122;
+  if (n <= 10) return 140;
+  if (n <= 12) return 150;
+  if (n <= 14) return 162;
+  if (n <= 17) return 172;
+  if (n <= 60) return 175;
+  return 168;
+}
+
+// ─── Importance + arrangement ──────────────────────────────────────────
+function sortByImportance(chars) {
+  return chars.slice().sort((a, b) => {
+    const score = (c) => {
+      if (c.isMain || c.isMainCharacter === true) return 0;
+      const age = parseInt(c.age, 10);
+      if (Number.isFinite(age) && age <= 12) return 1;
+      return 2;
+    };
+    return score(a) - score(b);
+  });
+}
+
+const flipGender = (g) => g === 'male' ? 'female' : g === 'female' ? 'male' : null;
+const genderOf = (c) => String(c?.gender || '').toLowerCase();
+
+/**
+ * Centre-out arrangement with gender alternation, supporting any number of
+ * mains. All mains occupy the central block; non-mains fill outward with
+ * alternating gender from each block edge.
+ */
+function arrangeCenterOut(sorted) {
+  const n = sorted.length;
+  if (n === 0) return [];
+  const out = new Array(n);
+  const mains = sorted.filter(c => c.isMain || c.isMainCharacter === true);
+  const nonMains = sorted.filter(c => !(c.isMain || c.isMainCharacter === true));
+
+  const K = Math.max(1, mains.length);
+  const blockStart = Math.floor((n - K) / 2);
+  const blockEnd = blockStart + K;
+
+  if (mains.length === 0) {
+    let male = 0, female = 0;
+    for (const c of nonMains) {
+      const g = genderOf(c);
+      if (g === 'male') male++; else if (g === 'female') female++;
+    }
+    let pickIdx = 0;
+    if (male !== female) {
+      const target = male > female ? 'male' : 'female';
+      const idx = nonMains.findIndex(c => genderOf(c) === target);
+      if (idx >= 0) pickIdx = idx;
+    }
+    out[blockStart] = nonMains[pickIdx];
+    nonMains.splice(pickIdx, 1);
+  } else {
+    const inner = new Array(K);
+    const innerCentre = Math.floor((K - 1) / 2);
+    inner[innerCentre] = mains[0];
+    const usedMain = new Set([0]);
+    const innerCentreGender = genderOf(mains[0]);
+    const innerOffsets = [];
+    for (let d = 1; d <= Math.max(innerCentre, K - 1 - innerCentre); d++) {
+      if (innerCentre + d < K) innerOffsets.push(d);
+      if (innerCentre - d >= 0) innerOffsets.push(-d);
+    }
+    for (const off of innerOffsets) {
+      const want = (Math.abs(off) % 2 === 0) ? innerCentreGender : flipGender(innerCentreGender);
+      let pick = -1;
+      if (want) {
+        for (let i = 0; i < mains.length; i++) {
+          if (usedMain.has(i)) continue;
+          if (genderOf(mains[i]) === want) { pick = i; break; }
+        }
+      }
+      if (pick === -1) {
+        for (let i = 0; i < mains.length; i++) { if (!usedMain.has(i)) { pick = i; break; } }
+      }
+      inner[innerCentre + off] = mains[pick];
+      usedMain.add(pick);
+    }
+    for (let k = 0; k < K; k++) out[blockStart + k] = inner[k];
+  }
+
+  const pickByGender = (want) => {
+    if (want) {
+      for (let i = 0; i < nonMains.length; i++) {
+        if (genderOf(nonMains[i]) === want) return i;
+      }
+    }
+    return nonMains.length > 0 ? 0 : -1;
+  };
+
+  let nextWant = flipGender(genderOf(out[blockEnd - 1]));
+  for (let pos = blockEnd; pos < n; pos++) {
+    const idx = pickByGender(nextWant);
+    if (idx === -1) break;
+    out[pos] = nonMains[idx];
+    nonMains.splice(idx, 1);
+    nextWant = flipGender(genderOf(out[pos]));
+  }
+  nextWant = flipGender(genderOf(out[blockStart]));
+  for (let pos = blockStart - 1; pos >= 0; pos--) {
+    const idx = pickByGender(nextWant);
+    if (idx === -1) break;
+    out[pos] = nonMains[idx];
+    nonMains.splice(idx, 1);
+    nextWant = flipGender(genderOf(out[pos]));
+  }
+
+  return out;
+}
+
+/**
+ * Try to honor an explicit character sequence from the cover hint.
+ *   coverHint.characters can be ["Noah (left foreground)", "Emma (right foreground)", ...]
+ * If positions are present (parenthesised), parse them and return the
+ * corresponding character objects in left→right order. Otherwise return null
+ * so callers fall back to arrangeCenterOut().
+ */
+function parseExplicitSequence(coverHint, characters) {
+  if (!Array.isArray(coverHint?.characters)) return null;
+  const parsed = coverHint.characters.map(entry => {
+    if (typeof entry !== 'string') return null;
+    const match = entry.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+    if (match) return { name: match[1].trim(), pos: match[2].trim().toLowerCase() };
+    return { name: entry.trim(), pos: null };
+  }).filter(Boolean);
+  const anyPos = parsed.some(p => p.pos);
+  if (!anyPos || parsed.length < 2) return null;
+
+  const score = (p) => {
+    const pos = p.pos || '';
+    if (pos.includes('far left')) return 0;
+    if (pos.includes('left foreground')) return 1;
+    if (pos.includes('left midground')) return 2;
+    if (pos.includes('left')) return 3;
+    if (pos.includes('center') || pos.includes('centre')) return 4;
+    if (pos.includes('right foreground')) return 5;
+    if (pos.includes('right midground')) return 6;
+    if (pos.includes('far right')) return 8;
+    if (pos.includes('right')) return 7;
+    return 9;
+  };
+  parsed.sort((a, b) => score(a) - score(b));
+
+  const result = [];
+  for (const p of parsed) {
+    const ch = characters.find(c => c.name?.toLowerCase() === p.name.toLowerCase());
+    if (ch) result.push(ch);
+  }
+  return result.length >= 2 ? result : null;
+}
+
+// ─── Avatar quadrant extraction (body-front / body-profile) ────────────
+async function extractQuadrant(buffer, which = 'body-front') {
+  const meta = await sharp(buffer).metadata();
+  if (!meta.width || !meta.height) return null;
+  const aspect = meta.height / meta.width;
+  if (aspect < 1.3 || aspect > 2.2) return buffer; // not a 2x2 grid
+
+  const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  let minHVar = Infinity, sepY = Math.floor(height / 2);
+  for (let y = Math.floor(height * 0.25); y < Math.floor(height * 0.75); y++) {
+    let s = 0, sq = 0;
+    for (let x = 0; x < width; x++) { const v = data[y * width + x]; s += v; sq += v * v; }
+    const mean = s / width;
+    const variance = sq / width - mean * mean;
+    if (variance < minHVar) { minHVar = variance; sepY = y; }
+  }
+  let minVVar = Infinity, sepX = Math.floor(width / 2);
+  for (let x = Math.floor(width * 0.3); x < Math.floor(width * 0.7); x++) {
+    let s = 0, sq = 0;
+    for (let y = 0; y < height; y++) { const v = data[y * width + x]; s += v; sq += v * v; }
+    const mean = s / height;
+    const variance = sq / height - mean * mean;
+    if (variance < minVVar) { minVVar = variance; sepX = x; }
+  }
+  if (which === 'body-profile') {
+    return sharp(buffer).extract({ left: sepX, top: sepY, width: width - sepX, height: height - sepY }).toBuffer();
+  }
+  return sharp(buffer).extract({ left: 0, top: sepY, width: sepX, height: height - sepY }).toBuffer();
+}
+
+// ─── Background removal (rembg via Python service, chroma-key fallback) ──
+async function removeBackground(buf) {
+  // Try Python rembg first
+  try {
+    const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
+    const r = await fetch(`${PHOTO_ANALYZER_URL}/remove-bg`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, max_size: 1024 }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.success && j.image) {
+        return Buffer.from(j.image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      }
+    }
+  } catch (e) {
+    log.warn(`[COVER-COMPOSITE] rembg failed: ${e.message}`);
+  }
+  // Fallback: edge-flood chroma-key
+  return chromaKeyBg(buf, 45);
+}
+
+async function chromaKeyBg(buf, threshold = 45) {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const CH = 4;
+  const sample = (x0, y0, w = 8, h = 8) => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let y = y0; y < y0 + h && y < height; y++) {
+      for (let x = x0; x < x0 + w && x < width; x++) {
+        const i = (y * width + x) * CH;
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+      }
+    }
+    return n > 0 ? [r / n, g / n, b / n] : null;
+  };
+  const samples = [
+    sample(0, 0), sample(width - 8, 0), sample(0, height - 8), sample(width - 8, height - 8),
+  ].filter(Boolean);
+  const med = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
+  const bgR = med(samples.map(s => s[0]));
+  const bgG = med(samples.map(s => s[1]));
+  const bgB = med(samples.map(s => s[2]));
+  const T_HARD = threshold * threshold;
+  const T_SOFT = (threshold * 1.5) * (threshold * 1.5);
+  const distSq = (i) => {
+    const dr = data[i] - bgR, dg = data[i + 1] - bgG, db = data[i + 2] - bgB;
+    return dr * dr + dg * dg + db * db;
+  };
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let qHead = 0, qTail = 0;
+  const enqueue = (x, y) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    const idx = y * width + x;
+    if (visited[idx]) return;
+    if (distSq(idx * CH) > T_SOFT) { visited[idx] = 1; return; }
+    visited[idx] = 1;
+    queue[qTail++] = idx;
+  };
+  for (let x = 0; x < width; x++) { enqueue(x, 0); enqueue(x, height - 1); }
+  for (let y = 0; y < height; y++) { enqueue(0, y); enqueue(width - 1, y); }
+  while (qHead < qTail) {
+    const idx = queue[qHead++];
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+    const pix = idx * CH;
+    const d2 = distSq(pix);
+    if (d2 < T_HARD) data[pix + 3] = 0;
+    else if (d2 < T_SOFT) data[pix + 3] = Math.round(255 * (Math.sqrt(d2) - threshold) / (threshold * 0.5));
+    else continue;
+    enqueue(x + 1, y); enqueue(x - 1, y); enqueue(x, y + 1); enqueue(x, y - 1);
+  }
+  return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
+// ─── Visual identifiers for the prompt (no character names sent to Grok) ──
+function visualIdentifier(idx, n, age) {
+  const centerIdx = Math.floor(n / 2);
+  let pos;
+  if (n === 1) pos = 'the figure';
+  else if (idx === 0) pos = 'the leftmost figure';
+  else if (idx === n - 1) pos = 'the rightmost figure';
+  else if (idx === centerIdx) pos = 'the centre figure';
+  else if (idx < centerIdx) pos = `the ${idx === 1 ? 'second-from-left' : `${idx + 1}th-from-left`} figure`;
+  else pos = `the ${(n - idx) === 2 ? 'second-from-right' : `${n - idx}th-from-right`} figure`;
+
+  const a = parseInt(age, 10);
+  let ageWord = 'figure';
+  if (Number.isFinite(a)) {
+    if (a <= 6) ageWord = 'small child';
+    else if (a <= 12) ageWord = 'older child';
+    else if (a <= 17) ageWord = 'teenager';
+    else if (a <= 60) ageWord = 'adult';
+    else ageWord = 'elderly figure';
+  }
+  return `${pos} (the ${ageWord})`;
+}
+
+// ─── Grok edit call ────────────────────────────────────────────────────
+async function callGrokEdit(prompt, imgBuf, { aspectRatio = '3:4', model = 'grok-imagine-image' } = {}) {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) throw new Error('XAI_API_KEY not set');
+  const t0 = Date.now();
+  const resp = await fetch(`${XAI_API_URL}/images/edits`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model, prompt,
+      response_format: 'b64_json',
+      aspect_ratio: aspectRatio,
+      image: { url: `data:image/jpeg;base64,${imgBuf.toString('base64')}`, type: 'image_url' },
+    }),
+    signal: AbortSignal.timeout(180000),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Grok edit ${resp.status}: ${err.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('Grok edit returned no image');
+  return { imageData: Buffer.from(b64, 'base64'), elapsedMs: Date.now() - t0, modelId: model };
+}
+
+// ─── Resolve the styled costumed avatar for a character ────────────────
+function getCostumedAvatarSrc(c, artStyle) {
+  const styled = c.avatars?.styledAvatars?.[artStyle];
+  if (!styled) return null;
+  const costumedObj = styled.costumed;
+  if (costumedObj && typeof costumedObj === 'object') {
+    // costumed is keyed by costume description: { "medieval swiss huntsman": "data:..." }
+    const first = Object.values(costumedObj)[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object') return first.imageUrl || first.imageData;
+  } else if (typeof costumedObj === 'string') {
+    return costumedObj;
+  }
+  // Fall back to standard / formal in the same art style
+  for (const k of ['standard', 'formal']) {
+    const v = styled[k];
+    if (typeof v === 'string') return v;
+    if (v && typeof v === 'object') return v.imageUrl || v.imageData;
+  }
+  // Last resort: avatars.standardUrl
+  return c.avatars?.standardUrl || c.avatars?.standard || null;
+}
+
+async function loadImageAny(src) {
+  if (!src) return null;
+  if (typeof src === 'object') return loadImageAny(src.imageUrl || src.imageData);
+  if (typeof src !== 'string') return null;
+  if (src.startsWith('data:')) return Buffer.from(src.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  if (/^https?:\/\//i.test(src)) {
+    const r = await fetch(src);
+    if (!r.ok) return null;
+    return Buffer.from(await r.arrayBuffer());
+  }
+  try { return Buffer.from(src, 'base64'); } catch { return null; }
+}
+
+/**
+ * Main entry point.
+ *
+ * @param {Object} args
+ * @param {string} args.coverKey               'frontCover' | 'initialPage' | 'backCover'
+ * @param {Object[]} args.characters           Story characters with avatars + age + gender + isMainCharacter
+ * @param {Object} args.coverHint              storyData.coverHints[hintKey]
+ * @param {Buffer|null} args.landmarkBuf       Landmark photo buffer (optional — pass 2 skipped if null)
+ * @param {string} args.artStyle               e.g. 'watercolor'
+ * @param {string} args.title                  Story title for cover text rendering
+ * @param {string} args.styleHint              Verbose art-style description used in pass 2 prompt
+ * @param {Function} [args.usageTracker]       (provider, usage, fn, modelId) callback for cost tracking
+ * @returns {Promise<{ imageData: string, modelId: string, prompt: string, totalAttempts: number, debug: object }>}
+ */
+async function generateCoverViaComposite({
+  coverKey,
+  characters,
+  coverHint,
+  landmarkBuf,
+  artStyle = 'watercolor',
+  title = '',
+  styleHint = "watercolor children's storybook illustration, soft brushwork, gentle storybook colors",
+  usageTracker = null,
+}) {
+  const W = 1024;
+  const H = 1365;
+  const label = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+  log.info(`🎨 [COVER-COMPOSITE] ${label}: starting composite-cover generation`);
+
+  // 1. Determine character sequence (explicit > alternation)
+  let sequence = parseExplicitSequence(coverHint, characters);
+  if (sequence) {
+    log.info(`🎨 [COVER-COMPOSITE] ${label}: using explicit sequence from coverHint`);
+  } else {
+    const importance = sortByImportance(characters);
+    sequence = arrangeCenterOut(importance);
+    log.info(`🎨 [COVER-COMPOSITE] ${label}: using gender-alternated centre-out sequence`);
+  }
+  log.info(`🎨 [COVER-COMPOSITE] order: ${sequence.map(c => `${c.name}(${(c.gender || '?')[0]?.toUpperCase()})`).join(' → ')}`);
+
+  // 2. Load each character's costumed avatar, extract body-front, bg-remove
+  const figures = [];
+  const tallestCm = Math.max(...sequence.map(c => heightCm(c.age)));
+  const sceneScale = 0.62; // village/cover scale
+  const pxPerCm = (TARGET_TALLEST_PX * sceneScale) / tallestCm;
+  for (const c of sequence) {
+    const src = getCostumedAvatarSrc(c, artStyle);
+    if (!src) {
+      log.warn(`[COVER-COMPOSITE] ${c.name}: no styled avatar found in style=${artStyle}`);
+      continue;
+    }
+    const buf = await loadImageAny(src);
+    if (!buf) { log.warn(`[COVER-COMPOSITE] ${c.name}: avatar load failed`); continue; }
+    const body = await extractQuadrant(buf, 'body-front');
+    const cleanRaw = await removeBackground(body);
+    const trimmed = await sharp(cleanRaw).trim({ threshold: 1 }).toBuffer().catch(() => cleanRaw);
+    const targetH = Math.max(40, Math.round(heightCm(c.age) * pxPerCm * 1.2));
+    const resized = await sharp(trimmed).resize({ height: targetH }).png().toBuffer();
+    const m = await sharp(resized).metadata();
+    figures.push({ name: c.name, age: parseInt(c.age, 10), gender: c.gender, buffer: resized, width: m.width, height: m.height });
+  }
+  if (figures.length === 0) throw new Error('No figures could be assembled for composite cover');
+
+  // 3. Pull and bg-remove the cover prop (first ART* in coverHint.objects)
+  const propIds = (coverHint?.objects || []).filter(id => /^ART\d+/.test(String(id)));
+  let propBuf = null;
+  if (propIds.length > 0) {
+    // Caller must supply propUrl/propData via coverHint.artifacts (passed in by the wrapper)
+    // For now, the artifacts must be loaded by the caller and attached to coverHint as `_artifactImages`
+    const artImg = coverHint._artifactImages?.[propIds[0]];
+    if (artImg) {
+      const raw = await loadImageAny(artImg);
+      if (raw) {
+        const cleaned = await removeBackground(raw);
+        const trimmed = await sharp(cleaned).trim({ threshold: 1 }).toBuffer().catch(() => cleaned);
+        propBuf = trimmed;
+      }
+    }
+  }
+
+  // 4. Composite figures + prop on WHITE bg (pass 1 input)
+  const whiteBg = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } }).jpeg({ quality: 92 }).toBuffer();
+  const margin = 24;
+  const usableW = W - margin * 2;
+  const overlap = 0.20;
+  const groundY = Math.round(H * 0.96);
+  const centres = new Array(figures.length);
+  centres[0] = 0;
+  for (let i = 1; i < figures.length; i++) {
+    const step = (figures[i - 1].width + figures[i].width) / 2 * (1 - overlap);
+    centres[i] = centres[i - 1] + step;
+  }
+  const span = centres[figures.length - 1] || 0;
+  const startCentre = (W - span) / 2;
+  for (let i = 0; i < figures.length; i++) centres[i] += startCentre;
+
+  const layers = [];
+  for (let i = 0; i < figures.length; i++) {
+    const f = figures[i];
+    const left = Math.max(0, Math.min(W - f.width, Math.round(centres[i] - f.width / 2)));
+    const top = Math.max(0, groundY - f.height);
+    layers.push({ input: f.buffer, left, top });
+  }
+  if (propBuf) {
+    const propTargetH = Math.round(H * 0.25);
+    const propResized = await sharp(propBuf).resize({ height: propTargetH }).png().toBuffer();
+    const pm = await sharp(propResized).metadata();
+    const left = Math.max(0, Math.round((W - pm.width) / 2));
+    const top = Math.max(0, H - 8 - pm.height);
+    layers.push({ input: propResized, left, top });
+  }
+  const pass1Input = await sharp(whiteBg).composite(layers).jpeg({ quality: 92 }).toBuffer();
+
+  // 5. Build pass 1 prompt (pose redraw only, no landmark, no style)
+  const n = figures.length;
+  const centerIdx = Math.floor(n / 2);
+  const propName = propIds[0] ? (coverHint._artifactNames?.[propIds[0]] || 'central prop') : null;
+  const POSES = [];
+  for (let i = 0; i < n; i++) {
+    const me = visualIdentifier(i, n, figures[i].age);
+    let pose;
+    if (i === centerIdx) {
+      pose = propName
+        ? `BOTH HANDS rest on the ${propName} on the ground in front. Body leans slightly forward. Head looks down at the prop and up at the viewer. NOT arms-at-sides.`
+        : `Holding hands with the figure to the immediate right. Body squared to camera. NOT arms-at-sides.`;
+    } else if (i < centerIdx) {
+      pose = `RIGHT ARM raised and around ${visualIdentifier(i + 1, n, figures[i + 1].age)}'s shoulders, pulling that figure close. Body angled slightly to the right. NOT arms-at-sides.`;
+    } else {
+      pose = `LEFT HAND placed on ${visualIdentifier(i - 1, n, figures[i - 1].age)}'s shoulder, fingers visible. Body angled slightly to the left. NOT arms-at-sides.`;
+    }
+    POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose}`);
+  }
+  const pass1Prompt = `PASS 1: REPOSE FIGURES ONLY.
+
+The input shows ${n} character cutouts on a plain white background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Just change the poses.
+
+═══ POSE REDRAW (mandatory — do every line) ═══
+${POSES.join('\n')}
+
+PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, white background, relative left-to-right positions.
+
+DO NOT add or remove characters. DO NOT add a landscape or background. KEEP THE WHITE BACKGROUND. NO TEXT.
+
+If any figure still has arms at their sides, the task has failed.`;
+
+  // 6. Call Grok pass 1
+  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit`);
+  const pass1 = await callGrokEdit(pass1Prompt, pass1Input);
+  if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass1.elapsedMs }, 'cover_composite_pass1', pass1.modelId);
+
+  // If no landmark, return pass 1 result
+  if (!landmarkBuf) {
+    return {
+      imageData: `data:image/jpeg;base64,${pass1.imageData.toString('base64')}`,
+      modelId: pass1.modelId,
+      prompt: pass1Prompt,
+      totalAttempts: 1,
+      debug: { pass1Input, pass1Output: pass1.imageData },
+    };
+  }
+
+  // 7. Cut figures from pass 1 result
+  let cutout = await removeBackground(pass1.imageData);
+  // 8. Composite cutout onto landmark
+  const landmarkResized = await sharp(landmarkBuf).resize(W, H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+  const cutoutResized = await sharp(cutout).resize(W, H, { fit: 'inside' }).png().toBuffer();
+  const cm = await sharp(cutoutResized).metadata();
+  const offX = Math.round((W - cm.width) / 2);
+  const offY = Math.round((H - cm.height) / 2);
+  const pass2Input = await sharp(landmarkResized).composite([{ input: cutoutResized, left: offX, top: offY }]).jpeg({ quality: 92 }).toBuffer();
+
+  // 9. Build pass 2 prompt
+  const titleLine = title
+    ? `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`
+    : '';
+  const pass2Prompt = `LANDMARK PROTECTION (CRITICAL — read first):
+The background of this image is a real photograph of a specific landmark. DO NOT redraw it. DO NOT move buildings. DO NOT change architecture. DO NOT change the skyline. DO NOT add or remove windows. The buildings, the position of every window, the roofline, and the silhouette must remain pixel-faithful to the input photograph. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
+
+YOUR EDIT (in this order):
+1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
+2. The figures (already painted in watercolor with interactive poses) are foreground — blend them into the scene by matching lighting and softening cutout edges. DO NOT change their poses.
+3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.${titleLine}
+
+PRESERVE EXACTLY:
+- Every building, window, roofline, doorway — they are correct in the input.
+- Every figure's pose, face, hair, skin tone, clothing.
+- Every prop's silhouette and material.
+
+DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${titleLine ? '' : ' NO text, no signage, no letters anywhere.'}`;
+
+  // 10. Call Grok pass 2
+  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 2 (watercolor + landmark) — Grok edit`);
+  const pass2 = await callGrokEdit(pass2Prompt, pass2Input);
+  if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass2.elapsedMs }, 'cover_composite_pass2', pass2.modelId);
+
+  return {
+    imageData: `data:image/jpeg;base64,${pass2.imageData.toString('base64')}`,
+    modelId: pass2.modelId,
+    prompt: pass2Prompt,
+    totalAttempts: 1,
+    debug: {
+      sequence: sequence.map(c => c.name),
+      pass1Input, pass1Output: pass1.imageData,
+      pass2Input, pass2Output: pass2.imageData,
+    },
+  };
+}
+
+module.exports = {
+  generateCoverViaComposite,
+  // Exported for testing / reuse:
+  sortByImportance,
+  arrangeCenterOut,
+  parseExplicitSequence,
+  visualIdentifier,
+};

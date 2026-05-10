@@ -173,6 +173,21 @@ const MODEL_DEFAULTS = {
   pageAspect: IMAGE_ASPECTS.A4,
   coverAspect: IMAGE_ASPECTS.A4,
   avatarAspect: IMAGE_ASPECTS.AVATAR,
+
+  // ─── Composite Cover mode ────────────────────────────────────────────
+  // When true, cover pages (frontCover, initialPage, backCover) skip the
+  // normal generateImageWithQualityRetry path and instead use a manual
+  // composite + 2-pass Grok edit:
+  //   1. Pull the story's costumed avatars for each character.
+  //   2. Background-remove via Python rembg service.
+  //   3. Composite onto white canvas with prop layered in front, in a
+  //      gender-alternated centre-out arrangement (mains in centre).
+  //   4. Pass 1: Grok edit with strict pose-redraw prompt.
+  //   5. Cut figures from pass 1, composite onto landmark photo.
+  //   6. Pass 2: Grok edit applies watercolor + ground material + title.
+  // Off by default — flip to true once validated on production stories.
+  // Both initial cover gen and iterate-cover honor this flag.
+  compositeCovers: true,
 };
 
 // Available inpaint backends

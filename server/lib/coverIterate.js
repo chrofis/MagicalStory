@@ -281,6 +281,66 @@ async function iterateCover(coverKey, storyData, options = {}) {
     sceneMetadata: coverSceneMetadata,
   } = refs;
 
+  // --- Composite Cover branch (flag-gated) ──────────────────────────────
+  // When MODEL_DEFAULTS.compositeCovers is true (or modelOverrides override),
+  // skip the normal generation path and use the manual-composite + 2-pass
+  // Grok edit method. Same return shape so all callers stay agnostic.
+  const compositeOn = options.compositeCovers === true
+    || MODEL_DEFAULTS.compositeCovers === true;
+  if (compositeOn) {
+    try {
+      const { generateCoverViaComposite } = require('./coverComposite');
+      // Pull artifact images from the visual bible so the composite layer
+      // has the prop bytes ready.
+      const enrichedHint = { ...(coverHint || {}) };
+      enrichedHint._artifactImages = {};
+      enrichedHint._artifactNames = {};
+      for (const id of (coverHint?.objects || [])) {
+        if (!/^ART\d+/.test(String(id))) continue;
+        const art = (visualBible?.artifacts || []).find(a => a?.id === id);
+        if (!art) continue;
+        enrichedHint._artifactNames[id] = art.name || id;
+        const src = art.referenceImageUrl || art.referenceImageData;
+        if (src) enrichedHint._artifactImages[id] = src;
+      }
+      // First landmark photo for the cover
+      const landmarkBuf = coverLandmarkPhotos?.[0]
+        ? await loadLandmarkBytes(coverLandmarkPhotos[0])
+        : null;
+      const compositeResult = await generateCoverViaComposite({
+        coverKey,
+        // Use mergedCharacters (with fresh avatars merged) so the composite
+        // pulls the same costumed avatars the rest of the pipeline uses.
+        characters: mergedCharacters,
+        coverHint: enrichedHint,
+        landmarkBuf,
+        artStyle: storyData.artStyle || 'watercolor',
+        title: storyData.title || '',
+        styleHint: styleDescription,
+        usageTracker,
+      });
+      log.info(`🎨 [COVER-ITERATE] ${coverKey}: composite-cover generated (modelId=${compositeResult.modelId})`);
+      return {
+        imageData: compositeResult.imageData,
+        score: null, // composite path skips quality eval — returns immediately
+        reasoning: 'composite-cover (no quality eval)',
+        modelId: compositeResult.modelId,
+        totalAttempts: compositeResult.totalAttempts || 1,
+        prompt: compositeResult.prompt,
+        referencePhotos: coverCharacterPhotos,
+        landmarkPhotos: coverLandmarkPhotos,
+        visualBibleGrid: null,
+        grokRefImages: null,
+        usage: { cost: 0.04, direct_cost: 0.04 }, // 2 Grok edits
+        previousImage: existingCover.imageData,
+        previousScore: existingCover.qualityScore || null,
+        compositeDebug: compositeResult.debug,
+      };
+    } catch (err) {
+      log.warn(`⚠️ [COVER-ITERATE] composite path failed: ${err.message} — falling back to normal path`);
+    }
+  }
+
   // --- Generate image ---
   const imageResult = await generateImageWithQualityRetry(
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
@@ -306,6 +366,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
     previousImage: existingCover.imageData,
     previousScore: existingCover.qualityScore || null,
   };
+}
+
+// Helper: turn a landmark-photo entry from getLandmarkPhotosForScene
+// (could be { photoUrl, photoData, ... }) into a Buffer.
+async function loadLandmarkBytes(lm) {
+  if (!lm) return null;
+  const r2 = require('./r2');
+  const candidates = [lm.photoUrl, lm.photoData].filter(s => typeof s === 'string' && s.length > 0);
+  for (const src of candidates) {
+    try {
+      const buf = await r2.bytesFromAnyImage(src);
+      if (buf) return buf;
+    } catch { /* try next */ }
+  }
+  return null;
 }
 
 /**
