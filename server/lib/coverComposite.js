@@ -395,6 +395,7 @@ async function loadImageAny(src) {
  * @param {string} args.artStyle               e.g. 'watercolor'
  * @param {string} args.title                  Story title for cover text rendering
  * @param {string} args.styleHint              Verbose art-style description used in pass 2 prompt
+ * @param {string} [args.sceneDescription]     Full scene prose (Emma holds X / Noah gazes at Y) — when provided, embedded into pass-1 and pass-2 prompts so the model knows the story-specific action instead of inventing generic poses.
  * @param {Function} [args.usageTracker]       (provider, usage, fn, modelId) callback for cost tracking
  * @returns {Promise<{ imageData: string, modelId: string, prompt: string, totalAttempts: number, debug: object }>}
  */
@@ -406,6 +407,7 @@ async function generateCoverViaComposite({
   artStyle = 'watercolor',
   title = '',
   styleHint = "watercolor children's storybook illustration, soft brushwork, gentle storybook colors",
+  sceneDescription = '',
   usageTracker = null,
 }) {
   const W = 1024;
@@ -516,18 +518,46 @@ async function generateCoverViaComposite({
     }
     POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose}`);
   }
+  // Pass-1 must stay WHITE-BACKGROUND only. We can't dump the full scene
+  // prose here — the prose names the landmark explicitly ("Holzbrücke spanning
+  // the river behind them") and Grok will dutifully paint that landscape into
+  // pass-1's white background, defeating the cutout step entirely. Instead we
+  // extract structured interactions[] from the scene metadata: each is a
+  // {character, object, where} triple naming what each character does and
+  // gazes at, with no environmental description. That's the safe channel.
+  const interactionLines = [];
+  try {
+    const metaMatch = String(sceneDescription || '').match(/---\s*METADATA\s*---([\s\S]*?)(?:\n---|$)/i)
+      || String(sceneDescription || '').match(/```json([\s\S]*?)```/i);
+    if (metaMatch) {
+      const meta = JSON.parse(metaMatch[1].trim().replace(/^json\s*/i, ''));
+      const ints = meta.interactions || meta.fullData?.interactions || [];
+      for (const ix of ints) {
+        if (!ix?.character || !ix?.where) continue;
+        const splitChars = String(ix.character).split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
+        const targets = splitChars.length > 1 ? splitChars : [String(ix.character).trim()];
+        for (const t of targets) {
+          interactionLines.push(`- ${t}: ${ix.where}`);
+        }
+      }
+    }
+  } catch { /* metadata not parseable — fall back to positional templates only */ }
+  const actionSection = interactionLines.length > 0
+    ? `\n═══ STORY ACTION (use these poses; no environmental detail) ═══\n${interactionLines.join('\n')}\n**These story actions take priority over the POSE REDRAW lines below when the same character appears in both.**\n`
+    : '';
+
   const pass1Prompt = `PASS 1: REPOSE FIGURES ONLY.
 
 The input shows ${n} character cutouts on a plain white background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Just change the poses.
-
+${actionSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
 PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, white background, relative left-to-right positions.
 
-DO NOT add or remove characters. DO NOT add a landscape or background. KEEP THE WHITE BACKGROUND. NO TEXT.
+DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, or any background. The background MUST stay pure white. NO TEXT, no signage, no letters anywhere.
 
-If any figure still has arms at their sides, the task has failed.`;
+If any figure still has arms at their sides, the task has failed. If the background is anything other than white, the task has failed.`;
 
   // 6. Call Grok pass 1
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit`);
@@ -541,7 +571,13 @@ If any figure still has arms at their sides, the task has failed.`;
       modelId: pass1.modelId,
       prompt: pass1Prompt,
       totalAttempts: 1,
-      debug: { pass1Input, pass1Output: pass1.imageData },
+      debug: {
+        pass1Input,
+        pass1Output: pass1.imageData,
+        pass1Prompt,
+        pass1ModelId: pass1.modelId,
+        pass1ElapsedMs: pass1.elapsedMs,
+      },
     };
   }
 
@@ -559,6 +595,21 @@ If any figure still has arms at their sides, the task has failed.`;
   const titleLine = title
     ? `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`
     : '';
+  // Pass 2: full scene prose IS safe to include because the landmark is
+  // already painted into the input. Prose context helps the model match
+  // atmosphere and reinforce gaze direction (without it pass-2 sometimes
+  // "resets" gazes to camera-front during the texture pass). Strip metadata
+  // block; cap at 1200 chars to keep prompt size reasonable.
+  const proseForPass2 = String(sceneDescription || '')
+    .split(/\n*---\s*METADATA\s*---/i)[0]
+    .replace(/```json[\s\S]*?```/gi, '')
+    .replace(/\s+\n/g, '\n')
+    .trim()
+    .slice(0, 1200);
+  const sceneSectionPass2 = proseForPass2
+    ? `\n\nSTORY SCENE CONTEXT (do not change poses; this is for atmosphere matching only):\n${proseForPass2}`
+    : '';
+
   const pass2Prompt = `LANDMARK PROTECTION (CRITICAL — read first):
 The background of this image is a real photograph of a specific landmark. DO NOT redraw it. DO NOT move buildings. DO NOT change architecture. DO NOT change the skyline. DO NOT add or remove windows. The buildings, the position of every window, the roofline, and the silhouette must remain pixel-faithful to the input photograph. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
 
@@ -571,8 +622,9 @@ PRESERVE EXACTLY:
 - Every building, window, roofline, doorway — they are correct in the input.
 - Every figure's pose, face, hair, skin tone, clothing.
 - Every prop's silhouette and material.
+- Every figure's GAZE DIRECTION — if a character is looking down at a held prop in the input, they are still looking down at that prop in the output. Do NOT redirect any gaze toward the camera.
 
-DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${titleLine ? '' : ' NO text, no signage, no letters anywhere.'}`;
+DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${titleLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
 
   // 10. Call Grok pass 2
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 2 (watercolor + landmark) — Grok edit`);
@@ -586,8 +638,16 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
     totalAttempts: 1,
     debug: {
       sequence: sequence.map(c => c.name),
-      pass1Input, pass1Output: pass1.imageData,
-      pass2Input, pass2Output: pass2.imageData,
+      pass1Input,
+      pass1Output: pass1.imageData,
+      pass1Prompt,
+      pass1ModelId: pass1.modelId,
+      pass1ElapsedMs: pass1.elapsedMs,
+      pass2Input,
+      pass2Output: pass2.imageData,
+      pass2Prompt,
+      pass2ModelId: pass2.modelId,
+      pass2ElapsedMs: pass2.elapsedMs,
     },
   };
 }

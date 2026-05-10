@@ -6745,10 +6745,56 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           if (method === 'iterate') {
             const result = await executeIterateAction(img, latestEval);
             if (result?.imageData) {
+              // For composite-cover iterate the bottom-line "result" hides a
+              // 2-pass workflow with 4 intermediate buffers and 2 distinct
+              // prompts. Carry that detail forward so the version row records
+              // exactly what went to the image model on each pass — without
+              // this the dev panel can't distinguish a composite iterate from
+              // a legacy iterate, and there's no way to inspect why pass 1
+              // produced the wrong arms or why pass 2 lost the gaze.
+              const bufToDataUrl = (b, mime = 'image/jpeg') => {
+                if (!b) return null;
+                if (typeof b === 'string') return b.startsWith('data:') ? b : `data:${mime};base64,${b}`;
+                if (Buffer.isBuffer(b)) return `data:${mime};base64,${b.toString('base64')}`;
+                return null;
+              };
+              const compositeAttempts = result.compositeDebug
+                ? (result.compositeDebug.pass2Input
+                    ? [
+                        {
+                          pass: 1,
+                          input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
+                          output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
+                          prompt: result.compositeDebug.pass1Prompt || null,
+                          modelId: result.compositeDebug.pass1ModelId || null,
+                          elapsedMs: result.compositeDebug.pass1ElapsedMs || null,
+                        },
+                        {
+                          pass: 2,
+                          input: bufToDataUrl(result.compositeDebug.pass2Input, 'image/jpeg'),
+                          output: bufToDataUrl(result.compositeDebug.pass2Output, 'image/jpeg'),
+                          prompt: result.compositeDebug.pass2Prompt || null,
+                          modelId: result.compositeDebug.pass2ModelId || null,
+                          elapsedMs: result.compositeDebug.pass2ElapsedMs || null,
+                        },
+                      ]
+                    : [
+                        // No-landmark variant: only pass 1 ran.
+                        {
+                          pass: 1,
+                          input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
+                          output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
+                          prompt: result.compositeDebug.pass1Prompt || null,
+                          modelId: result.compositeDebug.pass1ModelId || null,
+                          elapsedMs: result.compositeDebug.pass1ElapsedMs || null,
+                        },
+                      ])
+                : null;
               return {
                 pageNumber,
                 imageData: result.imageData,
-                source: `iterate-round-${round}`,
+                source: compositeAttempts ? `composite-iterate-round-${round}` : `iterate-round-${round}`,
+                method: compositeAttempts ? 'composite' : undefined,
                 modelId: result.modelId,
                 grokRefImages: result.grokRefImages || null,
                 // Capture the iterate's actual image prompt — this is the
@@ -6761,6 +6807,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // appended.
                 prompt: result.imagePrompt || null,
                 description: result.newScene || null,
+                compositeAttempts,
               };
             }
             return { pageNumber, imageData: null, error: 'iterate produced no result' };

@@ -2008,6 +2008,20 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           ? source.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
           : [];
         target.hasInpaintReferenceImages = Array.isArray(source.inpaintReferenceImages) && source.inpaintReferenceImages.length > 0;
+        // Composite-cover 2-pass debug: forward attempts with R2 URLs only
+        // (input/output buffers were uploaded by saveStoryData). Prompts +
+        // modelIds + elapsed are small strings/numbers and pass through.
+        if (Array.isArray(source.compositeAttempts)) {
+          target.compositeAttempts = source.compositeAttempts.map(a => ({
+            pass: a?.pass,
+            input: typeof a?.input === 'string' && !a.input.startsWith('data:') ? a.input : null,
+            output: typeof a?.output === 'string' && !a.output.startsWith('data:') ? a.output : null,
+            prompt: a?.prompt || null,
+            modelId: a?.modelId || null,
+            elapsedMs: a?.elapsedMs ?? null,
+          }));
+          target.method = source.method || target.method || null;
+        }
         target.textSpaceCoveragePct = source.textSpaceCoveragePct ?? null;
         target.textSpacePosition = source.textSpacePosition || null;
         target.iterationFeedback = source.iterationFeedback || null;

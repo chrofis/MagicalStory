@@ -313,6 +313,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // pulls the same costumed avatars the rest of the pipeline uses.
         characters: mergedCharacters,
         coverHint: enrichedHint,
+        // Pass the full scene prose so pass-1 / pass-2 prompts can include
+        // the story-specific action (Emma holds the Schatztruhe with eyes on
+        // contents, Noah gazes at the Schatzkarte). Without this the
+        // composite fell back to generic positional pose templates and the
+        // model invented arbitrary poses that contradicted the story.
+        sceneDescription,
         landmarkBuf,
         artStyle: storyData.artStyle || 'watercolor',
         title: storyData.title || '',

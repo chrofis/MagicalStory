@@ -809,6 +809,18 @@ async function extractInlineImagesToR2(storyId, data) {
               upload(v.inpaintReferenceImages[idx], r2.keyForInpaintRef(storyId, pageNum, i, idx), (url) => { v.inpaintReferenceImages[idx] = url; });
             }
           }
+          // Composite-cover 2-pass debug — 4 buffers per attempt (pass1 input/
+          // output, pass2 input/output) and the 2 prompts. Saves what was
+          // actually sent to Grok edit on each pass so the dev panel can show
+          // the full pipeline. Inline base64 → R2.
+          if (Array.isArray(v.compositeAttempts)) {
+            for (let a = 0; a < v.compositeAttempts.length; a++) {
+              const att = v.compositeAttempts[a];
+              if (!att || typeof att !== 'object') continue;
+              upload(att.input, `stories/${storyId}/debug/p${pageNum}/v${i}/composite-pass${att.pass}-input.jpg`, (url) => { att.input = url; });
+              upload(att.output, `stories/${storyId}/debug/p${pageNum}/v${i}/composite-pass${att.pass}-output.jpg`, (url) => { att.output = url; });
+            }
+          }
         }
       }
       if (Array.isArray(s.landmarkPhotos)) {
@@ -892,6 +904,17 @@ async function extractInlineImagesToR2(storyId, data) {
             for (let k = 0; k < v.inpaintReferenceImages.length; k++) {
               const idx = k;
               upload(v.inpaintReferenceImages[idx], `stories/${storyId}/debug/${pageMarker}/v${i}/inpaint-ref-${idx}.jpg`, (url) => { v.inpaintReferenceImages[idx] = url; });
+            }
+          }
+          // Composite-cover 2-pass debug (covers go through this path more
+          // than pages — composite is currently cover-only). 4 buffers + 2
+          // prompts; uploaded the same way as page composite attempts.
+          if (Array.isArray(v.compositeAttempts)) {
+            for (let a = 0; a < v.compositeAttempts.length; a++) {
+              const att = v.compositeAttempts[a];
+              if (!att || typeof att !== 'object') continue;
+              upload(att.input, `stories/${storyId}/debug/${pageMarker}/v${i}/composite-pass${att.pass}-input.jpg`, (url) => { att.input = url; });
+              upload(att.output, `stories/${storyId}/debug/${pageMarker}/v${i}/composite-pass${att.pass}-output.jpg`, (url) => { att.output = url; });
             }
           }
         }

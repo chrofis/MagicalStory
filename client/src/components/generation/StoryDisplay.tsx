@@ -4498,7 +4498,8 @@ export function StoryDisplay({
                   // imageVersions[activeVersion], and the root stays stale.
                   const activeIdx = frontCoverObj.activeVersion ?? (frontCoverObj.imageVersions?.length ? frontCoverObj.imageVersions.length - 1 : 0);
                   const frontCoverGrokRefs = (frontCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? frontCoverObj.grokRefImages;
-                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverGrokRefs?.length ?? 0) > 0;
+                  const frontCoverComposite = (frontCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
+                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverGrokRefs?.length ?? 0) > 0 || (frontCoverComposite?.length ?? 0) > 0;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
@@ -4506,6 +4507,7 @@ export function StoryDisplay({
                       landmarkPhotos={frontCoverObj.landmarkPhotos}
                       visualBibleGrid={frontCoverObj.visualBibleGrid}
                       grokRefImages={frontCoverGrokRefs}
+                      compositeAttempts={frontCoverComposite}
                       language={language}
                     />
                   );
@@ -4740,7 +4742,8 @@ export function StoryDisplay({
                 {(() => {
                   const activeIdx = initialPageObj.activeVersion ?? (initialPageObj.imageVersions?.length ? initialPageObj.imageVersions.length - 1 : 0);
                   const initialPageGrokRefs = (initialPageObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? initialPageObj.grokRefImages;
-                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageGrokRefs?.length ?? 0) > 0;
+                  const initialPageComposite = (initialPageObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
+                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageGrokRefs?.length ?? 0) > 0 || (initialPageComposite?.length ?? 0) > 0;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
@@ -4748,6 +4751,7 @@ export function StoryDisplay({
                       landmarkPhotos={initialPageObj.landmarkPhotos}
                       visualBibleGrid={initialPageObj.visualBibleGrid}
                       grokRefImages={initialPageGrokRefs}
+                      compositeAttempts={initialPageComposite}
                       language={language}
                     />
                   );
@@ -5346,6 +5350,7 @@ export function StoryDisplay({
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
                                 grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)]?.grokRefImages ?? (image as any)?.grokRefImages}
+                                compositeAttempts={(image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -6024,6 +6029,7 @@ export function StoryDisplay({
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
                                 grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions?.length ? image.imageVersions.length - 1 : 0)]?.grokRefImages ?? (image as any)?.grokRefImages}
+                                compositeAttempts={(image?.imageVersions?.[image.activeVersion ?? (image.imageVersions?.length ? image.imageVersions.length - 1 : 0)] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -6427,7 +6433,8 @@ export function StoryDisplay({
                 {(() => {
                   const activeIdx = backCoverObj.activeVersion ?? (backCoverObj.imageVersions?.length ? backCoverObj.imageVersions.length - 1 : 0);
                   const backCoverGrokRefs = (backCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? backCoverObj.grokRefImages;
-                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverGrokRefs?.length ?? 0) > 0;
+                  const backCoverComposite = (backCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
+                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverGrokRefs?.length ?? 0) > 0 || (backCoverComposite?.length ?? 0) > 0;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
@@ -6435,6 +6442,7 @@ export function StoryDisplay({
                       landmarkPhotos={backCoverObj.landmarkPhotos}
                       visualBibleGrid={backCoverObj.visualBibleGrid}
                       grokRefImages={backCoverGrokRefs}
+                      compositeAttempts={backCoverComposite}
                       language={language}
                     />
                   );
