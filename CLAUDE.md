@@ -122,12 +122,21 @@ npm run dev:python     # Terminal 3: Python photo analyzer on :5000
 # Build frontend for production
 cd client && npm run build     # Outputs to /dist
 
-# Deploy to Railway
-git push origin master && railway redeploy --yes
+# Deploy to staging (auto-deploys from `staging` branch)
+git push origin staging
 
-# View Railway logs
+# Deploy to production (auto-deploys from `master` branch)
+# Standard flow: merge staging → master, push.
+git checkout master && git merge staging && git push origin master
+
+# View Railway logs (current environment, set via `railway environment`)
 railway logs
 ```
+
+**Branch / deploy flow:**
+- `feature/X` → PR → `staging` → smoke-test on staging.magicalstory.ch → `master` (prod).
+- Hotfixes can push direct to `master` but should be the exception.
+- See `docs/staging-setup.md` for one-time staging environment provisioning.
 
 ### Python Photo Analyzer Service
 
