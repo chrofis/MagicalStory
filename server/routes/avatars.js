@@ -1018,8 +1018,21 @@ async function generateDynamicAvatar(character, category, config) {
   log.debug(`🎭 [DYNAMIC AVATAR] Generating ${logCategory} avatar for ${character.name}`);
 
   try {
+    // Fail-fast if prompt templates aren't loaded. Without this guard we used
+    // to JSON.stringify `text: undefined` → Gemini received parts:[{}] → 400
+    // "system_instruction.parts[0].data: required oneof field 'data' must
+    // have one initialized field". The 400 looked unrelated; the real cause
+    // was a missing prompt file silently swallowed by the prompt loader.
+    if (!PROMPT_TEMPLATES.avatarMainPrompt || !PROMPT_TEMPLATES.avatarSystemInstruction) {
+      const missing = [
+        !PROMPT_TEMPLATES.avatarMainPrompt && 'avatarMainPrompt',
+        !PROMPT_TEMPLATES.avatarSystemInstruction && 'avatarSystemInstruction',
+      ].filter(Boolean).join(', ');
+      log.error(`[DYNAMIC AVATAR] Prompt templates not loaded: ${missing} — refusing to call Gemini`);
+      return { success: false, error: `Avatar prompt templates not loaded: ${missing}` };
+    }
     // Build the prompt
-    const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+    const promptPart = PROMPT_TEMPLATES.avatarMainPrompt.split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingPrompt = getDynamicClothingPrompt(category, config, isFemale);
     const avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingPrompt

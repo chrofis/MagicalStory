@@ -11,111 +11,104 @@ const { log } = require('../utils/logger');
 const PROMPT_TEMPLATES = {};
 
 async function loadPromptTemplates() {
-  try {
-    const promptsDir = path.join(__dirname, '../../prompts');
+  const promptsDir = path.join(__dirname, '../../prompts');
+  // Per-key load wrapper. If one file is missing, log the specific failure
+  // and CONTINUE. The previous giant try/catch aborted the whole load on
+  // the first ENOENT, leaving every subsequent key undefined (including
+  // avatarSystemInstruction + avatarMainPrompt). At request time this
+  // produced silent 400s from Gemini ("system_instruction.parts[0].data:
+  // required oneof field 'data' must have one initialized field") because
+  // the avatar code happily sends `text: undefined` → JSON drops it →
+  // Gemini sees an empty Part. Per-key loading + a clear failure summary
+  // makes one missing file visible without blocking everything else.
+  const failures = [];
+  const load = async (key, filename) => {
+    try {
+      PROMPT_TEMPLATES[key] = await fs.readFile(path.join(promptsDir, filename), 'utf-8');
+    } catch (err) {
+      failures.push({ key, filename, message: err.message });
+    }
+  };
 
-    PROMPT_TEMPLATES.outline = await fs.readFile(path.join(promptsDir, 'outline.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyText = await fs.readFile(path.join(promptsDir, 'story-text.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneIteration = await fs.readFile(path.join(promptsDir, 'scene-iteration.txt'), 'utf-8');
-    // Free-mode iteration: looser rules — iterate may drop/swap characters or
-    // reframe the scene to escape an impossible composition. Used when the
-    // caller explicitly opts in via iteratePageCore({ freeIterate: true }).
-    PROMPT_TEMPLATES.sceneIterationFree = await fs.readFile(path.join(promptsDir, 'scene-iteration-free.txt'), 'utf-8');
-    // Backwards compat alias - points to iteration (full prompt with all checks)
-    PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
-    PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationDe = await fs.readFile(path.join(promptsDir, 'image-generation-de.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationFr = await fs.readFile(path.join(promptsDir, 'image-generation-fr.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequential = await fs.readFile(path.join(promptsDir, 'image-generation-sequential.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
-    // Storybook template was merged into image-generation.txt — alias for backward compat
-    PROMPT_TEMPLATES.imageGenerationStorybook = PROMPT_TEMPLATES.imageGeneration;
-    PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageVisualInventory = await fs.readFile(path.join(promptsDir, 'image-visual-inventory.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageVisionInventory = await fs.readFile(path.join(promptsDir, 'image-vision-inventory.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imagePromptCompliance = await fs.readFile(path.join(promptsDir, 'image-prompt-compliance.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageSemantic = await fs.readFile(path.join(promptsDir, 'image-semantic.txt'), 'utf-8');
-    PROMPT_TEMPLATES.coverImageEvaluation = await fs.readFile(path.join(promptsDir, 'cover-image-evaluation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
-    PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
-    PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
-    PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
-    PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
-    // Character analysis prompt
-    PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
-    // Image generation system instruction
-    PROMPT_TEMPLATES.imageSystemInstruction = await fs.readFile(path.join(promptsDir, 'image-system-instruction.txt'), 'utf-8');
-    // Avatar generation prompts
-    PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarAcePrompt = await fs.readFile(path.join(promptsDir, 'avatar-ace-prompt.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarRetryPrompt = await fs.readFile(path.join(promptsDir, 'avatar-retry-prompt.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarEvaluation = await fs.readFile(path.join(promptsDir, 'avatar-evaluation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.styledCostumedAvatar = await fs.readFile(path.join(promptsDir, 'styled-costumed-avatar.txt'), 'utf-8');
-    // Visual Bible and editing prompts
-    PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
-    PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
-    // Auto-repair / Inpainting prompt
-    PROMPT_TEMPLATES.imageInspection = await fs.readFile(path.join(promptsDir, 'image-inspection.txt'), 'utf-8');
-    PROMPT_TEMPLATES.inpainting = await fs.readFile(path.join(promptsDir, 'inpainting.txt'), 'utf-8');
-    // Character repair (Grok blended mode) — face-only template
-    PROMPT_TEMPLATES.characterRepairBlended = await fs.readFile(path.join(promptsDir, 'character-repair-blended.txt'), 'utf-8');
-    // Character repair (Grok blended mode) — full-figure template used when whiteoutTarget='body'
-    PROMPT_TEMPLATES.characterRepairBodyBlended = await fs.readFile(path.join(promptsDir, 'character-repair-body-blended.txt'), 'utf-8');
-    // Character repair (Grok cutout mode) — replace figure in extracted region, composite back
-    PROMPT_TEMPLATES.characterRepairCutout = await fs.readFile(path.join(promptsDir, 'character-repair-cutout.txt'), 'utf-8');
-    // Character repair (Grok full-scene inpaint) — crosshatch body + solid face block on the
-    // FULL scene (mirror-padded to Grok's aspect), no compositing back. Replaces cutout as
-    // the default for body repairs.
-    PROMPT_TEMPLATES.characterRepairInpaint = await fs.readFile(path.join(promptsDir, 'character-repair-inpaint.txt'), 'utf-8');
-    // Bbox refinement (iterate overlay with vision model)
-    PROMPT_TEMPLATES.bboxRefine = await fs.readFile(path.join(promptsDir, 'bbox-refine.txt'), 'utf-8');
-    // Scene expansion - UNUSED, moved to prompts/_unused/
-    // PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
-    // PROMPT_TEMPLATES.sceneExpansionDe = await fs.readFile(path.join(promptsDir, 'scene-expansion-de.txt'), 'utf-8');
-    // PROMPT_TEMPLATES.sceneExpansionFr = await fs.readFile(path.join(promptsDir, 'scene-expansion-fr.txt'), 'utf-8');
-    // Unified story generation (single prompt for complete story)
-    PROMPT_TEMPLATES.storyUnified = await fs.readFile(path.join(promptsDir, 'story-unified.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyTrial = await fs.readFile(path.join(promptsDir, 'story-trial.txt'), 'utf-8');
-    PROMPT_TEMPLATES.trialIdea = await fs.readFile(path.join(promptsDir, 'trial-idea.txt'), 'utf-8');
-    // Final consistency check prompts
-    PROMPT_TEMPLATES.finalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'final-consistency-check.txt'), 'utf-8');
-    PROMPT_TEMPLATES.textConsistencyCheck = await fs.readFile(path.join(promptsDir, 'text-consistency-check.txt'), 'utf-8');
-    // Incremental consistency check (compare new image against previous images)
-    PROMPT_TEMPLATES.incrementalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'incremental-consistency-check.txt'), 'utf-8');
-    // Dedicated bounding box detection (two-stage detection for auto-repair)
-    PROMPT_TEMPLATES.boundingBoxDetection = await fs.readFile(path.join(promptsDir, 'bounding-box-detection.txt'), 'utf-8');
-    // Grid-based repair verification prompt
-    PROMPT_TEMPLATES.repairVerification = await fs.readFile(path.join(promptsDir, 'repair-verification.txt'), 'utf-8');
-    // Reference sheet generation prompt for secondary elements
-    PROMPT_TEMPLATES.referenceSheet = await fs.readFile(path.join(promptsDir, 'reference-sheet.txt'), 'utf-8');
-    // Scene repair prompt for geometric issue fixing
-    PROMPT_TEMPLATES.sceneRepair = await fs.readFile(path.join(promptsDir, 'scene-repair.txt'), 'utf-8');
-    // Entity consistency check prompt (for per-entity grid evaluation)
-    PROMPT_TEMPLATES.entityConsistencyCheck = await fs.readFile(path.join(promptsDir, 'entity-consistency-check.txt'), 'utf-8');
-    // Entity consistency repair prompt (for regenerating cells to match reference)
-    PROMPT_TEMPLATES.entityConsistencyRepair = await fs.readFile(path.join(promptsDir, 'entity-consistency-repair.txt'), 'utf-8');
-    // Single-page entity repair prompt (for repairing one page at a time)
-    PROMPT_TEMPLATES.entitySinglePageRepair = await fs.readFile(path.join(promptsDir, 'entity-single-page-repair.txt'), 'utf-8');
-    // Sub-region detection prompt (for targeted repairs of specific body parts/clothing)
-    PROMPT_TEMPLATES.subRegionDetection = await fs.readFile(path.join(promptsDir, 'sub-region-detection.txt'), 'utf-8');
-    // Generated image analysis prompt (identifies characters by name using traits/clothing)
-    PROMPT_TEMPLATES.generatedImageAnalysis = await fs.readFile(path.join(promptsDir, 'generated-image-analysis.txt'), 'utf-8');
-    // Empty scene template (for style-anchor background generation)
-    PROMPT_TEMPLATES.emptyScene = await fs.readFile(path.join(promptsDir, 'empty-scene.txt'), 'utf-8');
-    // Text-space repair — moves characters out of the white mask region
-    PROMPT_TEMPLATES.textSpaceRepair = await fs.readFile(path.join(promptsDir, 'text-space-repair.txt'), 'utf-8');
-    // Feedback consolidator (Haiku) — splits per-character vs scene issues, translates names to visual identifiers
-    PROMPT_TEMPLATES.feedbackConsolidator = await fs.readFile(path.join(promptsDir, 'feedback-consolidator.txt'), 'utf-8');
+  // Each line: [key, filename]. Order doesn't matter — failures are isolated.
+  const FILES = [
+    ['outline', 'outline.txt'],
+    ['storyText', 'story-text.txt'],
+    ['sceneExpansion', 'scene-expansion.txt'],
+    ['sceneIteration', 'scene-iteration.txt'],
+    ['sceneIterationFree', 'scene-iteration-free.txt'],
+    ['imageGeneration', 'image-generation.txt'],
+    ['imageGenerationDe', 'image-generation-de.txt'],
+    ['imageGenerationFr', 'image-generation-fr.txt'],
+    ['imageGenerationSequential', 'image-generation-sequential.txt'],
+    ['imageGenerationSequentialDe', 'image-generation-sequential-de.txt'],
+    ['imageGenerationSequentialFr', 'image-generation-sequential-fr.txt'],
+    ['imageEvaluation', 'image-evaluation.txt'],
+    ['imageVisualInventory', 'image-visual-inventory.txt'],
+    ['imageVisionInventory', 'image-vision-inventory.txt'],
+    ['imagePromptCompliance', 'image-prompt-compliance.txt'],
+    ['imageSemantic', 'image-semantic.txt'],
+    // coverImageEvaluation: removed in commit 0f408228 (May 9 2026). The
+    // file was deleted but the load-line stayed, which cascaded a load
+    // failure across every entry below it. Fall back to imageEvaluation
+    // for cover scoring — the two regeneration.js callers already guard
+    // with `if (PROMPT_TEMPLATES.coverImageEvaluation)`.
+    ['frontCover', 'front-cover.txt'],
+    ['initialPageWithDedication', 'initial-page-with-dedication.txt'],
+    ['initialPageNoDedication', 'initial-page-no-dedication.txt'],
+    ['backCover', 'back-cover.txt'],
+    ['storybookCombined', 'storybook-combined.txt'],
+    ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
+    ['characterAnalysis', 'character-analysis.txt'],
+    ['imageSystemInstruction', 'image-system-instruction.txt'],
+    ['avatarSystemInstruction', 'avatar-system-instruction.txt'],
+    ['avatarMainPrompt', 'avatar-main-prompt.txt'],
+    ['avatarAcePrompt', 'avatar-ace-prompt.txt'],
+    ['avatarRetryPrompt', 'avatar-retry-prompt.txt'],
+    ['avatarEvaluation', 'avatar-evaluation.txt'],
+    ['styledCostumedAvatar', 'styled-costumed-avatar.txt'],
+    ['visualBibleAnalysis', 'visual-bible-analysis.txt'],
+    ['illustrationEdit', 'illustration-edit.txt'],
+    ['imageInspection', 'image-inspection.txt'],
+    ['inpainting', 'inpainting.txt'],
+    ['characterRepairBlended', 'character-repair-blended.txt'],
+    ['characterRepairBodyBlended', 'character-repair-body-blended.txt'],
+    ['characterRepairCutout', 'character-repair-cutout.txt'],
+    ['characterRepairInpaint', 'character-repair-inpaint.txt'],
+    ['bboxRefine', 'bbox-refine.txt'],
+    ['storyUnified', 'story-unified.txt'],
+    ['storyTrial', 'story-trial.txt'],
+    ['trialIdea', 'trial-idea.txt'],
+    ['finalConsistencyCheck', 'final-consistency-check.txt'],
+    ['textConsistencyCheck', 'text-consistency-check.txt'],
+    ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],
+    ['boundingBoxDetection', 'bounding-box-detection.txt'],
+    ['repairVerification', 'repair-verification.txt'],
+    ['referenceSheet', 'reference-sheet.txt'],
+    ['sceneRepair', 'scene-repair.txt'],
+    ['entityConsistencyCheck', 'entity-consistency-check.txt'],
+    ['entityConsistencyRepair', 'entity-consistency-repair.txt'],
+    ['entitySinglePageRepair', 'entity-single-page-repair.txt'],
+    ['subRegionDetection', 'sub-region-detection.txt'],
+    ['generatedImageAnalysis', 'generated-image-analysis.txt'],
+    ['emptyScene', 'empty-scene.txt'],
+    ['textSpaceRepair', 'text-space-repair.txt'],
+    ['feedbackConsolidator', 'feedback-consolidator.txt'],
+  ];
 
-    log.info('📝 Prompt templates loaded from prompts/ folder');
-  } catch (err) {
-    log.error('❌ Failed to load prompt templates:', err.message);
-    log.error('   Falling back to hardcoded prompts');
+  await Promise.all(FILES.map(([k, f]) => load(k, f)));
+
+  // Backwards-compat aliases (computed AFTER loads so the source key is set)
+  PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
+  PROMPT_TEMPLATES.imageGenerationStorybook = PROMPT_TEMPLATES.imageGeneration;
+
+  if (failures.length > 0) {
+    log.error(`❌ Prompt template load: ${failures.length} file(s) failed:`);
+    for (const f of failures) {
+      log.error(`   - ${f.key} (${f.filename}): ${f.message}`);
+    }
   }
+  log.info(`📝 Prompt templates loaded: ${FILES.length - failures.length}/${FILES.length} ok`);
 }
 
 /**
