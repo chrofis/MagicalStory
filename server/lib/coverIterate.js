@@ -634,4 +634,107 @@ async function buildCoverReferences({
   return { landmarkPhotos, visualBibleGrid, sceneBackground, sceneMetadata, coverPageNumber };
 }
 
-module.exports = { iterateCover, buildCoverReferences };
+/**
+ * Build a deterministic SCENE prose string from a structured coverHint.
+ *
+ * This REPLACES the previous Haiku scene-expansion call for covers. The
+ * outline already produced everything we need (mood + objects + per-
+ * character details with holds/gazesAt/priority); this function templates
+ * those structured fields into the SCENE string the cover prompt templates
+ * (frontCover.txt / initialPage*.txt / backCover.txt) expect.
+ *
+ * Zero LLM calls. Pure JavaScript. Same result every time for the same input.
+ *
+ * Used by:
+ *  - server.js streaming cover initial-gen (no second LLM call needed)
+ *  - coverIterate.js iterate path (when stored description is missing or
+ *    the caller wants a fresh deterministic rebuild)
+ *  - regeneration.js user-triggered regenerate
+ *
+ * @param {Object} hint - coverHint shape from extractCoverHints():
+ *                        { mood, objects, characterDetails, characters,
+ *                          characterClothing, hint? }
+ * @param {Object} visualBible - story.visualBible (for landmark + artifact name lookup)
+ * @param {Array<Object>} characters - scene characters with physical traits
+ * @returns {string} SCENE prose ready to drop into the cover prompt template
+ */
+function buildCoverSceneFromHint(hint, visualBible, characters) {
+  if (!hint) return '';
+
+  // Resolve landmark name from the first LOC### in objects
+  const objects = Array.isArray(hint.objects) ? hint.objects : [];
+  const locId = objects.find(o => typeof o === 'string' && /^LOC\d+/i.test(o));
+  const loc = locId && Array.isArray(visualBible?.locations)
+    ? visualBible.locations.find(l => l?.id && l.id.toUpperCase() === locId.toUpperCase())
+    : null;
+  const landmarkName = loc?.name || (locId ? 'the landmark' : 'a scenic outdoor setting');
+
+  // Resolve artifact names from any ART### in objects
+  const artMap = {};
+  const artifacts = Array.isArray(visualBible?.artifacts) ? visualBible.artifacts : [];
+  for (const o of objects) {
+    if (typeof o !== 'string' || !/^ART\d+/i.test(o)) continue;
+    const art = artifacts.find(a => a?.id && a.id.toUpperCase() === o.toUpperCase());
+    if (art?.name) artMap[o.toUpperCase()] = art.name;
+  }
+
+  // Resolve gaze targets — same artifact-name lookup, plus pass-through for
+  // viewer / distance / another character's name.
+  const resolveGazeTarget = (gazesAt) => {
+    if (!gazesAt) return '';
+    const trimmed = String(gazesAt).trim();
+    const m = trimmed.match(/^(ART\d+)/i);
+    if (m && artMap[m[1].toUpperCase()]) return `the ${artMap[m[1].toUpperCase()]}`;
+    if (/^the (viewer|camera)$/i.test(trimmed)) return 'the viewer';
+    if (/^the distance$/i.test(trimmed)) return 'into the distance';
+    return trimmed; // a character name or freeform target
+  };
+
+  // Sort characters by priority (essential first, then normal, then low) so
+  // the most important figures lead the prose.
+  const PRIO_RANK = { essential: 0, normal: 1, low: 2 };
+  const details = (hint.characterDetails && typeof hint.characterDetails === 'object')
+    ? Object.values(hint.characterDetails)
+    : [];
+  const sortedDetails = details
+    .filter(d => d && d.name)
+    .sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1));
+
+  const charSentences = sortedDetails.map(d => {
+    const pos = d.position ? `in the ${d.position}` : '';
+    const physChar = Array.isArray(characters)
+      ? characters.find(c => c?.name === d.name)
+      : null;
+    // Brief physical descriptor — the cover prompt template's CHARACTER_REFERENCE_LIST
+    // also provides per-character details, but mentioning the name in prose ties
+    // pose to identity.
+    const physTraits = physChar
+      ? [physChar.age && `${physChar.age}-year-old`, physChar.gender].filter(Boolean).join(' ')
+      : '';
+    const intro = physTraits ? `${d.name}, ${physTraits},` : `${d.name}`;
+
+    // Action: holds + gaze, resolved.
+    const holds = String(d.holds || '').trim();
+    const gaze = String(d.gazesAt || '').trim();
+    const parts = [];
+    if (pos) parts.push(`stands ${pos}`);
+    if (holds && holds.toLowerCase() !== 'nothing') {
+      const m = holds.match(/^(ART\d+)/i);
+      const name = m && artMap[m[1].toUpperCase()] ? artMap[m[1].toUpperCase()] : holds;
+      parts.push(`holds the ${name}`);
+    }
+    if (gaze) {
+      const target = resolveGazeTarget(gaze);
+      if (target) parts.push(`eyes on ${target}`);
+    }
+    return `${intro} ${parts.join(', ')}.`;
+  });
+
+  // Mood at the front; landmark behind everything; per-character sentences.
+  const moodPhrase = hint.mood ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
+  const sceneStarter = `A wide group portrait set before ${landmarkName}.`;
+  const lines = [moodPhrase, sceneStarter, ...charSentences].filter(Boolean);
+  return lines.join(' ');
+}
+
+module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint };

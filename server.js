@@ -3315,87 +3315,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (landmarkDescriptionsPromise) {
           await landmarkDescriptionsPromise;
         }
-        // Initial model guess for scene expansion's maxCharactersPerScene / backend hint.
-        // The actual image model is chosen after expansion (complexity-aware routing).
+
+        // No second LLM call for covers. The outline's structured coverHint
+        // already contains everything needed to render: mood, objects (LOC +
+        // ART), per-character details (position, clothing, holds, gazesAt,
+        // priority). Build the image-prompt SCENE string deterministically
+        // from those fields in code. One Sonnet call (outline) → JS templating
+        // → one image-model call. Replaces the previous Haiku scene-expansion
+        // round-trip which cost a call per cover and merged structured per-
+        // character actions into atmospheric prose ("both face the viewer
+        // with wide-eyed discovery"), losing the explicit holds: ART005 spec.
         const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
         const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
-        let coverExpandedDescription = sceneDescription;
-        let coverExpandedMetadata = null;
-        try {
-          // Build a synthetic raw outline block for the cover so the scene expander
-          // has the same input shape as a page (TEXT + SCENE HINT).
-          const coverHintJson = {
-            description: hint.hint || '',
-            characters: Object.entries(hint.characterClothing || {}).map(([name, clothing]) => ({
-              name,
-              position: 'center',
-              clothing,
-            })),
-            objects: hint.objects || [],
-            background: 'landmark',
-            setting: 'outdoor',
-            shot: 'wide',
-          };
-          const syntheticPageBlock = `--- Cover: ${coverType} ---\nTEXT:\n${hint.hint || ''}\n\nSCENE HINT:\n${JSON.stringify(coverHintJson, null, 2)}\n`;
-          const coverAvailableAvatars = buildAvailableAvatarsForPrompt(charactersForCover, streamingClothingRequirements);
-          const coverExpansionPrompt = buildSceneExpansionPrompt(
-            0, // page number 0 = cover
-            hint.hint || '',
-            charactersForCover,
-            lang,
-            streamingVisualBible,
-            coverAvailableAvatars,
-            { previousPages: '', currentPage: syntheticPageBlock },
-            {
-              maxCharactersPerScene: IMAGE_MODELS[initialCoverModel]?.maxCharactersPerScene || 5,
-              artStyleId: inputData.artStyle,
-              imageBackend: initialCoverBackend,
-              referencePhotos: coverPhotos,
-            }
-          );
-          const coverExpansionResult = await callTextModelStreaming(
-            coverExpansionPrompt,
-            10000,
-            null,
-            modelOverrides.sceneDescriptionModel
-          );
-          const coverExpansionProvider = coverExpansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
-          addUsage(coverExpansionProvider, coverExpansionResult.usage, 'cover_expansion', coverExpansionResult.modelId);
-          const expandedText = coverExpansionResult.text || '';
-          // Reject expansion outputs that aren't real scene prose (refusal text, "I cannot…", empty-hint analysis).
-          // A valid expansion always contains the ---METADATA--- block.
-          const looksLikeRefusal = !expandedText.includes('---METADATA---')
-            || /Empty scene hint|I cannot generate|I appreciate the detailed|Please provide the actual/i.test(expandedText);
-          if (looksLikeRefusal) {
-            log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion returned non-prose / refusal — falling back to raw hint`);
-            coverExpandedDescription = sceneDescription;
-            coverExpandedMetadata = null;
-          } else {
-            coverExpandedDescription = expandedText;
-            coverExpandedMetadata = extractSceneMetadata(coverExpandedDescription);
-            log.debug(`✅ [STREAM-COVER] ${coverType} scene expanded`);
-          }
-        } catch (expansionErr) {
-          log.warn(`⚠️ [STREAM-COVER] ${coverType} scene expansion failed: ${expansionErr.message} — using raw hint`);
-        }
-        // Use the expanded description (falls back to raw hint if expansion failed)
-        // Strip metadata block before using as image prompt — the ---METADATA--- JSON
-        // is for code consumption, not for the image model
-        sceneDescription = stripSceneMetadata(coverExpandedDescription) || coverExpandedDescription;
-
-        // If scene expansion produced prose (already contains character descriptions),
-        // don't duplicate with the structured CHARACTER_REFERENCE_LIST
-        const isProseScene = coverExpandedDescription.includes('---METADATA---');
-        if (isProseScene) {
-          characterRefList = ''; // Prose already describes characters
-        }
+        const { buildCoverSceneFromHint } = require('./server/lib/coverIterate');
+        sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover);
+        const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
-        // Per-cover image model routing based on scene complexity (same as pages).
-        // sceneComplexity comes from scene expansion metadata (set to 'complex' when
-        // a character has depth:background, otherwise 'simple').
-        const coverSceneComplexity = coverExpandedMetadata?.sceneComplexity || 'simple';
+        // Per-cover image model routing: covers always render at simple
+        // complexity now (no depth/perspective allowed on covers — see story-
+        // unified.txt COVER RULES). Composite render method handles its own
+        // complexity decisions internally.
+        const coverSceneComplexity = 'simple';
         const coverSceneRouting = modelOverrides.sceneRouting || 'auto';
         let coverImageModel, coverImageBackend;
         if (modelOverrides.coverImageModel) {
