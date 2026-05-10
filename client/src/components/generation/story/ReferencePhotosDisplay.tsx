@@ -15,6 +15,7 @@ interface LandmarkPhoto {
 interface CompositeAttempt {
   pass: number;
   input?: string | null;
+  vbGrid?: string | null;  // VB grid second-image reference for pass 1
   output?: string | null;
   prompt?: string | null;
   modelId?: string | null;
@@ -639,7 +640,10 @@ export function ReferencePhotosDisplay({
                 {att.modelId && <span className="ml-2 text-[10px] font-normal text-purple-500">{att.modelId}</span>}
                 {att.elapsedMs != null && <span className="ml-2 text-[10px] font-normal text-purple-500">{(att.elapsedMs / 1000).toFixed(1)}s</span>}
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
+              {/* Pass 1 includes a VB grid reference slot when available;
+                  pass 2 only has input/output. Layout adapts: 2 cols for
+                  input+output, 3 cols when VB grid is also present. */}
+              <div className={`grid gap-2 mb-2 ${att.vbGrid ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {att.input && (
                   <div>
                     <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Eingabe' : 'Input'}</div>
@@ -648,6 +652,18 @@ export function ReferencePhotosDisplay({
                       alt={`Composite pass ${att.pass} input`}
                       className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={(e) => { e.stopPropagation(); setLightboxImage(att.input!); }}
+                      title="Click to enlarge"
+                    />
+                  </div>
+                )}
+                {att.vbGrid && (
+                  <div>
+                    <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'VB-Raster (Ref.)' : 'VB grid (ref)'}</div>
+                    <img
+                      src={att.vbGrid}
+                      alt={`Composite pass ${att.pass} VB grid reference`}
+                      className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); setLightboxImage(att.vbGrid!); }}
                       title="Click to enlarge"
                     />
                   </div>

@@ -2015,6 +2015,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           target.compositeAttempts = source.compositeAttempts.map(a => ({
             pass: a?.pass,
             input: typeof a?.input === 'string' && !a.input.startsWith('data:') ? a.input : null,
+            vbGrid: typeof a?.vbGrid === 'string' && !a.vbGrid.startsWith('data:') ? a.vbGrid : null,
             output: typeof a?.output === 'string' && !a.output.startsWith('data:') ? a.output : null,
             prompt: a?.prompt || null,
             modelId: a?.modelId || null,

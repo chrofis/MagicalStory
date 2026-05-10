@@ -319,6 +319,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // composite fell back to generic positional pose templates and the
         // model invented arbitrary poses that contradicted the story.
         sceneDescription,
+        // VB grid as a second image slot for pass 1. The grid carries
+        // reference cells for every artifact / animal / secondary character
+        // referenced by the cover hint. Pass 1 was previously blind to these
+        // — only the first artifact was pasted into the input image as a
+        // single "prop" buffer; multiple artifacts (Schatztruhe + Schatzkarte
+        // in one scene), animals, and secondary characters had no visual
+        // reference at all and Grok rendered them generically. Sending the
+        // VB grid as a labeled second image gives Grok the actual look of
+        // each element it should depict in the figures' hands.
+        vbGrid: coverVbGrid,
         landmarkBuf,
         artStyle: storyData.artStyle || 'watercolor',
         title: storyData.title || '',

@@ -818,6 +818,7 @@ async function extractInlineImagesToR2(storyId, data) {
               const att = v.compositeAttempts[a];
               if (!att || typeof att !== 'object') continue;
               upload(att.input, `stories/${storyId}/debug/p${pageNum}/v${i}/composite-pass${att.pass}-input.jpg`, (url) => { att.input = url; });
+              upload(att.vbGrid, `stories/${storyId}/debug/p${pageNum}/v${i}/composite-pass${att.pass}-vbgrid.jpg`, (url) => { att.vbGrid = url; });
               upload(att.output, `stories/${storyId}/debug/p${pageNum}/v${i}/composite-pass${att.pass}-output.jpg`, (url) => { att.output = url; });
             }
           }
@@ -914,6 +915,7 @@ async function extractInlineImagesToR2(storyId, data) {
               const att = v.compositeAttempts[a];
               if (!att || typeof att !== 'object') continue;
               upload(att.input, `stories/${storyId}/debug/${pageMarker}/v${i}/composite-pass${att.pass}-input.jpg`, (url) => { att.input = url; });
+              upload(att.vbGrid, `stories/${storyId}/debug/${pageMarker}/v${i}/composite-pass${att.pass}-vbgrid.jpg`, (url) => { att.vbGrid = url; });
               upload(att.output, `stories/${storyId}/debug/${pageMarker}/v${i}/composite-pass${att.pass}-output.jpg`, (url) => { att.output = url; });
             }
           }

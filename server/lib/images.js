@@ -6764,6 +6764,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                         {
                           pass: 1,
                           input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
+                          vbGrid: bufToDataUrl(result.compositeDebug.pass1VbGrid, 'image/jpeg'),
                           output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
                           prompt: result.compositeDebug.pass1Prompt || null,
                           modelId: result.compositeDebug.pass1ModelId || null,
@@ -6783,6 +6784,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                         {
                           pass: 1,
                           input: bufToDataUrl(result.compositeDebug.pass1Input, 'image/jpeg'),
+                          vbGrid: bufToDataUrl(result.compositeDebug.pass1VbGrid, 'image/jpeg'),
                           output: bufToDataUrl(result.compositeDebug.pass1Output, 'image/jpeg'),
                           prompt: result.compositeDebug.pass1Prompt || null,
                           modelId: result.compositeDebug.pass1ModelId || null,

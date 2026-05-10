@@ -323,19 +323,32 @@ function visualIdentifier(idx, n, age) {
 }
 
 // ─── Grok edit call ────────────────────────────────────────────────────
-async function callGrokEdit(prompt, imgBuf, { aspectRatio = '3:4', model = 'grok-imagine-image' } = {}) {
+// Accepts a single buffer OR an array of buffers (up to 3 — Grok's hard cap
+// on multi-image edits for the standard model). When more than one buffer is
+// passed, the request uses `images[]` instead of `image` so all slots reach
+// the model. The Grok API treats the first image as the primary edit target
+// and subsequent images as visual references.
+async function callGrokEdit(promptOrImgs, imgBuf, { aspectRatio = '3:4', model = 'grok-imagine-image' } = {}) {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) throw new Error('XAI_API_KEY not set');
+  const prompt = promptOrImgs;
+  const buffers = Array.isArray(imgBuf) ? imgBuf.filter(Boolean).slice(0, 3) : [imgBuf];
+  if (buffers.length === 0) throw new Error('callGrokEdit requires at least one input image');
   const t0 = Date.now();
+  const body = {
+    model, prompt,
+    response_format: 'b64_json',
+    aspect_ratio: aspectRatio,
+  };
+  if (buffers.length === 1) {
+    body.image = { url: `data:image/jpeg;base64,${buffers[0].toString('base64')}`, type: 'image_url' };
+  } else {
+    body.images = buffers.map(b => ({ url: `data:image/jpeg;base64,${b.toString('base64')}`, type: 'image_url' }));
+  }
   const resp = await fetch(`${XAI_API_URL}/images/edits`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model, prompt,
-      response_format: 'b64_json',
-      aspect_ratio: aspectRatio,
-      image: { url: `data:image/jpeg;base64,${imgBuf.toString('base64')}`, type: 'image_url' },
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(180000),
   });
   if (!resp.ok) {
@@ -396,6 +409,7 @@ async function loadImageAny(src) {
  * @param {string} args.title                  Story title for cover text rendering
  * @param {string} args.styleHint              Verbose art-style description used in pass 2 prompt
  * @param {string} [args.sceneDescription]     Full scene prose (Emma holds X / Noah gazes at Y) — when provided, embedded into pass-1 and pass-2 prompts so the model knows the story-specific action instead of inventing generic poses.
+ * @param {Buffer} [args.vbGrid]               Visual Bible grid image (multi-cell composite of artifacts / animals / secondary characters referenced by the cover hint). Passed as a second image slot to pass-1 so Grok knows the actual visual of each prop the figures should hold or interact with.
  * @param {Function} [args.usageTracker]       (provider, usage, fn, modelId) callback for cost tracking
  * @returns {Promise<{ imageData: string, modelId: string, prompt: string, totalAttempts: number, debug: object }>}
  */
@@ -408,6 +422,7 @@ async function generateCoverViaComposite({
   title = '',
   styleHint = "watercolor children's storybook illustration, soft brushwork, gentle storybook colors",
   sceneDescription = '',
+  vbGrid = null,
   usageTracker = null,
 }) {
   const W = 1024;
@@ -546,10 +561,26 @@ async function generateCoverViaComposite({
     ? `\n═══ STORY ACTION (use these poses; no environmental detail) ═══\n${interactionLines.join('\n')}\n**These story actions take priority over the POSE REDRAW lines below when the same character appears in both.**\n`
     : '';
 
+  // VB grid handling: when present, send as a second image slot. Normalise
+  // input format — buildVisualBibleGrid returns a Buffer; coverIterate may
+  // also pass a data: URI or base64 string depending on path. Accept all.
+  let vbGridBuf = null;
+  if (vbGrid) {
+    if (Buffer.isBuffer(vbGrid)) {
+      vbGridBuf = vbGrid;
+    } else if (typeof vbGrid === 'string') {
+      const stripped = vbGrid.replace(/^data:image\/\w+;base64,/, '');
+      try { vbGridBuf = Buffer.from(stripped, 'base64'); } catch { vbGridBuf = null; }
+    }
+  }
+  const vbGridSection = vbGridBuf
+    ? `\n═══ VISUAL BIBLE GRID (second image attached) ═══\nThe SECOND image shows a labeled grid of every artifact, animal, and secondary character referenced in this scene. When the STORY ACTION above names an object (map, chest, key, sword, lantern, etc.), use the matching grid cell as the visual reference for that object — that's exactly what the rendered prop must look like. Do NOT copy the grid cell layout or background into the output; the grid is reference only. The first image (figures on white) remains the primary edit target.\n`
+    : '';
+
   const pass1Prompt = `PASS 1: REPOSE FIGURES ONLY.
 
-The input shows ${n} character cutouts on a plain white background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Just change the poses.
-${actionSection}
+The first input image shows ${n} character cutouts on a plain white background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Just change the poses.
+${actionSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
@@ -559,9 +590,12 @@ DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings,
 
 If any figure still has arms at their sides, the task has failed. If the background is anything other than white, the task has failed.`;
 
-  // 6. Call Grok pass 1
-  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit`);
-  const pass1 = await callGrokEdit(pass1Prompt, pass1Input);
+  // 6. Call Grok pass 1 — figures-on-white as primary edit target, VB grid as
+  // a second reference image when available so the model knows exactly what
+  // each named artifact / animal / secondary character looks like.
+  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit${vbGridBuf ? ' + VB grid ref' : ''}`);
+  const pass1Inputs = vbGridBuf ? [pass1Input, vbGridBuf] : pass1Input;
+  const pass1 = await callGrokEdit(pass1Prompt, pass1Inputs);
   if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass1.elapsedMs }, 'cover_composite_pass1', pass1.modelId);
 
   // If no landmark, return pass 1 result
@@ -573,6 +607,7 @@ If any figure still has arms at their sides, the task has failed. If the backgro
       totalAttempts: 1,
       debug: {
         pass1Input,
+        pass1VbGrid: vbGridBuf || null,
         pass1Output: pass1.imageData,
         pass1Prompt,
         pass1ModelId: pass1.modelId,
@@ -639,6 +674,7 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
     debug: {
       sequence: sequence.map(c => c.name),
       pass1Input,
+      pass1VbGrid: vbGridBuf || null,
       pass1Output: pass1.imageData,
       pass1Prompt,
       pass1ModelId: pass1.modelId,
