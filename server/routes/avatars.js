@@ -547,8 +547,13 @@ function consensusTraits(photoTraits, avatarTraitsArray) {
     'hairColor', 'facialHair'
   ];
 
-  // Fields that just copy from photo (no avatar equivalent or photo is definitive)
-  const PHOTO_ONLY_FIELDS = ['face', 'other'];
+  // Fields that just copy from photo (no avatar equivalent or photo is definitive).
+  // `glasses` belongs here: the photo is ground truth for whether the person wears
+  // glasses (avatars in stylized art may render them inconsistently). Without this,
+  // glasses were silently dropped — Sarah's profile had no glasses field even
+  // though her uploaded photo shows glasses, which produced an endless eval loop
+  // ("unrequested glasses" vs "missing glasses" depending on which version).
+  const PHOTO_ONLY_FIELDS = ['face', 'other', 'glasses'];
 
   // Fields that copy best value available (hex codes — take from photo if available)
   const HEX_FIELDS = ['skinToneHex', 'eyeColorHex', 'hairColorHex'];

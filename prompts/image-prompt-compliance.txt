@@ -35,7 +35,7 @@ For each paired row from STEP 1 with a non-null `vision_description`:
 - **Clothing type**: Vision clothing vs prompt. Modern clothes (sweatshirt, jeans, sneakers) when medieval/costume was requested = CRITICAL. Wrong main colour = MAJOR. Accessories that can be occluded (apron under cloak, scarf, jewellery, belt) missing from vision are NOT a deduction.
 - **Age appearance**: Vision age group vs prompt.
 - **Hair**: Vision hair vs prompt.
-- **Position**: Vision zone vs the zone the prompt places this character in. Different horizontal half (left vs right) = MODERATE `wrong_position`. Different depth only (foreground vs midground) = no deduction.
+- **Position**: Horizontal half (left vs right) is a mirror — never deduct. Different depth only (foreground vs midground) = no deduction either.
 
 ---
 
@@ -69,7 +69,7 @@ If the inventory is roughly compatible with the declared action, do not deduct. 
 Start at 10:
 - CRITICAL (-3): Missing character (per STEP 1 matching — no inventory figure matches on age + clothing colour), clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming)
 - MAJOR (-2): Character facing the wrong way for a DECLARED INTERACTION (e.g. two characters declared as interacting but facing away from each other; character declared as watching a named object but looking elsewhere), wrong clothing color, wrong age appearance, cross-eyes
-- MODERATE (-1): Character on wrong side, minor clothing detail, key object missing
+- MODERATE (-1): Minor clothing detail, key object missing
 - MINOR (-0.5): Small differences
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
