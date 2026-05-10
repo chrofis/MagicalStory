@@ -785,50 +785,52 @@ Each vantage entry has:
 
 ---COVER SCENE HINTS---
 
+Each cover is a STRUCTURED render spec, not a prose paragraph. The fields below ARE the spec — rendering reads them directly. No prose `Hint:` line; if you include one, it is ignored.
+
 **COVER RULES (CRITICAL):**
-- **USE REAL LANDMARKS ONLY**: Each cover's `objects` list must include exactly one LOC### whose Visual Bible entry satisfies BOTH conditions: (1) `isRealLandmark: true`, AND (2) its `landmarkQuery` value EXACTLY matches a name from the AVAILABLE LANDMARKS list above. You may NOT invent new locations for cover backdrops — every cover backdrop must trace back to that input list. Story-local non-landmark settings (riverbanks, town squares, family homes) are forbidden as cover backdrops, no matter how well they fit the closing story beat. Covers reuse the same real landmark across front/initial/back when the story has only one real landmark. Pick the most iconic landmark for the front cover.
-- **LIST BY NAME**: NEVER write "the family", "everyone", "the group" - list each character by name
-- **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
-- **ALWAYS USE COSTUMED for covers** — if the story has costumed clothing, ALL cover characters MUST use their `costumed:type` variant, not `standard`. The book cover should showcase the story's theme.
-- **CLOTHING CONSISTENCY (HARD RULE)**: A character's clothing on ANY cover MUST be one of the categories you marked `used: true` in their `clothingRequirements`. Example: if Sophie's `clothingRequirements` only has `costumed: { used: true, costume: "wizard" }`, then EVERY cover that includes Sophie MUST list her as `costumed:wizard` — NEVER `standard` or any other category. If you need her in standard clothing on a cover, you MUST also mark `standard: { used: true }` for her in `clothingRequirements`.
-- **No `perspective` or `depth` on covers** — every cover character faces the viewer and is fully visible. If you can't fit everyone, drop them, don't hide them.
-- **`holds` per character (max 2 items)** — each cover character entry must include `holds: ...`. Each character has 2 hands → max 2 items. Pick the 1-2 most iconic items, or `holds: nothing`. Never list 3+ items for one character.
+- **REAL LANDMARK ONLY:** the first entry in `Objects:` is the backdrop and must be a LOC### whose Visual Bible entry has BOTH (1) `isRealLandmark: true` AND (2) `landmarkQuery` EXACTLY matching a name from the AVAILABLE LANDMARKS list above. You may NOT invent new backdrop locations. Story-local non-landmark settings (riverbanks, town squares, family homes) are forbidden as cover backdrops — pick a real landmark from the input list even when a story-local setting fits the closing beat better.
+- **LIST EVERY CHARACTER BY NAME.** Never write "the family", "everyone", "the group", "his family behind him". List each one: `- Sophie ...`, `- Manuel ...`.
+- **CLOTHING:** must be one of `standard | winter | summer | costumed:<type>` AND must be a category this character has marked `used: true` in their `clothingRequirements`. If the story has any costumed clothing, all cover characters MUST use the costumed variant.
+- **HOLDS:** exactly one item per character (each character has 2 hands but a cover needs one focal prop per figure). Value is an ART### from `Objects:` or the word `nothing`. Never list 2+ items for the same character.
+- **GAZES AT:** every character MUST have a gaze target. Value is one of: an ART### from `Objects:`, another character's name, `the viewer`, `the distance`, `each other (with [Name])`. This drives head-tilt and eyeline in rendering — without it characters default to camera-facing portraits.
+- **PRIORITY:** every character is `essential | normal | low`. Essential = central action, dramatic beat (the held prop, the key gesture). Normal = supporting. Low = decorative / atmospheric / there for inclusion only. Higher-priority characters get more compositional weight.
+- **MOOD:** one short phrase (2-5 words) describing the emotional tone of the cover (`wonder and discovery`, `quiet triumph`, `warm reunion`, `mischief unleashed`). Drives atmosphere matching, not literal rendering.
+- **No `perspective` or `depth`** on covers — every cover character faces the viewer and is fully visible. If you can't fit everyone, drop the least-essential, don't hide them in the background.
+
+**Field shape (each character, one line):**
+`- Name (position): clothing, holds: ART### or nothing, gazes at: <target>, priority: <essential|normal|low>`
+
+Example: `- Emma (center-left foreground): costumed:pirate, holds: ART005, gazes at: ART005, priority: essential`
 
 **Title Page**
 (Front cover — what readers see first.)
 ONLY main characters: {MAIN_CHARACTER_NAMES}
-NO primary characters on title page - keep focus on protagonist(s).
 
-Hint: [1-2 sentences - ONLY main character(s), generic setting, mood. If a character carries items, mention at most 2.]
-Objects: [LOC### + 2-3 key element IDs (ANI###, ART###, etc.) that define the story's visual identity]
+Mood: [one phrase]
+Objects: [LOC### + 1-2 ART### refs that define the cover's visual identity]
 Characters:
-- [MainChar1] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-(List EVERY main character by name with position, clothing, and what they hold. Max 2 items per character — they have 2 hands.)
+- [MainChar1] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [MainChar2] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 
 **Initial Page**
-(Dedication page — facing the title page, group portrait of who's in the story.)
-Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}.
-Always include main characters. If total characters exceed 5, DROP the least important primary characters entirely — do NOT put them in the background, do NOT reference them as a group ("the children", "the others"). They simply don't appear in this cover.
-Place 2-3 characters in the foreground with positions, rest in background.
+(Dedication page — group portrait of who's in the story.)
+Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}. Always include main characters. If total exceeds 5, DROP the least important primary characters entirely — never reference them as a group.
 
-Hint: [1-2 sentences - welcoming scene, characters, generic setting. Max 2 items per character if they carry anything.]
-Objects: [LOC### + 2-3 key element IDs (ANI###, ART###, etc.) that define the story's visual identity]
-Characters (MAX 5, each listed BY NAME):
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [Name] (position): [clothing], holds: [item1 + item2 OR "nothing"]
+Mood: [one phrase]
+Objects: [LOC### + 1-2 ART### refs]
+Characters (MAX 5):
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 
 **Back Cover**
 ONLY main characters: {MAIN_CHARACTER_NAMES}
-NO primary characters on back cover - match the focus of the title page.
 
-Hint: [1-2 sentences - happy conclusion, ONLY main character(s) together. Max 2 items per character if they carry anything.]
-Objects: [LOC### + 2-3 key element IDs (ANI###, ART###, etc.) that define the story's visual identity]
+Mood: [one phrase]
+Objects: [LOC### + 1-2 ART### refs]
 Characters:
-- [MainChar1] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-- [MainChar2] (position): [clothing], holds: [item1 + item2 OR "nothing"]
-(List EVERY main character by name with position, clothing, and what they hold. Max 2 items per character — they have 2 hands.)
+- [MainChar1] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [MainChar2] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 
 ---SCENE PLAN---
 Plan the visual composition for each page BEFORE writing. One line per page:

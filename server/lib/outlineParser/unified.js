@@ -315,9 +315,9 @@ class UnifiedStoryParser {
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
     const defaults = {
-      titlePage: { hint: '', objects: [], characterClothing: {}, characters: [] },
-      initialPage: { hint: '', objects: [], characterClothing: {}, characters: [] },
-      backCover: { hint: '', objects: [], characterClothing: {}, characters: [] }
+      titlePage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
+      initialPage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
+      backCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} }
     };
 
     if (!sectionMatch) {
@@ -327,29 +327,30 @@ class UnifiedStoryParser {
 
     const section = sectionMatch[1];
 
-    // Extract each cover hint with per-character clothing
+    // Extract each cover hint with per-character clothing.
+    //
+    // Outline format (post-2026-05-10 restructure): structured-only — Mood: + Objects: +
+    // per-character bullets with holds / gazes at / priority. Legacy stories may still
+    // carry a `Hint:` prose line — kept as a passthrough for downstream consumers that
+    // display it, but no rendering decision should rely on it.
     const extractCover = (label) => {
       // Match the cover block from **Label** to the next **Label** or end
       const blockPattern = new RegExp(`\\*\\*${label}\\*\\*\\s*([\\s\\S]*?)(?=\\n\\*\\*(?:Title Page|Initial Page|Back Cover)\\*\\*|$)`, 'i');
       const blockMatch = section.match(blockPattern);
 
       if (!blockMatch) {
-        return { hint: '', objects: [], characterClothing: {}, characters: [] };
+        return { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} };
       }
 
       const block = blockMatch[1];
 
-      // Extract hint - specifically look for "Hint:" line first
-      // The block may start with "(Front Cover)" label, so we need to find the actual hint
+      // Extract optional Hint: prose (legacy stories). New schema has no Hint: line.
       const hintLineMatch = block.match(/^Hint:\s*(.+)$/im);
-      let hint = '';
-      if (hintLineMatch) {
-        hint = hintLineMatch[1].trim();
-      } else {
-        // Fallback: get first non-empty line that isn't a label like "(Front Cover)"
-        const lines = block.split('\n').map(l => l.trim()).filter(l => l && !l.match(/^\(.*\)$/));
-        hint = lines[0] || '';
-      }
+      const hint = hintLineMatch ? hintLineMatch[1].trim() : '';
+
+      // Extract Mood: line — short atmospheric phrase used by render methods.
+      const moodLineMatch = block.match(/^Mood:\s*(.+)$/im);
+      const mood = moodLineMatch ? moodLineMatch[1].trim() : '';
 
       // Extract Objects: line — list of Visual Bible element IDs (LOC, ANI, ART, OBJ, VEH, CHR)
       const objectsMatch = block.match(/^Objects?:\s*(.+)$/im);
@@ -357,10 +358,30 @@ class UnifiedStoryParser {
         ? objectsMatch[1].match(/(?:LOC|ANI|ART|OBJ|VEH|CHR)\d+/gi)?.map(id => id.toUpperCase()) || []
         : [];
 
-      // Extract per-character clothing + optional perspective annotations
+      // Extract per-character clothing + annotations (holds / gazes at / priority / position).
       const { characterClothing, characterPerspectives, characters } = parseCharacterClothingBlock(block);
 
-      return { hint, objects, characterClothing, characterPerspectives, characters };
+      // Per-character structured details — render methods read from here.
+      // Shape: { Name: { position, clothing, holds, gazesAt, priority } }
+      const characterDetails = {};
+      for (const fullName of characters) {
+        const baseName = fullName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const ann = characterPerspectives[baseName] || {};
+        // Position: prefer parenthesised value in the name ("Emma (center-left foreground)"),
+        // fall back to annotation `position`.
+        const parenMatch = fullName.match(/\(\s*([^)]+?)\s*\)/);
+        const position = parenMatch ? parenMatch[1].trim() : (ann.position || '');
+        characterDetails[baseName] = {
+          name: baseName,
+          position,
+          clothing: characterClothing[baseName] || 'standard',
+          holds: ann.holds || 'nothing',
+          gazesAt: ann.gazesAt || '',
+          priority: (ann.priority || 'normal').toLowerCase(),
+        };
+      }
+
+      return { hint, mood, objects, characterClothing, characterPerspectives, characters, characterDetails };
     };
 
     this._cache.coverHints = {
@@ -562,7 +583,10 @@ class UnifiedStoryParser {
       hasCharacterArcs: !!this.extractCharacterArcs(),
       hasPlotStructure: !!this.extractPlotStructure(),
       hasVisualBible: !!this.extractVisualBible(),
-      hasCoverHints: !!this.extractCoverHints().titlePage.hint,
+      hasCoverHints: (() => {
+        const t = this.extractCoverHints().titlePage;
+        return !!(t.hint || t.mood || (t.objects && t.objects.length > 0) || (t.characters && t.characters.length > 0));
+      })(),
       pageCount: this.extractPages().length
     };
   }

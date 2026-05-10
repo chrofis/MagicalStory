@@ -89,6 +89,10 @@ function parseCharacterClothingBlock(content) {
       if (posMatch) annotations.position = posMatch[1].trim();
       const holdsMatch = obj.match(/"holds"\s*:\s*"([^"]+)"/);
       if (holdsMatch) annotations.holds = holdsMatch[1].trim();
+      const gazesMatch = obj.match(/"(?:gazesAt|gazes_at|gazes at|gaze)"\s*:\s*"([^"]+)"/);
+      if (gazesMatch) annotations.gazesAt = gazesMatch[1].trim();
+      const priorityMatch = obj.match(/"priority"\s*:\s*"([^"]+)"/);
+      if (priorityMatch) annotations.priority = priorityMatch[1].trim();
       if (Object.keys(annotations).length > 0) {
         characterPerspectives[baseName] = annotations;
       }
@@ -108,10 +112,12 @@ function parseCharacterClothingBlock(content) {
     // IMPORTANT: Uses possessive-safe pattern to avoid catastrophic backtracking (O(2^n) with nested quantifiers).
     // Clothing pattern handles costumed:{...} (braces with commas inside) and costumed:type (plain).
     // We capture an optional trailing annotations group (depth/perspective/position) up to end-of-line.
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))((?:\s*,\s*(?:depth|perspective|position|holds|holding)\s*:\s*[^,\r\n]+)*)/gim;
-    // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book").
+    // Annotations after clothing: depth / perspective / position / holds / gazes at / priority.
+    // "gazes at" has a space inside the key — regex matches both with and without space.
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+?))((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
+    // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book", "gazes at: chest", "priority: essential").
     // We never want these mistaken for character names — they should be silently dropped.
-    const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding']);
+    const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding', 'gazes', 'gaze', 'priority', 'mood']);
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
@@ -128,13 +134,15 @@ function parseCharacterClothingBlock(content) {
       }
       characters.push(rawName);
       characterClothing[baseName] = clothing;
-      // Parse trailing annotations like ", depth: background, perspective: back view, holds: book + wand"
+      // Parse trailing annotations like ", depth: background, perspective: back view, holds: book + wand, gazes at: the tower, priority: essential"
       if (annotationsRaw) {
         const annotations = {};
-        const annotationPattern = /(depth|perspective|position|holds|holding)\s*:\s*([^,\r\n]+)/gi;
+        const annotationPattern = /(depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*([^,\r\n]+)/gi;
         let annMatch;
         while ((annMatch = annotationPattern.exec(annotationsRaw)) !== null) {
-          const key = annMatch[1].toLowerCase() === 'holding' ? 'holds' : annMatch[1].toLowerCase();
+          let key = annMatch[1].toLowerCase().replace(/\s+/g, ' ');
+          if (key === 'holding') key = 'holds';
+          if (key === 'gazes at' || key === 'gaze') key = 'gazesAt';
           annotations[key] = annMatch[2].trim();
         }
         if (Object.keys(annotations).length > 0) {

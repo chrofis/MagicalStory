@@ -1,24 +1,45 @@
 /**
- * Composite-cover generation pipeline.
+ * COMPOSITE render method for cover images.
  *
- * When MODEL_DEFAULTS.compositeCovers is true, this module replaces the
- * normal "build prompt → call generateImageWithQualityRetry" path for
- * cover pages. Instead it:
+ * One of two render methods available. The other is the DIRECT method
+ * (single-pass prompt → image via generateImageWithQualityRetry), defined
+ * in server/lib/images.js. Routing between methods happens in
+ * server/lib/coverIterate.js based on MODEL_DEFAULTS.compositeCovers and
+ * per-call options.
  *
- *   1. Pulls the costumed styled-avatar for each story character.
- *   2. Removes background via the Python rembg service (chroma-key fallback).
- *   3. Computes a left-to-right placement using:
+ * Composite advantages:
+ *  - Character faces / costumes are GUARANTEED to come from the stored
+ *    styled-costumed avatars (no model re-imagining of a character's look).
+ *  - Landmark architecture is GUARANTEED to be pixel-faithful (the photo
+ *    is the input image; pass-2 only restyles, never redraws).
+ *  - Pose, action, and prop placement are model-controlled but constrained
+ *    by per-character structured action lines from coverHint.characterDetails
+ *    — no prose round-trip.
+ *
+ * Composite disadvantages:
+ *  - Two Grok edit calls per cover instead of one (~$0.04 vs $0.02).
+ *  - Pass 1 + Pass 2 + cutout step = ~15s total vs ~4s for direct.
+ *  - Requires real-landmark photo bytes for pass 2 (no photo → pass-2
+ *    skipped, output is figures-on-white).
+ *
+ * Pipeline steps:
+ *   1. Pull the costumed styled-avatar for each story character.
+ *   2. Remove background via the Python rembg service (chroma-key fallback).
+ *   3. Compute left-to-right placement using:
  *        - explicit positions from coverHint.characters when provided
  *        - else: gender-alternated centre-out arrangement (main → child → adult)
- *   4. Composites figures + prop onto a WHITE canvas (pass 1 input).
- *   5. Pass 1 → Grok edit, prompt = strict pose-redraw only.
- *   6. Cuts the reposed figures from pass 1 via rembg.
- *   7. Composites the cutout onto the landmark photo (pass 2 input).
+ *   4. Composite figures + prop onto a WHITE canvas (pass 1 input).
+ *   5. Pass 1 → Grok edit, prompt = strict pose-redraw only,
+ *      action lines from coverHint.characterDetails (holds + gazesAt + priority).
+ *      VB grid attached as a second image so artifact references are visible.
+ *   6. Cut figures from pass 1 result via rembg.
+ *   7. Composite cutout onto the landmark photo (pass 2 input).
  *   8. Pass 2 → Grok edit, prompt = watercolor unification + ground repaint
- *      + title rendering. Landmark architecture preserved.
+ *      + title rendering. Landmark architecture preserved. Atmosphere from
+ *      coverHint.mood + scene prose (legacy) or synthesized from characterDetails.
  *
- * Returns the same { imageData, modelId, prompt, totalAttempts } shape that
- * iterateCover/server.js expect from generateImageWithQualityRetry.
+ * Returns the same { imageData, modelId, prompt, totalAttempts, debug } shape
+ * that iterateCover expects, so callers don't care which render method ran.
  */
 
 const sharp = require('sharp');
@@ -534,31 +555,78 @@ async function generateCoverViaComposite({
     POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose}`);
   }
   // Pass-1 must stay WHITE-BACKGROUND only. We can't dump the full scene
-  // prose here — the prose names the landmark explicitly ("Holzbrücke spanning
-  // the river behind them") and Grok will dutifully paint that landscape into
-  // pass-1's white background, defeating the cutout step entirely. Instead we
-  // extract structured interactions[] from the scene metadata: each is a
-  // {character, object, where} triple naming what each character does and
-  // gazes at, with no environmental description. That's the safe channel.
+  // prose here — the prose names the landmark explicitly and Grok would paint
+  // that landscape into pass-1's white background, defeating the cutout step.
+  //
+  // PRIMARY SOURCE: coverHint.characterDetails — the structured per-character
+  // data the outline parser populates from the cover hint. Each entry carries
+  // { position, clothing, holds (ART###), gazesAt, priority }. This is one
+  // step from Sonnet's outline, no Haiku scene-expansion intermediary, no
+  // prose lossy round-trip.
+  //
+  // FALLBACK: scene-metadata interactions[]. Only used when characterDetails
+  // is missing (legacy stories from before the structured schema landed).
+  const PRIO_RANK = { essential: 0, normal: 1, low: 2 };
   const interactionLines = [];
-  try {
-    const metaMatch = String(sceneDescription || '').match(/---\s*METADATA\s*---([\s\S]*?)(?:\n---|$)/i)
-      || String(sceneDescription || '').match(/```json([\s\S]*?)```/i);
-    if (metaMatch) {
-      const meta = JSON.parse(metaMatch[1].trim().replace(/^json\s*/i, ''));
-      const ints = meta.interactions || meta.fullData?.interactions || [];
-      for (const ix of ints) {
-        if (!ix?.character || !ix?.where) continue;
-        const splitChars = String(ix.character).split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
-        const targets = splitChars.length > 1 ? splitChars : [String(ix.character).trim()];
-        for (const t of targets) {
-          interactionLines.push(`- ${t}: ${ix.where}`);
-        }
+  const details = (coverHint && coverHint.characterDetails) || {};
+  const artNames = (coverHint && coverHint._artifactNames) || {};
+  const detailEntries = Object.values(details)
+    .filter(d => d && d.name)
+    .sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1));
+  for (const d of detailEntries) {
+    const holds = String(d.holds || '').trim();
+    const gaze = String(d.gazesAt || '').trim();
+    const prio = String(d.priority || 'normal').toLowerCase();
+    if ((!holds || holds.toLowerCase() === 'nothing') && !gaze) continue;
+    // Resolve ART### references to the artifact's name when known.
+    let holdsPhrase = '';
+    if (holds && holds.toLowerCase() !== 'nothing') {
+      const artMatch = holds.match(/^(ART\d+)/i);
+      if (artMatch && artNames[artMatch[1].toUpperCase()]) {
+        holdsPhrase = `holds the ${artNames[artMatch[1].toUpperCase()]}, both hands visibly gripping it`;
+      } else {
+        holdsPhrase = `holds ${holds}`;
       }
     }
-  } catch { /* metadata not parseable — fall back to positional templates only */ }
+    let gazePhrase = '';
+    if (gaze) {
+      const gazeArtMatch = gaze.match(/^(ART\d+)/i);
+      if (gazeArtMatch && artNames[gazeArtMatch[1].toUpperCase()]) {
+        gazePhrase = `eyes fixed on the ${artNames[gazeArtMatch[1].toUpperCase()]}`;
+      } else if (/^the viewer$/i.test(gaze)) {
+        gazePhrase = `eyes on the viewer`;
+      } else if (/^the distance$/i.test(gaze)) {
+        gazePhrase = `eyes looking off into the distance`;
+      } else {
+        gazePhrase = `eyes on ${gaze}`;
+      }
+    }
+    const action = [holdsPhrase, gazePhrase].filter(Boolean).join(', ');
+    const prioTag = prio === 'essential' ? ' [ESSENTIAL]' : prio === 'low' ? ' [low]' : '';
+    interactionLines.push(`- ${d.name}${prioTag}: ${action}`);
+  }
+  // Legacy fallback: parse scene-metadata interactions[] when no structured
+  // details came through.
+  if (interactionLines.length === 0) {
+    try {
+      const metaMatch = String(sceneDescription || '').match(/---\s*METADATA\s*---([\s\S]*?)(?:\n---|$)/i)
+        || String(sceneDescription || '').match(/```json([\s\S]*?)```/i);
+      if (metaMatch) {
+        const meta = JSON.parse(metaMatch[1].trim().replace(/^json\s*/i, ''));
+        const ints = meta.interactions || meta.fullData?.interactions || [];
+        for (const ix of ints) {
+          if (!ix?.character || !ix?.where) continue;
+          const splitChars = String(ix.character).split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
+          const targets = splitChars.length > 1 ? splitChars : [String(ix.character).trim()];
+          for (const t of targets) {
+            interactionLines.push(`- ${t}: ${ix.where}`);
+          }
+        }
+      }
+    } catch { /* metadata not parseable — fall back to positional templates only */ }
+  }
   const actionSection = interactionLines.length > 0
-    ? `\n═══ STORY ACTION (use these poses; no environmental detail) ═══\n${interactionLines.join('\n')}\n**These story actions take priority over the POSE REDRAW lines below when the same character appears in both.**\n`
+    ? `\n═══ STORY ACTION (essential first — these poses are mandatory; environmental detail forbidden) ═══\n${interactionLines.join('\n')}\n**Essential lines override the POSE REDRAW templates below when the same character appears in both.**\n`
     : '';
 
   // VB grid handling: when present, send as a second image slot. Normalise
@@ -630,23 +698,41 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   const titleLine = title
     ? `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`
     : '';
-  // Pass 2: full scene prose IS safe to include because the landmark is
-  // already painted into the input. Prose context helps the model match
-  // atmosphere and reinforce gaze direction (without it pass-2 sometimes
-  // "resets" gazes to camera-front during the texture pass). Strip metadata
-  // block. The cap used to be 1200 chars which truncated the back cover's
-  // Emma+Noah prose mid-Noah ("...he s") — leaving the model with half a
-  // character description. Grok's effective prompt cap is ~7000 chars and
-  // the rest of pass-2's static text is ~700 chars, so a 5000-char window
-  // is safe and fits even 4-character multi-paragraph scenes. Truncation
-  // only fires when prose runs longer — typical single-cover prose is
-  // ~1500-2500 chars.
-  const proseForPass2 = String(sceneDescription || '')
+  // Pass 2: scene prose (legacy stories) is fine because the landmark is
+  // already painted into the input — atmosphere matching, no risk of
+  // Grok adding a wrong landscape. New stories carry only the structured
+  // coverHint, so we build a deterministic atmosphere paragraph instead:
+  // mood + per-character action + gaze. Either way, no Haiku round-trip.
+  let proseForPass2 = String(sceneDescription || '')
     .split(/\n*---\s*METADATA\s*---/i)[0]
     .replace(/```json[\s\S]*?```/gi, '')
     .replace(/\s+\n/g, '\n')
-    .trim()
-    .slice(0, 5000);
+    .trim();
+  // When no prose (structured-only outline), synthesize a short atmospheric
+  // paragraph from coverHint so pass-2 still has gaze + mood reinforcement.
+  if (!proseForPass2 && (coverHint?.mood || detailEntries.length > 0)) {
+    const moodLine = coverHint?.mood ? `Mood: ${coverHint.mood}.` : '';
+    const actionPhrases = detailEntries.map(d => {
+      const holds = String(d.holds || '').trim();
+      const gaze = String(d.gazesAt || '').trim();
+      let phrase = d.name;
+      if (holds && holds.toLowerCase() !== 'nothing') {
+        const m = holds.match(/^(ART\d+)/i);
+        const name = m && artNames[m[1].toUpperCase()] ? artNames[m[1].toUpperCase()] : holds;
+        phrase += ` holds the ${name}`;
+      }
+      if (gaze) {
+        const m = gaze.match(/^(ART\d+)/i);
+        const target = m && artNames[m[1].toUpperCase()]
+          ? `the ${artNames[m[1].toUpperCase()]}`
+          : (/^the (viewer|distance)$/i.test(gaze) ? gaze : gaze);
+        phrase += `, eyes on ${target}`;
+      }
+      return phrase + '.';
+    });
+    proseForPass2 = [moodLine, ...actionPhrases].filter(Boolean).join(' ');
+  }
+  proseForPass2 = proseForPass2.slice(0, 5000);
   const sceneSectionPass2 = proseForPass2
     ? `\n\nSTORY SCENE CONTEXT (do not change poses; this is for atmosphere matching only):\n${proseForPass2}`
     : '';
