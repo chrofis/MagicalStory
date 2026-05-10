@@ -56,6 +56,120 @@
 const { setActiveVersion } = require('../services/database');
 const { arrayToDbIndex } = require('./versionManager');
 
+// =====================================================================
+// NEW DEDUCTIONS-FIRST MODEL (May 2026 redesign)
+// ---------------------------------------------------------------------
+// One canonical version shape. Each evaluator produces ISSUES with a
+// severity. We sum the severity points into a math final score. The
+// consolidator (when it runs) emits a tolerant deduplicated score.
+// ONE flag picks which one becomes `version.finalScore`.
+//
+//   deductions = {
+//     quality:    [{severity, description, type, ...}, …],   // image-evaluation.txt
+//     semantic:   [{severity, description, ...}, …],          // image-semantic.txt
+//     compliance: [{severity, description, ...}, …],          // image-prompt-compliance.txt
+//     entity:     [{severity, description, name, ...}, …],    // entityConsistency.js
+//   }
+//
+//   mathFinalScore   = max(0, 100 − Σ SEVERITY_POINTS[d.severity])
+//   promptFinalScore = consolidator's tolerant deduplicated score (0–100), or null
+//   finalScore       = (scoreModel === 'prompt' && promptFinalScore != null) ? promptFinalScore : mathFinalScore
+//
+// Writers call `applyScore(version, {evalResult, entityResult, complianceResult, promptFinalScore, scoreModel})`
+// — single entry point. Readers (`findBadPages`, `pickBestVersionIndex`)
+// read `version.finalScore` only.
+//
+// Severity points calibrated for tolerance — minor wobbles shouldn't
+// trip the redo gate.
+// =====================================================================
+const SEVERITY_POINTS = {
+  catastrophic: 50,
+  critical:     25,
+  major:        15,
+  moderate:      5,
+  minor:         2,
+};
+
+/**
+ * Normalize a list of raw evaluator issues into the deductions shape.
+ * Filters out anything without a severity.
+ */
+function normalizeIssues(rawIssues, source) {
+  if (!Array.isArray(rawIssues)) return [];
+  const out = [];
+  for (const it of rawIssues) {
+    if (!it || typeof it !== 'object') continue;
+    const sev = String(it.severity || '').toLowerCase();
+    if (!SEVERITY_POINTS[sev]) continue; // unknown severity → drop
+    out.push({
+      severity: sev,
+      description: it.description || it.problem || it.issue || '',
+      type: it.type || it.category || null,
+      name: it.character || it.name || it.element || null,
+      source,
+    });
+  }
+  return out;
+}
+
+/**
+ * Build the deductions structure from evaluator outputs. Each input is
+ * the raw eval result; the helper extracts the issues lists and normalizes.
+ *
+ * @param {object} params
+ * @param {object} [params.evalResult]       output of evaluateImageQuality (has fixableIssues, semanticResult, threeStageResult)
+ * @param {object} [params.entityResult]     { issues: [{name, severity, description, ...}], ... }
+ * @returns {{quality, semantic, compliance, entity}}
+ */
+function composeDeductions({ evalResult = null, entityResult = null } = {}) {
+  const quality    = normalizeIssues(evalResult?.fixableIssues, 'quality');
+  const semantic   = normalizeIssues(evalResult?.semanticResult?.semanticIssues, 'semantic');
+  const compliance = normalizeIssues(evalResult?.threeStageResult?.fixableIssues
+                                  || evalResult?.threeStageResult?.issues, 'compliance');
+  const entity     = normalizeIssues(entityResult?.issues, 'entity');
+  return { quality, semantic, compliance, entity };
+}
+
+/**
+ * Sum severity points across every category and clamp 100−sum to [0, 100].
+ */
+function computeMathFinalScore(deductions) {
+  if (!deductions || typeof deductions !== 'object') return 100;
+  let total = 0;
+  for (const cat of ['quality', 'semantic', 'compliance', 'entity']) {
+    const list = deductions[cat] || [];
+    for (const d of list) total += SEVERITY_POINTS[d.severity] || 0;
+  }
+  return Math.max(0, Math.min(100, 100 - total));
+}
+
+/**
+ * Single entry point that mutates a version with the canonical scoring
+ * fields. Writers call this; readers read `version.finalScore`.
+ *
+ * @param {object} version  mutated in place
+ * @param {object} params
+ * @param {object} [params.evalResult]     evaluateImageQuality output
+ * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
+ * @param {number|null} [params.promptFinalScore]   consolidator's final_score (null if no consolidator ran)
+ * @param {'prompt'|'math'} [params.scoreModel='prompt']
+ */
+function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null, scoreModel = 'prompt' } = {}) {
+  if (!version || typeof version !== 'object') return;
+  const deductions = composeDeductions({ evalResult, entityResult });
+  const mathFinalScore = computeMathFinalScore(deductions);
+  const usePrompt = scoreModel === 'prompt' && typeof promptFinalScore === 'number';
+  const finalScore = usePrompt ? promptFinalScore : mathFinalScore;
+  version.deductions = deductions;
+  version.mathFinalScore = mathFinalScore;
+  version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
+  version.finalScore = finalScore;
+  version.scoreModel = scoreModel; // remember which model produced finalScore
+  return version;
+}
+
+
+
 /**
  * Pick the score that represents this version's quality, in canonical
  * priority. Returns null when the version has no score at all (un-evaluated).
@@ -65,8 +179,8 @@ const { arrayToDbIndex } = require('./versionManager');
  */
 function computeFinalScore(version) {
   if (!version || typeof version !== 'object') return null;
-  // Modern shape: finalScore is computed at write time as
-  // evalScore − entityPenalty. Trust it.
+  // New shape (May 2026): applyScore wrote finalScore directly. Trust it.
+  // mathFinalScore + promptFinalScore are stored alongside for audit.
   if (typeof version.finalScore === 'number') return version.finalScore;
   // Older shape: evalScore + entityPenalty separate, no finalScore field.
   if (typeof version.evalScore === 'number') {
@@ -284,6 +398,12 @@ function shouldRedo(version) {
 }
 
 module.exports = {
+  // New deductions-first model (canonical)
+  SEVERITY_POINTS,
+  composeDeductions,
+  computeMathFinalScore,
+  applyScore,
+  // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   buildScoreBreakdown,
   composeEvalScore,

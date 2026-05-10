@@ -119,6 +119,15 @@ const MODEL_DEFAULTS = {
   // and character-repair passes catch most of it.
   imageBackend: 'grok',
 
+  // Scoring model — picks which finalScore the pipeline uses.
+  //   'prompt' = consolidator's tolerant deduplicated final_score (default).
+  //             Falls back to math when consolidator hasn't run on a version.
+  //   'math'   = sum of severity points from raw deductions, 100 − total.
+  // Both numbers are stored on every version (mathFinalScore, promptFinalScore)
+  // so retrospectives can see what each model said. The flag is snapshotted
+  // onto each story at creation in story.flagSnapshot.scoreModel — old stories
+  // can be re-evaluated against either model later.
+  scoreModel: 'prompt',
   // Feature flags for generation pipeline
   enableAutoRepair: false,             // Auto-repair: inpaint fixable issues (Runware SDXL/FLUX)
   useGridRepair: false,                // Grid-based artifact repair: OFF - we only want character fixes
