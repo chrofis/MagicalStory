@@ -5360,13 +5360,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Add covers to rawImages with negative page numbers
         for (const [coverKey, coverData] of Object.entries(coverImages)) {
           if (coverData?.imageData && COVER_PAGE_MAP[coverKey] != null) {
-            // Include text requirements so cover evaluator knows what text to check
+            // Include text requirements so cover evaluator knows what text to check.
+            // The TITLE comes from `title` (extracted by UnifiedStoryParser from
+            // the unified Sonnet pass at line 3889), NOT from inputData. The
+            // user never types a title — the model invents one. Reading
+            // inputData.title here yields '' on every unified-pipeline run, so
+            // the gate-text becomes `MUST include this exact title text: ""`,
+            // and Gemini correctly flags the rendered title as "unrequested
+            // text" (observed: job_1778525478433_fkl0f12x4 frontCover scored
+            // -20 because of its OWN title). Same fix possibility for
+            // dedication: it lives on coverData / storyData if it's been set.
             let coverEvalPrompt = coverData.description || coverData.prompt || '';
             if (coverKey === 'frontCover') {
-              const title = inputData.title || inputData.storyTitle || '';
-              if (title) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${title}"`;
+              const titleForEval = title || inputData.title || inputData.storyTitle || '';
+              if (titleForEval) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${titleForEval}"`;
             } else if (coverKey === 'initialPage') {
-              const dedication = inputData.dedication || '';
+              const dedication = coverData.dedication || inputData.dedication || '';
               if (dedication) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
             } else if (coverKey === 'backCover') {
               coverEvalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';

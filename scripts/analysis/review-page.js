@@ -71,16 +71,24 @@ async function main() {
   try {
     let row;
     if (storyArg === 'latest') {
-      const r = await pool.query("SELECT id, data FROM stories ORDER BY created_at DESC LIMIT 1");
+      const r = await pool.query("SELECT id, data, image_version_meta FROM stories ORDER BY created_at DESC LIMIT 1");
       row = r.rows[0];
     } else {
-      const r = await pool.query("SELECT id, data FROM stories WHERE id = $1", [storyArg]);
+      const r = await pool.query("SELECT id, data, image_version_meta FROM stories WHERE id = $1", [storyArg]);
       row = r.rows[0];
     }
     if (!row) { console.error('Story not found:', storyArg); process.exit(1); }
 
     const d = row.data || {};
     const scenes = d.sceneImages || [];
+    // image_version_meta is the source of truth for which version is active
+    // per page (the JSON blob's `scene.activeVersion` is never set by the
+    // unified pipeline). Both setActiveVersion (server.js → unified pipeline
+    // finalisation) and recomputeActiveVersion (server/lib/scoring.js) write
+    // here. Reading the blob's `activeVersion` instead silently returns
+    // undefined and the dev panel defaults to "last pushed", which is wrong
+    // whenever pick-best chose a non-last version.
+    const versionMeta = row.image_version_meta || {};
     const scene = scenes.find((s) => s.pageNumber === pageNum) || scenes[pageNum - 1];
     if (!scene) {
       console.error(`Page ${pageNum} not found (have ${scenes.length})`);
@@ -168,7 +176,18 @@ async function main() {
     // step OR when caller asked for 'active' specifically.
     if (shouldPrint('active') || shouldPrint('v0') || shouldPrint('v1') || shouldPrint('v2') || shouldPrint('v3') || shouldPrint('v4') || shouldPrint('v5')) {
       hr('-', `ACTIVE VERSION SUMMARY`);
-      console.log(`active: quality=${scene.qualityScore ?? '?'}  semantic=${scene.semanticScore ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
+      // Resolve active index from image_version_meta (correct source) before
+      // falling back to scene.activeVersion (rarely populated) or last index.
+      const metaActive = versionMeta?.[String(pageNum)]?.activeVersion;
+      const activeIdx = (typeof metaActive === 'number') ? metaActive
+        : (typeof scene.activeVersion === 'number') ? scene.activeVersion
+        : (vs.length ? vs.length - 1 : -1);
+      const av = activeIdx >= 0 ? vs[activeIdx] : null;
+      const aQual = av?.qualityScore ?? scene.qualityScore;
+      const aSem = av?.semanticScore ?? scene.semanticScore;
+      const aFinal = av?.finalScore;
+      const aSrc = av?.source ?? '?';
+      console.log(`active: v${activeIdx} (${aSrc})  quality=${aQual ?? '?'}  semantic=${aSem ?? '?'}  finalScore=${aFinal ?? '?'}  verdict=${scene.verdict?.verdict || scene.verdict || '?'}  regen=${scene.wasRegenerated ?? false}`);
       console.log(`versions kept: ${vs.length}`);
     }
     if (vs.length === 0 && shouldPrint('active')) {
