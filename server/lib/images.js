@@ -5910,6 +5910,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Reusable helper: build eval inputs for an array of image entries
   const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
     const orig = rawImages.find(img => img.pageNumber === entry.pageNumber) || entry;
+    // sharedBboxDetection is the bbox detection that ran on the ORIGINAL
+    // image bytes pre-pipeline (server.js:5570). Reusing it skips a redundant
+    // Gemini call when re-evaluating the same image. But it MUST NOT be
+    // reused when the entry's imageData differs from the original — that
+    // happens on every round-result image (iterate / inpaint / char-fix
+    // produce new bytes). Page 5 of job_1778525478433_fkl0f12x4 showed v3
+    // and v4 carrying v0's bbox figures even though their pixel content was
+    // completely different — because every round eval got the same
+    // sharedBboxDetection forwarded.
+    const isOriginalImage = entry.imageData === orig.imageData;
     return {
       imageData: entry.imageData,
       pageNumber: entry.pageNumber,
@@ -5922,12 +5932,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageText: orig.text,
       sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
-      // Phase 5b-pre detected bboxes for every image (incl. covers); without
-      // forwarding it the eval's enrich step re-detects from scratch with no
-      // expectedCharacters list, which on covers makes every figure UNKNOWN.
-      // Char repair then filters out all UNKNOWN figures and protectedFaces
-      // ends up empty — so only the target face is blurred during repair.
-      sharedBboxDetection: orig.sharedBboxDetection || null,
+      // Only forward the pre-detected bbox when the image is the original.
+      // For round-result images, leave null so enrichWithBoundingBoxes runs
+      // fresh detection against the actual rendered pixels.
+      sharedBboxDetection: isOriginalImage ? (orig.sharedBboxDetection || null) : null,
     };
   });
 
