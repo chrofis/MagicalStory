@@ -1127,9 +1127,17 @@ function buildEraGuard(era) {
  * identity stability for painterly cohesion.
  *
  * Modes:
- *   'strict'      — pass everything through unchanged (legacy behaviour)
- *   'loose'       — keep character photos only on close-up / medium / OTS shots
- *   'styled-only' — keep character photos (already styled) on every shot
+ *   'strict'      — pass the full 2×2 quadrant grid (face+body, front+profile)
+ *                   on every shot (legacy behaviour)
+ *   'loose'       — shot-aware reference packing using the pre-cropped
+ *                   quadrants instead of the 2×2 grid:
+ *                     close / medium / OTS  →  TWO refs per character
+ *                                              (face crop + body crop)
+ *                     wide                  →  ONE ref per character (body)
+ *                   The face quadrant would anchor portrait scale on wide
+ *                   shots, so it's dropped there. Older avatars without
+ *                   thumbnail URLs fall back to the full 2×2 grid.
+ *   'styled-only' — keep the full 2×2 grid (already styled) on every shot
  *   'off'         — drop character photos, landmarks, and empty-scene plate
  *
  * @param {Object} args
@@ -1161,13 +1169,32 @@ function applyReferenceMode({
   }
   if (m === 'loose') {
     const shot = String(sceneMetadata?.fullData?.shot || sceneMetadata?.framingPattern || '').toLowerCase();
-    const isCloseFraming = shot.includes('close') || shot.includes('medium') || shot.includes('over-the-shoulder');
-    return {
-      characterPhotos: isCloseFraming ? characterPhotos : [],
-      visualBibleGrid,
-      landmarkPhotos,
-      sceneBackground,
-    };
+    const isWide = shot.includes('wide');
+    // Two outputs per character: face + body, attached as separate refs (so
+    // Grok can use each crop verbatim without splitting a quadrant). On wide
+    // shots we drop the face crop because it would anchor portrait scale.
+    // Older avatars (no thumbnail URLs) keep their single full-grid entry.
+    const out = [];
+    for (const p of characterPhotos) {
+      if (!p) continue;
+      const v = p.variantUrls || {};
+      if (!v.face && !v.body) {
+        // Pre-thumbnail avatar — keep the original entry untouched.
+        out.push(p);
+        continue;
+      }
+      if (!isWide && v.face) {
+        out.push({ ...p, photoUrl: v.face, photoVariant: 'face' });
+      }
+      if (v.body) {
+        out.push({ ...p, photoUrl: v.body, photoVariant: 'body' });
+      } else if (isWide) {
+        // Wide shot but no body crop available — keep the full grid as
+        // fallback rather than dropping the character entirely.
+        out.push(p);
+      }
+    }
+    return { characterPhotos: out, visualBibleGrid, landmarkPhotos, sceneBackground };
   }
   return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
 }
@@ -2901,6 +2928,19 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
       }
 
+      // Per-clothing face/body crop URLs for shot-aware reference selection.
+      // The default `photoUrl` above is the full 2x2 quadrant grid (face-front,
+      // face-profile, body-front, body-profile). For wide shots we want body
+      // only — the face quadrants anchor portrait scale and pull the figure
+      // into the foreground. For close-ups we want face only — the body
+      // quadrants waste reference attention. applyReferenceMode() reads these
+      // and swaps photoUrl per scene shot type. Falls back to null when an
+      // older avatar (no thumbnails generated) doesn't have these slots.
+      const variantClothing = (actualClothingUsed || resolvedClothing || 'standard');
+      const variantBase = variantClothing.startsWith('costumed') ? 'standard' : variantClothing;
+      const faceVariantUrl = avatars?.faceThumbnailsUrl?.[variantBase] || null;
+      const bodyVariantUrl = avatars?.bodyThumbnailsUrl?.[variantBase] || null;
+
       return {
         name: char.name,
         id: char.id,
@@ -2909,6 +2949,10 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         photoHash: getImagesModule().hashImageData(photoUrl),  // For dev mode verification
         clothingCategory: actualClothingUsed || resolvedClothing || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
+        variantUrls: {
+          face: faceVariantUrl,
+          body: bodyVariantUrl,
+        },
         hasPhoto: photoType !== 'none'
       };
     })
