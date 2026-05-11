@@ -71,15 +71,20 @@ function needsScaleRepair(sceneMetadata) {
  */
 function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription }) {
   const lines = [];
-  lines.push(`Render this same ${shot || 'wide'} scene with the foreground composition unchanged, but add the following figures as tiny distant figures far away in the background.`);
+  // Grok ALWAYS renders the named characters in the input image — usually
+  // too large and too close to the camera. Scale-repair's job is to
+  // RELOCATE existing figures, not to add new ones. Phrasing the prompt
+  // as "add" caused Grok to leave the original copy in place and paint a
+  // second tiny version. Phrase as "move".
+  lines.push(`Edit this ${shot || 'wide'} scene by RELOCATING the named characters. Every named character is already drawn somewhere in the input image — do not add new figures. The total figure count must not increase. Each named character must appear EXACTLY ONCE in the output.`);
   lines.push('');
-  lines.push('Foreground / midground stays as in the input image:');
+  lines.push('Foreground / midground figures — keep these at their current position and size:');
   for (const c of fgChars) {
     const pos = c.position ? ` — ${c.position}` : '';
     lines.push(`- ${c.name}${pos}`);
   }
   lines.push('');
-  lines.push('Tiny background figures to add (clearly smaller than the foreground figures):');
+  lines.push('Background figures — find the existing figure of this character in the input image and MOVE+SHRINK it to the target position below. The relocated figure should be clearly smaller than the foreground figures (roughly one-third their height or less):');
   for (const c of bgChars) {
     // Each bg figure needs three things in one line:
     //   1. a clear name handle for the model,
@@ -90,13 +95,20 @@ function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription })
     // No "body language only / no facial detail" — that phrasing produced
     // black silhouettes. Just say "tiny in the background".
     const desc = (c.physicalDescription || '').trim();
-    const pos = c.position ? `, ${c.position}` : '';
+    const pos = c.position ? ` Target position: ${c.position}.` : '';
     if (desc) {
-      lines.push(`- ${c.name} (${desc}): tiny in the background${pos}.`);
+      lines.push(`- ${c.name} (${desc}): move this character to the deep background.${pos}`);
     } else {
-      lines.push(`- ${c.name}: tiny in the background${pos}.`);
+      lines.push(`- ${c.name}: move this character to the deep background.${pos}`);
     }
   }
+  lines.push('');
+  lines.push('After the move, the background-only zone occupied by the wrongly-sized original (face / torso / clothing) must be repainted with the natural setting (forest / sky / wall / floor) so no trace of the figure remains there.');
+  lines.push('');
+  // Reference-identifier rule (mirrors the rule we ship in image-generation.txt).
+  // scaleRepair builds its own prompt, so the no-name-rendering instruction
+  // has to be repeated here.
+  lines.push('Character names in this prompt are reference identifiers only — never paint them onto clothing, signs, banners, captions, name tags, or any surface in the scene.');
   lines.push('');
   lines.push('Keep the input image\'s lighting, palette, and overall composition. Do not enlarge the background figures. Do not add other people.');
   if (artStyleDescription) {
