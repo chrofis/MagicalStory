@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DOCUMENTATION.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory Documentation Index</h1>
+<p><strong>Last Updated:</strong> 2025-12-15
+<strong>Platform:</strong> Web Application (React + Node.js)
+<strong>Hosting:</strong> Railway
+<strong>Domain:</strong> magicalstory.ch</p>
+<hr>
+<h2>Quick Links</h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Description</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="README.md">README.md</a></td>
+<td>Project overview and quick start</td>
+<td>Current</td>
+</tr>
+<tr>
+<td><a href="DEPLOYMENT_GUIDE.md">DEPLOYMENT_GUIDE.md</a></td>
+<td>How to deploy to Railway/Render</td>
+<td>Current</td>
+</tr>
+<tr>
+<td><a href="EMAIL_SETUP_GUIDE.md">EMAIL_SETUP_GUIDE.md</a></td>
+<td>Resend email configuration</td>
+<td>Current</td>
+</tr>
+<tr>
+<td><a href="docs/PIPELINE_ANALYSIS.md">docs/PIPELINE_ANALYSIS.md</a></td>
+<td>Story generation pipeline details</td>
+<td>Current</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Current Architecture</h2>
+<h3>Tech Stack</h3>
+<ul>
+<li><strong>Frontend:</strong> React 18 + Vite + TypeScript + Tailwind CSS</li>
+<li><strong>Backend:</strong> Node.js + Express.js</li>
+<li><strong>Database:</strong> PostgreSQL (Railway)</li>
+<li><strong>AI Services:</strong><ul>
+<li>Claude (Anthropic) - Story text generation</li>
+<li>Gemini (Google) - Image generation &amp; photo analysis</li>
+</ul>
+</li>
+<li><strong>Email:</strong> Resend</li>
+<li><strong>Payments:</strong> Stripe</li>
+<li><strong>Print:</strong> Gelato</li>
+<li><strong>Hosting:</strong> Railway</li>
+</ul>
+<h3>Key Features</h3>
+<ul>
+<li>Multi-language support (EN, DE, FR)</li>
+<li>Character photo upload and AI analysis</li>
+<li>Story generation with multiple art styles</li>
+<li>Sequential image generation for visual consistency</li>
+<li>Cover image generation (front, back, initial)</li>
+<li>PDF generation and print ordering</li>
+<li>User authentication (Firebase)</li>
+<li>Admin dashboard with developer mode</li>
+</ul>
+<hr>
+<h2>Documentation by Category</h2>
+<h3>Core Documentation</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>README.md</strong></td>
+<td>Project overview, tech stack, quick start</td>
+</tr>
+<tr>
+<td><strong>DEPLOYMENT_GUIDE.md</strong></td>
+<td>Railway/Render deployment instructions</td>
+</tr>
+<tr>
+<td><strong>EMAIL_SETUP_GUIDE.md</strong></td>
+<td>Resend email setup and templates</td>
+</tr>
+</tbody></table>
+<h3>Technical Documentation</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>docs/PIPELINE_ANALYSIS.md</strong></td>
+<td>Story generation job pipeline</td>
+</tr>
+<tr>
+<td><strong>STORY-GENERATION-ANALYSIS.md</strong></td>
+<td>Detailed generation analysis</td>
+</tr>
+<tr>
+<td><strong>PIPELINE_OPTIMIZATIONS.md</strong></td>
+<td>Performance optimization details</td>
+</tr>
+<tr>
+<td><strong>PERFORMANCE_OPTIMIZATIONS.md</strong></td>
+<td>System performance tuning</td>
+</tr>
+<tr>
+<td><strong>IMPLEMENTATION_DIFFERENCES.md</strong></td>
+<td>Client vs server implementation notes</td>
+</tr>
+<tr>
+<td><strong>DATABASE_MIGRATION_SUMMARY.md</strong></td>
+<td>PostgreSQL migration notes</td>
+</tr>
+</tbody></table>
+<h3>Feature Documentation</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>CHARAKTER-ERSTELLUNG.md</strong></td>
+<td>Character creation feature (German)</td>
+</tr>
+<tr>
+<td><strong>COVER_SYSTEM_IMPLEMENTATION_PLAN.md</strong></td>
+<td>Cover generation system</td>
+</tr>
+</tbody></table>
+<h3>Planning Documentation</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ADMIN_DASHBOARD.md</strong></td>
+<td>Admin analytics dashboard design</td>
+<td>Partially implemented</td>
+</tr>
+<tr>
+<td><strong>STORAGE-PROPOSAL.md</strong></td>
+<td>R2 object storage migration plan</td>
+<td>Not implemented</td>
+</tr>
+<tr>
+<td><strong>ToDo.md</strong></td>
+<td>Current task list</td>
+<td>Active</td>
+</tr>
+<tr>
+<td><strong>requirements/</strong></td>
+<td>Enterprise architecture specs</td>
+<td>Future vision</td>
+</tr>
+</tbody></table>
+<h3>Development Instructions</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>CLAUDE.md</strong></td>
+<td>Claude Code AI assistant instructions</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Archived Documentation</h2>
+<p>Outdated files moved to <code>docs/archive/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Reason Archived</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CHARACTER-CONSISTENCY-SYSTEM.md</td>
+<td>iOS app architecture (Swift) - not applicable</td>
+</tr>
+<tr>
+<td>DATABASE_SETUP.md</td>
+<td>MySQL setup - we use PostgreSQL</td>
+</tr>
+<tr>
+<td>DATABASE_TROUBLESHOOTING.md</td>
+<td>MySQL troubleshooting</td>
+</tr>
+<tr>
+<td>DEPLOY-CLOUDFLARE.md</td>
+<td>Cloudflare Workers - we use Railway</td>
+</tr>
+<tr>
+<td>DEPLOY.md</td>
+<td>Old deployment notes</td>
+</tr>
+<tr>
+<td>SERVER_SETUP.md</td>
+<td>Old server setup</td>
+</tr>
+<tr>
+<td>PROMPT-1-OUTLINE.md</td>
+<td>Outdated line references</td>
+</tr>
+<tr>
+<td>PROMPT-2-STORY-TEXT.md</td>
+<td>Outdated line references</td>
+</tr>
+<tr>
+<td>PROMPT-3-SCENE-DESCRIPTIONS.md</td>
+<td>Outdated line references</td>
+</tr>
+<tr>
+<td>PROMPT-4-IMAGE-GENERATION.md</td>
+<td>Outdated line references</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Server Configuration</h2>
+<h3>Environment Variables (Railway)</h3>
+<pre><code class="language-env"># Database
+DATABASE_URL=postgresql://...
+
+# AI APIs
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+
+# Authentication
+JWT_SECRET=...
+FIREBASE_SERVICE_ACCOUNT={&quot;type&quot;:&quot;service_account&quot;,...}
+
+# Email
+RESEND_API_KEY=re_...
+EMAIL_FROM=MagicalStory &lt;noreply@magicalstory.ch&gt;
+ADMIN_EMAIL=admin@magicalstory.ch
+
+# Payments
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Print
+GELATO_API_KEY=...
+
+# App
+NODE_ENV=production
+ADMIN_USER_IDS=1,2,3
+</code></pre>
+<hr>
+<h2>API Endpoints Summary</h2>
+<h3>Stories</h3>
+<ul>
+<li><code>POST /api/jobs/create-story</code> - Start story generation job</li>
+<li><code>GET /api/jobs/:jobId/status</code> - Poll job status</li>
+<li><code>GET /api/stories</code> - List user&#39;s stories</li>
+<li><code>GET /api/stories/:id</code> - Get story details</li>
+<li><code>DELETE /api/stories/:id</code> - Delete story</li>
+</ul>
+<h3>Regeneration</h3>
+<ul>
+<li><code>POST /api/stories/:id/regenerate/scene-description/:pageNum</code> - Regenerate scene</li>
+<li><code>POST /api/stories/:id/regenerate/image/:pageNum</code> - Regenerate image</li>
+<li><code>POST /api/stories/:id/regenerate/cover/:coverType</code> - Regenerate cover</li>
+<li><code>POST /api/stories/:id/edit/image/:pageNum</code> - Edit image with prompt</li>
+<li><code>POST /api/stories/:id/edit/cover/:coverType</code> - Edit cover with prompt</li>
+</ul>
+<h3>Admin</h3>
+<ul>
+<li><code>GET /api/admin/metrics/summary</code> - Dashboard metrics</li>
+<li><code>GET /api/admin/users</code> - List all users</li>
+<li><code>GET /api/admin/user-storage</code> - Storage usage per user</li>
+<li><code>GET /api/admin/database-size</code> - Database statistics</li>
+</ul>
+<h3>Payments</h3>
+<ul>
+<li><code>POST /api/stripe/create-checkout-session</code> - Create payment</li>
+<li><code>GET /api/stripe/order-status/:sessionId</code> - Check order status</li>
+<li><code>POST /api/print-provider/order</code> - Direct print order (dev mode)</li>
+</ul>
+<hr>
+<h2>Development Workflow</h2>
+<h3>Local Development</h3>
+<pre><code class="language-bash"># Install dependencies
+npm install
+cd client &amp;&amp; npm install
+
+# Start development servers
+npm run dev          # Backend on port 3000
+cd client &amp;&amp; npm run dev  # Frontend on port 5173
+</code></pre>
+<h3>Deployment</h3>
+<pre><code class="language-bash"># Push to main branch triggers Railway auto-deploy
+git push origin master
+
+# Or manual deploy
+railway up
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Common Issues</h3>
+<p><strong>Story generation fails:</strong></p>
+<ul>
+<li>Check Railway logs for error details</li>
+<li>Verify API keys are valid</li>
+<li>Check Gemini image generation limits</li>
+</ul>
+<p><strong>Images not generating:</strong></p>
+<ul>
+<li>Gemini content safety filters may block certain prompts</li>
+<li>Check <code>finishReason</code> and <code>finishMessage</code> in logs</li>
+<li>Retry usually works</li>
+</ul>
+<p><strong>Email not sending:</strong></p>
+<ul>
+<li>Verify Resend API key</li>
+<li>Check domain verification in Resend dashboard</li>
+<li>Check ADMIN_EMAIL env variable</li>
+</ul>
+<hr>
+<h2>File Organization</h2>
+<pre><code>MagicalStory/
+├── client/                  # React frontend
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API clients
+│   │   ├── context/         # React contexts
+│   │   └── types/           # TypeScript types
+│   └── public/
+├── server.js                # Express backend
+├── email.js                 # Email utilities
+├── prompts/                 # AI prompt templates
+├── docs/                    # Documentation
+│   ├── archive/             # Archived/obsolete docs
+│   └── PIPELINE_ANALYSIS.md
+├── requirements/            # Future architecture specs
+├── DOCUMENTATION.md         # This file
+├── README.md                # Project overview
+└── *.md                     # Feature documentation
+</code></pre>
+<hr>
+<h2>External Service Integrations</h2>
+<h3>Firebase Authentication</h3>
+<p><strong>Purpose:</strong> User authentication and session management</p>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Firebase project at console.firebase.google.com</li>
+<li>Enable Email/Password authentication</li>
+<li>Generate service account key (Project Settings → Service Accounts)</li>
+<li>Base64 encode the JSON and set <code>FIREBASE_SERVICE_ACCOUNT</code></li>
+<li>Add your domain to authorized domains</li>
+</ol>
+<p><strong>Client-side:</strong> Uses Firebase SDK for login/signup flows
+<strong>Server-side:</strong> Verifies tokens using Firebase Admin SDK</p>
+<h3>Stripe Payments</h3>
+<p><strong>Purpose:</strong> Payment processing for print book orders</p>
+<p><strong>Endpoints:</strong></p>
+<ul>
+<li><code>POST /api/stripe/create-checkout-session</code> - Creates Stripe checkout</li>
+<li><code>POST /api/stripe/webhook</code> - Handles payment events</li>
+<li><code>GET /api/stripe/order-status/:sessionId</code> - Checks payment status</li>
+</ul>
+<p><strong>Webhook Events:</strong></p>
+<ul>
+<li><code>checkout.session.completed</code> - Payment successful, triggers print order</li>
+<li><code>payment_intent.succeeded</code> - Backup payment confirmation</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Stripe account at dashboard.stripe.com</li>
+<li>Get API keys (Settings → API keys)</li>
+<li>Create webhook endpoint pointing to <code>/api/stripe/webhook</code></li>
+<li>Set <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_WEBHOOK_SECRET</code></li>
+</ol>
+<h3>Gelato Print API</h3>
+<p><strong>Purpose:</strong> Print-on-demand book fulfillment</p>
+<p><strong>Flow:</strong></p>
+<ol>
+<li>User completes Stripe payment</li>
+<li>Server generates print-ready PDF</li>
+<li>Server creates Gelato order via API</li>
+<li>Gelato prints and ships book</li>
+</ol>
+<p><strong>Products:</strong></p>
+<ul>
+<li>Hardcover photobook (28 pages minimum)</li>
+<li>A4 format</li>
+</ul>
+<p><strong>Endpoints:</strong></p>
+<ul>
+<li><code>POST /api/print-provider/order</code> - Create print order (dev mode: no payment required)</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Gelato account at gelato.com</li>
+<li>Get API key from dashboard</li>
+<li>Set <code>GELATO_API_KEY</code></li>
+</ol>
+<h3>Resend Email</h3>
+<p><strong>Purpose:</strong> Transactional emails (story completion, order confirmation)</p>
+<p><strong>Templates:</strong></p>
+<ul>
+<li>Story completion notification</li>
+<li>Order confirmation</li>
+<li>Admin notifications</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Resend account at resend.com</li>
+<li>Verify your domain</li>
+<li>Get API key</li>
+<li>Set <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code></li>
+</ol>
+<p>See <a href="EMAIL_SETUP_GUIDE.md">EMAIL_SETUP_GUIDE.md</a> for detailed configuration.</p>
+<h3>Claude (Anthropic)</h3>
+<p><strong>Purpose:</strong> AI text generation</p>
+<p><strong>Used for:</strong></p>
+<ul>
+<li>Story outline generation</li>
+<li>Story text generation</li>
+<li>Scene descriptions</li>
+<li>Image quality evaluation</li>
+</ul>
+<p><strong>Model:</strong> claude-sonnet-4-20250514 (configurable)</p>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Get API key from console.anthropic.com</li>
+<li>Set <code>ANTHROPIC_API_KEY</code></li>
+</ol>
+<h3>Gemini (Google AI)</h3>
+<p><strong>Purpose:</strong> AI image generation and photo analysis</p>
+<p><strong>Used for:</strong></p>
+<ul>
+<li>Character photo analysis (extract traits)</li>
+<li>Scene image generation</li>
+<li>Cover image generation</li>
+<li>Image quality scoring</li>
+</ul>
+<p><strong>Models:</strong></p>
+<ul>
+<li><code>gemini-2.5-flash-image</code> - Image generation</li>
+<li><code>gemini-2.0-flash-exp-image-generation</code> - Image editing</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Get API key from ai.google.dev</li>
+<li>Set <code>GEMINI_API_KEY</code></li>
+</ol>
+<hr>
+<h2>Support</h2>
+<ul>
+<li><strong>GitHub Issues:</strong> Report bugs and feature requests</li>
+<li><strong>Admin Dashboard:</strong> Monitor system health at /admin</li>
+<li><strong>Railway Logs:</strong> Debug production issues</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>DOCUMENTATION.md</code>.
+</footer>
+</body>
+</html>

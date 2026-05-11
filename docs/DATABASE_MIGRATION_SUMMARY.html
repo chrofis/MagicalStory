@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DATABASE_MIGRATION_SUMMARY.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Database Migration Summary - December 6, 2025</h1>
+<h2>✅ Completed: Migration from IONOS MySQL to Railway PostgreSQL</h2>
+<h3>What Was Done</h3>
+<h4>1. <strong>Removed All Old MySQL/IONOS Database Code</strong></h4>
+<ul>
+<li>Removed <code>mysql2</code> import and dependency</li>
+<li>Deleted all <code>DB_TYPE</code> conditionals (20+ occurrences throughout server.js)</li>
+<li>Removed MySQL connection pool code</li>
+<li>Simplified all database queries to PostgreSQL-only syntax</li>
+<li><strong>Result:</strong> Removed 242 lines of obsolete code</li>
+</ul>
+<h4>2. <strong>Database Configuration Cleanup</strong></h4>
+<p>   <strong>Before:</strong></p>
+<ul>
+<li>Supported both PostgreSQL (Railway) and MySQL (IONOS)</li>
+<li>Required <code>DB_TYPE</code> checks for every database query</li>
+<li>MySQL credentials: <code>db5019134498.hosting-data.io</code></li>
+</ul>
+<p>   <strong>After:</strong></p>
+<ul>
+<li>PostgreSQL-only (Railway)</li>
+<li>Simplified queries using <code>$1, $2</code> parameters</li>
+<li>Old MySQL credentials commented out in <code>.env</code> (kept for reference)</li>
+</ul>
+<h4>3. <strong>Fixed Critical Product UID Bug</strong></h4>
+<p>   <strong>The Problem:</strong></p>
+<ul>
+<li>Migration <code>003_add_24_page_product.sql</code> was configured for 24 pages</li>
+<li>Frontend code calculates: <code>24 scenes × 2 pages/scene = 48 PDF pages</code></li>
+<li>Product lookup failed: &quot;No product matches page count: 48&quot;</li>
+<li>Result: <code>Selected product: undefined UID: undefined</code></li>
+</ul>
+<p>   <strong>The Fix:</strong></p>
+<ul>
+<li>Updated migration to configure product for <strong>48 pages</strong> (not 24)</li>
+<li>Changed <code>available_page_counts</code> from <code>[24]</code> to <code>[48]</code></li>
+<li>Fixed SQL syntax: <code>ON DUPLICATE KEY UPDATE</code> (MySQL) → <code>ON CONFLICT</code> (PostgreSQL)</li>
+</ul>
+<h4>4. <strong>Code Changes Summary</strong></h4>
+<pre><code>Commit 763e7ff: Remove MySQL/IONOS database code
+- server.js: 242 lines removed (404 → 162 insertions)
+- Removed all DB_TYPE conditionals
+- PostgreSQL-only query wrapper
+
+Commit b44e5ab: Remove mysql2 dependency
+- package.json: Removed mysql2 from dependencies
+
+Commit fe9090a: Fix migration for 48 pages + PostgreSQL syntax
+- database/migrations/003_add_24_page_product.sql
+- Changed: 24 pages → 48 pages
+- Changed: MySQL syntax → PostgreSQL syntax
+</code></pre>
+<hr>
+<h2>🗄️ Current Database Configuration</h2>
+<p><strong>Active Database:</strong> PostgreSQL on Railway</p>
+<ul>
+<li><strong>Connection:</strong> <code>postgresql://postgres:***@postgres.railway.internal:5432/railway</code></li>
+<li><strong>Mode:</strong> <code>STORAGE_MODE=database</code></li>
+<li><strong>Migrations:</strong> Automatically run on server startup</li>
+</ul>
+<p><strong>Old Database (Deprecated):</strong> MySQL on IONOS</p>
+<ul>
+<li>Status: ❌ Deactivated</li>
+<li>Credentials: Commented out in <code>.env</code></li>
+<li>Code: Completely removed from server.js</li>
+</ul>
+<hr>
+<h2>🐛 Product UID Issue - Root Cause &amp; Fix</h2>
+<h3>Root Cause Analysis</h3>
+<p><strong>Issue:</strong> &quot;Selected product: undefined UID: undefined&quot;</p>
+<p><strong>Why it happened:</strong></p>
+<ol>
+<li>Frontend calculates: <code>actualPdfPages = 24 scenes × 2 = 48 pages</code></li>
+<li>Product in database had: <code>available_page_counts = [24]</code></li>
+<li>Product matching failed: <code>48 ∉ [24]</code></li>
+<li>Result: <code>matchingProduct = undefined</code></li>
+</ol>
+<h3>The Fix</h3>
+<p><strong>Migration Updated:</strong></p>
+<pre><code class="language-sql">-- OLD (WRONG)
+min_pages: 24
+max_pages: 24
+available_page_counts: &#39;[24]&#39;
+
+-- NEW (CORRECT)
+min_pages: 48
+max_pages: 48
+available_page_counts: &#39;[48]&#39;
+</code></pre>
+<p><strong>Why 48 pages?</strong></p>
+<ul>
+<li>Each story scene generates 2 PDF pages:<ol>
+<li>Text page (story text)</li>
+<li>Image page (illustration)</li>
+</ol>
+</li>
+<li>24 scenes × 2 pages/scene = <strong>48 PDF pages</strong></li>
+<li>Gelato counts PDF pages, not scenes</li>
+</ul>
+<hr>
+<h2>📋 Testing Checklist</h2>
+<p>After Railway deployment completes (~2-3 minutes):</p>
+<h3>1. Hard Refresh Browser</h3>
+<ul>
+<li>Press <strong>Ctrl+Shift+R</strong> (Windows) or <strong>Cmd+Shift+R</strong> (Mac)</li>
+<li>This clears cached JavaScript/CSS</li>
+</ul>
+<h3>2. Check Console Logs</h3>
+<p>   Open browser DevTools (F12) and verify:</p>
+<pre><code>✅ Expected:
+📄 Story scenes: 24 (PDF pages: 48)
+🔍 Checking product: ...
+Available counts: [48] Looking for: 48 Match: true
+✅ Selected product: 14x14cm Softcover Photobook - 48 pages UID: photobooks-softcover_pf_...
+
+❌ OLD (should NOT see):
+Looking for: 24
+❌ No product matches page count: 24
+✅ Selected product: undefined UID: undefined
+</code></pre>
+<h3>3. Test Print Order Flow</h3>
+<ul>
+<li>Generate a 24-scene story</li>
+<li>Click &quot;Order Print Book&quot;</li>
+<li>Should see: &quot;Gelato product configured for 48 pages&quot;</li>
+<li>Should NOT see: &quot;Kein Gelato-Produkt konfiguriert&quot;</li>
+</ul>
+<h3>4. Verify Database Migration</h3>
+<p>   Check that the product was updated:</p>
+<ul>
+<li>Go to Admin Panel → Manage Products</li>
+<li>Should see: &quot;14x14cm Softcover Photobook - 48 pages&quot;</li>
+<li>Available counts: [48]</li>
+</ul>
+<hr>
+<h2>🚀 Deployment Status</h2>
+<p><strong>Commits Deployed:</strong></p>
+<ol>
+<li><code>763e7ff</code> - Remove MySQL/IONOS database code, migrate to PostgreSQL-only</li>
+<li><code>b44e5ab</code> - Remove mysql2 dependency from package.json</li>
+<li><code>fe9090a</code> - Fix migration: Update to 48 pages and PostgreSQL syntax</li>
+</ol>
+<p><strong>Railway Status:</strong> 🟢 Automatic deployment triggered
+<strong>Estimated Completion:</strong> 2-3 minutes from push time</p>
+<p><strong>Verification URL:</strong> <a href="https://www.magicalstory.ch">https://www.magicalstory.ch</a></p>
+<hr>
+<h2>📝 Next Steps</h2>
+<ol>
+<li><strong>Wait for Railway deployment</strong> to complete</li>
+<li><strong>Hard refresh</strong> the website (Ctrl+Shift+R)</li>
+<li><strong>Test the print order</strong> feature</li>
+<li><strong>Check console logs</strong> to verify product UID is no longer undefined</li>
+</ol>
+<p>If the issue persists after deployment:</p>
+<ul>
+<li>Check Railway logs for migration errors</li>
+<li>Verify the migration actually ran: <code>SELECT * FROM gelato_products;</code></li>
+<li>Check if <code>available_page_counts</code> column contains <code>[48]</code> (not <code>[24]</code>)</li>
+</ul>
+<hr>
+<h2>🎯 Summary</h2>
+<p><strong>Database Migration:</strong> ✅ Complete</p>
+<ul>
+<li>Old MySQL/IONOS code: ✅ Removed</li>
+<li>PostgreSQL-only: ✅ Implemented</li>
+<li>Code reduction: ✅ 242 lines removed</li>
+</ul>
+<p><strong>Product UID Bug:</strong> ✅ Fixed</p>
+<ul>
+<li>Migration: ✅ Updated to 48 pages</li>
+<li>SQL syntax: ✅ Changed to PostgreSQL</li>
+<li>Product matching: ✅ Should now work</li>
+</ul>
+<p><strong>Deployed:</strong> ✅ Yes</p>
+<ul>
+<li>All changes pushed to Railway</li>
+<li>Automatic deployment in progress</li>
+</ul>
+<p>The app should now properly find the Gelato product for 24-scene stories (48 PDF pages) and successfully create print orders! 🎉</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>DATABASE_MIGRATION_SUMMARY.md</code>.
+</footer>
+</body>
+</html>

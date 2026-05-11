@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>calm-zone-pipeline.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Calm-Zone Text Overlay Pipeline</h1>
+<p>How story text gets onto AI-generated page images, and how the pipeline keeps that overlay area legible.</p>
+<h2>Gating — when does any of this run?</h2>
+<p>The text-overlay pipeline is governed by two flags. Both must be true; either one being false disables the entire pipeline for that story.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Where</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MODEL_DEFAULTS.enableTextOverlay</code></td>
+<td><code>server/config/models.js</code></td>
+<td><strong>Global</strong> kill switch</td>
+</tr>
+<tr>
+<td><code>inputData.layout.textInImage</code></td>
+<td>story input data, set by <code>resolveLayout()</code></td>
+<td><strong>Per story</strong> — <code>1st-grade</code> layout = true; <code>standard</code>/<code>advanced</code> = false</td>
+</tr>
+</tbody></table>
+<p><strong>The single gate is at persistence.</strong> <code>sceneImages[].textPosition</code> is set in <code>server.js</code> (~line 5537 / 5605 / 5701) only when <code>skipTextRegionPhase === false</code> (the same condition that runs the text-region phase). For non-overlay stories the field is <code>null</code>; for overlay stories it carries the locked corner. This means every downstream consumer can rely on a simple <code>if (textPosition)</code> check — a non-null value implies overlay is enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Site</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Outline (Sonnet picks textPosition)</td>
+<td><code>prompts/story-unified.txt</code></td>
+<td>Always emits — value is filtered out at persistence for non-overlay stories</td>
+</tr>
+<tr>
+<td>Image gen (COPY SPACE in prompt)</td>
+<td><code>storyHelpers.js:4458</code> <code>buildImagePrompt</code></td>
+<td><code>textInImage &amp;&amp; textPosition</code> ✓</td>
+</tr>
+<tr>
+<td>Empty-scene gen</td>
+<td><code>storyHelpers.js</code> <code>buildTextZoneInstruction</code></td>
+<td>only called from <code>buildImagePrompt</code> (gated) ✓</td>
+</tr>
+<tr>
+<td>Text-region phase (calmness probe + lighten)</td>
+<td><code>server.js:5427</code></td>
+<td><code>skipTextRegionPhase</code> gates entry ✓</td>
+</tr>
+<tr>
+<td>Persistence (sceneImages[].textPosition)</td>
+<td><code>server.js:5537/5605/5701</code></td>
+<td><code>skipTextRegionPhase ? null : ...</code> ✓</td>
+</tr>
+<tr>
+<td>Text-space repair loop</td>
+<td><code>textSpaceRepair.js</code> <code>ensureCalmZone</code></td>
+<td>only called from text-region phase (gated) ✓</td>
+</tr>
+<tr>
+<td>Step 7.5 post-repair recovery</td>
+<td><code>images.js</code></td>
+<td><code>textAreaMask</code> absent → skip; layout flag honoured ✓</td>
+</tr>
+<tr>
+<td>Inpaint quiet-zone suffix</td>
+<td><code>images.js:5742</code></td>
+<td><code>if (textPosition)</code> ✓ — null on non-overlay stories</td>
+</tr>
+<tr>
+<td>Char-fix quiet-zone suffix</td>
+<td><code>images.js:8387</code></td>
+<td><code>if (textPosition)</code> ✓ — null on non-overlay stories</td>
+</tr>
+<tr>
+<td>Manual char-repair endpoint</td>
+<td><code>routes/regeneration.js</code></td>
+<td>reads <code>sceneImage.textPosition</code>; null on non-overlay stories ✓</td>
+</tr>
+<tr>
+<td>Iterate re-gen</td>
+<td><code>images.js</code> <code>iteratePageCore</code></td>
+<td>reads <code>savedScene.textPosition</code>; null on non-overlay stories ✓</td>
+</tr>
+<tr>
+<td>Browser overlay PNG</td>
+<td><code>routes/sharing.js</code> <code>/text-overlay</code></td>
+<td>client only requests for overlay layouts</td>
+</tr>
+<tr>
+<td>PDF overlay</td>
+<td><code>pdf.js</code></td>
+<td><code>sceneTextInImage || layoutFromLevel.textInImage</code> ✓</td>
+</tr>
+</tbody></table>
+<h3>Migrating old stories</h3>
+<p>Stories generated before the persistence-side gate was introduced may have <code>sceneImages[].textPosition</code> populated even on <code>standard</code> / <code>advanced</code> layouts. To clear them, run:</p>
+<pre><code class="language-sql">UPDATE stories
+SET data = jsonb_set(
+  data,
+  &#39;{sceneImages}&#39;,
+  (SELECT jsonb_agg(elem - &#39;textPosition&#39; || jsonb_build_object(&#39;textPosition&#39;, null))
+   FROM jsonb_array_elements(data-&gt;&#39;sceneImages&#39;) elem)
+)
+WHERE (data-&gt;&#39;inputData&#39;-&gt;&#39;layout&#39;-&gt;&gt;&#39;textInImage&#39;)::boolean IS FALSE
+  AND data-&gt;&#39;sceneImages&#39; IS NOT NULL;
+</code></pre>
+<p>Without this, repair runs on old non-overlay stories will still emit a quiet-zone suffix to Grok.</p>
+<h2>End-to-end flow</h2>
+<pre><code>                 1. Sonnet picks textPosition + textZoneDescription per page
+                              │
+                              ▼
+                 2. enforceSpreadTextPosition (storyHelpers.js)
+                    flips wrong-side corners (odd→left, even→right)
+                              │
+                              ▼
+                 3. Empty-scene + page generation
+                    use the calm-zone block in the prompt
+                    (buildTextZoneInstruction → ART STYLE block)
+                              │
+                              ▼
+                 4. detectAndLightenTextRegion (textRegion.js)
+                    measures calm pixels INSIDE the actual overlay polygon
+                              │
+                              ▼
+                 5. Text-space-repair loop (server.js)
+                    if calmFound &lt; calmNeeded → re-roll image with mask
+                    keep all candidates as imageVersions[]
+                              │
+                              ▼
+                 6. Quality-eval + repair workflow (iterate / inpaint /
+                    character-fix). Each branch threads textPosition
+                    through to its own prompt as a &quot;Quiet zone:&quot; warning.
+                              │
+                              ▼
+                 7. Step 7.5 post-repair calm-zone recovery (images.js)
+                    re-detects on repaired pages; runs text-space-repair
+                    again if calm zone was degraded by a repair step.
+                              │
+                              ▼
+                 8. Renderers consume textPosition (corner enum):
+                    ┌─ Frontend (browser)        — getTextOverlayPosition
+                    │  (CSS fallback) + server-rendered PNG (preferred)
+                    └─ PDF                        — generateTextOverlay
+                       (textOverlayRenderer.js, polygon-clipped Canvas)
+</code></pre>
+<h2>Position semantics</h2>
+<p><code>textPosition</code> is one of six string values:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Shape (from <code>getTextZonePolygon</code>)</th>
+<th>Renderer text alignment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>top-left</code></td>
+<td>right triangle, hypotenuse cuts down-right</td>
+<td>left-aligned, top-anchored</td>
+</tr>
+<tr>
+<td><code>top-right</code></td>
+<td>right triangle, hypotenuse cuts down-left</td>
+<td>right-aligned, top-anchored</td>
+</tr>
+<tr>
+<td><code>bottom-left</code></td>
+<td>right triangle, hypotenuse cuts up-right</td>
+<td>left-aligned, bottom-anchored</td>
+</tr>
+<tr>
+<td><code>bottom-right</code></td>
+<td>right triangle, hypotenuse cuts up-left</td>
+<td>right-aligned, bottom-anchored</td>
+</tr>
+<tr>
+<td><code>top-full</code></td>
+<td>rectangle across the top N% of the frame</td>
+<td>centered, top-anchored</td>
+</tr>
+<tr>
+<td><code>bottom-full</code></td>
+<td>rectangle across the bottom N% of the frame</td>
+<td>centered, bottom-anchored</td>
+</tr>
+</tbody></table>
+<p><strong>Critical:</strong> corner positions are <strong>triangles</strong>, not rectangles. The right angle sits at the corner of the frame; the hypotenuse cuts diagonally into the scene. Triangle area ≈ half the bounding rectangle&#39;s area.</p>
+<p><strong>Spread parity rule:</strong></p>
+<ul>
+<li>Odd pages (1, 3, 5, 7, 9) — left side of the printed two-page spread → text must use a <code>*-left</code> or <code>*-full</code> position.</li>
+<li>Even pages (2, 4, 6, 8, 10) — right side → text must use <code>*-right</code> or <code>*-full</code>.</li>
+<li><code>enforceSpreadTextPosition</code> mechanically rewrites wrong-side corners (<code>top-right</code> → <code>top-left</code> on an odd page, etc.). Sonnet should pick correctly via the prompt&#39;s parity rule, but the deterministic flip is the safety net.</li>
+</ul>
+<p>Both server (<code>storyHelpers.js</code>) and client (<code>textOverlay.ts</code>) apply the spread rule.</p>
+<h2>Polygon size — driven by <code>languageLevel</code></h2>
+<table>
+<thead>
+<tr>
+<th><code>languageLevel</code></th>
+<th>Bucket</th>
+<th>Area fraction (<code>SIZE_FRACTION</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>1st-grade</code></td>
+<td>small</td>
+<td>10%</td>
+</tr>
+<tr>
+<td><code>standard</code></td>
+<td>medium</td>
+<td>25%</td>
+</tr>
+<tr>
+<td><code>advanced</code></td>
+<td>large</td>
+<td>40%</td>
+</tr>
+</tbody></table>
+<p><code>getTextZonePolygon</code> produces a polygon with that pixel area, scaled to the image dimensions. For corners, both legs are scaled by <code>√(2 × areaPct)</code>, with the horizontal leg further multiplied by <code>0.75</code> so text hugs the outer corner instead of stretching too far into the scene.</p>
+<h2>Calm-pixel measurement (post-generation)</h2>
+<p><code>detectAndLightenTextRegion</code> (<code>server/lib/textRegion.js</code>):</p>
+<ol>
+<li>Greyscale the image, divide into 16×16 blocks.</li>
+<li>For each block, compute brightness (mean) and variance (std).</li>
+<li>Calmness score = <code>(1 - varianceNorm) × (0.7 + 0.3 × (1 - brightnessNorm))</code> — variance dominates; dark calm patches score slightly higher than light calm patches.</li>
+<li>Hard-restrict the block mask to the chosen half × half quadrant (corners) or half-strip (<code>*-full</code>). Outside-zone blocks → 0.</li>
+<li>Upscale the block mask to per-pixel resolution with cubic interpolation; blur for feathered edges.</li>
+<li>Count calm pixels inside the actual rendered <strong>polygon</strong> (not a bounding rectangle). Polygon comes from <code>computeOverlayPolygon</code> (config) which mirrors <code>getTextZonePolygon</code> byte-for-byte.</li>
+<li>Return:<ul>
+<li><code>score</code> — fraction of total image pixels that are calm (legacy/zone metric)</li>
+<li><code>rect</code> — bounding box of all calm pixels within the constrained zone</li>
+<li><code>overlayCalmPx</code> — calm pixels inside the polygon (legibility-relevant)</li>
+<li><code>overlayAreaPx</code> — polygon&#39;s total area in pixels</li>
+</ul>
+</li>
+</ol>
+<h2>The repair gate (geometric)</h2>
+<p><code>server/config/textRegion.js</code>:</p>
+<ul>
+<li><code>requiredTextPixels(words, fontPt)</code> — how many pixels² of text the renderer needs, from font metrics:<pre><code>font_height = pt × 96/72 × 1.18
+char_width  ≈ pt × 0.55
+pxPerWord   = char_width × line_height × 5.5 chars/word × 1.5 overhead
+</code></pre>
+Exposed at module-level constants <code>PIXELS_PER_WORD = { 14: 1399, 12: 1028, 10: 714 }</code>.</li>
+<li><code>requiredTextCoveragePct(words, fontPt)</code> — legacy fallback; unused when polygon probe succeeds.</li>
+</ul>
+<p><strong>Gate</strong> (in <code>server.js</code> text-region phase):</p>
+<pre><code>calmFoundPx = pixels in polygon that are calm
+calmNeededPx = words × pxPerWord(fontPt)
+
+if calmFoundPx &lt; calmNeededPx → repair
+</code></pre>
+<p>Falls back to <code>coverage% &lt; requiredPct%</code> only when the sharp probe failed (no width/height available).</p>
+<p><strong>Per-page log line:</strong></p>
+<pre><code>📝 [TEXT-REGION] P3: 38w@12pt — calmNeeded 39064px, calmFound 9421px
+                in 192871px overlay (5% calm) — BELOW THRESHOLD → repair
+</code></pre>
+<h2>Text-space-repair loop (initial generation)</h2>
+<p>When <code>calmFound &lt; calmNeeded</code>:</p>
+<ol>
+<li>Build <code>textSpaceRepair</code> prompt with the scene description (max 1200 chars).</li>
+<li>Pass <code>textAreaMask</code> (a pre-built B/W layout PNG: black region marks the calm zone) as a reference image.</li>
+<li>Call <code>generateImageOnly</code> with <code>previousImage: original</code>. Up to <code>REPAIR.maxRetries = 2</code> attempts.</li>
+<li>After each attempt, re-detect calm pixels INSIDE the same polygon.</li>
+<li><strong>Winner selection</strong> (per-candidate fallback): prefer the candidate with the highest <code>overlayCalmPx</code>; if a candidate&#39;s probe failed, compare on <code>coverage</code> instead.</li>
+<li><strong>Early exit</strong>: stop attempting when an attempt&#39;s <code>overlayCalmPx ≥ calmNeededPx</code> (the metric that gated entry).</li>
+<li>Persist all candidates as separate entries in <code>imageVersions[]</code> with <code>source: &#39;text-space-repair-N&#39;</code> so the user can pick a different one in the dev panel.</li>
+</ol>
+<h2>Step 7.5 — post-repair recovery</h2>
+<p>After the unified pipeline&#39;s repair rounds (iterate / inpaint / character-fix), Step 7.5 re-detects calm pixels on the active version of each repaired page. Skipped if:</p>
+<ul>
+<li>Layout is not text-in-image (<code>textAreaMask</code> absent)</li>
+<li>Active version&#39;s source is <code>&#39;original&#39;</code> (page wasn&#39;t repaired) or <code>&#39;text-space-repair-*&#39;</code> (already validated at initial gen)</li>
+</ul>
+<p>If <code>calmFoundPx &lt; calmNeededPx</code>, runs text-space-repair on the active image (up to <code>maxRetries</code> attempts), best by <code>overlayCalmPx</code> is added as a <code>&#39;post-repair-text-space&#39;</code> version. Wrapped in try/catch so a failure here cannot derail finalization.</p>
+<h2>Renderers (production)</h2>
+<p>Both browser and PDF use the <strong>same server-side renderer</strong>: <code>server/lib/textOverlayRenderer.js → generateTextOverlay</code>. It:</p>
+<ol>
+<li>Looks up the polygon via <code>getTextZonePolygon(textPosition, languageLevel, w, h)</code>.</li>
+<li>Renders text at fixed 11px Georgia using Canvas, clipped to the polygon.</li>
+<li>Returns a transparent PNG composited over the page image.</li>
+</ol>
+<p><strong>Browser:</strong> <code>StoryDisplay.tsx</code> and <code>SharedStoryViewer.tsx</code> (via <code>BookStoryPage</code>) request the overlay PNG from <code>/api/shared/:token/text-overlay/:pageNum</code> (or the authenticated equivalent) and layer it on the page image. While the PNG loads, a CSS gradient fallback is rendered using <code>getTextOverlayPosition</code> from <code>client/src/utils/textOverlay.ts</code>.</p>
+<p><strong>PDF:</strong> <code>server/lib/pdf.js</code> calls <code>generateTextOverlay</code> and bakes the composited image into the printed page.</p>
+<p>Both apply <code>enforceSpreadTextPosition</code> before rendering. The shared viewer defaults to <code>showTextOverlay=false</code> on mobile and shows a translucent bottom strip instead.</p>
+<h2>What&#39;s user-visible</h2>
+<ul>
+<li><strong>Final composited page image</strong> with white text on the calm zone — visible everywhere.</li>
+<li><strong>CSS fallback</strong> during PNG load — visible briefly in <code>StoryDisplay</code>, never in the PDF or shared viewer.</li>
+</ul>
+<h2>What&#39;s NOT user-visible (developer mode only)</h2>
+<ul>
+<li><strong><code>textRect</code></strong> (bbox of calm pixels) — written to DB, but not consumed by either renderer. Diagnostic metadata only.</li>
+<li><strong><code>textCoverageReport</code></strong> with <code>calmNeededPx</code> / <code>calmFoundPx</code> / <code>overlayAreaPx</code> / <code>geometricPassed</code> — surfaced in dev panel.</li>
+<li><strong><code>textSpaceCandidates</code></strong> — when text-space-repair runs (initial gen) or post-repair recovery fires (Step 7.5), all candidates persist as separate <code>imageVersions[]</code> entries. Selectable through the standard image-history modal in dev mode. <strong>Not exposed to end users.</strong></li>
+</ul>
+<h2>Key files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>prompts/story-unified.txt</code></td>
+<td>Sonnet draft + critical-review with parity / forbidden-side / collision checks</td>
+</tr>
+<tr>
+<td><code>server/lib/storyHelpers.js</code></td>
+<td><code>enforceSpreadTextPosition</code>, <code>buildTextZoneInstruction</code>, <code>extractSceneMetadata</code></td>
+</tr>
+<tr>
+<td><code>server/lib/textMasks.js</code></td>
+<td><code>getTextAreaMask</code> (pre-built PNG masks), <code>getTextZonePolygon</code> (analytical polygon, <strong>single source of truth for shape</strong>), <code>polygonArea</code>, <code>sizeNameFor</code></td>
+</tr>
+<tr>
+<td><code>server/config/textRegion.js</code></td>
+<td><code>requiredTextPixels</code>, <code>requiredFontPt</code>, <code>countWords</code>, repair budget</td>
+</tr>
+<tr>
+<td><code>server/lib/textRegion.js</code></td>
+<td><code>detectAndLightenTextRegion</code> — calmness measurement + polygon-aware calm count</td>
+</tr>
+<tr>
+<td><code>server/lib/textSpaceRepair.js</code></td>
+<td><strong><code>ensureCalmZone</code> — single source of truth for the gate + repair loop</strong> (used by both initial gen and post-repair recovery)</td>
+</tr>
+<tr>
+<td><code>server/lib/textOverlayRenderer.js</code></td>
+<td><code>generateTextOverlay</code> — server-side text-on-image compositing</td>
+</tr>
+<tr>
+<td><code>server.js</code> (text-region phase)</td>
+<td>calls <code>ensureCalmZone</code>, persists candidates + report</td>
+</tr>
+<tr>
+<td><code>server/lib/images.js</code> (Step 7.5)</td>
+<td>calls <code>ensureCalmZone</code>, swaps active version on recovery win</td>
+</tr>
+<tr>
+<td><code>server/lib/pdf.js</code></td>
+<td>PDF rendering, calls <code>generateTextOverlay</code></td>
+</tr>
+<tr>
+<td><code>client/src/utils/textOverlay.ts</code></td>
+<td>CSS fallback positioning + spread parity for the browser</td>
+</tr>
+<tr>
+<td><code>client/src/components/generation/StoryDisplay.tsx</code></td>
+<td>renders overlay PNG with CSS fallback</td>
+</tr>
+<tr>
+<td><code>client/src/pages/SharedStoryViewer.tsx</code></td>
+<td>shared viewer, mobile/desktop layouts</td>
+</tr>
+</tbody></table>
+<h2>Outstanding caveats (not bugs, but worth knowing)</h2>
+<ul>
+<li>The CSS fallback in <code>StoryDisplay</code> uses different visual styling (gradient ellipse / band) than the production canvas renderer (polygon-clipped text). It&#39;s only visible briefly during PNG load.</li>
+<li><code>getTextSize</code> in <code>textOverlay.ts</code> is a per-CSS-fallback word-count bucket (<code>&lt;20</code>/<code>&lt;50</code>/<code>else</code>). It does NOT match the polygon&#39;s <code>languageLevel</code>-driven size. The fallback&#39;s gradient is a rough hint, not the production text shape.</li>
+<li><code>textOverlayRenderer.js</code> font is fixed Georgia 11px. The server&#39;s <code>requiredTextPixels</code> formula assumes Helvetica metrics with 1.5× overhead — close enough for legibility budgeting, not a precise-per-glyph guarantee.</li>
+<li>PDF&#39;s combined-PDF path (<code>addStoryContentPages</code>) does not pre-compute a consistent font size across pages the way <code>addPictureBookPages</code> does. Visual font-size variation is possible in combined output. Tracked separately.</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>calm-zone-pipeline.md</code>.
+</footer>
+</body>
+</html>

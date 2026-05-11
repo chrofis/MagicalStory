@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>showcase-job_1778400519362_xwufe7ptv-improvements.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Showcase analysis — <code>job_1778400519362_xwufe7ptv</code></h1>
+<p><strong>Story:</strong> &quot;Was unter der Holzbrücke lag&quot; · de-ch · 5 chars (Emma, Hans, Noah, Sarah, Daniel) · watercolor
+<strong>Run:</strong> completed 2026-05-06 06:31:05 UTC, 22m 26s, no error_message
+<strong>Pipeline:</strong> unified mode, composite covers ON</p>
+<p>This file is read-only investigation. Each finding is an evidence-based candidate for a future code change with options and trade-offs — <strong>no code touched</strong>.</p>
+<p>Sources used:</p>
+<ul>
+<li>Per-version DB pull from <code>stories.data.sceneImages[*]</code> and <code>stories.data.coverImages.*</code> (qualityScore, fixableIssues, retryHistory, best-version source)</li>
+<li><code>stories.data.finalChecksReport.entity</code> (entity grid analysis)</li>
+<li>Visual Bible character descriptions (<code>stories.data.visualBible.characters[]</code>)</li>
+<li>Code paths inferred from <code>server/lib/images.js</code>, <code>server/services/prompts.js</code>, <code>prompts/image-generation.txt</code>, <code>prompts/scene-expansion.txt</code>, <code>prompts/entity-consistency-check.txt</code></li>
+</ul>
+<hr>
+<h2>Tier 1 — Recurring patterns (high leverage, fix one → many pages improve)</h2>
+<h3>R1. Emma&#39;s hair (ponytail + side-part) almost never rendered correctly</h3>
+<p><strong>Source.</strong> Visual Bible: Emma — <em>&quot;ear-length wavy brown hair, side-parted on the left, pulled back into a small ponytail&quot;</em>. Fixable issues across <strong>pages 1, 2, 5, 6, 9, 10, 11, 12, 13, 14</strong>, <strong>back cover</strong>, <strong>front cover</strong>, <strong>initial page</strong>. Entity report flags Emma cells D/F/G as not matching reference R for hair style.</p>
+<p><strong>Observation.</strong> Two failure modes mixed together:</p>
+<ol>
+<li>Hair rendered as down/loose instead of pulled back into a ponytail (most common).</li>
+<li>Hair rendered with side-part on the wrong side (right instead of left) — page 1.</li>
+</ol>
+<p>This accumulates across the book: even when no single deduction is severe, the character looks subtly different on every page. The composite cover pipeline (now ON) feeds Grok the styled costumed avatar but still drops the ponytail in the redraw pass.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Add a &quot;fixed-style&quot; body-shot ref to the per-character grid for hair-critical descriptors.</strong> Today the VB grid sends a face crop + body-front. Add a back-of-head / 3/4-back crop showing the ponytail + part. Cheap to compute (one extra avatar variant at character creation), high signal for the model.<ul>
+<li>Pros: deterministic visual anchor, model copies what it sees.</li>
+<li>Cons: another avatar render at character-creation time (+~$0.02/char + ~5s); needs schema for <code>avatar.backView</code> or similar.</li>
+</ul>
+</li>
+<li><strong>(b) Promote hair-style adherence to a dedicated paragraph in scene-expansion + image-generation, not buried inside the character description.</strong> Currently hair sits in a long character description blob; Grok/Gemini parse it as &quot;one of many traits&quot;. A &quot;hair adherence&quot; instruction would say <em>&quot;Each character&#39;s hair style is non-negotiable: copy from the reference exactly, do not invent loose/down hair if the description says ponytail.&quot;</em><ul>
+<li>Pros: zero infra cost; one prompt edit.</li>
+<li>Cons: prompt-only fix → unreliable; image models routinely ignore one-line &quot;do not&quot; rules in long prompts.</li>
+</ul>
+</li>
+<li><strong>(c) Treat &quot;hair style mismatch&quot; as a Grok-cutout repair candidate (face-region inpaint) in the post-gen workflow.</strong> The character-repair stage today fixes face/body but doesn&#39;t gate on hair specifically.<ul>
+<li>Pros: targeted retroactive fix; uses existing repair infra.</li>
+<li>Cons: face-region cutouts often miss the ponytail tail (it&#39;s outside the bbox); needs bbox expansion logic; runs after-the-fact rather than preventing.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(a) + (b) together.</strong> The grid anchor is the durable fix; the prompt note prevents regression in the meantime.</p>
+<hr>
+<h3>R2. Map artifacts get &quot;Erste/Zweite/Dritte Schatzkarte&quot; baked as visible text</h3>
+<p><strong>Source.</strong> Pages 3 &amp; 4 — fixable issue type=<code>rendered_text</code>, severity MAJOR. Back cover also flags <code>Dritte Schatzkarte missing</code> (different — there it&#39;s the artifact itself).</p>
+<p><strong>Observation.</strong> The artifact&#39;s <em>name</em> (in German) is being painted onto the parchment by the model. Story-text overlay then sits on top → double text. Likely cause: the artifact ID/name (<code>Dritte Schatzkarte</code>) is being passed to the image prompt as part of the object descriptor and the model renders &quot;label + object&quot; by reflex.</p>
+<p>The plan in <code>tasks/no-too-complicated-we-partitioned-spindle.md</code> already touches <code>image-evaluation.txt</code> §3 (rendered text rule) — but that&#39;s about <em>not flagging</em> the cover title. The deeper issue is that <code>image-generation.txt</code> is <em>causing</em> unwanted text by emitting the artifact&#39;s name verbatim.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Sanitize artifact descriptors before the image prompt.</strong> Pass the artifact&#39;s <em>visual description</em> (&quot;a folded parchment map with hand-drawn ink lines and a red X&quot;) and drop the literal name <code>Dritte Schatzkarte</code> from the prompt entirely.<ul>
+<li>Pros: one-place fix; eliminates the source.</li>
+<li>Cons: need to thread sanitized descriptors through scene-expansion → image-generation; risk of losing artifact identity in entity-consistency check (which still wants the ID). Solution: sanitize only at the image-prompt boundary.</li>
+</ul>
+</li>
+<li><strong>(b) Add an explicit &quot;no rendered text on objects&quot; rule in <code>image-generation.txt</code>.</strong> Today the prompt asks for &quot;no text in the image&quot; but only as a soft instruction.<ul>
+<li>Pros: trivial.</li>
+<li>Cons: same fragility as R1 option (b).</li>
+</ul>
+</li>
+<li><strong>(c) Detect baked text post-hoc and inpaint it out.</strong> Run an OCR pass on flagged artifacts; if text found, run a Grok inpaint over the text region.<ul>
+<li>Pros: last-line-of-defense, doesn&#39;t require pipeline changes.</li>
+<li>Cons: adds cost + latency on every story; Grok inpaint can leak into the artifact.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(a)</strong>. The other two are bandages on a self-inflicted prompt.</p>
+<hr>
+<h3>R3. Noah&#39;s costume slips into modern clothes (recurring on pirate-themed pages)</h3>
+<p><strong>Source.</strong> Pages 11, 12, 13 fixable issues: <code>Noah is not wearing the pirate costume</code>. Front cover also: Noah&#39;s <code>tan pants instead of tan canvas knee-length shorts</code>. Entity report cell D flags Noah&#39;s left sleeve as plaid instead of plain dark green tunic.</p>
+<p><strong>Observation.</strong> When the story plot puts characters into a costume (here: pirate dress-up), Noah&#39;s <em>standard</em> clothing leaks through. This suggests the costumed-avatar reference isn&#39;t reaching the per-page generator, or it&#39;s being mixed with the standard-clothing description.</p>
+<p><code>server/lib/storyHelpers.js</code> builds the image prompt; check whether costumed-avatar URL (<code>character.avatars.costumed[]</code>) is forwarded to the model when the scene expansion calls for the costume.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) When <code>coverHint.costumedMode === true</code> (or scene metadata declares costume), route only the costumed-avatar refs to the prompt — strip the standard-clothing description.</strong> Today both probably flow through.<ul>
+<li>Pros: removes the contradiction the model is averaging over.</li>
+<li>Cons: requires a clean costume-mode flag in scene metadata; may need scene-expansion changes to set it.</li>
+</ul>
+</li>
+<li><strong>(b) Stronger costume reference: include both costumed-front + costumed-3/4 view in the VB grid for costumed scenes.</strong> Same idea as R1(a).<ul>
+<li>Pros: more visual signal.</li>
+<li>Cons: another avatar render per character per costume.</li>
+</ul>
+</li>
+<li><strong>(c) Add a costume-consistency check in entity-consistency-check.txt that explicitly compares against the costumed reference, not the standard.</strong><ul>
+<li>Pros: catches costume drift in the consistency pass.</li>
+<li>Cons: only fixes detection, not prevention; needs costume metadata to know which reference to compare against.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(a)</strong>, with (b) once schema supports it.</p>
+<hr>
+<h3>R4. Gaze direction — characters &quot;look at viewer&quot; instead of at the prop / each other</h3>
+<p><strong>Source.</strong> Back cover: <code>Emma is looking at the viewer instead of fixed downward on the Dritte Schatzkarte</code>. Pages 5, 11, 13: fixable issues with <code>face</code> / <code>gaze</code> problems.</p>
+<p><strong>Observation.</strong> This is the classic &quot;Grok defaults to camera-facing portrait&quot; failure documented in <code>feedback_grok_inpaint_capability.md</code> (which says Grok <em>can</em> handle facing-direction when given visual identifiers). Yet it still happens — probably because the scene description doesn&#39;t explicitly say <em>what each character is looking at</em>.</p>
+<p><code>prompts/scene-expansion.txt</code> could enforce a &quot;gaze target&quot; field per character per scene.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Add an explicit <code>gazeTarget</code> field per figure in scene metadata.</strong> scene-expansion produces it; image-generation emits &quot;Emma&#39;s eyes fixed downward on the open map&quot;.<ul>
+<li>Pros: small structural addition; deterministic.</li>
+<li>Cons: scene-expansion prompt edit + per-scene overhead in tokens.</li>
+</ul>
+</li>
+<li><strong>(b) Add a generic image-generation rule: &quot;Characters look at what they are interacting with (the prop, each other, the focal object). Never address the viewer unless the scene explicitly calls for it.&quot;</strong><ul>
+<li>Pros: zero structural change.</li>
+<li>Cons: prompt drift, same fragility as R1(b)/R2(b).</li>
+</ul>
+</li>
+<li><strong>(c) Detect &quot;face front-on to camera&quot; in evaluator and auto-route to character-repair.</strong> Already partially possible — character-repair handles facing — but needs an evaluator signal.<ul>
+<li>Pros: retroactive guardrail.</li>
+<li>Cons: another evaluator dimension to specify; deduplication with existing <code>face</code> checks needed.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(a)</strong>. Per-scene gaze targets are explicit and the model follows explicit visual direction reliably.</p>
+<hr>
+<h3>R5. Entity grid sometimes paints a totally different person (Noah → elderly man, Daniel → elderly with white mustache)</h3>
+<p><strong>Source.</strong> Entity report:</p>
+<ul>
+<li>Noah cell D: <em>&quot;completely different character… older man with different facial structure&quot;</em> — affects pages 1,2,3,4,5,7,8,10,11,12,14 (cross-page reference cells)</li>
+<li>Noah cell G page 8: <em>&quot;elderly man, completely different character&quot;</em></li>
+<li>Daniel cell C in <code>pages=-2</code> (back cover): <em>&quot;elderly man with white hair and a white mustache&quot;</em></li>
+</ul>
+<p><strong>Observation.</strong> This is the entity-grid analyzer mis-detecting a face crop on a multi-character page where an elderly background figure (a Hans-like character) gets attributed to Noah/Daniel&#39;s grid cell. It&#39;s an <em>analysis</em> error, not necessarily a <em>generation</em> error — but it inflates the entity-penalty count and triggers unnecessary repair attempts.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Anchor each grid cell to the figure&#39;s bbox from the cascade-face-detection stage (which knows which face is which character via avatar similarity).</strong> Today the grid analyzer probably picks a face crop heuristically.<ul>
+<li>Pros: addresses root cause; uses existing detection infra.</li>
+<li>Cons: requires reliable per-character face matching; cost: extra Python service round-trips.</li>
+</ul>
+</li>
+<li><strong>(b) Lower the severity of &quot;completely different character&quot; findings when the face-similarity score is below a confidence floor.</strong> I.e. distrust the entity report on low-confidence cells.<ul>
+<li>Pros: trivial post-processing of <code>finalChecksReport.entity</code>.</li>
+<li>Cons: hides real problems too; needs a confidence number from the analyzer (not currently exposed).</li>
+</ul>
+</li>
+<li><strong>(c) Run entity consistency on cropped per-character bboxes only, never on the whole page.</strong><ul>
+<li>Pros: removes the &quot;wrong face attributed to character X&quot; failure mode by construction.</li>
+<li>Cons: significant rework of <code>entity-consistency-check.txt</code> and <code>entityConsistency.js</code>; bbox quality must be high.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(c)</strong> is the cleanest long-term answer; <strong>(a)</strong> is the incremental step toward it.</p>
+<hr>
+<h2>Tier 2 — Single-page anomalies (lower leverage, but clear root causes)</h2>
+<h3>P1 (page 1). Quality 0, 6 fixable issues, used <code>iterate-round-3</code> as best version</h3>
+<p><strong>Source.</strong> Per-page DB pull. Best-source = <code>iterate-round-3</code>. Issues: Daniel holding a cloth instead of compass (object substitution); Emma + Sarah hair side-part on wrong side; primary character in cell A is &quot;a blonde boy not Emma&quot; (entity grid).</p>
+<p><strong>Observation.</strong> Three iterate rounds and final score still 0. The compass → cloth substitution suggests the artifact ID didn&#39;t resolve cleanly to its visual descriptor (cf. R2). The entity report attributes the leading character to the wrong person, suggesting cell-attribution failure (cf. R5).</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Hard-fail iterate after 2 rounds with no score improvement, escalate to a regenerate-from-scratch with a fresh seed and explicit composition direction.</strong> Today iterate keeps retrying with the same composition.<ul>
+<li>Pros: prevents wasted rounds; user already saw 3 rounds with no gain.</li>
+<li>Cons: regenerate-from-scratch costs more; needs a &quot;no progress&quot; signal.</li>
+</ul>
+</li>
+<li><strong>(b) Pass the artifact&#39;s visual descriptor (R2 fix) and gaze targets (R4 fix) into iterate prompts, not just the original generation prompt.</strong><ul>
+<li>Pros: applies tier-1 fixes at the iterate boundary too.</li>
+<li>Cons: requires plumbing same data through iterate.</li>
+</ul>
+</li>
+<li><strong>(c) Inspect <code>retryHistory</code> for page 1 to confirm whether iterate kept reusing the bad prompt or whether the score was already low at round 1.</strong><ul>
+<li>Pros: data first.</li>
+<li>Cons: investigation, not a fix.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(c)</strong> before deciding between (a) and (b).</p>
+<hr>
+<h3>P10 (page 10). CRITICAL position/scale — Noah at full foreground instead of small/distant</h3>
+<p><strong>Source.</strong> Page 10 fixable: severity CRITICAL, type=<code>position</code>/<code>scale</code>. Noah depicted full-foreground when scene description called for him distant/small.</p>
+<p><strong>Observation.</strong> The unified prompt encodes position relationally (&quot;on the boat&quot;, &quot;behind Roger&quot; — see memory file <code>feedback_position_relational_not_lr.md</code>), but doesn&#39;t always encode <em>scale</em>. When the scene wants someone in the deep background, the model needs an explicit &quot;small figure in the distance, ~10% of frame height&quot; type cue, not just &quot;behind&quot;.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Add a <code>figureScale</code> field per character per scene (foreground/midground/distant) in scene metadata, surfaced in image-generation as &quot;tiny in the distance&quot; / &quot;framed waist-up midground&quot; / &quot;full-frame foreground&quot;.</strong><ul>
+<li>Pros: explicit; image models follow scale cues well.</li>
+<li>Cons: scene-expansion prompt edit; one more JSON field.</li>
+</ul>
+</li>
+<li><strong>(b) When a character is described as <code>distant</code> in prose, automatically suppress the per-character avatar reference for that figure (no point sending a 1024px face crop for a 50px figure).</strong><ul>
+<li>Pros: reduces conflict between &quot;high-detail face ref&quot; and &quot;tiny background figure&quot;.</li>
+<li>Cons: bookkeeping.</li>
+</ul>
+</li>
+<li><strong>(c) Post-gen detection: if a character bbox covers &gt;40% of the frame on a page where scene metadata says &quot;distant&quot;, flag for redo.</strong><ul>
+<li>Pros: retroactive safety net.</li>
+<li>Cons: another evaluator dimension; bbox detection has to be reliable.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(a)</strong>. Scale is part of composition and belongs in scene metadata.</p>
+<hr>
+<h3>P14 (page 14). MAJOR object — Stadtturm not rendered as archway</h3>
+<p><strong>Source.</strong> Page 14 fixable: severity MAJOR, type=<code>object</code>. Specific landmark (Stadtturm = city tower archway) rendered as a generic tower, not the actual archway form.</p>
+<p><strong>Observation.</strong> This is the same family as R5 generally and &quot;Bug 2&quot; in the existing plan (<code>prompts/image-evaluation.txt</code> doesn&#39;t catch <em>broken-but-present</em> objects when a VB reference is provided). Plan&#39;s section C addresses this, but only post-hoc (evaluator catches it). The generation-time landmark-photo reference is presumably already in play — the model just isn&#39;t anchoring strongly enough.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Increase landmark-photo prominence in the prompt: explicit instruction &quot;the building&#39;s silhouette and architectural features must match the photo reference exactly, not a generic tower&quot;.</strong><ul>
+<li>Pros: prompt-only.</li>
+<li>Cons: prompt fragility (R1(b) again).</li>
+</ul>
+</li>
+<li><strong>(b) Use Grok edit (not generate) for landmark-heavy scenes: composite landmark photo into background plate first, then have Grok stylize without redrawing the structure.</strong> This is exactly what the new composite-covers pipeline does for covers — extend it to pages with <code>isRealLandmark === true</code>.<ul>
+<li>Pros: deterministic landmark fidelity; pipeline already exists for covers.</li>
+<li>Cons: significant expansion of the composite path to per-page; cost increase per landmark page.</li>
+</ul>
+</li>
+<li><strong>(c) Implement plan section C (evaluator catches broken VB-referenced objects) so at minimum a redo is triggered.</strong><ul>
+<li>Pros: aligns with existing planned work.</li>
+<li>Cons: doesn&#39;t prevent, only flags.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(b)</strong> is the high-quality path; <strong>(c)</strong> is the immediate low-cost improvement.</p>
+<hr>
+<h3>P3, P4. &quot;Erste / Zweite Schatzkarte&quot; rendered as visible text on the map</h3>
+<p>Already covered as R2.</p>
+<h3>P5. MAJOR facing — Emma facing wrong direction</h3>
+<p>Already covered as R4.</p>
+<h3>P6. MAJOR — Emma holding wrong prop, Hans missing prop</h3>
+<p>Object-substitution + missing-prop combo. Same family as R2&#39;s prompt-cleaning fix. Verify the scene-expansion output for page 6 actually contained both props per character. If yes → image model dropped them; if no → expansion is the culprit.</p>
+<hr>
+<h2>Tier 3 — Cover-specific (the new composite pipeline shipped this run)</h2>
+<h3>C1. Front cover q=30 — Emma missing tricorn hat, wrong shirt, holding dagger instead of treasure chest contents</h3>
+<p><strong>Source.</strong> Front cover fixable issues: 4. Composite covers ON for this run.</p>
+<p><strong>Observation.</strong> The composite pipeline assembles styled-costumed avatars before sending to Grok. Emma&#39;s costumed avatar must already be missing the tricorn (or the avatar has it but pass-2 redraw drops it). The &quot;holding dagger&quot; suggests Grok hallucinated a prop that wasn&#39;t requested.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Extend composite pass-2 prompt to enumerate every prop explicitly and forbid invented ones: &quot;Show ONLY these props: [list]. Do not add weapons, tools, or accessories not on this list.&quot;</strong><ul>
+<li>Pros: tightens the open-ended pass-2.</li>
+<li>Cons: more prompt rules → may cause over-conservative generation.</li>
+</ul>
+</li>
+<li><strong>(b) Verify the styled-costumed avatar generation for Emma actually has the tricorn — pull her costumed avatar from this story and inspect.</strong><ul>
+<li>Pros: data first; could confirm the failure isn&#39;t in the cover pipeline at all.</li>
+<li>Cons: investigation step.</li>
+</ul>
+</li>
+<li><strong>(c) Move the cover hint&#39;s <code>objects</code> list into the pass-1 prompt (currently mostly in pass-2) so each composited character is anchored to specific props from the start.</strong><ul>
+<li>Pros: earlier prop anchoring.</li>
+<li>Cons: pass-1 is meant to be &quot;redraw poses on white&quot; and is already complex.</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(b)</strong> before any prompt edits.</p>
+<hr>
+<h3>C2. Back cover q=0 — extensive issues: footwear, hair, Noah legwear, missing map, missing Limmat, gaze at viewer</h3>
+<p><strong>Source.</strong> Back cover q=0, 7 fixable, attempts=1 (not retried).</p>
+<p><strong>Observation.</strong> Every recurring pattern (R1 hair, R3 costume, R4 gaze, plus environmental misses) compounding on one image. attempts=1 means no retry happened — likely because back cover composite path doesn&#39;t loop on score.</p>
+<p><strong>Fix options.</strong></p>
+<ul>
+<li><strong>(a) Apply repair workflow / iterate retry to covers when score &lt; threshold.</strong> Today only pages get the full repair workflow.<ul>
+<li>Pros: brings covers to parity.</li>
+<li>Cons: more cost on cover regen; needs UI parity in <code>RepairWorkflowPanel</code>.</li>
+</ul>
+</li>
+<li><strong>(b) Treat back cover as a &quot;summary-page&quot; composite (multiple characters interacting with prop) and refine its dedicated prompt.</strong> Front-cover and initial-page have specific prompts; back-cover may be using a generic one.<ul>
+<li>Pros: targeted.</li>
+<li>Cons: another prompt to maintain.</li>
+</ul>
+</li>
+<li><strong>(c) Audit: was the landmark photo (Limmat) actually fed to the back-cover composite call?</strong> If <code>landmarkBuf</code> was null, nothing in the prompt could have produced the river.<ul>
+<li>Pros: cheap to verify; could be a one-line fix.</li>
+<li>Cons: needs log inspection (logs may already be rotated — check Railway).</li>
+</ul>
+</li>
+</ul>
+<p>Recommendation: <strong>(c)</strong>, then (a).</p>
+<hr>
+<h3>C3. Initial page q=70 — Emma hair (R1) + missing Swiss flag on tower</h3>
+<p><strong>Source.</strong> Initial page fixable: 2 issues, both addressable by tier-1 fixes (R1 hair, R5/P14 landmark fidelity).</p>
+<p>Already covered by R1 + P14 fixes.</p>
+<hr>
+<h2>Cross-cutting &quot;what&#39;s surprising&quot; (interview takeaways)</h2>
+<ol>
+<li><strong>One score, one prompt issue, one infra issue dominate this run.</strong> R1 (hair) is a single missing reference; R2 (rendered text) is a single sanitization gap; R5 (entity grid mis-attribution) is one analyzer flaw. Three changes would address ~70% of fixable issues.</li>
+<li><strong>The composite-cover pipeline shipped but is not retrying low-score covers.</strong> attempts=1 on all three covers, including q=0 back cover. The retry/iterate gating that exists for pages does not exist for composite-cover output.</li>
+<li><strong>Iterate-round-3 was the best version on multiple pages but final score was still 0.</strong> This suggests iterate is finding <em>less bad</em> versions but never breaking out of a wrong-prompt local minimum. Plan section A (single consolidator score across all versions) will at least make the comparison honest, but won&#39;t fix the root cause that iterate inherits the same broken prompt.</li>
+<li><strong>The unified plan in <code>tasks/no-too-complicated-we-partitioned-spindle.md</code> (cover scoring + cover v0 refs + evaluator object-quality + cover-title carveout) addresses fewer of the patterns than expected.</strong> The biggest wins from this run are R1 (hair anchor), R2 (artifact name sanitization), and R5 (per-character bbox attribution) — none of which are in the current plan. Worth weighing before continuing the plan vs. pivoting.</li>
+</ol>
+<hr>
+<h2>Suggested next-step priorities (if asked)</h2>
+<ol>
+<li><strong>R2 — Sanitize artifact descriptors</strong> (smallest change, eliminates 2 MAJOR issues immediately).</li>
+<li><strong>R1(a) — Add back/3-quarter hair-reference avatar variant</strong> (one-time character-creation cost, helps every page after).</li>
+<li><strong>R5(c) — Per-character bbox-cropped entity consistency</strong> (removes phantom &quot;wrong character&quot; findings that inflate penalties).</li>
+<li><strong>C2(c) → C2(a) — Audit back-cover landmark wiring, then enable cover retry loop</strong>.</li>
+<li><strong>R4(a) — Add per-figure <code>gazeTarget</code></strong> (small structural addition, big composition signal).</li>
+</ol>
+<p>Each is incremental, none requires a pipeline rewrite, and 1+2+5 together would likely turn this story&#39;s 4-cover/14-page run from ~half-bad-pages to ~all-clean on a re-run.</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>showcase-job_1778400519362_xwufe7ptv-improvements.md</code>.
+</footer>
+</body>
+</html>

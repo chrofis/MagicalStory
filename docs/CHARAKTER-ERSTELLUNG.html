@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CHARAKTER-ERSTELLUNG.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Charaktererstellung - Detaillierte Dokumentation</h1>
+<h2>Übersicht</h2>
+<p>Die Charaktererstellung ist ein mehrstufiger Prozess, der es ermöglicht, personalisierte Charaktere mit verschiedenen Eigenschaften, Merkmalen und Beziehungen zu erstellen.</p>
+<hr>
+<h2>Schritt 1: Grundlegende Charakterinformationen</h2>
+<h3>1.1 Charaktername (Pflichtfeld)</h3>
+<ul>
+<li><strong>Feldtyp</strong>: Texteingabe</li>
+<li><strong>Validierung</strong>: Muss ausgefüllt sein</li>
+<li><strong>Funktion</strong>: Hauptidentifikator des Charakters</li>
+<li><strong>Besonderheit</strong>: Bei Eingabe erfolgt automatische Geschlechtserkennung basierend auf:<ul>
+<li>Bekannten Namen (Sophia, Emma, Liam, Noah, etc.)</li>
+<li>Endungen (a, e, ie, ine, elle = weiblich)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Beispiel:</strong></p>
+<pre><code>Name: &quot;Sophie&quot; → Geschlecht wird automatisch auf &quot;weiblich&quot; gesetzt
+Name: &quot;Max&quot; → Geschlecht wird automatisch auf &quot;männlich&quot; gesetzt
+</code></pre>
+<h3>1.2 Geschlecht (Pflichtfeld)</h3>
+<ul>
+<li><strong>Feldtyp</strong>: Auswahlfeld (Dropdown)</li>
+<li><strong>Optionen</strong>:<ul>
+<li>Männlich</li>
+<li>Weiblich</li>
+<li>Unbekannt</li>
+</ul>
+</li>
+<li><strong>Standardwert</strong>: Wird durch Namenserkennung vorausgefüllt</li>
+<li><strong>Anpassbar</strong>: Kann manuell geändert werden</li>
+</ul>
+<h3>1.3 Alter (Pflichtfeld)</h3>
+<ul>
+<li><strong>Feldtyp</strong>: Zahleneingabe</li>
+<li><strong>Bereich</strong>: 1-99 Jahre</li>
+<li><strong>Validierung</strong>: Muss eine positive Zahl sein</li>
+<li><strong>Verwendung</strong>: Beeinflusst die Altersangabe in der Geschichte</li>
+</ul>
+<hr>
+<h2>Schritt 2: Visuelle Beschreibung</h2>
+<h3>2.1 Charakterfoto (Optional)</h3>
+<ul>
+<li><strong>Feldtyp</strong>: Datei-Upload</li>
+<li><strong>Akzeptierte Formate</strong>: Alle gängigen Bildformate (jpg, png, gif, etc.)</li>
+<li><strong>Funktion</strong>:<ul>
+<li>Wird als Vorschaubild angezeigt</li>
+<li>Hilft bei der Visualisierung des Charakters</li>
+<li>Kann für KI-generierte Illustrationen verwendet werden</li>
+</ul>
+</li>
+<li><strong>Speicherung</strong>: Als Data URL im Browser</li>
+<li><strong>Darstellung</strong>:<ul>
+<li>20x20 Rundformat in der Charakterübersicht</li>
+<li>32x32 in Beziehungsansicht</li>
+<li>Wird mit <code>object-cover</code> zugeschnitten</li>
+</ul>
+</li>
+</ul>
+<p><strong>Technische Details:</strong></p>
+<pre><code class="language-javascript">// Foto wird als Data URL gespeichert
+reader.readAsDataURL(file);
+// Gespeichert in: char.photoUrl
+</code></pre>
+<h3>2.2 Alternative: Textbeschreibung</h3>
+<h4>2.2.1 Haarfarbe (Optional)</h4>
+<ul>
+<li><strong>Feldtyp</strong>: Texteingabe</li>
+<li><strong>Beispiele</strong>: Blond, Braun, Schwarz, Rot, Grau</li>
+<li><strong>Verwendung</strong>: Wird in Prompt nur eingefügt, wenn ausgefüllt</li>
+</ul>
+<h4>2.2.2 Weitere Merkmale (Optional)</h4>
+<ul>
+<li><strong>Feldtyp</strong>: Mehrzeiliges Textfeld (Textarea)</li>
+<li><strong>Zweck</strong>: Detaillierte physische Beschreibung</li>
+<li><strong>Beispiele</strong>:<pre><code>- Blaue Augen, trägt eine Brille
+- Hat Sommersprossen
+- Große Ohren, lockiges Haar
+- Trägt immer einen roten Schal
+</code></pre>
+</li>
+<li><strong>Verwendung</strong>: Nur in Prompt, wenn ausgefüllt</li>
+</ul>
+<hr>
+<h2>Schritt 3: Charaktereigenschaften</h2>
+<h3>3.1 Stärken (Pflichtfeld)</h3>
+<ul>
+<li><strong>Minimum</strong>: 3 Stärken</li>
+<li><strong>Maximum</strong>: Unbegrenzt</li>
+<li><strong>Auswahlmethode</strong>: Multi-Select Pills/Tags</li>
+<li><strong>Feldtyp</strong>: Vorauswahl + Custom Input</li>
+</ul>
+<h4>Vorgegebene Stärken (Mehrsprachig):</h4>
+<p><strong>Englisch:</strong></p>
+<ul>
+<li>Brave, Smart, Kind, Strong, Fast, Creative, Funny, Leader, Helpful, Patient</li>
+<li>Honest, Loyal, Curious, Determined, Caring, Confident, Cheerful, Generous</li>
+<li>Clever, Adventurous, Resourceful, Protective, Imaginative, Hardworking, Trustworthy</li>
+</ul>
+<p><strong>Deutsch:</strong></p>
+<ul>
+<li>Mutig, Klug, Freundlich, Stark, Schnell, Kreativ, Lustig, Führungspersönlichkeit</li>
+<li>Hilfsbereit, Geduldig, Ehrlich, Treu, Neugierig, Entschlossen, Fürsorglich</li>
+<li>Selbstbewusst, Fröhlich, Großzügig, Schlau, Abenteuerlustig, Einfallsreich</li>
+<li>Beschützend, Fantasievoll, Fleißig, Vertrauenswürdig</li>
+</ul>
+<p><strong>Französisch:</strong></p>
+<ul>
+<li>Courageux, Intelligent, Gentil, Fort, Rapide, Créatif, Drôle, Leader</li>
+<li>Serviable, Patient, Honnête, Loyal, Curieux, Déterminé, Attentionné</li>
+<li>Confiant, Joyeux, Généreux, Astucieux, Aventureux, Débrouillard</li>
+<li>Protecteur, Imaginatif, Travailleur, Digne de confiance</li>
+</ul>
+<h4>Eigene Stärken hinzufügen:</h4>
+<pre><code>1. Texteingabe für neue Stärke
+2. Enter-Taste oder Plus-Button klicken
+3. Stärke wird zur Liste hinzugefügt
+4. Automatisch als ausgewählt markiert
+</code></pre>
+<p><strong>UI-Verhalten:</strong></p>
+<ul>
+<li>Ausgewählte Stärken: Grüner Hintergrund (<code>bg-green-500</code>)</li>
+<li>Nicht ausgewählt: Grauer Hintergrund (<code>bg-gray-200</code>)</li>
+<li>Zähler zeigt aktuelle Auswahl: &quot;Ausgewählt: X&quot;</li>
+</ul>
+<h3>3.2 Schwächen (Pflichtfeld)</h3>
+<ul>
+<li><strong>Minimum</strong>: 2 Schwächen</li>
+<li><strong>Maximum</strong>: Unbegrenzt</li>
+<li><strong>Funktionsweise</strong>: Identisch zu Stärken</li>
+</ul>
+<h4>Vorgegebene Schwächen (Mehrsprachig):</h4>
+<p><strong>Englisch:</strong></p>
+<ul>
+<li>Shy, Clumsy, Impatient, Forgetful, Messy, Talkative, Stubborn, Lazy</li>
+<li>Greedy, Jealous, Anxious, Distracted, Reckless, Bossy, Easily scared</li>
+<li>Too trusting, Perfectionist, Indecisive, Secretive, Boastful</li>
+<li>Quick-tempered, Careless, Overly cautious, Selfish</li>
+</ul>
+<p><strong>Deutsch:</strong></p>
+<ul>
+<li>Schüchtern, Tollpatschig, Ungeduldig, Vergesslich, Unordentlich</li>
+<li>Gesprächig, Stur, Faul, Gierig, Eifersüchtig, Ängstlich, Abgelenkt</li>
+<li>Leichtsinnig, Herrschsüchtig, Leicht ängstlich, Zu vertrauensvoll</li>
+<li>Perfektionist, Unentschlossen, Verschlossen, Prahlerisch, Jähzornig</li>
+<li>Nachlässig, Übervorsichtig, Egoistisch</li>
+</ul>
+<p><strong>Französisch:</strong></p>
+<ul>
+<li>Timide, Maladroit, Impatient, Distrait, Désordonné, Bavard, Têtu</li>
+<li>Paresseux, Avide, Jaloux, Anxieux, Imprudent, Autoritaire</li>
+<li>Facilement effrayé, Trop confiant, Perfectionniste, Indécis, Secret</li>
+<li>Vantard, Colérique, Négligent, Trop prudent, Égoïste</li>
+</ul>
+<p><strong>UI-Verhalten:</strong></p>
+<ul>
+<li>Ausgewählte Schwächen: Orange Hintergrund (<code>bg-orange-500</code>)</li>
+<li>Nicht ausgewählt: Grauer Hintergrund (<code>bg-gray-200</code>)</li>
+</ul>
+<h3>3.3 Ängste (Optional)</h3>
+<ul>
+<li><strong>Minimum</strong>: 0 (Optional)</li>
+<li><strong>Maximum</strong>: Unbegrenzt</li>
+<li><strong>Funktionsweise</strong>: Wie Stärken/Schwächen</li>
+</ul>
+<h4>Vorgegebene Ängste (Mehrsprachig):</h4>
+<p><strong>Englisch:</strong></p>
+<ul>
+<li>Fear of heights</li>
+<li>Fear of spiders</li>
+<li>Fear of the dark</li>
+<li>Fear of being alone</li>
+<li>Fear of loud noises</li>
+</ul>
+<p><strong>Deutsch:</strong></p>
+<ul>
+<li>Höhenangst</li>
+<li>Angst vor Spinnen</li>
+<li>Angst vor der Dunkelheit</li>
+<li>Angst allein zu sein</li>
+<li>Angst vor lauten Geräuschen</li>
+</ul>
+<p><strong>Französisch:</strong></p>
+<ul>
+<li>Peur du vide</li>
+<li>Peur des araignées</li>
+<li>Peur du noir</li>
+<li>Peur d&#39;être seul</li>
+<li>Peur des bruits forts</li>
+</ul>
+<p><strong>UI-Verhalten:</strong></p>
+<ul>
+<li>Ausgewählte Ängste: Roter Hintergrund (<code>bg-red-500</code>)</li>
+<li>Nicht ausgewählt: Grauer Hintergrund (<code>bg-gray-200</code>)</li>
+</ul>
+<h3>3.4 Besondere Details (Optional)</h3>
+<ul>
+<li><strong>Feldtyp</strong>: Mehrzeiliges Textfeld (Textarea)</li>
+<li><strong>Zweck</strong>: Zusätzliche Charakterinformationen</li>
+<li><strong>Beispiele</strong>:<pre><code>- Lieblingstier: Hunde
+- Träumt davon zu fliegen
+- Trägt immer einen roten Hut
+- Sammelt Steine
+- Spielt gerne Fußball
+</code></pre>
+</li>
+<li><strong>Rows</strong>: 3 Zeilen</li>
+<li><strong>Verwendung</strong>: Nur in Prompt, wenn ausgefüllt</li>
+</ul>
+<hr>
+<h2>Schritt 4: Charaktervalidierung</h2>
+<h3>Validierungsregeln beim Speichern:</h3>
+<pre><code class="language-javascript">const canSave =
+  currentCharacter.name &amp;&amp;                    // Name muss vorhanden sein
+  currentCharacter.strengths.length &gt;= 3 &amp;&amp;   // Mind. 3 Stärken
+  currentCharacter.weaknesses.length &gt;= 2;    // Mind. 2 Schwächen
+</code></pre>
+<h3>Speicher-Button-Verhalten:</h3>
+<ul>
+<li><strong>Aktiviert</strong>: Grüner Hintergrund, klickbar</li>
+<li><strong>Deaktiviert</strong>: Grauer Hintergrund, Cursor: not-allowed</li>
+<li><strong>Feedback</strong>: Zeigt aktuellen Status der Validierung</li>
+</ul>
+<hr>
+<h2>Schritt 5: Charakterübersicht nach Erstellung</h2>
+<h3>5.1 Erfolgsanzeige</h3>
+<p>Nach erfolgreichem Speichern erscheint:</p>
+<ul>
+<li><strong>Großes Häkchen-Symbol</strong> (Icon: <code>check</code>, 64px)</li>
+<li><strong>Nachricht</strong>: &quot;Charakter erstellt!&quot;</li>
+<li><strong>Zähler</strong>: &quot;Du hast bisher X Charakter(e) erstellt.&quot;</li>
+</ul>
+<h3>5.2 Aktionen</h3>
+<p>Zwei Buttons stehen zur Verfügung:</p>
+<ol>
+<li><p><strong>&quot;Weiteren Charakter erstellen&quot;</strong></p>
+<ul>
+<li>Icon: Plus</li>
+<li>Startet neue Charaktererstellung</li>
+</ul>
+</li>
+<li><p><strong>&quot;Weiter zu Beziehungen&quot;</strong></p>
+<ul>
+<li>Icon: Pfeil rechts</li>
+<li>Initialisiert Beziehungsmatrix</li>
+<li>Geht zu Schritt 3 (Beziehungen definieren)</li>
+</ul>
+</li>
+</ol>
+<h3>5.3 Charakterkarte in Übersicht</h3>
+<p>Jeder erstellte Charakter wird angezeigt mit:</p>
+<ul>
+<li><strong>Foto</strong>: Rund, 80x80px (falls vorhanden)</li>
+<li><strong>Name</strong>: Fett gedruckt, zentriert</li>
+<li><strong>Alter &amp; Geschlecht</strong>: Kleinerer Text, zentriert</li>
+<li><strong>Stärken</strong>: Erste 3 Stärken (gekürzt)</li>
+<li><strong>Aktionen</strong>:<ul>
+<li><strong>Bearbeiten-Button</strong>: Blau, lädt Charakter in Editor</li>
+<li><strong>Löschen-Button</strong>: Rot, entfernt mit Bestätigung</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>Datenstruktur eines Charakters</h2>
+<pre><code class="language-javascript">{
+  id: 1234567890123,              // Timestamp als eindeutige ID
+  name: &quot;Sophie&quot;,                 // String, Pflicht
+  gender: &quot;female&quot;,               // &quot;male&quot; | &quot;female&quot; | &quot;other&quot;
+  age: &quot;8&quot;,                       // String (Zahl)
+
+  // ============================================
+  // PHYSISCHE MERKMALE (für Bildgenerierung)
+  // Diese Felder werden NUR für die Bildgenerierung verwendet
+  // ============================================
+  photo: File | null,             // File-Objekt (Original-Upload)
+  photoUrl: &quot;data:image/...&quot;,     // Data URL oder null (für API-Referenz)
+  height: &quot;120cm&quot;,                // Größe (optional)
+  build: &quot;schlank&quot;,               // Körperbau (optional)
+  hairColor: &quot;Blond&quot;,             // Haarfarbe (optional)
+  clothing: &quot;blaues T-Shirt&quot;,     // Kleidung - extrahiert aus Foto (optional)
+  otherFeatures: &quot;Blaue Augen&quot;,   // Weitere physische Merkmale (optional)
+
+  // ============================================
+  // PSYCHOLOGISCHE MERKMALE (für Textgenerierung)
+  // Diese Felder werden NUR für die Story-Generierung verwendet
+  // ============================================
+  strengths: [                    // Min. 3 - Charakterstärken
+    &quot;Mutig&quot;,
+    &quot;Klug&quot;,
+    &quot;Freundlich&quot;
+  ],
+  weaknesses: [                   // Min. 2 - Charakterschwächen
+    &quot;Ungeduldig&quot;,
+    &quot;Tollpatschig&quot;
+  ],
+  fears: [                        // Optional - Ängste
+    &quot;Höhenangst&quot;
+  ],
+  specialDetails: &quot;Liebt Hunde&quot;   // Optional - Besondere Details/Hobbys
+}
+</code></pre>
+<hr>
+<h2>Verwendung der Charakterdaten</h2>
+<h3>WICHTIG: Trennung von physischen und psychologischen Merkmalen</h3>
+<p>Die Charakterdaten werden für zwei verschiedene Zwecke verwendet:</p>
+<ol>
+<li><strong>Story-Generierung (Text)</strong> - Nutzt psychologische Merkmale</li>
+<li><strong>Bild-Generierung</strong> - Nutzt physische Merkmale</li>
+</ol>
+<p>Diese Trennung ist wichtig, da:</p>
+<ul>
+<li>Die KI für Textgenerierung Persönlichkeitsmerkmale braucht, um interessante Geschichten zu schreiben</li>
+<li>Die KI für Bildgenerierung nur das visuelle Erscheinungsbild braucht</li>
+</ul>
+<hr>
+<h3>Gemeinsame Merkmale (für Text UND Bild):</h3>
+<p>Das <strong>Hauptcharakter-Flag</strong> (<code>mainCharacters</code> Array) wird für BEIDE Zwecke verwendet:</p>
+<table>
+<thead>
+<tr>
+<th>Verwendung</th>
+<th>Auswirkung</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Story-Text</strong></td>
+<td>Hauptcharaktere bekommen mehr Fokus in der Geschichte</td>
+</tr>
+<tr>
+<td><strong>Cover-Bilder</strong></td>
+<td>Hauptcharaktere werden ZENTRAL und GROSS im Bild platziert</td>
+</tr>
+<tr>
+<td><strong>Szenen-Bilder</strong></td>
+<td>Hauptcharaktere werden als &quot;MAIN CHARACTER&quot; markiert</td>
+</tr>
+</tbody></table>
+<pre><code class="language-javascript">// mainCharacters ist ein Array von Character-IDs
+mainCharacters: [1234567890123]  // IDs der Hauptcharaktere (max. 2)
+</code></pre>
+<hr>
+<h3>Story-Prompt (psychologische Merkmale):</h3>
+<p>Für die Generierung der Geschichte werden folgende Felder verwendet:</p>
+<ul>
+<li><code>name</code>, <code>gender</code>, <code>age</code> (Basisinformationen)</li>
+<li><code>isMainCharacter</code> (aus mainCharacters Array)</li>
+<li><code>strengths</code> (Stärken)</li>
+<li><code>weaknesses</code> (Schwächen)</li>
+<li><code>fears</code> (Ängste)</li>
+<li><code>specialDetails</code> (Besondere Details)</li>
+</ul>
+<pre><code class="language-javascript">// Beispiel Story-Prompt:
+&quot;Sophie (MAIN CHARACTER) (female, 8 years old):
+Strengths: Mutig, Klug, Freundlich,
+Weaknesses: Ungeduldig, Tollpatschig,
+Fears: Höhenangst,
+Special Details: Liebt Hunde&quot;
+</code></pre>
+<hr>
+<h3>Bild-Prompt (physische Merkmale):</h3>
+<p>Für die Generierung der Bilder werden folgende Felder verwendet:</p>
+<ul>
+<li><code>name</code>, <code>gender</code>, <code>age</code> (Basisinformationen)</li>
+<li><code>isMainCharacter</code> (aus mainCharacters Array) - <strong>für Positionierung im Bild</strong></li>
+<li><code>height</code> (Größe)</li>
+<li><code>build</code> (Körperbau)</li>
+<li><code>hairColor</code> (Haarfarbe)</li>
+<li><code>clothing</code> (Kleidung - aus Foto extrahiert)</li>
+<li><code>otherFeatures</code> (Weitere physische Merkmale)</li>
+<li><code>photoUrl</code> (Referenzbild für Konsistenz)</li>
+</ul>
+<pre><code class="language-javascript">// Beispiel Cover-Bild-Prompt:
+&quot;**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**
+⭐ MAIN: Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes. Wearing: blue t-shirt
+
+**Supporting characters (can appear in background or sides):**
+Supporting: Max is a 10-year-old boy, 135cm, athletic build, with brown hair
+
+**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**&quot;
+</code></pre>
+<p><strong>Hinweis:</strong> Psychologische Merkmale (strengths, weaknesses, fears, specialDetails) werden NICHT an die Bildgenerierung übergeben, da sie für die visuelle Darstellung nicht relevant sind.</p>
+<hr>
+<h3>Smart-Filtering:</h3>
+<p>Die <code>buildPrompt()</code>-Funktion für Story-Text fügt nur Felder hinzu, die tatsächlich Werte enthalten:</p>
+<pre><code class="language-javascript">const details = [];
+if (char.strengths &amp;&amp; char.strengths.length &gt; 0) {
+  details.push(`Strengths: ${char.strengths.join(&#39;, &#39;)}`);
+}
+if (char.weaknesses &amp;&amp; char.weaknesses.length &gt; 0) {
+  details.push(`Weaknesses: ${char.weaknesses.join(&#39;, &#39;)}`);
+}
+if (char.fears &amp;&amp; char.fears.length &gt; 0) {
+  details.push(`Fears: ${char.fears.join(&#39;, &#39;)}`);
+}
+if (char.specialDetails) {
+  details.push(`Special Details: ${char.specialDetails}`);
+}
+// NICHT: hairColor, clothing, otherFeatures, height, build (diese sind für Bilder)
+</code></pre>
+<p>Die <code>generateCharacterDescription()</code>-Funktion für Bilder:</p>
+<pre><code class="language-javascript">let description = `${char.name} is a ${age}-year-old ${gender}`;
+if (char.height) description += `, ${char.height}`;
+if (char.build) description += `, ${char.build} build`;
+if (char.hairColor) description += `, with ${char.hairColor} hair`;
+if (char.otherFeatures) description += `, ${char.otherFeatures}`;
+if (char.clothing) description += `. Wearing: ${char.clothing}`;
+// NICHT: strengths, weaknesses, fears, specialDetails (diese sind für Text)
+</code></pre>
+<hr>
+<h2>Bearbeitungsfunktionen</h2>
+<h3>Charakter bearbeiten:</h3>
+<pre><code class="language-javascript">editCharacter(char) {
+  // Lädt Charakter in Editor
+  // Entfernt aus Liste temporär
+  // Ermöglicht Neubearbeitung
+}
+</code></pre>
+<h3>Charakter löschen:</h3>
+<pre><code class="language-javascript">deleteCharacter(charId) {
+  // Zeigt Bestätigungsdialog
+  // Entfernt aus Charakterliste
+  // Entfernt aus Hauptcharakteren
+  // Löscht alle Beziehungen des Charakters
+}
+</code></pre>
+<hr>
+<h2>Sprachunterstützung</h2>
+<p>Alle UI-Elemente und vordefinierten Listen sind in 3 Sprachen verfügbar:</p>
+<ul>
+<li><strong>Englisch (en)</strong></li>
+<li><strong>Deutsch (de)</strong></li>
+<li><strong>Französisch (fr)</strong></li>
+</ul>
+<p>Die Sprache wird automatisch beim Start erkannt basierend auf:</p>
+<pre><code class="language-javascript">const browserLang = navigator.language || navigator.userLanguage;
+if (browserLang.startsWith(&#39;de&#39;)) return &#39;de&#39;;
+if (browserLang.startsWith(&#39;fr&#39;)) return &#39;fr&#39;;
+return &#39;en&#39;; // Standard
+</code></pre>
+<hr>
+<h2>Best Practices</h2>
+<h3>1. Charaktervielfalt</h3>
+<ul>
+<li>Erstelle mindestens 2 Charaktere für interessante Geschichten</li>
+<li>Wähle unterschiedliche Stärken und Schwächen</li>
+<li>Definiere klare Beziehungen zwischen Charakteren</li>
+</ul>
+<h3>2. Detailgrad</h3>
+<ul>
+<li>Nutze optionale Felder für reichere Charaktere</li>
+<li>Beschreibe visuelle Merkmale für lebendige Geschichten</li>
+<li>Füge besondere Details hinzu für Persönlichkeit</li>
+</ul>
+<h3>3. Ausgewogenheit</h3>
+<ul>
+<li>Balance zwischen Stärken und Schwächen</li>
+<li>Realistische Charaktere sind interessanter</li>
+<li>Ängste können Konfliktpotenzial schaffen</li>
+</ul>
+<h3>4. Hauptcharaktere</h3>
+<ul>
+<li>Wähle 1-2 Hauptcharaktere (max. 2)</li>
+<li>Hauptcharaktere erhalten mehr Fokus in der Geschichte</li>
+<li>Gekennzeichnet mit ⭐ in Exporten</li>
+</ul>
+<hr>
+<h2>Fehlerbehebung</h2>
+<h3>Problem: Speichern-Button deaktiviert</h3>
+<p><strong>Lösung</strong>: Überprüfe Validierung</p>
+<ul>
+<li>Mindestens 3 Stärken ausgewählt?</li>
+<li>Mindestens 2 Schwächen ausgewählt?</li>
+<li>Name eingegeben?</li>
+</ul>
+<h3>Problem: Eigene Eigenschaften erscheinen nicht</h3>
+<p><strong>Lösung</strong>:</p>
+<ul>
+<li>Enter-Taste drücken oder Plus-Button klicken</li>
+<li>Prüfen ob bereits in Liste vorhanden</li>
+</ul>
+<h3>Problem: Foto wird nicht angezeigt</h3>
+<p><strong>Lösung</strong>:</p>
+<ul>
+<li>Nur Bildformate verwenden</li>
+<li>Dateigröße prüfen (Browser-Limit)</li>
+<li>Data URL wird im Browser gespeichert</li>
+</ul>
+<hr>
+<h2>Export-Formate</h2>
+<h3>JSON-Export</h3>
+<p>Vollständige Charakterdaten inklusive:</p>
+<ul>
+<li>Alle Eigenschaften</li>
+<li>IDs für Beziehungen</li>
+<li>Custom-Erweiterungen</li>
+</ul>
+<h3>Markdown-Export</h3>
+<p>Lesbare Übersicht mit:</p>
+<ul>
+<li>Charaktername + Hauptcharakter-Markierung</li>
+<li>Alle ausgefüllten Eigenschaften</li>
+<li>Formatierte Listen</li>
+<li>Beispiel:<pre><code class="language-markdown">### 1. Sophie ⭐ (Main Character)
+
+- **Gender**: Weiblich
+- **Age**: 8 Jahre
+- **Hair Color**: Blond
+- **Strengths**: Mutig, Klug, Freundlich
+- **Weaknesses**: Ungeduldig, Tollpatschig
+- **Fears**: Höhenangst
+- **Special Details**: Liebt Hunde
+</code></pre>
+</li>
+</ul>
+<hr>
+<h2>Technische Implementation</h2>
+<h3>React State Management</h3>
+<pre><code class="language-javascript">const [currentCharacter, setCurrentCharacter] = useState(null);
+const [characters, setCharacters] = useState([]);
+const [showCharacterCreated, setShowCharacterCreated] = useState(false);
+</code></pre>
+<h3>Custom State</h3>
+<pre><code class="language-javascript">const [customStrengths, setCustomStrengths] = useState([]);
+const [customWeaknesses, setCustomWeaknesses] = useState([]);
+const [customFears, setCustomFears] = useState([]);
+</code></pre>
+<h3>Geschlechtserkennung</h3>
+<pre><code class="language-javascript">const detectGender = (name) =&gt; {
+  const femaleSuffixes = [&#39;a&#39;, &#39;e&#39;, &#39;ie&#39;, &#39;ine&#39;, &#39;elle&#39;];
+  const femaleNames = [&#39;sophia&#39;, &#39;emma&#39;, &#39;olivia&#39;, ...];
+  const maleNames = [&#39;liam&#39;, &#39;noah&#39;, &#39;oliver&#39;, ...];
+
+  // Logik zur Erkennung
+  return &#39;male&#39; | &#39;female&#39; | &#39;other&#39;;
+};
+</code></pre>
+<hr>
+<h2>Zusammenfassung</h2>
+<p>Die Charaktererstellung ermöglicht:
+✅ Detaillierte, personalisierte Charaktere
+✅ Flexible Eigenschaftswahl
+✅ Visuelle und textuelle Beschreibung
+✅ Mehrsprachige Unterstützung
+✅ Smart Prompt-Generierung (nur gefüllte Felder)
+✅ Export in verschiedenen Formaten
+✅ Einfache Bearbeitung und Verwaltung</p>
+<p>Alle Daten bleiben lokal im Browser gespeichert und werden nur für die Prompt-Generierung verwendet.</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>CHARAKTER-ERSTELLUNG.md</code>.
+</footer>
+</body>
+</html>

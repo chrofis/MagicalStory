@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MULTI-CHARACTER-COVER-TESTS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Multi-Character Cover Generation Tests</h1>
+<p>This document tracks experiments for generating cover images with many characters (5-10+).</p>
+<p><strong>Problem:</strong> Cover images ideally show all main characters together (up to 10), but AI image generation struggles with:</p>
+<ul>
+<li>Maintaining distinct identities for many characters</li>
+<li>Consistent composition when adding characters iteratively</li>
+<li>Matching art style when stitching separately-generated parts</li>
+</ul>
+<p><strong>Test Date:</strong> January 29-30, 2025</p>
+<hr>
+<h2>Summary of Results</h2>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Result</th>
+<th>Main Issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Single-shot 10 chars</td>
+<td>❌ Failed</td>
+<td>Characters blend together, identity loss</td>
+</tr>
+<tr>
+<td>Iterative add (3→6→10)</td>
+<td>❌ Failed</td>
+<td>Identity drift - characters &quot;mix&quot; together</td>
+</tr>
+<tr>
+<td>Ghost + external inpaint (FLUX/ACE++)</td>
+<td>❌ Failed</td>
+<td>Inpainted figures don&#39;t match style</td>
+</tr>
+<tr>
+<td>Ghost + Gemini edit</td>
+<td>❌ Failed</td>
+<td>Gemini re-interprets whole scene, ignores ghost</td>
+</tr>
+<tr>
+<td>Multi-turn conversation</td>
+<td>❌ Failed</td>
+<td>No better than single-shot</td>
+</tr>
+<tr>
+<td>Stitching separate parts</td>
+<td>❌ Failed</td>
+<td>Scene elements (table, background) change between generations</td>
+</tr>
+</tbody></table>
+<p><strong>Conclusion:</strong> No reliable method found for 10+ character covers. Current limit is ~3-4 characters with acceptable consistency.</p>
+<hr>
+<h2>Approach 1: Single-Shot Generation</h2>
+<h3>What We Tested</h3>
+<p>Generate all 10 characters in a single prompt with all reference images.</p>
+<h3>Test Files</h3>
+<ul>
+<li><code>tests/manual/test-output/10-chars-*/10-characters.png</code></li>
+<li><code>tests/manual/test-output/table-test-*/test1-3chars-*.png</code> (baseline)</li>
+<li><code>tests/manual/test-output/table-test-*/test2-6chars-gemini20.png</code></li>
+<li><code>tests/manual/test-output/table-test-*/test3-10chars-gemini20.png</code></li>
+</ul>
+<h3>Results</h3>
+<table>
+<thead>
+<tr>
+<th>Characters</th>
+<th>Model</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3</td>
+<td>Gemini 2.0</td>
+<td>✅ Good - distinct identities</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Gemini 2.5</td>
+<td>✅ Good - higher quality</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Gemini 2.0</td>
+<td>⚠️ Some identity mixing</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Gemini 2.0</td>
+<td>❌ Severe identity mixing</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Gemini 2.5</td>
+<td>❌ Characters blend together</td>
+</tr>
+</tbody></table>
+<h3>Key Finding</h3>
+<p>Beyond 4-5 characters, the model starts &quot;averaging&quot; faces. Reference images compete for attention and identities merge.</p>
+<hr>
+<h2>Approach 2: Iterative Build-Up</h2>
+<h3>What We Tested</h3>
+<p>Start with 3 characters, then ask the model to add 3 more to the existing image, repeat until 10.</p>
+<pre><code>Step 1: Generate base image with 3 characters
+Step 2: &quot;Add characters 4, 5, 6 to this image, keep existing characters identical&quot;
+Step 3: &quot;Add characters 7, 8, 9, 10 to this image...&quot;
+</code></pre>
+<h3>Test Files</h3>
+<ul>
+<li><code>tests/manual/test-output/iterative-table-*/01-base-3chars.png</code></li>
+<li><code>tests/manual/test-output/iterative-table-*/02-added-3more-6total.png</code></li>
+<li><code>tests/manual/test-output/iterative-table-*/03-final-10chars.png</code></li>
+<li><code>tests/manual/test-output/iterative-10-*/01-4chars.png</code></li>
+<li><code>tests/manual/test-output/iterative-10-*/02-7chars.png</code></li>
+<li><code>tests/manual/test-output/iterative-10-*/03-10chars.png</code></li>
+</ul>
+<h3>Results</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Base (3-4 chars)</td>
+<td>✅ Good</td>
+</tr>
+<tr>
+<td>+3 more (6-7 total)</td>
+<td>⚠️ Original characters start changing</td>
+</tr>
+<tr>
+<td>+3 more (9-10 total)</td>
+<td>❌ Total mixture - identities blended</td>
+</tr>
+</tbody></table>
+<h3>Key Finding</h3>
+<p>When adding new characters, the model doesn&#39;t preserve existing characters properly. It re-interprets the entire scene, causing original characters to drift toward the new ones.</p>
+<p><strong>&quot;Total mixture&quot;</strong> - characters that looked distinct in step 1 become averaged/blended by step 3.</p>
+<hr>
+<h2>Approach 3: Ghost Placeholders + Inpainting</h2>
+<h3>What We Tested</h3>
+<ol>
+<li>Generate image with real characters + ghost/silhouette placeholders</li>
+<li>Use bounding box detection to find ghost regions</li>
+<li>Inpaint each ghost with a real character using ACE++/FLUX Fill</li>
+</ol>
+<pre><code>Step 1: &quot;3 real children + 7 grey silhouette placeholders around a table&quot;
+Step 2: Detect bbox for each ghost
+Step 3: For each ghost: mask region → inpaint with character reference
+</code></pre>
+<h3>Test Files</h3>
+<ul>
+<li><code>tests/manual/test-output/placeholder-*/01-2real-8placeholders.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/table-3real-7ghosts.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/ghost-mask.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/ace-inpaint-result.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/full-inpaint-result.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/manuel-replaced.png</code></li>
+</ul>
+<h3>Results</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Generate with ghosts</td>
+<td>✅ Works - clear placeholder positions</td>
+</tr>
+<tr>
+<td>Detect ghost bboxes</td>
+<td>✅ Works</td>
+</tr>
+<tr>
+<td>Inpaint with FLUX Fill (text)</td>
+<td>⚠️ Generic faces, don&#39;t match characters</td>
+</tr>
+<tr>
+<td>Inpaint with ACE++ (reference)</td>
+<td>❌ Style mismatch - inpainted figures look different</td>
+</tr>
+<tr>
+<td><strong>Gemini edit own image</strong></td>
+<td>❌ Re-interprets whole scene, ignores ghost</td>
+</tr>
+</tbody></table>
+<h3>Key Findings</h3>
+<p><strong>External inpainting (FLUX/ACE++):</strong> Style mismatch - inpainted figures look &quot;pasted in&quot; rather than natural. ACE++ prioritizes face identity over style matching, resulting in realistic-looking faces in a cartoon scene.</p>
+<p><strong>Gemini editing its own output:</strong> Even when using Gemini to edit a Gemini-generated image, asking it to &quot;replace this ghost with this character&quot; causes it to <strong>re-interpret the entire scene</strong> rather than doing a localized edit. This is the same failure mode as the iterative approach - the model can&#39;t preserve the existing image while making targeted changes.</p>
+<hr>
+<h2>Approach 4: Multi-Turn Conversation</h2>
+<h3>What We Tested</h3>
+<p>Use Gemini&#39;s multi-turn chat to maintain context across requests.</p>
+<pre><code>Turn 1: &quot;Generate Sophie at a table&quot;
+Turn 2: &quot;Add Manuel to her left, keep Sophie identical&quot;
+Turn 3: &quot;Add Lukas to her right, keep both existing characters identical&quot;
+...continue for all characters
+</code></pre>
+<h3>Test Files</h3>
+<ul>
+<li><code>tests/manual/test-output/multi-turn-*/multi-turn-result.png</code></li>
+<li><code>tests/manual/test-output/multi-turn-base-*/</code></li>
+</ul>
+<h3>Results</h3>
+<p>❌ <strong>No improvement over iterative approach</strong></p>
+<p>The conversation context doesn&#39;t prevent identity drift. The model still re-interprets the scene with each addition.</p>
+<h3>Key Finding</h3>
+<p>Multi-turn memory helps with text/reasoning tasks but doesn&#39;t create a persistent &quot;lock&quot; on character identities in image generation.</p>
+<hr>
+<h2>Approach 5: Stitching Separate Parts</h2>
+<h3>What We Tested</h3>
+<p>Generate different parts of the scene separately, then composite them:</p>
+<pre><code>1. Generate left side: table + 3 characters
+2. Generate right side: same table + 3 different characters
+3. Stitch left + right halves together
+</code></pre>
+<h3>Test Files</h3>
+<ul>
+<li><code>tests/manual/test-output/seating-*/table.png</code></li>
+<li><code>tests/manual/test-output/seating-*/table-4people.png</code></li>
+<li><code>tests/manual/test-output/seating-*/table-4people-v2.png</code></li>
+<li><code>tests/manual/test-output/seating-*/table-edited-v3.png</code></li>
+<li><code>tests/manual/test-output/seating-*/table-edited-v4.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/right-half-cropped.png</code></li>
+<li><code>tests/manual/test-output/numbered-ghosts-*/right-side-replaced.png</code></li>
+</ul>
+<h3>Results</h3>
+<p>❌ <strong>Scene elements change between generations</strong></p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Consistent?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Characters</td>
+<td>✅ Each half has correct characters</td>
+</tr>
+<tr>
+<td>Table</td>
+<td>❌ Different shape/angle/style each time</td>
+</tr>
+<tr>
+<td>Background</td>
+<td>❌ Lighting, colors, details change</td>
+</tr>
+<tr>
+<td>Perspective</td>
+<td>❌ Camera angle shifts</td>
+</tr>
+</tbody></table>
+<h3>Key Finding</h3>
+<p>Even with the same prompt, the model generates different scene elements each time. The table looked different in left vs right generations, making seamless stitching impossible.</p>
+<p>Attempted workarounds:</p>
+<ul>
+<li>Describe table in detail → still varies</li>
+<li>Use same seed → not supported by Gemini</li>
+<li>Generate full scene, crop, regenerate half → perspective mismatch</li>
+</ul>
+<hr>
+<h2>What Works (Limited)</h2>
+<h3>3-4 Characters Maximum</h3>
+<p>Single-shot generation works acceptably with 3-4 characters:</p>
+<ul>
+<li>Pass all character reference images</li>
+<li>Detailed prompt with positions</li>
+<li>Accept some identity softening</li>
+</ul>
+<h3>Cover Workarounds</h3>
+<p>Current production approach for covers with many characters:</p>
+<ol>
+<li><strong>Foreground focus</strong>: Show 2-3 main characters prominently, others as small/background figures</li>
+<li><strong>Silhouettes</strong>: Background characters as stylized silhouettes (no face detail needed)</li>
+<li><strong>Split covers</strong>: Front cover shows some characters, back cover shows others</li>
+<li><strong>Symbolic representation</strong>: Objects/items representing characters instead of showing all faces</li>
+</ol>
+<hr>
+<h2>Technical Notes</h2>
+<h3>Gemini Limits</h3>
+<ul>
+<li>Maximum reference images: ~14 (6 objects + 5 humans per docs)</li>
+<li>Effective human references: 3-4 before identity blending</li>
+<li>No seed control for reproducibility</li>
+</ul>
+<h3>Cost Comparison</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Images Generated</th>
+<th>Est. Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Single-shot</td>
+<td>1</td>
+<td>$0.05</td>
+</tr>
+<tr>
+<td>Iterative (3 steps)</td>
+<td>3</td>
+<td>$0.15</td>
+</tr>
+<tr>
+<td>Ghost + inpaint (7 ghosts)</td>
+<td>8</td>
+<td>$0.40</td>
+</tr>
+<tr>
+<td>Multi-turn (10 chars)</td>
+<td>10</td>
+<td>$0.50</td>
+</tr>
+</tbody></table>
+<h3>Test Scripts</h3>
+<p>No dedicated script was created - tests were run manually via the Gemini API and various test files:</p>
+<ul>
+<li><code>tests/manual/test-inpaint.js</code> - for ghost inpainting</li>
+<li><code>tests/manual/test-character-replacement.js</code> - for ACE++ tests</li>
+</ul>
+<hr>
+<h2>Future Ideas (Not Yet Tested)</h2>
+<ol>
+<li><strong>ControlNet pose conditioning</strong>: Lock body positions, only vary faces</li>
+<li><strong>Layered compositing with AI background removal</strong>: Generate each character separately, composite with consistent background</li>
+<li><strong>Fine-tuned model</strong>: Train on consistent character set</li>
+<li><strong>Video frame extraction</strong>: Generate video of characters, extract best frame</li>
+</ol>
+<hr>
+<h2>Conclusion</h2>
+<p><strong>No reliable solution exists</strong> for generating 10+ character covers with consistent identities.</p>
+<p><strong>Recommendation</strong>: Limit covers to 3-4 prominent characters. Use artistic techniques (silhouettes, partial views, symbolic elements) to suggest additional characters without requiring AI to generate all faces distinctly.</p>
+<p>The problem is fundamental to how diffusion models handle multiple identity references - they tend to average/blend when given too many competing references.</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>MULTI-CHARACTER-COVER-TESTS.md</code>.
+</footer>
+</body>
+</html>

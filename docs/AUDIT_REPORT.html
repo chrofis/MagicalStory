@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AUDIT_REPORT.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Comprehensive Feature Quality Audit - MagicalStory</h1>
+<p><strong>Date:</strong> 2025-12-27
+<strong>Audited By:</strong> Claude Code
+<strong>Features Reviewed:</strong> 21</p>
+<hr>
+<h2>Executive Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Features Audited</strong></td>
+<td>21</td>
+</tr>
+<tr>
+<td><strong>Critical Issues</strong></td>
+<td>6</td>
+</tr>
+<tr>
+<td><strong>Medium Issues</strong></td>
+<td>34</td>
+</tr>
+<tr>
+<td><strong>Low Issues</strong></td>
+<td>50+</td>
+</tr>
+<tr>
+<td><strong>Naming Violations</strong></td>
+<td>Widespread (snake_case/camelCase mixing)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Critical Issues (Must Fix)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature</th>
+<th>Issue</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Admin</strong></td>
+<td>SQL Injection - string interpolation for <code>days</code> param</td>
+<td><code>admin.js:1526</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Admin</strong></td>
+<td>Files too large (1731 + 1623 lines)</td>
+<td><code>admin.js</code>, <code>AdminDashboard.tsx</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Auth</strong></td>
+<td>Duplicate route <code>/api/auth/refresh</code> defined twice</td>
+<td><code>auth.js:649-692, 761-810</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Auth</strong></td>
+<td>Missing <code>getPool</code> import - runtime error</td>
+<td><code>auth.js:333</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Characters</strong></td>
+<td>All chars stored as single JSON blob with DELETE/INSERT</td>
+<td><code>characters.js</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>PDF</strong></td>
+<td>300+ lines duplicated between <code>server.js</code> and <code>pdf.js</code></td>
+<td><code>server.js:4245-4570</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Code Locality Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Rating</th>
+<th>Features</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>:green_circle: <strong>Cohesive</strong></td>
+<td>User Profile, Story Generation, Story Library, Gelato, Email, Files, Config, Health, UI Components</td>
+</tr>
+<tr>
+<td>:yellow_circle: <strong>Moderate</strong></td>
+<td>Auth, Characters, Story Wizard, Images, PDF, i18n, Dev Mode</td>
+</tr>
+<tr>
+<td>:red_circle: <strong>Fragmented</strong></td>
+<td>Admin (1731 lines), Photos (embedded in 8500-line server.js)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Dimension Ratings by Feature</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Impl</th>
+<th>Docs</th>
+<th>Consist</th>
+<th>Errors</th>
+<th>UX</th>
+<th>Mobile</th>
+<th>Scale</th>
+<th>Maintain</th>
+<th>Naming</th>
+<th>Locality</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auth</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:x:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>User Profile</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>N/A</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Admin</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:x:</td>
+<td>:warning:</td>
+<td>:x:</td>
+<td>:x:</td>
+<td>:red_circle:</td>
+</tr>
+<tr>
+<td>Characters</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:x:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Photos</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:x:</td>
+<td>:x:</td>
+<td>:red_circle:</td>
+</tr>
+<tr>
+<td>Story Wizard</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:x:</td>
+<td>:warning:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Story Gen</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Story Library</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Images</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>PDF</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:x:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>N/A</td>
+<td>:warning:</td>
+<td>:x:</td>
+<td>:white_check_mark:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Book Builder</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Gelato</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Emails</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>i18n</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Dev Mode</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:yellow_circle:</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Config</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>Health</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:green_circle:</td>
+</tr>
+<tr>
+<td>UI Components</td>
+<td>:white_check_mark:</td>
+<td>:warning:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:white_check_mark:</td>
+<td>:green_circle:</td>
+</tr>
+</tbody></table>
+<h3>Legend</h3>
+<ul>
+<li>:white_check_mark: Good</li>
+<li>:warning: Needs Improvement</li>
+<li>:x: Poor</li>
+<li>:green_circle: Cohesive</li>
+<li>:yellow_circle: Moderate</li>
+<li>:red_circle: Fragmented</li>
+</ul>
+<hr>
+<h2>Naming Convention Issues (snake_case vs camelCase)</h2>
+<p><strong>Pattern:</strong> Database uses <code>snake_case</code>, JavaScript uses <code>camelCase</code>, but API responses are inconsistent.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DB → API passthrough</strong></td>
+<td><code>created_at</code>, <code>user_id</code>, <code>story_quota</code> returned raw</td>
+</tr>
+<tr>
+<td><strong>DB → API transformed</strong></td>
+<td><code>createdAt</code>, <code>userId</code>, <code>storyQuota</code> in some endpoints</td>
+</tr>
+<tr>
+<td><strong>Mixed in same response</strong></td>
+<td>Orders return <code>user_id</code> AND <code>userId</code> depending on source</td>
+</tr>
+<tr>
+<td><strong>Python → JS</strong></td>
+<td><code>face_thumbnail</code> vs <code>faceThumbnail</code> (both handled)</td>
+</tr>
+<tr>
+<td><strong>Inconsistent DB columns</strong></td>
+<td><code>shipping_postal_code</code> vs <code>shipping_post_code</code></td>
+</tr>
+</tbody></table>
+<p><strong>Recommendation:</strong> Create a data mapping layer that always transforms to camelCase at API boundaries.</p>
+<hr>
+<h2>Top Medium Issues (Prioritized)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>StoryWizard.tsx has 40+ useState hooks (1500+ lines)</td>
+<td>Hard to maintain</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Photo endpoints embedded in server.js (500+ lines)</td>
+<td>Should be in routes/photos.js</td>
+</tr>
+<tr>
+<td>3</td>
+<td>No pagination on admin users list</td>
+<td>Performance</td>
+</tr>
+<tr>
+<td>4</td>
+<td>No file size/MIME validation on uploads</td>
+<td>Security</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>/log-error</code> has no rate limiting or auth</td>
+<td>DoS risk</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Email errors return null (silent failures)</td>
+<td>Debugging</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Inline translations in 3+ components</td>
+<td>Maintenance</td>
+</tr>
+<tr>
+<td>8</td>
+<td>No rate limiting on image regeneration</td>
+<td>Credit drain</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Password min length: schema=8, change-password=6</td>
+<td>Inconsistent</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Character storage DELETE-all/INSERT pattern</td>
+<td>Data loss risk</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Files Needing Refactoring (by size)</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server.js</code></td>
+<td>8500+</td>
+<td>Monolith - extract routes</td>
+</tr>
+<tr>
+<td><code>server/routes/admin.js</code></td>
+<td>1731</td>
+<td>Split into sub-modules</td>
+</tr>
+<tr>
+<td><code>client/src/pages/AdminDashboard.tsx</code></td>
+<td>1623</td>
+<td>Extract components</td>
+</tr>
+<tr>
+<td><code>client/src/pages/StoryWizard.tsx</code></td>
+<td>1500+</td>
+<td>Extract hooks/components</td>
+</tr>
+<tr>
+<td><code>server/lib/images.js</code></td>
+<td>1843</td>
+<td>Acceptable (single responsibility)</td>
+</tr>
+<tr>
+<td><code>client/src/components/generation/StoryDisplay.tsx</code></td>
+<td>1000+</td>
+<td>Extract sub-components</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Detailed Feature Reports</h2>
+<h3>Feature 1: Authentication &amp; User Management</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/auth.js</code> (812 lines)</li>
+<li><code>server/middleware/auth.js</code> (59 lines)</li>
+<li><code>server/middleware/validation.js</code> (159 lines)</li>
+<li><code>client/src/components/auth/*.tsx</code> (6 components)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] Duplicate route <code>/api/auth/refresh</code> defined twice (lines 649-692 and 761-810)</li>
+<li>[Critical] Missing <code>getPool</code> import - will cause runtime error at line 333</li>
+<li>[Medium] Password min inconsistency: schema=8 chars, change-password=6 chars</li>
+<li>[Medium] Error message leakage: &quot;email already registered&quot; for username field</li>
+<li>[Low] File mode dead code paths</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>DB: <code>story_quota</code>, <code>stories_generated</code>, <code>preferred_language</code>, <code>email_verified</code></li>
+<li>JS: <code>storyQuota</code>, <code>storiesGenerated</code>, <code>preferredLanguage</code>, <code>emailVerified</code></li>
+<li>Some routes return raw DB columns, others transform</li>
+</ul>
+<hr>
+<h3>Feature 2: User Profile &amp; Account</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/user.js</code> (277 lines)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] No pagination on orders query (line 163)</li>
+<li>[Medium] No LIMIT on credit purchases query (line 210)</li>
+<li>[Low] Weak email validation: <code>!newEmail.includes(&#39;@&#39;)</code></li>
+<li>[Low] Conflates email and username in update</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>DB: <code>shipping_postal_code</code> vs <code>shipping_post_code</code> (inconsistent)</li>
+<li>API correctly transforms to camelCase</li>
+</ul>
+<hr>
+<h3>Feature 3: Admin Dashboard</h3>
+<p><strong>Code Locality:</strong> :red_circle: Fragmented</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/admin.js</code> (1731 lines - TOO LARGE)</li>
+<li><code>client/src/pages/AdminDashboard.tsx</code> (1623 lines - TOO LARGE)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] SQL Injection at line 1526: <code>WHERE s.created_at &gt;= NOW() - INTERVAL &#39;${days} days&#39;</code></li>
+<li>[Critical] Files exceed maintainability thresholds</li>
+<li>[Medium] No pagination on users list</li>
+<li>[Medium] Inconsistent HTTP status codes (503 vs 400/501)</li>
+<li>[Medium] Dead code: <code>handleToggleRole</code> references non-existent route</li>
+<li>[Low] 360+ lines of inline translations</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Print products API uses snake_case throughout</li>
+<li>Orders API mixes snake_case and camelCase</li>
+<li>Token usage returns <code>gemini_text</code>, <code>gemini_image</code> (snake_case)</li>
+</ul>
+<hr>
+<h3>Feature 4: Character Creation &amp; Management</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/characters.js</code></li>
+<li><code>client/src/components/character/*.tsx</code></li>
+<li><code>client/src/services/characterService.ts</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] All characters stored as single JSON blob with DELETE/INSERT pattern - race condition risk</li>
+<li>[Critical] No server-side input validation on character data</li>
+<li>[Medium] No pagination or limit on characters array</li>
+<li>[Medium] CharacterForm.tsx at 677 lines - too complex</li>
+<li>[Low] Legacy format migration adds complexity</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>CharacterApiResponse supports BOTH conventions: <code>photo_url</code> AND <code>photoUrl</code></li>
+<li>Service layer explicitly maps between conventions</li>
+</ul>
+<hr>
+<h3>Feature 5: Photo Analysis &amp; Avatars</h3>
+<p><strong>Code Locality:</strong> :red_circle: Fragmented</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server.js</code> lines 3309-3964 (~655 lines embedded in monolith)</li>
+<li><code>server/routes/photos.js</code> (41 lines - health check only)</li>
+<li><code>client/src/components/character/PhotoUpload.tsx</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] Major endpoints embedded in 8500+ line server.js - should be in routes/photos.js</li>
+<li>[Critical] <code>extractTraitsWithGemini()</code> defined inside route handler on every request</li>
+<li>[Medium] Duplicated MIME type extraction regex</li>
+<li>[Medium] No rate limiting on expensive avatar generation</li>
+<li>[Medium] Hardcoded Python service URL fallback</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Python returns: <code>face_thumbnail</code>, <code>body_crop</code>, <code>body_no_bg</code> (snake_case)</li>
+<li>Server converts to: <code>faceThumbnail</code>, <code>bodyCrop</code>, <code>bodyNoBg</code></li>
+<li>Code handles BOTH: <code>analyzerData.bodyCrop || analyzerData.body_crop</code></li>
+</ul>
+<hr>
+<h3>Feature 6: Story Wizard</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>client/src/pages/StoryWizard.tsx</code> (~1500+ lines - TOO LARGE)</li>
+<li><code>client/src/components/story/*.tsx</code></li>
+<li><code>client/src/components/generation/*.tsx</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] 40+ useState hooks in single component - unmaintainable</li>
+<li>[Medium] No TypeScript interfaces for complex state shapes</li>
+<li>[Medium] Complex useEffect dependencies could cause re-render issues</li>
+<li>[Low] Some hardcoded strings instead of translation keys</li>
+<li>[Low] <code>pendingAutoGenerate</code> ref pattern could be cleaner</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Generally consistent camelCase within file</li>
+<li><code>languageLevel</code> vs potential <code>language_level</code> API mismatch</li>
+</ul>
+<hr>
+<h3>Feature 7: Story Generation Engine</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server.js</code> (processStoryJob function)</li>
+<li><code>server/lib/textModels.js</code> (581 lines)</li>
+<li><code>server/lib/images.js</code> (1843 lines)</li>
+<li><code>server/lib/storyHelpers.js</code></li>
+<li><code>server/lib/visualBible.js</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] processStoryJob still very long (~500+ lines) in server.js</li>
+<li>[Medium] MODEL_PRICING hardcoded - should be in config</li>
+<li>[Low] Mixed console.log() and log.debug()</li>
+<li>[Low] Magic numbers could be named constants</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li><code>input_tokens</code>/<code>output_tokens</code> (API) vs <code>inputTokens</code>/<code>outputTokens</code> (some places)</li>
+<li>Gemini API: <code>inlineData</code> vs <code>inline_data</code> - both handled</li>
+</ul>
+<hr>
+<h3>Feature 8: Story Library &amp; Management</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/stories.js</code> (476 lines)</li>
+<li><code>client/src/pages/MyStories.tsx</code> (741 lines)</li>
+<li><code>client/src/components/generation/StoryDisplay.tsx</code> (1000+ lines)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] StoryDisplay.tsx handles too many concerns - should be split</li>
+<li>[Medium] <code>getPool()</code> called but not imported in stories.js</li>
+<li>[Low] Module-level cache variable</li>
+<li>[Low] Browser <code>confirm()</code> instead of custom modal</li>
+<li>[Low] Payment callback logic duplicated</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li><code>created_at</code> (DB) vs <code>createdAt</code> (JS) - client handles both with fallback</li>
+</ul>
+<hr>
+<h3>Feature 9: Image Editing &amp; Regeneration</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/lib/images.js</code> (1843 lines - well-modularized)</li>
+<li><code>server.js</code> (regenerate endpoints at lines ~1569-2580)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] Duplicated logic in regenerate endpoints (~70% shared)</li>
+<li>[Low] Credit deduction not in transaction - potential loss</li>
+<li>[Low] No rate limiting on regeneration</li>
+<li>[Low] <code>evaluateImageQuality</code> returns null without type safety</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Gemini API: <code>inlineData</code> and <code>inline_data</code> - correctly handles both</li>
+<li><code>pageNum</code> param vs <code>pageNumber</code> variable</li>
+</ul>
+<hr>
+<h3>Feature 10: PDF Generation</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/lib/pdf.js</code> (434 lines - clean)</li>
+<li><code>server.js</code> (endpoints at lines ~4245-4570 - DUPLICATED)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Critical] <code>/api/generate-pdf</code> reimplements pdf.js logic (300+ lines duplicated)</li>
+<li>[Medium] No timeout on PDF generation</li>
+<li>[Medium] Memory pressure - all images buffered</li>
+<li>[Low] Font hardcoded to Helvetica (no i18n for non-Latin)</li>
+<li>[Low] No PDF compression</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent camelCase throughout</li>
+</ul>
+<hr>
+<h3>Feature 11: Book Builder &amp; Ordering</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>client/src/pages/BookBuilder.tsx</code> (536 lines)</li>
+<li><code>client/src/pages/Pricing.tsx</code> (221 lines)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] Uses <code>alert()</code> for errors - should use modal/toast</li>
+<li>[Medium] No validation that stories still exist before checkout</li>
+<li>[Low] Translation duplication between files</li>
+<li>[Low] No confirmation dialog before checkout</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li><code>PricingTier</code> interface defined in both files - should be shared</li>
+<li>Consistent camelCase otherwise</li>
+</ul>
+<hr>
+<h3>Feature 12: Stripe Payment Integration</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server.js</code> (lines 35-67, 374-686, 5055-5291)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] Webhook handler 300+ lines - hard to test</li>
+<li>[Medium] No rate limiting on checkout session creation</li>
+<li>[Low] Magic numbers hardcoded (retry delays, prices)</li>
+<li>[Low] Webhook returns 400 on errors (causes Stripe retries)</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>DB: <code>stripe_session_id</code>, <code>payment_status</code>, <code>amount_total</code></li>
+<li>JS: <code>sessionId</code>, <code>paymentIntent</code></li>
+<li>API metadata: <code>storyIds</code>, <code>userId</code>, <code>coverType</code></li>
+</ul>
+<hr>
+<h3>Feature 13: Gelato Print Integration</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/lib/gelato.js</code> (317 lines)</li>
+<li><code>server.js</code> (webhook handler lines 688-832)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] Sequential DB queries for stories - could batch</li>
+<li>[Medium] PDF stored as base64 in database (large)</li>
+<li>[Low] Hardcoded currency &#39;CHF&#39; and shipment method</li>
+<li>[Low] Fragile relative require path</li>
+<li>[Low] Name splitting assumes Western format</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>DB: <code>gelato_order_id</code>, <code>gelato_status</code>, <code>tracking_number</code></li>
+<li>JS: <code>gelatoOrderType</code>, <code>trackingNumber</code></li>
+<li>API: <code>orderId</code>, <code>fulfillmentStatus</code></li>
+</ul>
+<hr>
+<h3>Feature 14: Email Notifications</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>email.js</code> (573 lines)</li>
+<li><code>emails/*.html</code> (6 templates)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] All functions return <code>null</code> on failure - can&#39;t distinguish error types</li>
+<li>[Medium] No retry mechanism for transient failures</li>
+<li>[Low] Templates loaded synchronously at startup</li>
+<li>[Low] Admin emails use hardcoded HTML, customer emails use templates</li>
+<li>[Low] Missing accented characters in German templates</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent camelCase throughout</li>
+</ul>
+<hr>
+<h3>Feature 15: Multi-Language/i18n</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>client/src/context/LanguageContext.tsx</code></li>
+<li><code>client/src/constants/translations.ts</code></li>
+<li>Inline translations in: <code>Navigation.tsx</code>, <code>Footer.tsx</code>, <code>ImpersonationBanner.tsx</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] Inline translations in 3+ components instead of central system</li>
+<li>[Low] No documentation for adding new languages</li>
+<li>[Low] Hardcoded language array repeated in multiple places</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent camelCase</li>
+</ul>
+<hr>
+<h3>Feature 16: Developer Mode</h3>
+<p><strong>Code Locality:</strong> :yellow_circle: Moderate</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>State in <code>StoryWizard.tsx</code></li>
+<li>Toggle in <code>Navigation.tsx</code></li>
+<li>UI in <code>ModelSelector.tsx</code>, <code>StoryDisplay.tsx</code>, <code>StorySettings.tsx</code>, <code>CharacterForm.tsx</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Low] Prop drilling through many levels - could use context</li>
+<li>[Low] No persistent state - resets on refresh</li>
+<li>[Low] ModelSelector access rules could be clearer</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent <code>developerMode</code> naming</li>
+</ul>
+<hr>
+<h3>Feature 17: File Management</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/files.js</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] No file size validation/limits</li>
+<li>[Medium] No MIME type validation</li>
+<li>[Low] Database storage may not scale for large files</li>
+<li>[Low] <code>optionalAuth</code> middleware defined inline</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>DB: <code>file_data</code>, <code>file_type</code>, <code>user_id</code>, <code>mime_type</code></li>
+<li>JS/API: <code>fileData</code>, <code>fileType</code>, <code>mimeType</code>, <code>fileId</code></li>
+</ul>
+<hr>
+<h3>Feature 18: Configuration</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/config.js</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Low] No caching headers on config endpoint</li>
+<li>[Low] URL path uses kebab-case (<code>print-product-uid</code>) vs flat naming elsewhere</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>URL: <code>print-product-uid</code> (kebab-case)</li>
+<li>Response: <code>productUid</code> (camelCase) - acceptable</li>
+</ul>
+<hr>
+<h3>Feature 19: Health Monitoring</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>server/routes/health.js</code></li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] <code>/log-error</code> has no rate limiting - DoS risk</li>
+<li>[Medium] <code>/log-error</code> has no authentication</li>
+<li>[Low] <code>/check-ip</code> returns 200 on error</li>
+<li>[Low] Stack trace truncated without indication</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent camelCase</li>
+</ul>
+<hr>
+<h3>Feature 20: UI Components</h3>
+<p><strong>Code Locality:</strong> :green_circle: Cohesive</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>client/src/components/common/*.tsx</code> (16 files)</li>
+</ul>
+<p><strong>Issues Found:</strong></p>
+<ol>
+<li>[Medium] ImpersonationBanner has inline translations</li>
+<li>[Medium] Navigation.tsx too large (~400 lines) with embedded modal</li>
+<li>[Low] LoadingSpinner references undefined CSS class</li>
+<li>[Low] Toast uses inline style tag</li>
+<li>[Low] Input/Textarea code duplication</li>
+<li>[Low] No component documentation/storybook</li>
+</ol>
+<p><strong>Naming Issues:</strong></p>
+<ul>
+<li>Consistent PascalCase for components, camelCase for props</li>
+</ul>
+<hr>
+<h2>Positive Findings</h2>
+<p>:white_check_mark: <strong>Strong error handling</strong> across most features
+:white_check_mark: <strong>Good i18n architecture</strong> (EN/DE/FR with central translations)
+:white_check_mark: <strong>Solid security</strong> (rate limiting, webhook verification, parameterized queries)
+:white_check_mark: <strong>Good UX patterns</strong> (loading states, progress indicators, fallbacks)
+:white_check_mark: <strong>Well-modularized libraries</strong> (textModels.js, images.js, gelato.js, email.js)
+:white_check_mark: <strong>TypeScript interfaces</strong> provide type safety
+:white_check_mark: <strong>LRU caching</strong> with TTL for images
+:white_check_mark: <strong>Atomic credit operations</strong> (UPDATE with WHERE clause)
+:white_check_mark: <strong>Idempotency protection</strong> for story job creation</p>
+<hr>
+<h2>Recommendations Summary</h2>
+<h3>Immediate (Critical)</h3>
+<ol>
+<li>Fix SQL injection in admin.js line 1526</li>
+<li>Remove duplicate <code>/api/auth/refresh</code> route</li>
+<li>Add missing <code>getPool</code> import in auth.js</li>
+<li>Fix PDF code duplication</li>
+</ol>
+<h3>Short-term (High)</h3>
+<ol>
+<li>Split large files (admin.js, AdminDashboard.tsx, StoryWizard.tsx)</li>
+<li>Extract photo endpoints from server.js to routes/photos.js</li>
+<li>Add file size/MIME validation</li>
+<li>Add rate limiting to <code>/log-error</code></li>
+<li>Standardize naming conventions with mapping layer</li>
+</ol>
+<h3>Medium-term</h3>
+<ol>
+<li>Refactor character storage to individual row updates</li>
+<li>Extract StoryWizard state into custom hooks</li>
+<li>Consolidate inline translations to central system</li>
+<li>Add pagination to admin users list</li>
+<li>Improve email error handling granularity</li>
+</ol>
+<hr>
+<p><em>Report generated by Claude Code audit system</em></p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>AUDIT_REPORT.md</code>.
+</footer>
+</body>
+</html>

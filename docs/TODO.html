@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TODO.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory TODO</h1>
+<h2>Bugs / High Priority</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Legal - add email <a href="mailto:legal@magicalstory.ch">legal@magicalstory.ch</a> &amp; <a href="mailto:privacy@magicalstory.ch">privacy@magicalstory.ch</a></li>
+<li><input disabled="" type="checkbox"> Legal - block US</li>
+<li><input disabled="" type="checkbox"> Legal - delete images after 30 days</li>
+<li><input disabled="" type="checkbox"> Avatar creation flow: First generate without physical details, then read from avatar, then use for future avatars</li>
+</ul>
+<hr>
+<h2>Features / Ideas</h2>
+<h3>User Experience</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Pop up to guide first time users through webpage</li>
+<li><input disabled="" type="checkbox"> Propose stories based on main character</li>
+<li><input disabled="" type="checkbox"> Allow to configure a 2nd story while first one is generating</li>
+<li><input disabled="" type="checkbox"> Avatar generation only upon Email verification</li>
+<li><input disabled="" type="checkbox"> Home page convert pictures to animated gifs</li>
+</ul>
+<h3>Image Generation</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Image evaluation for cover images (quality scoring)</li>
+<li><input disabled="" type="checkbox"> Scene prompt restructure: Instructions first, characters &amp; bible 2nd, story 3rd</li>
+</ul>
+<hr>
+<h2>Technical Debt &amp; Refactoring</h2>
+<h3>Completed (2024-12)</h3>
+<h4>Security &amp; Validation</h4>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Rate limiting for <code>/log-error</code> endpoint</li>
+<li><input checked="" disabled="" type="checkbox"> File upload validation (size, MIME type)</li>
+<li><input checked="" disabled="" type="checkbox"> Password validation consistency (min 8 chars)</li>
+<li><input checked="" disabled="" type="checkbox"> Image regeneration rate limiting</li>
+</ul>
+<h4>Frontend</h4>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Extract wizard step components (WizardStep1-4)</li>
+<li><input checked="" disabled="" type="checkbox"> Extract StoryDisplay modals (SceneEditModal, ImageHistoryModal, EnlargedImageModal)</li>
+<li><input checked="" disabled="" type="checkbox"> Replace all alert() calls with Toast notifications</li>
+<li><input checked="" disabled="" type="checkbox"> Extract CreditsModal from Navigation.tsx</li>
+<li><input checked="" disabled="" type="checkbox"> Create useDeveloperMode hook</li>
+</ul>
+<h3>Pending - Server Route Extraction</h3>
+<h4>Extract Webhook Handlers (~450 lines)</h4>
+<p><strong>From:</strong> <code>server.js</code> → <strong>To:</strong> <code>server/routes/webhooks.js</code></p>
+<ul>
+<li><code>POST /api/stripe/webhook</code></li>
+<li><code>POST /api/gelato/webhook</code></li>
+</ul>
+<h4>Extract PDF Generation (~700 lines)</h4>
+<p><strong>From:</strong> <code>server.js</code> → <strong>To:</strong> <code>server/routes/pdf.js</code></p>
+<ul>
+<li><code>GET /api/stories/:id/pdf</code></li>
+<li><code>GET /api/stories/:id/print-pdf</code></li>
+<li><code>POST /api/generate-pdf</code></li>
+<li><code>POST /api/generate-book-pdf</code></li>
+</ul>
+<h4>Extract Payment Endpoints (~250 lines)</h4>
+<p><strong>From:</strong> <code>server.js</code> → <strong>To:</strong> <code>server/routes/payments.js</code></p>
+<ul>
+<li><code>GET /api/pricing</code></li>
+<li><code>POST /api/stripe/create-checkout-session</code></li>
+<li><code>POST /api/stripe/create-credits-checkout</code></li>
+</ul>
+<h4>Extract Job Management (~530 lines)</h4>
+<p><strong>From:</strong> <code>server.js</code> → <strong>To:</strong> <code>server/routes/jobs.js</code></p>
+<ul>
+<li><code>POST /api/jobs/create-story</code></li>
+<li><code>GET /api/jobs/:jobId/status</code></li>
+<li><code>POST /api/jobs/:jobId/cancel</code></li>
+</ul>
+<h3>Pending - Frontend Refactoring (Optional)</h3>
+<h4>URL Structure Refactoring</h4>
+<p>Currently <code>/create</code> handles everything (wizard, generation, viewing). Split into cleaner routes:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>/create</code> - wizard for creating stories (steps 1-5 only)</li>
+<li><input disabled="" type="checkbox"> <code>/story/:id</code> - viewing a completed story</li>
+<li><input disabled="" type="checkbox"> <code>/story/:id/generating</code> or <code>/generating/:jobId</code> - watching generation progress</li>
+</ul>
+<p>Benefits:</p>
+<ul>
+<li>StoryWizard.tsx becomes much simpler (just wizard steps)</li>
+<li>Cleaner, shareable URLs</li>
+<li>Separation of concerns</li>
+<li>Easier navigation to ongoing generation from anywhere</li>
+</ul>
+<h4>StoryWizard.tsx (~3800 lines)</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Extract <code>useWizardNavigation.ts</code> hook</li>
+<li><input disabled="" type="checkbox"> Extract <code>WizardStep5Generation.tsx</code></li>
+</ul>
+<h4>StoryDisplay.tsx (2341 lines)</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Extract <code>TitleEditor.tsx</code></li>
+<li><input disabled="" type="checkbox"> Extract <code>PageDisplay.tsx</code></li>
+</ul>
+<h4>CharacterForm.tsx (750 lines)</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Extract step components</li>
+</ul>
+<h3>Pending - Performance</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Admin users pagination</li>
+<li><input disabled="" type="checkbox"> Gelato batch queries</li>
+<li><input disabled="" type="checkbox"> Move MODEL_PRICING to config file</li>
+</ul>
+<h3>Duplicate Endpoints (Fix Required)</h3>
+<p><strong>1. <code>PATCH /api/stories/:id/page/:pageNum</code></strong> - Defined in TWO places:</p>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>Line</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server.js</code></td>
+<td>3294</td>
+<td>Active (hit first)</td>
+</tr>
+<tr>
+<td><code>server/routes/stories.js</code></td>
+<td>741</td>
+<td>Active (never reached)</td>
+</tr>
+</tbody></table>
+<p><strong>Action:</strong> Remove from <code>server.js</code>, keep only in <code>stories.js</code></p>
+<p><strong>2. Print Products Admin</strong> - Two different paths for same functionality:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/admin/print-provider/products</code></td>
+<td><code>server.js:3799</code></td>
+<td>Legacy</td>
+</tr>
+<tr>
+<td><code>/api/admin/print-products/</code></td>
+<td><code>admin/print-products.js</code></td>
+<td>Current</td>
+</tr>
+</tbody></table>
+<p><strong>Action:</strong> Deprecate <code>/print-provider/</code> path, use <code>/print-products/</code> only</p>
+<h3>Missing Route Exports</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <code>avatarsRoutes</code> loaded directly in server.js, not exported from <code>server/routes/index.js</code></li>
+</ul>
+<h3>Character Attributes - Legacy Cleanup</h3>
+<p><strong>Physical Traits (17 active + 1 deprecated):</strong></p>
+<ul>
+<li>Active: <code>height</code>, <code>build</code>, <code>face</code>, <code>eyeColor</code>/<code>eyeColorHex</code>, <code>hairColor</code>/<code>hairColorHex</code>, <code>hairLength</code>, <code>hairStyle</code>, <code>facialHair</code>, <code>skinTone</code>/<code>skinUndertone</code>/<code>skinToneHex</code>, <code>other</code>, <code>detailedHairAnalysis</code>, <code>apparentAge</code></li>
+<li><input disabled="" type="checkbox"> <strong>DEPRECATED:</strong> <code>hair</code> field - remove and migrate to <code>hairColor</code> + <code>hairLength</code> + <code>hairStyle</code></li>
+</ul>
+<p><strong>Clothing Attributes (4 active + 1 deprecated):</strong></p>
+<ul>
+<li>Active: <code>upperBody</code>, <code>lowerBody</code>, <code>shoes</code>, <code>fullBody</code> (mutually exclusive)</li>
+<li>Categories: <code>winter</code>, <code>standard</code>, <code>summer</code>, <code>formal</code></li>
+<li><input disabled="" type="checkbox"> <strong>DEPRECATED:</strong> <code>clothing.current</code> (free-text) - remove, use <code>clothing.structured</code> only</li>
+</ul>
+<p><strong>Snake_case vs camelCase (API compatibility):</strong></p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Standardized to camelCase: <code>physicalTraitsSource</code>, <code>generatedOutfits</code>, <code>structuredClothing</code>, <code>ageCategory</code></li>
+<li>Physical trait fields still sent as snake_case by frontend but handled by server-side <code>normalizePhysical()</code> which migrates them to <code>physical.*</code> camelCase</li>
+</ul>
+<p><strong>Deprecated Type Aliases (TODO: Remove):</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>ClothingAvatars</code> → <code>CharacterAvatars</code></li>
+<li><input disabled="" type="checkbox"> <code>PhysicalFeatures</code> → <code>PhysicalTraits</code></li>
+<li>Location: <code>client/src/types/character.ts</code> (lines 303-306)</li>
+</ul>
+<p><strong>Key Files:</strong></p>
+<ul>
+<li><code>client/src/types/character.ts</code> - Type definitions</li>
+<li><code>client/src/services/characterService.ts</code> - API mapping with legacy support</li>
+<li><code>prompts/avatar-evaluation.txt</code> - Extraction prompt with field values</li>
+</ul>
+<hr>
+<h2>Future Improvements</h2>
+<h3>Image Inpainting Alternatives</h3>
+<p><strong>Current Implementation:</strong></p>
+<ul>
+<li>Model: Gemini 2.5 Flash Image (~$0.04/image)</li>
+<li>Limitation: No true mask support - uses text-based coordinates</li>
+<li>Issue: Large area repairs (&gt;25%) fail - we skip them</li>
+</ul>
+<p><strong>Recommended: Stability AI SDXL</strong></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cost</td>
+<td>~$0.01/image (4x cheaper)</td>
+</tr>
+<tr>
+<td>Setup</td>
+<td>Simple API key</td>
+</tr>
+<tr>
+<td>Features</td>
+<td>True binary mask support</td>
+</tr>
+</tbody></table>
+<p><strong>Alternative APIs:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Model</th>
+<th>Cost</th>
+<th>Mask Support</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Google Imagen 3</td>
+<td>Imagen 3</td>
+<td>$0.04</td>
+<td>Binary + dilation</td>
+</tr>
+<tr>
+<td>Google Imagen 3</td>
+<td>Imagen 3 Fast</td>
+<td>$0.02</td>
+<td>Binary + dilation</td>
+</tr>
+<tr>
+<td>Stability AI</td>
+<td>SDXL Inpaint</td>
+<td>$0.01</td>
+<td>Full mask</td>
+</tr>
+<tr>
+<td>Replicate</td>
+<td>FLUX Fill Pro</td>
+<td>$0.05</td>
+<td>Paint-based</td>
+</tr>
+<tr>
+<td>OpenAI</td>
+<td>GPT Image 1 Mini</td>
+<td>$0.005-0.05</td>
+<td>Mask editing</td>
+</tr>
+</tbody></table>
+<h3>Face Identity Preservation (Research Completed)</h3>
+<p><strong>PuLID-FLUX Testing Results (Jan 2025): NOT Recommended</strong></p>
+<p>Problems found:</p>
+<ul>
+<li>Smooth/painterly skin - looks like digital paintings</li>
+<li>Identity drift - randomly adds/changes features</li>
+<li>Pose prompts ignored - always front-facing</li>
+<li>Unpredictable results</li>
+<li>~$0.07/image for mediocre quality</li>
+</ul>
+<p><strong>Conclusion:</strong> Stick with Gemini for avatar generation. See <code>docs/FACE-EMBEDDINGS-RESEARCH.md</code> for full details.</p>
+<hr>
+<h2>Completed (Archive)</h2>
+<details>
+<summary>Previously completed items</summary><ul>
+<li><input checked="" disabled="" type="checkbox"> Cover image at start of prompt</li>
+<li><input checked="" disabled="" type="checkbox"> Show user &quot;my orders&quot;</li>
+<li><input checked="" disabled="" type="checkbox"> Order handling Emails</li>
+<li><input checked="" disabled="" type="checkbox"> Email language</li>
+<li><input checked="" disabled="" type="checkbox"> Height in scene generation (cm → relative height)</li>
+<li><input checked="" disabled="" type="checkbox"> Cover images keep clothing style</li>
+<li><input checked="" disabled="" type="checkbox"> &quot;Deine Geschichte&quot; as title</li>
+<li><input checked="" disabled="" type="checkbox"> PDF line spacing</li>
+<li><input checked="" disabled="" type="checkbox"> ä in Text</li>
+<li><input checked="" disabled="" type="checkbox"> Image format consistency</li>
+<li><input checked="" disabled="" type="checkbox"> Token limit 9200</li>
+<li><input checked="" disabled="" type="checkbox"> Plot truncation at 24 pages</li>
+<li><input checked="" disabled="" type="checkbox"> Story book print</li>
+<li><input checked="" disabled="" type="checkbox"> Pass only needed characters</li>
+<li><input checked="" disabled="" type="checkbox"> Image prompt language (German)</li>
+<li><input checked="" disabled="" type="checkbox"> Steampunk photo</li>
+<li><input checked="" disabled="" type="checkbox"> Watercolor style</li>
+<li><input checked="" disabled="" type="checkbox"> Sequential images</li>
+<li><input checked="" disabled="" type="checkbox"> New story clearing</li>
+<li><input checked="" disabled="" type="checkbox"> Relationships narrow box</li>
+<li><input checked="" disabled="" type="checkbox"> Character consistency for non-main characters</li>
+<li><input checked="" disabled="" type="checkbox"> Avatar placement (2 next to each other)</li>
+<li><input checked="" disabled="" type="checkbox"> Next button slow on relationships</li>
+<li><input checked="" disabled="" type="checkbox"> Bad example crowd</li>
+<li><input checked="" disabled="" type="checkbox"> Store character performance</li>
+<li><input checked="" disabled="" type="checkbox"> Thumbnail padding</li>
+<li><input checked="" disabled="" type="checkbox"> Email to rogerfischer</li>
+<li><input checked="" disabled="" type="checkbox"> Email direct link to story</li>
+<li><input checked="" disabled="" type="checkbox"> Printing functionality</li>
+<li><input checked="" disabled="" type="checkbox"> Text length definition</li>
+<li><input checked="" disabled="" type="checkbox"> &quot;Meine Geschichten&quot; centering, back button</li>
+<li><input checked="" disabled="" type="checkbox"> Admin dashboard</li>
+<li><input checked="" disabled="" type="checkbox"> Print book</li>
+<li><input checked="" disabled="" type="checkbox"> Page count</li>
+<li><input checked="" disabled="" type="checkbox"> Multiple stories in one book</li>
+<li><input checked="" disabled="" type="checkbox"> PDF text overflow, font scaling</li>
+<li><input checked="" disabled="" type="checkbox"> Password login</li>
+<li><input checked="" disabled="" type="checkbox"> Remove test for 10 images</li>
+<li><input checked="" disabled="" type="checkbox"> Pages in story generation</li>
+<li><input checked="" disabled="" type="checkbox"> Hardcover and Softcover</li>
+<li><input checked="" disabled="" type="checkbox"> Buy credits</li>
+<li><input checked="" disabled="" type="checkbox"> Generate story prompt</li>
+<li><input checked="" disabled="" type="checkbox"> Art styles images</li>
+<li><input checked="" disabled="" type="checkbox"> Art styles prompts</li>
+<li><input checked="" disabled="" type="checkbox"> Generate story button</li>
+<li><input checked="" disabled="" type="checkbox"> Home page pictures</li>
+<li><input checked="" disabled="" type="checkbox"> Remove character relations</li>
+<li><input checked="" disabled="" type="checkbox"> Privacy approval persistence</li>
+<li><input checked="" disabled="" type="checkbox"> Accept click area</li>
+<li><input checked="" disabled="" type="checkbox"> Person detection</li>
+<li><input checked="" disabled="" type="checkbox"> Home page layout</li>
+<li><input checked="" disabled="" type="checkbox"> Model display in developer view</li>
+<li><input checked="" disabled="" type="checkbox"> Status check on back navigation</li>
+<li><input checked="" disabled="" type="checkbox"> Back button navigation</li>
+<li><input checked="" disabled="" type="checkbox"> Secondary characters in scene composition</li>
+</ul>
+</details>
+</main>
+<footer class="doc-footer">
+  Rendered from <code>TODO.md</code>.
+</footer>
+</body>
+</html>

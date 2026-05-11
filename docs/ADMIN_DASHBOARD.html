@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADMIN_DASHBOARD.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Admin Dashboard Design Document</h1>
+<h2>Overview</h2>
+<p>This document outlines a comprehensive analytics and monitoring dashboard for the MagicalStory platform. The dashboard will provide real-time insights into user behavior, system performance, revenue metrics, and operational health.</p>
+<hr>
+<h2>Core Metrics &amp; KPIs</h2>
+<h3>1. User Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Total Users</strong>: Count of all registered users</li>
+<li><strong>Active Users</strong>: Users who generated a story in the last 30 days</li>
+<li><strong>New Users</strong>: Registrations in last 24h / 7d / 30d</li>
+<li><strong>User Retention</strong>: % of users who return after first story</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>User Growth Rate</strong>: Week-over-week and month-over-month</li>
+<li><strong>Average Stories per User</strong>: Distribution histogram</li>
+<li><strong>Power Users</strong>: Users with 10+ stories (identify superfans)</li>
+<li><strong>Dormant Users</strong>: Registered but never generated a story</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>User growth</strong> shows product-market fit</li>
+<li><strong>Retention</strong> indicates if users find value</li>
+<li><strong>Power users</strong> are potential testimonials/case studies</li>
+<li><strong>Dormant users</strong> represent optimization opportunity</li>
+</ul>
+<h4>SQL Queries</h4>
+<pre><code class="language-sql">-- Total users
+SELECT COUNT(*) as total_users FROM users;
+
+-- Active users (last 30 days)
+SELECT COUNT(DISTINCT user_id) as active_users
+FROM stories
+WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;;
+
+-- New users by period
+SELECT
+  DATE(created_at) as date,
+  COUNT(*) as new_users
+FROM users
+WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- User retention (users who came back)
+SELECT
+  COUNT(DISTINCT u.id) as retained_users,
+  COUNT(DISTINCT u.id) * 100.0 / (SELECT COUNT(*) FROM users) as retention_rate
+FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM stories s1
+  WHERE s1.user_id = u.id
+  AND DATE(s1.created_at) = DATE(u.created_at)
+)
+AND EXISTS (
+  SELECT 1 FROM stories s2
+  WHERE s2.user_id = u.id
+  AND DATE(s2.created_at) &gt; DATE(u.created_at)
+);
+
+-- Stories per user distribution
+SELECT
+  stories_count,
+  COUNT(*) as users_with_this_many_stories
+FROM (
+  SELECT user_id, COUNT(*) as stories_count
+  FROM stories
+  GROUP BY user_id
+) story_counts
+GROUP BY stories_count
+ORDER BY stories_count;
+</code></pre>
+<hr>
+<h3>2. Story Generation Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Total Stories Generated</strong>: All-time count</li>
+<li><strong>Stories Today/Week/Month</strong>: Time-based breakdown</li>
+<li><strong>Success Rate</strong>: % of stories that completed successfully</li>
+<li><strong>Average Generation Time</strong>: By mode (step-by-step vs pipeline)</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Stories by Language</strong>: German vs French vs English breakdown</li>
+<li><strong>Stories by Theme</strong>: Which themes are most popular</li>
+<li><strong>Stories by Page Count</strong>: Distribution (8, 10, 12 pages)</li>
+<li><strong>Stories by Mode</strong>: Step-by-step vs Pipeline usage</li>
+<li><strong>Failed Stories</strong>: Count and failure reasons</li>
+</ul>
+<h4>Advanced Metrics</h4>
+<ul>
+<li><strong>Peak Generation Times</strong>: When is the system busiest</li>
+<li><strong>Story Completion Rate</strong>: % of started stories that finish</li>
+<li><strong>Re-generation Rate</strong>: How often users regenerate the same story</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>Generation time</strong> affects user satisfaction</li>
+<li><strong>Success rate</strong> indicates system stability</li>
+<li><strong>Language/theme breakdown</strong> shows which markets to focus on</li>
+<li><strong>Failure analysis</strong> helps prioritize bug fixes</li>
+</ul>
+<h4>SQL Queries</h4>
+<pre><code class="language-sql">-- Total stories by period
+SELECT
+  DATE(created_at) as date,
+  COUNT(*) as stories_generated
+FROM stories
+WHERE created_at &gt; NOW() - INTERVAL &#39;90 days&#39;
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- Success rate (assuming we track failures)
+SELECT
+  SUM(CASE WHEN status = &#39;completed&#39; THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate
+FROM story_jobs
+WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;;
+
+-- Stories by language (parsing from story data JSON)
+SELECT
+  data-&gt;&gt;&#39;language&#39; as language,
+  COUNT(*) as story_count
+FROM stories
+GROUP BY data-&gt;&gt;&#39;language&#39;
+ORDER BY story_count DESC;
+
+-- Stories by theme
+SELECT
+  data-&gt;&gt;&#39;theme&#39; as theme,
+  COUNT(*) as story_count
+FROM stories
+GROUP BY data-&gt;&gt;&#39;theme&#39;
+ORDER BY story_count DESC
+LIMIT 20;
+
+-- Average generation time by mode
+SELECT
+  generation_mode,
+  AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) as avg_seconds
+FROM story_jobs
+WHERE status = &#39;completed&#39;
+GROUP BY generation_mode;
+
+-- Peak usage hours
+SELECT
+  EXTRACT(HOUR FROM created_at) as hour_of_day,
+  COUNT(*) as stories_generated
+FROM stories
+WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;
+GROUP BY EXTRACT(HOUR FROM created_at)
+ORDER BY hour_of_day;
+</code></pre>
+<hr>
+<h3>3. Image Generation Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Total Images Generated</strong>: All images across all stories</li>
+<li><strong>Images by Type</strong>: Cover / Pages / Back Cover breakdown</li>
+<li><strong>Image Success Rate</strong>: % of images generated successfully</li>
+<li><strong>Average Image Generation Time</strong>: Per image</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Failed Image Generations</strong>: Count and error types</li>
+<li><strong>Images per Story</strong>: Average and distribution</li>
+<li><strong>Concurrent Image Generations</strong>: If using parallel optimization</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>Image failures</strong> are the #1 cause of story failures</li>
+<li><strong>Generation time</strong> is the main bottleneck for overall speed</li>
+<li><strong>Concurrent generations</strong> shows if optimization is working</li>
+</ul>
+<h4>Estimated Calculations</h4>
+<p>Since images aren&#39;t tracked separately in the current database:</p>
+<pre><code class="language-javascript">// Estimate from stories
+const pagesPerStory = story.pages || 10;
+const imagesPerStory = pagesPerStory + 3; // pages + front cover + back cover + page 0
+const totalImages = totalStories * avgImagesPerStory;
+</code></pre>
+<h4>Future Database Schema</h4>
+<pre><code class="language-sql">CREATE TABLE image_generations (
+  id SERIAL PRIMARY KEY,
+  story_id INTEGER REFERENCES stories(id),
+  image_type VARCHAR(50), -- &#39;front_cover&#39;, &#39;page&#39;, &#39;back_cover&#39;, &#39;page_0&#39;
+  page_number INTEGER,
+  generation_time_ms INTEGER,
+  status VARCHAR(50), -- &#39;success&#39;, &#39;failed&#39;, &#39;retried&#39;
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<hr>
+<h3>4. Revenue &amp; Order Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Total Revenue</strong>: All-time and by period (day/week/month)</li>
+<li><strong>Total Orders</strong>: Completed orders count</li>
+<li><strong>Conversion Rate</strong>: Stories → Paid Orders %</li>
+<li><strong>Average Order Value (AOV)</strong>: Revenue / Orders</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Pending Orders</strong>: Payment initiated but not completed</li>
+<li><strong>Failed Payments</strong>: Count and reasons</li>
+<li><strong>Revenue by Country</strong>: Geographic breakdown</li>
+<li><strong>Revenue Trend</strong>: Growth over time</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>Revenue</strong> is the ultimate success metric</li>
+<li><strong>Conversion rate</strong> shows product value perception</li>
+<li><strong>AOV</strong> helps with pricing optimization</li>
+<li><strong>Geographic data</strong> shows where to focus marketing</li>
+</ul>
+<h4>SQL Queries</h4>
+<pre><code class="language-sql">-- Total revenue
+SELECT
+  SUM(amount_total / 100.0) as total_revenue, -- Stripe amounts in cents
+  currency
+FROM orders
+WHERE payment_status = &#39;paid&#39;
+GROUP BY currency;
+
+-- Revenue by period
+SELECT
+  DATE(created_at) as date,
+  SUM(amount_total / 100.0) as revenue,
+  COUNT(*) as orders,
+  currency
+FROM orders
+WHERE payment_status = &#39;paid&#39;
+AND created_at &gt; NOW() - INTERVAL &#39;90 days&#39;
+GROUP BY DATE(created_at), currency
+ORDER BY date DESC;
+
+-- Conversion rate
+SELECT
+  (SELECT COUNT(*) FROM orders WHERE payment_status = &#39;paid&#39;) * 100.0 /
+  (SELECT COUNT(*) FROM stories) as conversion_rate_percent;
+
+-- Average Order Value
+SELECT
+  AVG(amount_total / 100.0) as average_order_value,
+  currency
+FROM orders
+WHERE payment_status = &#39;paid&#39;
+GROUP BY currency;
+
+-- Revenue by country
+SELECT
+  shipping_country as country,
+  COUNT(*) as orders,
+  SUM(amount_total / 100.0) as revenue,
+  currency
+FROM orders
+WHERE payment_status = &#39;paid&#39;
+GROUP BY shipping_country, currency
+ORDER BY revenue DESC;
+
+-- Orders by status
+SELECT
+  payment_status,
+  COUNT(*) as order_count
+FROM orders
+GROUP BY payment_status;
+</code></pre>
+<hr>
+<h3>5. API Usage &amp; Cost Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Total API Calls</strong>: Claude + Gemini combined</li>
+<li><strong>API Calls by Type</strong>: Text generation vs Image generation</li>
+<li><strong>Token Usage</strong>: Input + Output tokens (Claude)</li>
+<li><strong>Estimated API Costs</strong>: Based on pricing</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Cost per Story</strong>: Average API cost per generated story</li>
+<li><strong>API Error Rate</strong>: Failed calls %</li>
+<li><strong>API Response Time</strong>: Average latency</li>
+</ul>
+<h4>Cost Calculation</h4>
+<pre><code class="language-javascript">// Claude API Costs (Sonnet 4.5)
+const inputCostPer1M = 3.00;  // $3 per 1M input tokens
+const outputCostPer1M = 15.00; // $15 per 1M output tokens
+
+// Gemini API Costs (for images)
+const costPerImage = 0.05; // Estimate
+
+// Per Story Estimate
+const avgOutlineTokens = 1000;
+const avgStoryTokens = 64000;
+const avgImages = 13;
+
+const costPerStory =
+  (avgOutlineTokens / 1000000 * outputCostPer1M) +
+  (avgStoryTokens / 1000000 * outputCostPer1M) +
+  (avgImages * costPerImage);
+
+// $1.00 + $0.65 = ~$1.65 per story
+</code></pre>
+<h4>Future Tracking Table</h4>
+<pre><code class="language-sql">CREATE TABLE api_usage_metrics (
+  id SERIAL PRIMARY KEY,
+  story_id INTEGER REFERENCES stories(id),
+  api_provider VARCHAR(50), -- &#39;claude&#39;, &#39;gemini&#39;
+  api_operation VARCHAR(100), -- &#39;generate_outline&#39;, &#39;generate_story&#39;, &#39;generate_image&#39;
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  response_time_ms INTEGER,
+  status VARCHAR(50),
+  error_message TEXT,
+  estimated_cost_usd DECIMAL(10,4),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<hr>
+<h3>6. System Performance Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Average Story Generation Time</strong>: Total time from start to finish</li>
+<li><strong>System Uptime</strong>: % of time system is available</li>
+<li><strong>Error Rate</strong>: % of requests that fail</li>
+<li><strong>Active Story Jobs</strong>: Currently processing stories</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Queue Length</strong>: Stories waiting to be processed</li>
+<li><strong>Database Performance</strong>: Query execution times</li>
+<li><strong>Memory Usage</strong>: Server memory consumption</li>
+<li><strong>CPU Usage</strong>: Server CPU utilization</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>Generation time</strong> affects user satisfaction</li>
+<li><strong>Uptime</strong> is critical for reliability</li>
+<li><strong>Error rates</strong> show stability</li>
+<li><strong>Resource usage</strong> indicates when to scale</li>
+</ul>
+<h4>Monitoring Queries</h4>
+<pre><code class="language-sql">-- Active story jobs
+SELECT
+  status,
+  COUNT(*) as job_count
+FROM story_jobs
+WHERE status != &#39;completed&#39; AND status != &#39;failed&#39;
+GROUP BY status;
+
+-- Average processing time by status
+SELECT
+  status,
+  AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_seconds
+FROM story_jobs
+WHERE created_at &gt; NOW() - INTERVAL &#39;7 days&#39;
+GROUP BY status;
+
+-- Recent errors
+SELECT
+  error_message,
+  COUNT(*) as occurrence_count
+FROM story_jobs
+WHERE status = &#39;failed&#39;
+AND created_at &gt; NOW() - INTERVAL &#39;7 days&#39;
+GROUP BY error_message
+ORDER BY occurrence_count DESC
+LIMIT 10;
+</code></pre>
+<hr>
+<h3>7. User Engagement Metrics</h3>
+<h4>Primary Metrics</h4>
+<ul>
+<li><strong>Daily Active Users (DAU)</strong>: Unique users per day</li>
+<li><strong>Weekly Active Users (WAU)</strong>: Unique users per week</li>
+<li><strong>Monthly Active Users (MAU)</strong>: Unique users per month</li>
+<li><strong>DAU/MAU Ratio</strong>: Stickiness indicator</li>
+</ul>
+<h4>Secondary Metrics</h4>
+<ul>
+<li><strong>Session Duration</strong>: Time spent on site</li>
+<li><strong>Actions per Session</strong>: Stories generated per visit</li>
+<li><strong>Return Visit Rate</strong>: % of users who come back</li>
+<li><strong>Feature Adoption</strong>: Pipeline vs Step-by-step usage</li>
+</ul>
+<h4>Why These Metrics Matter</h4>
+<ul>
+<li><strong>DAU/MAU</strong> shows how sticky the product is</li>
+<li><strong>Session metrics</strong> show engagement depth</li>
+<li><strong>Feature adoption</strong> guides product development</li>
+</ul>
+<h4>SQL Queries</h4>
+<pre><code class="language-sql">-- Daily/Weekly/Monthly Active Users
+SELECT
+  DATE(created_at) as date,
+  COUNT(DISTINCT user_id) as dau
+FROM stories
+WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- DAU/MAU Ratio (Stickiness)
+WITH mau AS (
+  SELECT COUNT(DISTINCT user_id) as monthly_active
+  FROM stories
+  WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;
+),
+dau AS (
+  SELECT AVG(daily_active) as avg_daily_active
+  FROM (
+    SELECT COUNT(DISTINCT user_id) as daily_active
+    FROM stories
+    WHERE created_at &gt; NOW() - INTERVAL &#39;30 days&#39;
+    GROUP BY DATE(created_at)
+  ) daily_counts
+)
+SELECT
+  dau.avg_daily_active,
+  mau.monthly_active,
+  (dau.avg_daily_active / mau.monthly_active) * 100 as stickiness_percent
+FROM dau, mau;
+</code></pre>
+<hr>
+<h2>Dashboard Layout Design</h2>
+<h3>Page Structure</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│  MAGICAL STORY - Admin Dashboard                            │
+│  ┌─────────────┬─────────────┬─────────────┬──────────────┐│
+│  │ Total Users │Total Stories│Total Revenue│   Uptime     ││
+│  │   1,234     │   5,678     │  $12,345   │   99.9%      ││
+│  │  +15% ↑     │  +23% ↑     │  +45% ↑    │              ││
+│  └─────────────┴─────────────┴─────────────┴──────────────┘│
+│                                                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ 📊 Stories Generated (Last 30 Days)                   │  │
+│  │ [Line Chart showing daily story counts]               │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌──────────────────────┐  ┌──────────────────────────────┐│
+│  │ 👥 User Growth       │  │ 💰 Revenue Trend             ││
+│  │ [Chart]              │  │ [Chart]                      ││
+│  └──────────────────────┘  └──────────────────────────────┘│
+│                                                              │
+│  ┌──────────────────────┐  ┌──────────────────────────────┐│
+│  │ 🌍 Stories by Lang   │  │ 🎨 Popular Themes            ││
+│  │ German:    45%       │  │ 1. Fairy Tale     123        ││
+│  │ English:   35%       │  │ 2. Adventure      98         ││
+│  │ French:    20%       │  │ 3. Fantasy        87         ││
+│  └──────────────────────┘  └──────────────────────────────┘│
+│                                                              │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ ⚡ System Performance                                   ││
+│  │ Avg Generation Time: 45s    API Success Rate: 98.5%    ││
+│  │ Active Jobs: 3              Queue Length: 0            ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Visual Components</h3>
+<h4>1. Summary Cards (Top Row)</h4>
+<ul>
+<li>Large number with trend indicator</li>
+<li>Sparkline showing 7-day trend</li>
+<li>Color-coded (green for positive, red for negative)</li>
+</ul>
+<h4>2. Time Series Charts</h4>
+<ul>
+<li>Line charts for trends over time</li>
+<li>Selectable time ranges (7d, 30d, 90d, 1y, All)</li>
+<li>Tooltips with exact values</li>
+<li>Export to CSV button</li>
+</ul>
+<h4>3. Distribution Charts</h4>
+<ul>
+<li>Pie charts for language/theme breakdown</li>
+<li>Bar charts for comparisons</li>
+<li>Interactive (click to drill down)</li>
+</ul>
+<h4>4. Real-time Status</h4>
+<ul>
+<li>Live updating metrics (WebSocket or polling)</li>
+<li>Color-coded health indicators</li>
+<li>Alert badges for critical issues</li>
+</ul>
+<hr>
+<h2>Technical Implementation</h2>
+<h3>Backend API Endpoints</h3>
+<pre><code class="language-javascript">// GET /api/admin/metrics/summary
+// Returns: Overall summary stats
+{
+  users: {
+    total: 1234,
+    active_30d: 456,
+    new_7d: 89,
+    growth_rate: 15.2
+  },
+  stories: {
+    total: 5678,
+    today: 23,
+    week: 156,
+    month: 678,
+    success_rate: 98.5
+  },
+  revenue: {
+    total: 12345.67,
+    currency: &quot;CHF&quot;,
+    month: 2345.67,
+    aov: 45.00,
+    conversion_rate: 8.5
+  },
+  system: {
+    uptime_percent: 99.9,
+    avg_generation_time: 45,
+    active_jobs: 3,
+    error_rate: 1.5
+  }
+}
+
+// GET /api/admin/metrics/stories?period=30d
+// Returns: Story generation data over time
+{
+  period: &quot;30d&quot;,
+  data: [
+    { date: &quot;2025-12-01&quot;, count: 45, avg_time: 42 },
+    { date: &quot;2025-12-02&quot;, count: 52, avg_time: 38 },
+    ...
+  ]
+}
+
+// GET /api/admin/metrics/users?period=30d
+// Returns: User growth data over time
+
+// GET /api/admin/metrics/revenue?period=30d
+// Returns: Revenue data over time
+
+// GET /api/admin/metrics/breakdown?type=language|theme|country
+// Returns: Distribution breakdowns
+</code></pre>
+<h3>Database Schema Updates</h3>
+<pre><code class="language-sql">-- Add indexes for performance
+CREATE INDEX idx_stories_created_at ON stories(created_at);
+CREATE INDEX idx_stories_user_id ON stories(user_id);
+CREATE INDEX idx_orders_payment_status ON orders(payment_status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+
+-- Create materialized view for expensive queries
+CREATE MATERIALIZED VIEW daily_metrics AS
+SELECT
+  DATE(created_at) as date,
+  COUNT(*) as stories_generated,
+  COUNT(DISTINCT user_id) as active_users,
+  AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_generation_time
+FROM stories
+GROUP BY DATE(created_at);
+
+-- Refresh daily
+CREATE OR REPLACE FUNCTION refresh_daily_metrics()
+RETURNS void AS $$
+BEGIN
+  REFRESH MATERIALIZED VIEW daily_metrics;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule refresh (using pg_cron or external scheduler)
+</code></pre>
+<h3>Caching Strategy</h3>
+<pre><code class="language-javascript">// Redis cache for expensive queries
+const cache = {
+  summary: { ttl: 60 }, // 1 minute
+  stories_30d: { ttl: 300 }, // 5 minutes
+  users_30d: { ttl: 300 },
+  revenue_30d: { ttl: 60 },
+  breakdown: { ttl: 600 } // 10 minutes
+};
+
+async function getMetrics(type, period) {
+  const cacheKey = `metrics:${type}:${period}`;
+
+  // Try cache first
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  // Query database
+  const data = await queryDatabase(type, period);
+
+  // Cache result
+  await redis.setex(
+    cacheKey,
+    cache[type]?.ttl || 300,
+    JSON.stringify(data)
+  );
+
+  return data;
+}
+</code></pre>
+<h3>Frontend Implementation</h3>
+<pre><code class="language-html">&lt;!-- Simple HTML dashboard page --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;MagicalStory Admin Dashboard&lt;/title&gt;
+  &lt;script src=&quot;https://cdn.jsdelivr.net/npm/chart.js&quot;&gt;&lt;/script&gt;
+  &lt;style&gt;
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card-value {
+      font-size: 36px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    .card-label {
+      color: #666;
+      font-size: 14px;
+    }
+    .trend-positive {
+      color: #22c55e;
+    }
+    .trend-negative {
+      color: #ef4444;
+    }
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;MagicalStory Admin Dashboard&lt;/h1&gt;
+
+  &lt;!-- Summary Cards --&gt;
+  &lt;div class=&quot;summary-cards&quot;&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;div class=&quot;card-label&quot;&gt;Total Users&lt;/div&gt;
+      &lt;div class=&quot;card-value&quot; id=&quot;total-users&quot;&gt;-&lt;/div&gt;
+      &lt;div id=&quot;users-trend&quot;&gt;-&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;div class=&quot;card-label&quot;&gt;Total Stories&lt;/div&gt;
+      &lt;div class=&quot;card-value&quot; id=&quot;total-stories&quot;&gt;-&lt;/div&gt;
+      &lt;div id=&quot;stories-trend&quot;&gt;-&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;div class=&quot;card-label&quot;&gt;Total Revenue&lt;/div&gt;
+      &lt;div class=&quot;card-value&quot; id=&quot;total-revenue&quot;&gt;-&lt;/div&gt;
+      &lt;div id=&quot;revenue-trend&quot;&gt;-&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;div class=&quot;card-label&quot;&gt;System Uptime&lt;/div&gt;
+      &lt;div class=&quot;card-value&quot; id=&quot;uptime&quot;&gt;-&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;!-- Charts --&gt;
+  &lt;div class=&quot;chart-container&quot;&gt;
+    &lt;h2&gt;Stories Generated (Last 30 Days)&lt;/h2&gt;
+    &lt;canvas id=&quot;stories-chart&quot;&gt;&lt;/canvas&gt;
+  &lt;/div&gt;
+
+  &lt;div style=&quot;display: grid; grid-template-columns: 1fr 1fr; gap: 20px;&quot;&gt;
+    &lt;div class=&quot;chart-container&quot;&gt;
+      &lt;h2&gt;User Growth&lt;/h2&gt;
+      &lt;canvas id=&quot;users-chart&quot;&gt;&lt;/canvas&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;chart-container&quot;&gt;
+      &lt;h2&gt;Revenue Trend&lt;/h2&gt;
+      &lt;canvas id=&quot;revenue-chart&quot;&gt;&lt;/canvas&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    // Fetch and display metrics
+    async function loadDashboard() {
+      try {
+        // Load summary
+        const summary = await fetch(&#39;/api/admin/metrics/summary&#39;).then(r =&gt; r.json());
+
+        document.getElementById(&#39;total-users&#39;).textContent = summary.users.total.toLocaleString();
+        document.getElementById(&#39;total-stories&#39;).textContent = summary.stories.total.toLocaleString();
+        document.getElementById(&#39;total-revenue&#39;).textContent = `${summary.revenue.currency} ${summary.revenue.total.toLocaleString()}`;
+        document.getElementById(&#39;uptime&#39;).textContent = `${summary.system.uptime_percent}%`;
+
+        // Trends
+        const userTrend = summary.users.growth_rate &gt; 0 ?
+          `&lt;span class=&quot;trend-positive&quot;&gt;↑ ${summary.users.growth_rate}%&lt;/span&gt;` :
+          `&lt;span class=&quot;trend-negative&quot;&gt;↓ ${Math.abs(summary.users.growth_rate)}%&lt;/span&gt;`;
+        document.getElementById(&#39;users-trend&#39;).innerHTML = userTrend;
+
+        // Load charts
+        await loadStoriesChart();
+        await loadUsersChart();
+        await loadRevenueChart();
+
+      } catch (error) {
+        console.error(&#39;Failed to load dashboard:&#39;, error);
+      }
+    }
+
+    async function loadStoriesChart() {
+      const data = await fetch(&#39;/api/admin/metrics/stories?period=30d&#39;).then(r =&gt; r.json());
+
+      new Chart(document.getElementById(&#39;stories-chart&#39;), {
+        type: &#39;line&#39;,
+        data: {
+          labels: data.data.map(d =&gt; d.date),
+          datasets: [{
+            label: &#39;Stories Generated&#39;,
+            data: data.data.map(d =&gt; d.count),
+            borderColor: &#39;#3b82f6&#39;,
+            tension: 0.1
+          }]
+        }
+      });
+    }
+
+    // Similar for other charts...
+
+    // Load dashboard on page load
+    loadDashboard();
+
+    // Refresh every minute
+    setInterval(loadDashboard, 60000);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<hr>
+<h2>Security Considerations</h2>
+<h3>Authentication &amp; Authorization</h3>
+<pre><code class="language-javascript">// Middleware to protect admin routes
+function requireAdmin(req, res, next) {
+  const user = req.user; // From authenticateToken middleware
+
+  if (!user || user.role !== &#39;admin&#39;) {
+    return res.status(403).json({ error: &#39;Admin access required&#39; });
+  }
+
+  next();
+}
+
+// Apply to all admin routes
+app.use(&#39;/api/admin/*&#39;, authenticateToken, requireAdmin);
+</code></pre>
+<h3>Sensitive Data Protection</h3>
+<ul>
+<li>Never expose individual user emails or personal data</li>
+<li>Aggregate data only (counts, averages, totals)</li>
+<li>Anonymize any user-specific information</li>
+<li>Use rate limiting on admin endpoints</li>
+</ul>
+<h3>Audit Logging</h3>
+<pre><code class="language-sql">CREATE TABLE admin_audit_log (
+  id SERIAL PRIMARY KEY,
+  admin_user_id INTEGER REFERENCES users(id),
+  action VARCHAR(100),
+  resource VARCHAR(100),
+  details JSONB,
+  ip_address INET,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Log all admin actions
+INSERT INTO admin_audit_log (admin_user_id, action, resource, ip_address)
+VALUES ($1, &#39;view_dashboard&#39;, &#39;metrics&#39;, $2);
+</code></pre>
+<hr>
+<h2>Performance Optimization</h2>
+<h3>Query Optimization</h3>
+<ol>
+<li><strong>Use Materialized Views</strong> for expensive aggregations</li>
+<li><strong>Add Indexes</strong> on commonly queried columns</li>
+<li><strong>Implement Caching</strong> with Redis</li>
+<li><strong>Use Connection Pooling</strong> for database connections</li>
+<li><strong>Batch Queries</strong> instead of N+1 queries</li>
+</ol>
+<h3>Caching Strategy</h3>
+<pre><code class="language-javascript">// Multi-level cache
+const cache = {
+  // Level 1: In-memory (fastest, 30 seconds)
+  memory: new Map(),
+
+  // Level 2: Redis (fast, 5 minutes)
+  redis: redisClient,
+
+  // Level 3: Database (slowest)
+  db: dbPool
+};
+
+async function getCachedMetric(key, queryFn) {
+  // Try memory first
+  if (cache.memory.has(key)) {
+    const { data, expires } = cache.memory.get(key);
+    if (Date.now() &lt; expires) {
+      return data;
+    }
+  }
+
+  // Try Redis
+  const redisData = await cache.redis.get(key);
+  if (redisData) {
+    const data = JSON.parse(redisData);
+    cache.memory.set(key, { data, expires: Date.now() + 30000 });
+    return data;
+  }
+
+  // Query database
+  const data = await queryFn();
+
+  // Cache in both layers
+  await cache.redis.setex(key, 300, JSON.stringify(data));
+  cache.memory.set(key, { data, expires: Date.now() + 30000 });
+
+  return data;
+}
+</code></pre>
+<h3>Background Jobs</h3>
+<p>For expensive calculations, use background jobs:</p>
+<pre><code class="language-javascript">// Update metrics every hour
+cron.schedule(&#39;0 * * * *&#39;, async () =&gt; {
+  console.log(&#39;Updating dashboard metrics...&#39;);
+
+  const metrics = {
+    summary: await calculateSummaryMetrics(),
+    stories_30d: await calculateStoriesMetrics(30),
+    users_30d: await calculateUsersMetrics(30),
+    revenue_30d: await calculateRevenueMetrics(30)
+  };
+
+  // Cache results
+  for (const [key, value] of Object.entries(metrics)) {
+    await redis.setex(`metrics:${key}`, 3600, JSON.stringify(value));
+  }
+
+  console.log(&#39;Metrics updated successfully&#39;);
+});
+</code></pre>
+<hr>
+<h2>Alert System</h2>
+<h3>Critical Alerts</h3>
+<p>Configure alerts for:</p>
+<ol>
+<li><strong>Error Rate &gt; 5%</strong>: System health issue</li>
+<li><strong>Generation Time &gt; 120s</strong>: Performance degradation</li>
+<li><strong>API Failure Rate &gt; 10%</strong>: External dependency issue</li>
+<li><strong>No Stories Generated for 1 hour</strong>: System down</li>
+<li><strong>Database Connection Failures</strong>: Infrastructure issue</li>
+</ol>
+<h3>Alert Implementation</h3>
+<pre><code class="language-javascript">// Simple email alerts
+async function checkAlerts() {
+  const metrics = await getRecentMetrics();
+
+  if (metrics.error_rate &gt; 0.05) {
+    await sendAlert({
+      type: &#39;critical&#39;,
+      title: &#39;High Error Rate&#39;,
+      message: `Error rate is ${(metrics.error_rate * 100).toFixed(1)}%`,
+      metric: metrics
+    });
+  }
+
+  if (metrics.avg_generation_time &gt; 120) {
+    await sendAlert({
+      type: &#39;warning&#39;,
+      title: &#39;Slow Generation Times&#39;,
+      message: `Average generation time is ${metrics.avg_generation_time}s`,
+      metric: metrics
+    });
+  }
+}
+
+// Run every 5 minutes
+setInterval(checkAlerts, 5 * 60 * 1000);
+</code></pre>
+<hr>
+<h2>Future Enhancements</h2>
+<h3>Phase 2 Features</h3>
+<ol>
+<li><p><strong>User Segmentation</strong></p>
+<ul>
+<li>Group users by behavior (power users, trial users, etc.)</li>
+<li>Cohort analysis (users who joined in same week)</li>
+<li>Funnel visualization (registration → story → order)</li>
+</ul>
+</li>
+<li><p><strong>A/B Testing Dashboard</strong></p>
+<ul>
+<li>Track experiment results</li>
+<li>Compare conversion rates between variants</li>
+<li>Statistical significance calculator</li>
+</ul>
+</li>
+<li><p><strong>Revenue Analytics</strong></p>
+<ul>
+<li>LTV (Lifetime Value) per user</li>
+<li>Churn analysis</li>
+<li>Subscription metrics (if adding subscriptions)</li>
+</ul>
+</li>
+<li><p><strong>Advanced Charts</strong></p>
+<ul>
+<li>Heat maps for activity patterns</li>
+<li>Funnel charts for conversion flow</li>
+<li>Retention cohort charts</li>
+</ul>
+</li>
+<li><p><strong>Export &amp; Reporting</strong></p>
+<ul>
+<li>PDF report generation</li>
+<li>CSV data export</li>
+<li>Scheduled email reports</li>
+</ul>
+</li>
+<li><p><strong>Mobile Dashboard</strong></p>
+<ul>
+<li>Responsive design</li>
+<li>Push notifications for alerts</li>
+<li>Mobile app (optional)</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Advanced Analytics</h3>
+<ol>
+<li><p><strong>Predictive Analytics</strong></p>
+<ul>
+<li>User churn prediction</li>
+<li>Revenue forecasting</li>
+<li>Capacity planning</li>
+</ul>
+</li>
+<li><p><strong>Real-time Monitoring</strong></p>
+<ul>
+<li>WebSocket-based live updates</li>
+<li>Real-time error tracking</li>
+<li>Live user activity feed</li>
+</ul>
+</li>
+<li><p><strong>Business Intelligence Integration</strong></p>
+<ul>
+<li>Integrate with Google Analytics</li>
+<li>Connect to Tableau/Power BI</li>
+<li>Data warehouse export</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Implementation Checklist</h2>
+<h3>Week 1: Basic Dashboard</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Create admin role in users table</li>
+<li><input disabled="" type="checkbox"> Implement admin authentication middleware</li>
+<li><input disabled="" type="checkbox"> Create summary metrics endpoint</li>
+<li><input disabled="" type="checkbox"> Build basic HTML dashboard page</li>
+<li><input disabled="" type="checkbox"> Add summary cards (users, stories, revenue)</li>
+</ul>
+<h3>Week 2: Time Series Data</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add indexes on timestamp columns</li>
+<li><input disabled="" type="checkbox"> Create time series endpoints (30d, 90d)</li>
+<li><input disabled="" type="checkbox"> Implement Chart.js visualizations</li>
+<li><input disabled="" type="checkbox"> Add date range selectors</li>
+<li><input disabled="" type="checkbox"> Implement Redis caching</li>
+</ul>
+<h3>Week 3: Detailed Metrics</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add breakdown endpoints (language, theme, country)</li>
+<li><input disabled="" type="checkbox"> Create distribution charts</li>
+<li><input disabled="" type="checkbox"> Add system performance metrics</li>
+<li><input disabled="" type="checkbox"> Implement error tracking</li>
+<li><input disabled="" type="checkbox"> Add export to CSV feature</li>
+</ul>
+<h3>Week 4: Polish &amp; Optimization</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Create materialized views for expensive queries</li>
+<li><input disabled="" type="checkbox"> Implement background metric calculation</li>
+<li><input disabled="" type="checkbox"> Add alert system</li>
+<li><input disabled="" type="checkbox"> Performance testing &amp; optimization</li>
+<li><input disabled="" type="checkbox"> Documentation &amp; user guide</li>
+</ul>
+<hr>
+<h2>Cost-Benefit Analysis</h2>
+<h3>Development Time</h3>
+<ul>
+<li><strong>Week 1</strong>: 8-12 hours (basic dashboard)</li>
+<li><strong>Week 2</strong>: 10-15 hours (time series)</li>
+<li><strong>Week 3</strong>: 12-16 hours (detailed metrics)</li>
+<li><strong>Week 4</strong>: 6-10 hours (polish)</li>
+<li><strong>Total</strong>: ~40-50 hours</li>
+</ul>
+<h3>Business Value</h3>
+<p><strong>Immediate Benefits:</strong></p>
+<ol>
+<li><strong>Data-Driven Decisions</strong>: Know which features to prioritize</li>
+<li><strong>Revenue Tracking</strong>: Understand business growth</li>
+<li><strong>Issue Detection</strong>: Catch problems before users complain</li>
+<li><strong>User Understanding</strong>: Know who your customers are</li>
+</ol>
+<p><strong>Long-term Benefits:</strong></p>
+<ol>
+<li><strong>Growth Acceleration</strong>: Optimize based on data</li>
+<li><strong>Cost Reduction</strong>: Identify and fix inefficiencies</li>
+<li><strong>Product-Market Fit</strong>: Validate feature decisions</li>
+<li><strong>Competitive Advantage</strong>: Better insights than competitors</li>
+</ol>
+<h3>ROI Estimate</h3>
+<p>If dashboard helps:</p>
+<ul>
+<li>Increase conversion rate by 2% → +$X,XXX in revenue</li>
+<li>Reduce error rate by 3% → Better user experience → More referrals</li>
+<li>Identify cost optimization → Save $XXX/month on API costs</li>
+<li>Faster debugging → Save 5 hours/week of developer time</li>
+</ul>
+<p><strong>ROI: Positive within 1-2 months</strong></p>
+<hr>
+<h2>Conclusion</h2>
+<p>This dashboard will provide complete visibility into the MagicalStory platform&#39;s health, user behavior, and business performance. Start with the basic implementation and iterate based on actual needs and insights gained.</p>
+<p>The key is to start simple (Week 1-2) and add complexity only when needed. Focus on actionable metrics that drive decisions, not vanity metrics that look good but don&#39;t help.</p>
+<p>Ready to implement tomorrow!</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>ADMIN_DASHBOARD.md</code>.
+</footer>
+</body>
+</html>

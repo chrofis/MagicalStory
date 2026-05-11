@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PIPELINE_OPTIMIZATIONS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Pipeline Optimization Analysis</h1>
+<h2>Executive Summary</h2>
+<p><strong>Current Performance:</strong></p>
+<ul>
+<li>Story generation time: 5-7 minutes</li>
+<li>Estimated cost per story: $2-10</li>
+</ul>
+<p><strong>Potential Improvements:</strong></p>
+<ul>
+<li>Speed: 10-15x faster (30-45 seconds)</li>
+<li>Cost: 30-50% reduction ($0.70-5.00 per story)</li>
+</ul>
+<hr>
+<h2>Current Pipeline Bottlenecks</h2>
+<h3>1. Sequential Image Generation</h3>
+<ul>
+<li>Images generated one-by-one for each page</li>
+<li>10-15 pages × ~30 seconds each = 5-7 minutes total</li>
+<li><strong>Impact: Major speed bottleneck</strong></li>
+</ul>
+<h3>2. Photo Re-uploading</h3>
+<ul>
+<li>Same character photos uploaded 15+ times per story</li>
+<li>Photos re-uploaded for every new story with same characters</li>
+<li><strong>Impact: Wasted bandwidth, slower uploads, potential API costs</strong></li>
+</ul>
+<h3>3. No Caching</h3>
+<ul>
+<li>Every story generated completely from scratch</li>
+<li>No reuse of similar content or images</li>
+<li><strong>Impact: Unnecessary API calls and costs</strong></li>
+</ul>
+<h3>4. Excessive Context Sending</h3>
+<ul>
+<li>Full story text (8K-64K tokens) sent to each image generation call</li>
+<li>Complete character descriptions repeated 15+ times</li>
+<li><strong>Impact: High token usage = higher costs</strong></li>
+</ul>
+<hr>
+<h2>Optimization Recommendations</h2>
+<h3>Priority 1: Parallel Image Generation ⚡</h3>
+<p><strong>Impact: 10-14x speed improvement</strong></p>
+<p><strong>Current Implementation:</strong></p>
+<pre><code class="language-javascript">// Sequential - SLOW
+for (const page of pages) {
+  page.image = await generateImage(page);
+}
+</code></pre>
+<p><strong>Optimized Implementation:</strong></p>
+<pre><code class="language-javascript">// Parallel - FAST
+const imagePromises = pages.map(page =&gt; generateImage(page));
+const images = await Promise.all(imagePromises);
+pages.forEach((page, i) =&gt; page.image = images[i]);
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Time reduction: 5-7 minutes → 30-45 seconds</li>
+<li>User experience: Dramatically faster</li>
+<li>Cost: Same (just faster)</li>
+</ul>
+<p><strong>Considerations:</strong></p>
+<ul>
+<li>May hit API rate limits (need to implement concurrency control)</li>
+<li>Use p-limit library to cap concurrent requests</li>
+</ul>
+<pre><code class="language-javascript">const pLimit = require(&#39;p-limit&#39;);
+const limit = pLimit(5); // Max 5 concurrent requests
+
+const imagePromises = pages.map(page =&gt;
+  limit(() =&gt; generateImage(page))
+);
+const images = await Promise.all(imagePromises);
+</code></pre>
+<hr>
+<h3>Priority 2: Photo Hash Caching 💾</h3>
+<p><strong>Impact: 90% faster uploads, bandwidth savings</strong></p>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-javascript">const crypto = require(&#39;crypto&#39;);
+const photoCache = new Map(); // hash → API URL
+
+async function uploadPhotoOnce(photoData) {
+  const hash = crypto.createHash(&#39;sha256&#39;)
+    .update(photoData)
+    .digest(&#39;hex&#39;);
+
+  if (photoCache.has(hash)) {
+    console.log(&#39;📸 Reusing cached photo upload&#39;);
+    return photoCache.get(hash);
+  }
+
+  console.log(&#39;📤 Uploading new photo&#39;);
+  const url = await uploadToAPI(photoData);
+  photoCache.set(hash, url);
+  return url;
+}
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>First story: Normal upload time</li>
+<li>Subsequent stories with same photos: Instant reuse</li>
+<li>Reduced bandwidth usage</li>
+<li>Faster overall generation</li>
+</ul>
+<p><strong>Database-backed version:</strong></p>
+<pre><code class="language-sql">CREATE TABLE photo_cache (
+  photo_hash VARCHAR(64) PRIMARY KEY,
+  api_url TEXT NOT NULL,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<hr>
+<h3>Priority 3: Token Usage Optimization 💰</h3>
+<p><strong>Impact: 80-95% token reduction per image call, $0.50-2.00 savings per story</strong></p>
+<p><strong>Current Waste:</strong></p>
+<pre><code class="language-javascript">// Sending full context to each image generation
+const imagePrompt = {
+  fullStoryText: 64000 tokens,  // ❌ Not needed
+  allCharacterDetails: 3000 tokens,  // ❌ Too much
+  pageContent: page.text
+};
+</code></pre>
+<p><strong>Optimized Context:</strong></p>
+<pre><code class="language-javascript">// Send only what&#39;s needed
+const imagePrompt = {
+  pageText: page.text,  // ~200 tokens ✅
+  characters: characters.map(c =&gt; ({
+    name: c.name,
+    visualTraits: extractVisualOnly(c.traits)  // ~50 tokens ✅
+  })),
+  style: storyStyle  // ~50 tokens ✅
+};
+// Total: ~300 tokens instead of 67,000
+</code></pre>
+<p><strong>Helper Function:</strong></p>
+<pre><code class="language-javascript">function extractVisualOnly(traits) {
+  const visualKeywords = [&#39;hair&#39;, &#39;eyes&#39;, &#39;skin&#39;, &#39;height&#39;, &#39;build&#39;, &#39;clothing&#39;];
+  return traits.filter(trait =&gt;
+    visualKeywords.some(keyword =&gt; trait.toLowerCase().includes(keyword))
+  );
+}
+</code></pre>
+<hr>
+<h3>Priority 4: Model Selection Optimization 🎯</h3>
+<p><strong>Impact: 40-60% cost reduction on text generation</strong></p>
+<p><strong>Current:</strong> Uses Sonnet for everything</p>
+<p><strong>Optimized Strategy:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Current Model</th>
+<th>Suggested Model</th>
+<th>Cost Comparison</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Outline</td>
+<td>Sonnet</td>
+<td>Haiku</td>
+<td>10x cheaper</td>
+</tr>
+<tr>
+<td>Story Text</td>
+<td>Sonnet</td>
+<td>Sonnet</td>
+<td>Same (quality matters)</td>
+</tr>
+<tr>
+<td>Image Prompts</td>
+<td>Sonnet</td>
+<td>Haiku</td>
+<td>10x cheaper</td>
+</tr>
+<tr>
+<td>Title Extraction</td>
+<td>Sonnet</td>
+<td>Haiku</td>
+<td>10x cheaper</td>
+</tr>
+</tbody></table>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-javascript">// Use model parameter in API calls
+async function callClaudeAPI(prompt, maxTokens, model = &#39;claude-sonnet-4-5&#39;) {
+  // existing implementation
+}
+
+// Outline generation
+const outline = await callClaudeAPI(outlinePrompt, 8192, &#39;claude-haiku-4-5&#39;);
+
+// Story text (quality matters)
+const storyText = await callClaudeAPI(storyPrompt, 64000, &#39;claude-sonnet-4-5&#39;);
+</code></pre>
+<hr>
+<h3>Priority 5: Image Result Caching 🖼️</h3>
+<p><strong>Impact: 30-70% cost savings for repeat/similar stories</strong></p>
+<p><strong>Concept:</strong> Cache generated images based on prompt + photo hash</p>
+<pre><code class="language-javascript">const imageCache = new Map();
+// hash(prompt + photoHashes + style) → image URL
+
+function generateImageCacheKey(prompt, photos, style) {
+  const photoHashes = photos.map(p =&gt;
+    crypto.createHash(&#39;sha256&#39;).update(p).digest(&#39;hex&#39;)
+  ).sort().join(&#39;|&#39;);
+
+  const combined = `${prompt}|${photoHashes}|${style}`;
+  return crypto.createHash(&#39;sha256&#39;).update(combined).digest(&#39;hex&#39;);
+}
+
+async function generateImageCached(prompt, photos, style) {
+  const cacheKey = generateImageCacheKey(prompt, photos, style);
+
+  if (imageCache.has(cacheKey)) {
+    console.log(&#39;🎨 Reusing cached image&#39;);
+    return imageCache.get(cacheKey);
+  }
+
+  console.log(&#39;🎨 Generating new image&#39;);
+  const image = await generateImage(prompt, photos, style);
+  imageCache.set(cacheKey, image);
+  return image;
+}
+</code></pre>
+<p><strong>Database Schema:</strong></p>
+<pre><code class="language-sql">CREATE TABLE image_cache (
+  cache_key VARCHAR(64) PRIMARY KEY,
+  prompt_text TEXT,
+  character_photo_hashes JSON,
+  style VARCHAR(100),
+  generated_image_url TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  use_count INTEGER DEFAULT 1
+);
+
+CREATE INDEX idx_image_cache_last_used ON image_cache(last_used_at);
+</code></pre>
+<p><strong>When This Helps:</strong></p>
+<ul>
+<li>User regenerates similar story with same characters</li>
+<li>Common fairy tale scenes (similar descriptions)</li>
+<li>Template-based stories</li>
+</ul>
+<hr>
+<h3>Priority 6: Batch API Calls 📦</h3>
+<p><strong>Impact: Reduced network overhead, potential batch discounts</strong></p>
+<p><strong>If API Supports Batching:</strong></p>
+<pre><code class="language-javascript">// Instead of 15 separate calls
+const results = await Promise.all(pages.map(p =&gt; generateImage(p)));
+
+// Use batch API
+const batch = await claudeAPI.batch({
+  requests: pages.map(page =&gt; ({
+    model: &#39;claude-sonnet-4-5&#39;,
+    prompt: createImagePrompt(page)
+  }))
+});
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Fewer network round-trips</li>
+<li>Potential batch pricing</li>
+<li>Better error handling (all or nothing)</li>
+</ul>
+<hr>
+<h3>Priority 7: Progressive Loading 🔄</h3>
+<p><strong>Impact: 3-5x perceived speed improvement</strong></p>
+<p><strong>Current:</strong> User waits for complete story</p>
+<p><strong>Optimized:</strong> Stream results as they complete</p>
+<pre><code class="language-javascript">// Server-side (use Server-Sent Events)
+app.post(&#39;/api/generate-story-stream&#39;, async (req, res) =&gt; {
+  res.setHeader(&#39;Content-Type&#39;, &#39;text/event-stream&#39;);
+
+  // 1. Stream outline
+  const outline = await generateOutline();
+  res.write(`data: ${JSON.stringify({ type: &#39;outline&#39;, data: outline })}\n\n`);
+
+  // 2. Stream story text
+  const story = await generateStory(outline);
+  res.write(`data: ${JSON.stringify({ type: &#39;story&#39;, data: story })}\n\n`);
+
+  // 3. Stream images as they complete
+  const pages = parsePages(story);
+  for (const page of pages) {
+    const image = await generateImage(page);
+    res.write(`data: ${JSON.stringify({ type: &#39;image&#39;, pageNum: page.num, url: image })}\n\n`);
+  }
+
+  res.write(&#39;data: {&quot;type&quot;: &quot;complete&quot;}\n\n&#39;);
+  res.end();
+});
+</code></pre>
+<p><strong>User Experience:</strong></p>
+<ul>
+<li>Sees outline in 5-10 seconds</li>
+<li>Reads story while images generate</li>
+<li>Images appear one by one</li>
+<li>Feels much faster even if total time is similar</li>
+</ul>
+<hr>
+<h2>Cost Analysis</h2>
+<h3>Current Costs Per Story (Estimated)</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Tokens/Calls</th>
+<th>Estimated Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Outline (Sonnet)</td>
+<td>~1,000 output</td>
+<td>$0.01-0.05</td>
+</tr>
+<tr>
+<td>Story Text (Sonnet)</td>
+<td>~64,000 output</td>
+<td>$0.50-2.00</td>
+</tr>
+<tr>
+<td>15 Image Generations</td>
+<td>15 images</td>
+<td>$1.50-7.50</td>
+</tr>
+<tr>
+<td>Context overhead</td>
+<td>~500K tokens</td>
+<td>$0.50-1.00</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>$2.00-10.00</strong></td>
+</tr>
+</tbody></table>
+<h3>Optimized Costs Per Story</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Tokens/Calls</th>
+<th>Estimated Cost</th>
+<th>Savings</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Outline (Haiku)</td>
+<td>~1,000 output</td>
+<td>$0.001-0.005</td>
+<td>-95%</td>
+</tr>
+<tr>
+<td>Story Text (Sonnet)</td>
+<td>~64,000 output</td>
+<td>$0.50-2.00</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>15 Images (optimized)</td>
+<td>15 images</td>
+<td>$1.50-7.50</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Context (reduced)</td>
+<td>~50K tokens</td>
+<td>$0.05-0.10</td>
+<td>-80%</td>
+</tr>
+<tr>
+<td>Photo reuse</td>
+<td>Cached</td>
+<td>$0</td>
+<td>-100% upload cost</td>
+</tr>
+<tr>
+<td>Image cache (30% hit)</td>
+<td>~5 images cached</td>
+<td>Save $0.50-2.50</td>
+<td>-30%</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>$0.70-5.00</strong></td>
+<td><strong>30-50%</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Implementation Roadmap</h2>
+<h3>Phase 1: Quick Wins (1-2 hours)</h3>
+<ol>
+<li>✅ Parallel image generation</li>
+<li>✅ Token optimization (reduce context)</li>
+<li>✅ Model selection (Haiku for outline)</li>
+</ol>
+<p><strong>Expected Impact:</strong> 10x speed, 20% cost reduction</p>
+<h3>Phase 2: Caching Layer (3-4 hours)</h3>
+<ol>
+<li>✅ Photo hash caching (in-memory)</li>
+<li>✅ Image result caching (in-memory)</li>
+<li>✅ Rate limiting for parallel requests</li>
+</ol>
+<p><strong>Expected Impact:</strong> Additional 10-30% cost reduction for repeat users</p>
+<h3>Phase 3: Database Persistence (4-6 hours)</h3>
+<ol>
+<li>✅ Photo cache table</li>
+<li>✅ Image cache table</li>
+<li>✅ Cache invalidation strategy</li>
+<li>✅ Analytics on cache hit rates</li>
+</ol>
+<p><strong>Expected Impact:</strong> Persistent savings, cross-user optimization</p>
+<h3>Phase 4: Advanced Features (Optional)</h3>
+<ol>
+<li>✅ Progressive loading with SSE</li>
+<li>✅ Batch API integration</li>
+<li>✅ Smart prefetching</li>
+<li>✅ A/B testing different models</li>
+</ol>
+<hr>
+<h2>Monitoring &amp; Metrics</h2>
+<h3>Key Metrics to Track</h3>
+<pre><code class="language-javascript">const metrics = {
+  generation_time_ms: Date.now() - startTime,
+  total_tokens_used: outlineTokens + storyTokens + imageTokens,
+  api_calls_made: apiCallCount,
+  cache_hits: {
+    photo_cache: photoCacheHits,
+    image_cache: imageCacheHits
+  },
+  estimated_cost: calculateCost(tokens, apiCalls)
+};
+
+// Log to database for analysis
+await db.query(`
+  INSERT INTO generation_metrics
+  (user_id, story_id, generation_time_ms, total_tokens, api_calls, cache_hits, cost)
+  VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, [userId, storyId, ...Object.values(metrics)]);
+</code></pre>
+<h3>Dashboard Queries</h3>
+<pre><code class="language-sql">-- Average generation time over time
+SELECT
+  DATE(created_at) as date,
+  AVG(generation_time_ms / 1000.0) as avg_seconds
+FROM generation_metrics
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- Cache hit rates
+SELECT
+  AVG((cache_hits-&gt;&gt;&#39;photo_cache&#39;)::int) as avg_photo_hits,
+  AVG((cache_hits-&gt;&gt;&#39;image_cache&#39;)::int) as avg_image_hits
+FROM generation_metrics
+WHERE created_at &gt; NOW() - INTERVAL &#39;7 days&#39;;
+
+-- Cost trends
+SELECT
+  DATE(created_at) as date,
+  AVG(estimated_cost) as avg_cost_per_story,
+  SUM(estimated_cost) as total_cost
+FROM generation_metrics
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+</code></pre>
+<hr>
+<h2>Risk Mitigation</h2>
+<h3>Potential Issues &amp; Solutions</h3>
+<p><strong>1. API Rate Limits</strong></p>
+<ul>
+<li>Problem: Parallel requests may hit rate limits</li>
+<li>Solution: Implement p-limit with concurrency cap</li>
+<li>Fallback: Queue system with exponential backoff</li>
+</ul>
+<p><strong>2. Cache Invalidation</strong></p>
+<ul>
+<li>Problem: Stale cached images</li>
+<li>Solution: TTL-based expiration (30 days)</li>
+<li>Solution: Version-based cache keys (include model version)</li>
+</ul>
+<p><strong>3. Memory Usage</strong></p>
+<ul>
+<li>Problem: In-memory caches grow too large</li>
+<li>Solution: LRU eviction policy</li>
+<li>Solution: Move to database-backed cache</li>
+</ul>
+<p><strong>4. Cache Collisions</strong></p>
+<ul>
+<li>Problem: Different prompts hash to same key</li>
+<li>Solution: Use SHA-256 (collision probability negligible)</li>
+<li>Solution: Include more context in cache key</li>
+</ul>
+<hr>
+<h2>Conclusion</h2>
+<p>Implementing these optimizations will:</p>
+<p>✅ <strong>Speed:</strong> 10-15x faster generation (5-7 min → 30-45 sec)
+✅ <strong>Cost:</strong> 30-50% reduction per story
+✅ <strong>UX:</strong> Progressive loading, perceived as 3-5x faster
+✅ <strong>Scalability:</strong> Better resource utilization
+✅ <strong>Sustainability:</strong> Lower costs enable lower pricing</p>
+<p><strong>Recommended Next Step:</strong> Start with Phase 1 (parallel generation + token optimization) for immediate 10x speed improvement with minimal risk.</p>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>PIPELINE_OPTIMIZATIONS.md</code>.
+</footer>
+</body>
+</html>

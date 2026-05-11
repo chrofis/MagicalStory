@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>INCREMENTAL-CONSISTENCY-REQUIREMENTS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Incremental Consistency Check - Requirements Document</h1>
+<h2>Overview</h2>
+<p>This feature adds real-time consistency checking during story generation. After each image is generated, it is evaluated both for quality issues AND consistency against previously generated images. All issues are collected and fixed in a single inpainting call.</p>
+<hr>
+<h2>Current System</h2>
+<h3>Existing Flow</h3>
+<pre><code>For each page:
+  1. Generate image
+  2. Evaluate image quality (evaluateImageQuality)
+     - Checks: rendering errors, character match to reference photos
+     - Returns: score, issues, fix_targets
+  3. If issues found → fix via inpainting (one call per issue type)
+  4. Re-evaluate if fixed
+
+After all pages complete:
+  5. Run final consistency check (evaluateConsistencyAcrossImages)
+     - Checks: consistency across ALL images
+     - Returns: issues per image
+  6. Currently: issues logged but NOT auto-fixed
+</code></pre>
+<h3>Problems with Current Approach</h3>
+<ol>
+<li><strong>Late detection</strong>: Consistency issues only found at the end</li>
+<li><strong>No auto-fix</strong>: Final consistency check doesn&#39;t trigger repairs</li>
+<li><strong>Multiple fix calls</strong>: Quality issues fixed one at a time</li>
+<li><strong>Drift accumulates</strong>: Small inconsistencies compound across pages</li>
+</ol>
+<hr>
+<h2>New System</h2>
+<h3>Proposed Flow</h3>
+<pre><code>For each page:
+  1. Generate image
+  2. Evaluate image quality (existing)
+     - Returns: qualityIssues[], fix_targets[]
+  3. NEW: Evaluate against previous images (incremental consistency)
+     - Compare with last N images (configurable, default 3)
+     - Returns: consistencyIssues[]
+  4. Merge all issues into unified fix list
+  5. Make SINGLE inpainting call to fix all issues
+  6. Re-evaluate if fixed
+</code></pre>
+<h3>Key Changes</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Current</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Consistency check timing</td>
+<td>End of story</td>
+<td>After each image</td>
+</tr>
+<tr>
+<td>Images compared</td>
+<td>All at once</td>
+<td>Current + last N</td>
+</tr>
+<tr>
+<td>Fix calls per image</td>
+<td>Multiple (per issue)</td>
+<td>Single (all issues)</td>
+</tr>
+<tr>
+<td>Dry-run mode</td>
+<td>None</td>
+<td>Shows what would be fixed</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Detailed Requirements</h2>
+<h3>1. Incremental Consistency Check Function</h3>
+<pre><code class="language-typescript">interface IncrementalConsistencyOptions {
+  // How many previous images to compare against
+  lookbackCount: number;        // Default: 3
+
+  // What to check
+  checkCharacterAppearance: boolean;  // Hair, clothing, etc.
+  checkArtStyle: boolean;             // Color palette, rendering style
+  checkEnvironment: boolean;          // Background consistency
+
+  // Dry-run mode
+  dryRun: boolean;              // If true, return issues but don&#39;t fix
+
+  // Character reference photos (for identity verification)
+  referencePhotos: Array&lt;{
+    characterName: string;
+    photoUrl: string;
+  }&gt;;
+}
+
+interface ConsistencyIssue {
+  type: &#39;character_appearance&#39; | &#39;art_style&#39; | &#39;environment&#39; | &#39;other&#39;;
+  severity: &#39;critical&#39; | &#39;major&#39; | &#39;minor&#39;;
+  description: string;
+  affectedCharacter?: string;
+
+  // For inpainting
+  fixTarget?: {
+    region: &#39;full&#39; | BoundingBox;
+    instruction: string;
+  };
+}
+
+async function evaluateIncrementalConsistency(
+  currentImage: string,           // Base64 image data
+  currentPageNumber: number,
+  previousImages: Array&lt;{
+    imageData: string;
+    pageNumber: number;
+    characters: string[];
+    clothing: Record&lt;string, string&gt;;
+  }&gt;,
+  options: IncrementalConsistencyOptions
+): Promise&lt;{
+  consistent: boolean;
+  score: number;                  // 0-10
+  issues: ConsistencyIssue[];
+  summary: string;
+}&gt;;
+</code></pre>
+<h3>2. Unified Issue Collection</h3>
+<p>After both evaluations complete, merge issues:</p>
+<pre><code class="language-typescript">interface UnifiedIssueReport {
+  // From quality evaluation
+  qualityIssues: QualityIssue[];
+
+  // From consistency evaluation
+  consistencyIssues: ConsistencyIssue[];
+
+  // Merged and deduplicated
+  allIssues: Issue[];
+
+  // Single fix plan
+  fixPlan: {
+    requiresFix: boolean;
+    fixTargets: FixTarget[];      // Consolidated targets
+    estimatedFixCount: number;    // How many regions to inpaint
+  };
+
+  // For dry-run display
+  dryRunReport?: {
+    wouldFix: string[];           // Human-readable list
+    wouldSkip: string[];          // Issues below threshold
+    estimatedCost: string;        // Token/API cost estimate
+  };
+}
+</code></pre>
+<h3>3. Single Fix Call</h3>
+<p>Instead of multiple inpainting calls:</p>
+<pre><code class="language-typescript">// CURRENT (multiple calls):
+for (const issue of issues) {
+  await inpaintRegion(image, issue.target, issue.instruction);
+}
+
+// NEW (single call with multiple targets):
+const fixResult = await inpaintMultipleRegions(image, {
+  targets: unifiedReport.fixPlan.fixTargets,
+  combineInstructions: true,  // Merge overlapping regions
+  prioritize: &#39;critical_first&#39;
+});
+</code></pre>
+<h3>4. Dry-Run Mode</h3>
+<p>When <code>dryRun: true</code>:</p>
+<pre><code class="language-typescript">// Returns report without making any fixes
+const report = await evaluateWithConsistency(image, pageNum, prevImages, {
+  dryRun: true
+});
+
+// Log what WOULD be fixed
+console.log(&#39;=== DRY RUN REPORT ===&#39;);
+console.log(&#39;Quality issues found:&#39;, report.qualityIssues.length);
+console.log(&#39;Consistency issues found:&#39;, report.consistencyIssues.length);
+console.log(&#39;&#39;);
+console.log(&#39;Would fix:&#39;);
+for (const fix of report.dryRunReport.wouldFix) {
+  console.log(`  - ${fix}`);
+}
+console.log(&#39;&#39;);
+console.log(&#39;Would skip (below threshold):&#39;);
+for (const skip of report.dryRunReport.wouldSkip) {
+  console.log(`  - ${skip}`);
+}
+</code></pre>
+<hr>
+<h2>Configuration</h2>
+<h3>New Config Options</h3>
+<p>Add to <code>server/config/models.js</code> or story generation options:</p>
+<pre><code class="language-javascript">const INCREMENTAL_CONSISTENCY_DEFAULTS = {
+  // Enable/disable the feature
+  enabled: true,
+
+  // How many previous images to check against
+  lookbackCount: 3,
+
+  // Minimum score to trigger fix (0-10)
+  fixThreshold: 7,
+
+  // Issue severity threshold
+  minSeverityToFix: &#39;major&#39;,  // &#39;critical&#39; | &#39;major&#39; | &#39;minor&#39;
+
+  // Dry-run mode (for testing)
+  dryRun: false,
+
+  // What aspects to check
+  checks: {
+    characterAppearance: true,
+    artStyle: true,
+    environment: false,  // Less important for children&#39;s books
+  },
+
+  // Performance tuning
+  compressImagesForComparison: true,
+  maxComparisonResolution: 768,
+};
+</code></pre>
+<h3>Developer Mode Override</h3>
+<p>In frontend developer mode, allow toggling:</p>
+<pre><code class="language-typescript">interface DevModeOptions {
+  incrementalConsistency: {
+    enabled: boolean;
+    dryRun: boolean;
+    lookbackCount: number;
+    showDetailedReport: boolean;
+  };
+}
+</code></pre>
+<hr>
+<h2>Prompt Template</h2>
+<p>Create new prompt file: <code>prompts/incremental-consistency-check.txt</code></p>
+<pre><code>You are evaluating a newly generated storybook illustration for consistency with previous pages.
+
+**CURRENT IMAGE**: Image 1 (Page {{PAGE_NUMBER}})
+**PREVIOUS IMAGES**: Images 2-{{PREV_COUNT}} (Pages {{PREV_PAGES}})
+
+**CHARACTERS IN SCENE**: {{CHARACTERS}}
+**EXPECTED CLOTHING**: {{CLOTHING}}
+
+**TASK**: Check if the current image (Image 1) is consistent with the previous images.
+
+**CHECK FOR**:
+1. **Character Appearance**: Does each character look the same as in previous images?
+   - Hair color, style, length
+   - Skin tone
+   - Facial features
+   - Body proportions
+
+2. **Clothing Consistency**: Are characters wearing the expected clothing?
+   - Match against provided clothing descriptions
+   - Note any unexplained changes
+
+3. **Art Style**: Does the image match the style of previous images?
+   - Color palette
+   - Line work
+   - Shading style
+   - Background rendering
+
+**OUTPUT**: Return JSON only:
+```json
+{
+  &quot;consistent&quot;: true/false,
+  &quot;score&quot;: 0-10,
+  &quot;issues&quot;: [
+    {
+      &quot;type&quot;: &quot;character_appearance|art_style|clothing|environment&quot;,
+      &quot;severity&quot;: &quot;critical|major|minor&quot;,
+      &quot;description&quot;: &quot;...&quot;,
+      &quot;affectedCharacter&quot;: &quot;character name or null&quot;,
+      &quot;fixTarget&quot;: {
+        &quot;region&quot;: &quot;full&quot; or {&quot;x&quot;:0,&quot;y&quot;:0,&quot;width&quot;:100,&quot;height&quot;:100},
+        &quot;instruction&quot;: &quot;Fix instruction for inpainting&quot;
+      }
+    }
+  ],
+  &quot;summary&quot;: &quot;Brief summary of findings&quot;
+}
+</code></pre>
+<pre><code>
+---
+
+## Implementation Steps
+
+### Phase 1: Dry-Run Mode (Testing)
+
+1. Create `evaluateIncrementalConsistency()` function
+2. Integrate into image generation loop (after quality eval)
+3. Log results but DON&#39;T fix anything
+4. Add `--dry-run` flag or config option
+
+### Phase 2: Issue Merging
+
+1. Create `UnifiedIssueReport` structure
+2. Implement issue deduplication logic
+3. Create consolidated fix plan
+4. Log merged report
+
+### Phase 3: Single Fix Call
+
+1. Modify inpainting to accept multiple targets
+2. Implement region merging for overlapping issues
+3. Make single API call with all fixes
+4. Re-evaluate after fix
+
+### Phase 4: Frontend Integration
+
+1. Add dev mode toggle for feature
+2. Show consistency status per page in generation UI
+3. Display dry-run reports when enabled
+
+---
+
+## API Changes
+
+### Story Generation Job
+
+Add to job options:
+
+```typescript
+interface StoryJobOptions {
+  // ... existing options ...
+
+  incrementalConsistency?: {
+    enabled?: boolean;
+    dryRun?: boolean;
+    lookbackCount?: number;
+  };
+}
+</code></pre>
+<h3>Job Status Updates</h3>
+<p>Include consistency info in status:</p>
+<pre><code class="language-typescript">interface PageStatus {
+  pageNumber: number;
+  imageStatus: &#39;generating&#39; | &#39;evaluating&#39; | &#39;fixing&#39; | &#39;complete&#39;;
+
+  // NEW
+  consistencyCheck?: {
+    score: number;
+    issueCount: number;
+    fixesApplied: number;
+    dryRunReport?: string[];
+  };
+}
+</code></pre>
+<hr>
+<h2>Logging</h2>
+<h3>Log Format</h3>
+<pre><code>📸 [PAGE 5] Image generated
+⭐ [PAGE 5] Quality eval: score=7, issues=2 (finger count, minor clipping)
+🔍 [PAGE 5] Consistency check vs pages 2,3,4: score=8, issues=1 (hair color drift)
+📋 [PAGE 5] Unified report: 3 issues total, 2 will be fixed
+🔧 [PAGE 5] Fixing: [finger count, hair color] in single call
+✅ [PAGE 5] Fixed, re-eval score: 9
+
+--- DRY RUN MODE ---
+📸 [PAGE 5] Image generated
+⭐ [PAGE 5] Quality eval: score=7, issues=2
+🔍 [PAGE 5] Consistency check: score=8, issues=1
+📋 [PAGE 5] DRY RUN - Would fix:
+   - Finger count on left hand (severity: major)
+   - Hair color drift from page 3 (severity: major)
+   - Minor clipping on edge (severity: minor) [SKIPPED - below threshold]
+</code></pre>
+<hr>
+<h2>Testing Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Dry-run mode shows correct issues without fixing</li>
+<li><input disabled="" type="checkbox"> Consistency check compares against correct previous images</li>
+<li><input disabled="" type="checkbox"> Issues from both evaluations are merged correctly</li>
+<li><input disabled="" type="checkbox"> Duplicate issues are deduplicated</li>
+<li><input disabled="" type="checkbox"> Single inpainting call made (not multiple)</li>
+<li><input disabled="" type="checkbox"> Re-evaluation runs after fix</li>
+<li><input disabled="" type="checkbox"> Lookback count is configurable</li>
+<li><input disabled="" type="checkbox"> Feature can be disabled entirely</li>
+<li><input disabled="" type="checkbox"> Performance acceptable (not too slow)</li>
+<li><input disabled="" type="checkbox"> Token usage logged for cost tracking</li>
+</ul>
+<hr>
+<h2>Performance Considerations</h2>
+<ol>
+<li><strong>Image compression</strong>: Compress previous images before comparison</li>
+<li><strong>Caching</strong>: Cache compressed versions of previous images</li>
+<li><strong>Batch size</strong>: Limit lookback to 3-5 images max</li>
+<li><strong>Early exit</strong>: Skip consistency check if quality score is very low (will regenerate anyway)</li>
+</ol>
+<hr>
+<h2>Rollout Plan</h2>
+<ol>
+<li><strong>Week 1</strong>: Implement dry-run mode, test internally</li>
+<li><strong>Week 2</strong>: Enable for dev mode users only</li>
+<li><strong>Week 3</strong>: Gradual rollout to production (10% → 50% → 100%)</li>
+<li><strong>Week 4</strong>: Remove dry-run default, full production</li>
+</ol>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>INCREMENTAL-CONSISTENCY-REQUIREMENTS.md</code>.
+</footer>
+</body>
+</html>

@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ARCHITECTURE.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory Architecture &amp; Deployment</h1>
+<p><strong>Last Updated:</strong> January 2026</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-tech-stack">Tech Stack</a></li>
+<li><a href="#2-architecture-overview">Architecture Overview</a></li>
+<li><a href="#3-file-organization">File Organization</a></li>
+<li><a href="#4-environment-variables">Environment Variables</a></li>
+<li><a href="#5-database">Database</a></li>
+<li><a href="#6-api-endpoints">API Endpoints</a></li>
+<li><a href="#7-external-service-integrations">External Service Integrations</a></li>
+<li><a href="#8-image-generation--repair-system">Image Generation &amp; Repair System</a></li>
+<li><a href="#9-deployment">Deployment</a></li>
+<li><a href="#10-development">Development</a></li>
+<li><a href="#11-troubleshooting">Troubleshooting</a></li>
+</ol>
+<hr>
+<h2>1. Tech Stack</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Frontend</strong></td>
+<td>React 18 + Vite + TypeScript + Tailwind CSS</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Node.js + Express.js</td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td>PostgreSQL (Railway)</td>
+</tr>
+<tr>
+<td><strong>AI Text</strong></td>
+<td>Claude (Anthropic) - Story generation</td>
+</tr>
+<tr>
+<td><strong>AI Images</strong></td>
+<td>Gemini (Google) - Image generation &amp; photo analysis</td>
+</tr>
+<tr>
+<td><strong>Cheap Images</strong></td>
+<td>Runware - Dev mode, inpainting (SDXL $0.002/img)</td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td>Firebase Authentication</td>
+</tr>
+<tr>
+<td><strong>Email</strong></td>
+<td>Resend</td>
+</tr>
+<tr>
+<td><strong>Payments</strong></td>
+<td>Stripe</td>
+</tr>
+<tr>
+<td><strong>Print</strong></td>
+<td>Gelato</td>
+</tr>
+<tr>
+<td><strong>Hosting</strong></td>
+<td>Railway</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Architecture Overview</h2>
+<h3>Story Generation Pipeline</h3>
+<pre><code>POST /api/jobs/create-story → Background Job:
+  1. Generate Outline (Claude)
+  2. Extract Scene Hints
+  3. Generate Story Text (Claude, batched)
+  4. Generate Scene Descriptions (Claude, parallel)
+  5. Generate Images (Gemini, parallel/sequential)
+  6. Quality Evaluation + Auto-Repair (optional)
+  7. Generate Covers (front, back, dedication)
+  → GET /api/jobs/:id/status (polling)
+</code></pre>
+<h3>Key Backend Files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server.js</code></td>
+<td>Main Express app with embedded routes</td>
+</tr>
+<tr>
+<td><code>server/config/models.js</code></td>
+<td>AI model configuration and defaults</td>
+</tr>
+<tr>
+<td><code>server/lib/images.js</code></td>
+<td>Image generation, quality eval, inpainting</td>
+</tr>
+<tr>
+<td><code>server/lib/runware.js</code></td>
+<td>Runware API (FLUX, ACE++, inpainting)</td>
+</tr>
+<tr>
+<td><code>server/lib/textModels.js</code></td>
+<td>Claude/Gemini text generation</td>
+</tr>
+<tr>
+<td><code>server/lib/visualBible.js</code></td>
+<td>Character consistency tracking</td>
+</tr>
+<tr>
+<td><code>server/routes/avatars.js</code></td>
+<td>Avatar generation endpoints</td>
+</tr>
+<tr>
+<td><code>server/routes/stories.js</code></td>
+<td>Story CRUD and regeneration</td>
+</tr>
+<tr>
+<td><code>prompts/</code></td>
+<td>AI prompt templates</td>
+</tr>
+</tbody></table>
+<h3>Key Frontend Files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>client/src/pages/StoryWizard.tsx</code></td>
+<td>Main story creation wizard</td>
+</tr>
+<tr>
+<td><code>client/src/hooks/useDeveloperMode.ts</code></td>
+<td>Dev mode model overrides</td>
+</tr>
+<tr>
+<td><code>client/src/types/character.ts</code></td>
+<td>Character type definitions</td>
+</tr>
+<tr>
+<td><code>client/src/components/generation/</code></td>
+<td>Story generation UI</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. File Organization</h2>
+<pre><code>MagicalStory/
+├── client/                  # React frontend
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   │   ├── auth/        # Auth components
+│   │   │   ├── character/   # Character form components
+│   │   │   ├── common/      # Shared UI components
+│   │   │   ├── generation/  # Story generation UI
+│   │   │   └── story/       # Story wizard steps
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API clients
+│   │   ├── context/         # React contexts
+│   │   ├── hooks/           # Custom hooks
+│   │   └── types/           # TypeScript types
+│   └── public/
+├── server/                  # Backend modules
+│   ├── config/              # Configuration
+│   ├── lib/                 # Core libraries
+│   ├── middleware/          # Express middleware
+│   ├── routes/              # API routes
+│   └── services/            # Business logic
+├── server.js                # Express backend entry
+├── email.js                 # Email utilities
+├── prompts/                 # AI prompt templates
+├── docs/                    # Documentation
+├── database/                # Migrations
+└── scripts/                 # Utility scripts
+</code></pre>
+<hr>
+<h2>4. Environment Variables</h2>
+<h3>Required Variables</h3>
+<pre><code class="language-env"># Database (auto-set by Railway PostgreSQL)
+DATABASE_URL=postgresql://...
+
+# AI APIs
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+RUNWARE_API_KEY=...
+
+# Authentication (Firebase service account JSON, base64 encoded)
+FIREBASE_SERVICE_ACCOUNT=eyJ0eXBlIjoic2VydmljZV9hY2NvdW50Ii...
+JWT_SECRET=your-secure-random-string
+
+# Email (Resend)
+RESEND_API_KEY=re_...
+EMAIL_FROM=MagicalStory &lt;noreply@magicalstory.ch&gt;
+ADMIN_EMAIL=admin@magicalstory.ch
+
+# Payments (Stripe)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Print (Gelato)
+GELATO_API_KEY=...
+
+# App Settings
+NODE_ENV=production
+ADMIN_USER_IDS=1,2,3
+</code></pre>
+<h3>Environment Variables Reference</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DATABASE_URL</code></td>
+<td>Yes</td>
+<td>PostgreSQL connection string</td>
+</tr>
+<tr>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>Yes</td>
+<td>Claude API for story generation</td>
+</tr>
+<tr>
+<td><code>GEMINI_API_KEY</code></td>
+<td>Yes</td>
+<td>Gemini API for image generation</td>
+</tr>
+<tr>
+<td><code>RUNWARE_API_KEY</code></td>
+<td>No</td>
+<td>Runware for dev mode/inpainting</td>
+</tr>
+<tr>
+<td><code>FIREBASE_SERVICE_ACCOUNT</code></td>
+<td>Yes</td>
+<td>Base64-encoded Firebase service account JSON</td>
+</tr>
+<tr>
+<td><code>JWT_SECRET</code></td>
+<td>Yes</td>
+<td>Secret for JWT token signing</td>
+</tr>
+<tr>
+<td><code>RESEND_API_KEY</code></td>
+<td>Yes</td>
+<td>Resend API for emails</td>
+</tr>
+<tr>
+<td><code>EMAIL_FROM</code></td>
+<td>Yes</td>
+<td>From address for emails</td>
+</tr>
+<tr>
+<td><code>ADMIN_EMAIL</code></td>
+<td>No</td>
+<td>Admin notification email</td>
+</tr>
+<tr>
+<td><code>STRIPE_SECRET_KEY</code></td>
+<td>Yes</td>
+<td>Stripe secret key</td>
+</tr>
+<tr>
+<td><code>STRIPE_WEBHOOK_SECRET</code></td>
+<td>Yes</td>
+<td>Stripe webhook signing secret</td>
+</tr>
+<tr>
+<td><code>GELATO_API_KEY</code></td>
+<td>Yes</td>
+<td>Gelato API for print orders</td>
+</tr>
+<tr>
+<td><code>NODE_ENV</code></td>
+<td>No</td>
+<td>Set to &quot;production&quot;</td>
+</tr>
+<tr>
+<td><code>ADMIN_USER_IDS</code></td>
+<td>No</td>
+<td>Comma-separated admin user IDs</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Database</h2>
+<h3>PostgreSQL on Railway</h3>
+<ul>
+<li><strong>Connection:</strong> <code>postgresql://postgres:***@postgres.railway.internal:5432/railway</code></li>
+<li><strong>Mode:</strong> <code>STORAGE_MODE=database</code></li>
+<li><strong>Migrations:</strong> Automatically run on server startup from <code>database/migrations/</code></li>
+</ul>
+<h3>Key Tables</h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>users</code></td>
+<td>User accounts, credits, preferences</td>
+</tr>
+<tr>
+<td><code>characters</code></td>
+<td>Character data (JSONB)</td>
+</tr>
+<tr>
+<td><code>stories</code></td>
+<td>Generated stories with pages</td>
+</tr>
+<tr>
+<td><code>story_jobs</code></td>
+<td>Background job tracking</td>
+</tr>
+<tr>
+<td><code>orders</code></td>
+<td>Print orders</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>System configuration</td>
+</tr>
+<tr>
+<td><code>gelato_products</code></td>
+<td>Print product configuration</td>
+</tr>
+</tbody></table>
+<h3>Migrations</h3>
+<p>Migrations are in <code>database/migrations/</code> and run sequentially on startup:</p>
+<ul>
+<li><code>001_initial_schema.sql</code></li>
+<li><code>002_add_story_jobs.sql</code></li>
+<li>... etc.</li>
+</ul>
+<hr>
+<h2>6. API Endpoints</h2>
+<h3>Stories</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/jobs/create-story</code></td>
+<td>POST</td>
+<td>Start story generation job</td>
+</tr>
+<tr>
+<td><code>/api/jobs/:jobId/status</code></td>
+<td>GET</td>
+<td>Poll job status</td>
+</tr>
+<tr>
+<td><code>/api/jobs/:jobId/cancel</code></td>
+<td>POST</td>
+<td>Cancel job</td>
+</tr>
+<tr>
+<td><code>/api/stories</code></td>
+<td>GET</td>
+<td>List user&#39;s stories</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id</code></td>
+<td>GET</td>
+<td>Get story details</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id</code></td>
+<td>DELETE</td>
+<td>Delete story</td>
+</tr>
+</tbody></table>
+<h3>Regeneration</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/stories/:id/regenerate/scene-description/:pageNum</code></td>
+<td>POST</td>
+<td>Regenerate scene</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id/regenerate/image/:pageNum</code></td>
+<td>POST</td>
+<td>Regenerate image</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id/regenerate/cover/:coverType</code></td>
+<td>POST</td>
+<td>Regenerate cover</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id/edit/image/:pageNum</code></td>
+<td>POST</td>
+<td>Edit image with prompt</td>
+</tr>
+<tr>
+<td><code>/api/stories/:id/edit/cover/:coverType</code></td>
+<td>POST</td>
+<td>Edit cover with prompt</td>
+</tr>
+</tbody></table>
+<h3>Characters</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/characters</code></td>
+<td>GET</td>
+<td>Get user&#39;s characters</td>
+</tr>
+<tr>
+<td><code>/api/characters</code></td>
+<td>POST</td>
+<td>Save characters</td>
+</tr>
+<tr>
+<td><code>/api/characters/analyze</code></td>
+<td>POST</td>
+<td>Analyze photo</td>
+</tr>
+<tr>
+<td><code>/api/avatars/generate</code></td>
+<td>POST</td>
+<td>Generate avatar</td>
+</tr>
+</tbody></table>
+<h3>Admin</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/admin/metrics/summary</code></td>
+<td>GET</td>
+<td>Dashboard metrics</td>
+</tr>
+<tr>
+<td><code>/api/admin/users</code></td>
+<td>GET</td>
+<td>List all users</td>
+</tr>
+<tr>
+<td><code>/api/admin/user-storage</code></td>
+<td>GET</td>
+<td>Storage usage</td>
+</tr>
+</tbody></table>
+<h3>Payments</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/api/stripe/create-checkout-session</code></td>
+<td>POST</td>
+<td>Create payment</td>
+</tr>
+<tr>
+<td><code>/api/stripe/webhook</code></td>
+<td>POST</td>
+<td>Stripe webhooks</td>
+</tr>
+<tr>
+<td><code>/api/pricing</code></td>
+<td>GET</td>
+<td>Get pricing tiers</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. External Service Integrations</h2>
+<h3>Firebase Authentication</h3>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Firebase project at console.firebase.google.com</li>
+<li>Enable Email/Password authentication</li>
+<li>Generate service account key (Project Settings → Service Accounts)</li>
+<li>Base64 encode: <code>base64 -i service-account.json</code></li>
+<li>Set <code>FIREBASE_SERVICE_ACCOUNT</code> environment variable</li>
+<li>Add your domain to authorized domains</li>
+</ol>
+<h3>Stripe Payments</h3>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Stripe account at dashboard.stripe.com</li>
+<li>Get API keys (Settings → API keys)</li>
+<li>Create webhook endpoint: <code>https://your-domain.com/api/stripe/webhook</code></li>
+<li>Select events: <code>checkout.session.completed</code>, <code>payment_intent.succeeded</code></li>
+<li>Set <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_WEBHOOK_SECRET</code></li>
+</ol>
+<h3>Gelato Print API</h3>
+<p><strong>Flow:</strong></p>
+<ol>
+<li>User completes Stripe payment</li>
+<li>Server generates print-ready PDF</li>
+<li>Server creates Gelato order via API</li>
+<li>Gelato prints and ships book</li>
+</ol>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Gelato account at gelato.com</li>
+<li>Get API key from dashboard</li>
+<li>Set <code>GELATO_API_KEY</code></li>
+</ol>
+<h3>Resend Email</h3>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Create Resend account at resend.com</li>
+<li>Verify your domain</li>
+<li>Get API key</li>
+<li>Set <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code></li>
+</ol>
+<p><strong>Templates:</strong> Located in <code>emails/*.html</code></p>
+<h3>Claude (Anthropic)</h3>
+<p><strong>Used for:</strong> Story outline, text generation, scene descriptions, quality evaluation</p>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Get API key from console.anthropic.com</li>
+<li>Set <code>ANTHROPIC_API_KEY</code></li>
+</ol>
+<h3>Gemini (Google AI)</h3>
+<p><strong>Used for:</strong> Character photo analysis, scene images, cover images, quality scoring</p>
+<p><strong>Models:</strong></p>
+<ul>
+<li><code>gemini-2.5-flash-preview-05-20</code> - Image generation</li>
+<li>Spatial reasoning for quality evaluation</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Get API key from ai.google.dev</li>
+<li>Set <code>GEMINI_API_KEY</code></li>
+</ol>
+<h3>Runware</h3>
+<p><strong>Used for:</strong> Dev mode cheap images, inpainting, ACE++ avatars</p>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Get API key from runware.ai</li>
+<li>Set <code>RUNWARE_API_KEY</code></li>
+</ol>
+<hr>
+<h2>8. Image Generation &amp; Repair System</h2>
+<h3>Image Generation Models</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Provider</th>
+<th>Cost</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>gemini-2.5-flash-image</code></td>
+<td>Google</td>
+<td>~$0.04/img</td>
+<td>Page illustrations (default)</td>
+</tr>
+<tr>
+<td><code>gemini-3-pro-image-preview</code></td>
+<td>Google</td>
+<td>~$0.15/img</td>
+<td>Cover images (higher quality)</td>
+</tr>
+<tr>
+<td><code>flux-schnell</code> (runware:5@1)</td>
+<td>Runware</td>
+<td>~$0.0006/img</td>
+<td>Dev mode testing (ultra cheap)</td>
+</tr>
+<tr>
+<td><code>flux-dev</code> (runware:6@1)</td>
+<td>Runware</td>
+<td>~$0.004/img</td>
+<td>Better quality testing</td>
+</tr>
+<tr>
+<td><code>ace-plus-plus</code></td>
+<td>Runware</td>
+<td>~$0.005/img</td>
+<td>Face-consistent avatar generation</td>
+</tr>
+</tbody></table>
+<p>Configuration in <code>server/config/models.js</code>:</p>
+<pre><code class="language-javascript">MODEL_DEFAULTS = {
+  pageImage: &#39;gemini-2.5-flash-image&#39;,
+  coverImage: &#39;gemini-3-pro-image-preview&#39;,
+  qualityEval: &#39;gemini-2.5-flash&#39;,
+  inpaintBackend: &#39;runware&#39;
+}
+</code></pre>
+<h3>Quality Evaluation</h3>
+<p><strong>Model:</strong> <code>gemini-2.5-flash</code> (required - has spatial reasoning for bounding boxes)</p>
+<p><strong>Note:</strong> <code>gemini-2.0-flash</code> cannot return bounding boxes, so it cannot do auto-repair.</p>
+<p><strong>Two evaluation types:</strong></p>
+<ol>
+<li><strong>Scene evaluation</strong> (<code>prompts/image-evaluation.txt</code>) - Character consistency, anatomy, objects</li>
+<li><strong>Cover evaluation</strong> (<code>prompts/cover-image-evaluation.txt</code>) - Text-focused (titles, readability)</li>
+</ol>
+<p><strong>Scoring:</strong> 0-10 scale</p>
+<ul>
+<li>PASS: Score 5+ (usable)</li>
+<li>SOFT_FAIL: Score 3-4 (consider retry)</li>
+<li>HARD_FAIL: Score 0-2 (must retry)</li>
+</ul>
+<p><strong>Output includes <code>fix_targets</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;score&quot;: 6,
+  &quot;fix_targets&quot;: [
+    {&quot;bbox&quot;: [0.2, 0.3, 0.6, 0.7], &quot;issue&quot;: &quot;extra finger&quot;, &quot;fix&quot;: &quot;Fix hand to have 5 fingers&quot;}
+  ]
+}
+</code></pre>
+<h3>Inpainting/Repair Backends</h3>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Model</th>
+<th>Cost</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>runware</code> (default)</td>
+<td>SDXL (runware:101@1)</td>
+<td>~$0.002/img</td>
+<td>Objects, backgrounds</td>
+</tr>
+<tr>
+<td><code>runware-flux-fill</code></td>
+<td>FLUX Fill (runware:102@1)</td>
+<td>~$0.05/img</td>
+<td>Face repair</td>
+</tr>
+<tr>
+<td><code>gemini</code></td>
+<td>gemini-2.5-flash-image</td>
+<td>~$0.03/img</td>
+<td>Text-based editing (not true inpainting)</td>
+</tr>
+</tbody></table>
+<p><strong>Key difference:</strong></p>
+<ul>
+<li><strong>Runware (real inpainting):</strong> Uses binary mask images (white = repaint area, black = keep). Model trained specifically for inpainting.</li>
+<li><strong>Gemini (workaround):</strong> Uses text-based coordinates in prompt (&quot;edit region from top 20% to 60%&quot;). Not true inpainting - may not precisely respect boundaries or may change other areas.</li>
+</ul>
+<h3>Auto-Repair Flow</h3>
+<p>When clicking &quot;Repair&quot; button (admin-only):</p>
+<ol>
+<li><p><strong>Check for pre-computed fix targets</strong></p>
+<ul>
+<li>Quality evaluation already saved <code>fix_targets</code> with bounding boxes</li>
+<li>If available, skip inspection step</li>
+</ul>
+</li>
+<li><p><strong>If no pre-computed targets: Inspect image</strong></p>
+<ul>
+<li><code>inspectImageForErrors()</code> calls Gemini 2.0 Flash (utility model)</li>
+<li>Looks for physics errors (extra fingers, floating objects, anatomical issues)</li>
+<li>Returns: <code>error_type</code>, <code>description</code>, <code>bounding_box [ymin, xmin, ymax, xmax]</code>, <code>fix_prompt</code></li>
+</ul>
+</li>
+<li><p><strong>Generate mask from bounding box</strong></p>
+<ul>
+<li>Creates black/white mask image using Sharp</li>
+<li>White rectangle = area to repaint</li>
+</ul>
+</li>
+<li><p><strong>Call inpainting backend</strong></p>
+<ul>
+<li>Default: Runware SDXL with mask + original image + fix prompt</li>
+<li>Returns edited image with only that region modified</li>
+</ul>
+</li>
+<li><p><strong>Save result</strong></p>
+<ul>
+<li>Updates <code>sceneImages</code> array with new image</li>
+<li>Sets <code>wasAutoRepaired: true</code></li>
+<li>Stores <code>repairHistory</code> for debugging</li>
+</ul>
+</li>
+</ol>
+<p><strong>Limit:</strong> Masks covering &gt;25% of image are skipped (inpainting doesn&#39;t work well for large areas).</p>
+<h3>Repair Endpoint</h3>
+<pre><code>POST /api/stories/:id/repair/image/:pageNum
+</code></pre>
+<ul>
+<li><strong>Admin-only</strong> (dev mode feature)</li>
+<li>Located in <code>server.js:3094</code></li>
+<li>Uses <code>autoRepairWithTargets()</code> or <code>autoRepairImage()</code> from <code>server/lib/images.js</code></li>
+</ul>
+<h3>Text Models</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Provider</th>
+<th>Cost (per 1M tokens)</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>claude-sonnet-4-5</code></td>
+<td>Anthropic</td>
+<td>$3 in / $15 out</td>
+<td>Story outline, text, scenes</td>
+</tr>
+<tr>
+<td><code>claude-3-5-haiku</code></td>
+<td>Anthropic</td>
+<td>$0.25 in / $1.25 out</td>
+<td>Fast/cheap tasks</td>
+</tr>
+<tr>
+<td><code>gemini-2.5-flash</code></td>
+<td>Google</td>
+<td>$0.30 in / $2.50 out</td>
+<td>Quality evaluation</td>
+</tr>
+<tr>
+<td><code>gemini-2.0-flash</code></td>
+<td>Google</td>
+<td>$0.10 in / $0.40 out</td>
+<td>Utility tasks (fast)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>9. Deployment</h2>
+<h3>Deploy to Railway (Recommended)</h3>
+<p><strong>Step 1: Connect Repository</strong></p>
+<ol>
+<li>Go to <a href="https://railway.app/">https://railway.app/</a></li>
+<li>Sign up/login with GitHub</li>
+<li>Click &quot;New Project&quot; → &quot;Deploy from GitHub repo&quot;</li>
+<li>Select MagicalStory repository</li>
+<li>Railway auto-detects Node.js</li>
+</ol>
+<p><strong>Step 2: Add PostgreSQL Database</strong></p>
+<ol>
+<li>Click &quot;+ New&quot; → &quot;Database&quot; → &quot;PostgreSQL&quot;</li>
+<li>Railway automatically sets <code>DATABASE_URL</code></li>
+</ol>
+<p><strong>Step 3: Configure Environment Variables</strong>
+Add all required variables in Railway dashboard → Variables tab</p>
+<p><strong>Step 4: Custom Domain (Optional)</strong></p>
+<ol>
+<li>Settings → Domains</li>
+<li>Add custom domain</li>
+<li>Configure DNS CNAME at your registrar</li>
+</ol>
+<h3>Manual Deployment</h3>
+<pre><code class="language-bash"># Push to master triggers auto-deploy
+git push origin master
+
+# Or manual deploy with Railway CLI
+railway up
+</code></pre>
+<h3>Production Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> PostgreSQL database provisioned</li>
+<li><input checked="" disabled="" type="checkbox"> All environment variables configured</li>
+<li><input checked="" disabled="" type="checkbox"> Firebase authentication working</li>
+<li><input checked="" disabled="" type="checkbox"> Story generation working</li>
+<li><input checked="" disabled="" type="checkbox"> Email notifications working</li>
+<li><input checked="" disabled="" type="checkbox"> Payment processing working</li>
+<li><input checked="" disabled="" type="checkbox"> Print ordering working</li>
+<li><input checked="" disabled="" type="checkbox"> SSL/HTTPS enabled (automatic on Railway)</li>
+</ul>
+<hr>
+<h2>10. Development</h2>
+<h3>Local Development</h3>
+<pre><code class="language-bash"># Install all dependencies
+npm install &amp;&amp; cd client &amp;&amp; npm install &amp;&amp; cd ..
+
+# Development (two terminals)
+npm run dev                    # Backend on :3000
+cd client &amp;&amp; npm run dev       # Frontend on :5173
+
+# Build frontend for production
+cd client &amp;&amp; npm run build     # Outputs to /dist
+</code></pre>
+<h3>Model Configuration</h3>
+<p>Models configured in <code>server/config/models.js</code>. Frontend can override via developer mode.</p>
+<p><strong>Important notes:</strong></p>
+<ul>
+<li><code>gemini-2.5-flash</code> required for quality evaluation (spatial reasoning)</li>
+<li>Runware has 3000 char prompt limit (vs 30000 for Gemini)</li>
+<li>ACE++ uses <code>referenceImages</code> at root level</li>
+</ul>
+<h3>Prompt Templates</h3>
+<p>All prompts in <code>/prompts/*.txt</code>, loaded via <code>server/services/prompts.js</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>avatar-main-prompt.txt</code></td>
+<td>Gemini avatar generation</td>
+</tr>
+<tr>
+<td><code>avatar-ace-prompt.txt</code></td>
+<td>Runware ACE++ avatars</td>
+</tr>
+<tr>
+<td><code>image-generation.txt</code></td>
+<td>Scene illustrations</td>
+</tr>
+<tr>
+<td><code>image-evaluation.txt</code></td>
+<td>Quality evaluation</td>
+</tr>
+<tr>
+<td><code>outline.txt</code></td>
+<td>Story outline</td>
+</tr>
+<tr>
+<td><code>story-text-batch.txt</code></td>
+<td>Story text</td>
+</tr>
+<tr>
+<td><code>scene-descriptions.txt</code></td>
+<td>Scene descriptions</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>11. Troubleshooting</h2>
+<h3>Common Issues</h3>
+<p><strong>Story generation fails:</strong></p>
+<ul>
+<li>Check Railway logs for error details</li>
+<li>Verify API keys are valid</li>
+<li>Check Gemini image generation limits</li>
+</ul>
+<p><strong>Images not generating:</strong></p>
+<ul>
+<li>Gemini content safety filters may block prompts</li>
+<li>Check <code>finishReason</code> and <code>finishMessage</code> in logs</li>
+<li>Retry usually works</li>
+</ul>
+<p><strong>Email not sending:</strong></p>
+<ul>
+<li>Verify Resend API key</li>
+<li>Check domain verification in Resend dashboard</li>
+<li>Check ADMIN_EMAIL env variable</li>
+</ul>
+<p><strong>Build fails:</strong></p>
+<ul>
+<li>Check Railway logs</li>
+<li>Verify all dependencies in package.json</li>
+<li>Ensure client build succeeds</li>
+</ul>
+<p><strong>Database connection errors:</strong></p>
+<ul>
+<li>Verify DATABASE_URL is correct</li>
+<li>Check PostgreSQL service is running</li>
+</ul>
+<h3>View Logs</h3>
+<pre><code class="language-bash"># Railway CLI
+railway logs
+
+# Or in Railway dashboard → Deployments → View Logs
+</code></pre>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>ARCHITECTURE.md</code>.
+</footer>
+</body>
+</html>

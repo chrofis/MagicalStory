@@ -1,0 +1,1331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CHARACTER-SYSTEM-REQUIREMENTS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Character Creation &amp; Modification System - Requirements Document</h1>
+<p>This document specifies all requirements for implementing the character creation, modification, photo upload, and avatar generation system. A developer following this document should be able to implement a functionally equivalent system.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-character-data-model">Character Data Model</a></li>
+<li><a href="#3-photo-upload--analysis">Photo Upload &amp; Analysis</a></li>
+<li><a href="#4-physical-traits">Physical Traits</a></li>
+<li><a href="#5-psychological-traits">Psychological Traits</a></li>
+<li><a href="#6-clothing-system">Clothing System</a></li>
+<li><a href="#7-avatar-generation">Avatar Generation</a></li>
+<li><a href="#8-character-saveload">Character Save/Load</a></li>
+<li><a href="#9-frontend-ui-requirements">Frontend UI Requirements</a></li>
+<li><a href="#10-database-schema">Database Schema</a></li>
+<li><a href="#11-api-endpoints">API Endpoints</a></li>
+<li><a href="#12-error-handling">Error Handling</a></li>
+<li><a href="#13-race-condition-prevention">Race Condition Prevention</a></li>
+<li><a href="#14-performance-requirements">Performance Requirements</a></li>
+</ol>
+<hr>
+<h2>1. Overview</h2>
+<h3>1.1 Purpose</h3>
+<p>The character system allows users to create characters for personalized story generation. Characters can be:</p>
+<ul>
+<li>Created from uploaded photos (face detected, traits extracted)</li>
+<li>Created manually without photos</li>
+<li>Modified after creation (with restrictions on certain fields)</li>
+</ul>
+<h3>1.2 Key Principles</h3>
+<ol>
+<li><strong>Photo Analysis is Authoritative</strong>: Traits extracted from photos take precedence</li>
+<li><strong>Backend Owns Avatars</strong>: Frontend NEVER writes avatar data; backend manages exclusively</li>
+<li><strong>Preserve Over Overwrite</strong>: On save, preserve existing DB data that frontend doesn&#39;t have</li>
+<li><strong>Trait Source Tracking</strong>: Track where each trait value came from (<code>&#39;photo&#39;</code> or <code>&#39;user&#39;</code>)</li>
+</ol>
+<hr>
+<h2>2. Character Data Model</h2>
+<h3>2.1 Core Character Interface</h3>
+<pre><code class="language-typescript">interface Character {
+  // Identity
+  id: number;                    // Unique identifier (timestamp-based)
+  name: string;                  // Required, user-editable
+  gender: &#39;male&#39; | &#39;female&#39; | &#39;other&#39;;
+  age: string;                   // Age as string (e.g., &quot;7&quot;, &quot;42&quot;)
+  ageCategory?: AgeCategory;     // Auto-computed from age for image generation
+
+  // Physical traits (nested object)
+  physical?: PhysicalTraits;
+  physicalTraitsSource?: PhysicalTraitsSource;
+
+  // Psychological traits (nested object)
+  traits: PsychologicalTraits;
+
+  // Photos
+  photos?: CharacterPhotos;
+
+  // Avatars - READ ONLY FROM FRONTEND
+  avatars?: CharacterAvatars;
+
+  // Clothing (what they&#39;re wearing in reference photo)
+  clothing?: CharacterClothing;
+  clothingSource?: ClothingSource;
+
+  // Generated outfits per page (during story generation)
+  generatedOutfits?: Record&lt;number, GeneratedOutfit&gt;;
+}
+</code></pre>
+<h3>2.2 Physical Traits</h3>
+<pre><code class="language-typescript">interface PhysicalTraits {
+  height?: string;              // Height description
+  build?: string;               // Body type (e.g., &quot;slim&quot;, &quot;athletic&quot;)
+  face?: string;                // Face shape description
+  eyeColor?: string;            // Eye color (e.g., &quot;blue&quot;, &quot;brown&quot;, &quot;green&quot;)
+  eyeColorHex?: string;         // Hex color code (e.g., &quot;#6B4423&quot;)
+  hairColor?: string;           // Hair color (e.g., &quot;blonde&quot;, &quot;brown&quot;, &quot;black&quot;)
+  hairColorHex?: string;        // Hex color code (e.g., &quot;#3B2314&quot;)
+  hairLength?: string;          // Hair length (e.g., &quot;shoulder-length&quot;, &quot;chin-length&quot;, &quot;mid-back&quot;)
+  hairStyle?: string;           // Hair texture/style (e.g., &quot;straight&quot;, &quot;wavy&quot;, &quot;curly ponytail&quot;)
+  hair?: string;                // Legacy: combined hair description (deprecated)
+  facialHair?: string;          // For males (e.g., &quot;none&quot;, &quot;stubble&quot;, &quot;beard&quot;, &quot;mustache&quot;, &quot;goatee&quot;)
+  skinTone?: string;            // Skin tone (e.g., &quot;fair&quot;, &quot;medium&quot;, &quot;olive&quot;, &quot;dark&quot;)
+  skinUndertone?: string;       // Skin undertone (e.g., &quot;warm&quot;, &quot;cool&quot;, &quot;neutral&quot;)
+  skinToneHex?: string;         // Hex color code (e.g., &quot;#E8BEAC&quot;)
+  other?: string;               // Glasses, birthmarks, always-present accessories
+  detailedHairAnalysis?: string; // Detailed hair analysis from avatar evaluation
+  apparentAge?: AgeCategory;    // How old they look in photo (from analysis or user override)
+}
+
+// Source tracking for each physical trait
+type TraitSource = &#39;photo&#39; | &#39;extracted&#39; | &#39;user&#39;;
+
+interface PhysicalTraitsSource {
+  build?: TraitSource;
+  face?: TraitSource;
+  eyeColor?: TraitSource;
+  hairColor?: TraitSource;
+  hairLength?: TraitSource;
+  hairStyle?: TraitSource;
+  hair?: TraitSource;          // Legacy
+  facialHair?: TraitSource;
+  other?: TraitSource;
+  skinTone?: TraitSource;
+  apparentAge?: TraitSource;
+}
+</code></pre>
+<h3>2.3 Psychological Traits</h3>
+<pre><code class="language-typescript">interface PsychologicalTraits {
+  strengths: string[];          // Positive traits (e.g., [&quot;brave&quot;, &quot;kind&quot;, &quot;curious&quot;])
+  flaws: string[];              // Negative traits (e.g., [&quot;impatient&quot;, &quot;stubborn&quot;])
+  challenges: string[];         // Challenges they face (e.g., [&quot;fear of heights&quot;])
+  specialDetails?: string;      // Free-form additional details
+}
+</code></pre>
+<h3>2.4 Clothing</h3>
+<pre><code class="language-typescript">interface CharacterClothing {
+  current?: string;             // Legacy: free-text description
+  structured?: StructuredClothing;
+}
+
+interface StructuredClothing {
+  upperBody?: string;           // T-shirt, sweater, blouse, jacket, etc.
+  lowerBody?: string;           // Pants, jeans, skirt, shorts, etc.
+  shoes?: string;               // Sneakers, boots, sandals, etc.
+  fullBody?: string;            // Dress, gown, jumpsuit - overrides upper+lower
+}
+
+// Source tracking for clothing
+interface ClothingSource {
+  upperBody?: TraitSource;
+  lowerBody?: TraitSource;
+  shoes?: TraitSource;
+  fullBody?: TraitSource;
+}
+</code></pre>
+<h3>2.5 Photo Data Structure</h3>
+<pre><code class="language-typescript">interface CharacterPhotos {
+  original?: string;            // Uploaded photo URL
+  face?: string;                // Cropped face thumbnail URL
+  body?: string;                // Cropped body URL
+  bodyNoBg?: string;            // Body with background removed
+  faceBox?: BoundingBox;        // Face detection coordinates
+  bodyBox?: BoundingBox;        // Body detection coordinates
+}
+
+interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// For multi-face selection UI
+interface DetectedFace {
+  id: number;
+  confidence: number;
+  faceBox: BoundingBox;
+  thumbnail: string;            // Base64 200x200 image
+}
+</code></pre>
+<h3>2.6 Avatar Data Structure</h3>
+<pre><code class="language-typescript">type ClothingCategory = &#39;winter&#39; | &#39;standard&#39; | &#39;summer&#39; | &#39;formal&#39;;
+
+interface CharacterAvatars {
+  // Generated avatar images per clothing category (base64 or URLs)
+  winter?: string;
+  standard?: string;
+  summer?: string;
+  formal?: string;
+
+  // Face thumbnails for quick display in lists
+  faceThumbnails?: Record&lt;ClothingCategory, string&gt;;
+
+  // Metadata
+  hasFullAvatars?: boolean;      // Flag indicating full avatars exist
+  generatedAt?: string;
+  status?: &#39;pending&#39; | &#39;generating&#39; | &#39;complete&#39; | &#39;failed&#39;;
+  stale?: boolean;               // True when avatars were generated from previous photo
+
+  // Extracted clothing descriptions per avatar
+  clothing?: Record&lt;ClothingCategory, string&gt;;
+
+  // Dev mode only fields
+  faceMatch?: Record&lt;ClothingCategory, FaceMatchResult&gt;;
+  prompts?: Record&lt;ClothingCategory, string&gt;;
+  styledAvatars?: Record&lt;string, StyledAvatarSet&gt;;
+  costumed?: Record&lt;string, CostumedAvatarData&gt;;
+}
+</code></pre>
+<h3>2.7 Age Categories</h3>
+<pre><code class="language-typescript">type AgeCategory =
+  | &#39;infant&#39; | &#39;toddler&#39; | &#39;preschooler&#39; | &#39;kindergartner&#39;
+  | &#39;young-school-age&#39; | &#39;school-age&#39; | &#39;preteen&#39; | &#39;young-teen&#39;
+  | &#39;teenager&#39; | &#39;young-adult&#39; | &#39;adult&#39; | &#39;middle-aged&#39; | &#39;senior&#39; | &#39;elderly&#39;;
+</code></pre>
+<hr>
+<h2>3. Photo Upload &amp; Analysis</h2>
+<h3>3.1 Upload Flow</h3>
+<pre><code>User selects photo
+    ↓
+Frontend sends to /api/avatars/analyze-photo
+    ↓
+Backend processes:
+  1. Face detection (find all faces)
+  2. If multiple faces → return all for selection
+  3. If single face → auto-select
+  4. Crop face region
+  5. Crop body region (from face down)
+  6. Remove background from body
+  7. Extract physical traits from face
+    ↓
+Return to frontend:
+  - photos object (all URLs)
+  - extracted traits
+  - all detected faces (if multiple)
+    ↓
+Frontend updates character state
+    ↓
+Avatar generation triggered (async)
+</code></pre>
+<h3>3.2 Face Detection Requirements</h3>
+<ul>
+<li><strong>Minimum face size</strong>: 50x50 pixels</li>
+<li><strong>Confidence threshold</strong>: 0.7 (70%)</li>
+<li><strong>Multiple faces</strong>: Return all faces with bounds, let user select</li>
+<li><strong>No face detected</strong>: Return error, allow manual trait entry</li>
+</ul>
+<h3>3.3 Photo Processing Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Description</th>
+<th>Format</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>photos.original</code></td>
+<td>Original uploaded image</td>
+<td>URL (stored in cloud)</td>
+</tr>
+<tr>
+<td><code>photos.face</code></td>
+<td>Cropped face (square)</td>
+<td>URL</td>
+</tr>
+<tr>
+<td><code>photos.body</code></td>
+<td>Full body from face down</td>
+<td>URL</td>
+</tr>
+<tr>
+<td><code>photos.bodyNoBg</code></td>
+<td>Body with background removed</td>
+<td>URL</td>
+</tr>
+<tr>
+<td><code>photos.thumbnail</code></td>
+<td>Small preview</td>
+<td>Base64 (max 100KB)</td>
+</tr>
+</tbody></table>
+<h3>3.4 Photo Analysis Output</h3>
+<p>The analyze-photo endpoint returns:</p>
+<ul>
+<li><code>faceThumbnail</code> - Cropped face image (base64)</li>
+<li><code>bodyCrop</code> - Body cropped from face down (base64)</li>
+<li><code>bodyNoBg</code> - Body with background removed (base64)</li>
+<li><code>faceBox</code> - Bounding box coordinates for face</li>
+<li><code>bodyBox</code> - Bounding box coordinates for body</li>
+<li><code>characterId</code> - ID of created/updated character</li>
+</ul>
+<p><strong>Note</strong>: Physical traits (eyeColor, hairColor, skinTone, etc.) are NOT extracted during photo analysis. They are extracted later during avatar evaluation.</p>
+<h3>3.5 Physical Trait Extraction (During Avatar Evaluation)</h3>
+<p>Physical traits are extracted when avatars are generated and evaluated. Extracted into <code>physical</code> object:</p>
+<ul>
+<li><code>eyeColor</code> + <code>eyeColorHex</code> - Eye color with hex code</li>
+<li><code>hairColor</code> + <code>hairColorHex</code> - Hair color with hex code</li>
+<li><code>hairLength</code> - Length description (e.g., &quot;shoulder-length&quot;)</li>
+<li><code>hairStyle</code> - Texture/style (e.g., &quot;straight&quot;, &quot;wavy&quot;)</li>
+<li><code>skinTone</code> + <code>skinToneHex</code> - Skin tone with hex code</li>
+<li><code>facialHair</code> - For males (e.g., &quot;none&quot;, &quot;beard&quot;)</li>
+<li><code>build</code> - Body type</li>
+<li><code>apparentAge</code> - How old they look (mapped to AgeCategory)</li>
+<li><code>detailedHairAnalysis</code> - Comprehensive hair description</li>
+</ul>
+<h3>3.6 Photo Re-upload Behavior</h3>
+<p><strong>CRITICAL</strong>: When user uploads a new photo for existing character:</p>
+<ol>
+<li>DO NOT erase existing avatar images immediately</li>
+<li>Set <code>avatars.stale = true</code> and <code>avatars.status = &#39;pending&#39;</code></li>
+<li>Preserve existing avatar images until new ones are generated</li>
+<li>Replace old avatars only when new generation completes</li>
+</ol>
+<pre><code class="language-javascript">// CORRECT implementation:
+if (character.avatars) {
+  character.avatars.stale = true;
+  character.avatars.status = &#39;pending&#39;;
+} else {
+  character.avatars = { status: &#39;pending&#39;, stale: true };
+}
+// WRONG - destroys existing avatars:
+// character.avatars = { status: &#39;pending&#39;, stale: true };
+</code></pre>
+<hr>
+<h2>4. Physical Traits</h2>
+<p>Physical traits are stored in the nested <code>physical</code> object on the character.</p>
+<h3>4.1 Identity Fields (Top-Level)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Editable</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>gender</code></td>
+<td>&#39;male&#39; | &#39;female&#39; | &#39;other&#39;</td>
+<td>Always</td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>age</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Age as string (e.g., &quot;7&quot;)</td>
+</tr>
+<tr>
+<td><code>ageCategory</code></td>
+<td>AgeCategory</td>
+<td>Auto-computed</td>
+<td>Derived from age for image generation</td>
+</tr>
+</tbody></table>
+<h3>4.2 Physical Traits (Nested in <code>physical</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Editable</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>height</code></td>
+<td>string</td>
+<td>Always</td>
+<td>User only (in cm, e.g., &quot;120&quot;)</td>
+</tr>
+<tr>
+<td><code>build</code></td>
+<td>string</td>
+<td>Always</td>
+<td>User or photo</td>
+</tr>
+<tr>
+<td><code>eyeColor</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user</td>
+</tr>
+<tr>
+<td><code>eyeColorHex</code></td>
+<td>string</td>
+<td>From photo</td>
+<td>Auto-extracted</td>
+</tr>
+<tr>
+<td><code>hairColor</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user</td>
+</tr>
+<tr>
+<td><code>hairColorHex</code></td>
+<td>string</td>
+<td>From photo</td>
+<td>Auto-extracted</td>
+</tr>
+<tr>
+<td><code>hairLength</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user</td>
+</tr>
+<tr>
+<td><code>hairStyle</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user</td>
+</tr>
+<tr>
+<td><code>facialHair</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user (males only)</td>
+</tr>
+<tr>
+<td><code>skinTone</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Photo or user</td>
+</tr>
+<tr>
+<td><code>skinToneHex</code></td>
+<td>string</td>
+<td>From photo</td>
+<td>Auto-extracted</td>
+</tr>
+<tr>
+<td><code>other</code></td>
+<td>string</td>
+<td>Always</td>
+<td>Birthmarks, accessories</td>
+</tr>
+<tr>
+<td><code>apparentAge</code></td>
+<td>AgeCategory</td>
+<td>Always</td>
+<td>From photo or user override</td>
+</tr>
+</tbody></table>
+<h3>4.3 Trait Source Tracking</h3>
+<p>Each physical trait tracks its source via <code>physicalTraitsSource</code>:</p>
+<pre><code class="language-typescript">physicalTraitsSource: {
+  eyeColor: &#39;photo&#39;,      // Extracted from photo
+  hairColor: &#39;user&#39;,      // User changed it
+  skinTone: &#39;photo&#39;,      // Extracted from photo
+  build: &#39;user&#39;,          // User entered
+}
+</code></pre>
+<p><strong>Rule</strong>: Only <code>&#39;user&#39;</code> source traits are sent to AI generation to avoid reinforcing extraction errors.</p>
+<h3>4.4 Editability Rules</h3>
+<ol>
+<li><strong>All traits are technically editable</strong> - user can override photo-extracted values</li>
+<li><strong>Source tracking matters for generation</strong> - only user-entered values influence AI</li>
+<li><strong>UI hint</strong>: Show photo icon on extracted traits to indicate source</li>
+</ol>
+<hr>
+<h2>5. Psychological Traits</h2>
+<p>Psychological traits are stored in the <code>traits</code> object (required).</p>
+<h3>5.1 Structure</h3>
+<pre><code class="language-typescript">interface PsychologicalTraits {
+  strengths: string[];    // Positive traits
+  flaws: string[];        // Negative traits
+  challenges: string[];   // Challenges they face
+  specialDetails?: string; // Free-form additional info
+}
+</code></pre>
+<h3>5.2 Strengths (Predefined Options)</h3>
+<p>Select from list (English):</p>
+<ul>
+<li>Cheerful, Kind, Caring, Funny, Forgiving, Protective, Loyal, Generous</li>
+<li>Fair-minded, Honest, Confident, Brave, Trustworthy, Determined, Hardworking</li>
+<li>Leader, Patient, Curious, Imaginative, Smart, Creative, Observant</li>
+<li>Resourceful, Energetic, Fast, Strong, Adventurous</li>
+</ul>
+<h3>5.3 Flaws (Predefined Options)</h3>
+<p>Select from list (English):</p>
+<ul>
+<li>Impatient, Distracted, Talkative, Whiny, Messy, Forgetful, Tattletale</li>
+<li>Sore Loser, Stubborn, Lying, Bossy, Gullible, Jealous, Easily scared</li>
+<li>Clingy, Quick-tempered, Selfish, Sneaky, Reckless, Shy, Clumsy</li>
+<li>Lazy, Boastful, Indecisive, Perfectionist</li>
+</ul>
+<h3>5.4 Challenges (Predefined Options)</h3>
+<p>Select from list (English):</p>
+<ul>
+<li>Following rules, Controlling emotions, Sharing with others</li>
+<li>Tests and grades, Making new friends, Speaking in public</li>
+<li>Trying new things, Accepting and asking for help</li>
+<li>Dealing with change, Standing up for oneself</li>
+<li>Fear of the dark, Bad dreams and nightmares</li>
+<li>Monsters, ghosts and things under the bed</li>
+<li>Fear of being alone, Fear of getting lost</li>
+<li>Doctors, dentists and shots, Fear of heights</li>
+<li>Fear of spiders, Fear of loud noises</li>
+</ul>
+<h3>5.5 Editability</h3>
+<p>All psychological traits are ALWAYS editable by user. They are never extracted from photos.</p>
+<hr>
+<h2>6. Clothing System</h2>
+<p>Clothing is stored in the <code>clothing</code> object with structured fields.</p>
+<h3>6.1 Clothing Structure</h3>
+<pre><code class="language-typescript">interface CharacterClothing {
+  current?: string;              // Legacy: free-text description
+  structured?: StructuredClothing;
+}
+
+interface StructuredClothing {
+  upperBody?: string;            // T-shirt, sweater, blouse, jacket
+  lowerBody?: string;            // Pants, jeans, skirt, shorts
+  shoes?: string;                // Sneakers, boots, sandals
+  fullBody?: string;             // Dress, gown - overrides upper+lower
+}
+</code></pre>
+<h3>6.2 Clothing Source Tracking</h3>
+<pre><code class="language-typescript">// Uses same TraitSource type as physical traits
+interface ClothingSource {
+  upperBody?: TraitSource;  // &#39;photo&#39; | &#39;extracted&#39; | &#39;user&#39;
+  lowerBody?: TraitSource;
+  shoes?: TraitSource;
+  fullBody?: TraitSource;
+}
+</code></pre>
+<h3>6.3 Editability</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Description</th>
+<th>Editability</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;photo&#39;</code></td>
+<td>Extracted from uploaded photo</td>
+<td>User can override</td>
+</tr>
+<tr>
+<td><code>&#39;user&#39;</code></td>
+<td>User manually entered</td>
+<td>Editable</td>
+</tr>
+</tbody></table>
+<p><strong>Rule</strong>: Only <code>&#39;user&#39;</code> source clothing is sent to AI generation.</p>
+<hr>
+<h2>7. Avatar Generation</h2>
+<h3>7.1 Avatar Types (ClothingCategory)</h3>
+<p>Four avatar variants can be generated for each character:</p>
+<ol>
+<li><strong>standard</strong> - Default appearance with typical clothing</li>
+<li><strong>winter</strong> - Winter clothing variant (coat, hat, etc.)</li>
+<li><strong>summer</strong> - Summer clothing variant (t-shirt, shorts, etc.)</li>
+<li><strong>formal</strong> - Formal/dressy clothing variant</li>
+</ol>
+<h3>7.2 Generation Flow</h3>
+<pre><code>Character saved with photo
+    ↓
+Avatar job created (async)
+    ↓
+Job polls for character in DB (up to 60 seconds)
+    ↓
+Character found → generate avatars
+    ↓
+AI generates avatar variants (standard, winter, summer, formal)
+    ↓
+Extract face thumbnails from each
+    ↓
+Save to character.avatars in DB
+    ↓
+Update metadata column (without large images)
+    ↓
+Frontend polls job status → receives completion
+    ↓
+Frontend fetches fresh character data with avatars
+</code></pre>
+<h3>7.3 Avatar Job Requirements</h3>
+<ol>
+<li><strong>Async Processing</strong>: Avatar generation runs in background job</li>
+<li><strong>Job Timeout</strong>: 5 minutes maximum</li>
+<li><strong>Character Lookup Retry</strong>: Poll DB for character up to 60 seconds (30 retries × 2 sec)</li>
+<li><strong>Job Status</strong>: Track <code>pending</code> → <code>generating</code> → <code>complete</code> | <code>error</code></li>
+<li><strong>Atomic Save</strong>: Use SQL-level merge to preserve existing data</li>
+</ol>
+<h3>7.4 Frontend Avatar Handling</h3>
+<p><strong>CRITICAL RULE</strong>: Frontend NEVER sends avatars to backend.</p>
+<pre><code class="language-typescript">// When saving character, strip avatars before sending
+function mapCharacterToApi(char: Character): ApiCharacter {
+  const { avatars, ...charWithoutAvatars } = char;
+  // avatars are NEVER sent to backend
+  return charWithoutAvatars;
+}
+</code></pre>
+<h3>7.5 Avatar Retry Logic</h3>
+<p>Frontend must retry to get avatar data after generation:</p>
+<pre><code class="language-typescript">// Wait up to 60 seconds for avatar data
+const maxAttempts = 30;
+for (let attempt = 0; attempt &lt; maxAttempts; attempt++) {
+  if (attempt &gt; 0) {
+    // Exponential backoff: 500ms → 600ms → 720ms → ... → 3000ms max
+    const delay = Math.min(500 * Math.pow(1.2, attempt), 3000);
+    await sleep(delay);
+  }
+
+  const character = await loadFullCharacter(characterId);
+  if (character?.avatars?.standard ||
+      character?.avatars?.winter ||
+      character?.avatars?.summer) {
+    return character; // Got avatars
+  }
+}
+</code></pre>
+<hr>
+<h2>8. Character Save/Load</h2>
+<h3>8.1 Save Flow (POST /api/characters)</h3>
+<pre><code>Frontend prepares character data
+    ↓
+Strip avatars (frontend never sends avatars)
+    ↓
+POST to /api/characters
+    ↓
+Backend: BEGIN transaction
+    ↓
+Backend: SELECT ... FOR UPDATE (lock row)
+    ↓
+Backend: Merge frontend data with DB data:
+  - Frontend data takes precedence for user-editable fields
+  - DB data preserved for: avatars, photos, extracted traits
+    ↓
+Backend: Atomic UPDATE with merged data
+    ↓
+Backend: Update metadata column (lightweight version)
+    ↓
+Backend: COMMIT transaction
+    ↓
+Return merged character to frontend
+</code></pre>
+<h3>8.2 Preserve Query</h3>
+<p>When saving, backend runs a &quot;preserve query&quot; to keep DB-only data:</p>
+<pre><code class="language-sql">SELECT jsonb_build_object(
+  &#39;avatars&#39;, c-&gt;&#39;avatars&#39;,
+  &#39;photos&#39;, c-&gt;&#39;photos&#39;,
+  &#39;photo_url&#39;, c-&gt;&gt;&#39;photo_url&#39;,
+  &#39;body_photo_url&#39;, c-&gt;&gt;&#39;body_photo_url&#39;,
+  &#39;body_no_bg_url&#39;, c-&gt;&gt;&#39;body_no_bg_url&#39;,
+  &#39;thumbnail_url&#39;, c-&gt;&gt;&#39;thumbnail_url&#39;,
+  &#39;hair_length&#39;, c-&gt;&gt;&#39;hair_length&#39;,
+  &#39;skin_tone&#39;, c-&gt;&gt;&#39;skin_tone&#39;,
+  &#39;skin_tone_hex&#39;, c-&gt;&gt;&#39;skin_tone_hex&#39;,
+  &#39;facial_hair&#39;, c-&gt;&gt;&#39;facial_hair&#39;,
+  &#39;detailed_hair_analysis&#39;, c-&gt;&gt;&#39;detailed_hair_analysis&#39;
+) as preserved
+FROM characters,
+     jsonb_array_elements(data-&gt;&#39;characters&#39;) AS c
+WHERE id = $1 AND c-&gt;&gt;&#39;id&#39; = $2
+</code></pre>
+<h3>8.3 Merge Logic</h3>
+<pre><code class="language-javascript">function mergeCharacters(frontendChar, dbChar) {
+  const merged = { ...frontendChar };
+
+  // Always preserve from DB (frontend never has these)
+  merged.avatars = dbChar.avatars;
+  merged.photos = dbChar.photos || merged.photos;
+
+  // Preserve extracted traits if frontend doesn&#39;t have them
+  const preserveIfMissing = [
+    &#39;hair_length&#39;, &#39;skin_tone&#39;, &#39;skin_tone_hex&#39;,
+    &#39;facial_hair&#39;, &#39;detailed_hair_analysis&#39;
+  ];
+
+  for (const field of preserveIfMissing) {
+    if (dbChar[field] &amp;&amp; !frontendChar[field]) {
+      merged[field] = dbChar[field];
+    }
+  }
+
+  return merged;
+}
+</code></pre>
+<h3>8.4 Load Flow</h3>
+<p>Two load modes:</p>
+<ol>
+<li><strong>Metadata (lightweight)</strong>: For lists, no avatar images</li>
+<li><strong>Full data</strong>: For editing, includes all avatar images</li>
+</ol>
+<pre><code>GET /api/characters         → Returns metadata (small)
+GET /api/characters/:id/full → Returns full data (large)
+</code></pre>
+<hr>
+<h2>9. Frontend UI Requirements</h2>
+<h3>9.1 Character Form</h3>
+<h4>9.1.1 Photo Section</h4>
+<ul>
+<li>Upload button with drag-and-drop support</li>
+<li>Preview of uploaded photo</li>
+<li>Face selection UI (if multiple faces detected)</li>
+<li>&quot;Analyzing...&quot; indicator during processing</li>
+<li>Error display if face detection fails</li>
+</ul>
+<h4>9.1.2 Basic Info Section</h4>
+<ul>
+<li>Name input (required)</li>
+<li>Gender selector (male/female/other)</li>
+<li>Age input (string)</li>
+</ul>
+<h4>9.1.3 Physical Traits Section</h4>
+<ul>
+<li>Form fields for all traits in Section 4</li>
+<li>Lock icons on photo-extracted traits</li>
+<li>Tooltips explaining why fields are locked</li>
+<li>Dropdowns for enum values, text inputs for strings</li>
+</ul>
+<h4>9.1.4 Psychological Traits Section</h4>
+<ul>
+<li>Strengths: Multi-select chips from predefined list</li>
+<li>Flaws: Multi-select chips from predefined list</li>
+<li>Challenges: Multi-select chips from predefined list</li>
+<li>Special Details: Optional free-form text area</li>
+</ul>
+<h4>9.1.5 Clothing Section</h4>
+<ul>
+<li>Display extracted/generated clothing</li>
+<li>&quot;Source&quot; indicator (photo/avatar/user)</li>
+<li>Edit button (disabled for photo/avatar sources)</li>
+</ul>
+<h4>9.1.6 Avatar Section</h4>
+<ul>
+<li>Display generated avatars (standard, winter, summer, formal)</li>
+<li>&quot;Generating...&quot; indicator with spinner</li>
+<li>Regenerate button</li>
+<li>Error display if generation failed</li>
+</ul>
+<h3>9.2 State Management</h3>
+<pre><code class="language-typescript">// Local state for character being edited
+const [character, setCharacter] = useState&lt;Character | null&gt;(null);
+
+// Track which character is generating avatars
+const [generatingAvatarForId, setGeneratingAvatarForId] = useState&lt;string | null&gt;(null);
+
+// Disable save button during avatar generation
+const canSave = generatingAvatarForId !== character?.id;
+</code></pre>
+<h3>9.3 Validation</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>gender</code></td>
+<td>Required (male/female/other)</td>
+</tr>
+<tr>
+<td><code>age</code></td>
+<td>Required (string)</td>
+</tr>
+<tr>
+<td><code>traits.strengths</code></td>
+<td>Array of strings</td>
+</tr>
+<tr>
+<td><code>traits.flaws</code></td>
+<td>Array of strings</td>
+</tr>
+<tr>
+<td><code>traits.challenges</code></td>
+<td>Array of strings</td>
+</tr>
+<tr>
+<td><code>traits.specialDetails</code></td>
+<td>Optional, free-form text</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. Database Schema</h2>
+<h3>10.1 Characters Table</h3>
+<pre><code class="language-sql">CREATE TABLE characters (
+  id VARCHAR(255) PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  data JSONB NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for user lookups
+CREATE INDEX idx_characters_user_id ON characters(user_id);
+
+-- Add metadata column if missing (migration)
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS metadata JSONB;
+</code></pre>
+<h3>10.2 Data Column Structure</h3>
+<pre><code class="language-json">{
+  &quot;characters&quot;: [
+    {
+      &quot;id&quot;: &quot;1705432100000&quot;,
+      &quot;name&quot;: &quot;Emma&quot;,
+      &quot;role&quot;: &quot;main&quot;,
+      &quot;gender&quot;: &quot;female&quot;,
+      &quot;age_group&quot;: &quot;child&quot;,
+      &quot;photos&quot;: { ... },
+      &quot;avatars&quot;: { ... },
+      &quot;traitSources&quot;: { ... }
+    }
+  ],
+  &quot;relationships&quot;: {
+    &quot;1705432200000&quot;: &quot;sister&quot;
+  }
+}
+</code></pre>
+<h3>10.3 Metadata Column Structure</h3>
+<p>Lightweight version for list views (no large images):</p>
+<pre><code class="language-json">{
+  &quot;characters&quot;: [
+    {
+      &quot;id&quot;: &quot;1705432100000&quot;,
+      &quot;name&quot;: &quot;Emma&quot;,
+      &quot;role&quot;: &quot;main&quot;,
+      &quot;avatars&quot;: {
+        &quot;status&quot;: &quot;complete&quot;,
+        &quot;faceThumbnails&quot;: { ... }
+      }
+    }
+  ]
+}
+</code></pre>
+<p><strong>Stripped from metadata</strong>: <code>photos</code>, <code>photo_url</code>, <code>body_photo_url</code>, <code>body_no_bg_url</code>, <code>thumbnail_url</code>, <code>clothing_avatars</code>, full avatar images</p>
+<hr>
+<h2>11. API Endpoints</h2>
+<h3>11.1 Character Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/api/characters</code></td>
+<td>List all characters (metadata only)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/characters/:id/full</code></td>
+<td>Get single character with full data</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters</code></td>
+<td>Create/update characters</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/characters/:id</code></td>
+<td>Delete character</td>
+</tr>
+</tbody></table>
+<h3>11.2 Photo Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/api/avatars/analyze-photo</code></td>
+<td>Upload and analyze photo</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/avatars/select-face</code></td>
+<td>Select face from multi-face photo</td>
+</tr>
+</tbody></table>
+<h3>11.3 Avatar Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/api/avatars/generate</code></td>
+<td>Start avatar generation job</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/avatars/job/:id</code></td>
+<td>Get job status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/avatars/regenerate</code></td>
+<td>Regenerate avatars for character</td>
+</tr>
+</tbody></table>
+<h3>11.4 Request/Response Examples</h3>
+<h4>POST /api/avatars/analyze-photo</h4>
+<p>Request:</p>
+<pre><code class="language-json">{
+  &quot;photo&quot;: &quot;data:image/jpeg;base64,...&quot;,
+  &quot;characterId&quot;: &quot;1705432100000&quot;,
+  &quot;characterName&quot;: &quot;Emma&quot;
+}
+</code></pre>
+<p>Response (single face):</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;photos&quot;: {
+    &quot;original&quot;: &quot;https://...&quot;,
+    &quot;face&quot;: &quot;https://...&quot;,
+    &quot;body&quot;: &quot;https://...&quot;,
+    &quot;bodyNoBg&quot;: &quot;https://...&quot;
+  },
+  &quot;traits&quot;: {
+    &quot;gender&quot;: &quot;female&quot;,
+    &quot;age_group&quot;: &quot;child&quot;,
+    &quot;eye_color&quot;: &quot;blue&quot;,
+    &quot;hair_color&quot;: &quot;blonde&quot;
+  },
+  &quot;traitSources&quot;: {
+    &quot;gender&quot;: &quot;photo&quot;,
+    &quot;eye_color&quot;: &quot;photo&quot;
+  }
+}
+</code></pre>
+<p>Response (multiple faces):</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;multipleFaces&quot;: true,
+  &quot;faces&quot;: [
+    { &quot;url&quot;: &quot;...&quot;, &quot;bounds&quot;: {...}, &quot;confidence&quot;: 0.95 },
+    { &quot;url&quot;: &quot;...&quot;, &quot;bounds&quot;: {...}, &quot;confidence&quot;: 0.87 }
+  ]
+}
+</code></pre>
+<h4>POST /api/characters</h4>
+<p>Request:</p>
+<pre><code class="language-json">{
+  &quot;characters&quot;: [
+    {
+      &quot;id&quot;: &quot;1705432100000&quot;,
+      &quot;name&quot;: &quot;Emma&quot;,
+      &quot;gender&quot;: &quot;female&quot;
+      // NOTE: avatars NOT included - backend manages
+    }
+  ]
+}
+</code></pre>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;characters&quot;: [
+    {
+      &quot;id&quot;: &quot;1705432100000&quot;,
+      &quot;name&quot;: &quot;Emma&quot;,
+      &quot;gender&quot;: &quot;female&quot;,
+      &quot;avatars&quot;: {
+        &quot;status&quot;: &quot;complete&quot;,
+        &quot;standard&quot;: &quot;https://...&quot;
+      }
+    }
+  ]
+}
+</code></pre>
+<hr>
+<h2>12. Error Handling</h2>
+<h3>12.1 Photo Upload Errors</h3>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>User Message</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>No face detected</td>
+<td>&quot;No face detected in photo. Please try a different photo.&quot;</td>
+<td>Retry with different photo</td>
+</tr>
+<tr>
+<td>Image too small</td>
+<td>&quot;Image is too small. Please use a larger photo.&quot;</td>
+<td>Retry with larger image</td>
+</tr>
+<tr>
+<td>Invalid format</td>
+<td>&quot;Unsupported image format. Please use JPG or PNG.&quot;</td>
+<td>Retry with supported format</td>
+</tr>
+<tr>
+<td>Processing failed</td>
+<td>&quot;Failed to process photo. Please try again.&quot;</td>
+<td>Retry same photo</td>
+</tr>
+</tbody></table>
+<h3>12.2 Avatar Generation Errors</h3>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>User Message</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Generation failed</td>
+<td>&quot;Failed to generate avatars. Please try again.&quot;</td>
+<td>Click regenerate</td>
+</tr>
+<tr>
+<td>Timeout</td>
+<td>&quot;Avatar generation timed out. Please try again.&quot;</td>
+<td>Click regenerate</td>
+</tr>
+<tr>
+<td>Character not found</td>
+<td>&quot;Character not saved. Please save first.&quot;</td>
+<td>Save character, then regenerate</td>
+</tr>
+</tbody></table>
+<h3>12.3 Save Errors</h3>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>User Message</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Network error</td>
+<td>&quot;Failed to save. Please check your connection.&quot;</td>
+<td>Retry save</td>
+</tr>
+<tr>
+<td>Conflict</td>
+<td>&quot;Character was modified elsewhere. Please refresh.&quot;</td>
+<td>Refresh and re-edit</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>&quot;[Specific field] is invalid&quot;</td>
+<td>Fix field and retry</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>13. Race Condition Prevention</h2>
+<h3>13.1 Problem: Async Avatar Generation vs Character Save</h3>
+<pre><code>Timeline without protection:
+T0: Upload photo → avatar job starts (async)
+T1: User saves character → POST reads DB (no avatars yet)
+T2: POST writes to DB (overwrites with no avatars)
+T3: Avatar job completes → writes avatars
+T4: Character save completes → avatars lost!
+</code></pre>
+<h3>13.2 Solution: Row-Level Locking</h3>
+<pre><code class="language-javascript">// In character POST handler
+await dbQuery(&#39;BEGIN&#39;);
+
+// FIRST: Acquire row lock
+await dbQuery(&#39;SELECT id FROM characters WHERE id = $1 FOR UPDATE&#39;, [id]);
+
+// THEN: Read current data (now locked, can&#39;t change)
+const current = await dbQuery(&#39;SELECT data FROM characters WHERE id = $1&#39;, [id]);
+
+// Merge and save
+const merged = merge(frontendData, current.data);
+await dbQuery(&#39;UPDATE characters SET data = $1 WHERE id = $2&#39;, [merged, id]);
+
+await dbQuery(&#39;COMMIT&#39;);
+</code></pre>
+<h3>13.3 Solution: Frontend Retry with Backoff</h3>
+<p>Frontend waits for avatars to appear (up to 60 seconds):</p>
+<pre><code class="language-typescript">const maxAttempts = 30;
+for (let i = 0; i &lt; maxAttempts; i++) {
+  const delay = Math.min(500 * Math.pow(1.2, i), 3000);
+  await sleep(delay);
+
+  const char = await loadFullCharacter(id);
+  if (char.avatars?.standard) {
+    return char;
+  }
+}
+</code></pre>
+<h3>13.4 Solution: Atomic SQL Merge for Avatar Jobs</h3>
+<p>Avatar job uses SQL-level COALESCE to never overwrite existing data:</p>
+<pre><code class="language-sql">UPDATE characters
+SET data = jsonb_set(
+  data,
+  &#39;{characters}&#39;,
+  (
+    SELECT jsonb_agg(
+      CASE
+        WHEN c-&gt;&gt;&#39;id&#39; = $2
+        THEN c || $3::jsonb  -- Merge, don&#39;t replace
+        ELSE c
+      END
+    )
+    FROM jsonb_array_elements(data-&gt;&#39;characters&#39;) AS c
+  )
+)
+WHERE id = $1
+</code></pre>
+<hr>
+<h2>14. Performance Requirements</h2>
+<h3>14.1 Response Times</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Target</th>
+<th>Maximum</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Character list (metadata)</td>
+<td>200ms</td>
+<td>1s</td>
+</tr>
+<tr>
+<td>Character full load</td>
+<td>500ms</td>
+<td>2s</td>
+</tr>
+<tr>
+<td>Photo upload + analysis</td>
+<td>3s</td>
+<td>10s</td>
+</tr>
+<tr>
+<td>Avatar generation</td>
+<td>15s</td>
+<td>60s</td>
+</tr>
+<tr>
+<td>Character save</td>
+<td>200ms</td>
+<td>1s</td>
+</tr>
+</tbody></table>
+<h3>14.2 Payload Sizes</h3>
+<table>
+<thead>
+<tr>
+<th>Data Type</th>
+<th>Target</th>
+<th>Maximum</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Metadata per character</td>
+<td>10KB</td>
+<td>50KB</td>
+</tr>
+<tr>
+<td>Full data per character</td>
+<td>500KB</td>
+<td>5MB</td>
+</tr>
+<tr>
+<td>Avatar image</td>
+<td>200KB</td>
+<td>1MB</td>
+</tr>
+<tr>
+<td>Thumbnail</td>
+<td>10KB</td>
+<td>50KB</td>
+</tr>
+</tbody></table>
+<h3>14.3 Optimization Strategies</h3>
+<ol>
+<li><strong>Two-column storage</strong>: <code>data</code> (full) vs <code>metadata</code> (lightweight)</li>
+<li><strong>Strip large fields from metadata</strong>: photos, avatar images</li>
+<li><strong>Lazy loading</strong>: Only load full character when editing</li>
+<li><strong>Image compression</strong>: Compress avatars before storage</li>
+<li><strong>Thumbnail generation</strong>: Small previews for lists</li>
+</ol>
+<hr>
+<h2>Appendix A: Trait Options</h2>
+<h3>A.1 Age Categories (AgeCategory type)</h3>
+<p>Used for image generation consistency:</p>
+<ul>
+<li>infant</li>
+<li>toddler</li>
+<li>preschooler</li>
+<li>kindergartner</li>
+<li>young-school-age</li>
+<li>school-age</li>
+<li>preteen</li>
+<li>young-teen</li>
+<li>teenager</li>
+<li>young-adult</li>
+<li>adult</li>
+<li>middle-aged</li>
+<li>senior</li>
+<li>elderly</li>
+</ul>
+<h3>A.2 Clothing Categories</h3>
+<ul>
+<li>winter (warm clothing)</li>
+<li>standard (everyday clothing)</li>
+<li>summer (light clothing)</li>
+<li>formal (dressy clothing)</li>
+</ul>
+<h3>A.3 Build Types (examples)</h3>
+<ul>
+<li>slim</li>
+<li>average</li>
+<li>athletic</li>
+<li>stocky</li>
+<li>heavy</li>
+</ul>
+<hr>
+<h2>Appendix B: Implementation Checklist</h2>
+<h3>Backend</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Characters table with <code>data</code> and <code>metadata</code> columns</li>
+<li><input disabled="" type="checkbox"> Photo upload endpoint with face/body detection</li>
+<li><input disabled="" type="checkbox"> Multi-face detection and selection</li>
+<li><input disabled="" type="checkbox"> Avatar generation job system</li>
+<li><input disabled="" type="checkbox"> Physical trait extraction during avatar evaluation</li>
+<li><input disabled="" type="checkbox"> Character save with preserve query</li>
+<li><input disabled="" type="checkbox"> Row-level locking for race conditions</li>
+<li><input disabled="" type="checkbox"> Atomic SQL merge for avatar jobs</li>
+<li><input disabled="" type="checkbox"> Metadata stripping for list endpoints</li>
+</ul>
+<h3>Frontend</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Photo upload with drag-and-drop</li>
+<li><input disabled="" type="checkbox"> Face selection UI</li>
+<li><input disabled="" type="checkbox"> Character form with all trait fields</li>
+<li><input disabled="" type="checkbox"> Trait locking based on source</li>
+<li><input disabled="" type="checkbox"> Avatar display with loading states</li>
+<li><input disabled="" type="checkbox"> Retry logic with exponential backoff</li>
+<li><input disabled="" type="checkbox"> Never send avatars to backend</li>
+<li><input disabled="" type="checkbox"> Disable save during avatar generation</li>
+</ul>
+<h3>Testing</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Photo upload → face/body detected, photos saved</li>
+<li><input disabled="" type="checkbox"> Avatar generation → images + physical traits saved to DB</li>
+<li><input disabled="" type="checkbox"> Page refresh → character data persists</li>
+<li><input disabled="" type="checkbox"> Photo re-upload → old avatars preserved until new ones ready</li>
+<li><input disabled="" type="checkbox"> Concurrent saves → no data loss</li>
+<li><input disabled="" type="checkbox"> Multiple faces → selection UI works</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>CHARACTER-SYSTEM-REQUIREMENTS.md</code>.
+</footer>
+</body>
+</html>

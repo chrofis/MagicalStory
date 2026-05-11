@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EMAIL_SETUP_GUIDE.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Email Messaging Setup Guide for MagicalStory</h1>
+<h2>Overview</h2>
+<p>This guide covers how to implement email notifications for customers and admins in your MagicalStory application deployed on Railway.</p>
+<hr>
+<h2>1. Email Service Options</h2>
+<h3>Recommended: <strong>Resend</strong> (Best for Railway)</h3>
+<ul>
+<li><strong>Why</strong>: Modern API, excellent developer experience, generous free tier</li>
+<li><strong>Free Tier</strong>: 3,000 emails/month, 100 emails/day</li>
+<li><strong>Pricing</strong>: $20/month for 50,000 emails</li>
+<li><strong>Integration</strong>: Simple REST API or Node.js SDK</li>
+<li><strong>Website</strong>: <a href="https://resend.com">https://resend.com</a></li>
+</ul>
+<h3>Alternative Options</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Free Tier</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SendGrid</strong></td>
+<td>100 emails/day forever</td>
+<td>Industry standard, reliable</td>
+<td>Complex setup, owned by Twilio</td>
+</tr>
+<tr>
+<td><strong>Postmark</strong></td>
+<td>100 emails/month</td>
+<td>Fast delivery, great for transactional</td>
+<td>Small free tier</td>
+</tr>
+<tr>
+<td><strong>AWS SES</strong></td>
+<td>62,000/month (from EC2)</td>
+<td>Cheapest at scale ($0.10/1000)</td>
+<td>Complex IAM setup</td>
+</tr>
+<tr>
+<td><strong>Mailgun</strong></td>
+<td>5,000/month for 3 months</td>
+<td>Good API</td>
+<td>Free tier expires</td>
+</tr>
+<tr>
+<td><strong>Brevo (Sendinblue)</strong></td>
+<td>300 emails/day</td>
+<td>Marketing + transactional</td>
+<td>Lower sending limits</td>
+</tr>
+</tbody></table>
+<h3>NOT Recommended</h3>
+<ul>
+<li><strong>Gmail SMTP</strong>: Rate limited, will get blocked</li>
+<li><strong>Self-hosted SMTP</strong>: Deliverability issues, spam filters</li>
+</ul>
+<hr>
+<h2>2. Where to Set Up Email</h2>
+<h3>Email Service Provider (External to Railway)</h3>
+<p>You&#39;ll create an account with an email provider like Resend or SendGrid. This is <strong>separate from Railway</strong> - Railway hosts your app, the email provider sends emails.</p>
+<h3>Railway Configuration</h3>
+<p>You&#39;ll add API keys to Railway as environment variables. The email sending code runs in your Node.js server on Railway.</p>
+<pre><code>┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   Your App      │      │  Email Service  │      │   Customer      │
+│   (Railway)     │─────▶│  (Resend/etc)   │─────▶│   Inbox         │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+     server.js            External API            Gmail/Outlook/etc
+</code></pre>
+<hr>
+<h2>3. Setup Instructions (Using Resend)</h2>
+<h3>Step 1: Create Resend Account</h3>
+<ol>
+<li>Go to <a href="https://resend.com">https://resend.com</a></li>
+<li>Sign up with GitHub or email</li>
+<li>Verify your email address</li>
+</ol>
+<h3>Step 2: Add Your Domain</h3>
+<ol>
+<li>In Resend dashboard, go to <strong>Domains</strong></li>
+<li>Click <strong>Add Domain</strong></li>
+<li>Enter: <code>magicalstory.ch</code></li>
+<li>Add the DNS records Resend provides to your domain registrar (IONOS):<ul>
+<li><strong>SPF Record</strong> (TXT): Authorizes Resend to send on your behalf</li>
+<li><strong>DKIM Record</strong> (TXT): Cryptographic signature for authenticity</li>
+<li><strong>Optional DMARC</strong> (TXT): Policy for failed authentication</li>
+</ul>
+</li>
+</ol>
+<p>Example DNS records to add at IONOS:</p>
+<pre><code>Type: TXT
+Name: @
+Value: v=spf1 include:resend.com ~all
+
+Type: TXT
+Name: resend._domainkey
+Value: [provided by Resend]
+
+Type: TXT
+Name: _dmarc
+Value: v=DMARC1; p=none;
+</code></pre>
+<ol start="5">
+<li>Wait for verification (usually 5-30 minutes)</li>
+</ol>
+<h3>Step 3: Get API Key</h3>
+<ol>
+<li>In Resend, go to <strong>API Keys</strong></li>
+<li>Click <strong>Create API Key</strong></li>
+<li>Name it: <code>magicalstory-production</code></li>
+<li>Copy the key (starts with <code>re_</code>)</li>
+</ol>
+<h3>Step 4: Add to Railway</h3>
+<ol>
+<li>Go to Railway dashboard → MagicalStory project</li>
+<li>Click on your service → <strong>Variables</strong></li>
+<li>Add new variable:<pre><code>RESEND_API_KEY=re_xxxxxxxxxxxx
+EMAIL_FROM=MagicalStory &lt;noreply@magicalstory.ch&gt;
+ADMIN_EMAIL=roger@youremail.com
+</code></pre>
+</li>
+<li>Railway will auto-redeploy</li>
+</ol>
+<h3>Step 5: Install Resend SDK</h3>
+<pre><code class="language-bash">npm install resend
+</code></pre>
+<p>Update <code>package.json</code> dependencies.</p>
+<hr>
+<h2>4. Email Triggers &amp; Use Cases</h2>
+<h3>Customer Emails</h3>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>When</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Story Complete</strong></td>
+<td><code>story_jobs.status</code> → <code>completed</code></td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Story Failed</strong></td>
+<td><code>story_jobs.status</code> → <code>failed</code></td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Order Confirmed</strong></td>
+<td>Stripe <code>checkout.session.completed</code></td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Book Shipped</strong></td>
+<td>Gelato webhook (shipment update)</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>Welcome Email</strong></td>
+<td>User registration</td>
+<td>Low</td>
+</tr>
+<tr>
+<td><strong>Password Reset</strong></td>
+<td>User requests reset</td>
+<td>Medium</td>
+</tr>
+</tbody></table>
+<h3>Admin Emails</h3>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>When</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Story Generation Failed</strong></td>
+<td>Any <code>story_jobs</code> failure</td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Book Order Failed</strong></td>
+<td>Payment succeeded but Gelato failed</td>
+<td>Critical</td>
+</tr>
+<tr>
+<td><strong>Payment Failed</strong></td>
+<td>Stripe payment failure</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>Low API Credits</strong></td>
+<td>Claude/Gemini errors</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>Daily Summary</strong></td>
+<td>Cron job (optional)</td>
+<td>Low</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Implementation Code</h2>
+<h3>Create Email Utility Module</h3>
+<p>Create a new file <code>email.js</code> in your project root:</p>
+<pre><code class="language-javascript">// email.js - Email utility module for MagicalStory
+
+const { Resend } = require(&#39;resend&#39;);
+
+// Initialize Resend client
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const EMAIL_FROM = process.env.EMAIL_FROM || &#39;MagicalStory &lt;noreply@magicalstory.ch&gt;&#39;;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || &#39;admin@magicalstory.ch&#39;;
+
+// Check if email is configured
+function isEmailConfigured() {
+  return !!resend;
+}
+
+// ===========================================
+// CUSTOMER EMAILS
+// ===========================================
+
+/**
+ * Send story completion notification to customer
+ */
+async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
+  if (!resend) {
+    console.log(&#39;📧 Email not configured - skipping story complete notification&#39;);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: userEmail,
+      subject: `Your magical story &quot;${storyTitle}&quot; is ready! ✨`,
+      html: `
+        &lt;div style=&quot;font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;&quot;&gt;
+          &lt;h1 style=&quot;color: #6366f1;&quot;&gt;Your Story is Ready!&lt;/h1&gt;
+          &lt;p&gt;Hello ${userName},&lt;/p&gt;
+          &lt;p&gt;Great news! Your personalized story &lt;strong&gt;&quot;${storyTitle}&quot;&lt;/strong&gt; has been created and is waiting for you.&lt;/p&gt;
+          &lt;p&gt;
+            &lt;a href=&quot;https://www.magicalstory.ch&quot;
+               style=&quot;display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;&quot;&gt;
+              View Your Story
+            &lt;/a&gt;
+          &lt;/p&gt;
+          &lt;p&gt;You can now:&lt;/p&gt;
+          &lt;ul&gt;
+            &lt;li&gt;Preview your complete story with illustrations&lt;/li&gt;
+            &lt;li&gt;Order a printed hardcover book&lt;/li&gt;
+            &lt;li&gt;Download as PDF&lt;/li&gt;
+          &lt;/ul&gt;
+          &lt;p&gt;Thank you for using MagicalStory!&lt;/p&gt;
+          &lt;hr style=&quot;border: none; border-top: 1px solid #eee; margin: 20px 0;&quot;&gt;
+          &lt;p style=&quot;color: #666; font-size: 12px;&quot;&gt;
+            MagicalStory - Personalized AI-Generated Children&#39;s Books&lt;br&gt;
+            &lt;a href=&quot;https://www.magicalstory.ch&quot;&gt;www.magicalstory.ch&lt;/a&gt;
+          &lt;/p&gt;
+        &lt;/div&gt;
+      `,
+    });
+
+    if (error) {
+      console.error(&#39;❌ Failed to send story complete email:&#39;, error);
+      return null;
+    }
+
+    console.log(`📧 Story complete email sent to ${userEmail}, id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(&#39;❌ Email send error:&#39;, err);
+    return null;
+  }
+}
+
+/**
+ * Send story generation failure notification to customer
+ */
+async function sendStoryFailedEmail(userEmail, userName, errorMessage) {
+  if (!resend) {
+    console.log(&#39;📧 Email not configured - skipping story failed notification&#39;);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: userEmail,
+      subject: &#39;We encountered an issue with your story&#39;,
+      html: `
+        &lt;div style=&quot;font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;&quot;&gt;
+          &lt;h1 style=&quot;color: #ef4444;&quot;&gt;Story Generation Issue&lt;/h1&gt;
+          &lt;p&gt;Hello ${userName},&lt;/p&gt;
+          &lt;p&gt;We&#39;re sorry, but we encountered a problem while creating your story.&lt;/p&gt;
+          &lt;p&gt;Our team has been notified and is looking into this. You can try creating your story again, or contact us if the problem persists.&lt;/p&gt;
+          &lt;p&gt;
+            &lt;a href=&quot;https://www.magicalstory.ch&quot;
+               style=&quot;display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;&quot;&gt;
+              Try Again
+            &lt;/a&gt;
+          &lt;/p&gt;
+          &lt;p&gt;We apologize for any inconvenience.&lt;/p&gt;
+          &lt;p&gt;Best regards,&lt;br&gt;The MagicalStory Team&lt;/p&gt;
+        &lt;/div&gt;
+      `,
+    });
+
+    if (error) {
+      console.error(&#39;❌ Failed to send story failed email:&#39;, error);
+      return null;
+    }
+
+    console.log(`📧 Story failed email sent to ${userEmail}, id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(&#39;❌ Email send error:&#39;, err);
+    return null;
+  }
+}
+
+/**
+ * Send order confirmation email
+ */
+async function sendOrderConfirmationEmail(customerEmail, customerName, orderDetails) {
+  if (!resend) {
+    console.log(&#39;📧 Email not configured - skipping order confirmation&#39;);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: customerEmail,
+      subject: `Order Confirmed - Your MagicalStory Book is Being Printed! 📚`,
+      html: `
+        &lt;div style=&quot;font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;&quot;&gt;
+          &lt;h1 style=&quot;color: #22c55e;&quot;&gt;Order Confirmed!&lt;/h1&gt;
+          &lt;p&gt;Hello ${customerName},&lt;/p&gt;
+          &lt;p&gt;Thank you for your order! Your personalized storybook is now being printed.&lt;/p&gt;
+
+          &lt;div style=&quot;background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;&quot;&gt;
+            &lt;h3 style=&quot;margin-top: 0;&quot;&gt;Order Details&lt;/h3&gt;
+            &lt;p&gt;&lt;strong&gt;Order ID:&lt;/strong&gt; ${orderDetails.orderId}&lt;/p&gt;
+            &lt;p&gt;&lt;strong&gt;Amount:&lt;/strong&gt; ${orderDetails.amount} ${orderDetails.currency}&lt;/p&gt;
+            &lt;p&gt;&lt;strong&gt;Shipping to:&lt;/strong&gt;&lt;br&gt;
+              ${orderDetails.shippingAddress.line1}&lt;br&gt;
+              ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}&lt;br&gt;
+              ${orderDetails.shippingAddress.country}
+            &lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;p&gt;You&#39;ll receive another email when your book ships with tracking information.&lt;/p&gt;
+          &lt;p&gt;Estimated delivery: 5-10 business days&lt;/p&gt;
+
+          &lt;p&gt;Thank you for choosing MagicalStory!&lt;/p&gt;
+        &lt;/div&gt;
+      `,
+    });
+
+    if (error) {
+      console.error(&#39;❌ Failed to send order confirmation email:&#39;, error);
+      return null;
+    }
+
+    console.log(`📧 Order confirmation email sent to ${customerEmail}, id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(&#39;❌ Email send error:&#39;, err);
+    return null;
+  }
+}
+
+// ===========================================
+// ADMIN EMAILS
+// ===========================================
+
+/**
+ * Send admin alert for story generation failure
+ */
+async function sendAdminStoryFailureAlert(jobId, userId, userName, errorMessage) {
+  if (!resend) {
+    console.log(&#39;📧 Email not configured - skipping admin alert&#39;);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ADMIN_EMAIL,
+      subject: `⚠️ Story Generation Failed - Job ${jobId}`,
+      html: `
+        &lt;div style=&quot;font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;&quot;&gt;
+          &lt;h1 style=&quot;color: #ef4444;&quot;&gt;⚠️ Story Generation Failed&lt;/h1&gt;
+
+          &lt;div style=&quot;background: #fef2f2; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444;&quot;&gt;
+            &lt;p&gt;&lt;strong&gt;Job ID:&lt;/strong&gt; ${jobId}&lt;/p&gt;
+            &lt;p&gt;&lt;strong&gt;User ID:&lt;/strong&gt; ${userId}&lt;/p&gt;
+            &lt;p&gt;&lt;strong&gt;Username:&lt;/strong&gt; ${userName}&lt;/p&gt;
+            &lt;p&gt;&lt;strong&gt;Time:&lt;/strong&gt; ${new Date().toISOString()}&lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;h3&gt;Error Message:&lt;/h3&gt;
+          &lt;pre style=&quot;background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto;&quot;&gt;${errorMessage}&lt;/pre&gt;
+
+          &lt;p&gt;
+            &lt;a href=&quot;https://www.magicalstory.ch/admin&quot;
+               style=&quot;display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;&quot;&gt;
+              View Admin Dashboard
+            &lt;/a&gt;
+          &lt;/p&gt;
+        &lt;/div&gt;
+      `,
+    });
+
+    if (error) {
+      console.error(&#39;❌ Failed to send admin alert:&#39;, error);
+      return null;
+    }
+
+    console.log(`📧 Admin alert sent for job ${jobId}, email id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(&#39;❌ Email send error:&#39;, err);
+    return null;
+  }
+}
+
+/**
+ * CRITICAL: Send admin alert when payment succeeded but book order failed
+ */
+async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName, errorMessage) {
+  if (!resend) {
+    console.log(&#39;📧 Email not configured - skipping critical admin alert&#39;);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ADMIN_EMAIL,
+      subject: `🚨 CRITICAL: Book Order Failed After Payment - ${sessionId}`,
+      html: `
+        &lt;div style=&quot;font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;&quot;&gt;
+          &lt;h1 style=&quot;color: #dc2626;&quot;&gt;🚨 CRITICAL: Payment Received But Order Failed&lt;/h1&gt;
+
+          &lt;div style=&quot;background: #fef2f2; padding: 20px; border-radius: 8px; border: 2px solid #dc2626;&quot;&gt;
+            &lt;p&gt;&lt;strong&gt;⚠️ Customer has paid but their book was NOT ordered!&lt;/strong&gt;&lt;/p&gt;
+            &lt;p&gt;Immediate action required: Either manually process the order or issue a refund.&lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;h3&gt;Details:&lt;/h3&gt;
+          &lt;ul&gt;
+            &lt;li&gt;&lt;strong&gt;Stripe Session:&lt;/strong&gt; ${sessionId}&lt;/li&gt;
+            &lt;li&gt;&lt;strong&gt;Customer:&lt;/strong&gt; ${customerName}&lt;/li&gt;
+            &lt;li&gt;&lt;strong&gt;Email:&lt;/strong&gt; ${customerEmail}&lt;/li&gt;
+            &lt;li&gt;&lt;strong&gt;Time:&lt;/strong&gt; ${new Date().toISOString()}&lt;/li&gt;
+          &lt;/ul&gt;
+
+          &lt;h3&gt;Error:&lt;/h3&gt;
+          &lt;pre style=&quot;background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto;&quot;&gt;${errorMessage}&lt;/pre&gt;
+
+          &lt;h3&gt;Action Required:&lt;/h3&gt;
+          &lt;ol&gt;
+            &lt;li&gt;Check the order in the admin dashboard&lt;/li&gt;
+            &lt;li&gt;Try to manually trigger the Gelato order&lt;/li&gt;
+            &lt;li&gt;If not possible, contact customer and issue refund via Stripe&lt;/li&gt;
+          &lt;/ol&gt;
+
+          &lt;p&gt;
+            &lt;a href=&quot;https://dashboard.stripe.com/payments&quot;
+               style=&quot;display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-right: 10px;&quot;&gt;
+              Stripe Dashboard
+            &lt;/a&gt;
+            &lt;a href=&quot;https://www.magicalstory.ch/admin&quot;
+               style=&quot;display: inline-block; background: #374151; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;&quot;&gt;
+              Admin Dashboard
+            &lt;/a&gt;
+          &lt;/p&gt;
+        &lt;/div&gt;
+      `,
+    });
+
+    if (error) {
+      console.error(&#39;❌ Failed to send critical admin alert:&#39;, error);
+      return null;
+    }
+
+    console.log(`📧 CRITICAL admin alert sent for session ${sessionId}, email id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(&#39;❌ Email send error:&#39;, err);
+    return null;
+  }
+}
+
+// Export all functions
+module.exports = {
+  isEmailConfigured,
+  sendStoryCompleteEmail,
+  sendStoryFailedEmail,
+  sendOrderConfirmationEmail,
+  sendAdminStoryFailureAlert,
+  sendAdminOrderFailureAlert,
+};
+</code></pre>
+<hr>
+<h2>6. Integration Points in server.js</h2>
+<h3>6.1 Story Generation Complete/Failed</h3>
+<p>Find the <code>processStoryJob</code> function (around line 4435) and add email notifications:</p>
+<pre><code class="language-javascript">// At the top of server.js, add:
+const email = require(&#39;./email&#39;);
+
+// In processStoryJob, after successful completion (around line 4430):
+// After: await dbPool.query(`UPDATE story_jobs SET status = $1, result_data = $2...`)
+
+// Add this block:
+if (email.isEmailConfigured()) {
+  // Get user email
+  const userResult = await dbPool.query(&#39;SELECT email, username FROM users WHERE id = $1&#39;, [userId]);
+  if (userResult.rows.length &gt; 0) {
+    const user = userResult.rows[0];
+    const storyTitle = inputData.storyTitle || &#39;Your Story&#39;;
+    await email.sendStoryCompleteEmail(user.email, user.username, storyTitle);
+  }
+}
+
+// In the catch block (around line 4440), after marking job as failed:
+// After: await dbPool.query(`UPDATE story_jobs SET status = $1, error_message = $2...`)
+
+// Add this block:
+if (email.isEmailConfigured()) {
+  // Notify admin
+  const userResult = await dbPool.query(&#39;SELECT email, username FROM users WHERE id = $1&#39;, [userId]);
+  const userName = userResult.rows[0]?.username || &#39;Unknown&#39;;
+  await email.sendAdminStoryFailureAlert(jobId, userId, userName, error.message);
+
+  // Notify customer
+  if (userResult.rows[0]?.email) {
+    await email.sendStoryFailedEmail(userResult.rows[0].email, userName, error.message);
+  }
+}
+</code></pre>
+<h3>6.2 Order Confirmation After Stripe Payment</h3>
+<p>In the Stripe webhook handler (around line 285), after successful order creation:</p>
+<pre><code class="language-javascript">// After the order is inserted into the database and before processBookOrder:
+
+if (email.isEmailConfigured()) {
+  await email.sendOrderConfirmationEmail(
+    customer_email,
+    customer_name,
+    {
+      orderId: session.id.slice(-8).toUpperCase(),
+      amount: (session.amount_total / 100).toFixed(2),
+      currency: session.currency.toUpperCase(),
+      shippingAddress: shipping_address
+    }
+  );
+}
+</code></pre>
+<h3>6.3 Book Order Failure Alert</h3>
+<p>In <code>processBookOrder</code> catch block (around line 3905):</p>
+<pre><code class="language-javascript">// After: await dbPool.query(`UPDATE orders SET payment_status = &#39;failed&#39;...`)
+
+if (email.isEmailConfigured()) {
+  await email.sendAdminOrderFailureAlert(
+    sessionId,
+    customerInfo.email,
+    customerInfo.name,
+    error.message
+  );
+}
+</code></pre>
+<hr>
+<h2>7. Environment Variables Summary</h2>
+<p>Add these to Railway:</p>
+<pre><code class="language-env"># Email Configuration (Resend)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM=MagicalStory &lt;noreply@magicalstory.ch&gt;
+ADMIN_EMAIL=your-email@example.com
+</code></pre>
+<hr>
+<h2>8. Testing Checklist</h2>
+<h3>Before Going Live</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Resend account created</li>
+<li><input disabled="" type="checkbox"> Domain <code>magicalstory.ch</code> added and verified in Resend</li>
+<li><input disabled="" type="checkbox"> DNS records (SPF, DKIM) added at IONOS</li>
+<li><input disabled="" type="checkbox"> API key added to Railway environment variables</li>
+<li><input disabled="" type="checkbox"> <code>npm install resend</code> added to package.json</li>
+<li><input disabled="" type="checkbox"> <code>email.js</code> module created</li>
+<li><input disabled="" type="checkbox"> Integration code added to server.js</li>
+</ul>
+<h3>Test Emails</h3>
+<ol>
+<li><strong>Test story completion</strong>: Create a test story and verify email arrives</li>
+<li><strong>Test story failure</strong>: Temporarily break something to trigger failure email</li>
+<li><strong>Test order confirmation</strong>: Make a test Stripe payment</li>
+<li><strong>Check spam folder</strong>: Ensure emails don&#39;t land in spam</li>
+</ol>
+<h3>Monitoring</h3>
+<ul>
+<li>Resend dashboard shows sent/delivered/bounced stats</li>
+<li>Check Railway logs for email send confirmations</li>
+<li>Monitor bounce rates and adjust if needed</li>
+</ul>
+<hr>
+<h2>9. Cost Estimate</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Monthly Emails</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>100 stories/month</td>
+<td>~200 (customer + admin)</td>
+<td>Free</td>
+</tr>
+<tr>
+<td>500 stories/month</td>
+<td>~1,000</td>
+<td>Free</td>
+</tr>
+<tr>
+<td>1,000 stories/month</td>
+<td>~2,000</td>
+<td>Free</td>
+</tr>
+<tr>
+<td>2,000+ stories/month</td>
+<td>~4,000+</td>
+<td>$20/month</td>
+</tr>
+</tbody></table>
+<p>Resend free tier (3,000/month) should cover most early-stage usage.</p>
+<hr>
+<h2>10. Future Enhancements</h2>
+<h3>Phase 2 (Optional)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Shipping notification when Gelato ships (requires Gelato webhook)</li>
+<li><input disabled="" type="checkbox"> Password reset emails</li>
+<li><input disabled="" type="checkbox"> Welcome email on registration</li>
+<li><input disabled="" type="checkbox"> Weekly digest for admins</li>
+</ul>
+<h3>Phase 3 (Optional)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Email templates in separate HTML files</li>
+<li><input disabled="" type="checkbox"> Multi-language email support (DE, FR, EN)</li>
+<li><input disabled="" type="checkbox"> Unsubscribe links for marketing emails</li>
+<li><input disabled="" type="checkbox"> Email preference settings for users</li>
+</ul>
+<hr>
+<h2>Quick Start Summary</h2>
+<ol>
+<li><strong>Sign up</strong> at <a href="https://resend.com">https://resend.com</a></li>
+<li><strong>Add domain</strong> <code>magicalstory.ch</code> and verify DNS</li>
+<li><strong>Get API key</strong> from Resend dashboard</li>
+<li><strong>Add to Railway</strong>: <code>RESEND_API_KEY</code>, <code>EMAIL_FROM</code>, <code>ADMIN_EMAIL</code></li>
+<li><strong>Install</strong>: <code>npm install resend</code></li>
+<li><strong>Create</strong>: <code>email.js</code> (copy from section 5)</li>
+<li><strong>Integrate</strong>: Add email calls to server.js (section 6)</li>
+<li><strong>Deploy</strong>: Push to Railway</li>
+<li><strong>Test</strong>: Trigger a story generation and check your inbox</li>
+</ol>
+<hr>
+<h2>Support Resources</h2>
+<ul>
+<li>Resend Documentation: <a href="https://resend.com/docs">https://resend.com/docs</a></li>
+<li>Resend Node.js SDK: <a href="https://resend.com/docs/sdks/nodejs">https://resend.com/docs/sdks/nodejs</a></li>
+<li>Railway Environment Variables: <a href="https://docs.railway.app/develop/variables">https://docs.railway.app/develop/variables</a></li>
+<li>IONOS DNS Management: <a href="https://www.ionos.com/help/domains/dns-settings/">https://www.ionos.com/help/domains/dns-settings/</a></li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>EMAIL_SETUP_GUIDE.md</code>.
+</footer>
+</body>
+</html>

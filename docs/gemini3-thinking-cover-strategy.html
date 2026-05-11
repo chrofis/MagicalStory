@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>gemini3-thinking-cover-strategy.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Gemini 3 Pro Image: Thinking Mode &amp; Multi-Character Cover Strategy</h1>
+<h2>The Problem</h2>
+<p>Cover/title images need up to 10 consistent characters. Every approach tested has failed (see <code>docs/MULTI-CHARACTER-COVER-TESTS.md</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Single-shot 10 chars</td>
+<td>Characters blend together</td>
+</tr>
+<tr>
+<td>Iterative add (3-&gt;6-&gt;10)</td>
+<td>Identity drift</td>
+</tr>
+<tr>
+<td>Ghost + inpaint</td>
+<td>Style mismatch</td>
+</tr>
+<tr>
+<td>Gemini edit its own image</td>
+<td>Re-interprets whole scene</td>
+</tr>
+<tr>
+<td>Multi-turn conversation</td>
+<td>No better than single-shot</td>
+</tr>
+<tr>
+<td>Stitching separate parts</td>
+<td>Scene elements change</td>
+</tr>
+</tbody></table>
+<p><strong>Root cause:</strong> Diffusion models average/blend when given too many competing reference images. Beyond 4-5 characters, faces merge.</p>
+<hr>
+<h2>What Gemini 3 Pro Image Changes</h2>
+<h3>Model: <code>gemini-3-pro-image-preview</code> (codename &quot;Nano Banana Pro&quot;)</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Gemini 2.5 Flash Image</th>
+<th>Gemini 3 Pro Image</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Reference images</td>
+<td>Up to 3</td>
+<td><strong>Up to 14</strong> (5 human, 6 object)</td>
+</tr>
+<tr>
+<td>Resolution</td>
+<td>1024px max</td>
+<td><strong>1K / 2K / 4K</strong></td>
+</tr>
+<tr>
+<td>Thinking mode</td>
+<td>No</td>
+<td><strong>Yes</strong> - plans composition before rendering</td>
+</tr>
+<tr>
+<td>Text rendering</td>
+<td>Mediocre</td>
+<td>State-of-the-art</td>
+</tr>
+<tr>
+<td>Price per image</td>
+<td>~$0.02</td>
+<td><strong>$0.134</strong> (2K), $0.067 batch</td>
+</tr>
+</tbody></table>
+<h3>The Thinking Process</h3>
+<p>The model generates <strong>up to 2 interim &quot;thought images&quot;</strong> before the final output. These are composition tests - the model plans spatial layout visually before committing. Thought images are <strong>not charged</strong>.</p>
+<p>The process:</p>
+<ol>
+<li><strong>Analyze</strong> - deeply parses prompt for spatial relationships, character placement</li>
+<li><strong>Design</strong> - generates interim images to test composition layout</li>
+<li><strong>Evaluate</strong> - checks if characters are distinct and well-positioned</li>
+<li><strong>Render</strong> - produces the optimized final image</li>
+</ol>
+<p><strong>Benchmark:</strong> 89% prompt adherence (vs Midjourney V7&#39;s 72% on identical prompts).</p>
+<hr>
+<h2>How To Guide The Thinking (It&#39;s Not Just On/Off)</h2>
+<h3>What DOESN&#39;T Work</h3>
+<ul>
+<li><code>thinkingBudget</code> parameter (Gemini 2.5 only, deprecated)</li>
+<li>Meta-instructions like &quot;think carefully about composition&quot; (model already does this)</li>
+<li>Chain-of-thought prompting (Google says to stop doing this for Gemini 3)</li>
+<li>Telling it to &quot;plan first&quot; in the prompt</li>
+</ul>
+<h3>What DOES Work</h3>
+<h4>1. System Instructions (biggest opportunity)</h4>
+<p>System instructions anchor the model&#39;s reasoning <strong>before</strong> it sees the prompt. We currently don&#39;t use them.</p>
+<pre><code class="language-javascript">system_instruction: {
+  parts: [{
+    text: &quot;You are an expert children&#39;s book illustrator specializing in group scenes. &quot; +
+          &quot;When drawing multiple characters, give each character DISTINCT features: &quot; +
+          &quot;different heights, different hair styles, different clothing colors. &quot; +
+          &quot;Never blend or average character faces. Each character must be individually &quot; +
+          &quot;recognizable. Use warm, vibrant colors appropriate for children&#39;s books.&quot;
+  }]
+}
+</code></pre>
+<p>This tells the thinking process <strong>how</strong> to approach composition before it sees any specific scene.</p>
+<h4>2. Structured Scene Layering (guides composition planning)</h4>
+<p>Instead of one paragraph, layer the scene so the model&#39;s thinking follows a spatial blueprint:</p>
+<p><strong>Current approach (single paragraph):</strong></p>
+<pre><code>All ten family members sit around a long wooden dinner table. Sophie (8) is at the head...
+</code></pre>
+<p><strong>Better approach (layered):</strong></p>
+<pre><code>BACKGROUND: A warm dining room with golden evening light from windows on the left wall.
+
+SETTING: A long wooden dinner table with 10 place settings, viewed from a slight elevation.
+
+LEFT SIDE OF TABLE (from viewer&#39;s perspective):
+- Sophie (8, brown hair, blue dress) at the head of the table
+- Manuel (9, dark hair, red shirt) next to Sophie
+- Grandmother (elderly, white hair, green cardigan) next to Manuel
+
+RIGHT SIDE OF TABLE:
+- Father (tall, brown hair, white shirt) opposite Sophie
+- Mother (blonde, floral dress) next to Father
+- Baby Max (2, blonde curls, yellow bib) in a high chair next to Mother
+
+BACKGROUND CHARACTERS (smaller, less detail needed):
+- Uncle Hans, Aunt Marie, Cousin Lena, Cousin Tim sitting in remaining seats
+
+Style: Pixar-style 3D illustration with soft lighting.
+</code></pre>
+<p>This gives the thinking process a spatial map. The model doesn&#39;t have to figure out where 10 people go - you&#39;ve done the layout work.</p>
+<h4>3. Two-Turn &quot;Plan Then Generate&quot; (for covers specifically)</h4>
+<p><strong>Turn 1</strong> - text only, ask model to plan:</p>
+<pre><code>I need to create a children&#39;s book cover illustration showing 10 family members
+around a dinner table. Here are their reference photos: [photos]
+
+Before generating the image, describe in detail:
+1. How would you arrange all 10 characters around the table?
+2. Which characters should be in the foreground (larger, more detail)?
+3. Which characters can be in the background (smaller, less detail needed)?
+4. What camera angle would work best to show everyone?
+5. How will you ensure each character remains distinct?
+</code></pre>
+<p><strong>Turn 2</strong> - generate based on the plan:</p>
+<pre><code>Generate the illustration based on your plan above.
+</code></pre>
+<p>The thought signatures carry between turns, so Turn 1&#39;s reasoning directly informs Turn 2&#39;s generation. This doubles API cost (~$0.27 for a cover) but could be worth it for the most important images.</p>
+<h4>4. Constraints at the END</h4>
+<p>Google&#39;s guidance: critical restrictions go <strong>last</strong> because the model drops late-prompt constraints less during complex reasoning.</p>
+<pre><code>[scene description...]
+[character placement...]
+[style...]
+
+CRITICAL CONSTRAINTS:
+- Every character must have a DIFFERENT face - no blending or averaging
+- Characters in the background can be smaller but must still be recognizable
+- Do NOT show reference photos or grids in the output
+- Title text &quot;{STORY_TITLE}&quot; must appear at the top, clearly legible
+</code></pre>
+<h4>5. Temperature 1.0</h4>
+<p>Google &quot;strongly recommends&quot; 1.0 for Gemini 3. We currently use 0.8. Higher temperature gives the thinking process more creative room for composition solutions.</p>
+<h4>6. Reading Back the Thoughts (debugging)</h4>
+<pre><code class="language-javascript">// After generation, inspect what the model reasoned about
+for (const part of response.candidates[0].content.parts) {
+  if (part.thought &amp;&amp; part.text) {
+    console.log(&#39;Model reasoning:&#39;, part.text);
+  }
+  if (part.thought &amp;&amp; part.inlineData) {
+    console.log(&#39;Interim composition test image found&#39;);
+  }
+}
+</code></pre>
+<p>Use this to understand <strong>why</strong> a composition failed. If the thought text reveals the model struggled with character placement, retry with clearer spatial instructions instead of the same prompt.</p>
+<hr>
+<h2>Can We Skip Our Complicated Scene Creation?</h2>
+<h3>What We Currently Do</h3>
+<ol>
+<li>Claude generates a scene description from the story outline</li>
+<li><code>OutlineParser.extractCoverScenes()</code> extracts it (simple string)</li>
+<li><code>buildCharacterReferenceList()</code> creates detailed character descriptions</li>
+<li><code>buildFullVisualBiblePrompt()</code> adds secondary elements</li>
+<li>Template fills <code>front-cover.txt</code> with all these pieces</li>
+<li>Send to Gemini with all reference photos</li>
+</ol>
+<p>The scene creation for covers is actually <strong>already simple</strong> - it&#39;s just a text description plus character reference photos. The complexity is in the prompts and the character reference system, not in scene construction.</p>
+<h3>What We Could Simplify With Gemini 3</h3>
+<p><strong>YES - we can lean more on internal reasoning:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Current Approach</th>
+<th>Gemini 3 Approach</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Detailed CHARACTER_REFERENCE_LIST with physical descriptions</td>
+<td>Pass reference photos + names only</td>
+<td>Model&#39;s thinking can extract features from photos directly</td>
+</tr>
+<tr>
+<td>VISUAL_BIBLE with secondary elements</td>
+<td>Skip for covers</td>
+<td>Thinking mode handles scene coherence</td>
+</tr>
+<tr>
+<td>Explicit composition instructions</td>
+<td>Spatial layout hints only</td>
+<td>Model plans composition internally</td>
+</tr>
+<tr>
+<td>Complex prompt template (36 lines)</td>
+<td>Simpler conversational prompt</td>
+<td>&quot;Think like a creative director, not keyword tags&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>NO - we still need:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Still Needed</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Reference photos</td>
+<td>Model needs to know what characters look like</td>
+</tr>
+<tr>
+<td>Character names</td>
+<td>Need to label who is who</td>
+</tr>
+<tr>
+<td>Scene description</td>
+<td>Model needs to know what to draw</td>
+</tr>
+<tr>
+<td>Art style</td>
+<td>Needs to match the book&#39;s style</td>
+</tr>
+<tr>
+<td>Text requirements</td>
+<td>Title/URL placement</td>
+</tr>
+</tbody></table>
+<h3>Proposed Simplified Cover Prompt (Gemini 3)</h3>
+<pre><code>system_instruction: &quot;You are an expert children&#39;s book illustrator. Create warm,
+vibrant illustrations where every character is individually recognizable.
+When drawing group scenes with many characters, use depth (foreground/background)
+and varied positioning to keep each character distinct.&quot;
+
+prompt: &quot;&quot;&quot;
+Create a front cover for the children&#39;s book &quot;{STORY_TITLE}&quot;.
+
+Scene: {TITLE_PAGE_SCENE}
+Art style: {STYLE_DESCRIPTION}
+
+The following reference photos show each character. Transform them into the art style
+while keeping each face recognizable:
+
+{photos with name labels}
+
+Arrange all characters in a balanced group composition.
+Use foreground/background depth - main characters (first 2-3) larger in front,
+others visible but smaller behind.
+
+The title &quot;{STORY_TITLE}&quot; must appear prominently at the top in an attractive font.
+Do NOT include reference photos or grids in the output image.
+&quot;&quot;&quot;
+</code></pre>
+<p>This is ~15 lines vs our current 36-line template, and leans on the model&#39;s thinking to handle composition rather than over-specifying.</p>
+<hr>
+<h2>The Real Question: Does 5 Human References Fix 10 Characters?</h2>
+<h3>Honest Assessment</h3>
+<p>Gemini 3 Pro supports up to <strong>5 human reference images</strong> and <strong>6 object images</strong> (14 total). For 10 characters, this means:</p>
+<ul>
+<li><strong>5 characters get direct face references</strong> (the 5 most important)</li>
+<li><strong>5 characters must rely on text descriptions only</strong></li>
+</ul>
+<p>This is better than Gemini 2.5&#39;s 3-image limit, but still doesn&#39;t solve the fundamental problem of 10 distinct identities.</p>
+<h3>Realistic Strategy for 10-Character Covers</h3>
+<p><strong>Tier the characters by visual importance:</strong></p>
+<pre><code>FOREGROUND (3 characters, large, full face references):
+- Main character 1: full reference photo
+- Main character 2: full reference photo
+- Main character 3: full reference photo
+
+MIDGROUND (2-3 characters, medium, reference photos):
+- Supporting character 4: reference photo
+- Supporting character 5: reference photo
+
+BACKGROUND (4-5 characters, small, text-described):
+- Background characters: described by text only
+- Shown smaller, partial views, or from behind
+- Distinct through clothing color, height, hair color
+</code></pre>
+<p><strong>This plays to the model&#39;s strengths:</strong></p>
+<ul>
+<li>5 face references for the 5 most prominent characters</li>
+<li>Background characters don&#39;t need face-level consistency</li>
+<li>The thinking mode can plan this depth layering itself if we tell it the tier structure</li>
+</ul>
+<h3>What To Test</h3>
+<ol>
+<li><strong>Gemini 3 single-shot with 5 refs + 5 text-described</strong> - does thinking mode handle the tiering?</li>
+<li><strong>Two-turn approach</strong> - ask model to plan the group layout first, then generate</li>
+<li><strong>Simplified prompt</strong> vs current detailed template - does less instruction + better thinking = better results?</li>
+<li><strong>System instruction impact</strong> - same prompt with/without system instruction</li>
+<li><strong>Temperature 1.0 vs 0.8</strong> - does it help or hurt consistency?</li>
+</ol>
+<hr>
+<h2>Implementation Checklist</h2>
+<h3>Phase 1: Quick Tests (no code changes)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Test <code>gemini-3-pro-image-preview</code> with current prompts (baseline)</li>
+<li><input disabled="" type="checkbox"> Test with system instruction added</li>
+<li><input disabled="" type="checkbox"> Test simplified prompt (this doc&#39;s version) vs current template</li>
+<li><input disabled="" type="checkbox"> Test two-turn plan-then-generate for a cover</li>
+<li><input disabled="" type="checkbox"> Test 5 refs + 5 text-described characters</li>
+<li><input disabled="" type="checkbox"> Log thought text to understand model reasoning</li>
+<li><input disabled="" type="checkbox"> Compare temperature 0.8 vs 1.0</li>
+</ul>
+<h3>Phase 2: Integration (if tests show improvement)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add system instruction support to image generation calls</li>
+<li><input disabled="" type="checkbox"> Create Gemini 3-specific cover prompt templates</li>
+<li><input disabled="" type="checkbox"> Add thought text logging to cover generation</li>
+<li><input disabled="" type="checkbox"> Implement two-turn generation option for covers</li>
+<li><input disabled="" type="checkbox"> Update character tiering logic (foreground/midground/background)</li>
+<li><input disabled="" type="checkbox"> Bump temperature to 1.0 for Gemini 3 calls</li>
+</ul>
+<h3>Phase 3: Pipeline Simplification (if Phase 2 works)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Simplify cover prompts to lean on internal reasoning</li>
+<li><input disabled="" type="checkbox"> Reduce CHARACTER_REFERENCE_LIST to names + photos only</li>
+<li><input disabled="" type="checkbox"> Remove VISUAL_BIBLE from cover prompts</li>
+<li><input disabled="" type="checkbox"> Use thought text for quality pre-screening (before full eval)</li>
+<li><input disabled="" type="checkbox"> Evaluate cost: $0.134/image vs current cost + repair loops</li>
+</ul>
+<hr>
+<h2>Cost Analysis</h2>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Cost per Cover</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Current (Gemini 2.5 + retries)</td>
+<td>~$0.05-0.20</td>
+<td>Depends on retry count</td>
+</tr>
+<tr>
+<td>Gemini 3 single-shot</td>
+<td>$0.134</td>
+<td>Higher base, possibly fewer retries</td>
+</tr>
+<tr>
+<td>Gemini 3 two-turn</td>
+<td>~$0.27</td>
+<td>Plan + generate</td>
+</tr>
+<tr>
+<td>Gemini 3 batch API</td>
+<td>$0.067</td>
+<td>50% discount, but async</td>
+</tr>
+<tr>
+<td>Current + quality eval + repair</td>
+<td>$0.15-0.40</td>
+<td>Eval costs add up</td>
+</tr>
+</tbody></table>
+<p>If Gemini 3&#39;s thinking reduces retries from ~3 to ~1, the total cost could be <strong>lower</strong> despite the higher per-image price.</p>
+<hr>
+<h2>Alternative: FLUX.2 for Covers</h2>
+<p>FLUX.2 supports <strong>up to 10 reference images</strong> at $0.03-0.05/image. This could handle the 10-character problem differently:</p>
+<ul>
+<li>All 10 characters get direct reference photos</li>
+<li>No thinking mode, but multi-reference is the core feature</li>
+<li>Available via fal.ai, Replicate, and already via Runware (which we use)</li>
+</ul>
+<p>Worth testing in parallel with Gemini 3.</p>
+<hr>
+<h2>Sources</h2>
+<ul>
+<li><a href="https://ai.google.dev/gemini-api/docs/image-generation">Gemini 3 Pro Image API Docs</a></li>
+<li><a href="https://ai.google.dev/gemini-api/docs/thinking">Gemini 3 Thinking Documentation</a></li>
+<li><a href="https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/gemini-3-prompting-guide">Gemini 3 Prompting Guide</a></li>
+<li><a href="https://deepmind.google/models/gemini-image/pro/">Nano Banana Pro - Google DeepMind</a></li>
+<li><a href="https://codelabs.developers.google.com/gemini-consistent-imagery-notebook">Generating Consistent Imagery with Gemini - Google Codelabs</a></li>
+<li><a href="https://fal.ai/flux-2">FLUX.2 on fal.ai</a></li>
+<li>Internal: <code>docs/MULTI-CHARACTER-COVER-TESTS.md</code></li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>gemini3-thinking-cover-strategy.md</code>.
+</footer>
+</body>
+</html>

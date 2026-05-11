@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FAIRY-TALES-RESEARCH.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Fairy Tales (Märchen) — Story Category Research</h1>
+<p><strong>Last updated</strong>: March 2026
+<strong>Status</strong>: Research only — no code changes yet</p>
+<p>This document collects fairy tale information for a potential new &quot;Märchen&quot; story category, structured similarly to the existing historical events system.</p>
+<h2>How It Would Work</h2>
+<p>Like historical stories, each fairy tale would have:</p>
+<ul>
+<li>An event ID (e.g., <code>cinderella</code>, <code>devils-bridge</code>)</li>
+<li>A teaching/story guide in <code>prompts/fairytale-guides.txt</code></li>
+<li>Frontend topic selection in <code>client/src/constants/storyTypes.ts</code></li>
+<li>Optional: pre-fetched location photos (for Swiss tales with real landmarks)</li>
+</ul>
+<p>Key difference from historical: the child characters <strong>become</strong> the fairy tale characters (participant mode), or the fairy tale happens around them. The AI adapts the classic story to feature the child&#39;s name, appearance, and companions.</p>
+<hr>
+<h2>Swiss Fairy Tales &amp; Legends</h2>
+<p>These are unique to Switzerland and give the product a differentiator. Many have real locations that could use pre-fetched photos.</p>
+<h3>1. heidi</h3>
+<p><strong>Name:</strong> Heidi
+<strong>Origin:</strong> Johanna Spyri (1881, Switzerland)
+<strong>Summary:</strong> An orphan girl is sent to live with her gruff grandfather in the Swiss Alps. She befriends goatherd Peter and discovers the joy of mountain life. Later she helps heal a disabled girl named Klara who visits from Frankfurt.
+<strong>Key Characters:</strong> Heidi, Grandfather (Alm-Öhi), Peter the goatherd, Klara, Peter&#39;s Grandmother
+<strong>Settings:</strong> Alpine meadows above Maienfeld, a mountain hut, goat pastures, Frankfurt (city contrast)
+<strong>Real Locations:</strong> Maienfeld (GR), Heididorf museum, the Alp above Maienfeld
+<strong>Themes:</strong> Nature heals, kindness transforms hearts, home is where you belong
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — Swiss Alps, wildflowers, goats, cozy wooden hut, panoramic views</p>
+<h3>2. devils-bridge</h3>
+<p><strong>Name:</strong> The Devil&#39;s Bridge (Teufelsbrücke)
+<strong>Origin:</strong> Swiss folk legend (Schöllenen Gorge, Canton Uri)
+<strong>Summary:</strong> Villagers desperately need a bridge across a dangerous gorge. The Devil offers to build it but demands the soul of the first to cross. The clever villagers trick him by sending a goat across first. The furious Devil throws a boulder but misses.
+<strong>Key Characters:</strong> The Devil, clever villagers, the goat
+<strong>Settings:</strong> Schöllenen Gorge near Andermatt, the rushing Reuss River, a dramatic stone bridge
+<strong>Real Locations:</strong> Teufelsbrücke (Schöllenen Gorge, UR), Devil&#39;s Stone (Teufelsstein), Andermatt
+<strong>Themes:</strong> Cleverness outwits power, community problem-solving
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Mild — portray Devil as silly/outwitted, not scary
+<strong>Visual appeal:</strong> Excellent — dramatic gorge, rushing waterfall, stone bridge, comic Devil with a goat</p>
+<h3>3. dragons-pilatus</h3>
+<p><strong>Name:</strong> The Dragons of Mount Pilatus (Die Drachen vom Pilatus)
+<strong>Origin:</strong> Swiss folk legend (Lucerne region)
+<strong>Summary:</strong> Friendly dragons with magical healing powers live in caves on Mount Pilatus. A farmer witnesses a great dragon fly into the mountain and discovers the legendary Dragon Stone, said to have the power to heal the sick.
+<strong>Key Characters:</strong> The Dragons, the Farmer, townspeople of Lucerne
+<strong>Settings:</strong> Mount Pilatus, Lake Lucerne, mountain caves
+<strong>Real Locations:</strong> Mount Pilatus, Lake Lucerne, Pilatus Kulm
+<strong>Themes:</strong> Don&#39;t judge by appearances, nature holds hidden wonders
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — these are friendly, healing dragons
+<strong>Visual appeal:</strong> Excellent — friendly dragons over Alpine peaks, crystal-clear lake, healing stones</p>
+<h3>4. st-gall-bear</h3>
+<p><strong>Name:</strong> St. Gall and the Bear (Sankt Gallus und der Bär)
+<strong>Origin:</strong> Swiss legend (7th century, Canton St. Gallen)
+<strong>Summary:</strong> Irish monk Gallus travels to the Swiss wilderness. He encounters a large bear but instead of fighting, shares his bread. The grateful bear helps carry logs and build a shelter. The town of St. Gallen grew around the monastery built on that spot.
+<strong>Key Characters:</strong> St. Gallus (the monk), the Bear
+<strong>Settings:</strong> Swiss forest wilderness, a clearing by a stream, the beginnings of a monastery
+<strong>Real Locations:</strong> Abbey of St. Gall (UNESCO World Heritage), St. Gallen old town
+<strong>Themes:</strong> Kindness tames wild creatures, sharing creates friendship
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — monk and bear sharing bread, forest, building together</p>
+<h3>5. vogel-gryff</h3>
+<p><strong>Name:</strong> Vogel Gryff of Basel
+<strong>Origin:</strong> Basel folk tradition (centuries old, still celebrated annually in January)
+<strong>Summary:</strong> Three magical creatures — the Vogel Gryff (griffin), the Wild Man, and the Lion — represent the guilds of Basel. Once a year they dance on the bridge over the Rhine, celebrating the spirit of the city.
+<strong>Key Characters:</strong> Vogel Gryff (Griffin), Wild Maa (Wild Man), Leu (Lion)
+<strong>Settings:</strong> The Rhine River, Basel&#39;s Mittlere Brücke (Middle Bridge), the old town
+<strong>Real Locations:</strong> Mittlere Brücke Basel, Kleinbasel, the Rhine
+<strong>Themes:</strong> Community celebration, tradition brings people together
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — festive and joyful
+<strong>Visual appeal:</strong> Excellent — griffin, wild man, and lion dancing on a medieval bridge over a river</p>
+<h3>6. white-chamois</h3>
+<p><strong>Name:</strong> The White Chamois (Die weisse Gämse)
+<strong>Origin:</strong> Swiss Alpine folk legend
+<strong>Summary:</strong> A legendary white chamois lives on the highest peaks. Hunters who chase it selfishly are led to danger, but those with pure hearts are guided to safety by the magical creature.
+<strong>Key Characters:</strong> The White Chamois, Alpine hunters, mountain villagers
+<strong>Settings:</strong> High Alpine peaks, rocky cliffs, mountain paths
+<strong>Real Locations:</strong> Various Swiss Alpine peaks (Bernese Oberland, Valais)
+<strong>Themes:</strong> Respect nature, greed leads to danger, pure hearts find their way
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — gleaming white chamois leaping across snowy peaks</p>
+<h3>7. frost-giants</h3>
+<p><strong>Name:</strong> The Frost Giants and the Sunbeam Fairies (Die Frostriesen und die Sonnenelfen)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> Switzerland was a frozen wasteland ruled by cruel Frost Giants. The Fairy Queen and the Sun send an army of Sunbeam Fairies to battle the giants, melting the ice and transforming the land into a green paradise with flowers and meadows.
+<strong>Key Characters:</strong> The Frost Giants, the Fairy Queen, the Sunbeam Fairies, the Sun
+<strong>Settings:</strong> Frozen Swiss mountains, glaciers turning into meadows, Alpine flower fields
+<strong>Themes:</strong> Light triumphs over cold, beauty grows from harsh beginnings
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — glaciers, tiny glowing fairies, frozen giants, flowers blooming in snow</p>
+<h3>8. cuckoo-clock-fairy</h3>
+<p><strong>Name:</strong> The Fairy in the Cuckoo Clock (Die Fee in der Kuckucksuhr)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> A mischievous fairy discovers Swiss woodworkers&#39; clever clock mechanisms. She enchants a wooden bird to pop out and call &quot;cuckoo&quot; at every hour, delighting the villagers. This is how the first cuckoo clock was born.
+<strong>Key Characters:</strong> The Fairy, Swiss woodworker, the cuckoo bird
+<strong>Settings:</strong> A Swiss woodworker&#39;s workshop, a mountain village
+<strong>Themes:</strong> Magic and craftsmanship create wonder
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — cuckoo clock mechanics, tiny fairy, cozy workshop</p>
+<h3>9. edelweiss-fairy</h3>
+<p><strong>Name:</strong> The Fairy of the Edelweiss (Die Edelweissfee)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> A brave fairy is transformed by the Fairy Queen into the first Edelweiss flower to stand guard against the Frost King on the highest mountain peaks. The small fuzzy white flower grows where almost nothing else can, symbolizing courage and love.
+<strong>Key Characters:</strong> The Fairy, the Fairy Queen, the Frost King
+<strong>Settings:</strong> High Alpine peaks, rocky mountain ledges, snow-covered cliffs
+<strong>Themes:</strong> Bravery means standing firm in hard places, small things hold great courage
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — Edelweiss on dramatic cliffsides, fairy transforming, mountain vistas</p>
+<h3>10. alpine-horn</h3>
+<p><strong>Name:</strong> The Wonderful Alpine Horn (Das wunderbare Alphorn)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> A young shepherd boy named Perrod receives a magical Alpine horn from mysterious mountain visitors. When he plays it, the sound echoes through the valleys, bringing joy to everyone and calling the cows safely home.
+<strong>Key Characters:</strong> Perrod (shepherd boy), mysterious mountain visitors, villagers
+<strong>Settings:</strong> Alpine pastures, mountain valleys, a Swiss village
+<strong>Themes:</strong> Music brings people together, gifts should help others
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — boy playing alphorn with mountain echoes, cows coming home, Alpine sunset</p>
+<h3>11. dwarf-chocolate</h3>
+<p><strong>Name:</strong> The Dwarf and His Confectionery (Der Zwerg und sein Süsswarenladen)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> A dairy farmer discovers that the Dwarf King has a secret underground workshop making wonderful candy and chocolate. The farmer tries to steal the recipe but is caught and learns about honesty and respect.
+<strong>Key Characters:</strong> The Dwarf King, the Dairy Farmer, underground dwarf helpers
+<strong>Settings:</strong> Swiss mountain pastures, a hidden underground confectionery cavern
+<strong>Themes:</strong> Respect others&#39; work, greed leads to trouble
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — hidden underground candy workshop, dwarves making chocolate. Connects to Switzerland&#39;s chocolate tradition.</p>
+<h3>12. palace-under-waves</h3>
+<p><strong>Name:</strong> The Palace Under the Waves (Der Palast unter den Wellen)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> The king of the water spirits invites a human princess into his crystal palace beneath a Swiss lake. She discovers an enchanted world of shimmering halls and water gardens, and must choose between the magical underwater world and her life above.
+<strong>Key Characters:</strong> The Water King, the Princess, lake spirits
+<strong>Settings:</strong> A Swiss lake shore, a crystal palace underwater, water gardens
+<strong>Themes:</strong> Every world has its own beauty, be grateful for where you belong
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — crystal underwater palace, Swiss lake, shimmering water spirits</p>
+<h3>13. friendly-dragons</h3>
+<p><strong>Name:</strong> Two Good-Natured Dragons (Zwei gutmütige Drachen)
+<strong>Origin:</strong> William Elliot Griffis collection (1920)
+<strong>Summary:</strong> A man lost in a mountain storm stumbles into a cave and discovers two friendly dragons. Instead of being frightening, they keep him warm through the winter and share their food.
+<strong>Key Characters:</strong> The lost traveler, two friendly dragons
+<strong>Settings:</strong> Swiss mountain cave, stormy Alpine landscape
+<strong>Themes:</strong> Don&#39;t judge by appearances, kindness in unexpected places
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — cozy dragon cave, friendly dragons, snowy mountains, warm firelight</p>
+<h3>14. gargantua-matterhorn</h3>
+<p><strong>Name:</strong> The Gargantua of the Matterhorn
+<strong>Origin:</strong> Swiss Alpine legend
+<strong>Summary:</strong> A legendary giant named Gargantua shaped the Swiss landscape as he walked. His footprints became lakes, and when he lay down to rest, his body became the Matterhorn.
+<strong>Key Characters:</strong> Gargantua the Giant
+<strong>Settings:</strong> The Matterhorn, Swiss valleys and lakes
+<strong>Themes:</strong> Even the mightiest things have a story behind them
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — giant walking through the Alps, footprints becoming lakes, the Matterhorn forming</p>
+<hr>
+<h2>Classic European Fairy Tales</h2>
+<p>The most well-known fairy tales worldwide. Parents recognize these instantly.</p>
+<h3>15. cinderella</h3>
+<p><strong>Name:</strong> Cinderella / Aschenputtel (DE) / Cendrillon (FR)
+<strong>Origin:</strong> Charles Perrault (1697) / Brothers Grimm
+<strong>Summary:</strong> A kind girl mistreated by her stepmother and stepsisters attends a royal ball with help from a fairy godmother, wins the prince&#39;s heart, and is identified by a lost glass slipper.
+<strong>Key Characters:</strong> Cinderella, Fairy Godmother, Prince Charming, Wicked Stepmother, Stepsisters
+<strong>Settings:</strong> A manor house, the royal palace ballroom, a pumpkin carriage
+<strong>Themes:</strong> Kindness and inner beauty triumph over cruelty
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> Mild — use Perrault version (no violent punishment for stepsisters)
+<strong>Visual appeal:</strong> Excellent — ball gown transformation, pumpkin carriage, glass slipper, grand palace</p>
+<h3>16. snow-white</h3>
+<p><strong>Name:</strong> Snow White / Schneewittchen (DE)
+<strong>Origin:</strong> Brothers Grimm (1812)
+<strong>Summary:</strong> A princess flees her jealous stepmother and finds refuge with seven kind dwarfs. The Queen tricks her with a poisoned apple, but true love breaks the spell.
+<strong>Key Characters:</strong> Snow White, the Evil Queen, the Seven Dwarfs, the Prince, the Magic Mirror
+<strong>Settings:</strong> Dark enchanted forest, the dwarfs&#39; cozy cottage, the Queen&#39;s castle
+<strong>Themes:</strong> Jealousy leads to downfall, kindness attracts friendship
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Yes — soften poisoning to sleeping spell, remove violent punishments
+<strong>Visual appeal:</strong> Excellent — magical mirror, forest cottage, seven distinct dwarfs, apple, castle</p>
+<h3>17. sleeping-beauty</h3>
+<p><strong>Name:</strong> Sleeping Beauty / Dornröschen (DE) / La Belle au bois dormant (FR)
+<strong>Origin:</strong> Charles Perrault (1697) / Brothers Grimm
+<strong>Summary:</strong> A princess is cursed by an evil fairy to fall into a deep sleep for 100 years. A good fairy softens the curse, and a brave prince eventually wakes her with true love&#39;s kiss.
+<strong>Key Characters:</strong> Princess Aurora, Evil Fairy, Good Fairies, Prince, King and Queen
+<strong>Settings:</strong> Royal palace, an overgrown castle covered in thorns and roses, the spindle room
+<strong>Themes:</strong> Good triumphs over evil, love conquers curses
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Mild — omit Perrault&#39;s dark second half
+<strong>Visual appeal:</strong> Excellent — fairy christening, thorn-covered castle, sleeping princess</p>
+<h3>18. red-riding-hood</h3>
+<p><strong>Name:</strong> Little Red Riding Hood / Rotkäppchen (DE)
+<strong>Origin:</strong> Charles Perrault (1697) / Brothers Grimm
+<strong>Summary:</strong> A girl in a red cloak visits her grandmother but encounters a cunning wolf who tricks her. A brave woodsman rescues both grandmother and Red Riding Hood.
+<strong>Key Characters:</strong> Little Red Riding Hood, the Big Bad Wolf, Grandmother, the Woodsman
+<strong>Settings:</strong> A forest path, Grandmother&#39;s cottage in the woods
+<strong>Themes:</strong> Listen to your parents, don&#39;t talk to strangers, appearances deceive
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Yes — use Grimm version with rescue, soften &quot;swallowing&quot; to &quot;trapping&quot;
+<strong>Visual appeal:</strong> Excellent — red cloak in green forest, wolf in grandmother&#39;s clothing, cozy cottage</p>
+<h3>19. hansel-gretel</h3>
+<p><strong>Name:</strong> Hansel and Gretel / Hänsel und Gretel (DE)
+<strong>Origin:</strong> Brothers Grimm (1812)
+<strong>Summary:</strong> Two siblings lost in the forest discover a house made of candy. A wicked witch captures them, but clever Gretel outwits her and frees her brother.
+<strong>Key Characters:</strong> Hansel, Gretel, the Witch, Father
+<strong>Settings:</strong> Deep dark forest, gingerbread/candy house, the witch&#39;s oven
+<strong>Themes:</strong> Siblings working together overcome anything, cleverness defeats evil
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Yes — children get lost (not abandoned), witch is defeated/banished (not burned)
+<strong>Visual appeal:</strong> Excellent — gingerbread house is one of the most iconic fairy tale images</p>
+<h3>20. rapunzel</h3>
+<p><strong>Name:</strong> Rapunzel
+<strong>Origin:</strong> Brothers Grimm (1812)
+<strong>Summary:</strong> A girl with incredibly long golden hair is locked in a tower by an enchantress. A prince discovers her singing, climbs her hair, and together they escape.
+<strong>Key Characters:</strong> Rapunzel, the Prince, Dame Gothel (enchantress)
+<strong>Settings:</strong> A tall stone tower in the forest, the enchantress&#39;s garden
+<strong>Themes:</strong> Love and courage overcome imprisonment, freedom is precious
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Yes — simplify to escape story, remove dark elements
+<strong>Visual appeal:</strong> Excellent — iconic long golden hair from a tower, magical garden</p>
+<h3>21. frog-prince</h3>
+<p><strong>Name:</strong> The Frog Prince / Der Froschkönig (DE)
+<strong>Origin:</strong> Brothers Grimm
+<strong>Summary:</strong> A princess drops her golden ball into a well. A frog retrieves it in exchange for friendship. When she keeps her promise, the frog transforms into a prince.
+<strong>Key Characters:</strong> The Princess, the Frog/Prince, the King
+<strong>Settings:</strong> A castle, a well in a garden, the royal dining hall
+<strong>Themes:</strong> Keep your promises, don&#39;t judge by appearance
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> Mild — use &quot;kiss&quot; version, not &quot;throw against wall&quot;
+<strong>Visual appeal:</strong> Good — golden ball, well, frog with tiny crown, transformation</p>
+<h3>22. beauty-beast</h3>
+<p><strong>Name:</strong> Beauty and the Beast / La Belle et la Bête (FR)
+<strong>Origin:</strong> Gabrielle-Suzanne de Villeneuve (1740, France)
+<strong>Summary:</strong> Belle goes to live in an enchanted castle with a fearsome Beast to save her father. She discovers his gentle heart, and her love breaks the curse.
+<strong>Key Characters:</strong> Belle, the Beast/Prince, Belle&#39;s Father, enchanted servants
+<strong>Settings:</strong> An enchanted castle, a magical rose garden, Belle&#39;s village
+<strong>Themes:</strong> True beauty is within, love transforms
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No — naturally gentle
+<strong>Visual appeal:</strong> Excellent — enchanted castle, magical rose, transformation, ballroom</p>
+<h3>23. rumpelstiltskin</h3>
+<p><strong>Name:</strong> Rumpelstiltskin / Rumpelstilzchen (DE)
+<strong>Origin:</strong> Brothers Grimm
+<strong>Summary:</strong> A mysterious little man helps a girl spin straw into gold but demands her firstborn child. She escapes the deal by guessing his name.
+<strong>Key Characters:</strong> The Miller&#39;s Daughter/Queen, Rumpelstiltskin, the King
+<strong>Settings:</strong> A castle room with a spinning wheel, the forest
+<strong>Themes:</strong> Cleverness solves impossible problems
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Yes — he stomps and disappears (doesn&#39;t tear himself apart)
+<strong>Visual appeal:</strong> Good — spinning wheel, gold thread, little man dancing by firelight</p>
+<h3>24. little-mermaid</h3>
+<p><strong>Name:</strong> The Little Mermaid / Den lille Havfrue (DA)
+<strong>Origin:</strong> Hans Christian Andersen (1837, Denmark)
+<strong>Summary:</strong> A mermaid princess trades her voice to a sea witch for human legs, hoping to win the love of a prince she rescued from a shipwreck.
+<strong>Key Characters:</strong> The Little Mermaid, the Prince, the Sea Witch, Mermaid&#39;s Sisters
+<strong>Settings:</strong> An underwater palace, the ocean surface, a coastal kingdom
+<strong>Themes:</strong> Follow your dreams, be true to yourself
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Yes — use happy ending (not dissolving into sea foam)
+<strong>Visual appeal:</strong> Excellent — underwater kingdom, shimmering tail, sea creatures, coastal castle</p>
+<h3>25. ugly-duckling</h3>
+<p><strong>Name:</strong> The Ugly Duckling / Das hässliche Entlein (DE)
+<strong>Origin:</strong> Hans Christian Andersen (1843, Denmark)
+<strong>Summary:</strong> A little bird mocked for looking different endures hardship through the seasons, then discovers he has grown into a beautiful swan.
+<strong>Key Characters:</strong> The Ugly Duckling/Swan, Mother Duck, other ducklings, farm animals
+<strong>Settings:</strong> A farm pond, a frozen lake in winter, a spring garden with swans
+<strong>Themes:</strong> You are beautiful as you are, patience reveals your true self
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — frame bullying scenes gently
+<strong>Visual appeal:</strong> Excellent — duckling on pond, seasonal changes, stunning swan transformation</p>
+<h3>26. thumbelina</h3>
+<p><strong>Name:</strong> Thumbelina / Däumelinchen (DE)
+<strong>Origin:</strong> Hans Christian Andersen (1835, Denmark)
+<strong>Summary:</strong> A tiny girl no bigger than a thumb is born from a magical flower. She has adventures with a toad, beetle, field mouse, and mole before a swallow carries her to a land of flower fairies.
+<strong>Key Characters:</strong> Thumbelina, the Toad, the Field Mouse, the Mole, the Swallow, the Flower Prince
+<strong>Settings:</strong> A flower garden, a lily pad, an underground burrow, a sunny land of flowers
+<strong>Themes:</strong> Stay true to yourself, kindness is rewarded
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — tiny girl on a flower, lily pad boats, flying on a swallow</p>
+<h3>27. snow-queen</h3>
+<p><strong>Name:</strong> The Snow Queen / Die Schneekönigin (DE)
+<strong>Origin:</strong> Hans Christian Andersen (1844, Denmark)
+<strong>Summary:</strong> When Kai is enchanted and kidnapped by the Snow Queen, his brave friend Gerda journeys across snowy lands to rescue him using the power of love and friendship.
+<strong>Key Characters:</strong> Gerda, Kai, the Snow Queen, the Robber Girl, the Reindeer
+<strong>Settings:</strong> A snowy village, a river journey, a robber&#39;s camp, the Snow Queen&#39;s ice palace
+<strong>Themes:</strong> True friendship overcomes any coldness
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Mild — tone down kidnapping/robbers
+<strong>Visual appeal:</strong> Excellent — ice palace, snow landscapes, sledge rides, flower gardens</p>
+<h3>28. emperors-clothes</h3>
+<p><strong>Name:</strong> The Emperor&#39;s New Clothes / Des Kaisers neue Kleider (DE)
+<strong>Origin:</strong> Hans Christian Andersen (1837, Denmark)
+<strong>Summary:</strong> Swindler tailors convince a vain emperor they&#39;re making magnificent invisible clothes. Everyone pretends to see them until a child declares &quot;The Emperor has no clothes!&quot;
+<strong>Key Characters:</strong> The Emperor, the Two Swindlers, the Little Child, Townspeople
+<strong>Settings:</strong> A royal palace, the streets during a procession
+<strong>Themes:</strong> Honesty is important, children see the truth
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — naturally humorous
+<strong>Visual appeal:</strong> Good — ridiculous parade, fancy palace, humorous expressions</p>
+<h3>29. princess-pea</h3>
+<p><strong>Name:</strong> The Princess and the Pea / Die Prinzessin auf der Erbse (DE)
+<strong>Origin:</strong> Hans Christian Andersen (1835, Denmark)
+<strong>Summary:</strong> A prince searches for a real princess. A girl arrives on a stormy night; the queen tests her by placing a pea under twenty mattresses. She feels it, proving she&#39;s a true princess.
+<strong>Key Characters:</strong> The Princess, the Prince, the Queen
+<strong>Settings:</strong> A royal castle, a bedroom with a towering stack of mattresses
+<strong>Themes:</strong> True quality shines through
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — towering stack of mattresses is an iconic image</p>
+<h3>30. puss-in-boots</h3>
+<p><strong>Name:</strong> Puss in Boots / Der gestiefelte Kater (DE)
+<strong>Origin:</strong> Charles Perrault (1697, France)
+<strong>Summary:</strong> A clever cat helps a poor young man become rich and marry a princess through wit and a pair of fancy boots. The cat outsmarts an ogre and wins his master a castle.
+<strong>Key Characters:</strong> Puss in Boots, the Miller&#39;s Son, the Princess, the Ogre, the King
+<strong>Settings:</strong> A mill, rolling countryside, the Ogre&#39;s castle, the King&#39;s carriage
+<strong>Themes:</strong> Cleverness changes your fortune
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No — mild trickery only
+<strong>Visual appeal:</strong> Excellent — cat in boots and feathered hat, castle, carriage</p>
+<h3>31. goldilocks</h3>
+<p><strong>Name:</strong> Goldilocks and the Three Bears
+<strong>Origin:</strong> English folk tale (Robert Southey, 1837)
+<strong>Summary:</strong> Curious Goldilocks wanders into the home of three bears while they&#39;re out. She tries their porridge, chairs, and beds, finding one &quot;just right&quot; each time. The bears return to find her sleeping.
+<strong>Key Characters:</strong> Goldilocks, Papa Bear, Mama Bear, Baby Bear
+<strong>Settings:</strong> A cozy cottage in the woods with three of everything
+<strong>Themes:</strong> Respect others&#39; property, ask before you take
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — one of the gentlest fairy tales
+<strong>Visual appeal:</strong> Excellent — &quot;three of everything&quot; visual pattern, cozy bear cottage</p>
+<h3>32. three-little-pigs</h3>
+<p><strong>Name:</strong> The Three Little Pigs
+<strong>Origin:</strong> English folk tale (James Halliwell-Phillipps, 1886)
+<strong>Summary:</strong> Three pig brothers each build a house — straw, sticks, and bricks. The Big Bad Wolf blows down the first two but cannot blow down the brick house.
+<strong>Key Characters:</strong> Three Little Pigs, the Big Bad Wolf
+<strong>Settings:</strong> Three houses (straw, sticks, bricks), countryside
+<strong>Themes:</strong> Hard work pays off, don&#39;t take shortcuts
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> Mild — pigs escape to next house (not eaten), wolf gives up (not boiled)
+<strong>Visual appeal:</strong> Excellent — three distinct houses, huffing wolf, cozy brick house</p>
+<h3>33. jack-beanstalk</h3>
+<p><strong>Name:</strong> Jack and the Beanstalk
+<strong>Origin:</strong> English folk tale (1734)
+<strong>Summary:</strong> A poor boy trades his cow for magic beans. A giant beanstalk grows overnight. Jack climbs it and discovers a giant&#39;s castle in the clouds with a golden harp and a goose that lays golden eggs.
+<strong>Key Characters:</strong> Jack, Jack&#39;s Mother, the Giant, the Giant&#39;s Wife, the Golden Goose
+<strong>Settings:</strong> A poor cottage, a towering beanstalk, a castle above the clouds
+<strong>Themes:</strong> Bravery and cleverness overcome the biggest challenges
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Mild — tone down &quot;Fee-fi-fo-fum&quot; threat
+<strong>Visual appeal:</strong> Excellent — giant beanstalk, castle in clouds, golden goose</p>
+<h3>34. pinocchio</h3>
+<p><strong>Name:</strong> Pinocchio / Le avventure di Pinocchio (IT)
+<strong>Origin:</strong> Carlo Collodi (1883, Italy)
+<strong>Summary:</strong> A wooden puppet carved by kindly Geppetto dreams of becoming a real boy. His nose grows when he lies. Through adventures guided by a fairy and a talking cricket, he learns honesty and courage.
+<strong>Key Characters:</strong> Pinocchio, Geppetto, the Blue Fairy, Jiminy Cricket
+<strong>Settings:</strong> Geppetto&#39;s workshop, a puppet theater, inside a whale
+<strong>Themes:</strong> Honesty, courage, unselfishness make you &quot;real&quot;
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Yes — use Disney-style version, original is very dark
+<strong>Visual appeal:</strong> Excellent — wooden puppet, growing nose, workshop, whale scene, transformation</p>
+<h3>35. bremen-musicians</h3>
+<p><strong>Name:</strong> The Bremen Town Musicians / Die Bremer Stadtmusikanten (DE)
+<strong>Origin:</strong> Brothers Grimm
+<strong>Summary:</strong> Four aging animals — donkey, dog, cat, rooster — run away and set off to become musicians. They scare off robbers by standing on each other&#39;s backs and making tremendous noise.
+<strong>Key Characters:</strong> Donkey, Dog, Cat, Rooster, the Robbers
+<strong>Settings:</strong> A road to Bremen, the robbers&#39; house in the forest
+<strong>Themes:</strong> Teamwork, you&#39;re never too old for adventure
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — gentle and humorous
+<strong>Visual appeal:</strong> Excellent — four stacked animals is an iconic image</p>
+<h3>36. elves-shoemaker</h3>
+<p><strong>Name:</strong> The Elves and the Shoemaker / Die Wichtelmänner (DE)
+<strong>Origin:</strong> Brothers Grimm
+<strong>Summary:</strong> A poor shoemaker finds that tiny elves come at night to make beautiful shoes. He and his wife thank them by making tiny clothes for the elves.
+<strong>Key Characters:</strong> The Shoemaker, his Wife, the Elves
+<strong>Settings:</strong> A small shoe workshop, nighttime candlelight
+<strong>Themes:</strong> Kindness is repaid, gratitude matters
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No
+<strong>Visual appeal:</strong> Excellent — tiny elves working by candlelight, beautiful miniature shoes</p>
+<hr>
+<h2>World Fairy Tales</h2>
+<p>Well-known tales from other cultures, adding diversity.</p>
+<h3>37. aladdin</h3>
+<p><strong>Name:</strong> Aladdin and the Magic Lamp / Aladin und die Wunderlampe (DE)
+<strong>Origin:</strong> One Thousand and One Nights (Arabian Nights)
+<strong>Summary:</strong> A poor young man discovers a magical lamp in a cave. A powerful genie grants wishes. Aladdin must protect the lamp from a wicked sorcerer while winning a princess&#39;s heart.
+<strong>Key Characters:</strong> Aladdin, the Genie, the Princess, the Wicked Sorcerer
+<strong>Settings:</strong> A Middle Eastern marketplace, a cave of wonders, a desert palace
+<strong>Themes:</strong> Kindness matters more than riches, be careful what you wish for
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Mild — reduce violent confrontations
+<strong>Visual appeal:</strong> Excellent — magic lamp, cave of treasures, flying carpet, genie, desert palace</p>
+<h3>38. momotaro</h3>
+<p><strong>Name:</strong> Momotaro (Peach Boy)
+<strong>Origin:</strong> Japanese folk tale (one of Japan&#39;s &quot;Five Great Fairy Tales&quot;)
+<strong>Summary:</strong> An elderly couple find a giant peach in the river with a baby boy inside. Momotaro grows strong and sets out to defeat demons (Oni), befriending a dog, monkey, and pheasant along the way.
+<strong>Key Characters:</strong> Momotaro, the Elderly Couple, the Dog, the Monkey, the Pheasant, the Oni
+<strong>Settings:</strong> A riverside village, countryside, Onigashima (Demon Island)
+<strong>Themes:</strong> Bravery, friendship, sharing bring victory
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> Mild — portray Oni as silly rather than scary
+<strong>Visual appeal:</strong> Excellent — giant peach, boy with animal friends, Japanese landscape</p>
+<h3>39. monkey-king</h3>
+<p><strong>Name:</strong> The Monkey King (Sun Wukong)
+<strong>Origin:</strong> Journey to the West, Wu Cheng&#39;en (16th century, China)
+<strong>Summary:</strong> Born from a magical stone egg, the Monkey King gains incredible powers. After causing havoc in heaven, he&#39;s imprisoned under a mountain, then redeemed by joining a monk&#39;s journey to find sacred scriptures.
+<strong>Key Characters:</strong> Sun Wukong (Monkey King), Xuanzang (the Monk), Pigsy, Sandy
+<strong>Settings:</strong> Flower Fruit Mountain, the Heavenly Palace, the road westward
+<strong>Themes:</strong> Even the mightiest must learn humility, redemption through helping others
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Mild — select child-friendly episodes
+<strong>Visual appeal:</strong> Excellent — stone egg hatching, cloud-riding monkey, golden staff, Chinese landscapes</p>
+<h3>40. mulan</h3>
+<p><strong>Name:</strong> Mulan / Hua Mulan
+<strong>Origin:</strong> Chinese folk ballad (6th century)
+<strong>Summary:</strong> When her aging father is called to serve in the army, brave young Mulan disguises herself as a man and goes in his place. She serves with distinction and returns home a hero.
+<strong>Key Characters:</strong> Mulan, her Father, fellow soldiers, the Emperor
+<strong>Settings:</strong> A Chinese village, army camps, the Emperor&#39;s court
+<strong>Themes:</strong> Courage knows no gender, love for family inspires bravery
+<strong>Age:</strong> 5+
+<strong>Softening needed:</strong> Mild — downplay war, focus on bravery and family love
+<strong>Visual appeal:</strong> Excellent — Chinese village, armor and horses, cherry blossoms, Emperor&#39;s palace</p>
+<h3>41. anansi</h3>
+<p><strong>Name:</strong> Anansi the Spider
+<strong>Origin:</strong> Ashanti/Akan folk tradition (West Africa, Ghana)
+<strong>Summary:</strong> Clever spider Anansi captures all the world&#39;s stories from the Sky God by outsmarting a python, a leopard, and a hornet, earning the right to be keeper of all stories.
+<strong>Key Characters:</strong> Anansi the Spider, the Sky God (Nyame), Python, Leopard, Hornet
+<strong>Settings:</strong> The African forest, a spider&#39;s web, the Sky God&#39;s domain
+<strong>Themes:</strong> Wit accomplishes what strength cannot, stories are the greatest treasure
+<strong>Age:</strong> 4+
+<strong>Softening needed:</strong> No — naturally child-friendly trickster tales
+<strong>Visual appeal:</strong> Good — colorful spider, African forest, web designs, diverse animals</p>
+<h3>42. tortoise-hare</h3>
+<p><strong>Name:</strong> The Tortoise and the Hare
+<strong>Origin:</strong> Aesop&#39;s Fables (ancient Greek, ~600 BC)
+<strong>Summary:</strong> A boastful hare challenges a slow tortoise to a race. The hare naps mid-race, confident of victory. The steady tortoise keeps going and crosses the finish line first.
+<strong>Key Characters:</strong> The Tortoise, the Hare, forest animal spectators
+<strong>Settings:</strong> A countryside racecourse through fields and forests
+<strong>Themes:</strong> Slow and steady wins the race, don&#39;t be overconfident
+<strong>Age:</strong> 3+
+<strong>Softening needed:</strong> No — one of the gentlest fables
+<strong>Visual appeal:</strong> Excellent — racing animals, sleeping hare, determined tortoise, cheering crowd</p>
+<h3>43. ali-baba</h3>
+<p><strong>Name:</strong> Ali Baba and the Forty Thieves
+<strong>Origin:</strong> One Thousand and One Nights (Arabian Nights)
+<strong>Summary:</strong> A poor woodcutter discovers the secret cave of forty thieves with the magic words &quot;Open Sesame!&quot; His clever servant Morgiana helps him outsmart the thieves.
+<strong>Key Characters:</strong> Ali Baba, Morgiana, the Thieves&#39; Leader, the Forty Thieves
+<strong>Settings:</strong> A desert cave entrance, a Middle Eastern town
+<strong>Themes:</strong> Cleverness and loyalty are worth more than gold
+<strong>Age:</strong> 6+
+<strong>Softening needed:</strong> Yes — simplify to discovery and outwitting (remove violence)
+<strong>Visual appeal:</strong> Excellent — magical cave opening, piles of treasure, &quot;Open Sesame&quot; moment</p>
+<hr>
+<h2>Summary Table</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>ID</th>
+<th>Name</th>
+<th>Category</th>
+<th>Origin</th>
+<th>Age</th>
+<th>Softening</th>
+<th>Visual</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>heidi</td>
+<td>Heidi</td>
+<td>Swiss</td>
+<td>Spyri</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>2</td>
+<td>devils-bridge</td>
+<td>The Devil&#39;s Bridge</td>
+<td>Swiss</td>
+<td>Legend</td>
+<td>5+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>3</td>
+<td>dragons-pilatus</td>
+<td>Dragons of Pilatus</td>
+<td>Swiss</td>
+<td>Legend</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>4</td>
+<td>st-gall-bear</td>
+<td>St. Gall and the Bear</td>
+<td>Swiss</td>
+<td>Legend</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>5</td>
+<td>vogel-gryff</td>
+<td>Vogel Gryff Basel</td>
+<td>Swiss</td>
+<td>Tradition</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>6</td>
+<td>white-chamois</td>
+<td>The White Chamois</td>
+<td>Swiss</td>
+<td>Legend</td>
+<td>4+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>7</td>
+<td>frost-giants</td>
+<td>Frost Giants &amp; Sunbeam Fairies</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>8</td>
+<td>cuckoo-clock-fairy</td>
+<td>Fairy in the Cuckoo Clock</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>9</td>
+<td>edelweiss-fairy</td>
+<td>Fairy of the Edelweiss</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>10</td>
+<td>alpine-horn</td>
+<td>Wonderful Alpine Horn</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>11</td>
+<td>dwarf-chocolate</td>
+<td>Dwarf&#39;s Confectionery</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>4+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>12</td>
+<td>palace-under-waves</td>
+<td>Palace Under the Waves</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>4+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>13</td>
+<td>friendly-dragons</td>
+<td>Two Good-Natured Dragons</td>
+<td>Swiss</td>
+<td>Griffis</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>14</td>
+<td>gargantua-matterhorn</td>
+<td>Gargantua of Matterhorn</td>
+<td>Swiss</td>
+<td>Legend</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>15</td>
+<td>cinderella</td>
+<td>Cinderella</td>
+<td>European</td>
+<td>Perrault/Grimm</td>
+<td>3+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>16</td>
+<td>snow-white</td>
+<td>Snow White</td>
+<td>European</td>
+<td>Grimm</td>
+<td>4+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>17</td>
+<td>sleeping-beauty</td>
+<td>Sleeping Beauty</td>
+<td>European</td>
+<td>Perrault/Grimm</td>
+<td>4+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>18</td>
+<td>red-riding-hood</td>
+<td>Little Red Riding Hood</td>
+<td>European</td>
+<td>Perrault/Grimm</td>
+<td>4+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>19</td>
+<td>hansel-gretel</td>
+<td>Hansel and Gretel</td>
+<td>European</td>
+<td>Grimm</td>
+<td>5+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>20</td>
+<td>rapunzel</td>
+<td>Rapunzel</td>
+<td>European</td>
+<td>Grimm</td>
+<td>4+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>21</td>
+<td>frog-prince</td>
+<td>The Frog Prince</td>
+<td>European</td>
+<td>Grimm</td>
+<td>3+</td>
+<td>Mild</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>22</td>
+<td>beauty-beast</td>
+<td>Beauty and the Beast</td>
+<td>European</td>
+<td>Villeneuve</td>
+<td>4+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>23</td>
+<td>rumpelstiltskin</td>
+<td>Rumpelstiltskin</td>
+<td>European</td>
+<td>Grimm</td>
+<td>5+</td>
+<td>Yes</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>24</td>
+<td>little-mermaid</td>
+<td>The Little Mermaid</td>
+<td>European</td>
+<td>Andersen</td>
+<td>5+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>25</td>
+<td>ugly-duckling</td>
+<td>The Ugly Duckling</td>
+<td>European</td>
+<td>Andersen</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>26</td>
+<td>thumbelina</td>
+<td>Thumbelina</td>
+<td>European</td>
+<td>Andersen</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>27</td>
+<td>snow-queen</td>
+<td>The Snow Queen</td>
+<td>European</td>
+<td>Andersen</td>
+<td>5+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>28</td>
+<td>emperors-clothes</td>
+<td>Emperor&#39;s New Clothes</td>
+<td>European</td>
+<td>Andersen</td>
+<td>3+</td>
+<td>No</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>29</td>
+<td>princess-pea</td>
+<td>Princess and the Pea</td>
+<td>European</td>
+<td>Andersen</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>30</td>
+<td>puss-in-boots</td>
+<td>Puss in Boots</td>
+<td>European</td>
+<td>Perrault</td>
+<td>4+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>31</td>
+<td>goldilocks</td>
+<td>Goldilocks &amp; Three Bears</td>
+<td>European</td>
+<td>English</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>32</td>
+<td>three-little-pigs</td>
+<td>Three Little Pigs</td>
+<td>European</td>
+<td>English</td>
+<td>3+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>33</td>
+<td>jack-beanstalk</td>
+<td>Jack and the Beanstalk</td>
+<td>European</td>
+<td>English</td>
+<td>4+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>34</td>
+<td>pinocchio</td>
+<td>Pinocchio</td>
+<td>European</td>
+<td>Collodi</td>
+<td>4+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>35</td>
+<td>bremen-musicians</td>
+<td>Bremen Town Musicians</td>
+<td>European</td>
+<td>Grimm</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>36</td>
+<td>elves-shoemaker</td>
+<td>Elves and the Shoemaker</td>
+<td>European</td>
+<td>Grimm</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>37</td>
+<td>aladdin</td>
+<td>Aladdin</td>
+<td>World</td>
+<td>Arabian Nights</td>
+<td>4+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>38</td>
+<td>momotaro</td>
+<td>Momotaro (Peach Boy)</td>
+<td>World</td>
+<td>Japanese</td>
+<td>4+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>39</td>
+<td>monkey-king</td>
+<td>The Monkey King</td>
+<td>World</td>
+<td>Chinese</td>
+<td>5+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>40</td>
+<td>mulan</td>
+<td>Mulan</td>
+<td>World</td>
+<td>Chinese</td>
+<td>5+</td>
+<td>Mild</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>41</td>
+<td>anansi</td>
+<td>Anansi the Spider</td>
+<td>World</td>
+<td>West African</td>
+<td>4+</td>
+<td>No</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>42</td>
+<td>tortoise-hare</td>
+<td>Tortoise and the Hare</td>
+<td>World</td>
+<td>Aesop</td>
+<td>3+</td>
+<td>No</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>43</td>
+<td>ali-baba</td>
+<td>Ali Baba &amp; Forty Thieves</td>
+<td>World</td>
+<td>Arabian Nights</td>
+<td>6+</td>
+<td>Yes</td>
+<td>Excellent</td>
+</tr>
+</tbody></table>
+<p><strong>Total: 43 tales</strong> — 14 Swiss, 22 European classics, 7 World tales</p>
+<h2>Implementation Notes</h2>
+<ul>
+<li>Swiss tales are the differentiator — no competitor has these</li>
+<li>European classics are &quot;table stakes&quot; — parents expect to see these</li>
+<li>World tales add diversity and cultural breadth</li>
+<li>The &quot;softening needed&quot; column maps directly to story guide instructions for the AI</li>
+<li>Tales marked 3+ are safe for all ages; 5+ and 6+ need age-gating or careful prompting</li>
+<li>Pre-fetched location photos only apply to Swiss tales (real landmarks exist)</li>
+<li>Wilhelm Tell is already in historical — could be cross-listed or kept there only</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>FAIRY-TALES-RESEARCH.md</code>.
+</footer>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>grok-imagine-test-results.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Grok Imagine Character Reproduction Tests</h1>
+<p><strong>Date:</strong> 2026-03-18
+<strong>Model:</strong> grok-imagine-image (Standard, $0.02/image)
+<strong>API:</strong> xAI /images/edits endpoint</p>
+<h2>Key Finding</h2>
+<p>Grok&#39;s edit endpoint does <strong>full image regeneration</strong>, not inpainting. Every call regenerates the entire image, causing drift on characters that should stay unchanged. This makes iterative refinement unreliable.</p>
+<h2>Test Results</h2>
+<h3>1. Single-Shot Generation (v3_test_*.jpg)</h3>
+<p>Using front-facing body crops (left column of 2x2 avatar grid) as references.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Characters</th>
+<th>Ref Slots</th>
+<th>Quality</th>
+<th>Face Match</th>
+<th>Clothing Match</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3 chars (1 per slot)</td>
+<td>Lukas, Manuel, Sophie</td>
+<td>3</td>
+<td>Excellent</td>
+<td>Good</td>
+<td>Very good</td>
+</tr>
+<tr>
+<td>4 chars (4 stitched, 1 slot)</td>
+<td>+Franziska</td>
+<td>1</td>
+<td>Great</td>
+<td>Good</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>5 chars (2+2+1)</td>
+<td>+Roger</td>
+<td>3</td>
+<td>Very good</td>
+<td>Moderate</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>8 chars (3+3+2)</td>
+<td>+Werner, Uschi, Verena</td>
+<td>3</td>
+<td>Decent</td>
+<td>Weak</td>
+<td>Rough</td>
+</tr>
+</tbody></table>
+<p><strong>Conclusion:</strong> 3-5 characters is the sweet spot. Beyond 5, faces become generic.</p>
+<h3>2. Single Character Replacement (v3_test_replace_marcel.jpg)</h3>
+<p>Replace one character by description (&quot;replace the woman on the back left wearing black pullover with Marcel from Image 2&quot;).</p>
+<p><strong>Result:</strong> Worked well. Marcel appeared with correct clothing (navy hoodie with M logo). All other 7 characters preserved.</p>
+<h3>3. Red Box Replacement (v3_test_redbox_big_verena.jpg)</h3>
+<p>Cover target person with a red box, then tell Grok to &quot;replace the RED BOX with person from Image 2&quot;.</p>
+<table>
+<thead>
+<tr>
+<th>Box Size</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Small (face only)</td>
+<td>Replaced but face didn&#39;t match reference well</td>
+</tr>
+<tr>
+<td>Large (face + upper body)</td>
+<td>Cleaner fill, but still generic face</td>
+</tr>
+</tbody></table>
+<p><strong>Conclusion:</strong> Red box helps Grok locate WHERE to replace, but face likeness from reference remains weak for replacement tasks.</p>
+<h3>4. Dual Colored Box Replacement (v3_test_redgreen_verena_werner.jpg)</h3>
+<p>Red box on person A, green box on person B. Send scene + 2 reference crops. Tell &quot;red = Image 2, green = Image 3&quot;.</p>
+<p><strong>Result:</strong> Both boxes replaced in one pass. Grok understood the color-to-image mapping. Clothing matched better than faces.</p>
+<h3>5. Iterative Single Replacement (v3_test_werner_single.jpg)</h3>
+<p>Chain of: 8-char scene -&gt; replace Marcel -&gt; replace Verena -&gt; replace Werner (one per call).</p>
+<p><strong>Result:</strong> Non-deterministic. Same prompt + same image gave different results on retry. Sometimes replaced the wrong person. Sometimes worked perfectly.</p>
+<h3>6. Progressive Ghost Approach (v2_step*.jpg)</h3>
+<p>Step 1: Generate 3 real characters + 8 numbered ghost silhouettes.
+Step 2: Send result + 2 ref images, tell to fill ghosts 1-4.
+Step 3: Send result + 2 ref images, tell to fill ghosts 5-8.</p>
+<p><strong>Result:</strong> Scene consistency across passes was good. Ghosts replaced successfully. But some characters from earlier steps got lost or modified. Numbered ghost labels persisted as artifacts.</p>
+<h3>7. &quot;Fix Consistency&quot; Approach (v3_fix_*.jpg)</h3>
+<p>Tell Grok &quot;these people are already at the table but don&#39;t look exactly right, fix them to match reference&quot;.</p>
+<p><strong>Result:</strong> Failed. Each pass degraded ALL characters due to full image regeneration. Cumulative drift made everything worse after 2 passes.</p>
+<h2>Reference Image Findings</h2>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Quality</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Full 2x2 avatar grid</td>
+<td>Poor — faces too small when stitched</td>
+</tr>
+<tr>
+<td>2x2 grids stitched with <code>fit: cover</code></td>
+<td>Terrible — heads cut off</td>
+</tr>
+<tr>
+<td>Front column only (face+body front)</td>
+<td>Best — clear face and clothing</td>
+</tr>
+<tr>
+<td>Front columns stitched side-by-side</td>
+<td>Good — up to 4 per image works</td>
+</tr>
+</tbody></table>
+<h2>API Behavior Notes</h2>
+<ul>
+<li><strong>aspect_ratio ignored for single image edits</strong> — output matches input image dimensions</li>
+<li><strong>3 reference image slots max</strong> — must stitch characters to fit</li>
+<li><strong>8000 char prompt limit</strong> (exclusive — rejects &gt;= 8000)</li>
+<li><strong>Full regeneration, not inpainting</strong> — every pixel is regenerated, no masking support</li>
+<li><strong>Non-deterministic</strong> — same prompt + same image can give different results</li>
+<li><strong>~10-15s per generation</strong> at $0.02/image</li>
+</ul>
+<h2>Recommendations</h2>
+<ol>
+<li><strong>Use 1-3 characters per scene</strong> for best quality (matches story pipeline MAX 3 rule)</li>
+<li><strong>Front-only crops</strong> as references (not full 2x2 grids)</li>
+<li><strong>Single-shot generation</strong> is more reliable than iterative replacement</li>
+<li><strong>Don&#39;t chain edits</strong> — each pass introduces drift on all characters</li>
+<li><strong>Colored box technique</strong> works for targeting, but face likeness is weak</li>
+<li><strong>For character repair</strong>, Gemini inpainting is still superior (actual masking support)</li>
+</ol>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>grok-imagine-test-results.md</code>.
+</footer>
+</body>
+</html>

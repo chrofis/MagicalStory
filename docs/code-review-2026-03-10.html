@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>code-review-2026-03-10.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Full Code Review — MagicalStory</h1>
+<p><strong>Date:</strong> 2026-03-10
+<strong>Scope:</strong> Security, Performance, UX, Technical Debt</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-critical-issues">Critical Issues</a></li>
+<li><a href="#2-security">Security</a></li>
+<li><a href="#3-performance--architecture">Performance &amp; Architecture</a></li>
+<li><a href="#4-customer-experience--ux">Customer Experience &amp; UX</a></li>
+<li><a href="#5-technical-debt--code-quality">Technical Debt &amp; Code Quality</a></li>
+<li><a href="#6-positive-observations">Positive Observations</a></li>
+</ol>
+<hr>
+<h2>1. Critical Issues</h2>
+<p>These should be addressed before the next deploy or as soon as possible.</p>
+<h3>SEC-1: Hardcoded Admin Secret in Source Code</h3>
+<ul>
+<li><strong>Files:</strong> <code>server/routes/admin.js</code> (lines 274, 330, 379), <code>server/routes/admin/swiss-landmarks.js:28</code>, <code>server/routes/admin/landmark-index.js:30</code></li>
+<li><strong>Impact:</strong> Critical</li>
+<li>All use <code>process.env.ADMIN_SECRET || &#39;clear-landmarks-2026&#39;</code>. If <code>ADMIN_SECRET</code> isn&#39;t set, anyone who reads the code can call destructive admin endpoints.</li>
+<li><strong>Fix:</strong> Remove the hardcoded fallback. Refuse with 401 if <code>ADMIN_SECRET</code> is not set. Rotate the secret since it&#39;s in git history.</li>
+</ul>
+<h3>SEC-2: JWT Token Exposed in Redirect URL</h3>
+<ul>
+<li><strong>File:</strong> <code>server/routes/auth.js:699</code></li>
+<li><strong>Impact:</strong> Critical</li>
+<li>After trial email verification, the JWT is put in the URL: <code>/email-verified?token={JWT}&amp;trial=true</code>. Tokens in URLs appear in browser history, server logs, Referrer headers, and CDN logs. The JWT lasts 7 days.</li>
+<li><strong>Fix:</strong> Use an HttpOnly cookie or a short-lived single-use nonce instead.</li>
+</ul>
+<h3>PERF-1: Dual Database Connection Pool</h3>
+<ul>
+<li><strong>Files:</strong> <code>server.js:531-552</code> (creates its own <code>Pool</code>) + <code>server/services/database.js:8-42</code> (creates a second)</li>
+<li><strong>Impact:</strong> Critical</li>
+<li>Two independent pg pools are open. Stripe/Gelato webhooks, checkpoints, and <code>processStoryJob</code> use the local pool. Route modules use the modular pool. This silently doubles baseline connections against Railway&#39;s connection limit.</li>
+<li><strong>Fix:</strong> Remove the local Pool in <code>server.js</code>. Migrate all remaining <code>dbPool.query</code> calls to use the modular <code>dbQuery</code>.</li>
+</ul>
+<h3>DEBT-1: Broken Module Import</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/storyAvatarGeneration.js:17</code></li>
+<li><strong>Impact:</strong> Critical</li>
+<li><code>require(&#39;./logger&#39;).forModule(&#39;avatar-gen&#39;)</code> — no <code>server/lib/logger.js</code> exists. The logger lives at <code>server/utils/logger.js</code> and has no <code>forModule</code> method. This file crashes on require.</li>
+<li><strong>Fix:</strong> Change to <code>const { log } = require(&#39;../utils/logger&#39;);</code></li>
+</ul>
+<h3>DEBT-2: Firebase Service Account Key Possibly Tracked in Git</h3>
+<ul>
+<li><strong>File:</strong> <code>magical-story-3b745-firebase-adminsdk-fbsvc-a4d1b24148.json</code></li>
+<li><strong>Impact:</strong> Critical</li>
+<li>This file exists at root. The <code>.gitignore</code> pattern should catch it, but verify with <code>git ls-files</code>. If tracked, remove with <code>git rm --cached</code> and rotate the key.</li>
+</ul>
+<h3>DEBT-3: Hardcoded FreeImage API Key</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/magicApi.js:28</code></li>
+<li><strong>Impact:</strong> Critical</li>
+<li><code>const FREEIMAGE_API_KEY = &#39;6d207e02198a847aa98d0a2a901485a5&#39;</code> — hardcoded in committed source.</li>
+<li><strong>Fix:</strong> Move to env var <code>FREEIMAGE_API_KEY</code>.</li>
+</ul>
+<hr>
+<h2>2. Security</h2>
+<h3>SEC-3: No Input Size Validation on Base64 Uploads (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server/routes/trial.js:316-530</code>, <code>server.js:1256</code></li>
+<li>Global body parser allows <code>100mb</code>. Trial endpoints accept multiple base64 strings with no per-field size limit. An attacker can exhaust server memory.</li>
+<li><strong>Fix:</strong> Validate base64 string length per field (reject &gt; 15MB). Apply 100MB limit only to routes that need it; use 1MB globally.</li>
+</ul>
+<h3>SEC-4: AI Proxy Accepts Arbitrary Model Names (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/routes/ai-proxy.js:140-146</code></li>
+<li><code>POST /api/gemini</code> accepts any <code>model</code> from request body without whitelist. Users can route requests to expensive/experimental models.</li>
+<li><strong>Fix:</strong> Validate <code>model</code> against an explicit allowlist.</li>
+</ul>
+<h3>SEC-5: Wrong Column in Sharing Route (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/routes/sharing.js:152-153</code></li>
+<li>Queries <code>password_hash</code> but the column is <code>password</code>. Always returns null, causing <code>needsPassword = true</code> for story owners.</li>
+<li><strong>Fix:</strong> Change to <code>password</code> column or use <code>has_set_password</code> flag.</li>
+</ul>
+<h3>SEC-6: Trial Password Minimum Inconsistency (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/routes/trial.js:1988</code></li>
+<li>Trial claim validates <code>password.length &lt; 6</code> while every other path enforces minimum 8.</li>
+<li><strong>Fix:</strong> Change to <code>&lt; 8</code>.</li>
+</ul>
+<h3>SEC-7: CSP Fully Disabled (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:591-596</code></li>
+<li><code>contentSecurityPolicy: false</code> passed to Helmet. No XSS backstop.</li>
+<li><strong>Fix:</strong> Implement a CSP policy appropriate for a React SPA.</li>
+</ul>
+<h3>SEC-8: User Text Flows Directly into AI Prompts (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/storyHelpers.js:2156-2281</code></li>
+<li><code>storyTopic</code>, <code>storyDetails</code>, <code>customThemeText</code>, <code>dedication</code> are interpolated into prompts with length-only sanitization. Prompt injection risk.</li>
+<li><strong>Fix:</strong> Wrap user content in XML boundary tags (<code>&lt;user_input&gt;</code>) and instruct models to treat as data.</li>
+</ul>
+<h3>SEC-9: In-Memory Rate Limiters Reset on Deploy (Medium)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server/routes/trial.js:28-56</code>, <code>server/middleware/rateLimit.js</code></li>
+<li>All rate limiters use MemoryStore. Every deploy to Railway resets all counters.</li>
+<li><strong>Fix:</strong> Use Redis or PostgreSQL-backed store for the most sensitive limiters (avatar generation).</li>
+</ul>
+<h3>SEC-10: <code>railway.app</code> Wildcard CORS (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:573-575</code></li>
+<li><code>origin.includes(&#39;railway.app&#39;)</code> allows any Railway subdomain as CORS origin with credentials.</li>
+<li><strong>Fix:</strong> Replace with explicit domain pattern match.</li>
+</ul>
+<h3>SEC-11: Auth Token in Image URLs (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/SharedStoryViewer.tsx:147-149</code></li>
+<li>JWT appended as query parameter to image URLs. Leaks to browser history, logs, referrers.</li>
+<li><strong>Fix:</strong> Use short-lived signed media tokens or cookie-based auth for image endpoints.</li>
+</ul>
+<h3>SEC-12: Manual X-Forwarded-For Parsing (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/routes/user.js:19-20</code></li>
+<li>Reads <code>X-Forwarded-For</code> directly instead of using <code>req.ip</code> (which Express normalizes via <code>trust proxy</code>). IP can be spoofed.</li>
+<li><strong>Fix:</strong> Use <code>req.ip</code>.</li>
+</ul>
+<h3>SEC-13: Stripe userId Parsed with parseInt (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:723,789</code></li>
+<li>Trial users have UUID IDs. <code>parseInt</code> on a UUID returns NaN or wrong value. Could cause credit assignment to wrong user or silent failure.</li>
+<li><strong>Fix:</strong> Don&#39;t parseInt; validate as string matching expected format.</li>
+</ul>
+<h3>SEC-14: SSL Certificate Validation Disabled for DB (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:533-538</code></li>
+<li><code>ssl: { rejectUnauthorized: false }</code> — common on Railway but vulnerable to MITM.</li>
+</ul>
+<hr>
+<h2>3. Performance &amp; Architecture</h2>
+<h3>PERF-2: Sequential Per-Row Database Writes (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/services/database.js:1421-1492</code> (<code>saveRetryHistoryImages</code>), lines 520-575 (<code>saveStoryData</code>), lines 826-876 (<code>upsertStory</code>)</li>
+<li>Each image version is saved with an individual <code>await INSERT</code>. A 30-page story with retries produces up to 360 sequential DB round trips.</li>
+<li><strong>Fix:</strong> Batch into multi-row INSERTs or use <code>Promise.all</code> since writes are independent.</li>
+</ul>
+<h3>PERF-3: server.js is 5,098 Lines (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js</code></li>
+<li>Still contains: Stripe webhook (~340 lines), Gelato webhook (~260 lines), <code>processStoryJob</code> (~750 lines), <code>initializeDatabase()</code> (~450 lines), checkpoint system, landmark endpoints, and 127 direct <code>dbQuery</code> calls.</li>
+<li><strong>Fix:</strong> Extract to <code>server/routes/stripe.js</code>, <code>server/routes/gelato.js</code>, <code>server/services/storyPipeline.js</code>, <code>server/services/checkpoints.js</code>.</li>
+</ul>
+<h3>PERF-4: pLimit(50) is Effectively No-Limit (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/images.js:3093,4222,4339,4483</code></li>
+<li>50 concurrent tasks for 30 pages = all fire simultaneously. Holds ~60MB base64 in memory and risks hitting Gemini rate limits.</li>
+<li><strong>Fix:</strong> Lower to <code>pLimit(10)</code> for evaluations, <code>pLimit(5)</code> for image generation.</li>
+</ul>
+<h3>PERF-5: Base64 TEXT Columns for Image Storage (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/services/database.js:366</code> and story_images schema</li>
+<li>Base64 TEXT is 33% larger than binary, wastes TOAST overhead.</li>
+<li><strong>Fix:</strong> Migrate to <code>BYTEA</code> columns. Long-term, consider object storage (S3/R2).</li>
+</ul>
+<h3>PERF-6: No Retention Policy for Retry History Images (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/services/database.js:1421-1492</code></li>
+<li>A story with max retries can save 300MB+ of retry images with no cleanup.</li>
+<li><strong>Fix:</strong> Prune retry images for pages with good scores after generation completes.</li>
+</ul>
+<h3>PERF-7: 100MB Body Limit Applies Globally (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:1256</code></li>
+<li><code>express.json({ limit: &#39;100mb&#39; })</code> on every route. Any endpoint can receive 100MB payloads.</li>
+<li><strong>Fix:</strong> Use <code>1mb</code> globally, override to <code>100mb</code> only on image/story-save routes.</li>
+</ul>
+<h3>PERF-8: StoryWizard.tsx — 90 useState, 40 useEffect, No Memoization (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/StoryWizard.tsx</code></li>
+<li>5,386 lines, 90 state variables, 2 useCallback/useMemo. Any state update re-renders the entire component tree.</li>
+<li><strong>Fix:</strong> Split into <code>WizardConfigContext</code> + <code>GenerationResultContext</code>. Wrap expensive callbacks with <code>useCallback</code>.</li>
+</ul>
+<h3>PERF-9: StoryDisplay.tsx is 5,547 Lines (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/components/generation/StoryDisplay.tsx</code></li>
+<li>Bundles story display, dev panels, modals all in one chunk.</li>
+<li><strong>Fix:</strong> Sub-split into <code>StoryDisplayCore</code>, lazy-load <code>DevModePanel</code> and modals.</li>
+</ul>
+<h3>PERF-10: Checkpoint Data Includes Full Image Data (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server.js:1907-1921</code></li>
+<li><code>partial_page</code> checkpoints store ~200KB base64 per page. 30-page story = ~6MB in JSONB checkpoints.</li>
+<li><strong>Fix:</strong> Strip <code>imageData</code> from checkpoints; retrieve from <code>story_images</code> during recovery.</li>
+</ul>
+<h3>PERF-11: JSON.parse(JSON.stringify) Deep Clone of Story Data (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/services/database.js:512</code></li>
+<li>Deep-clones 6-10MB story objects during every save, doubling peak memory.</li>
+<li><strong>Fix:</strong> Build stripped copy structurally instead of clone-then-delete.</li>
+</ul>
+<h3>PERF-12: GEMINI_API_KEY Read from process.env 15 Times (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/images.js</code></li>
+<li><strong>Fix:</strong> Read once at module init: <code>const GEMINI_API_KEY = process.env.GEMINI_API_KEY;</code></li>
+</ul>
+<hr>
+<h2>4. Customer Experience &amp; UX</h2>
+<h3>UX-1: Trial Funnel Shows Sign-Up Form During Generation (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/TrialGenerationPage.tsx:596-654</code></li>
+<li>Email form appears immediately when generation starts, competing with the &quot;creating...&quot; state.</li>
+<li><strong>Fix:</strong> Show sign-up form only after completion (or at 80%+ progress).</li>
+</ul>
+<h3>UX-2: No 404 Route (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/App.tsx</code></li>
+<li>No catch-all <code>&lt;Route path=&quot;*&quot;&gt;</code>. Invalid URLs show blank pages.</li>
+<li><strong>Fix:</strong> Add <code>&lt;Route path=&quot;*&quot; element={&lt;Navigate to=&quot;/&quot; replace /&gt;} /&gt;</code> or a 404 page.</li>
+</ul>
+<h3>UX-3: Share URL Route Mismatch (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>SharedStoryViewer.tsx:212</code> constructs <code>/s/${shareToken}</code>, but <code>App.tsx:49</code> registers <code>/shared/:shareToken</code></li>
+<li>Share links may 404.</li>
+<li><strong>Fix:</strong> Verify and align route registration with URL construction. Add both routes if needed.</li>
+</ul>
+<h3>UX-4: Trial Failure Offers No Context or State Preservation (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/TrialGenerationPage.tsx:502-516</code></li>
+<li>Generic &quot;Something went wrong&quot; with &quot;Try Again&quot; that discards all user input.</li>
+<li><strong>Fix:</strong> Persist trial wizard state via <code>sessionStorage</code>. Distinguish timeout from hard failure.</li>
+</ul>
+<h3>UX-5: Regular Users Cannot Cancel Stalled Generation (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/components/generation/GenerationProgress.tsx:529-567</code></li>
+<li>Cancel button only shown to admins. Regular users are stuck for up to 15 minutes.</li>
+<li><strong>Fix:</strong> Show Cancel to all users when generation stalls.</li>
+</ul>
+<h3>UX-6: Hardcoded English Strings in SharedStoryViewer (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/SharedStoryViewer.tsx:315-328</code></li>
+<li>Error states (&quot;Story Not Found&quot;, &quot;Loading story...&quot;) hardcoded in English despite <code>useLanguage</code> being available.</li>
+<li><strong>Fix:</strong> Add to translations map.</li>
+</ul>
+<h3>UX-7: Wizard State Restored Even After Weeks (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/StoryWizard.tsx:84-90</code></li>
+<li>Returning to <code>/create</code> restores stale localStorage state with no expiry.</li>
+<li><strong>Fix:</strong> Add timestamp; only restore if &lt; 24 hours old.</li>
+</ul>
+<h3>UX-8: No Empty State on MyStories (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/MyStories.tsx</code></li>
+<li>No dedicated &quot;create your first story&quot; empty state for new users.</li>
+<li><strong>Fix:</strong> Add a prominent CTA when stories list is empty.</li>
+</ul>
+<h3>UX-9: Developer Print Flow Uses browser prompt()/confirm() (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/StoryWizard.tsx:4279-4317</code></li>
+<li><code>prompt()</code> and <code>confirm()</code> are blocked on many mobile browsers.</li>
+<li><strong>Fix:</strong> Replace with a proper modal form.</li>
+</ul>
+<h3>UX-10: Page Counter Mismatch in SharedStoryViewer (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/SharedStoryViewer.tsx:477</code></li>
+<li>&quot;Page X of Y&quot; counts only story pages but dot navigation includes covers + end page.</li>
+<li><strong>Fix:</strong> Use consistent counting across both indicators.</li>
+</ul>
+<h3>UX-11: upsellDesc Empty in EN and DE (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/TrialGenerationPage.tsx:65,111</code></li>
+<li>French has content, EN/DE are empty strings. Field is never rendered anyway.</li>
+<li><strong>Fix:</strong> Populate or remove the field.</li>
+</ul>
+<h3>UX-12: Inline Ternary Translations Throughout StoryWizard (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/StoryWizard.tsx</code> — dozens of occurrences</li>
+<li><code>language === &#39;de&#39; ? &#39;...&#39; : language === &#39;fr&#39; ? &#39;...&#39; : &#39;...&#39;</code> bypasses the translation system.</li>
+<li><strong>Fix:</strong> Move strings to <code>translations.ts</code>.</li>
+</ul>
+<h3>UX-13: Two Different Header Styles for SharedStoryViewer (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/pages/SharedStoryViewer.tsx:336-426</code></li>
+<li>Authenticated: <code>bg-black text-white</code>. Unauthenticated: <code>bg-white/80 backdrop-blur</code>. Brand name differs (&quot;✨ Magical Story&quot; vs &quot;MagicalStory&quot;).</li>
+<li><strong>Fix:</strong> Unify brand name; consider consistent header style.</li>
+</ul>
+<hr>
+<h2>5. Technical Debt &amp; Code Quality</h2>
+<h3>DEBT-4: tokenUsage Object Defined 4 Times (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server.js:2212,4344</code>, <code>server/lib/legacyPipelines.js:483,2409</code></li>
+<li>Identical ~30-line block copy-pasted into every pipeline function.</li>
+<li><strong>Fix:</strong> Extract <code>createTokenUsageTracker()</code> factory.</li>
+</ul>
+<h3>DEBT-5: Rate Limiters Defined Twice (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server.js:599-633</code> + <code>server/middleware/rateLimit.js:6-50</code></li>
+<li><code>authLimiter</code>, <code>registerLimiter</code>, <code>apiLimiter</code>, <code>aiProxyLimiter</code> are created twice with separate MemoryStores, halving rate-limit effectiveness.</li>
+<li><strong>Fix:</strong> Import from <code>server/middleware/rateLimit.js</code>; remove duplicates.</li>
+</ul>
+<h3>DEBT-6: authenticateToken Defined Twice (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server.js:1982</code> + <code>server/middleware/auth.js:12</code></li>
+<li><strong>Fix:</strong> Import from middleware; delete local copy.</li>
+</ul>
+<h3>DEBT-7: TEXT_MODELS Duplicated and Out of Sync (High)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server/utils/config.js:14-51</code> (stale model names) vs <code>server/config/models.js:9-46</code> (current)</li>
+<li>The stale copy still references <code>claude-sonnet-4-5-20250929</code>.</li>
+<li><strong>Fix:</strong> Delete from <code>utils/config.js</code>; import from <code>server/config/models.js</code>.</li>
+</ul>
+<h3>DEBT-8: Zero Unit Tests for Core Pipeline (High)</h3>
+<ul>
+<li>No tests for story generation, token usage tracking, image retry logic, entity scoring, or repair workflow orchestration.</li>
+<li><strong>Fix:</strong> Prioritize unit tests for <code>selectBestVersion</code>, <code>findBadPages</code>, <code>evaluateImageBatch</code>, cost calculation.</li>
+</ul>
+<h3>DEBT-9: No Database Migration System (High)</h3>
+<ul>
+<li>Schema changes via manually-run scripts with no version tracking or rollback.</li>
+<li><strong>Fix:</strong> Adopt <code>node-pg-migrate</code> or establish numbered SQL files with a migration runner.</li>
+</ul>
+<h3>DEBT-10: errorResponse.js Created But Never Used (High)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/utils/errorResponse.js</code></li>
+<li>Well-designed <code>sendError</code> utility with error codes taxonomy. Zero route files import it. All 600+ error responses use ad-hoc inline objects.</li>
+<li><strong>Fix:</strong> Adopt incrementally in new code.</li>
+</ul>
+<h3>DEBT-11: Inconsistent Error Response Format (High)</h3>
+<ul>
+<li><strong>Files:</strong> All <code>server/routes/*.js</code> — ~600 instances</li>
+<li>Mix of <code>{ error: message }</code>, <code>{ error: message, details: ... }</code>, <code>{ error: err.message }</code>.</li>
+<li><strong>Fix:</strong> Standardize via <code>errorResponse.js</code>.</li>
+</ul>
+<h3>DEBT-12: server/index.js — Unused Alternate Entry Point (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/index.js</code></li>
+<li>Parallel modular entry point that is never deployed. Migration artifact.</li>
+<li><strong>Fix:</strong> Delete or complete the migration.</li>
+</ul>
+<h3>DEBT-13: database/config.js — MySQL Config, No Callers (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>database/config.js</code></li>
+<li>Configures MySQL2 but the system uses PostgreSQL. <code>mysql2</code> not in package.json.</li>
+<li><strong>Fix:</strong> Delete.</li>
+</ul>
+<h3>DEBT-14: PROVIDER_PRICING Re-implemented in Every Pipeline (Medium)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server.js:2240-2248,4375-4389</code>, <code>server/lib/legacyPipelines.js:514-530,2433-2449</code></li>
+<li>Local <code>calculateImageCost</code> lambda despite the same function already exported from <code>server/config/models.js</code>.</li>
+<li><strong>Fix:</strong> Use the imported version.</li>
+</ul>
+<h3>DEBT-15: buildStoryMetadata Defined in Two Places (Medium)</h3>
+<ul>
+<li><strong>Files:</strong> <code>server/services/database.js:467</code> (rich version) + <code>server/routes/stories.js:22</code> (stripped version)</li>
+<li><strong>Fix:</strong> Export from database.js; delete duplicate.</li>
+</ul>
+<h3>DEBT-16: Temp/Debug Files Tracked in Git at Root (Medium)</h3>
+<ul>
+<li><strong>Files:</strong> <code>tmp-analyze-images.js</code>, <code>tmp-check-vb.js</code>, <code>tmp-vb-data.json</code>, <code>fetch-prompt.js</code></li>
+<li><strong>Fix:</strong> Add <code>tmp-*.js</code>/<code>tmp-*.json</code> to .gitignore; <code>git rm --cached</code> them. Move <code>fetch-prompt.js</code> to <code>scripts/</code>.</li>
+</ul>
+<h3>DEBT-17: <code>replicate</code> Package Installed But Unused (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>package.json</code></li>
+<li>No file imports <code>replicate</code>.</li>
+<li><strong>Fix:</strong> Remove from dependencies.</li>
+</ul>
+<h3>DEBT-18: legacyPipelines.js Uses bare console.log (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/legacyPipelines.js</code> (~15 occurrences)</li>
+<li>Bypasses log utility and LOG_LEVEL.</li>
+<li><strong>Fix:</strong> Import and use <code>log</code> from <code>server/utils/logger</code>.</li>
+</ul>
+<h3>DEBT-19: Mixed console.log / log.info in server.js (Low)</h3>
+<ul>
+<li>34 bare <code>console.log/error/warn</code> calls bypass LOG_LEVEL.</li>
+<li><strong>Fix:</strong> Replace with <code>log.*</code> calls.</li>
+</ul>
+<h3>DEBT-20: Pervasive <code>any</code> Casts in useRepairWorkflow.ts (Medium)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/hooks/useRepairWorkflow.ts:297-417</code></li>
+<li>Multiple <code>as any</code> where proper types exist.</li>
+<li><strong>Fix:</strong> Use <code>EntityConsistencyReport</code> and <code>EntityCheckResult</code> types.</li>
+</ul>
+<h3>DEBT-21: Dead Prompt Files (Low)</h3>
+<ul>
+<li><code>prompts/temp-historical-titles.js</code> — superseded by <code>server/config/trialTitles.js</code></li>
+<li><code>prompts/test-face-variations.txt</code> — never loaded</li>
+<li><code>prompts/scene-expansion.txt</code> — loaded but overwritten by alias</li>
+<li><code>prompts/story-idea-requirements-adventure.txt</code>, <code>story-idea-requirements-historical.txt</code> (base versions without number suffix) — never referenced</li>
+<li><strong>Fix:</strong> Delete all five.</li>
+</ul>
+<h3>DEBT-22: Test Files That Are Actually Admin Scripts (Low)</h3>
+<ul>
+<li><strong>Files:</strong> <code>tests/fix-roger-avatar.spec.ts</code>, <code>tests/setup-test-family.spec.ts</code></li>
+<li>Named as Playwright specs but are one-time data setup scripts.</li>
+<li><strong>Fix:</strong> Move to <code>scripts/admin/</code>.</li>
+</ul>
+<h3>DEBT-23: Firebase Config Hardcoded in Client (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>client/src/services/firebase.ts:13-20</code></li>
+<li>Firebase web keys are technically public, but hardcoding prevents rotation.</li>
+<li><strong>Fix:</strong> Move to <code>VITE_FIREBASE_*</code> env vars.</li>
+</ul>
+<h3>DEBT-24: Hardcoded Prompt Fallbacks in storyHelpers.js (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>server/lib/storyHelpers.js:2290-2299,2739,3072,3301</code></li>
+<li>Silently falls back to stripped-down prompts when templates fail to load.</li>
+<li><strong>Fix:</strong> Fail fast or log at error level.</li>
+</ul>
+<h3>DEBT-25: nodemon in devDependencies But Not Used in dev Script (Low)</h3>
+<ul>
+<li><strong>File:</strong> <code>package.json</code></li>
+<li><code>dev</code> script is <code>node server.js</code>, not <code>nodemon server.js</code>.</li>
+<li><strong>Fix:</strong> Change <code>dev</code> to <code>nodemon server.js</code>.</li>
+</ul>
+<hr>
+<h2>6. Positive Observations</h2>
+<p><strong>Security:</strong></p>
+<ul>
+<li>All database queries use parameterized queries (<code>$1</code>, <code>$2</code>) — zero SQL injection vectors found</li>
+<li>Story ownership correctly enforced via <code>AND user_id = $2</code> on all story queries (no IDOR)</li>
+<li>Password reset flow prevents email enumeration (same response whether email exists or not)</li>
+<li>Stripe webhook validates signatures with <code>constructEvent</code> + idempotency checking</li>
+<li>Trial flow has defense in depth: Turnstile CAPTCHA, fingerprint tracking, IP rate limiting, DB-persisted daily cap, atomic SQL for race prevention</li>
+<li>Admin impersonation prevents self/nested impersonation, uses short-lived tokens (2h)</li>
+<li>bcrypt rounds of 10 is appropriate</li>
+</ul>
+<p><strong>Performance:</strong></p>
+<ul>
+<li><code>getActiveStoryImages</code> CTE optimization avoids N queries for N pages</li>
+<li><code>jsonb_set</code> for atomic partial updates during parallel page regeneration</li>
+<li><code>App.tsx</code> lazy-loads all pages; StoryWizard lazy-loads expensive children</li>
+<li>LRU cache with TTL and hit/miss stats in image generation</li>
+<li><code>image_version_meta</code> JSONB column avoids full blob updates for version switching</li>
+<li>Two-phase story loading (fast metadata → background full data)</li>
+</ul>
+<p><strong>Architecture:</strong></p>
+<ul>
+<li><code>server/services/prompts.js</code> — file-based prompt templates loaded at startup</li>
+<li><code>server/config/models.js</code> — clean central source for AI model config and pricing</li>
+<li>TypeScript types in <code>client/src/types/story.ts</code> are exhaustive and well-documented</li>
+<li><code>withRetry</code> wrapper shows disciplined retry logic with backoff</li>
+<li>Story images table separation from main blob is a major architectural win</li>
+</ul>
+<p><strong>UX:</strong></p>
+<ul>
+<li><code>GenerationProgress</code> with rotating character messages, avatar previews, and tips is delightful for a long wait</li>
+<li><code>useSwipe</code> correctly distinguishes horizontal swipes from vertical scrolls</li>
+<li>Translation system covers EN/DE/FR with dialect variants (Swiss German, Austrian German)</li>
+<li>localStorage wizard state preservation with <code>?new=true</code> reset</li>
+</ul>
+<hr>
+<h2>Priority Order</h2>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Items</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0 — Now</strong></td>
+<td>SEC-1 (admin secret), SEC-2 (JWT in URL), PERF-1 (dual pool), DEBT-1 (broken import)</td>
+<td>Small</td>
+</tr>
+<tr>
+<td><strong>P1 — This week</strong></td>
+<td>SEC-3 (upload size), SEC-5 (wrong column), SEC-6 (password min), DEBT-5 (duplicate rate limiters), DEBT-6 (duplicate auth), UX-2 (404 route), UX-3 (share route)</td>
+<td>Small-Medium</td>
+</tr>
+<tr>
+<td><strong>P2 — This month</strong></td>
+<td>SEC-7 (CSP), SEC-4 (model whitelist), PERF-2 (batch DB writes), PERF-7 (body limit), DEBT-4 (tokenUsage), DEBT-7 (stale models), DEBT-16 (tmp files), UX-1 (trial funnel timing), UX-4 (failure recovery)</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P3 — Backlog</strong></td>
+<td>PERF-3 (split server.js), PERF-8/9 (split large components), DEBT-8 (tests), DEBT-9 (migrations), DEBT-10/11 (error responses), PERF-5 (BYTEA migration)</td>
+<td>Large</td>
+</tr>
+</tbody></table>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>code-review-2026-03-10.md</code>.
+</footer>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bbox-system.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Bounding Box (Bbox) Detection System</h1>
+<h2>Overview</h2>
+<p>The bbox system detects, tracks, and uses character/object bounding boxes throughout the story image pipeline. It serves three purposes:</p>
+<ol>
+<li><strong>Quality evaluation</strong> — identify which character/object has an issue and where it is</li>
+<li><strong>Targeted repair</strong> — crop and fix specific regions without regenerating the full image</li>
+<li><strong>Entity consistency</strong> — verify character appearance across pages</li>
+</ol>
+<hr>
+<h2>Architecture</h2>
+<pre><code>Image Generated
+    |
+    v
+enrichWithBoundingBoxes()          &lt;-- Stage 2 of quality pipeline
+    |
+    +-- detectAllBoundingBoxes()   &lt;-- Two-pass Gemini/Grok vision
+    |       +-- Pass 1: initial detection (characters + objects)
+    |       +-- Pass 2: refinement (overlay feedback loop)
+    |
+    +-- Match issues to elements   &lt;-- Link quality issues to bbox regions
+    |
+    v
+Store: scene.bboxDetection        &lt;-- Persisted per image version
+       scene.bboxOverlayImage      &lt;-- Debug visualization
+       scene.fixTargets            &lt;-- Repair targets with bbox coords
+    |
+    v
+Character Repair (Grok)           &lt;-- Uses bodyBox/faceBox for region targeting
+Auto Repair (Runware)             &lt;-- Uses fixTargets with boundingBox
+</code></pre>
+<hr>
+<h2>1. Detection</h2>
+<h3><code>detectAllBoundingBoxes(imageData, options)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 1265)</p>
+<p><strong>Models:</strong> Gemini 2.5 Flash (primary) | Grok 4 Fast (fallback)</p>
+<p><strong>Pass 1 — Initial Detection:</strong></p>
+<ul>
+<li>Sends image + expected characters (names, descriptions, positions) + expected objects</li>
+<li>AI returns JSON with <code>figures[]</code> and <code>objects[]</code></li>
+<li>Each figure: <code>{name, label, faceBox, bodyBox, confidence, position}</code></li>
+<li>Confidence: <code>high</code> | <code>medium</code> | <code>low</code></li>
+<li>Coordinates: 0-1000 scale (normalized to 0-1 on return)</li>
+</ul>
+<p><strong>Pass 2 — Refinement:</strong></p>
+<ul>
+<li>Only runs if Pass 1 found identified characters (skips UNKNOWN-only)</li>
+<li>Creates overlay image from Pass 1 boxes via <code>createBboxOverlayImage()</code></li>
+<li>Sends overlay back to model: &quot;refine these boxes for accuracy&quot;</li>
+<li>Focus: face boxes must cover full face (forehead to chin), body boxes must cover full figure (head to feet)</li>
+<li>Merges: refined main characters + UNKNOWN crowd figures from Pass 1</li>
+</ul>
+<p><strong>Fallback chain:</strong></p>
+<ol>
+<li>Gemini 2.5 Flash → JSON response</li>
+<li>On API error → Grok 4 Fast vision</li>
+<li>On empty response (0 tokens) → retry once, then Grok fallback</li>
+<li>JSON parse fail → repair truncated JSON → regex extraction</li>
+</ol>
+<h3><code>detectSubRegion(characterCrop, targetElement)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 1688)</p>
+<p>Detects specific body parts (shoes, shirt, hands, face) within a character crop. Used for targeted auto-repair of individual elements.</p>
+<p>Returns: <code>{found, box, confidence, description}</code></p>
+<hr>
+<h2>2. Storage</h2>
+<h3>Type: <code>BboxSceneDetection</code></h3>
+<p><strong>File:</strong> <code>client/src/types/story.ts</code> (line 216)</p>
+<pre><code class="language-typescript">interface BboxSceneDetection {
+  figures: Array&lt;{
+    name: string;            // Character name or &quot;UNKNOWN&quot;
+    label: string;           // Visual description
+    bodyBox?: number[];      // [ymin, xmin, ymax, xmax] normalized 0-1
+    faceBox?: number[];      // [ymin, xmin, ymax, xmax] normalized 0-1
+    position?: string;       // &quot;left&quot;, &quot;center&quot;, &quot;right&quot;
+    confidence?: string;     // &quot;high&quot;, &quot;medium&quot;, &quot;low&quot;
+  }&gt;;
+  objects: Array&lt;{
+    name?: string;           // Expected object name
+    found?: boolean;         // Whether expected object was found
+    label?: string;
+    bodyBox?: number[];
+    position?: string;
+  }&gt;;
+  // Metadata
+  expectedCharacters?: Array&lt;{name, description, position}&gt;;
+  expectedPositions?: Record&lt;string, string&gt;;
+  positionMismatches?: Array&lt;{character, expected, expectedLCR, actual}&gt;;
+  missingCharacters?: string[];
+  expectedObjects?: string[];
+  foundObjects?: string[];
+  missingObjects?: string[];
+  unknownFigures?: number;
+  characterDescriptions?: Record&lt;string, {age, gender, isChild}&gt;;
+  // Debug
+  rawPrompt?: string;
+  rawResponse?: string;
+  refinementResponse?: string;
+}
+</code></pre>
+<h3>Where stored</h3>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sceneImages[n].bboxDetection</code></td>
+<td>BboxSceneDetection</td>
+<td>Active detection for page</td>
+</tr>
+<tr>
+<td><code>sceneImages[n].bboxOverlayImage</code></td>
+<td>string (base64)</td>
+<td>Debug visualization</td>
+</tr>
+<tr>
+<td><code>sceneImages[n].retryHistory[].bboxDetection</code></td>
+<td>BboxSceneDetection</td>
+<td>Per-attempt detection</td>
+</tr>
+<tr>
+<td><code>coverImages.{front|initial|back}.bboxDetection</code></td>
+<td>BboxSceneDetection</td>
+<td>Cover detection</td>
+</tr>
+<tr>
+<td><code>imageVersionHistory[v].bboxDetection</code></td>
+<td>BboxSceneDetection</td>
+<td>Per-version detection</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Enrichment Pipeline</h2>
+<h3><code>enrichWithBoundingBoxes(imageData, issues, options)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 2078)</p>
+<p>Bridges quality evaluation and repair. Takes quality issues and matches them to detected elements.</p>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Build expected characters from metadata (names, descriptions, clothing, positions)</li>
+<li>Run <code>detectAllBoundingBoxes()</code> with expectations</li>
+<li>Match detected figures to characters by name</li>
+<li>Detect position mismatches (expected vs actual position)</li>
+<li>Find missing characters/objects</li>
+<li>Match each quality issue to a specific bbox region:<ul>
+<li>Priority 1: Explicit <code>issue.character</code> field</li>
+<li>Priority 2: Character name extracted from issue text</li>
+<li>Priority 3: Type-based (face issue → character, object issue → object)</li>
+<li>Priority 4: Fallback to largest element</li>
+</ul>
+</li>
+</ol>
+<p><strong>Output:</strong></p>
+<pre><code class="language-javascript">{
+  targets: [{
+    boundingBox,      // faceBox or bodyBox
+    faceBox, bodyBox, // Both stored
+    issue, severity, type, fixPrompt,
+    affectedCharacter, matchMethod
+  }],
+  detectionHistory: BboxSceneDetection
+}
+</code></pre>
+<hr>
+<h2>4. Overlay Visualization</h2>
+<h3><code>createBboxOverlayImage(imageData, bboxDetection)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 1922)</p>
+<p>Draws colored rectangles on the image as an SVG overlay:</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Color</th>
+<th>Stroke</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Body box (identified)</td>
+<td>Green <code>#00cc00</code></td>
+<td>4px</td>
+</tr>
+<tr>
+<td>Body box (UNKNOWN)</td>
+<td>Gray <code>#888888</code></td>
+<td>4px</td>
+</tr>
+<tr>
+<td>Face box (original)</td>
+<td>Blue <code>#0066ff</code></td>
+<td>5px</td>
+</tr>
+<tr>
+<td>Face box (refined)</td>
+<td>Cyan <code>#00cccc</code></td>
+<td>5px, labeled &quot;FACE check&quot;</td>
+</tr>
+<tr>
+<td>Face box (redetected)</td>
+<td>Magenta <code>#ff00cc</code></td>
+<td>5px, labeled &quot;FACE redo&quot;</td>
+</tr>
+<tr>
+<td>Object box (found)</td>
+<td>Cyan <code>#00cccc</code></td>
+<td>2px</td>
+</tr>
+<tr>
+<td>Object box (unknown)</td>
+<td>Orange <code>#ff8800</code></td>
+<td>2px</td>
+</tr>
+</tbody></table>
+<p>Labels include confidence icons: <code>star</code> (high), <code>diamond</code> (medium), <code>circle</code> (low)</p>
+<hr>
+<h2>5. Character Repair</h2>
+<h3><code>repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 6079)</p>
+<p>Uses bbox to target character region for Grok-based repair.</p>
+<p><strong>Three modes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Method</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Blended</strong> (default)</td>
+<td>Gradient whiteout + Grok redraw + feathered blend</td>
+<td>General character repair</td>
+</tr>
+<tr>
+<td><strong>Cutout</strong></td>
+<td>Extract region + Grok repair + composite back</td>
+<td>Isolated character fixes</td>
+</tr>
+<tr>
+<td><strong>Blackout</strong></td>
+<td>Full whiteout + Grok regenerate entire scene</td>
+<td>Major character issues</td>
+</tr>
+</tbody></table>
+<p><strong>Blended mode detail:</strong></p>
+<ol>
+<li>Create gradient whiteout overlay on character bbox (inner 20% fully white, outer fades)</li>
+<li>Send whiteout image + character reference photo to Grok</li>
+<li>Grok redraws character through semi-transparent overlay</li>
+<li>Feathered blend (30px feather) merges Grok output with original scene</li>
+<li>Protected faces (other characters) forced to 100% original</li>
+</ol>
+<p><strong>Key parameters:</strong></p>
+<ul>
+<li><code>bbox</code>: [ymin, xmin, ymax, xmax] — the character&#39;s body box</li>
+<li><code>options.faceBbox</code>: Optional face box for head-specific handling</li>
+<li><code>options.protectedFaces</code>: Other character face boxes to preserve during blend</li>
+</ul>
+<hr>
+<h2>6. Auto Repair (Inpainting)</h2>
+<h3><code>autoRepairWithTargets(imageData, fixTargets, maxAttempts, options)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 8922)</p>
+<p>Three-pass inpainting using fix targets with bbox regions:</p>
+<table>
+<thead>
+<tr>
+<th>Pass</th>
+<th>Model</th>
+<th>Target Type</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>FLUX Fill (<code>runware:102@1</code>)</td>
+<td>Face/head issues</td>
+<td>Highest</td>
+</tr>
+<tr>
+<td>2</td>
+<td>SDXL (<code>runware:101@1</code>)</td>
+<td>Anatomy (hands, limbs)</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SDXL (<code>runware:101@1</code>)</td>
+<td>Objects, props, background</td>
+<td>Lowest</td>
+</tr>
+</tbody></table>
+<p><strong>Safety:</strong> Skips repair if combined mask coverage &gt; 50% of image.</p>
+<hr>
+<h2>7. API Endpoints</h2>
+<h3><code>POST /api/stories/:id/refresh-bbox/:pageNum</code></h3>
+<p><strong>File:</strong> <code>server/routes/regeneration.js</code> (~line 3993)</p>
+<p>Run fresh bbox detection on active image. Dev/admin only.</p>
+<ul>
+<li><strong>Request:</strong> <code>{ bboxModel?: string }</code></li>
+<li><strong>Response:</strong> <code>{ bboxDetection, bboxOverlayImage, fixTargets }</code></li>
+<li>Saves results to DB</li>
+</ul>
+<h3><code>POST /api/stories/:id/iterate-bbox/:pageNum</code></h3>
+<p><strong>File:</strong> <code>server/routes/regeneration.js</code> (~line 4107)</p>
+<p>Refine existing bbox detection using overlay feedback.</p>
+<ul>
+<li><strong>Request:</strong> <code>{ bboxModel?, currentDetection, overlayImage }</code></li>
+<li><strong>Response:</strong> <code>{ bboxDetection, bboxOverlayImage }</code></li>
+<li>Sends current overlay + refinement prompt to model</li>
+</ul>
+<hr>
+<h2>8. Frontend Display</h2>
+<h3><code>ObjectDetectionDisplay</code> component</h3>
+<p><strong>File:</strong> <code>client/src/components/generation/story/ObjectDetectionDisplay.tsx</code></p>
+<p>Dev-mode component showing:</p>
+<ul>
+<li>Overlay image with colored boxes (click to enlarge)</li>
+<li>Figures list: name, confidence icon, face/body box coordinates</li>
+<li>Objects list: found/missing status</li>
+<li>Position mismatches: expected vs actual</li>
+<li>Missing characters/objects: red badges</li>
+<li>Controls: model selector, re-detect button, refine button</li>
+<li>Debug: raw prompt/response export, JSON download</li>
+</ul>
+<hr>
+<h2>9. Issue Collection</h2>
+<h3><code>collectAllIssuesForPage(scene, storyData, pageNumber)</code></h3>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (~line 10542)</p>
+<p>Aggregates issues from all sources that feed into bbox-targeted repair:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Type</th>
+<th>Origin</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Quality eval</td>
+<td>fixableIssues</td>
+<td>Initial image evaluation</td>
+</tr>
+<tr>
+<td>Retry history</td>
+<td>pre/post-repair eval</td>
+<td>Repair attempt evaluations</td>
+</tr>
+<tr>
+<td>Entity consistency</td>
+<td>character appearance</td>
+<td>Cross-page comparison</td>
+</tr>
+<tr>
+<td>Object consistency</td>
+<td>object appearance</td>
+<td>Cross-page comparison</td>
+</tr>
+<tr>
+<td>Image cross-checks</td>
+<td>character consistency</td>
+<td>Grid-based visual checks</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. Coordinate System</h2>
+<p>All bbox coordinates use <strong>normalized 0-1 scale</strong>:</p>
+<pre><code>[ymin, xmin, ymax, xmax]
+
+(0,0) -------- (0,1)
+  |              |
+  |   [face]     |
+  |              |
+(1,0) -------- (1,1)
+</code></pre>
+<ul>
+<li>Gemini returns 0-1000 scale → normalized on receipt</li>
+<li>Grok uses same 0-1000 scale</li>
+<li>All internal storage and usage is 0-1</li>
+<li>Frontend displays as percentages for readability</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>bbox-system.md</code>.
+</footer>
+</body>
+</html>

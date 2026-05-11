@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CHARACTER-REPLACEMENT-TESTS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Character Replacement Technology Tests</h1>
+<p>This document tracks testing of various AI tools for character replacement/swapping in story scenes.</p>
+<hr>
+<h2>Goal</h2>
+<p>Replace character A in a scene with character B while preserving:</p>
+<ul>
+<li>Scene composition (background, objects, lighting)</li>
+<li>Character pose</li>
+<li>Art style consistency</li>
+</ul>
+<hr>
+<h2>FLUX Kontext Testing (February 2025)</h2>
+<h3>What We Tested</h3>
+<ul>
+<li><strong>Provider:</strong> Runware</li>
+<li><strong>Model ID:</strong> <code>runware:106@1</code> (FLUX.1 Kontext [dev])</li>
+<li><strong>Cost:</strong> ~$0.02/image</li>
+</ul>
+<h3>Test 1: Using referenceImages Parameter</h3>
+<p><strong>Approach:</strong></p>
+<pre><code class="language-javascript">{
+  seedImage: sceneWithCharacterA,
+  referenceImages: [characterBReference],
+  prompt: &quot;Replace the person with this girl&quot;
+}
+</code></pre>
+<p><strong>Result:</strong> ❌ FAILED</p>
+<ul>
+<li>Model generated completely unrelated image (TV wrapped in plastic)</li>
+<li>Scene was not preserved at all</li>
+<li>Character reference was ignored</li>
+</ul>
+<h3>Test 2: Image Stitching Approach</h3>
+<p><strong>Approach:</strong></p>
+<ul>
+<li>Stitched scene + character reference side-by-side</li>
+<li>Used stitched image as single input</li>
+<li>Prompt: &quot;Replace the person in the left image with the girl from the right image&quot;</li>
+</ul>
+<p><strong>Result:</strong> ❌ PARTIAL - Not suitable for our use case</p>
+<ul>
+<li>Scene composition changed significantly</li>
+<li>Character pose not preserved</li>
+<li>Character likeness loosely approximated but not accurate</li>
+</ul>
+<h3>Key Findings</h3>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Not a character swapper</strong></td>
+<td>FLUX Kontext is an instruction-based editor, not a face/character swap tool</td>
+</tr>
+<tr>
+<td><strong>referenceImages ignored</strong></td>
+<td>For Kontext, this param is for style guidance, not character insertion</td>
+</tr>
+<tr>
+<td><strong>Stitching workaround limited</strong></td>
+<td>Model &quot;remixes&quot; rather than precisely swaps</td>
+</tr>
+<tr>
+<td><strong>Good for</strong></td>
+<td>Style transfer, background changes, text editing, artistic remixing</td>
+</tr>
+<tr>
+<td><strong>Not good for</strong></td>
+<td>Precise character replacement while preserving scene</td>
+</tr>
+</tbody></table>
+<h3>Documentation Sources</h3>
+<ul>
+<li><a href="https://runware.ai/blog/introducing-flux1-kontext-instruction-based-image-editing-with-ai">Runware Blog</a></li>
+<li><a href="https://comfyui-wiki.com/en/tutorial/advanced/image/flux/flux-1-kontext">ComfyUI Multi-Image Guide</a></li>
+<li><a href="https://replicate.com/blog/flux-kontext">Replicate FLUX Kontext</a></li>
+</ul>
+<h3>Supported Dimensions (Runware)</h3>
+<pre><code>1568x672, 1504x688, 1456x720, 1392x752, 1328x800, 1248x832,
+1184x880, 1104x944, 1024x1024, 944x1104, 880x1184, 832x1248,
+800x1328, 752x1392, 720x1456, 688x1504, 672x1568
+</code></pre>
+<hr>
+<h2>PuLID Testing (January 2025 - Replicate)</h2>
+<h3>Previous Test Results</h3>
+<p>Tested via Replicate&#39;s <code>zsxkib/flux-pulid</code> model.</p>
+<p><strong>Result:</strong> ❌ NOT RECOMMENDED</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Smooth/painterly skin</td>
+<td>All outputs look like digital paintings, not photos</td>
+</tr>
+<tr>
+<td>Identity drift</td>
+<td>Randomly adds facial hair, changes age, adds features</td>
+</tr>
+<tr>
+<td>Pose prompts ignored</td>
+<td>&quot;3/4 view&quot; never worked - always front-facing</td>
+</tr>
+<tr>
+<td>Unpredictable</td>
+<td>Same settings produce different results each time</td>
+</tr>
+<tr>
+<td>Expensive for quality</td>
+<td>~$0.07/image at 1536x1536 for mediocre results</td>
+</tr>
+</tbody></table>
+<p><strong>Best settings found (still not good enough):</strong></p>
+<pre><code class="language-javascript">{
+  true_cfg: 6,
+  id_weight: 1.5,
+  guidance_scale: 7,
+  width: 1536,
+  height: 1536
+}
+</code></pre>
+<h3>Runware PuLID (February 2025)</h3>
+<p>Tested via <code>generateWithPuLID()</code> in <code>server/lib/runware.js</code> using FLUX Dev model.</p>
+<p><strong>Model:</strong> <code>runware:101@1</code> (FLUX.1 Dev)
+<strong>Cost:</strong> ~$0.002/image (35x cheaper than Replicate!)
+<strong>Time:</strong> ~10 seconds</p>
+<p><strong>Test prompt:</strong></p>
+<pre><code>&quot;Young girl in a purple jacket standing in a medieval covered wooden bridge,
+holding a wooden table with another person, children book illustration style&quot;
+</code></pre>
+<p><strong>Result:</strong> ✅ Works for generation, ❌ NOT for replacement</p>
+<ul>
+<li>Generated a NEW scene with children at archway</li>
+<li>Girl somewhat resembles Sophie reference</li>
+<li>But this is TEXT-TO-IMAGE with face identity, NOT scene editing</li>
+</ul>
+<p><strong>Key Finding:</strong> PuLID generates new images with face consistency.
+It does NOT replace characters in existing scenes.</p>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>PuLID Suitable?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Generate avatar with face consistency</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td>Create new scene with specific character</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td>Replace character in existing scene</td>
+<td>❌ No</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>ACE++ Testing</h2>
+<h3>Current Implementation</h3>
+<p>Available via <code>generateAvatarWithACE()</code> in <code>server/lib/runware.js</code>.</p>
+<p><strong>What it does:</strong></p>
+<ul>
+<li>Uses FLUX Fill model with ACE++ configuration</li>
+<li>Preserves facial identity from reference photo</li>
+<li>Good for portrait generation</li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>Designed for portrait generation, not scene character replacement</li>
+<li>Type: &#39;portrait&#39; mode for face-consistent avatars</li>
+</ul>
+<p><strong>Cost:</strong> ~$0.005/image</p>
+<hr>
+<h2>Recommended Approach for Character Replacement</h2>
+<p>Based on testing, the best approach for replacing a character in a scene:</p>
+<h3>Option 1: Inpainting Workflow (Recommended)</h3>
+<ol>
+<li><strong>Detect character bounding box</strong> in scene (using existing evaluation)</li>
+<li><strong>Create mask</strong> for character region</li>
+<li><strong>Inpaint with description</strong> of new character</li>
+</ol>
+<pre><code class="language-javascript">// Use existing inpaintWithRunware()
+await inpaintWithRunware(sceneImage, characterMask,
+  &quot;Young girl with brown hair in purple jacket, same pose&quot;,
+  { model: RUNWARE_MODELS.FLUX_FILL }
+);
+</code></pre>
+<h3>Option 2: Full Regeneration</h3>
+<ul>
+<li>Regenerate the scene with new character description</li>
+<li>Pass new character&#39;s avatar as reference</li>
+<li>Loses exact scene composition</li>
+</ul>
+<h3>Option 3: Composite Approach</h3>
+<ol>
+<li>Generate new character in matching pose separately</li>
+<li>Remove old character from scene (inpaint background)</li>
+<li>Composite new character into scene</li>
+</ol>
+<hr>
+<h2>Test Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tests/manual/test-flux-kontext.js</code></td>
+<td>FLUX Kontext testing</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-inpaint.js</code></td>
+<td>Inpainting testing</td>
+</tr>
+<tr>
+<td><code>server/lib/runware.js</code></td>
+<td>All Runware integrations</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What It Does</th>
+<th>Character Replacement</th>
+<th>Scene Preservation</th>
+<th>Cost</th>
+<th>Recommended</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FLUX Kontext</td>
+<td>Instruction-based editing</td>
+<td>❌ Remixes scene</td>
+<td>❌ Poor</td>
+<td>$0.02</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PuLID (Replicate)</td>
+<td>Text-to-image + face</td>
+<td>❌ Generates new scene</td>
+<td>N/A</td>
+<td>$0.07</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PuLID (Runware)</td>
+<td>Text-to-image + face</td>
+<td>❌ Generates new scene</td>
+<td>N/A</td>
+<td>$0.002</td>
+<td>For new scenes only</td>
+</tr>
+<tr>
+<td>ACE++</td>
+<td>Portrait generation</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>$0.005</td>
+<td>For avatars only</td>
+</tr>
+<tr>
+<td>Inpainting</td>
+<td>Region replacement</td>
+<td>✅ With mask</td>
+<td>✅ Good</td>
+<td>$0.002-0.05</td>
+<td><strong>Yes</strong></td>
+</tr>
+</tbody></table>
+<h2>Inpainting Tests (February 2025)</h2>
+<h3>FLUX Fill Inpainting ✅ WINNER</h3>
+<p><strong>Result:</strong> Excellent - Best approach for character replacement</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene preserved</td>
+<td>✅ Background, lighting, composition intact</td>
+</tr>
+<tr>
+<td>Other characters preserved</td>
+<td>✅ Untouched</td>
+</tr>
+<tr>
+<td>Pose preserved</td>
+<td>✅ Same pose as original</td>
+</tr>
+<tr>
+<td>Style consistent</td>
+<td>✅ Matches illustration style</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>$0.002/image</td>
+</tr>
+<tr>
+<td>Time</td>
+<td>~13 seconds</td>
+</tr>
+</tbody></table>
+<p><strong>How it works:</strong></p>
+<pre><code class="language-javascript">await inpaintWithRunware(sceneImage, characterMask,
+  &quot;young girl with brown hair in red medieval dress, carrying table&quot;,
+  { model: RUNWARE_MODELS.FLUX_FILL }
+);
+</code></pre>
+<p><strong>Limitation:</strong> Text description only - new character matches description, not a specific face reference.</p>
+<h3>ACE++ Local Editing ❌ NOT SUITABLE</h3>
+<p><strong>Result:</strong> Destroys scene, not usable for character replacement</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene preserved</td>
+<td>❌ Completely destroyed</td>
+</tr>
+<tr>
+<td>Pose preserved</td>
+<td>❌ Wrong pose</td>
+</tr>
+<tr>
+<td>Face matches reference</td>
+<td>⚠️ Somewhat</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>$0.05/image</td>
+</tr>
+</tbody></table>
+<p><strong>Problem:</strong> ACE++ prioritizes the reference face over scene preservation, resulting in a completely new image.</p>
+<hr>
+<hr>
+<h2>Face Swap Tests (February 2025) ✅ BEST SOLUTION</h2>
+<h3>Replicate codeplugtech/face-swap ✅ WINNER</h3>
+<p><strong>Result:</strong> Excellent - This is the real solution for character face replacement!</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene preserved</td>
+<td>✅ Perfect - background, lighting, composition</td>
+</tr>
+<tr>
+<td>Poses preserved</td>
+<td>✅ All poses intact</td>
+</tr>
+<tr>
+<td>Faces swapped</td>
+<td>✅ Accurately replaces faces with reference</td>
+</tr>
+<tr>
+<td>Art style</td>
+<td>✅ Maintained</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td><strong>$0.003/run</strong></td>
+</tr>
+<tr>
+<td>Time</td>
+<td>~60 seconds</td>
+</tr>
+</tbody></table>
+<p><strong>How it works:</strong></p>
+<pre><code class="language-javascript">// Replicate API
+const result = await replicate.run(&quot;codeplugtech/face-swap&quot;, {
+  input: {
+    input_image: sceneImageUrl,   // Target scene with person(s)
+    swap_image: faceReferenceUrl  // Face to swap in
+  }
+});
+</code></pre>
+<p><strong>Key behavior:</strong></p>
+<ul>
+<li>Detects ALL faces in the target image</li>
+<li>Swaps ALL detected faces with the source face</li>
+<li>Preserves pose, clothing, lighting, background perfectly</li>
+</ul>
+<h3>Optimization Tests (February 2025)</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Full photo as source</td>
+<td>Works - swaps all faces</td>
+</tr>
+<tr>
+<td>Cropped face as source</td>
+<td>Works - similar quality</td>
+</tr>
+<tr>
+<td>Two-pass (swap result again)</td>
+<td>More consistent swap on all faces</td>
+</tr>
+<tr>
+<td><strong>Selective: crop→swap→composite</strong></td>
+<td>✅ <strong>Best for single person swap</strong></td>
+</tr>
+<tr>
+<td>Frontal face only</td>
+<td>Works well</td>
+</tr>
+</tbody></table>
+<h3>For selective face swap (only one person):</h3>
+<pre><code class="language-javascript">// 1. Crop scene to isolate target person
+const rightHalf = await sharp(sceneBuffer)
+  .extract({ left: Math.round(width * 0.45), top: 0, width: Math.round(width * 0.55), height })
+  .toBuffer();
+
+// 2. Face swap on cropped region only
+const swappedRight = await runFaceSwap(rightHalf, sophiePhoto);
+
+// 3. Composite back into original scene
+const final = await sharp(sceneBuffer)
+  .composite([{ input: swappedRight, left: Math.round(width * 0.45), top: 0 }])
+  .toBuffer();
+</code></pre>
+<h3>Source image recommendations:</h3>
+<ul>
+<li><strong>Frontal face</strong> works best</li>
+<li>Can use full photo or cropped face - similar results</li>
+<li>Clear, well-lit source faces produce better results</li>
+<li>Reference sheet with multiple angles can work, but single frontal is simpler</li>
+</ul>
+<p><strong>API Details:</strong></p>
+<ul>
+<li>Model: <code>codeplugtech/face-swap</code></li>
+<li>Version: <code>278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34</code></li>
+<li>Cost: ~$0.003/run (~333 runs per $1)</li>
+<li>Hardware: CPU (no GPU needed)</li>
+</ul>
+<hr>
+<h2>Final Conclusion</h2>
+<h3>Best Approach by Use Case</h3>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>Best Tool</th>
+<th>Cost</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Face swap in photo</strong></td>
+<td>codeplugtech/face-swap</td>
+<td>$0.003</td>
+<td>Face only, hair unchanged</td>
+</tr>
+<tr>
+<td><strong>New illustration with face</strong></td>
+<td>IP-Adapter FaceID</td>
+<td>$0.03</td>
+<td>Generates new scene</td>
+</tr>
+<tr>
+<td><strong>Replace with text description</strong></td>
+<td>FLUX Fill Inpaint</td>
+<td>$0.002</td>
+<td>No face/hair reference</td>
+</tr>
+<tr>
+<td><strong>Multi-character scene (5+)</strong></td>
+<td>Gemini</td>
+<td>$0.05</td>
+<td>Only option for 5+ chars</td>
+</tr>
+</tbody></table>
+<h3>Key Limitation: No Cheap Hair Transfer</h3>
+<p>There is currently <strong>no cost-effective solution</strong> for transferring both face AND hair from a reference image into an existing scene. Options are:</p>
+<ul>
+<li>Accept face-only swap (hair stays original)</li>
+<li>Regenerate entire scene with IP-Adapter (loses exact composition)</li>
+<li>Use expensive models ($0.05-$0.29 per image)</li>
+</ul>
+<h3>For Replicate Face Swap:</h3>
+<pre><code class="language-javascript">// Using Replicate API
+const Replicate = require(&#39;replicate&#39;);
+const replicate = new Replicate();
+
+const output = await replicate.run(
+  &quot;codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34&quot;,
+  {
+    input: {
+      input_image: sceneImageUrl,   // Scene with character(s)
+      swap_image: faceReferenceUrl  // Face to swap in
+    }
+  }
+);
+</code></pre>
+<h3>Comparison Summary</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Scene Preservation</th>
+<th>Face Match</th>
+<th>Cost</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Replicate face-swap</strong></td>
+<td>✅ Perfect</td>
+<td>✅ Excellent</td>
+<td>$0.003</td>
+<td><strong>USE THIS</strong></td>
+</tr>
+<tr>
+<td>FLUX Fill Inpaint</td>
+<td>✅ Excellent</td>
+<td>❌ Text only</td>
+<td>$0.002</td>
+<td>For text-based replacement</td>
+</tr>
+<tr>
+<td>ACE++ local_editing</td>
+<td>❌ Destroyed</td>
+<td>⚠️ Partial</td>
+<td>$0.05</td>
+<td>Don&#39;t use</td>
+</tr>
+<tr>
+<td>FLUX Kontext</td>
+<td>❌ Remixed</td>
+<td>❌ None</td>
+<td>$0.02</td>
+<td>Don&#39;t use</td>
+</tr>
+<tr>
+<td>PuLID</td>
+<td>N/A (new scene)</td>
+<td>✅ Good</td>
+<td>$0.002</td>
+<td>For new scenes only</td>
+</tr>
+</tbody></table>
+<h3>When to Use Each Tool</h3>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>Best Tool</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Swap face in scene (preserve everything)</strong></td>
+<td><strong>Replicate face-swap</strong></td>
+</tr>
+<tr>
+<td>Replace character with text description</td>
+<td>FLUX Fill Inpainting</td>
+</tr>
+<tr>
+<td>Generate new scene with specific face</td>
+<td>PuLID</td>
+</tr>
+<tr>
+<td>Generate avatar with face consistency</td>
+<td>ACE++ portrait / PuLID</td>
+</tr>
+<tr>
+<td>Edit text/colors/style in image</td>
+<td>FLUX Kontext</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Test Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tests/manual/test-face-swap.js</code></td>
+<td><strong>Face swap test script (BEST)</strong></td>
+</tr>
+<tr>
+<td><code>tests/manual/test-face-swap-variations.js</code></td>
+<td>Face swap optimization tests</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-lukas-three-methods.js</code></td>
+<td>Compare 3 methods on Lukas illustration</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-character-replacement.js</code></td>
+<td>Inpainting test script</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-flux-kontext.js</code></td>
+<td>FLUX Kontext test script</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-hair-v2-api.js</code></td>
+<td>Hair V2 API test script</td>
+</tr>
+<tr>
+<td><code>tests/manual/test-magicapi-faceswap.js</code></td>
+<td>MagicAPI face swap test script</td>
+</tr>
+<tr>
+<td><code>tests/fixtures/test-faceswap-replicate.png</code></td>
+<td><strong>Replicate face swap result ✅ BEST</strong></td>
+</tr>
+<tr>
+<td><code>tests/fixtures/test-faceswap-comparison.png</code></td>
+<td>Face swap comparison</td>
+</tr>
+<tr>
+<td><code>tests/fixtures/test-inpaint-flux-result.png</code></td>
+<td>FLUX Fill inpaint result</td>
+</tr>
+<tr>
+<td><code>tests/fixtures/test-replacement-ace.png</code></td>
+<td>ACE++ result ❌</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>IP-Adapter FaceID Tests (February 2025) ✅ BEST FOR ILLUSTRATIONS</h2>
+<h3>The Problem with Face Swap for Illustrations</h3>
+<p>Face swap models (codeplugtech, inswapper) are trained on <strong>photorealistic</strong> images. When used on illustrations:</p>
+<ul>
+<li>Identity is poorly preserved</li>
+<li>Style mismatch causes blending issues</li>
+<li>Face doesn&#39;t match the source</li>
+</ul>
+<h3>Solution: IP-Adapter FaceID</h3>
+<p><strong>IP-Adapter FaceID</strong> generates NEW images conditioned on a face identity. It can apply any style while preserving facial features.</p>
+<p><strong>API on Replicate:</strong> <code>lucataco/ip-adapter-faceid</code>
+<strong>Version:</strong> <code>fb81ef963e74776af72e6f380949013533d46dd5c6228a9e586c57db6303d7cd</code></p>
+<pre><code class="language-javascript">const output = await replicate.run(&quot;lucataco/ip-adapter-faceid:fb81ef96...&quot;, {
+  input: {
+    face_image: sophiePhotoUrl,
+    prompt: &quot;children book illustration of a young girl in red medieval dress, whimsical style&quot;,
+    negative_prompt: &quot;realistic, photorealistic, photo, blurry&quot;,
+    width: 1024,
+    height: 1024,
+    agree_to_research_only: true
+  }
+});
+</code></pre>
+<h3>Comparison Results</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Identity Match</th>
+<th>For Illustrations</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Face Swap (codeplugtech)</td>
+<td>❌ Weak</td>
+<td>❌ Not suitable</td>
+</tr>
+<tr>
+<td><strong>IP-Adapter FaceID</strong></td>
+<td>✅ Strong</td>
+<td>✅ <strong>Best choice</strong></td>
+</tr>
+</tbody></table>
+<h3>What Each Tool Does</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Face Swap</strong></td>
+<td>Swaps face in EXISTING image (photo→photo only)</td>
+</tr>
+<tr>
+<td><strong>IP-Adapter FaceID</strong></td>
+<td>Generates NEW image with face identity + style</td>
+</tr>
+</tbody></table>
+<h3>For Illustrated Children&#39;s Books</h3>
+<p>Use <strong>IP-Adapter FaceID</strong> to generate scene illustrations with consistent character faces:</p>
+<ol>
+<li>Upload child&#39;s photo as <code>face_image</code></li>
+<li>Describe scene in <code>prompt</code> with art style</li>
+<li>Generate illustration that resembles the child</li>
+</ol>
+<hr>
+<h2>Hair Transfer Testing (February 2025)</h2>
+<h3>The Problem</h3>
+<p>Face swap tools (codeplugtech, inswapper) only swap the <strong>face</strong>, NOT the hair. For character consistency in illustrations, we need both face AND hair to match.</p>
+<h3>Tools Researched</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Cost</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Stable-Hair</strong></td>
+<td>Free/self-host</td>
+<td>❌ Requires GPU</td>
+<td>Research paper, no hosted API</td>
+</tr>
+<tr>
+<td><strong>HairFastGAN</strong></td>
+<td>Free/self-host</td>
+<td>❌ Requires GPU</td>
+<td>Academic, no hosted API</td>
+</tr>
+<tr>
+<td><strong>style-your-hair (Replicate)</strong></td>
+<td>$0.29/image</td>
+<td>❌ Too expensive</td>
+<td>10x cost of face swap</td>
+</tr>
+<tr>
+<td><strong>Easel advanced-face-swap</strong></td>
+<td>$0.05/image</td>
+<td>❌ Deprecated</td>
+<td>Has <code>workflow_type: &quot;user_hair&quot;</code> but deprecated</td>
+</tr>
+<tr>
+<td><strong>Hair V2 (api.market)</strong></td>
+<td>~$0.02/image</td>
+<td>⚠️ Limited</td>
+<td>Text-based only, URL restrictions</td>
+</tr>
+</tbody></table>
+<h3>Hair V2 API Testing ✅ WORKING</h3>
+<p><strong>Provider:</strong> api.market (MagicAPI)
+<strong>Endpoint:</strong> <code>https://api.magicapi.dev/api/v1/magicapi/hair-v2</code> (NOT api.market!)
+<strong>Cost:</strong> ~$0.003/image (1 API unit)
+<strong>Speed:</strong> ~40 seconds
+<strong>What it does:</strong> Changes hair color/style based on text description</p>
+<pre><code class="language-javascript">// Submit job
+const resp = await fetch(&#39;https://api.magicapi.dev/api/v1/magicapi/hair-v2/run&#39;, {
+  method: &#39;POST&#39;,
+  headers: { &#39;x-magicapi-key&#39;: API_KEY, &#39;Content-Type&#39;: &#39;application/json&#39; },
+  body: JSON.stringify({
+    input: {
+      image: imageUrl,
+      haircolor: &#39;blonde&#39;,
+      hairstyle: &#39;pixie cut&#39;,
+      hairproperty: &#39;straight&#39;  // optional
+    }
+  })
+});
+
+// Poll for result
+const status = await fetch(`https://api.magicapi.dev/api/v1/magicapi/hair-v2/status/${jobId}`, {
+  headers: { &#39;x-magicapi-key&#39;: API_KEY }
+});
+</code></pre>
+<p><strong>IMPORTANT:</strong> Use <code>api.magicapi.dev</code> NOT <code>api.market</code> - the latter has Redis issues!</p>
+<p><strong>URL Hosting:</strong></p>
+<ul>
+<li>✅ freeimage.host works</li>
+<li>✅ Unsplash works</li>
+<li>❌ catbox.moe blocked</li>
+</ul>
+<p><strong>Result:</strong> ✅ Works well for text-based hair changes on photos
+<strong>Limitation:</strong> Text description only - can&#39;t use reference hair image</p>
+<h3>Inpainting Hair Test</h3>
+<p>Attempted to inpaint hair region using FLUX Fill with text prompt:</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene preserved</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td>Hair matches prompt</td>
+<td>❌ Poor - generic results</td>
+</tr>
+<tr>
+<td>Hair matches reference</td>
+<td>N/A - text prompt only</td>
+</tr>
+</tbody></table>
+<p><strong>Conclusion:</strong> Text-based inpainting doesn&#39;t produce specific enough hair styles to match a character reference.</p>
+<h3>Summary: Hair Transfer Options</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Works?</th>
+<th>Cost</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Face Swap only</td>
+<td>⚠️</td>
+<td>$0.003</td>
+<td>Keeps original hair</td>
+</tr>
+<tr>
+<td><strong>Hair V2 API</strong></td>
+<td>✅</td>
+<td>$0.003</td>
+<td>Text-based, works well</td>
+</tr>
+<tr>
+<td>Face Swap + Hair V2</td>
+<td>✅</td>
+<td>$0.006</td>
+<td>Combine both for full change</td>
+</tr>
+<tr>
+<td>IP-Adapter FaceID</td>
+<td>✅</td>
+<td>$0.03</td>
+<td>Generates new scene</td>
+</tr>
+<tr>
+<td>Dedicated hair models</td>
+<td>❌</td>
+<td>$0.05-$0.29</td>
+<td>Too expensive</td>
+</tr>
+</tbody></table>
+<p><strong>Best Approach for Character Replacement:</strong></p>
+<ol>
+<li><strong>Face Swap</strong> (codeplugtech or MagicAPI) - $0.003 - swap face</li>
+<li><strong>Hair V2 API</strong> - $0.003 - change hair style/color</li>
+<li><strong>Total: ~$0.006</strong> for face + hair changes on photos</li>
+</ol>
+<hr>
+<h2>Lukas Three Methods Test (February 2025)</h2>
+<h3>Test Setup</h3>
+<p>Compared three methods on illustration character replacement:</p>
+<ul>
+<li><strong>Source:</strong> Lukas face from story (cropped with hair, Panel B v3)</li>
+<li><strong>Target:</strong> Lukas Panel C illustration (full scene)</li>
+</ul>
+<h3>Methods Tested</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Cost</th>
+<th>Scene Preserved</th>
+<th>Face Match</th>
+<th>Hair Match</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Face Swap (codeplugtech)</td>
+<td>$0.003</td>
+<td>✅ Perfect</td>
+<td>⚠️ Subtle</td>
+<td>❌ Original</td>
+</tr>
+<tr>
+<td>IP-Adapter FaceID</td>
+<td>$0.03</td>
+<td>❌ New scene</td>
+<td>✅ Good</td>
+<td>✅ From prompt</td>
+</tr>
+<tr>
+<td>FLUX Fill Inpaint</td>
+<td>$0.002</td>
+<td>✅ Good</td>
+<td>❌ Text only</td>
+<td>❌ Text only</td>
+</tr>
+</tbody></table>
+<h3>Key Findings</h3>
+<ol>
+<li><strong>Face Swap:</strong> Best for scene preservation but face changes are subtle on illustrations</li>
+<li><strong>IP-Adapter:</strong> Best face match but generates entirely new scene</li>
+<li><strong>Inpainting:</strong> Good scene preservation but can&#39;t match specific face/hair</li>
+</ol>
+<h3>Test Script</h3>
+<p><code>tests/manual/test-lukas-three-methods.js</code></p>
+<hr>
+<h2>MagicAPI Face Swap (February 2025)</h2>
+<p><strong>Provider:</strong> api.market (MagicAPI)
+<strong>Endpoint:</strong> <code>https://api.magicapi.dev/api/v1/magicapi/faceswap</code>
+<strong>Cost:</strong> ~$0.003/image (1 API unit)
+<strong>Speed:</strong> 7-12 seconds</p>
+<h3>How to Use</h3>
+<pre><code class="language-javascript">// 1. Submit job
+const submitResp = await fetch(API_BASE + &#39;/faceswap-image&#39;, {
+  method: &#39;POST&#39;,
+  headers: { &#39;x-magicapi-key&#39;: API_KEY, &#39;Content-Type&#39;: &#39;application/json&#39; },
+  body: JSON.stringify({
+    input: {
+      swap_image: sourceUrl,  // Face to swap IN
+      target_image: targetUrl // Image to swap face INTO
+    }
+  })
+});
+
+// 2. Poll for result
+const resultResp = await fetch(API_BASE + &#39;/result&#39;, {
+  method: &#39;POST&#39;,
+  headers: { &#39;x-magicapi-key&#39;: API_KEY, &#39;Content-Type&#39;: &#39;application/json&#39; },
+  body: JSON.stringify({ request_id: requestId })
+});
+</code></pre>
+<h3>URL Requirements</h3>
+<ul>
+<li><strong>Must have file extension</strong> (.jpg, .png, .webp)</li>
+<li><strong>Blocked domains:</strong> catbox.moe</li>
+<li><strong>Working hosts:</strong> freeimage.host, Wikipedia Commons, Unsplash (with extension)</li>
+</ul>
+<h3>Test Results</h3>
+<table>
+<thead>
+<tr>
+<th>Test Case</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Photo → Art (Mona Lisa)</td>
+<td>✅ Excellent</td>
+<td>Face clearly transferred</td>
+</tr>
+<tr>
+<td>Sophie → Lukas photo</td>
+<td>⚠️ Subtle</td>
+<td>Minor changes</td>
+</tr>
+<tr>
+<td>Lukas → Sophie photo</td>
+<td>✅ Good</td>
+<td>Visible face blend</td>
+</tr>
+<tr>
+<td>Photo → Illustration</td>
+<td>❌ None</td>
+<td>Same as Replicate</td>
+</tr>
+</tbody></table>
+<h3>Key Findings</h3>
+<ul>
+<li>Works similar to Replicate codeplugtech</li>
+<li><strong>Does NOT work on illustrations</strong> - face detection fails</li>
+<li>Photo→photo works with varying quality</li>
+<li>Cheaper alternative to Replicate at same quality</li>
+</ul>
+<h3>Test Script</h3>
+<p><code>tests/manual/test-magicapi-faceswap.js</code></p>
+<hr>
+<h2>Environment Variables</h2>
+<pre><code class="language-bash"># Required for Replicate APIs
+REPLICATE_API_TOKEN=your_token_here
+
+# Optional (for fal.ai testing)
+FAL_KEY=your_key_here
+
+# Optional (for api.market APIs)
+MAGICAPI_KEY=your_key_here
+</code></pre>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>CHARACTER-REPLACEMENT-TESTS.md</code>.
+</footer>
+</body>
+</html>

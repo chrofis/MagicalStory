@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DEPLOYMENT_GUIDE.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory - Deployment Guide</h1>
+<p>This guide shows how to deploy MagicalStory to Railway (recommended).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>GitHub account with MagicalStory repository</li>
+<li>Railway account (<a href="https://railway.app/">https://railway.app/</a>)</li>
+<li>Required API keys:<ul>
+<li>Anthropic (Claude) API key</li>
+<li>Google AI (Gemini) API key</li>
+<li>Firebase service account (for authentication)</li>
+<li>Resend API key (for emails)</li>
+<li>Stripe keys (for payments)</li>
+<li>Gelato API key (for print orders)</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>Deploy to Railway (Recommended)</h2>
+<h3>Step 1: Connect Repository</h3>
+<ol>
+<li>Go to <a href="https://railway.app/">https://railway.app/</a></li>
+<li>Sign up/login with GitHub</li>
+<li>Click &quot;New Project&quot; → &quot;Deploy from GitHub repo&quot;</li>
+<li>Select your MagicalStory repository</li>
+<li>Railway auto-detects Node.js and starts deployment</li>
+</ol>
+<h3>Step 2: Add PostgreSQL Database</h3>
+<ol>
+<li>In Railway dashboard, click &quot;+ New&quot;</li>
+<li>Select &quot;Database&quot; → &quot;PostgreSQL&quot;</li>
+<li>Railway automatically sets <code>DATABASE_URL</code> environment variable</li>
+</ol>
+<h3>Step 3: Configure Environment Variables</h3>
+<p>In Railway dashboard → Variables tab, add:</p>
+<pre><code class="language-env"># Database (auto-set by Railway PostgreSQL)
+DATABASE_URL=postgresql://...
+
+# AI APIs
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+
+# Authentication (Firebase service account JSON, base64 encoded)
+FIREBASE_SERVICE_ACCOUNT=eyJ0eXBlIjoic2VydmljZV9hY2NvdW50Ii...
+JWT_SECRET=your-secure-random-string
+
+# Email (Resend)
+RESEND_API_KEY=re_...
+EMAIL_FROM=MagicalStory &lt;noreply@magicalstory.ch&gt;
+ADMIN_EMAIL=admin@magicalstory.ch
+
+# Payments (Stripe)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Print (Gelato)
+GELATO_API_KEY=...
+
+# App Settings
+NODE_ENV=production
+ADMIN_USER_IDS=1,2,3
+</code></pre>
+<h3>Step 4: Custom Domain (Optional)</h3>
+<ol>
+<li>In Railway dashboard → Settings → Domains</li>
+<li>Add custom domain (e.g., magicalstory.ch)</li>
+<li>Configure DNS at your registrar:<ul>
+<li>CNAME record pointing to Railway URL</li>
+</ul>
+</li>
+</ol>
+<h3>Step 5: Verify Deployment</h3>
+<ol>
+<li>Check deployment logs in Railway dashboard</li>
+<li>Visit your Railway URL or custom domain</li>
+<li>Test user registration and story generation</li>
+</ol>
+<hr>
+<h2>Environment Variables Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DATABASE_URL</code></td>
+<td>Yes</td>
+<td>PostgreSQL connection string</td>
+</tr>
+<tr>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>Yes</td>
+<td>Claude API for story generation</td>
+</tr>
+<tr>
+<td><code>GEMINI_API_KEY</code></td>
+<td>Yes</td>
+<td>Gemini API for image generation</td>
+</tr>
+<tr>
+<td><code>FIREBASE_SERVICE_ACCOUNT</code></td>
+<td>Yes</td>
+<td>Base64-encoded Firebase service account JSON</td>
+</tr>
+<tr>
+<td><code>JWT_SECRET</code></td>
+<td>Yes</td>
+<td>Secret for JWT token signing</td>
+</tr>
+<tr>
+<td><code>RESEND_API_KEY</code></td>
+<td>Yes</td>
+<td>Resend API for transactional emails</td>
+</tr>
+<tr>
+<td><code>EMAIL_FROM</code></td>
+<td>Yes</td>
+<td>From address for emails</td>
+</tr>
+<tr>
+<td><code>ADMIN_EMAIL</code></td>
+<td>No</td>
+<td>Admin notification email</td>
+</tr>
+<tr>
+<td><code>STRIPE_SECRET_KEY</code></td>
+<td>Yes</td>
+<td>Stripe secret key for payments</td>
+</tr>
+<tr>
+<td><code>STRIPE_WEBHOOK_SECRET</code></td>
+<td>Yes</td>
+<td>Stripe webhook signing secret</td>
+</tr>
+<tr>
+<td><code>GELATO_API_KEY</code></td>
+<td>Yes</td>
+<td>Gelato API for print orders</td>
+</tr>
+<tr>
+<td><code>NODE_ENV</code></td>
+<td>No</td>
+<td>Set to &quot;production&quot;</td>
+</tr>
+<tr>
+<td><code>ADMIN_USER_IDS</code></td>
+<td>No</td>
+<td>Comma-separated user IDs with admin access</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Firebase Setup</h2>
+<h3>Create Service Account</h3>
+<ol>
+<li>Go to Firebase Console → Project Settings → Service Accounts</li>
+<li>Click &quot;Generate new private key&quot;</li>
+<li>Download JSON file</li>
+<li>Base64 encode the JSON:<pre><code class="language-bash">base64 -i service-account.json
+</code></pre>
+</li>
+<li>Set <code>FIREBASE_SERVICE_ACCOUNT</code> to the base64 string</li>
+</ol>
+<h3>Configure Authentication</h3>
+<ol>
+<li>Enable Email/Password authentication in Firebase Console</li>
+<li>Add your domain to authorized domains</li>
+</ol>
+<hr>
+<h2>Stripe Setup</h2>
+<h3>Configure Webhook</h3>
+<ol>
+<li>In Stripe Dashboard → Developers → Webhooks</li>
+<li>Add endpoint: <code>https://your-domain.com/api/stripe/webhook</code></li>
+<li>Select events:<ul>
+<li><code>checkout.session.completed</code></li>
+<li><code>payment_intent.succeeded</code></li>
+</ul>
+</li>
+<li>Copy webhook signing secret to <code>STRIPE_WEBHOOK_SECRET</code></li>
+</ol>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Common Issues</h3>
+<p><strong>Build fails:</strong></p>
+<ul>
+<li>Check Railway logs for error details</li>
+<li>Verify all dependencies in package.json</li>
+<li>Ensure client build succeeds (<code>cd client &amp;&amp; npm run build</code>)</li>
+</ul>
+<p><strong>Database connection errors:</strong></p>
+<ul>
+<li>Verify DATABASE_URL is set correctly</li>
+<li>Check PostgreSQL service is running in Railway</li>
+</ul>
+<p><strong>Authentication fails:</strong></p>
+<ul>
+<li>Verify FIREBASE_SERVICE_ACCOUNT is valid base64</li>
+<li>Check JWT_SECRET is set</li>
+<li>Ensure Firebase project settings match</li>
+</ul>
+<p><strong>Images not generating:</strong></p>
+<ul>
+<li>Check GEMINI_API_KEY is valid</li>
+<li>Review logs for Gemini API errors</li>
+<li>Check for content safety filter blocks</li>
+</ul>
+<p><strong>Emails not sending:</strong></p>
+<ul>
+<li>Verify RESEND_API_KEY is valid</li>
+<li>Check domain verification in Resend dashboard</li>
+<li>Review email logs in Resend dashboard</li>
+</ul>
+<h3>View Logs</h3>
+<pre><code class="language-bash"># Railway CLI
+railway logs
+
+# Or in Railway dashboard → Deployments → View Logs
+</code></pre>
+<hr>
+<h2>Updating the App</h2>
+<p>Railway auto-deploys on push to main branch:</p>
+<pre><code class="language-bash">git add .
+git commit -m &quot;Your changes&quot;
+git push origin master
+</code></pre>
+<p>Or manual deploy:</p>
+<pre><code class="language-bash">railway up
+</code></pre>
+<hr>
+<h2>Production Checklist</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> PostgreSQL database provisioned</li>
+<li><input checked="" disabled="" type="checkbox"> All environment variables configured</li>
+<li><input checked="" disabled="" type="checkbox"> Firebase authentication working</li>
+<li><input checked="" disabled="" type="checkbox"> Story generation working (Claude + Gemini)</li>
+<li><input checked="" disabled="" type="checkbox"> Email notifications working (Resend)</li>
+<li><input checked="" disabled="" type="checkbox"> Payment processing working (Stripe)</li>
+<li><input checked="" disabled="" type="checkbox"> Print ordering working (Gelato)</li>
+<li><input checked="" disabled="" type="checkbox"> Custom domain configured (optional)</li>
+<li><input checked="" disabled="" type="checkbox"> SSL/HTTPS enabled (automatic on Railway)</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>DEPLOYMENT_GUIDE.md</code>.
+</footer>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>REPAIR-MECHANISMS.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Image Repair Mechanisms</h1>
+<p>This document describes the three different repair mechanisms used in the codebase for fixing image quality issues.</p>
+<h2>Summary</h2>
+<p>There are <strong>three different repair mechanisms</strong>, used in different contexts:</p>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Used By</th>
+<th>Approach</th>
+<th>Provider</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Grid-Based Repair</strong></td>
+<td>Auto-repair pipeline (default)</td>
+<td>Extract 512px regions → batch into grids → Gemini repairs → verify → composite back</td>
+<td>Gemini only</td>
+</tr>
+<tr>
+<td><strong>Direct Inpainting</strong></td>
+<td>Auto-repair fallback, manual inpainting</td>
+<td>Create mask → single API call with mask/coordinates</td>
+<td>Runware (default) or Gemini</td>
+</tr>
+<tr>
+<td><strong>Full Regeneration</strong></td>
+<td>Manual regenerate, major issues</td>
+<td>Completely regenerate with new prompt</td>
+<td>Gemini (primary)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>1. Grid-Based Repair (Default for Auto-Repair)</h2>
+<p><strong>Files:</strong> <code>server/lib/gridBasedRepair.js</code>, <code>server/lib/repairGrid.js</code></p>
+<h3>Flow</h3>
+<ol>
+<li>Collect all issues from quality evaluation</li>
+<li>Extract 256x512px regions around each issue</li>
+<li>Batch into grids (max 12 issues per grid)</li>
+<li>Send to Gemini with manifest describing each issue</li>
+<li>Extract repaired regions from returned grid</li>
+<li><strong>Verify each repair</strong> via Gemini comparison (confidence threshold: 70%)</li>
+<li>Apply verified repairs, retry failed ones individually</li>
+<li>Final artifact check</li>
+</ol>
+<h3>Called From</h3>
+<ul>
+<li><code>generateImageWithQualityRetry()</code> when <code>useGridRepair=true</code> (default)</li>
+<li><code>executeRepairPlan()</code> for batch repairs</li>
+<li><code>autoRepairWithTargets()</code> (hybrid mode)</li>
+</ul>
+<h3>Key Thresholds</h3>
+<table>
+<thead>
+<tr>
+<th>Threshold</th>
+<th>Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AUTO_REPAIR_THRESHOLD</td>
+<td>90%</td>
+<td>Trigger repair if score ≤ 90%</td>
+</tr>
+<tr>
+<td>LLM_CONFIDENCE_THRESHOLD</td>
+<td>70%</td>
+<td>Accept repair if confidence ≥ 70%</td>
+</tr>
+<tr>
+<td>TARGET_REGION_SIZE</td>
+<td>512px</td>
+<td>Default region extraction size</td>
+</tr>
+<tr>
+<td>MAX_PER_GRID</td>
+<td>12</td>
+<td>Max issues per grid batch</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Direct Inpainting</h2>
+<p><strong>File:</strong> <code>server/lib/images.js</code> (functions: <code>inpaintWithMask</code>, <code>autoRepairWithTargets</code>)</p>
+<h3>Flow</h3>
+<ol>
+<li>Group fix targets by type (face, anatomy, objects)</li>
+<li>Check mask coverage (skip if &gt; MAX_MASK_COVERAGE_PERCENT)</li>
+<li>Create combined mask for bounding boxes</li>
+<li>Single inpaint API call per group</li>
+<li>No verification step</li>
+</ol>
+<h3>Two Backends</h3>
+<h4>Runware (Default)</h4>
+<ul>
+<li>Uses actual mask image</li>
+<li>SDXL model (<code>runware:101@1</code>)</li>
+<li>Cost: ~$0.002/image</li>
+<li>Function: <code>inpaintWithRunwareBackend()</code></li>
+</ul>
+<h4>Gemini</h4>
+<ul>
+<li>Uses text-based coordinates in prompt (no mask image needed)</li>
+<li>More reliable for multiple similar elements</li>
+<li>Function: <code>inpaintWithMask()</code> with <code>backend=&#39;gemini&#39;</code></li>
+</ul>
+<h3>Called From</h3>
+<ul>
+<li>Auto-repair when <code>useGridRepair=false</code></li>
+<li>Legacy repair flows</li>
+</ul>
+<hr>
+<h2>3. Full Image Regeneration</h2>
+<p><strong>File:</strong> <code>server.js</code> (endpoint: <code>/api/stories/:id/regenerate/image/:pageNum</code>)</p>
+<h3>Flow</h3>
+<ol>
+<li>User clicks &quot;Regenerate&quot; in UI</li>
+<li>Calls <code>generateImageWithQualityRetry()</code> with same prompt</li>
+<li>Creates new image version (doesn&#39;t replace original)</li>
+<li>Runs quality evaluation + optional auto-repair on new version</li>
+</ol>
+<h3>Triggers</h3>
+<ul>
+<li>User manually clicks regenerate button</li>
+<li>Quality score &lt; 30% (auto-regenerate threshold)</li>
+<li>Major issues detected (missing characters, extra limbs, physics violations)</li>
+</ul>
+<hr>
+<h2>Comparison Table</h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Grid Repair</th>
+<th>Direct Inpaint</th>
+<th>Full Regen</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Verification</strong></td>
+<td>Yes (70% confidence)</td>
+<td>No</td>
+<td>Quality eval</td>
+</tr>
+<tr>
+<td><strong>Batching</strong></td>
+<td>Up to 12 issues/grid</td>
+<td>Single call</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Provider</strong></td>
+<td>Gemini only</td>
+<td>Runware or Gemini</td>
+<td>Gemini (primary)</td>
+</tr>
+<tr>
+<td><strong>Cost</strong></td>
+<td>Higher (multiple calls)</td>
+<td>Lower ($0.002 Runware)</td>
+<td>Varies</td>
+</tr>
+<tr>
+<td><strong>Retry logic</strong></td>
+<td>Failed repairs retried</td>
+<td>None</td>
+<td>Up to 3 attempts</td>
+</tr>
+<tr>
+<td><strong>Coverage limit</strong></td>
+<td>Per-cell (512px regions)</td>
+<td>Global mask coverage %</td>
+<td>N/A</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Decision Flow</h2>
+<pre><code>Story Generation → Auto-Repair Pipeline
+  ├─ useGridRepair=true (default)
+  │   └─ gridBasedRepair() [Gemini]
+  └─ useGridRepair=false
+      └─ autoRepairWithTargets() → inpaintWithMask() [Runware]
+
+Manual Regenerate → /api/stories/:id/regenerate/image/:pageNum
+  └─ generateImageWithQualityRetry() → Full new image
+      └─ May trigger auto-repair on new image if enabled
+
+executeRepairPlan() → Batch repair multiple pages
+  ├─ useGridRepair=true → gridBasedRepair() per page
+  └─ Regenerate pages with major issues
+</code></pre>
+<hr>
+<h2>Issue Classification → Repair Method</h2>
+<table>
+<thead>
+<tr>
+<th>Issue Type</th>
+<th>Detection</th>
+<th>Repair Method</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Missing character</td>
+<td><code>scene.all_present=false</code></td>
+<td>Regenerate</td>
+</tr>
+<tr>
+<td>Extra limbs</td>
+<td><code>rendering.extra_limbs=true</code></td>
+<td>Regenerate</td>
+</tr>
+<tr>
+<td>Physics violation</td>
+<td><code>rendering.physics_ok=false</code></td>
+<td>Regenerate</td>
+</tr>
+<tr>
+<td>Cross-eyes</td>
+<td><code>rendering.cross_eyes=true</code></td>
+<td>Regenerate</td>
+</tr>
+<tr>
+<td>Wrong pointing direction</td>
+<td><code>spatial.issues.length&gt;0</code></td>
+<td>Regenerate</td>
+</tr>
+<tr>
+<td>Hair mismatch</td>
+<td><code>match.hair_match=false</code></td>
+<td>Targeted replace or regen</td>
+</tr>
+<tr>
+<td>Clothing wrong</td>
+<td><code>match.clothing_match=false</code></td>
+<td>Grid inpaint</td>
+</tr>
+<tr>
+<td>Fixable clothing</td>
+<td><code>fixable_issues[].type=clothing</code></td>
+<td>Grid inpaint</td>
+</tr>
+<tr>
+<td>Style inconsistent</td>
+<td><code>scene.style_consistent=false</code></td>
+<td>Style transfer</td>
+</tr>
+<tr>
+<td>Low score (&lt; 30%)</td>
+<td>Score-based</td>
+<td>Regenerate</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Key Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server/lib/images.js</code></td>
+<td>Main orchestrator, quality evaluation, direct inpainting</td>
+</tr>
+<tr>
+<td><code>server/lib/gridBasedRepair.js</code></td>
+<td>Grid repair pipeline orchestration</td>
+</tr>
+<tr>
+<td><code>server/lib/repairGrid.js</code></td>
+<td>Grid creation, Gemini repair calls, region extraction</td>
+</tr>
+<tr>
+<td><code>server/lib/repairVerification.js</code></td>
+<td>Repair verification, diff images</td>
+</tr>
+<tr>
+<td><code>server/lib/issueExtractor.js</code></td>
+<td>Issue normalization, deduplication</td>
+</tr>
+<tr>
+<td><code>server/lib/runware.js</code></td>
+<td>Runware API for inpainting</td>
+</tr>
+<tr>
+<td><code>server/utils/config.js</code></td>
+<td>Quality thresholds, model defaults</td>
+</tr>
+<tr>
+<td><code>prompts/grid-repair.txt</code></td>
+<td>Gemini repair instruction prompt</td>
+</tr>
+<tr>
+<td><code>prompts/image-evaluation.txt</code></td>
+<td>Quality evaluation criteria</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Known Inconsistencies</h2>
+<ol>
+<li><p><strong>Provider mismatch</strong>: Grid repair only uses Gemini, while direct inpainting defaults to Runware - different quality/cost tradeoffs</p>
+</li>
+<li><p><strong>Verification gap</strong>: Only grid repair verifies if repairs succeeded; direct inpainting has no verification</p>
+</li>
+<li><p><strong>Threshold fragmentation</strong>:</p>
+<ul>
+<li>Auto-repair triggers at ≤ 90% score</li>
+<li>Quality threshold for regeneration is 50%</li>
+<li>Grid repair verification uses 70% confidence</li>
+</ul>
+</li>
+</ol>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>REPAIR-MECHANISMS.md</code>.
+</footer>
+</body>
+</html>

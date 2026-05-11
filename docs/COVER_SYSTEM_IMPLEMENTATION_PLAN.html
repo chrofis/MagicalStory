@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>COVER_SYSTEM_IMPLEMENTATION_PLAN.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Cover System Implementation Plan</h1>
+<h2>Goal</h2>
+<p>Add 3 cover pages to stories: Front Cover/Title Page, Page 0, and Back Cover</p>
+<h2>Current Status (Dec 7, 2025)</h2>
+<ul>
+<li>✅ All shipping address issues FIXED</li>
+<li>✅ PDF layout improvements complete (font sizing, alignment)</li>
+<li>✅ PDF dimensions correct (140x140mm + cover spread)</li>
+<li>⏳ Cover system - ready to implement in fresh session</li>
+</ul>
+<h2>What Needs to be Built</h2>
+<h3>1. Three Cover Images</h3>
+<ul>
+<li><strong>Front Cover / Title Page</strong> (same image) - shows story title</li>
+<li><strong>Page 0</strong> - dedication/introduction page</li>
+<li><strong>Back Cover</strong> - ending page</li>
+</ul>
+<h3>2. Display Order in App</h3>
+<pre><code>Front Cover → Page 0 → Story Pages → Back Cover
+</code></pre>
+<h3>3. PDF Print Order</h3>
+<pre><code>PDF Page 1: Back Cover + Front Cover (spread, 290.27 x 146.0 mm)
+PDF Page 2: Page 0 (140x140mm)
+PDF Pages 3+: Story content (alternating text/image)
+</code></pre>
+<h3>4. Story Metadata</h3>
+<ul>
+<li>Extract/save story title</li>
+<li>Use front cover as thumbnail</li>
+<li>Display in story list</li>
+</ul>
+<h2>Implementation Steps</h2>
+<h3>Phase 1: State &amp; Generation (index.html)</h3>
+<p><strong>Add State Variables</strong> (around line 708):</p>
+<pre><code class="language-javascript">const [coverImages, setCoverImages] = useState({
+  frontCover: null,
+  page0: null,
+  backCover: null
+});
+const [storyTitle, setStoryTitle] = useState(&#39;&#39;);
+</code></pre>
+<p><strong>Extract Title from Story Type</strong> (in generateOutline or after story generation):</p>
+<pre><code class="language-javascript">const title = storyTypes.find(t =&gt; t.id === storyType)?.name[language] || &#39;My Story&#39;;
+setStoryTitle(title);
+</code></pre>
+<p><strong>Generate Cover Images</strong> (around line 2515, in parallel with scene images):</p>
+<pre><code class="language-javascript">// Add to imagePromises array:
+const coverPromises = [
+  // Front cover/title
+  generateCoverImage(&#39;front&#39;, `Create a beautiful title page for a children&#39;s book called &quot;${storyTitle}&quot;. ${styleDescription}. Include decorative elements but leave space for the title text.`),
+
+  // Page 0
+  generateCoverImage(&#39;page0&#39;, `Create a dedication page or introduction illustration for &quot;${storyTitle}&quot;. ${styleDescription}. Warm, inviting scene.`),
+
+  // Back cover
+  generateCoverImage(&#39;back&#39;, `Create a back cover illustration for &quot;${storyTitle}&quot;. ${styleDescription}. Conclusive, satisfying ending scene.`)
+];
+
+// Await all
+const [frontCover, page0, backCover] = await Promise.all(coverPromises);
+setCoverImages({ frontCover, page0, backCover });
+</code></pre>
+<h3>Phase 2: PDF Generation (server.js)</h3>
+<p><strong>Update PDF Structure</strong> (around line 2267):</p>
+<pre><code class="language-javascript">// Page 1: Back + Front cover spread (290.27 x 146.0 mm)
+doc.addPage({ size: [coverWidth, coverHeight], margins: 0 });
+if (coverImages.backCover) {
+  // Add back cover on left half
+  doc.image(backCoverBuffer, 0, 0, { width: coverWidth/2, height: coverHeight });
+}
+if (coverImages.frontCover) {
+  // Add front cover on right half
+  doc.image(frontCoverBuffer, coverWidth/2, 0, { width: coverWidth/2, height: coverHeight });
+}
+
+// Page 2: Page 0 (140x140mm)
+doc.addPage({ size: [pageSize, pageSize], margins: 0 });
+if (coverImages.page0) {
+  doc.image(page0Buffer, 0, 0, { width: pageSize, height: pageSize });
+}
+
+// Pages 3+: Story content (existing logic)
+</code></pre>
+<p><strong>Update API endpoint</strong> (/api/generate-pdf):</p>
+<ul>
+<li>Accept <code>coverImages</code> and <code>storyTitle</code> in request body</li>
+<li>Extract base64 buffers for covers</li>
+<li>Use in PDF generation</li>
+</ul>
+<h3>Phase 3: Storage &amp; Display</h3>
+<p><strong>Save with Covers</strong> (in save story):</p>
+<pre><code class="language-javascript">const storyData = {
+  // ... existing fields
+  title: storyTitle,
+  coverImages: coverImages,
+  thumbnail: coverImages.frontCover // Use front cover as thumbnail
+};
+</code></pre>
+<p><strong>Display in Story List</strong> (around line 6800):</p>
+<pre><code class="language-javascript">{savedStories.map(story =&gt; (
+  &lt;div key={story.id}&gt;
+    {story.thumbnail &amp;&amp; (
+      &lt;img src={story.thumbnail} alt={story.title} /&gt;
+    )}
+    &lt;h3&gt;{story.title || story.storyType}&lt;/h3&gt;
+    &lt;p&gt;Pages: {story.pages}&lt;/p&gt;
+  &lt;/div&gt;
+))}
+</code></pre>
+<p><strong>Display in Story Viewer</strong> (around line 5400):</p>
+<pre><code class="language-javascript">// Add before story pages
+{coverImages.frontCover &amp;&amp; (
+  &lt;div className=&quot;cover-page&quot;&gt;
+    &lt;img src={coverImages.frontCover} /&gt;
+    &lt;h1&gt;{storyTitle}&lt;/h1&gt;
+  &lt;/div&gt;
+)}
+
+{coverImages.page0 &amp;&amp; (
+  &lt;img src={coverImages.page0} /&gt;
+)}
+
+// ... story pages ...
+
+{coverImages.backCover &amp;&amp; (
+  &lt;img src={coverImages.backCover} /&gt;
+)}
+</code></pre>
+<h2>Files to Modify</h2>
+<ol>
+<li><p><strong>index.html</strong> (~300 lines changed)</p>
+<ul>
+<li>State variables</li>
+<li>Title extraction</li>
+<li>Cover image generation</li>
+<li>Display logic</li>
+</ul>
+</li>
+<li><p><strong>server.js</strong> (~50 lines changed)</p>
+<ul>
+<li>PDF generation structure</li>
+<li>Cover image handling</li>
+</ul>
+</li>
+<li><p><strong>Database</strong> (optional)</p>
+<ul>
+<li>Migration to add title column if needed</li>
+<li>Backward compatibility</li>
+</ul>
+</li>
+</ol>
+<h2>Testing Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Generate new story with covers</li>
+<li><input disabled="" type="checkbox"> Covers appear in viewer in correct order</li>
+<li><input disabled="" type="checkbox"> PDF has correct structure (back+front, page0, content)</li>
+<li><input disabled="" type="checkbox"> Story saves with title and covers</li>
+<li><input disabled="" type="checkbox"> Thumbnail shows in story list</li>
+<li><input disabled="" type="checkbox"> Old stories still work (backward compatibility)</li>
+<li><input disabled="" type="checkbox"> Cover images quality is good</li>
+<li><input disabled="" type="checkbox"> PDF dimensions correct</li>
+</ul>
+<h2>Notes</h2>
+<ul>
+<li>Keep existing image generation parallel for performance</li>
+<li>Covers should match selected art style</li>
+<li>Title should be extracted from story type or generated</li>
+<li>Front cover serves dual purpose (cover + thumbnail)</li>
+<li>Backward compatibility: old stories without covers should still work</li>
+</ul>
+<h2>Current Working Features (Don&#39;t Break!)</h2>
+<ul>
+<li>✅ Shipping address save/load</li>
+<li>✅ PDF generation with correct dimensions</li>
+<li>✅ Smart font sizing (auto-reduce if text too long)</li>
+<li>✅ Left-aligned, vertically-centered text</li>
+<li>✅ Story loading with progress bar</li>
+<li>✅ Image generation in parallel</li>
+<li>✅ Character consistency system</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>COVER_SYSTEM_IMPLEMENTATION_PLAN.md</code>.
+</footer>
+</body>
+</html>

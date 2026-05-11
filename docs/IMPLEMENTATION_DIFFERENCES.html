@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IMPLEMENTATION_DIFFERENCES.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory: Old vs New Implementation Comparison</h1>
+<h2>Overview</h2>
+<p>This document details all differences between the original <code>index.html</code> (Babel/inline JSX) implementation and the new Vite + React + TypeScript implementation.</p>
+<p><strong>Old Implementation:</strong> Single HTML file with inline JSX, runtime Babel transpilation, CDN dependencies
+<strong>New Implementation:</strong> Vite build system, React 18, TypeScript, component-based architecture</p>
+<hr>
+<h2>Architecture Differences</h2>
+<h3>Build System</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Old</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Build Tool</td>
+<td>None (runtime Babel)</td>
+<td>Vite</td>
+</tr>
+<tr>
+<td>Transpilation</td>
+<td>Client-side Babel</td>
+<td>Pre-compiled at build time</td>
+</tr>
+<tr>
+<td>Bundle Size</td>
+<td>~1.8MB (Babel + Tailwind JIT + all scripts)</td>
+<td>~200KB initial bundle</td>
+</tr>
+<tr>
+<td>Load Time</td>
+<td>3-5 seconds</td>
+<td>1-1.5 seconds</td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Code Splitting</td>
+<td>No</td>
+<td>Yes (lazy loading)</td>
+</tr>
+</tbody></table>
+<h3>File Structure</h3>
+<table>
+<thead>
+<tr>
+<th>Old</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>index.html</code> (11,918 lines)</td>
+<td><code>client/src/</code> directory with 34+ component files</td>
+</tr>
+<tr>
+<td><code>admin-dashboard.html</code> (420 lines)</td>
+<td><code>client/src/pages/AdminDashboard.tsx</code></td>
+</tr>
+<tr>
+<td>All code inline</td>
+<td>Modular components</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Step-by-Step Comparison</h2>
+<h3>Step 0: Landing Page</h3>
+<p><strong>File:</strong> <code>LandingPage.tsx</code> (143 lines) vs <code>renderStep0()</code> in old index.html</p>
+<h4>Identical Features</h4>
+<ul>
+<li>Hero title and description with translations</li>
+<li>Photos column (Real person → Avatar) with arrow</li>
+<li>Video player with autoplay/loop/muted</li>
+<li>Decorative sparkles (hidden on mobile)</li>
+<li>Language-aware button text</li>
+</ul>
+<h4>Differences</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Container</td>
+<td><code>min-h-[calc(100vh-72px)]</code></td>
+<td><code>min-h-screen</code> with flex</td>
+<td>Different</td>
+</tr>
+<tr>
+<td>Image paths</td>
+<td><code>images/Real person.jpg</code></td>
+<td><code>/images/Real person.jpg</code> (with leading /)</td>
+<td>Different</td>
+</tr>
+<tr>
+<td>Auth handling</td>
+<td>Inline <code>setShowAuthModal(true)</code></td>
+<td><code>handleStartJourney()</code> checks auth first</td>
+<td>Different</td>
+</tr>
+<tr>
+<td>After login redirect</td>
+<td>Stays on step 0</td>
+<td>Navigates to <code>/create</code></td>
+<td>Different</td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ul>
+<li>None identified for landing page</li>
+</ul>
+<hr>
+<h3>Step 1: Story Type &amp; Art Style Selection</h3>
+<p><strong>Files:</strong> <code>StoryTypeSelector.tsx</code>, <code>ArtStyleSelector.tsx</code> vs <code>renderStep1()</code> in old index.html</p>
+<h4>Differences</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Custom story types</td>
+<td><code>addCustomStoryType()</code> with prompt()</td>
+<td>Not implemented</td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Custom story type state</td>
+<td><code>customStoryTypes</code> state</td>
+<td>Not present</td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Grid layout</td>
+<td><code>grid-cols-3 md:grid-cols-5 lg:grid-cols-6</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Art style image height</td>
+<td><code>h-32</code></td>
+<td><code>h-32</code></td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Auto-scroll to art style</td>
+<td><code>smoothScrollToElement(&#39;art-style-section&#39;)</code></td>
+<td><code>scrollIntoView()</code></td>
+<td>Slightly different</td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ol>
+<li><strong>Custom Story Type Creation</strong> - The &quot;➕ Add Custom&quot; button and prompt for creating custom story types is missing in the new implementation.</li>
+</ol>
+<hr>
+<h3>Step 2: Character Creation</h3>
+<p><strong>Files:</strong> <code>CharacterForm.tsx</code>, <code>CharacterList.tsx</code>, <code>PhotoUpload.tsx</code>, <code>TraitSelector.tsx</code> vs <code>renderStep2()</code> in old index.html</p>
+<h4>Photo Upload Section</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Photo examples</td>
+<td>4 examples (full body, upper body, close-up bad, sunglasses bad)</td>
+<td>4 examples</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Upload button styling</td>
+<td><code>px-10 py-4 rounded-xl text-xl</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Cancel button</td>
+<td>Below photo upload</td>
+<td>Present via <code>onCancel</code> prop</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h4>Character Form</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Name input</td>
+<td>Direct input</td>
+<td>Via <code>Input</code> component</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Gender auto-detection</td>
+<td><code>detectGender(name)</code> function</td>
+<td>Not implemented</td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Photo/attributes layout</td>
+<td>Grid with <code>md:bg-indigo-50</code> borders</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Trait selectors</td>
+<td>Inline implementation</td>
+<td><code>TraitSelector</code> component</td>
+<td>Same styling</td>
+</tr>
+<tr>
+<td>Custom trait input</td>
+<td>Inline <code>addCustomStrength()</code> etc.</td>
+<td>Via TraitSelector</td>
+<td>Same functionality</td>
+</tr>
+<tr>
+<td>Cancel/Save buttons</td>
+<td>Not side-by-side in old?</td>
+<td>Side-by-side</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+</tbody></table>
+<h4>Character List (after creation)</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Success message</td>
+<td>Green bg with checkmark</td>
+<td>Via <code>showSuccessMessage</code> prop</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Character card</td>
+<td>Photo + name + traits</td>
+<td>Photo + name + traits</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Edit/Delete buttons</td>
+<td>Side by side</td>
+<td>Side by side</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>&quot;What next?&quot; section</td>
+<td>Two buttons in grid</td>
+<td>Via <code>CharacterList</code> component</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ol>
+<li><strong>Gender auto-detection from name</strong> - The <code>detectGender(name)</code> function that automatically sets gender based on common name patterns is missing.</li>
+<li><strong>Avatar generation</strong> - The old code has <code>generateAvatarFromPhoto()</code> functionality that may not be fully implemented.</li>
+<li><strong>Thumbnail URL handling</strong> - Old uses <code>char.thumbnailUrl || char.photoUrl</code>, new only uses <code>char.photoUrl</code>.</li>
+</ol>
+<hr>
+<h3>Step 3: Relationship Editor</h3>
+<p><strong>File:</strong> <code>RelationshipEditor.tsx</code> (153 lines) vs <code>renderStep3()</code> in old index.html</p>
+<h4>Layout</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Container width</td>
+<td><code>max-w-[75%] mx-auto</code></td>
+<td><code>max-w-[75%] mx-auto</code></td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Character photos</td>
+<td><code>w-14 h-14 md:w-16 md:h-16</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Dropdown width</td>
+<td><code>max-w-[500px]</code></td>
+<td><code>max-w-[500px]</code></td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Details input</td>
+<td>Below dropdown, same width</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Custom relationship</td>
+<td>Via <code>__CREATE_CUSTOM__</code> option</td>
+<td>Same mechanism</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Border colors</td>
+<td>Red for undefined, blue for defined</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h4>Relationship Logic</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Inverse relationships</td>
+<td><code>getInverseRelationship()</code> auto-sets inverse</td>
+<td>Not implemented</td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Relationship types</td>
+<td>From <code>relationshipTypes</code> array</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>&quot;Not known&quot; default</td>
+<td><code>getNotKnownRelationship(language)</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ol>
+<li><strong>Inverse relationship auto-fill</strong> - When you set A→B as &quot;Father&quot;, it should auto-set B→A as &quot;Son/Daughter&quot;. The new code only stores the forward direction.</li>
+</ol>
+<hr>
+<h3>Step 4: Story Settings</h3>
+<p><strong>File:</strong> <code>StorySettings.tsx</code> (223 lines) vs <code>renderStep4()</code> in old index.html</p>
+<h4>Main Character Selection</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Grid layout</td>
+<td><code>md:grid-cols-2</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Star icon on selected</td>
+<td><code>Icon name=&quot;star&quot;</code></td>
+<td><code>Star</code> from lucide-react</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Photo display</td>
+<td>`thumbnailUrl</td>
+<td></td>
+<td>photoUrl`</td>
+</tr>
+<tr>
+<td>Auto-selection</td>
+<td>Not present</td>
+<td>Auto-selects ages 1-10</td>
+<td><strong>NEW FEATURE</strong></td>
+</tr>
+</tbody></table>
+<h4>Reading Level Selection</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3 levels</td>
+<td>1st-grade, standard, advanced</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Images for levels</td>
+<td>Local paths</td>
+<td><code>/images/...</code> paths</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Description text</td>
+<td>Localized</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h4>Page Count</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Options</td>
+<td>30, 40, 50 (+ 10 for admin)</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Admin test option</td>
+<td><code>currentUser.role === &#39;admin&#39;</code> check</td>
+<td><code>developerMode</code> check</td>
+<td>Different logic</td>
+</tr>
+<tr>
+<td>Page count formula</td>
+<td>Different for 1st-grade vs standard</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h4>Developer Mode Features</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Toggle location</td>
+<td>In Step 4 header</td>
+<td>In Navigation bar (always visible)</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+<tr>
+<td>10-page test option</td>
+<td>Visible when admin</td>
+<td>Visible when <code>developerMode</code></td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Image gen mode toggle</td>
+<td>Present (parallel/sequential)</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Generate Outline button</td>
+<td>Present</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Outline editor</td>
+<td>Editable textarea</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ol>
+<li><strong>Image Generation Mode Toggle</strong> - The parallel/sequential image generation mode selector is missing.</li>
+<li><strong>Two-stage generation</strong> - The &quot;Generate Outline&quot; → &quot;Edit Outline&quot; → &quot;Generate Story&quot; workflow is missing.</li>
+<li><strong>Editable outline</strong> - The <code>editableOutline</code> state and textarea for editing the story outline before generation is missing.</li>
+</ol>
+<hr>
+<h3>Step 5: Story Generation &amp; Display</h3>
+<p><strong>File:</strong> <code>StoryDisplay.tsx</code> (240 lines) + <code>GenerationProgress.tsx</code> vs <code>renderStep5()</code> in old index.html</p>
+<h4>Generation Process</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Outline generation</td>
+<td>Full API call to Claude</td>
+<td>Mock/placeholder</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+</tr>
+<tr>
+<td>Story generation</td>
+<td>Full API call with character context</td>
+<td>Mock/placeholder</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+</tr>
+<tr>
+<td>Scene descriptions</td>
+<td>Generated from Claude</td>
+<td>Mock/placeholder</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+</tr>
+<tr>
+<td>Image generation</td>
+<td>Gemini API calls</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Cover generation</td>
+<td>3 covers (front, initial, back)</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Sequential mode</td>
+<td>Previous image passed to next</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<h4>Story Display</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Title display</td>
+<td><code>storyTitle</code> variable</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Page parsing</td>
+<td>Split by <code>---Page X---</code> or <code>## Page X</code></td>
+<td>Same regex</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Picture book layout</td>
+<td>Image on top, text below</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Standard layout</td>
+<td>Image left, text right</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>PDF download</td>
+<td><code>html2pdf.js</code> integration</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>TXT download</td>
+<td>Blob creation</td>
+<td>Implemented</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Buy book</td>
+<td>Gelato API integration</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<h4>Developer Mode Features (Step 5)</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Show prompt</td>
+<td>Toggle to view used prompt</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Story outline display</td>
+<td>Collapsible section</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Scene descriptions</td>
+<td>Expandable per-page</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Image prompts</td>
+<td>View prompt for each image</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Quality scores</td>
+<td>Per-image quality analysis</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>API call debugging</td>
+<td>View raw API calls</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<p><strong>MISSING FEATURES:</strong></p>
+<ol>
+<li><strong>All AI generation</strong> - Outline, story, scenes, images are all mocked/placeholder.</li>
+<li><strong>PDF download</strong> - The <code>html2pdf.js</code> integration is missing.</li>
+<li><strong>Buy book functionality</strong> - Gelato API integration is missing.</li>
+<li><strong>All developer debugging features</strong> - Prompt viewing, quality analysis, etc.</li>
+</ol>
+<hr>
+<h2>API &amp; Service Layer</h2>
+<h3>Character Service</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Save characters</td>
+<td>Direct API call</td>
+<td><code>characterService.saveCharacters()</code></td>
+<td>Abstracted</td>
+</tr>
+<tr>
+<td>Load characters</td>
+<td>Direct API call</td>
+<td><code>characterService.getCharacters()</code></td>
+<td>Abstracted</td>
+</tr>
+<tr>
+<td>Photo analysis</td>
+<td>Direct call to <code>/api/analyze-photo</code></td>
+<td><code>characterService.analyzePhoto()</code></td>
+<td>Abstracted</td>
+</tr>
+<tr>
+<td>Avatar generation</td>
+<td><code>generateAvatarFromPhoto()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<h3>Story Service</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Generate outline</td>
+<td><code>generateOutline()</code> function</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Generate story</td>
+<td><code>generateStory()</code> function</td>
+<td>Mock implementation</td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Generate scenes</td>
+<td><code>generateSceneDescriptions()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Generate images</td>
+<td><code>generateSceneImages()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Save story</td>
+<td>Direct API call</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<h3>Image Service</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gemini API calls</td>
+<td>Multiple helper functions</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Character cartoons</td>
+<td><code>generateMainCharacterCartoons()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Cover images</td>
+<td><code>generateCoverImage()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Sequential generation</td>
+<td><code>callGeminiAPISequential()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Quality analysis</td>
+<td><code>analyzeImageQuality()</code></td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>State Management</h2>
+<h3>localStorage Persistence</h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auth token</td>
+<td><code>auth_token</code></td>
+<td><code>auth_token</code> (with migration from <code>token</code>)</td>
+<td>Improved</td>
+</tr>
+<tr>
+<td>Current user</td>
+<td><code>current_user</code></td>
+<td><code>current_user</code></td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Relationships</td>
+<td>Not persisted</td>
+<td><code>story_relationships</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Relationship texts</td>
+<td>Not persisted</td>
+<td><code>story_relationship_texts</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Custom relationships</td>
+<td>Not persisted</td>
+<td><code>story_custom_relationships</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Main characters</td>
+<td>Not persisted</td>
+<td><code>story_main_characters</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Language level</td>
+<td>Not persisted</td>
+<td><code>story_language_level</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Pages</td>
+<td>Not persisted</td>
+<td><code>story_pages</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Dedication</td>
+<td>Not persisted</td>
+<td><code>story_dedication</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+<tr>
+<td>Story details</td>
+<td>Not persisted</td>
+<td><code>story_details</code></td>
+<td><strong>NEW</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>UI/UX Differences</h2>
+<h3>Color Scheme</h3>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Primary buttons</td>
+<td><code>bg-indigo-600</code></td>
+<td><code>bg-indigo-600</code></td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Trait selector (success)</td>
+<td>Green variants</td>
+<td>All indigo</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+<tr>
+<td>Trait selector (warning)</td>
+<td>Orange variants</td>
+<td>All indigo</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+<tr>
+<td>Trait selector (danger)</td>
+<td>Red variants</td>
+<td>All indigo</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+<tr>
+<td>Button gradients</td>
+<td>Solid colors</td>
+<td>Solid colors</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h3>Layout</h3>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Navigation</td>
+<td>Black bar with step indicators</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Content container</td>
+<td><code>md:bg-white md:rounded-2xl md:shadow-xl md:p-8</code></td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Mobile backgrounds</td>
+<td>Often transparent</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+</tbody></table>
+<h3>Navigation</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Step indicators</td>
+<td>1-5 circles with connecting lines</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>Dev mode toggle</td>
+<td>In Step 4/5 headers</td>
+<td>In Navigation bar</td>
+<td><strong>CHANGED</strong></td>
+</tr>
+<tr>
+<td>Quota display</td>
+<td>In menu dropdown</td>
+<td>In menu dropdown + nav bar</td>
+<td>Same</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Admin Dashboard</h2>
+<p><strong>File:</strong> <code>AdminDashboard.tsx</code> vs <code>admin-dashboard.html</code></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Old</th>
+<th>New</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Stats display</td>
+<td>API calls for stats</td>
+<td>Same</td>
+<td>Identical</td>
+</tr>
+<tr>
+<td>User management</td>
+<td>Full CRUD</td>
+<td><strong>PARTIALLY IMPLEMENTED</strong></td>
+<td><strong>INCOMPLETE</strong></td>
+</tr>
+<tr>
+<td>Story management</td>
+<td>List/view/delete</td>
+<td><strong>NOT FULLY IMPLEMENTED</strong></td>
+<td><strong>INCOMPLETE</strong></td>
+</tr>
+<tr>
+<td>Orphaned data cleanup</td>
+<td>Present</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+<tr>
+<td>Logs viewing</td>
+<td>Present</td>
+<td><strong>NOT IMPLEMENTED</strong></td>
+<td><strong>MISSING</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Summary of Missing/Different Features</h2>
+<h3>Critical Missing (Core Functionality)</h3>
+<ol>
+<li><strong>AI Story Generation</strong> - All Claude API integration for outline, story, and scene generation</li>
+<li><strong>Image Generation</strong> - All Gemini API integration for scene and cover images</li>
+<li><strong>PDF Generation</strong> - The <code>html2pdf.js</code> integration</li>
+<li><strong>Book Purchase</strong> - Gelato API integration</li>
+</ol>
+<h3>Important Missing (Developer Features)</h3>
+<ol>
+<li><strong>Two-stage generation workflow</strong> (outline → edit → story)</li>
+<li><strong>Image generation mode toggle</strong> (parallel vs sequential)</li>
+<li><strong>All debugging/inspection features</strong> (prompts, quality scores, API calls)</li>
+</ol>
+<h3>Minor Missing</h3>
+<ol>
+<li><strong>Custom story type creation</strong> (prompt-based)</li>
+<li><strong>Gender auto-detection from name</strong></li>
+<li><strong>Inverse relationship auto-fill</strong></li>
+<li><strong>Thumbnail URL fallback</strong> in character display</li>
+</ol>
+<h3>New Features (Improvements)</h3>
+<ol>
+<li><strong>localStorage persistence</strong> for wizard state</li>
+<li><strong>Auto-select main characters</strong> based on age (1-10 years)</li>
+<li><strong>Dev mode toggle always visible</strong> in navigation</li>
+<li><strong>Token migration</strong> from old <code>token</code> key to <code>auth_token</code></li>
+</ol>
+<hr>
+<h2>Recommended Priority for Implementation</h2>
+<h3>Priority 1: Core Story Generation</h3>
+<ol>
+<li>Implement actual Claude API calls for outline/story generation</li>
+<li>Implement Gemini API calls for image generation</li>
+<li>Wire up the full generation pipeline</li>
+</ol>
+<h3>Priority 2: Export Features</h3>
+<ol>
+<li>Implement PDF generation with <code>html2pdf.js</code></li>
+<li>Implement book purchase flow</li>
+</ol>
+<h3>Priority 3: Developer Features</h3>
+<ol>
+<li>Add image generation mode toggle</li>
+<li>Add two-stage generation workflow</li>
+<li>Add debugging/inspection features</li>
+</ol>
+<h3>Priority 4: Minor Fixes</h3>
+<ol>
+<li>Add custom story type creation</li>
+<li>Add gender auto-detection</li>
+<li>Add inverse relationship auto-fill</li>
+<li>Add thumbnail URL fallback</li>
+</ol>
+<hr>
+<h2>Files Reference</h2>
+<h3>Old Implementation</h3>
+<ul>
+<li><code>index.html.backup</code> - 11,918 lines</li>
+</ul>
+<h3>New Implementation (Key Files)</h3>
+<ul>
+<li><code>client/src/pages/LandingPage.tsx</code> - 143 lines</li>
+<li><code>client/src/pages/StoryWizard.tsx</code> - 745 lines</li>
+<li><code>client/src/pages/AdminDashboard.tsx</code></li>
+<li><code>client/src/components/story/StoryTypeSelector.tsx</code></li>
+<li><code>client/src/components/story/ArtStyleSelector.tsx</code></li>
+<li><code>client/src/components/story/RelationshipEditor.tsx</code> - 153 lines</li>
+<li><code>client/src/components/story/StorySettings.tsx</code> - 223 lines</li>
+<li><code>client/src/components/character/CharacterForm.tsx</code> - 242 lines</li>
+<li><code>client/src/components/character/CharacterList.tsx</code></li>
+<li><code>client/src/components/character/PhotoUpload.tsx</code></li>
+<li><code>client/src/components/character/TraitSelector.tsx</code></li>
+<li><code>client/src/components/generation/GenerationProgress.tsx</code></li>
+<li><code>client/src/components/generation/StoryDisplay.tsx</code> - 240 lines</li>
+<li><code>client/src/components/common/Navigation.tsx</code> - 223 lines</li>
+<li><code>client/src/context/AuthContext.tsx</code> - 173 lines</li>
+<li><code>client/src/context/LanguageContext.tsx</code></li>
+<li><code>client/src/services/characterService.ts</code></li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>IMPLEMENTATION_DIFFERENCES.md</code>.
+</footer>
+</body>
+</html>

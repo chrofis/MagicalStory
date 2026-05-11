@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CHARACTER-SYSTEM.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>MagicalStory Character System</h1>
+<p><strong>Last Updated:</strong> January 2026</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-character-data-structure">Character Data Structure</a></li>
+<li><a href="#3-photo-analysis">Photo Analysis</a></li>
+<li><a href="#4-avatar-generation">Avatar Generation</a></li>
+<li><a href="#5-trait-handling--source-tracking">Trait Handling &amp; Source Tracking</a></li>
+<li><a href="#6-clothing-system">Clothing System</a></li>
+<li><a href="#7-styled-avatar-pipeline">Styled Avatar Pipeline</a></li>
+<li><a href="#8-character-consistency">Character Consistency</a></li>
+<li><a href="#9-code-locations">Code Locations</a></li>
+</ol>
+<hr>
+<h2>1. Overview</h2>
+<p>The character system manages:</p>
+<ul>
+<li>Photo upload and analysis</li>
+<li>Physical trait extraction and editing</li>
+<li>Avatar generation (seasonal + costumed)</li>
+<li>Trait source tracking (user vs AI-extracted)</li>
+<li>Clothing category selection for scenes</li>
+</ul>
+<h3>Character Flow</h3>
+<pre><code>Photo Upload → Analysis → Trait Extraction → Avatar Generation → Story Usage
+     │             │            │                  │                │
+     ▼             ▼            ▼                  ▼                ▼
+  Face crop    Physical     Suggest to       4 seasonal      Reference in
+  Body crop    features     user form         avatars         prompts
+  No-bg crop   Style DNA                   + costumes
+</code></pre>
+<hr>
+<h2>2. Character Data Structure</h2>
+<h3>Complete Character Object</h3>
+<pre><code class="language-typescript">interface Character {
+  // Identity
+  id: number;
+  name: string;
+  age: number;
+  gender: &quot;male&quot; | &quot;female&quot; | &quot;other&quot;;
+  ageCategory: string;      // Auto-calculated: &quot;toddler&quot;, &quot;young-school-age&quot;, etc.
+  apparentAge: number;      // How old they LOOK in avatar
+
+  // Photos
+  photoUrl: string;         // Original face photo (base64)
+  bodyPhotoUrl: string;     // Full body photo
+  bodyNoBgUrl: string;      // Body with transparent background
+
+  // Physical Traits
+  physical: {
+    height: string;
+    build: string;
+    eyeColor: string;
+    eyeColorHex: string;
+    hairColor: string;
+    hairColorHex: string;
+    hairLength: string;
+    hairStyle: string;
+    face: string;
+    skinTone: string;
+    skinToneHex: string;
+    facialHair: string;     // Males only
+    other: string;          // Glasses, birthmarks
+    detailedHairAnalysis: {
+      type: string;         // wavy, curly, straight
+      bangsEndAt: string;
+      direction: string;
+      lengthTop: string;
+      lengthSides: string;
+    };
+  };
+
+  // Source Tracking
+  physicalTraitsSource: {
+    build: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    eyeColor: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    hairColor: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    hairStyle: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    hairLength: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    face: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    skinTone: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    facialHair: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    other: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+    apparentAge: &#39;user&#39; | &#39;extracted&#39; | &#39;photo&#39;;
+  };
+
+  // Avatars
+  avatars: {
+    standard: string;       // Base64 image
+    winter: string;
+    summer: string;
+    formal: string;
+    costumed: {
+      [costumeType: string]: {
+        imageData: string;
+        clothing: string;
+      };
+    };
+    clothing: {
+      standard: string;     // Clothing description
+      winter: string;
+      summer: string;
+      costumed: {
+        [costumeType: string]: string;
+      };
+    };
+  };
+
+  // Styled Avatars (per art style)
+  styledAvatars: {
+    [artStyle: string]: {
+      standard: string;
+      winter: string;
+      summer: string;
+      costumed: {
+        [costumeType: string]: {
+          imageData: string;
+          clothing: string;
+        };
+      };
+    };
+  };
+
+  // Style Analysis (from photo)
+  styleAnalysis: {
+    physical: {
+      face: string;
+      hair: string;
+      build: string;
+    };
+    styleDNA: {
+      signatureColors: string[];
+      signaturePatterns: string[];
+      signatureDetails: string[];
+    };
+  };
+
+  // Personality
+  strengths: string[];
+  flaws: string[];
+  challenges: string;
+  specialDetails: string;
+  clothingStyle: string;    // Fallback clothing description
+}
+</code></pre>
+<hr>
+<h2>3. Photo Analysis</h2>
+<h3>Endpoint: <code>POST /api/characters/analyze</code></h3>
+<p>When a photo is uploaded, the server extracts:</p>
+<pre><code class="language-javascript">{
+  faceThumbnail: &quot;base64...&quot;,     // Cropped face
+  bodyCrop: &quot;base64...&quot;,          // Full body crop
+  bodyNoBg: &quot;base64...&quot;,          // Transparent background
+
+  attributes: {
+    gender: &quot;male&quot; | &quot;female&quot;,
+    age: 8,
+    height: &quot;average&quot;,
+    build: &quot;slim&quot;
+  },
+
+  styleAnalysis: {
+    physical: {
+      face: &quot;Round face, brown eyes, light skin tone, small nose&quot;,
+      hair: &quot;Medium brown, short, slightly messy, straight texture&quot;,
+      build: &quot;Slim build, appears to be around 9 years old&quot;
+    }
+  }
+}
+</code></pre>
+<h3>Style Analysis (prompts/style-analysis.txt)</h3>
+<p>Extracts detailed clothing/outfit info for Visual Bible:</p>
+<pre><code class="language-javascript">styleAnalysis: {
+  physical: { face, hair, build },
+  referenceOutfit: {
+    garmentType: &quot;casual hoodie and jeans&quot;,
+    primaryColor: &quot;blue&quot;,
+    secondaryColors: [&quot;gray&quot;, &quot;white&quot;],
+    pattern: &quot;solid&quot;,
+    fabric: &quot;cotton blend&quot;
+  },
+  styleDNA: {
+    signatureColors: [&quot;blue&quot;, &quot;gray&quot;],
+    signaturePatterns: [&quot;solid&quot;],
+    signatureDetails: [&quot;hood&quot;, &quot;drawstrings&quot;]
+  }
+}
+</code></pre>
+<hr>
+<h2>4. Avatar Generation</h2>
+<h3>Generation Flow</h3>
+<pre><code>1. Character with photo + traits created
+2. Avatar generation triggered (POST /api/avatars/generate)
+3. Generates 2x2 character sheet with 4 views
+4. Avatar evaluation extracts traits from generated image
+5. Traits merged back (respecting source tracking)
+6. Seasonal avatars generated (winter, summer, standard)
+7. Costume avatars generated if story requires
+</code></pre>
+<h3>Avatar Providers</h3>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Model</th>
+<th>Cost</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gemini</td>
+<td>2.5 Flash Image</td>
+<td>~$0.03/img</td>
+<td>Default, best prompt following</td>
+</tr>
+<tr>
+<td>Runware ACE++</td>
+<td>FLUX Fill</td>
+<td>~$0.005/img</td>
+<td>Dev mode, face-reference</td>
+</tr>
+</tbody></table>
+<h3>Prompt Templates</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>avatar-main-prompt.txt</code></td>
+<td>Gemini avatar generation (4500+ chars)</td>
+</tr>
+<tr>
+<td><code>avatar-ace-prompt.txt</code></td>
+<td>Runware ACE++ avatars (2900 char limit)</td>
+</tr>
+<tr>
+<td><code>avatar-evaluation.txt</code></td>
+<td>Extract traits from generated avatar</td>
+</tr>
+</tbody></table>
+<h3>Avatar Evaluation</h3>
+<p>After generation, Gemini analyzes the avatar to extract:</p>
+<pre><code class="language-javascript">{
+  apparentAge: 8,
+  build: &quot;slim&quot;,
+  eyeColor: &quot;brown&quot;,
+  hairColor: &quot;dark blonde&quot;,
+  hairStyle: &quot;ponytail&quot;,
+  hairLength: &quot;shoulder-length&quot;,
+  facialHair: &quot;none&quot;,        // Males only
+  skinTone: &quot;fair&quot;,
+  detailedHairAnalysis: {
+    type: &quot;wavy&quot;,
+    bangsEndAt: &quot;to eyebrows&quot;,
+    direction: &quot;part left&quot;
+  }
+}
+</code></pre>
+<h3>Styled Avatar Conversion</h3>
+<p>Convert base avatars to specific art styles while preserving identity.</p>
+<p><strong>Endpoint:</strong> <code>POST /api/avatars/convert-style</code></p>
+<p><strong>Flow:</strong></p>
+<pre><code>1. Get base avatar from character.avatars[category]
+2. Get physical traits from character.physical
+3. Build prompt with traits + target art style
+4. Call generateStyledCharacterAvatar() with reference image
+5. Store result in character.styledAvatars[artStyle][category]
+</code></pre>
+<p><strong>Key Function:</strong> <code>convertAvatarToStyle()</code> in <code>server/routes/avatars.js:440</code></p>
+<p><strong>Prompt Template:</strong> <code>prompts/styled-avatar.txt</code></p>
+<h3>Costumed Avatar Generation</h3>
+<p>Generate styled avatars with story-specific costumes.</p>
+<p><strong>Endpoint:</strong> <code>POST /api/avatars/styled-costumed</code></p>
+<p><strong>Flow:</strong></p>
+<pre><code>1. Get base avatar from character.avatars.standard
+2. Get physical traits from character.physical
+3. Get costume description from request or theme
+4. Build prompt with: traits + costume + art style
+5. Call generateStyledCostumedAvatar()
+6. Store in character.styledAvatars[artStyle].costumed[costumeType]
+</code></pre>
+<p><strong>Key Function:</strong> <code>generateStyledCostumedAvatar()</code> in <code>server/routes/avatars.js:580</code></p>
+<p><strong>Prompt Template:</strong> <code>prompts/styled-costumed-avatar.txt</code></p>
+<ul>
+<li>2x2 character sheet format</li>
+<li>Top row: face copies from reference (original style)</li>
+<li>Bottom row: full body in new style with costume</li>
+<li>Explicit instruction: NO HATS or HEAD COVERINGS (faces must be visible)</li>
+</ul>
+<h3>Avatar Data Flow</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    BASE CHARACTER                           │
+│  ┌─────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │ physical│  │  clothing   │  │        avatars          │ │
+│  │ traits  │  │ categories  │  │  standard/winter/summer │ │
+│  └────┬────┘  └──────┬──────┘  └───────────┬─────────────┘ │
+└───────┼──────────────┼─────────────────────┼───────────────┘
+        │              │                     │
+        │              │                     ▼
+        │              │         ┌───────────────────────┐
+        │              │         │  convertAvatarToStyle │
+        │              │         │  (with reference img) │
+        │              │         └───────────┬───────────┘
+        │              │                     │
+        │              │                     ▼
+        │              │         ┌───────────────────────────┐
+        │              │         │      styledAvatars        │
+        │              │         │  [artStyle][category]     │
+        │              │         └───────────┬───────────────┘
+        │              │                     │
+        │              ▼                     │
+        │    ┌─────────────────────┐         │
+        │    │ generateStyled      │         │
+        │    │ CostumedAvatar      │◄────────┘
+        │    │ (with costume desc) │
+        │    └─────────┬───────────┘
+        │              │
+        │              ▼
+        │    ┌─────────────────────────────┐
+        │    │  styledAvatars[style]       │
+        │    │  .costumed[costumeType]     │
+        │    └─────────────────────────────┘
+        │
+        └──────────────────┐
+                           ▼
+              ┌────────────────────────┐
+              │  SCENE GENERATION      │
+              │  - Reference images    │
+              │  - Physical traits     │
+              │  - Clothing from avatar│
+              └────────────────────────┘
+</code></pre>
+<p><strong>Key Design Points:</strong></p>
+<ol>
+<li><strong>Hair is in <code>physical</code> object</strong> - preserved across ALL avatar types</li>
+<li><strong>Clothing categories</strong> (standard/winter/summer) have separate base avatars</li>
+<li><strong>Costumed avatars</strong> use special <code>costumed:TYPE</code> format</li>
+<li><strong>Styled avatars</strong> are nested: <code>styledAvatars[artStyle][category]</code></li>
+<li><strong>Scene generation</strong> picks correct avatar based on story&#39;s art style + clothing/costume</li>
+</ol>
+<hr>
+<h2>5. Trait Handling &amp; Source Tracking</h2>
+<h3>Trait Categories</h3>
+<h4>1. User-Only Traits (Never Extracted by AI)</h4>
+<table>
+<thead>
+<tr>
+<th>Trait</th>
+<th>Location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td><code>character.name</code></td>
+<td>User input only</td>
+</tr>
+<tr>
+<td><code>age</code></td>
+<td><code>character.age</code></td>
+<td>User input only</td>
+</tr>
+<tr>
+<td><code>gender</code></td>
+<td><code>character.gender</code></td>
+<td>User input only</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td><code>character.physical.height</code></td>
+<td>Optional user input</td>
+</tr>
+</tbody></table>
+<h4>2. Always-Overwritten Traits</h4>
+<table>
+<thead>
+<tr>
+<th>Trait</th>
+<th>Location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>detailedHairAnalysis</code></td>
+<td><code>character.physical.detailedHairAnalysis</code></td>
+<td>Always from latest avatar</td>
+</tr>
+</tbody></table>
+<h4>3. Source-Tracked Traits</h4>
+<p>These traits respect user edits:</p>
+<table>
+<thead>
+<tr>
+<th>Trait</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>apparentAge</code></td>
+<td><code>character.apparentAge</code></td>
+</tr>
+<tr>
+<td><code>build</code></td>
+<td><code>character.physical.build</code></td>
+</tr>
+<tr>
+<td><code>eyeColor</code></td>
+<td><code>character.physical.eyeColor</code></td>
+</tr>
+<tr>
+<td><code>hairColor</code></td>
+<td><code>character.physical.hairColor</code></td>
+</tr>
+<tr>
+<td><code>hairLength</code></td>
+<td><code>character.physical.hairLength</code></td>
+</tr>
+<tr>
+<td><code>hairStyle</code></td>
+<td><code>character.physical.hairStyle</code></td>
+</tr>
+<tr>
+<td><code>face</code></td>
+<td><code>character.physical.face</code></td>
+</tr>
+<tr>
+<td><code>skinTone</code></td>
+<td><code>character.physical.skinTone</code></td>
+</tr>
+<tr>
+<td><code>facialHair</code></td>
+<td><code>character.physical.facialHair</code></td>
+</tr>
+<tr>
+<td><code>other</code></td>
+<td><code>character.physical.other</code></td>
+</tr>
+</tbody></table>
+<h3>Source Tracking Logic</h3>
+<pre><code>On Avatar Generation/Regeneration:
+
+1. User-edited traits (source === &#39;user&#39;):
+   → PRESERVED - value NOT overwritten
+   → Source remains &#39;user&#39;
+
+2. Non-user traits (source !== &#39;user&#39;):
+   → OVERWRITTEN with extracted value
+   → Source set to &#39;extracted&#39;
+
+3. Always-overwritten traits:
+   → ALWAYS replaced with latest extraction
+
+4. User-only traits (age, gender, height):
+   → NEVER touched by AI
+</code></pre>
+<h3>Hex Color Variants</h3>
+<p>Several traits have both text and hex values:</p>
+<table>
+<thead>
+<tr>
+<th>Text Trait</th>
+<th>Hex Trait</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eyeColor</code></td>
+<td><code>eyeColorHex</code></td>
+<td>Shared source tracking</td>
+</tr>
+<tr>
+<td><code>hairColor</code></td>
+<td><code>hairColorHex</code></td>
+<td>Shared source tracking</td>
+</tr>
+<tr>
+<td><code>skinTone</code></td>
+<td><code>skinToneHex</code></td>
+<td>Shared source tracking</td>
+</tr>
+</tbody></table>
+<p>Both updated together based on text trait&#39;s source.</p>
+<h3>User Edit Flow</h3>
+<p>When user edits a physical trait in CharacterForm:</p>
+<ol>
+<li>Value is updated</li>
+<li>Source is set to <code>&#39;user&#39;</code></li>
+<li>This trait preserved on future regenerations</li>
+</ol>
+<hr>
+<h2>6. Clothing System</h2>
+<h3>Clothing Categories</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Description</th>
+<th>Avatar Used</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>standard</code></td>
+<td>Everyday casual</td>
+<td><code>avatars.standard</code></td>
+</tr>
+<tr>
+<td><code>winter</code></td>
+<td>Cold weather</td>
+<td><code>avatars.winter</code></td>
+</tr>
+<tr>
+<td><code>summer</code></td>
+<td>Warm weather</td>
+<td><code>avatars.summer</code></td>
+</tr>
+<tr>
+<td><code>formal</code></td>
+<td>Dress clothes</td>
+<td><code>avatars.formal</code></td>
+</tr>
+<tr>
+<td><code>costumed:pirate</code></td>
+<td>Pirate outfit</td>
+<td><code>avatars.costumed.pirate</code></td>
+</tr>
+<tr>
+<td><code>costumed:knight</code></td>
+<td>Knight outfit</td>
+<td><code>avatars.costumed.knight</code></td>
+</tr>
+</tbody></table>
+<h3>Clothing Data Structure</h3>
+<pre><code class="language-typescript">avatars: {
+  // Seasonal avatars (images)
+  standard: &quot;base64...&quot;,
+  winter: &quot;base64...&quot;,
+  summer: &quot;base64...&quot;,
+
+  // Costumed avatars
+  costumed: {
+    pirate: {
+      imageData: &quot;base64...&quot;,
+      clothing: &quot;striped vest, brown pants, red bandana&quot;
+    },
+    knight: {
+      imageData: &quot;base64...&quot;,
+      clothing: &quot;silver armor, blue cape, leather boots&quot;
+    }
+  },
+
+  // Clothing descriptions per category
+  clothing: {
+    standard: &quot;blue t-shirt, jeans&quot;,
+    winter: &quot;red parka, dark jeans, snow boots&quot;,
+    summer: &quot;yellow sundress, sandals&quot;,
+    costumed: {
+      pirate: &quot;striped vest, brown pants, red bandana&quot;,
+      knight: &quot;silver armor, blue cape&quot;
+    }
+  }
+}
+</code></pre>
+<h3>Clothing Selection Flow</h3>
+<pre><code>Scene Description → Parse Clothing Category → Select Avatar → Build Prompt
+
+1. Scene specifies: &quot;Clothing: winter&quot;
+2. parseClothingCategory() extracts &quot;winter&quot;
+3. getCharacterPhotoDetails() returns:
+   - Photo: avatars.winter (or fallback)
+   - Clothing: avatars.clothing.winter
+4. Prompt includes: &quot;Wearing: red parka, dark jeans, snow boots&quot;
+</code></pre>
+<h3>Per-Character Clothing</h3>
+<p>Different characters can wear different outfits in same scene:</p>
+<pre><code>Scene hint:
+Characters:
+- Roger: summer
+- Sophie: costumed:pirate
+
+Result in prompt:
+Roger: summer avatar + &quot;yellow t-shirt, khaki shorts&quot;
+Sophie: pirate avatar + &quot;striped shirt, brown pants, red bandana&quot;
+</code></pre>
+<h3>Visual Bible Clothing Items</h3>
+<p>Visual Bible clothing entries (CLO001, etc.) are <strong>accessories and special items</strong> - NOT main outfits:</p>
+<table>
+<thead>
+<tr>
+<th>Purpose</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Special items</td>
+<td>Capes, masks, hats, magic wands</td>
+</tr>
+<tr>
+<td>Context-dependent</td>
+<td>May be worn, held, or lying on surface</td>
+</tr>
+<tr>
+<td>Scene-determined</td>
+<td>How item appears depends on scene description</td>
+</tr>
+</tbody></table>
+<p><strong>Why VB clothing is NOT merged into character &quot;Wearing:&quot;</strong></p>
+<ol>
+<li>Avatars cannot have masks/helmets - faces must stay visible</li>
+<li>Scene context matters - item might be held, found, or worn</li>
+<li>The <code>wornBy</code> field indicates ownership, not always-wearing</li>
+</ol>
+<hr>
+<h2>7. Styled Avatar Pipeline</h2>
+<p>This section documents the core functions that prepare and convert avatars during story generation.</p>
+<h3>Pipeline Overview</h3>
+<pre><code>Story Generation Start
+    │
+    ├─ Parse Outline → Extract clothingRequirements
+    │   { &quot;CharName&quot;: { &quot;standard&quot;: {used:true}, &quot;costumed&quot;: {costume:&quot;pirate&quot;, used:true} } }
+    │
+    ├─ collectAvatarRequirements() → Build page requirements
+    │   [{ pageNumber: 1, clothingCategory: &quot;standard&quot;, characterNames: [&quot;Roger&quot;] }]
+    │
+    ├─ prepareStyledAvatars() → Convert all needed avatars in parallel
+    │   ├─ getOrCreateStyledAvatar() → Check cache, start conversion
+    │   │   └─ convertAvatarToStyle() → Call Gemini API
+    │   └─ generateStyledCostumedAvatar() → On-demand costume generation
+    │
+    └─ Image Generation → Use cached styled avatars
+        └─ getCharacterPhotoDetails() → Select correct avatar per scene
+</code></pre>
+<h3>Core Functions</h3>
+<h4><code>collectAvatarRequirements()</code> (styledAvatars.js)</h4>
+<p><strong>Purpose:</strong> Transform per-character clothing requirements into per-page avatar requirements.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">function collectAvatarRequirements(
+  sceneDescriptions,      // Array of scene objects
+  characters,             // Array of character objects
+  pageClothing,          // Map of { pageNum: clothingCategory }
+  defaultClothing,       // Fallback: &#39;standard&#39;
+  clothingRequirements   // Per-character from outline (OPTIONAL)
+)
+</code></pre>
+<p><strong>Returns:</strong> Array of <code>{ pageNumber, clothingCategory, characterNames }</code></p>
+<p><strong>Used by:</strong> <code>server.js</code> (unified, picture book, outline &amp; text modes)</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Includes fuzzy matching for typos (&quot;sommer&quot; → &quot;summer&quot;, &quot;COSTUUM&quot; → &quot;costumed&quot;)</li>
+<li>Adds cover requirements for all character clothing variations</li>
+</ul>
+<hr>
+<h4><code>prepareStyledAvatars()</code> (styledAvatars.js)</h4>
+<p><strong>Purpose:</strong> Convert all needed avatars to target art style in parallel before image generation.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function prepareStyledAvatars(
+  characters,            // Array of character objects
+  artStyle,             // Target art style (&quot;pixar&quot;, &quot;watercolor&quot;, etc.)
+  pageRequirements,     // Output from collectAvatarRequirements()
+  clothingRequirements, // Per-character requirements (OPTIONAL)
+  addUsage              // Usage tracking callback (OPTIONAL)
+)
+</code></pre>
+<p><strong>Returns:</strong> Populated <code>styledAvatarCache</code> (Map)</p>
+<p><strong>Used by:</strong> <code>server.js</code> at three locations:</p>
+<ul>
+<li>Line ~7120 (unified mode)</li>
+<li>Line ~8681 (outline &amp; text mode - pre-cover)</li>
+<li>Line ~8712 (outline &amp; text mode - main)</li>
+</ul>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Skips conversion if <code>artStyle === &#39;realistic&#39;</code></li>
+<li>Handles on-demand costumed avatar generation if not pre-generated</li>
+<li>Uses promise-based locking to prevent duplicate API calls</li>
+</ul>
+<hr>
+<h4><code>getOrCreateStyledAvatar()</code> (styledAvatars.js)</h4>
+<p><strong>Purpose:</strong> Check cache and start conversion if needed, with deduplication.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function getOrCreateStyledAvatar(
+  characterName,
+  clothingCategory,      // &quot;standard&quot;, &quot;winter&quot;, &quot;costumed:pirate&quot;
+  artStyle,
+  originalAvatar,        // Base64 image (body/clothing reference)
+  facePhoto,            // High-res face for identity (OPTIONAL)
+  clothingDescription,  // Text description (OPTIONAL)
+  addUsage,             // Usage tracking (OPTIONAL)
+  character             // Full character object (OPTIONAL)
+)
+</code></pre>
+<p><strong>Returns:</strong> Base64 styled avatar image</p>
+<p><strong>Cache Key Format:</strong> <code>${charName.toLowerCase()}_${clothingCategory}_${artStyle}</code></p>
+<p><strong>Used by:</strong> <code>prepareStyledAvatars()</code> internally</p>
+<hr>
+<h4><code>convertAvatarToStyle()</code> (styledAvatars.js)</h4>
+<p><strong>Purpose:</strong> Single avatar conversion via Gemini 2.5 Flash Image API.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function convertAvatarToStyle(
+  originalAvatar,       // Base64 avatar (body/clothing reference)
+  artStyle,            // Target style ID
+  characterName,       // For logging
+  facePhoto,           // High-res face (OPTIONAL)
+  clothingDescription, // Text description (OPTIONAL)
+  clothingCategory,    // For logging
+  addUsage,            // Usage tracking (OPTIONAL)
+  character            // For physical traits (OPTIONAL)
+)
+</code></pre>
+<p><strong>Returns:</strong> Base64 styled avatar (downsized to 512px)</p>
+<p><strong>Reference Images Sent to API:</strong></p>
+<ol>
+<li><code>facePhoto</code> (if provided) - identity preservation</li>
+<li><code>originalAvatar</code> - body/clothing reference</li>
+<li><code>styleSample</code> - art style reference image</li>
+</ol>
+<p><strong>Prompt Template:</strong> <code>prompts/styled-costumed-avatar.txt</code></p>
+<p><strong>Used by:</strong> <code>getOrCreateStyledAvatar()</code> internally</p>
+<hr>
+<h4><code>generateStyledCostumedAvatar()</code> (avatars.js)</h4>
+<p><strong>Purpose:</strong> Generate costumed avatar combining costume + art style in single API call.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function generateStyledCostumedAvatar(
+  character,  // Character object with avatars, photos, physical traits
+  config,     // { costume: string, description: string }
+  artStyle    // Target art style
+)
+</code></pre>
+<p><strong>Returns:</strong> <code>{ success, imageData, clothing, costumeType, artStyle }</code></p>
+<p><strong>Used by:</strong></p>
+<ul>
+<li><code>prepareStyledAvatars()</code> - on-demand when costumed avatar missing</li>
+<li><code>storyAvatarGeneration.js</code> - explicit costume generation</li>
+</ul>
+<hr>
+<h4><code>generateStyledAvatarWithSignature()</code> (avatars.js)</h4>
+<p><strong>Purpose:</strong> Generate styled avatar with signature items (cape, accessory, etc.).</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function generateStyledAvatarWithSignature(
+  character,  // Character object
+  category,   // &quot;standard&quot;, &quot;winter&quot;, or &quot;summer&quot;
+  config,     // { signature?: string }
+  artStyle    // Target art style
+)
+</code></pre>
+<p><strong>Returns:</strong> <code>{ success, imageData, clothing, category, signature, artStyle }</code></p>
+<p><strong>Used by:</strong> <code>storyAvatarGeneration.js</code> - when signature items specified</p>
+<hr>
+<h4><code>generateDynamicAvatar()</code> (avatars.js)</h4>
+<p><strong>Purpose:</strong> Generate avatar on-demand as fallback when pre-generated avatar missing.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">async function generateDynamicAvatar(
+  character,  // Character object with photoUrl
+  category,   // &quot;standard&quot;, &quot;winter&quot;, &quot;summer&quot;, or &quot;costumed&quot;
+  config      // { signature?, costume?, description? }
+)
+</code></pre>
+<p><strong>Returns:</strong> <code>{ success, imageData, clothing, costumeType? }</code></p>
+<p><strong>Used by:</strong> <code>storyAvatarGeneration.js</code> - fallback generation</p>
+<hr>
+<h3>Helper Functions</h3>
+<h4><code>getCharacterPhotoDetails()</code> (storyHelpers.js)</h4>
+<p><strong>Purpose:</strong> Select appropriate avatar for each character based on clothing category.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-javascript">function getCharacterPhotoDetails(
+  characters,
+  clothingCategory,      // Default clothing
+  costumeType,          // For &quot;costumed&quot; category
+  artStyle,             // Look for styled avatars first
+  clothingRequirements  // Per-character overrides
+)
+</code></pre>
+<p><strong>Fallback Priority:</strong></p>
+<ul>
+<li>winter: standard → summer</li>
+<li>summer: standard → winter</li>
+<li>costumed: standard</li>
+</ul>
+<p><strong>Used by:</strong> Image generation phase in <code>server.js</code></p>
+<hr>
+<h4><code>parseClothingCategory()</code> (storyHelpers.js)</h4>
+<p><strong>Purpose:</strong> Extract clothing category from scene description text.</p>
+<p><strong>Logic:</strong></p>
+<ol>
+<li>Check JSON metadata first (<code>metadata.clothing</code>)</li>
+<li>Pattern match: <code>**Clothing:** winter</code></li>
+<li>Fuzzy match keywords within 100 chars</li>
+</ol>
+<p><strong>Used by:</strong> <code>collectAvatarRequirements()</code> internally</p>
+<hr>
+<h3>Cache Management</h3>
+<h4><code>styledAvatarCache</code> (Map)</h4>
+<ul>
+<li>In-memory cache of converted avatars</li>
+<li>Key: <code>${charName}_${category}_${artStyle}</code></li>
+<li>Cleared between stories via <code>clearStyledAvatarCache()</code></li>
+</ul>
+<h4><code>conversionInProgress</code> (Map)</h4>
+<ul>
+<li>Tracks ongoing conversions to prevent duplicates</li>
+<li>Key: same as cache key</li>
+<li>Value: Promise that resolves to styled avatar</li>
+</ul>
+<h4><code>getStyledAvatarCacheStats()</code> (exported but unused)</h4>
+<ul>
+<li>Returns <code>{ size, inProgress }</code> for debugging</li>
+</ul>
+<hr>
+<h3>Function Status</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>collectAvatarRequirements</code></td>
+<td><strong>Active</strong></td>
+<td>Core pipeline</td>
+</tr>
+<tr>
+<td><code>prepareStyledAvatars</code></td>
+<td><strong>Active</strong></td>
+<td>Core pipeline</td>
+</tr>
+<tr>
+<td><code>getOrCreateStyledAvatar</code></td>
+<td><strong>Active</strong></td>
+<td>Internal to prepareStyledAvatars</td>
+</tr>
+<tr>
+<td><code>convertAvatarToStyle</code></td>
+<td><strong>Active</strong></td>
+<td>Core conversion</td>
+</tr>
+<tr>
+<td><code>generateStyledCostumedAvatar</code></td>
+<td><strong>Active</strong></td>
+<td>On-demand costume generation</td>
+</tr>
+<tr>
+<td><code>generateStyledAvatarWithSignature</code></td>
+<td><strong>Active</strong></td>
+<td>Signature item generation</td>
+</tr>
+<tr>
+<td><code>generateDynamicAvatar</code></td>
+<td><strong>Active</strong></td>
+<td>Fallback generation</td>
+</tr>
+<tr>
+<td><code>getCharacterPhotoDetails</code></td>
+<td><strong>Active</strong></td>
+<td>Avatar selection</td>
+</tr>
+<tr>
+<td><code>parseClothingCategory</code></td>
+<td><strong>Active</strong></td>
+<td>Scene parsing</td>
+</tr>
+<tr>
+<td><code>getStyledAvatarCacheStats</code></td>
+<td><strong>Unused</strong></td>
+<td>Debug utility, never called</td>
+</tr>
+</tbody></table>
+<hr>
+<h3>Known Issues</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Severity</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Case sensitivity</td>
+<td>Medium</td>
+<td>Character name matching uses <code>.toLowerCase()</code> inconsistently</td>
+</tr>
+<tr>
+<td>Silent failures</td>
+<td>Medium</td>
+<td>On-demand costumed generation logs warning but continues</td>
+</tr>
+<tr>
+<td>Physical traits optional</td>
+<td>Medium</td>
+<td><code>character</code> param optional but needed for trait consistency</td>
+</tr>
+<tr>
+<td>Fuzzy matching</td>
+<td>Low</td>
+<td>50% similarity threshold may match wrong clothing</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Character Consistency</h2>
+<h3>Main Characters</h3>
+<p>Main characters have strong consistency through:</p>
+<ul>
+<li>Reference photos passed to every image generation</li>
+<li>Physical descriptions included in every prompt</li>
+<li>Style DNA (signature colors, patterns)</li>
+<li>Visual Bible entries</li>
+</ul>
+<h3>Secondary Characters</h3>
+<p>Secondary characters (introduced by AI) use:</p>
+<ul>
+<li>Character Bible generated during outline</li>
+<li>Extracted descriptions after first appearance</li>
+<li>Visual Bible entries with page appearances</li>
+</ul>
+<h3>Hair Description Building</h3>
+<pre><code class="language-javascript">buildHairDescription(character):
+  Output: &quot;dark blonde, ponytail, shoulder-length, bangs to eyebrows&quot;
+
+  Priority order:
+  1. hairColor (always first)
+  2. User-edited hairStyle &gt; detailedHairAnalysis.type &gt; extracted hairStyle
+  3. hairLength (or detailed analysis)
+  4. Bangs from detailed analysis
+  5. Direction (if specific)
+</code></pre>
+<h3>Physical Description in Prompts</h3>
+<pre><code>**CHARACTER REFERENCE PHOTOS (in order):**
+1. Roger, Looks: adult, 45 years old, man, Build: athletic. Eyes: brown.
+   Hair: dark blonde, ponytail, shoulder-length. Facial hair: clean-shaven.
+   Wearing: blue winter jacket, dark jeans
+2. Sophie, Looks: young-school-age, 7 years old, girl, Build: slim.
+   Eyes: blue. Hair: blonde, wavy, long.
+   Wearing: pink sweater, purple leggings
+
+HEIGHT ORDER: Sophie (shortest) -&gt; Roger (much taller)
+</code></pre>
+<h3>Filtering Rules</h3>
+<ul>
+<li><strong>&quot;none&quot; values</strong>: Filtered out for <code>other</code> and <code>facialHair</code></li>
+<li><strong>User edits</strong>: <code>hairStyle</code> respects user-edited values over AI-extracted</li>
+<li><strong>Males only</strong>: <code>facialHair</code> only included for <code>gender === &#39;male&#39;</code></li>
+</ul>
+<hr>
+<h2>9. Code Locations</h2>
+<h3>Frontend</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>client/src/types/character.ts</code></td>
+<td>Type definitions</td>
+</tr>
+<tr>
+<td><code>client/src/services/characterService.ts</code></td>
+<td>API calls, trait extraction</td>
+</tr>
+<tr>
+<td><code>client/src/pages/StoryWizard.tsx</code></td>
+<td>Trait merging on avatar generation</td>
+</tr>
+<tr>
+<td><code>client/src/components/character/CharacterForm.tsx</code></td>
+<td>User edit handling</td>
+</tr>
+</tbody></table>
+<h3>Backend</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server/routes/avatars.js</code></td>
+<td>Avatar generation endpoints, costumed/signature generation</td>
+</tr>
+<tr>
+<td><code>server/routes/characters.js</code></td>
+<td>Character CRUD</td>
+</tr>
+<tr>
+<td><code>server/lib/styledAvatars.js</code></td>
+<td>Style conversion pipeline, caching, avatar collection</td>
+</tr>
+<tr>
+<td><code>server/lib/storyAvatarGeneration.js</code></td>
+<td>Story avatar orchestration</td>
+</tr>
+<tr>
+<td><code>server/lib/storyHelpers.js</code></td>
+<td>Physical description building, clothing parsing</td>
+</tr>
+<tr>
+<td><code>server/lib/visualBible.js</code></td>
+<td>Visual Bible management</td>
+</tr>
+</tbody></table>
+<h3>Key Functions</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>collectAvatarRequirements()</code></td>
+<td>styledAvatars.js:~900</td>
+<td>Build per-page avatar requirements</td>
+</tr>
+<tr>
+<td><code>prepareStyledAvatars()</code></td>
+<td>styledAvatars.js:~410</td>
+<td>Convert avatars to art style in parallel</td>
+</tr>
+<tr>
+<td><code>getOrCreateStyledAvatar()</code></td>
+<td>styledAvatars.js:~366</td>
+<td>Cache check + conversion with dedup</td>
+</tr>
+<tr>
+<td><code>convertAvatarToStyle()</code></td>
+<td>styledAvatars.js:~191</td>
+<td>Single avatar conversion via Gemini</td>
+</tr>
+<tr>
+<td><code>generateStyledCostumedAvatar()</code></td>
+<td>avatars.js:~970</td>
+<td>Costume + style in one API call</td>
+</tr>
+<tr>
+<td><code>generateStyledAvatarWithSignature()</code></td>
+<td>avatars.js:~1223</td>
+<td>Signature items with style</td>
+</tr>
+<tr>
+<td><code>generateDynamicAvatar()</code></td>
+<td>avatars.js:~701</td>
+<td>On-demand fallback generation</td>
+</tr>
+<tr>
+<td><code>getCharacterPhotoDetails()</code></td>
+<td>storyHelpers.js:~1129</td>
+<td>Select avatar by clothing category</td>
+</tr>
+<tr>
+<td><code>parseClothingCategory()</code></td>
+<td>storyHelpers.js:~941</td>
+<td>Extract clothing from scene</td>
+</tr>
+<tr>
+<td><code>buildHairDescription()</code></td>
+<td>storyHelpers.js:~50</td>
+<td>Build hair description</td>
+</tr>
+<tr>
+<td><code>buildCharacterPhysicalDescription()</code></td>
+<td>storyHelpers.js:~942</td>
+<td>Full physical description</td>
+</tr>
+<tr>
+<td><code>buildCharacterReferenceList()</code></td>
+<td>storyHelpers.js:~1060</td>
+<td>Character list for prompts</td>
+</tr>
+<tr>
+<td><code>mergeTraitsWithSourceTracking()</code></td>
+<td>StoryWizard.tsx:~1816</td>
+<td>Merge extracted traits</td>
+</tr>
+</tbody></table>
+<h3>Prompt Templates</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>prompts/avatar-main-prompt.txt</code></td>
+<td>Gemini avatar generation</td>
+</tr>
+<tr>
+<td><code>prompts/avatar-ace-prompt.txt</code></td>
+<td>ACE++ avatar generation</td>
+</tr>
+<tr>
+<td><code>prompts/avatar-evaluation.txt</code></td>
+<td>Extract traits from avatar</td>
+</tr>
+<tr>
+<td><code>prompts/styled-costumed-avatar.txt</code></td>
+<td>Style conversion with costume/clothing</td>
+</tr>
+<tr>
+<td><code>prompts/character-analysis.txt</code></td>
+<td>Initial photo analysis</td>
+</tr>
+<tr>
+<td><code>prompts/style-analysis.txt</code></td>
+<td>Style DNA extraction</td>
+</tr>
+</tbody></table>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>CHARACTER-SYSTEM.md</code>.
+</footer>
+</body>
+</html>

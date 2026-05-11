@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>code-review-2026-04-12.html</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root {
+    --fg: #1f2328;
+    --bg: #ffffff;
+    --muted: #59636e;
+    --border: #d1d9e0;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0969da;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: var(--muted); }
+  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 85%;
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
+  blockquote {
+    border-left: 4px solid var(--border);
+    color: var(--muted);
+    padding: 0 1em;
+    margin: 0 0 16px;
+  }
+  ul, ol { padding-left: 2em; }
+  li { margin: 0.25em 0; }
+  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 6px 13px; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  img { max-width: 100%; height: auto; }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+</head>
+<body>
+<main>
+<h1>Code Review — April 12, 2026</h1>
+<p>Systematic review of all recently-added features. Bugs only — no style or improvement suggestions.</p>
+<h2>Critical Bugs</h2>
+<h3>1. PDF text overlay crashes when textRect.imgHeight is missing</h3>
+<p><strong>File</strong>: <code>server/lib/pdf.js:458</code>
+<strong>Impact</strong>: <code>scaleY = imageHeight / undefined = NaN</code>. All Y coordinates become NaN. PDFKit crashes or produces a corrupt page. Affects stories processed before textRect was fully populated, or any migration gap.
+<strong>Fix</strong>: Add <code>&amp;&amp; textRect.imgHeight</code> to the guard:</p>
+<pre><code class="language-js">if (textRect &amp;&amp; textRect.w &gt; 0 &amp;&amp; textRect.h &gt; 0 &amp;&amp; textRect.imgWidth &amp;&amp; textRect.imgHeight) {
+</code></pre>
+<h3>2. Text region bounding box produces negative dimensions</h3>
+<p><strong>File</strong>: <code>server/lib/textRegion.js:167-187</code>
+<strong>Impact</strong>: When <code>washCoverage &gt;= 5%</code> but no pixel passes the separate <code>threshold</code> check (threshold=34 vs coverage check=30), the bbox stays at init values: <code>minX=width, maxX=0</code> → rect has negative w/h. Any sharp operation with this rect crashes.
+<strong>Fix</strong>: Guard the rect before returning:</p>
+<pre><code class="language-js">if (maxX &lt; minX || maxY &lt; minY) {
+  return { imageData, position: preferredPosition, rect: null, score: 0, overridden: false };
+}
+</code></pre>
+<h2>Major Bugs</h2>
+<h3>3. SVG label crash on special characters in VB grid</h3>
+<p><strong>File</strong>: <code>server/lib/images.js:10603</code> (single-element) and <code>:10651</code> (multi-element)
+<strong>Impact</strong>: Character names with <code>&amp;</code>, <code>&lt;</code>, or <code>&gt;</code> (e.g. &quot;Tom &amp; Jerry&quot;) produce malformed SVG. Sharp&#39;s SVG parser fails, <code>buildVisualBibleGrid</code> returns null. Entity consistency proceeds without a VB grid — consistency checking degraded. The fallback from single-element to multi-element has the same bug.
+<strong>Fix</strong>: Escape XML before interpolation:</p>
+<pre><code class="language-js">const escapeXml = s =&gt; s.replace(/&amp;/g, &#39;&amp;amp;&#39;).replace(/&lt;/g, &#39;&amp;lt;&#39;).replace(/&gt;/g, &#39;&amp;gt;&#39;);
+</code></pre>
+<h3>4. SharedStoryViewer page turn is flat (no 3D depth) on story pages</h3>
+<p><strong>File</strong>: <code>client/src/pages/SharedStoryViewer.tsx:647-652</code>
+<strong>Impact</strong>: <code>perspective: &#39;2000px&#39;</code> is on the same element that has the <code>animation</code>. CSS requires <code>perspective</code> on the PARENT of the rotating element. Story pages turn as a flat 2D horizontal shrink. The initialPage turn works correctly because perspective is on the parent container.
+<strong>Fix</strong>: Add an inner wrapper div for the animation, keep perspective on the outer div.</p>
+<h3>5. PDF overlay height re-expansion can push past clamped bounds</h3>
+<p><strong>File</strong>: <code>server/lib/pdf.js:497</code>
+<strong>Impact</strong>: When textRect is near the bottom of the page AND text is long, <code>Math.max</code> re-expands <code>overlayH</code> past the bottom clamp enforced at line 474. Text/gradient spills below the printable area.
+<strong>Fix</strong>: Re-apply bottom clamp after the Math.max:</p>
+<pre><code class="language-js">const maxH = bleed + pageHeight - borderInset - overlayY;
+if (overlayH &gt; maxH) overlayH = Math.max(0, maxH);
+</code></pre>
+<h3>6. Admin JWT sent to public unauthenticated endpoint</h3>
+<p><strong>File</strong>: <code>client/src/pages/TrialWizard.tsx:368</code>, <code>client/src/pages/trial/TrialCharacterStep.tsx:308</code>
+<strong>Impact</strong>: The admin&#39;s full auth JWT is sent in the POST body to <code>/api/trial/create-anonymous-account</code> — a public endpoint with no prior auth. If logs capture request bodies, the admin JWT is exposed. Browser devtools also show it.
+<strong>Fix</strong>: Use a short-lived HMAC token (<code>&quot;trial-bypass:&quot; + timestamp</code>, 5-minute TTL) instead of the primary auth token.</p>
+<h3>7. TOCTOU in referral discount — buyer can get double discount</h3>
+<p><strong>File</strong>: <code>server/routes/print.js:1601</code> + <code>server.js:907</code>
+<strong>Impact</strong>: <code>validateReferralCodeForUser</code> checks <code>referred_by IS NULL</code> at checkout creation. If buyer opens two tabs simultaneously, both pass validation, both Stripe sessions get the discount baked in, and both payments complete at the reduced price. The webhook&#39;s <code>referred_by</code> lock only prevents double CREDIT GRANT — but both sessions already have the reduced amount. Buyer pays CHF 10 less on one extra order.
+<strong>Note</strong>: Low real-world risk (requires deliberate parallel checkout), but a real financial loss path.</p>
+<h3>8. PDF X-axis scaling uses pageWidth but image fills interiorW (includes bleed)</h3>
+<p><strong>File</strong>: <code>server/lib/pdf.js:460</code>
+<strong>Impact</strong>: <code>scaleX = pageWidth / textRect.imgWidth</code> but the image is drawn covering <code>interiorW = pageWidth + 2*bleed</code>. Text overlay X positions are shifted left by up to <code>bleed * 2 * scaleX</code> for rects on the right side. On A4 with 3mm bleed, this is ~2mm shift — visible but subtle.
+<strong>Fix</strong>: Use <code>(pageWidth + 2 * bleed) / textRect.imgWidth</code> for scaleX, and same for scaleY.</p>
+<h2>Minor Bugs</h2>
+<h3>9. Cascade face merge distance metric mixes scales</h3>
+<p><strong>File</strong>: <code>server/lib/entityConsistency.js:119-120</code>
+<strong>Impact</strong>: <code>dx</code> is in body-widths, <code>dy</code> is in normalized image coords (0-1). Combined metric can cause wrong face matched to wrong figure in crowded scenes with close horizontal spacing.</p>
+<h3>10. Lazy referral code generation: concurrent 500 errors</h3>
+<p><strong>File</strong>: <code>server/routes/print.js:1480-1494</code>
+<strong>Impact</strong>: Two concurrent requests to <code>GET /referral/my-code</code> for the same user — both try to generate, one hits unique constraint 10 times, returns 500 instead of reading the code the other request wrote. The re-read at line 1493 only runs after a successful break, not after exhausting retries.
+<strong>Fix</strong>: After the loop, unconditionally re-read from DB.</p>
+<h3>11. BookBuilder promo input visible when canUsePromo loading</h3>
+<p><strong>File</strong>: <code>client/src/pages/BookBuilder.tsx</code>
+<strong>Impact</strong>: <code>canUsePromo</code> defaults to <code>true</code> on error (per earlier fix). During the initial API call, it&#39;s <code>null</code> (loading). The guard <code>canUsePromo &amp;&amp; ...</code> treats null as falsy — field is hidden during load, then appears. Slight layout jump.</p>
+<h2>Not Bugs (Investigated and cleared)</h2>
+<ul>
+<li><code>sharp.composite</code> with JPEG buffer on <code>create:</code> canvas — valid, auto-detected from magic bytes</li>
+<li><code>Buffer.rawElements</code> property — valid in Node.js, intentional design pattern</li>
+<li>Backward navigation skipping <code>toHasPanel</code> — intentional instant navigation</li>
+<li><code>sharp.blur(0.3)</code> minimum — on the edge but valid per sharp docs</li>
+</ul>
+
+</main>
+<footer class="doc-footer">
+  Rendered from <code>code-review-2026-04-12.md</code>.
+</footer>
+</body>
+</html>
