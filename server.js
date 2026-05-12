@@ -520,27 +520,38 @@ if (STORAGE_MODE === 'database') {
 }
 
 // Middleware
-// Configure CORS to allow requests from your domains
+// Configure CORS to allow requests from your domains.
+// Allowed list = hardcoded baseline (prod + local dev) + anything in the
+// CORS_ORIGINS env var (comma-separated). Staging adds its own domain via
+// CORS_ORIGINS so no code change is needed when spinning up new environments.
+const ENV_CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const BASE_ALLOWED_ORIGINS = [
+  'http://localhost:8000',
+  'http://localhost:3000',
+  'http://localhost:5173',  // Vite dev server
+  'http://localhost:5174',  // Vite dev server (alternate port)
+  'http://localhost:5175',  // Vite dev server (alternate port)
+  'http://127.0.0.1:8000',
+  'http://127.0.0.1:5173',
+  'https://www.magicalstory.ch',
+  'https://magicalstory.ch',
+];
+
+const ALLOWED_ORIGINS = [...BASE_ALLOWED_ORIGINS, ...ENV_CORS_ORIGINS];
+log.info(`🔒 CORS allowed origins: ${ALLOWED_ORIGINS.join(', ')}`);
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = [
-      'http://localhost:8000',
-      'http://localhost:3000',
-      'http://localhost:5173',  // Vite dev server
-      'http://localhost:5174',  // Vite dev server (alternate port)
-      'http://localhost:5175',  // Vite dev server (alternate port)
-      'http://127.0.0.1:8000',
-      'http://127.0.0.1:5173',
-      'https://www.magicalstory.ch',
-      'https://magicalstory.ch'
-    ];
-
     // Also allow any Railway.app domain (strict suffix check to prevent spoofing)
     const isRailway = origin.endsWith('.railway.app') || origin === 'https://railway.app';
-    if (isRailway || allowedOrigins.includes(origin)) {
+    if (isRailway || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       log.warn('⚠️  CORS blocked origin:', origin);
