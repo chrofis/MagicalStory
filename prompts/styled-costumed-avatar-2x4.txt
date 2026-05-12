@@ -1,0 +1,12 @@
+Create a reference sheet showing the SAME person in 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. Light grey studio background.
+
+Row 1 (top) — face only (forehead to chin), in the ORIGINAL reference photo's style. No shoulders, no clothing visible.
+  Panel 1: face front. Panel 2: face turned 45° to camera's right. Panel 3: face profile (90° right). Panel 4: back of head.
+
+Row 2 (bottom) — full body from head to feet, in {ART_STYLE_PROMPT} style, wearing {COSTUME_DESCRIPTION}. Plain light-grey background, figure standing.
+  Panel 5: full body front. Panel 6: full body turned 45° right. Panel 7: full body side profile (90° right). Panel 8: full body back view (180°).
+
+Same person in every panel. Hair colour matches the reference photo exactly. If the reference person wears glasses, include glasses in all 8 panels; if not, none. Body proportions match the age below.
+
+PHYSICAL TRAITS TO PRESERVE:
+{PHYSICAL_TRAITS}

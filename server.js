@@ -5114,6 +5114,44 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       // Phase 5a continued: Generate ALL images (no evaluation)
+      // ── Scene composite — cast builder ──────────────────────────────────
+      // For each character on the page, locate their pre-rendered 2×4 sheet
+      // (stored on the character record as `avatars.sheet2x4_<costume>`).
+      // Returns null if any cast character lacks a sheet — the caller then
+      // falls through to the legacy direct-prompt path.
+      const buildCompositeCast = async (pageData, inputData) => {
+        const sceneChars = pageData.sceneCharacters || pageData.scene?.outlineCharacters || [];
+        if (!sceneChars.length) return null;
+        const out = [];
+        for (const sc of sceneChars) {
+          const name = sc.name || sc;
+          const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
+          if (!character) return null;
+          const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
+          const sheetField = `sheet2x4_${clothing.replace(/[^a-z0-9]/gi, '_')}`;
+          const sheetData = character.avatars?.[sheetField] || character.avatars?.sheet2x4_standard;
+          if (!sheetData) return null;
+          const sheetUri = typeof sheetData === 'string' ? sheetData : sheetData.data || sheetData.imageData;
+          if (!sheetUri || !sheetUri.startsWith('data:')) return null;
+          const sheetBuf = Buffer.from(sheetUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          // Pose + flip — Sonnet's outline emits these alongside position/perspective.
+          // Until the schema lands, fall back to 'threeQuarter' + flip=false.
+          const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+            ? sc.pose : 'threeQuarter';
+          const flip = sc.flip === true;
+          out.push({
+            name,
+            sheetBuf,
+            pose,
+            flip,
+            description: sc.description || character.description || name,
+            position: sc.position || 'in the scene',
+            sizeHint: sc.depth === 'background' ? 'small in the distance' : (sc.depth === 'midground' ? 'medium' : undefined),
+          });
+        }
+        return out;
+      };
+
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();
       const genLimit = pLimit(50);
@@ -5157,6 +5195,60 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           try {
+            // ── Scene composite gate ─────────────────────────────────────
+            // When MODEL_DEFAULTS.enableSceneComposite is true AND every
+            // cast character on this page has a pre-rendered 2×4 sheet,
+            // route through server/lib/sceneComposite.js (3 Grok calls,
+            // colour-silhouette blocking + character cut-in + blend).
+            // Otherwise fall through to the legacy direct-prompt path.
+            // See docs/SCENE-COMPOSITE-PIPELINE.html.
+            const compositeEnabled = MODEL_DEFAULTS.enableSceneComposite === true
+              && inputData?.composite !== false;
+            if (compositeEnabled) {
+              try {
+                const { generateSceneComposite } = require('./server/lib/sceneComposite');
+                const compositeCast = await buildCompositeCast(pageData, inputData);
+                if (compositeCast && compositeCast.length > 0) {
+                  log.info(`[SCENE COMPOSITE] P${pageData.pageNumber}: routing through composite path (${compositeCast.length} cast)`);
+                  const compResult = await generateSceneComposite({
+                    cleanBackgroundPrompt: pageData.scene?.emptyScenePrompt
+                      || pageData.scene?.sceneDescription
+                      || pageData.prompt,
+                    scene: {
+                      description: pageData.scene?.sceneDescription || '',
+                      action: pageData.scene?.text || '',
+                    },
+                    cast: compositeCast,
+                    aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                    usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
+                  });
+                  return {
+                    pageNumber: pageData.pageNumber,
+                    imageData: compResult.imageData,
+                    modelId: 'scene-composite',
+                    thinkingText: null,
+                    usage: compResult.usage,
+                    prompt: pageData.prompt,
+                    characterPhotos: pageData.characterPhotos,
+                    landmarkPhotos: pageData.landmarkPhotos,
+                    visualBibleGrid: pageData.visualBibleGrid,
+                    grokRefImages: null,
+                    emptySceneImage: null,
+                    emptyScenePrompt: pageData.scene?.emptyScenePrompt || null,
+                    sceneDescription: pageData.scene?.sceneDescription,
+                    text: pageData.scene?.text,
+                    sceneCharacters: pageData.sceneCharacters,
+                    sceneMetadata: pageData.sceneMetadata,
+                    perCharClothing: pageData.perCharClothing,
+                    scene: pageData.scene,
+                    compositeDebug: compResult.debug,
+                  };
+                }
+                log.info(`[SCENE COMPOSITE] P${pageData.pageNumber}: falling back to direct path (no usable cast)`);
+              } catch (compErr) {
+                log.warn(`[SCENE COMPOSITE] P${pageData.pageNumber}: composite path failed (${compErr.message}); falling back to direct path`);
+              }
+            }
             // Apply reference-mode flag — strips refs/grid per the chosen mode.
             // singlePassScene already prevented the empty-scene plate from being
             // generated above, so sceneBackground is naturally null in that mode.

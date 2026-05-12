@@ -139,6 +139,14 @@ const MODEL_DEFAULTS = {
                                        // (slot 1 in packReferences). Set to true to re-enable the
                                        // old "generate an empty AI scene first, then re-render with
                                        // characters" flow.
+  enableSceneComposite: false,         // Scene composite mode: route page generation through
+                                       // server/lib/sceneComposite.js (3 Grok calls per page —
+                                       // clean BG, blocking with colour silhouettes, blend pass —
+                                       // with characters cut in from their pre-rendered 2×4 sheets
+                                       // at positions decided by the blocking step). When false,
+                                       // the legacy direct-prompt path runs unchanged. Per-story
+                                       // opt-out: inputData.composite === false. See
+                                       // docs/SCENE-COMPOSITE-PIPELINE.html.
   enableTextOverlay: true,             // Global kill switch for the text-overlay pipeline. ON by
                                        // default — `1st-grade` stories use the a4-overlay layout
                                        // (text composited onto image, calm-zone reserved). Set to
