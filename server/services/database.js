@@ -580,6 +580,25 @@ async function initializeDatabase() {
       }
     }
 
+    // story_images table — was historically created manually on prod; this
+    // CREATE makes the runtime migration self-contained so a fresh DB (e.g.
+    // staging) gets the table on first boot. Without it, every ALTER /
+    // CREATE INDEX below errors out with "relation story_images does not
+    // exist", character save fails, and the wizard dies on step 1.
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        image_type VARCHAR(50) NOT NULL,
+        page_number INT,
+        version_index INT NOT NULL DEFAULT 0,
+        image_data TEXT,
+        image_url TEXT,
+        quality_score INT,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Fix NULL page_number breaking UNIQUE constraint for covers.
     // PostgreSQL treats NULL != NULL in UNIQUE, so ON CONFLICT never fires for covers.
     // Replace the broken constraint with two partial unique indexes.
