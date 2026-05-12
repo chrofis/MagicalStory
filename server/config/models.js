@@ -139,7 +139,7 @@ const MODEL_DEFAULTS = {
                                        // (slot 1 in packReferences). Set to true to re-enable the
                                        // old "generate an empty AI scene first, then re-render with
                                        // characters" flow.
-  enableSceneComposite: false,         // Scene composite mode: route page generation through
+  enableSceneComposite: true,          // Scene composite mode: route page generation through
                                        // server/lib/sceneComposite.js (3 Grok calls per page —
                                        // clean BG, blocking with colour silhouettes, blend pass —
                                        // with characters cut in from their pre-rendered 2×4 sheets
