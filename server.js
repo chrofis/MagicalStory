@@ -574,19 +574,38 @@ app.use(cors(corsOptions));
 //   - /api/health           — Railway healthcheck pings this
 //   - /api/stripe/webhook   — Stripe POSTs here from their servers, no Basic Auth header
 //   - /api/gelato/webhook   — same for Gelato print orders (when configured)
+//   - PWA / SEO static metadata — manifest.json, robots.txt, sitemap.xml,
+//     favicons, og-image. Browsers fetch these without credentials by spec;
+//     gating them breaks PWA install + social-link previews + favicons even
+//     for authenticated users.
 const STAGING_AUTH_USER = process.env.STAGING_AUTH_USER || 'staging';
 const STAGING_AUTH_PASSWORD = process.env.STAGING_AUTH_PASSWORD || null;
 if (STAGING_AUTH_PASSWORD) {
   const crypto = require('crypto');
   const expectedUser = Buffer.from(STAGING_AUTH_USER);
   const expectedPass = Buffer.from(STAGING_AUTH_PASSWORD);
-  const BYPASS_PATHS = new Set(['/api/health', '/api/stripe/webhook', '/api/gelato/webhook']);
+  const BYPASS_PATHS = new Set([
+    '/api/health',
+    '/api/stripe/webhook',
+    '/api/gelato/webhook',
+    '/manifest.json',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/favicon.ico',
+  ]);
+  // Pattern match for files where exact path varies (different sizes / variants).
+  const BYPASS_PATTERNS = [
+    /^\/favicon(-\d+)?\.png$/i,
+    /^\/apple-touch-icon(-\d+x\d+)?\.png$/i,
+    /^\/og-image(-\w+)?\.(png|jpg|jpeg|webp)$/i,
+  ];
   const timingSafe = (a, b) => {
     if (a.length !== b.length) return false;
     try { return crypto.timingSafeEqual(a, b); } catch { return false; }
   };
   app.use((req, res, next) => {
     if (BYPASS_PATHS.has(req.path)) return next();
+    if (BYPASS_PATTERNS.some(re => re.test(req.path))) return next();
     const header = req.headers.authorization || '';
     if (!header.startsWith('Basic ')) {
       res.set('WWW-Authenticate', 'Basic realm="MagicalStory Staging"');
