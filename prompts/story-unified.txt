@@ -151,8 +151,8 @@ METADATA:
 {
   "sceneIntent": "One present-tense sentence naming the single moment this image depicts. Names every character physically present in that moment and the action between them.",
   "characters": [
-    { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed:type", "depth": "foreground" },
-    { "name": "Name", "position": "behind Roger, gripping the boat's far side", "clothing": "standard", "depth": "midground", "perspective": "back view" }
+    { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed:type", "depth": "foreground", "pose": "profile", "flip": false },
+    { "name": "Name", "position": "behind Roger, gripping the boat's far side", "clothing": "standard", "depth": "midground", "perspective": "back view", "pose": "back", "flip": false }
   ],
   "objects": ["LOC001", "ANI001"],
   "interactions": [
@@ -189,6 +189,8 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 - `clothing` (required): must match an available avatar category exactly.
 - `depth` (optional, default `foreground`): camera distance, NOT frame position. `foreground` = large and close, filling ~1/3+ of frame height. `midground` = head and torso visible, middle band. `background` = small/distant; a tiny silhouette roughly 1/6 of frame height or less. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size, `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is named as a single distant figure, `depth` MUST be `background`.
 - `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder`.
+- `pose` (optional, default `front`): one of `front`, `threeQuarter`, `profile`, `back`. Picks which cell of the character's pre-rendered 2×4 reference sheet the composite path uses for this scene. `front` = facing the camera. `threeQuarter` = body rotated 45° away from the camera, both eyes still visible. `profile` = full side view, one eye visible. `back` = back of the figure, no face. Use the pose that matches the action: a watching character → `threeQuarter`; a character walking away → `back`; a character addressing the reader → `front`; a character in a side-by-side confrontation → `profile`. Consumed only when `enableSceneComposite` is on; harmless otherwise.
+- `flip` (optional, default `false`): `true` if this character should face the camera's RIGHT, `false` if facing the camera's LEFT. The 2×4 cells face left by default; `flip: true` mirrors them. Two characters facing each other should have opposite `flip` values. Consumed only when `enableSceneComposite` is on; harmless otherwise.
 
 **objects[]** — Visual Bible IDs. **For every page, the FIRST `LOC###` ID is the page's primary location and MUST be a vantage (e.g. `LOC001.2`, not bare `LOC001`).** The vantage you pick must be the one whose `pages: []` array includes this page number — i.e. the assignment you made in the Visual Bible. The pipeline reads this to attach the right pre-rendered canvas. If a real landmark also has numbered photo variants, use the same dotted form: the vantage and the photo variant are the same numbering.
 

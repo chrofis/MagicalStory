@@ -1239,6 +1239,12 @@ function extractSceneMetadata(sceneDescription) {
       const annotations = {};
       if (char.perspective) annotations.perspective = String(char.perspective).toLowerCase();
       if (char.depth) annotations.depth = String(char.depth).toLowerCase();
+      // Scene-composite pose + flip (consumed only when the scene-composite
+      // flag is on — see server/lib/sceneComposite.js).
+      if (char.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(char.pose)) {
+        annotations.pose = char.pose;
+      }
+      if (typeof char.flip === 'boolean') annotations.flip = char.flip;
       if (Object.keys(annotations).length > 0) {
         characterPerspectives[char.name] = annotations;
       }
