@@ -4,7 +4,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'https://magicalstory.ch';
+// BASE_URL drives canonical, og:url, hreflang, and sitemap URLs across
+// every SSR-rendered page. Reads from process.env.BASE_URL (set per
+// Railway environment — staging has BASE_URL=https://staging.magicalstory.ch
+// — so the prerender bakes the right hostname into the deployed HTML and
+// avoids React hydration mismatch on staging). Falls back to prod URL when
+// unset so local dev / one-off scripts don't break.
+const BASE_URL = process.env.BASE_URL || 'https://magicalstory.ch';
 
 // ─── Swiss City Data (loaded from JSON for /stadt routes) ────────────────────
 
