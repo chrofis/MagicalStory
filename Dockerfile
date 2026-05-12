@@ -47,6 +47,17 @@ ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
 ARG VITE_GOOGLE_OAUTH_CLIENT_ID
 
+# BASE_URL is needed by scripts/prerender.mjs (via server/lib/seoMeta.js)
+# at BUILD time — the prerender step bakes canonical / og:url / hreflang
+# into the static HTML files for each route. Without this ARG + ENV, the
+# build can't see the Railway service's BASE_URL env var, the prerender
+# falls back to the hardcoded prod URL, and any non-prod environment
+# (staging / preview) hits React hydration mismatch on first render.
+# Railway forwards service-level env vars as build args when they're
+# declared here.
+ARG BASE_URL
+ENV BASE_URL=${BASE_URL}
+
 # Build the React client + SSR bundle, then pre-render all SEO routes.
 # `cd client && npm run build` runs: tsc -b && vite build && vite build --ssr ...
 #   → produces dist/ (client bundle + manifest) and client/dist-ssr/ (SSR bundle)
