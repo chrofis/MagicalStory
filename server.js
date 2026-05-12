@@ -565,6 +565,51 @@ const corsOptions = {
 app.use(require('cookie-parser')());
 app.use(cors(corsOptions));
 
+// HTTP Basic Auth gate for staging / preview environments. Activated only
+// when STAGING_AUTH_PASSWORD is set in the environment — prod leaves it
+// unset and gets no gating. Mounted before everything else so unauthenticated
+// requests are rejected as cheaply as possible.
+//
+// Bypassed paths (must remain reachable without browser-prompt auth):
+//   - /api/health           — Railway healthcheck pings this
+//   - /api/stripe/webhook   — Stripe POSTs here from their servers, no Basic Auth header
+//   - /api/gelato/webhook   — same for Gelato print orders (when configured)
+const STAGING_AUTH_USER = process.env.STAGING_AUTH_USER || 'staging';
+const STAGING_AUTH_PASSWORD = process.env.STAGING_AUTH_PASSWORD || null;
+if (STAGING_AUTH_PASSWORD) {
+  const crypto = require('crypto');
+  const expectedUser = Buffer.from(STAGING_AUTH_USER);
+  const expectedPass = Buffer.from(STAGING_AUTH_PASSWORD);
+  const BYPASS_PATHS = new Set(['/api/health', '/api/stripe/webhook', '/api/gelato/webhook']);
+  const timingSafe = (a, b) => {
+    if (a.length !== b.length) return false;
+    try { return crypto.timingSafeEqual(a, b); } catch { return false; }
+  };
+  app.use((req, res, next) => {
+    if (BYPASS_PATHS.has(req.path)) return next();
+    const header = req.headers.authorization || '';
+    if (!header.startsWith('Basic ')) {
+      res.set('WWW-Authenticate', 'Basic realm="MagicalStory Staging"');
+      return res.status(401).send('Staging access requires authentication.');
+    }
+    let providedUser = '', providedPass = '';
+    try {
+      const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+      const idx = decoded.indexOf(':');
+      providedUser = decoded.slice(0, idx);
+      providedPass = decoded.slice(idx + 1);
+    } catch { /* fall through to 401 */ }
+    const userBuf = Buffer.from(providedUser);
+    const passBuf = Buffer.from(providedPass);
+    if (timingSafe(userBuf, expectedUser) && timingSafe(passBuf, expectedPass)) {
+      return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="MagicalStory Staging"');
+    return res.status(401).send('Invalid credentials.');
+  });
+  log.info(`🔒 Staging Basic Auth enabled (user: "${STAGING_AUTH_USER}")`);
+}
+
 // Gzip compression for all responses (reduces 33MB avatar data to ~5MB)
 app.use(compression());
 
@@ -5115,27 +5160,62 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Phase 5a continued: Generate ALL images (no evaluation)
       // ── Scene composite — cast builder ──────────────────────────────────
-      // For each character on the page, locate their pre-rendered 2×4 sheet
-      // (stored on the character record as `avatars.sheet2x4_<costume>`).
-      // Returns null if any cast character lacks a sheet — the caller then
-      // falls through to the legacy direct-prompt path.
+      // For each character on the page:
+      //   1. Locate the 2×4 reference sheet for the costume worn on this page.
+      //      Cached on character.avatars.sheet2x4_<clothing> after first
+      //      generation. If missing, generate it lazily via
+      //      generateCharacter2x4Sheet (one Grok call, ~$0.02 per character
+      //      per costume).
+      //   2. Pull pose + flip from the scene metadata (Sonnet outline emits
+      //      these alongside position/perspective when scene composite is on).
+      //
+      // Returns null if any cast character can't be set up — the caller
+      // then falls through to the legacy direct-prompt path.
       const buildCompositeCast = async (pageData, inputData) => {
-        const sceneChars = pageData.sceneCharacters || pageData.scene?.outlineCharacters || [];
+        // Read the per-scene character metadata (with pose/flip/position/depth)
+        // from sceneMetadata.fullData.characters — that's the raw JSON block
+        // Sonnet emitted in the outline. Fall back to sceneCharacters (just
+        // names) if metadata is missing.
+        const metaChars = pageData.sceneMetadata?.fullData?.characters
+          || pageData.sceneMetadata?.characters
+          || pageData.sceneCharacters
+          || [];
+        const sceneChars = Array.isArray(metaChars) ? metaChars : [];
         if (!sceneChars.length) return null;
+        const { generateCharacter2x4Sheet } = require('./server/lib/character2x4Sheet');
         const out = [];
         for (const sc of sceneChars) {
-          const name = sc.name || sc;
+          const name = typeof sc === 'string' ? sc : (sc.name || '');
+          if (!name) continue;
           const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
           if (!character) return null;
           const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
           const sheetField = `sheet2x4_${clothing.replace(/[^a-z0-9]/gi, '_')}`;
-          const sheetData = character.avatars?.[sheetField] || character.avatars?.sheet2x4_standard;
-          if (!sheetData) return null;
-          const sheetUri = typeof sheetData === 'string' ? sheetData : sheetData.data || sheetData.imageData;
-          if (!sheetUri || !sheetUri.startsWith('data:')) return null;
+          // Step 1: try the cached sheet on the character record.
+          let sheetData = character.avatars?.[sheetField] || character.avatars?.sheet2x4_standard;
+          let sheetUri = sheetData ? (typeof sheetData === 'string' ? sheetData : sheetData.data || sheetData.imageData) : null;
+          // Step 2: lazy-generate if missing.
+          if (!sheetUri || !sheetUri.startsWith('data:')) {
+            try {
+              const costumeDesc = inputData.clothingRequirements?.[name]?.costumed?.description
+                || inputData.clothingRequirements?.[name]?.description
+                || (clothing.startsWith('costumed:') ? clothing.split(':').slice(1).join(':') : 'standard outfit');
+              const gen = await generateCharacter2x4Sheet(character, {
+                clothingCategory: clothing,
+                costumeDescription: costumeDesc,
+                artStyle: inputData.artStyle || 'watercolor',
+                usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
+              });
+              sheetUri = gen.imageData;
+              // Cache on the character for downstream pages in this story.
+              character.avatars = character.avatars || {};
+              character.avatars[sheetField] = sheetUri;
+            } catch (err) {
+              log.warn(`[SCENE COMPOSITE] cannot generate 2×4 sheet for ${name} (${clothing}): ${err.message}`);
+              return null;
+            }
+          }
           const sheetBuf = Buffer.from(sheetUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          // Pose + flip — Sonnet's outline emits these alongside position/perspective.
-          // Until the schema lands, fall back to 'threeQuarter' + flip=false.
           const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
             ? sc.pose : 'threeQuarter';
           const flip = sc.flip === true;
