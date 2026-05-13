@@ -1680,6 +1680,18 @@ async function initializeDatabase() {
     // metadata column added later — writers do INSERT ... (id, user_id, data, metadata).
     // Fresh DBs (staging) need this; prod was migrated manually long ago.
     await dbPool.query(`ALTER TABLE characters ADD COLUMN IF NOT EXISTS metadata JSONB`);
+    // Runtime uses JSONB operators on characters.data (data->'characters', etc.)
+    // but the original CREATE TABLE above declared it TEXT. Prod was converted
+    // manually; fresh DBs need this. DO block is no-op when already JSONB.
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_name='characters' AND column_name='data') = 'text' THEN
+          ALTER TABLE characters ALTER COLUMN data TYPE JSONB USING data::jsonb;
+        END IF;
+      END $$;
+    `);
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS stories (
@@ -1692,6 +1704,16 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
     // metadata column added later — readers do SELECT metadata FROM stories.
     await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS metadata JSONB`);
+    // Same TEXT → JSONB conversion as characters.data (see above).
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_name='stories' AND column_name='data') = 'text' THEN
+          ALTER TABLE stories ALTER COLUMN data TYPE JSONB USING data::jsonb;
+        END IF;
+      END $$;
+    `);
 
     // Story sharing columns (migration for existing tables)
     await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT FALSE`);
