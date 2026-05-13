@@ -95,6 +95,10 @@ const MODEL_DEFAULTS = {
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
+  avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
+                                              // Gemini 2.5 Flash Image because Gemini's safety filter
+                                              // rejects adult-face photos with IMAGE_OTHER, leaving
+                                              // characters stuck at avatars.status='pending' forever.
 
   // Per-page routing by scene complexity (sceneRouting = 'auto')
   simplePageImage: 'grok-imagine',            // Simple scenes: all chars foreground ($0.02)

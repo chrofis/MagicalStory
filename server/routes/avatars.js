@@ -14,8 +14,9 @@ const { log } = require('../utils/logger');
 const { logActivity, dbQuery, saveAvatarToR2, saveAvatarThumbToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
-const { IMAGE_MODELS } = require('../config/models');
+const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
+const { editWithGrok } = require('../lib/grok');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
 const { getFacePhoto } = require('../lib/characterPhotos');
 
@@ -2257,13 +2258,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // Import the actual generation logic (reuse from sync path)
     // For now, we'll make a simplified version that calls the same helpers
 
-    const selectedModel = avatarModel || 'gemini-2.5-flash-image';
+    const selectedModel = avatarModel || MODEL_DEFAULTS.avatar || 'grok-imagine';
     const modelConfig = IMAGE_MODELS[selectedModel];
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const useGrok = modelConfig?.backend === 'grok';
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
     const isFemale = gender === 'female';
 
-    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}`);
+    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const clothingCategories = {
       winter: { emoji: '❄️' },
@@ -2353,7 +2355,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // Generate avatars (simplified - uses Gemini API directly)
     const generationStart = Date.now();
 
-    // Helper to generate single avatar with Gemini
+    // Helper to generate single avatar with the selected backend (Grok / Gemini / Runware).
+    // Grok is the default — Gemini's safety filter rejects adult-face photos with
+    // IMAGE_OTHER; Grok's edit endpoint handles the same photos cleanly.
     const generateSingleAvatarForJob = async (category) => {
       const MAX_RETRIES = 2; // Total attempts = MAX_RETRIES + 1 = 3
       let totalInputTokens = 0;
@@ -2369,6 +2373,37 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
         if (userTraitsSection) {
           avatarPrompt += userTraitsSection;
+        }
+
+        // Grok branch — edit endpoint with face photo as reference.
+        if (useGrok) {
+          log.info(`[AVATAR JOB ${jobId}] 🎨 Generating ${category} via Grok (${selectedModel})`);
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+              log.info(`[AVATAR JOB ${jobId}] 🔄 Retry ${attempt}/${MAX_RETRIES} for ${category} (Grok)...`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            try {
+              const result = await editWithGrok(avatarPrompt, [finalPhoto], {
+                aspectRatio: '9:16',
+                resolution: '1k',
+                model: modelConfig?.modelId || 'grok-imagine-image',
+              });
+              if (result?.imageData) {
+                const compressedImage = await compressImageToJPEG(result.imageData);
+                if (attempt > 0) {
+                  log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on Grok retry ${attempt}`);
+                }
+                return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
+              }
+            } catch (grokErr) {
+              log.warn(`[AVATAR JOB ${jobId}] Grok ${category} attempt ${attempt + 1} failed: ${grokErr.message}`);
+              if (attempt >= MAX_RETRIES) {
+                return { category, imageData: null, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
+              }
+            }
+          }
+          return { category, imageData: null, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
         }
 
         // Build request body matching the sync CLOTHING AVATARS path
@@ -3279,12 +3314,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     // SYNC MODE: Original blocking behavior (for backwards compatibility)
 
     // Determine which model to use
-    const selectedModel = avatarModel || 'gemini-2.5-flash-image';
+    const selectedModel = avatarModel || MODEL_DEFAULTS.avatar || 'grok-imagine';
     const modelConfig = IMAGE_MODELS[selectedModel];
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const useGrok = modelConfig?.backend === 'grok';
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const isFemale = gender === 'female';
 
@@ -3390,6 +3426,27 @@ These corrections OVERRIDE what is visible in the reference photo.
     // Check if using ACE++ model (face-consistent avatar generation)
     const useACEPlusPlus = selectedModel === 'ace-plus-plus';
 
+    // Helper function to generate avatar using Grok edit (face photo as reference).
+    // Grok is the default avatar backend; Gemini was deprecated because IMAGE_OTHER
+    // safety refusals on adult-face photos left avatars permanently 'pending'.
+    const generateAvatarWithGrok = async (category, avatarPrompt) => {
+      try {
+        const result = await editWithGrok(avatarPrompt, [facePhoto], {
+          aspectRatio: '9:16',
+          resolution: '1k',
+          model: modelConfig?.modelId || 'grok-imagine-image',
+        });
+        if (result?.imageData) {
+          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
+          return compressed || result.imageData;
+        }
+        return null;
+      } catch (err) {
+        log.error(`❌ [CLOTHING AVATARS] Grok generation failed for ${category}:`, err.message);
+        return null;
+      }
+    };
+
     // Helper function to generate avatar using ACE++ (face-consistent)
     // Uses optimized shorter prompt - ACE++ gets face from reference image
     const generateAvatarWithACEPlusPlus = async (category, userTraits) => {
@@ -3487,6 +3544,20 @@ These corrections OVERRIDE what is visible in the reference photo.
         // Physical traits (hair color, eye color, etc.) should be consistent across all outfits
         if (userTraitsSection) {
           avatarPrompt += userTraitsSection;
+        }
+
+        // Grok branch — default. Edit endpoint accepts face photo as reference and
+        // produces a clothing-variant avatar in one call, no IMAGE_OTHER rejections
+        // on adult-face photos.
+        if (useGrok) {
+          const imageData = await generateAvatarWithGrok(category, avatarPrompt);
+          if (imageData) {
+            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok`);
+            return { category, prompt: avatarPrompt, imageData };
+          } else {
+            log.warn(`[CLOTHING AVATARS] Grok generation failed for ${category}`);
+            return { category, prompt: avatarPrompt, imageData: null };
+          }
         }
 
         // Use ACE++ for face-consistent avatar generation
