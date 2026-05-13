@@ -723,14 +723,26 @@ async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 600
         name: c.name,
         hasAvatar: !!(c.avatars && (c.avatars.standard || c.avatars.winter || c.avatars.summer)),
         status: c.avatars?.status,
+        stale: c.avatars?.stale,
       }));
     });
 
     if (status) {
-      const ready = status.filter((c: any) => needed.has(c.name) && c.hasAvatar).map((c: any) => c.name);
+      // The wizard's pre-flight in generateStory() skips re-regenerating when
+      // avatars.status === 'complete' OR 'failed' (permanently broken — server
+      // gave up after Gemini retries exhausted). Treat both as terminal here
+      // so we stop waiting once every character has reached a final state.
+      const ready = status
+        .filter((c: any) => needed.has(c.name) && (c.status === 'complete' || c.status === 'failed') && c.stale !== true)
+        .map((c: any) => c.name);
+      const failed = status.filter((c: any) => c.status === 'failed').map((c: any) => c.name);
       const pending = [...needed].filter(n => !ready.includes(n));
       if (pending.length === 0) {
-        console.log(`  All ${family.characters.length} avatars ready.`);
+        if (failed.length > 0) {
+          console.log(`  ⚠️  ${failed.length} avatar(s) failed permanently: ${failed.join(', ')} — proceeding anyway.`);
+        } else {
+          console.log(`  All ${family.characters.length} avatars ready.`);
+        }
         return;
       }
       console.log(`  Avatars pending: ${pending.join(', ')} (ready: ${ready.length}/${family.characters.length})`);
@@ -739,7 +751,7 @@ async function waitForAllAvatars(page: Page, family: DemoFamily, timeoutMs = 600
     await page.waitForTimeout(10000);
   }
 
-  console.log(`  Avatar poll timed out after ${timeoutMs / 1000}s — continuing anyway.`);
+  console.log(`  ⚠️  Avatar poll timed out after ${timeoutMs / 1000}s — continuing anyway. Story generation may stall in the wizard's pre-flight avatar loop.`);
 }
 
 async function createFamilyViaWizard(page: Page, family: DemoFamily) {
@@ -910,6 +922,14 @@ test.describe('Demo Story Generation', () => {
     const generateBtn = page.locator('button').filter({ hasText: GENERATE_RE }).first();
     await expect(generateBtn).toBeVisible({ timeout: 10000 });
     await expect(generateBtn).toBeEnabled({ timeout: 10000 });
+
+    // The wizard's generateStory() runs a SEQUENTIAL avatar-regeneration loop
+    // before sending POST /api/jobs/create-story for any character whose
+    // avatars are missing/stale/not 'complete'. On a fresh demo account,
+    // avatars are still finishing when we reach Step 5 — without this wait
+    // the wizard stalls in that loop and the create-story POST never fires.
+    console.log('Step 5: Waiting for avatars to finish before triggering generation...');
+    await waitForAllAvatars(page, family);
     console.log('Step 5: Triggering generation...');
 
     // The wizard sets step=6 + isGenerating=true SYNCHRONOUSLY on click — the

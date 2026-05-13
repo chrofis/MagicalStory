@@ -3790,10 +3790,12 @@ export default function StoryWizard() {
     setCompletedPageImages({});
     setCoverImages({ frontCover: null, initialPage: null, backCover: null });
 
-    // Check for characters with stale or missing avatars
+    // Check for characters with stale or missing avatars. Exclude permanently-
+    // failed avatars (server marks them after Gemini gives up) — re-triggering
+    // would loop forever and the create-story POST never fires.
     const charactersNeedingAvatars = characters
       .filter(c => !excludedCharacters.includes(c.id))
-      .filter(c => !c.avatars || c.avatars.stale || c.avatars.status !== 'complete');
+      .filter(c => !c.avatars || c.avatars.stale || (c.avatars.status !== 'complete' && c.avatars.status !== 'failed'));
 
     if (charactersNeedingAvatars.length > 0) {
       console.log('[generateStory] Characters needing avatar regeneration:', charactersNeedingAvatars.map(c => c.name));

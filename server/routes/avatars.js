@@ -3175,6 +3175,34 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     log.error(`[AVATAR JOB ${jobId}] Failed:`, err.message);
     job.status = 'failed';
     job.error = err.message;
+
+    // Persist avatars.status='failed' to the character record so the wizard's
+    // generateStory() pre-flight loop (StoryWizard.tsx) can skip permanently-
+    // failed avatars instead of re-triggering the same Gemini call forever.
+    // Without this, status stays at 'pending' and the wizard stalls before
+    // POST /api/jobs/create-story is ever sent.
+    try {
+      const { characterId } = bodyParams;
+      const rowId = `characters_${user.id}`;
+      const rowRes = await dbQuery(`SELECT data FROM characters WHERE id = $1`, [rowId]);
+      if (rowRes.length > 0) {
+        const characters = rowRes[0].data?.characters || [];
+        const charIndex = characters.findIndex(c => String(c.id) === String(characterId));
+        if (charIndex >= 0) {
+          const failedAvatars = { status: 'failed', failedAt: new Date().toISOString(), error: err.message };
+          await dbQuery(
+            `UPDATE characters
+             SET data = jsonb_set(data, $2, COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb, true),
+                 metadata = jsonb_set(metadata, $2, COALESCE(metadata->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb, true)
+             WHERE id = $1`,
+            [rowId, `{characters,${charIndex},avatars}`, JSON.stringify(failedAvatars)]
+          );
+          log.warn(`[AVATAR JOB ${jobId}] Marked character ${characterId} avatars.status='failed' in DB`);
+        }
+      }
+    } catch (persistErr) {
+      log.error(`[AVATAR JOB ${jobId}] Failed to persist failed-status to character:`, persistErr.message);
+    }
   }
 }
 
