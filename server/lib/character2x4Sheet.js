@@ -97,13 +97,26 @@ function resolveFacePhoto(character) {
 
 /**
  * Resolve the styled 2×2 costumed avatar for the given clothing key.
+ * The canonical write location (storyAvatarGeneration.js) is
+ *   character.avatars.styledAvatars[artStyle].costumed[costumeKey]
+ *   character.avatars.styledAvatars[artStyle][category]   // standard/winter/summer
+ * Older fields are kept as fallbacks for legacy character records.
  */
-function resolveStyled2x2(character, clothingCategory) {
+function resolveStyled2x2(character, clothingCategory, artStyle) {
   if (!character?.avatars) return null;
-  // Try a handful of fields the production code uses for the costumed 2×2.
+  const costumeKey = (clothingCategory || '').startsWith('costumed:')
+    ? clothingCategory.split(':')[1]
+    : null;
+  const styledForStyle = artStyle ? character.avatars.styledAvatars?.[artStyle] : null;
   const candidates = [
+    // Canonical: storyAvatarGeneration writes here.
+    costumeKey ? styledForStyle?.costumed?.[costumeKey] : styledForStyle?.[clothingCategory],
+    // Some art-style entries may be stored without a wrapper category key —
+    // fall through any styledAvatars entry that matches our category.
+    costumeKey ? character.avatars.styledAvatars?.['*']?.costumed?.[costumeKey] : null,
+    // Legacy fields, kept for older character records.
     character.avatars[clothingCategory],
-    character.avatars.costumed?.[clothingCategory?.split(':')[1]],
+    character.avatars.costumed?.[costumeKey],
     character.avatars.costumed,
     character.avatars[`styled_${clothingCategory}`],
     character.avatars.standard,
@@ -137,7 +150,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   } = opts;
 
   const phantom = loadPhantom();
-  const styled2x2 = resolveStyled2x2(character, clothingCategory);
+  const styled2x2 = resolveStyled2x2(character, clothingCategory, artStyle);
   if (!styled2x2) {
     throw new Error(`No styled 2×2 avatar for ${character?.name || 'character'} (${clothingCategory}). Generate the styled-costumed avatar first.`);
   }
