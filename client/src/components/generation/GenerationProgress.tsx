@@ -361,14 +361,13 @@ export function GenerationProgress({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rotationIndex, rotationItems, language]);
 
-  if (!isGenerating || total === 0) {
-    return null;
-  }
-
   // Server sends sequential checkpoint numbers (1-73, then 100 for done).
   // We map these to target percentages and smoothly animate toward them —
   // the bar should always be increasing, just at different speeds.
-  const serverCheckpoint = total === 100 ? current : Math.round((current / total) * 100);
+  // NOTE: All hooks below MUST run before the `if (!isGenerating || total === 0)`
+  // early return — calling them conditionally violates the Rules of Hooks
+  // (React error #310) when isGenerating/total flips between renders.
+  const serverCheckpoint = total === 100 ? current : (total > 0 ? Math.round((current / total) * 100) : 0);
   const isDone = serverCheckpoint >= 100;
 
   const targetPercent = checkpointToPercent(serverCheckpoint);
@@ -424,6 +423,11 @@ export function GenerationProgress({
     }, 500);
     return () => clearInterval(interval);
   }, [isDone]);
+
+  // Early return AFTER all hooks above — never before.
+  if (!isGenerating || total === 0) {
+    return null;
+  }
 
   const progressPercent = isDone ? 100 : Math.round(displayProgress);
 
