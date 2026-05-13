@@ -199,7 +199,7 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 | Image Generation | Gemini (Google) + Grok (xAI) | Page illustrations, covers, avatars |
 | Character Repair | Grok Imagine (xAI) | Cutout + blended character repair ($0.02/img) |
 | Cheap Images | Runware | Dev mode, inpainting (SDXL $0.002/img) |
-| Avatar Faces | Grok Imagine (xAI) | Clothing avatars (winter/standard/summer) via edit endpoint with face-photo reference. Switched from Gemini after IMAGE_OTHER safety refusals on adult-face photos left avatars stuck pending. Costumed/styled avatars (mid-story costume changes) still use Gemini — they need a 2x2 grid Grok can't produce. |
+| Avatar Faces | Grok Imagine (xAI) | Clothing avatars (winter/standard/summer) via edit endpoint with face-photo reference. Switched from Gemini after IMAGE_OTHER safety refusals on adult-face photos left avatars stuck pending. Costumed/styled avatars (mid-story costume changes) still hit Gemini directly — migrating them to Grok is possible but untested. |
 | Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
 ### Story Generation Pipeline (Unified Mode)
