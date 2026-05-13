@@ -655,7 +655,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     );
 
     if (emailService) {
-      const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
+      const resetUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
       const emailResult = await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl, user.preferred_language);
       if (emailResult.success) {
         log.info(`Password reset email sent to ${user.email}`);
@@ -878,7 +878,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Email service not configured. Please contact support.' });
     }
 
-    const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
     log.debug(`Sending verification email to: ${user.email}, URL: ${verifyUrl}`);
 
     const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl, user.preferred_language);
@@ -934,7 +934,7 @@ router.get('/verify-email/:token', async (req, res) => {
       // Token not found at all — likely already used (token cleared after verification)
       // Check if there's a verified trial user who recently used this flow
       log.info(`[AUTH] verify-email: token not found (likely already consumed)`);
-      return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified?already=true`);
+      return res.redirect(`${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/email-verified?already=true`);
     }
 
     const user = result.rows[0];
@@ -987,14 +987,14 @@ router.get('/verify-email/:token', async (req, res) => {
         );
         const token = generateToken(fullUser.rows[0]);
         log.info(`[AUTH] Trial user ${user.email} verified - redirecting to /stories with token`);
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified?token=${token}&trial=true`);
+        return res.redirect(`${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/email-verified?token=${token}&trial=true`);
       } catch (trialErr) {
         log.error(`[AUTH] Failed to process trial verification for user ${user.id}:`, trialErr);
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
+        return res.redirect(`${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/email-verified`);
       }
     }
 
-    res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
+    res.redirect(`${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/email-verified`);
   } catch (err) {
     log.error('Verify email error:', err);
     res.status(500).json({ error: 'Failed to verify email' });
@@ -1052,7 +1052,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
     );
 
     if (emailService) {
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+      const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
       const emailResult = await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl, user.preferred_language);
       if (!emailResult.success) {
         log.error(`Failed to send verification email for email change:`, emailResult.error);

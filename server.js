@@ -6641,7 +6641,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 [claimToken, claimExpires, userId]
               );
             }
-            emailOptions.claimUrl = `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
+            emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
 
             // Generate a view PDF to attach to the email
             // Fetch the full story data with images (rehydrate from story_images table)

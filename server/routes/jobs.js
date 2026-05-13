@@ -148,7 +148,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
               [verificationToken, verificationExpires, user.id]
             );
 
-            const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+            const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
             console.log(`📧 Attempting to send verification email to: ${user.email}`);
             const result = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl, user.preferred_language);
             if (result) {

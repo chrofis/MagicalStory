@@ -21,7 +21,7 @@ const { log } = require('../utils/logger');
 const { verifyToken } = require('../middleware/auth');
 
 // Base URL for OG tags and share links (consistent with stories.js)
-const SITE_URL = process.env.FRONTEND_URL || 'https://www.magicalstory.ch';
+const SITE_URL = process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch';
 
 // In-memory cache for rendered text overlays. Result is fully deterministic
 // for (storyId, pageNumber, activeVersion, languageLevel, textPosition):

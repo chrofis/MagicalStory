@@ -1819,8 +1819,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/stories?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/stories?payment=cancelled`,
       metadata: {
         userId: userId.toString(),
         storyIds: JSON.stringify(allStoryIds),
@@ -1919,8 +1919,8 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?credits_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?credits_payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/create?credits_payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/create?credits_payment=cancelled`,
       metadata: {
         type: 'credits',
         userId: userId.toString(),

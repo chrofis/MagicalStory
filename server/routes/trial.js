@@ -1141,7 +1141,7 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
     const parsedTrial = typeof trialData === 'string' ? JSON.parse(trialData) : trialData;
     const language = parsedTrial?.storyInput?.language || 'en';
 
-    const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
     await emailService.sendEmailVerificationEmail(normalizedEmail, displayName, verifyUrl, language);
 
     log.info(`[TRIAL] Email linked for anonymous user ${userId}: ${normalizedEmail}`);
