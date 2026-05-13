@@ -571,9 +571,12 @@ app.use(cors(corsOptions));
 // requests are rejected as cheaply as possible.
 //
 // Bypassed paths (must remain reachable without browser-prompt auth):
-//   - /api/health           — Railway healthcheck pings this
-//   - /api/stripe/webhook   — Stripe POSTs here from their servers, no Basic Auth header
-//   - /api/gelato/webhook   — same for Gelato print orders (when configured)
+//   - /api/*                — all API routes. Browsers don't reliably replay
+//     Basic Auth credentials on XHR/fetch, so gating /api triggers an
+//     endless Basic Auth prompt loop the moment the frontend tries to
+//     register, log in, etc. The API has its own auth layer (JWT, Turnstile,
+//     rate-limit). The Basic Auth gate's job is to hide the *site* from
+//     casual visitors / search engines, not to be the API's authentication.
 //   - PWA / SEO static metadata — manifest.json, robots.txt, sitemap.xml,
 //     favicons, og-image. Browsers fetch these without credentials by spec;
 //     gating them breaks PWA install + social-link previews + favicons even
@@ -585,9 +588,6 @@ if (STAGING_AUTH_PASSWORD) {
   const expectedUser = Buffer.from(STAGING_AUTH_USER);
   const expectedPass = Buffer.from(STAGING_AUTH_PASSWORD);
   const BYPASS_PATHS = new Set([
-    '/api/health',
-    '/api/stripe/webhook',
-    '/api/gelato/webhook',
     '/manifest.json',
     '/robots.txt',
     '/sitemap.xml',
@@ -595,6 +595,9 @@ if (STAGING_AUTH_PASSWORD) {
   ]);
   // Pattern match for files where exact path varies (different sizes / variants).
   const BYPASS_PATTERNS = [
+    // All API routes — browsers don't replay Basic Auth on fetch/XHR reliably,
+    // so gating /api here breaks login/register/etc.
+    /^\/api(\/|$)/i,
     /^\/favicon(-\d+)?\.png$/i,
     /^\/apple-touch-icon(-\d+x\d+)?\.png$/i,
     /^\/og-image(-\w+)?\.(png|jpg|jpeg|webp)$/i,
