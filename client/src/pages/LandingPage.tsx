@@ -178,13 +178,15 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const [showAuthModal, setShowAuthModal] = useState(() => searchParams.get('signup') === 'true');
+  // Always start closed so SSR and client first render produce the same DOM.
+  // Reading searchParams during the initial render would mismatch hydration
+  // (StaticRouter has no query string at prerender time) → React error #418.
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const st = sectionTranslations[language] || sectionTranslations.en;
 
-
-  // Check for login query param
+  // Open the modal post-hydration if the URL asks for it.
   useEffect(() => {
-    if (searchParams.get('login') === 'true') {
+    if (searchParams.get('signup') === 'true' || searchParams.get('login') === 'true') {
       setShowAuthModal(true);
     }
   }, [searchParams]);
