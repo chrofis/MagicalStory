@@ -54,6 +54,74 @@ router.get('/location', async (req, res) => {
   }
 });
 
+// POST /api/user/verify-location - Verify a user-entered location via Nominatim (OSM)
+// Body: { city?, plz?, country? } — country defaults to Switzerland
+// Response: { verified: boolean, city, country, plz, displayName, lat, lon }
+const locationVerifyCache = new Map();
+const LOCATION_VERIFY_TTL = 24 * 60 * 60 * 1000; // 24h
+
+router.post('/verify-location', async (req, res) => {
+  try {
+    const { city, plz, country } = req.body || {};
+    const cleanCity = (city || '').trim();
+    const cleanPlz = (plz || '').trim();
+    const cleanCountry = (country || 'Switzerland').trim();
+
+    if (!cleanCity && !cleanPlz) {
+      return res.json({ verified: false });
+    }
+
+    const cacheKey = `${cleanCity}|${cleanPlz}|${cleanCountry}`.toLowerCase();
+    const cached = locationVerifyCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < LOCATION_VERIFY_TTL) {
+      return res.json(cached.result);
+    }
+
+    const params = new URLSearchParams({ format: 'json', limit: '1', addressdetails: '1' });
+    if (cleanPlz) params.set('postalcode', cleanPlz);
+    if (cleanCity) params.set('city', cleanCity);
+    if (cleanCountry) params.set('country', cleanCountry);
+
+    const url = `https://nominatim.openstreetmap.org/search?${params}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'MagicalStory/1.0 (contact@magicalstory.ch)' }
+    });
+
+    if (!response.ok) {
+      log.warn(`📍 [VERIFY-LOCATION] Nominatim ${response.status} for ${cacheKey}`);
+      return res.json({ verified: false });
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      const result = { verified: false };
+      locationVerifyCache.set(cacheKey, { ts: Date.now(), result });
+      return res.json(result);
+    }
+
+    const top = data[0];
+    const addr = top.address || {};
+    const resolvedCity = addr.city || addr.town || addr.village || addr.municipality || cleanCity || null;
+    const resolvedCountry = addr.country || cleanCountry || null;
+    const resolvedPlz = addr.postcode || cleanPlz || null;
+
+    const result = {
+      verified: true,
+      city: resolvedCity,
+      country: resolvedCountry,
+      plz: resolvedPlz,
+      displayName: top.display_name || null,
+      lat: top.lat ? parseFloat(top.lat) : null,
+      lon: top.lon ? parseFloat(top.lon) : null,
+    };
+    locationVerifyCache.set(cacheKey, { ts: Date.now(), result });
+    res.json(result);
+  } catch (err) {
+    log.error(`📍 [VERIFY-LOCATION] Error: ${err.message}`);
+    res.json({ verified: false });
+  }
+});
+
 // GET /api/user/quota - Get user's credits and quota
 router.get('/quota', authenticateToken, async (req, res) => {
   try {

@@ -1,8 +1,16 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus, Baby, Book, BookText } from 'lucide-react';
+import { BookOpen, MapPin, ChevronDown, Pencil, X, Plus, Baby, Book, BookText, Check, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { CREDITS_PER_PAGE } from '@/constants/credits';
+import { storyService } from '@/services';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
+
+// Localized default country label — preselected when adding a location
+function defaultCountryFor(uiLang: string): string {
+  if (uiLang === 'de') return 'Schweiz';
+  if (uiLang === 'fr') return 'Suisse';
+  return 'Switzerland';
+}
 
 // Language family type
 type LanguageFamily = 'de' | 'fr' | 'it' | 'en' | 'gsw';
@@ -127,7 +135,12 @@ export function WizardStep3BookSettings({
   const { t, language } = useLanguage();
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [editCity, setEditCity] = useState(userLocation?.city || '');
-  const [editCountry, setEditCountry] = useState(userLocation?.country || '');
+  const [editCountry, setEditCountry] = useState(userLocation?.country || defaultCountryFor(language));
+  const [editPlz, setEditPlz] = useState('');
+  // Verification state for the in-edit location: 'idle' | 'checking' | 'ok' | 'fail'
+  const [verifyState, setVerifyState] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle');
+  const [verifyResult, setVerifyResult] = useState<{ city?: string | null; plz?: string | null; displayName?: string | null } | null>(null);
+  const verifyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -158,9 +171,40 @@ export function WizardStep3BookSettings({
   useEffect(() => {
     if (userLocation) {
       setEditCity(userLocation.city || '');
-      setEditCountry(userLocation.country || '');
+      setEditCountry(userLocation.country || defaultCountryFor(language));
     }
-  }, [userLocation]);
+  }, [userLocation, language]);
+
+  // Debounced verify whenever city/plz/country changes during editing
+  useEffect(() => {
+    if (!isEditingLocation) return;
+    if (!editCity.trim() && !editPlz.trim()) {
+      setVerifyState('idle');
+      setVerifyResult(null);
+      return;
+    }
+    if (verifyDebounceRef.current) clearTimeout(verifyDebounceRef.current);
+    setVerifyState('checking');
+    verifyDebounceRef.current = setTimeout(async () => {
+      const res = await storyService.verifyLocation({
+        city: editCity.trim(),
+        plz: editPlz.trim(),
+        country: editCountry.trim() || defaultCountryFor(language),
+      });
+      if (res.verified) {
+        setVerifyState('ok');
+        setVerifyResult({ city: res.city, plz: res.plz, displayName: res.displayName });
+        // PLZ-only lookup → backfill the city input from the result
+        if (!editCity.trim() && res.city) setEditCity(res.city);
+      } else {
+        setVerifyState('fail');
+        setVerifyResult(null);
+      }
+    }, 500);
+    return () => {
+      if (verifyDebounceRef.current) clearTimeout(verifyDebounceRef.current);
+    };
+  }, [editCity, editPlz, editCountry, isEditingLocation, language]);
 
   const handleSaveLocation = () => {
     onLocationChange({
@@ -171,10 +215,18 @@ export function WizardStep3BookSettings({
     setIsEditingLocation(false);
   };
 
+  const handleStartEditing = () => {
+    if (!editCountry) setEditCountry(defaultCountryFor(language));
+    setIsEditingLocation(true);
+  };
+
   const handleClearLocation = () => {
     onLocationChange({ city: null, region: null, country: null });
     setEditCity('');
-    setEditCountry('');
+    setEditCountry(defaultCountryFor(language));
+    setEditPlz('');
+    setVerifyState('idle');
+    setVerifyResult(null);
     setIsEditingLocation(false);
   };
 
@@ -343,24 +395,54 @@ export function WizardStep3BookSettings({
               {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
             </span>
             {isEditingLocation ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={editPlz}
+                  onChange={(e) => setEditPlz(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="PLZ"
+                  title={language === 'de' ? 'Schweizer PLZ (4 Ziffern)' : language === 'fr' ? 'NPA suisse (4 chiffres)' : 'Swiss PLZ (4 digits)'}
+                  className="px-2 py-1 border border-gray-300 rounded text-base w-20 focus:outline-none focus:border-indigo-500"
+                />
                 <input
                   type="text"
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
                   placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
-                  className="px-2 py-1 border border-gray-300 rounded text-base w-48 focus:outline-none focus:border-indigo-500"
+                  className="px-2 py-1 border border-gray-300 rounded text-base w-44 focus:outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
                   value={editCountry}
                   onChange={(e) => setEditCountry(e.target.value)}
                   placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
-                  className="px-2 py-1 border border-gray-300 rounded text-base w-48 focus:outline-none focus:border-indigo-500"
+                  className="px-2 py-1 border border-gray-300 rounded text-base w-40 focus:outline-none focus:border-indigo-500"
                 />
+                {/* Verification indicator */}
+                <span className="inline-flex items-center justify-center w-6 h-6" aria-live="polite">
+                  {verifyState === 'checking' && <Loader2 size={14} className="animate-spin text-gray-400" />}
+                  {verifyState === 'ok' && (
+                    <Check
+                      size={16}
+                      className="text-green-600"
+                      aria-label={language === 'de' ? 'Ort gefunden' : language === 'fr' ? 'Lieu trouvé' : 'Location found'}
+                    />
+                  )}
+                  {verifyState === 'fail' && (
+                    <X
+                      size={16}
+                      className="text-red-500"
+                      aria-label={language === 'de' ? 'Ort nicht gefunden' : language === 'fr' ? 'Lieu introuvable' : 'Location not found'}
+                    />
+                  )}
+                </span>
                 <button
                   onClick={handleSaveLocation}
-                  className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600"
+                  disabled={verifyState === 'checking'}
+                  className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600 disabled:opacity-50"
                 >
                   OK
                 </button>
@@ -370,6 +452,33 @@ export function WizardStep3BookSettings({
                 >
                   ✕
                 </button>
+                {verifyState === 'ok' && verifyResult?.displayName && (
+                  <span className="basis-full text-xs text-gray-500 truncate" title={verifyResult.displayName}>
+                    {verifyResult.displayName}
+                  </span>
+                )}
+                {verifyState === 'fail' && (
+                  <div className="basis-full flex items-center gap-2 text-xs">
+                    <span className="text-red-600">
+                      {language === 'de'
+                        ? 'Ort nicht gefunden. Bitte korrigieren oder ohne Ort weitermachen.'
+                        : language === 'fr'
+                        ? 'Lieu introuvable. Veuillez corriger ou continuer sans lieu.'
+                        : 'Location not found. Please re-enter or continue without a location.'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleClearLocation}
+                      className="font-medium text-indigo-600 hover:text-indigo-700 underline"
+                    >
+                      {language === 'de'
+                        ? 'Ohne Ort weitermachen'
+                        : language === 'fr'
+                        ? 'Continuer sans lieu'
+                        : 'Continue without location'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : userLocation?.city ? (
               <div className="flex items-center gap-2">
@@ -377,7 +486,7 @@ export function WizardStep3BookSettings({
                   {userLocation.city}{userLocation.country ? `, ${userLocation.country}` : ''}
                 </span>
                 <button
-                  onClick={() => setIsEditingLocation(true)}
+                  onClick={handleStartEditing}
                   className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200"
                   title={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
                   aria-label={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
@@ -399,7 +508,7 @@ export function WizardStep3BookSettings({
                   {language === 'de' ? 'Kein Ort' : language === 'fr' ? 'Aucun lieu' : 'No location'}
                 </span>
                 <button
-                  onClick={() => setIsEditingLocation(true)}
+                  onClick={handleStartEditing}
                   className="text-xs font-medium text-indigo-500 hover:text-indigo-600 flex items-center gap-0.5"
                 >
                   <Plus size={12} />

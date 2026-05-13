@@ -2374,6 +2374,25 @@ export const storyService = {
     }
   },
 
+  // Verify a user-entered location via Nominatim (OSM). Used by the wizard
+  // to confirm city/PLZ exist before story generation. Country defaults to
+  // Switzerland on the server when omitted.
+  async verifyLocation(input: { city?: string; plz?: string; country?: string }): Promise<{
+    verified: boolean;
+    city?: string | null;
+    country?: string | null;
+    plz?: string | null;
+    displayName?: string | null;
+    lat?: number | null;
+    lon?: number | null;
+  }> {
+    try {
+      return await api.post('/api/user/verify-location', input);
+    } catch {
+      return { verified: false };
+    }
+  },
+
   // Trigger landmark discovery early (fire and forget)
   // Called as soon as user location is known to give discovery time to complete
   triggerLandmarkDiscovery(city: string | null, country: string | null): void {
