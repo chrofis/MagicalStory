@@ -79,9 +79,13 @@ router.post('/', authenticateToken, validateBody(schemas.uploadFile), async (req
 });
 
 // Optional auth middleware - doesn't fail if no token
+// Only accepts `Authorization: Bearer <jwt>`. Ignores other schemes (Basic, etc.)
+// so the staging password-gate's Basic credentials don't clobber JWT parsing.
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && /^Bearer\s+/i.test(authHeader)
+    ? authHeader.replace(/^Bearer\s+/i, '')
+    : null;
 
   if (token) {
     try {

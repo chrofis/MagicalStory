@@ -75,10 +75,21 @@ function initSharingRoutes(config) {
 /**
  * Optional auth middleware — sets req.user if valid JWT present, otherwise continues.
  * Checks Authorization header first, then ?token= query param (for <img> tags that can't send headers).
+ *
+ * Only accepts `Authorization: Bearer <jwt>`. Other schemes (notably the
+ * `Basic` credentials the staging password-gate makes browsers attach to
+ * every same-origin request) are ignored and we fall through to the query
+ * token — without this, `<img>` requests on staging carried both Basic
+ * auth AND the JWT in the query, optionalAuth grabbed the Basic creds,
+ * verifyToken failed silently, req.user stayed empty, and the user got a
+ * 404 on their own unshared story.
  */
 function optionalAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
+  const bearerToken = authHeader && /^Bearer\s+/i.test(authHeader)
+    ? authHeader.replace(/^Bearer\s+/i, '')
+    : null;
+  const token = bearerToken || req.query.token;
   if (token) {
     try {
       req.user = verifyToken(token);
