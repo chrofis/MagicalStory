@@ -1677,6 +1677,9 @@ async function initializeDatabase() {
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
+    // metadata column added later — writers do INSERT ... (id, user_id, data, metadata).
+    // Fresh DBs (staging) need this; prod was migrated manually long ago.
+    await dbPool.query(`ALTER TABLE characters ADD COLUMN IF NOT EXISTS metadata JSONB`);
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS stories (
@@ -1687,6 +1690,8 @@ async function initializeDatabase() {
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
+    // metadata column added later — readers do SELECT metadata FROM stories.
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS metadata JSONB`);
 
     // Story sharing columns (migration for existing tables)
     await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT FALSE`);
@@ -2057,6 +2062,63 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_style_lab_story ON style_lab_images(story_id)`);
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_style_lab_unique ON style_lab_images(story_id, page_number, run_id, model_id)`);
+
+    // consolidator_calls — per-call audit for the feedback consolidator.
+    // Same staging vs prod story: prod has it manually, fresh DBs don't.
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS consolidator_calls (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL,
+        page_number INT,
+        round INT,
+        full_prompt TEXT,
+        raw_response TEXT,
+        plan JSONB,
+        usage JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story ON consolidator_calls(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_consolidator_calls_story_page ON consolidator_calls(story_id, page_number, round)`);
+
+    // story_images + story_retry_images tables — prod has them from a manual
+    // migration long ago; fresh DBs (staging) need them created here so the
+    // ALTER TABLE statements below don't blow up with "relation does not exist".
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        image_type VARCHAR(50) NOT NULL,
+        page_number INT,
+        version_index INT NOT NULL DEFAULT 0,
+        image_data TEXT,
+        image_url TEXT,
+        quality_score INT,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_with_page
+      ON story_images(story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_without_page
+      ON story_images(story_id, image_type, version_index) WHERE page_number IS NULL`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_id ON story_images(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_version ON story_images(story_id, version_index)`);
+
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_retry_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        page_number INT NOT NULL,
+        retry_index INT NOT NULL,
+        image_type VARCHAR(50) NOT NULL,
+        grid_index INT,
+        image_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_story ON story_retry_images(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_page ON story_retry_images(story_id, page_number)`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_retry_images_unique ON story_retry_images(story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))`);
 
     // R2 dual-write migrations — the writers (saveStyleLabImage, story_images
     // write path) set image_data=null when the bytes succeed at uploading to
