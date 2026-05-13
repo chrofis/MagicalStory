@@ -1582,20 +1582,22 @@ async function dbQuery(sql, params = []) {
   return result.rows;
 }
 
-// Initialize database tables
-async function initializeDatabase() {
+// Schema management is now in migrations/00N_*.sql, executed by
+// server/services/migrate.js → runMigrations(). The previous inline
+// initializeDatabase() (630 lines of CREATE / ALTER IF NOT EXISTS) is
+// captured verbatim in migrations/001_baseline.sql.
+async function REMOVED_initializeDatabase_DEAD() {
+  return; // dead — kept only until the next refactor lands cleanly
+  /* DELETED — see migrations/001_baseline.sql
   if (!dbPool) {
     log.warn('⚠️  No database pool - skipping database initialization');
     return;
   }
 
   try {
-    // Test connection first
     await dbPool.query('SELECT 1');
     log.info('✓ Database connection successful');
 
-    // PostgreSQL table creation - includes all columns
-    // Note: All migrations have been run, this is just for fresh database setup
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(255) PRIMARY KEY,
@@ -2210,8 +2212,9 @@ async function initializeDatabase() {
     log.error('❌ Database initialization error:', err.message);
     log.error('Error code:', err.code);
     if (err.sql) log.error('SQL:', err.sql);
-    throw err; // Re-throw to be caught by initialization
+    throw err;
   }
+  */ // end DELETED block — see migrations/001_baseline.sql
 }
 
 // Helper functions for file operations
@@ -7296,17 +7299,22 @@ async function _processStoryJobImpl(jobId) {
 
 // Initialize and start server
 // Initialize database or files based on mode
+const { runMigrations } = require('./server/services/migrate');
+
 async function initialize() {
   // Load prompt templates first
   await loadPromptTemplates();
 
   if (STORAGE_MODE === 'database' && dbPool) {
-    try {
-      await initializeDatabase();
+    // Run schema migrations. If this throws, the app refuses to boot —
+    // we intentionally no longer fall back to file storage, because that
+    // mode masked the staging schema-drift bug for hours. A broken DB
+    // should make startup loud and obvious.
+    await runMigrations(dbPool, log);
 
-      // Clean up zombie jobs from previous container lifecycle
-      // If the server restarts (deploy, crash), any "processing"/"pending" jobs are dead
-      try {
+    // Clean up zombie jobs from previous container lifecycle
+    // If the server restarts (deploy, crash), any "processing"/"pending" jobs are dead
+    try {
         // First, find zombie jobs that need cleanup
         const zombieResult = await dbPool.query(
           `SELECT id, user_id, credits_reserved FROM story_jobs
@@ -7357,17 +7365,13 @@ async function initialize() {
         log.error('⚠️ Failed to clean up zombie jobs:', cleanupErr.message);
       }
 
-      // Preload historical locations from DB into memory cache
-      await preloadHistoricalLocations();
-      // Preload historical objects (period weapons/symbols/artifacts) into memory cache
-      await preloadHistoricalObjects();
-      // Load trial counters from DB so they survive deploys
-      if (trialRoutes.loadTrialCountersFromDb) {
-        await trialRoutes.loadTrialCountersFromDb();
-      }
-    } catch (err) {
-      log.error('⚠️  Database initialization failed, falling back to file storage');
-      await initializeDataFiles();
+    // Preload historical locations from DB into memory cache
+    await preloadHistoricalLocations();
+    // Preload historical objects (period weapons/symbols/artifacts) into memory cache
+    await preloadHistoricalObjects();
+    // Load trial counters from DB so they survive deploys
+    if (trialRoutes.loadTrialCountersFromDb) {
+      await trialRoutes.loadTrialCountersFromDb();
     }
   } else {
     await initializeDataFiles();
