@@ -300,20 +300,21 @@ function buildBlendEditPrompt(scene) {
 
   return `Refine Image 1 into a single cohesive children's book illustration in ${styleLine}.
 
-Image 1 (THIS IMAGE) already contains real characters pasted onto a clean scene background. They are at the correct positions, sizes, and body directions. Your job is to BLEND them into the scene — not to redraw, restage, or add anything.
+Image 1 (THIS IMAGE) already contains real characters pasted onto a clean scene background. The characters are at the correct positions, sizes, and body directions. Your job is to BLEND them into the scene and ADD any REQUIRED OBJECTS that the brief names but the staged composite is missing.
 
 DO:
 - Harmonise the lighting on each character so it matches the scene's light direction and colour temperature.
 - Soften pasted cutout edges so they read as painted, not stickered.
 - Add a subtle ground shadow under each character's feet, consistent with the scene light.
+- ADD every REQUIRED OBJECT named in the brief that is missing from the staged scene — render each one according to its description, placed where the EXACT POSES say a character interacts with it (e.g. a "treasure chest" the brief names should appear at the feet / in front of the character whose pose says "leans over the chest"; a "parchment map" should appear in the hands of the character whose pose says "holds the map between both hands"). Make these objects look like they belong in the scene's lighting and style.
 - If any solid red, blue, green, orange, magenta or yellow outlines or fringes are visible around or beneath a character (silhouette residue from the blocking step), paint over them with the surrounding scene colour. The final image must contain NO solid-colour outlines.
 
 DO NOT:
 - Move, resize, rotate, mirror, or change the facing direction of any character — their pixel position and pose are already correct.
 - Add, remove, or substitute any character.
 - Change any character's face, hair, age, body proportions, costume, or accessories — match the labelled portrait grid (Image 2) exactly.
-- Add or remove any object from a character's hands.
-- Modify the background scenery, props, or composition.
+- Add props or scenery that are NOT named in the brief — only required objects from the brief may be added.
+- Restructure the underlying background scenery (architecture, geography, sky). Adding a named required object at the correct position is COMPLETING the scene, not restructuring it.
 - Add text, captions, numbers, or signatures of any kind.${briefBlock}`;
 }
 
