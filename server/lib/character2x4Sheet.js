@@ -167,5 +167,5 @@ module.exports = {
   generateCharacter2x4Sheet,
   loadPhantom,
   // exposed for tests
-  _internal: { buildPrompt, resolveFacePhoto, resolveStyled2x2 },
+  _internal: { buildPrompt, resolveFacePhoto, resolveStandardAvatar },
 };
