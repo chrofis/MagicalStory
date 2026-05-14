@@ -1808,16 +1808,19 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Verify access (impersonation-aware, same shape as retry-images)
+    // Verify access (impersonation-aware, same shape as retry-images). Also
+    // remember which user the story belongs to so we can fetch their 2×4
+    // character sheets to display alongside the composite stages.
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
-      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      rows = await dbQuery('SELECT id, user_id FROM stories WHERE id = $1', [id]);
     } else {
-      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      rows = await dbQuery('SELECT id, user_id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     }
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
+    const storyUserId = rows[0].user_id;
 
     const stageTypes = ['composite_clean_bg', 'composite_blocking', 'composite_composited', 'scene'];
     const [cleanBg, blocking, composited, finalScene] = await Promise.all(
@@ -1838,6 +1841,37 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     );
     const meta = metaRows[0] || {};
 
+    // Look up each cast member's 2×4 reference sheet so the dev panel can
+    // show what was cropped from to produce the cutouts. We resolve the
+    // clothing key per character from the page-level perCharClothing on the
+    // JSONB blob — falls back to sheet2x4_standard if a specific costume
+    // sheet isn't cached.
+    const sheetsByCharacter = {};
+    if (meta.bboxes && typeof meta.bboxes === 'object') {
+      const perCharRow = await dbQuery(
+        `SELECT scene->'sceneCharacterClothing' AS clothing
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+        [id, pageNum]
+      );
+      const perChar = perCharRow[0]?.clothing || {};
+      const charsRow = await dbQuery(
+        `SELECT data->'characters' AS chars FROM characters WHERE id = $1`,
+        [`characters_${storyUserId}`]
+      );
+      const chars = charsRow[0]?.chars || [];
+      for (const name of Object.keys(meta.bboxes)) {
+        const char = chars.find(c => (c?.name || '').toLowerCase() === name.toLowerCase());
+        if (!char?.avatars) continue;
+        const clothing = (perChar[name] || 'standard').toLowerCase();
+        const sheetField = `sheet2x4_${clothing.replace(/[^a-z0-9]/gi, '_')}`;
+        const v = char.avatars[sheetField] || char.avatars.sheet2x4_standard;
+        if (!v) continue;
+        const url = typeof v === 'string' ? v : (v.imageUrl || null);
+        if (url) sheetsByCharacter[name] = { url, clothing };
+      }
+    }
+
     res.json({
       pageNumber: pageNum,
       stages: {
@@ -1850,6 +1884,7 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
       blockingPrompt: meta.blocking_prompt || null,
       cleanBgPrompt: meta.clean_bg_prompt || null,
       cleanBgSource: meta.clean_bg_source || null,
+      sheets: sheetsByCharacter,
     });
   } catch (err) {
     console.error('❌ Error fetching composite stages:', err);

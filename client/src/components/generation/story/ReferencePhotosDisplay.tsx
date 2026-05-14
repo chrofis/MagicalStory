@@ -91,6 +91,7 @@ export function ReferencePhotosDisplay({
     blockingPrompt: string | null;
     cleanBgPrompt: string | null;
     cleanBgSource: string | null;
+    sheets: Record<string, { url: string; clothing: string }>;
   } | null>(null);
   const [compositeStagesLoading, setCompositeStagesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -160,6 +161,7 @@ export function ReferencePhotosDisplay({
           blockingPrompt: data.blockingPrompt,
           cleanBgPrompt: data.cleanBgPrompt,
           cleanBgSource: data.cleanBgSource,
+          sheets: data.sheets || {},
         });
       }
     } finally {
@@ -472,6 +474,31 @@ export function ReferencePhotosDisplay({
               );
             })}
           </div>
+
+          {compositeStages?.sheets && Object.keys(compositeStages.sheets).length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                {language === 'de' ? '2×4-Referenzblätter (Input für die Cutouts)' : '2×4 reference sheets (cutout source)'}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {Object.entries(compositeStages.sheets).map(([name, info]) => (
+                  <div key={name} className="text-center">
+                    <div className="text-[10px] text-purple-600 mb-1">
+                      <span className="font-medium">{name}</span> <span className="text-purple-400">— {info.clothing}</span>
+                    </div>
+                    <img
+                      draggable={false}
+                      src={info.url}
+                      alt={`${name} — 2×4 sheet`}
+                      className="w-full max-h-32 object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setLightboxImage(info.url)}
+                      title={`${name} (${info.clothing}) — click to enlarge`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {compositeBboxes && Object.keys(compositeBboxes).length > 0 && (
             <div className="mt-2 text-[10px] text-purple-600">

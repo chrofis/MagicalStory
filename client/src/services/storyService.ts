@@ -755,6 +755,7 @@ export const storyService = {
     blockingPrompt: string | null;
     cleanBgPrompt: string | null;
     cleanBgSource: 'reused-empty-scene' | 'grok-generate' | null;
+    sheets: Record<string, { url: string; clothing: string }>;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');
