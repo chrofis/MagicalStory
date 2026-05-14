@@ -568,12 +568,21 @@ Based on the story draft, determine which clothing variants each character needs
 - **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
 - **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
-- **Distinct Styles — two tests every costumed description must pass:**
+- **Distinct Styles — three tests every costumed description must pass:**
   1. **Different primary garment color**: No two characters may describe the same dominant color word (e.g., if one wears "dark blue cloak", no other character can wear "dark blue" anything — pick a different color for each).
   2. **Different silhouette**: At least one of {garment type, length, cut} must differ. Not just different buttons, accessories, or trim.
-  - WRONG (all fail both tests): three characters each "dark blue cloak with silver stars" with different buckles/brooches
-  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe"
-  - RIGHT: one "dark blue knee-length cloak", another "crimson red short tunic with rope belt", another "emerald green long robe with wide sleeves"
+  3. **Costume-faithful signature**: the description MUST include at least TWO signature visual elements that identify the costume type at a glance. Generic "shirt + trousers + boots" with only colour variation FAILS — a reader must recognise the costume from the description alone. Examples per costume type (pick two or more per character):
+     - **Pirate**: striped shirt; leather vest with metal buttons; wide sash at the waist; boots tucked into trousers / tall cuffed boots; hoop earring; eyepatch.
+     - **Knight**: chainmail or scale armour; tabard or surcoat with heraldic colours; gauntlets; scabbard or sword belt; greaves over the boots.
+     - **Wizard**: pointed hood (no face cover); star- or moon-patterned robe; rope-cord belt; oversized sleeves; staff loop on the belt.
+     - **Medieval / Mittelalterliche**: linen tunic with leather lacings; hose / breeches; pointed leather shoes; wide leather belt with pouch; hooded short cape.
+     - **Cowboy**: fringed leather vest; bandana at the neck; chaps over the trousers; tall cuffed boots; large oval belt buckle.
+     - **1920s**: drop-waist dress / pinstripe waistcoat; T-bar shoes / two-tone oxfords; long pearl strand / bow tie; cloche or newsboy silhouette (no full face cover).
+     - For costume types not listed above: invent two signature elements that any child looking at a picture-book illustration would name as "that's a <costume>" — and write them into the description verbatim.
+  - WRONG (fails test 3): "headwear: none; top: burgundy wool vest over white undershirt; bottom: charcoal trousers; footwear: black leather boots; belt: burgundy sash" — colour-varied but no pirate signature → reads as a peasant.
+  - WRONG (all fail tests): three characters each "dark blue cloak with silver stars" with different buckles/brooches.
+  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe".
+  - RIGHT (pirate): "headwear: none; top: red-and-white striped linen shirt with rolled sleeves under a brown leather vest with brass buttons; bottom: dark indigo trousers tucked into tall cuffed black leather boots; belt/waist: wide crimson sash with a brass-buckled leather strap; outer layer: none; accessories: gold hoop earring".
 
 **Output format:**
 ```json

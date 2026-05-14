@@ -23,7 +23,7 @@ const PHOTOS_DIR = path.resolve(__dirname, 'fixtures', 'demo-photos');
 
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'DemoStory2026!';
 const ROTATION_STATE_FILE = path.join(__dirname, 'demo-rotation-state.json');
-const STORY_PAGES = 14;
+const STORY_PAGES = parseInt(process.env.DEMO_PAGES || '14', 10);
 const WIZARD_TIMEOUT = 90 * 60 * 1000;  // 90 min — full UI create (5 chars × 6 sub-steps) + avatar wait + story wizard
 
 // ─── Multilingual UI labels ────────────────────────────────────────────────
