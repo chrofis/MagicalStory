@@ -2255,12 +2255,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.message = 'Generating avatars...';
     job.progress = 10;
 
-    // `referencePhoto` is the reference image the generator edits — typically the
-    // bg-removed body photo with the user's clothing visible. Despite the
-    // old field name "facePhoto" (kept on the wire as `referencePhoto` since
-    // the 2026-05 rename), this is NOT a face crop — Grok's edit endpoint
-    // needs to see the clothing it's transforming.
-    const { characterId, referencePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
+    // `referencePhoto` is the bg-removed body photo with the user's clothing
+    // visible — what Grok edits to apply the seasonal outfit.
+    // `facePhoto` is the separate high-res face crop the Python service
+    // produced. We send both as Grok edit references: the body anchors
+    // outfit/pose, the face anchors identity (eyes/hair/skin) at full
+    // resolution since the face is tiny in the body crop.
+    const { characterId, referencePhoto, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
 
     // Import the actual generation logic (reuse from sync path)
     // For now, we'll make a simplified version that calls the same helpers
@@ -2390,7 +2391,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
             try {
-              const result = await editWithGrok(avatarPrompt, [finalPhoto], {
+              // Send body AND face crop as references. Body anchors outfit/pose,
+              // face provides identity at full resolution (the face area in the
+              // body crop is tiny — ~100px in a 432-wide canvas — too small for
+              // Grok to faithfully replicate in the face-dominant top quadrants).
+              const grokRefs = facePhoto ? [finalPhoto, facePhoto] : [finalPhoto];
+              const result = await editWithGrok(avatarPrompt, grokRefs, {
                 aspectRatio: '9:16',
                 resolution: '1k',
                 model: modelConfig?.modelId || 'grok-imagine-image',
@@ -2553,10 +2559,18 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // Upload each avatar to R2 in parallel and store the public URL on
     // results[`${category}Url`]. R2 misconfig or upload failure leaves the
     // URL undefined; the writer below then persists inline as the fallback.
+    //
+    // `r2Version` is a per-regeneration tag baked into every R2 key for this
+    // job (avatars + face/body thumbnails). Without it, regenerations
+    // overwrote the same R2 path (e.g. .../standard.jpg) — Cloudflare's
+    // 4-hour cache + the browser's HTTP cache then served the stale image
+    // even though the new bytes were on R2. With it, every regen produces a
+    // brand-new URL → no cache collision, no "save failed" mirage.
+    const r2Version = Date.now().toString(36);
     const r2UploadPromises = generatedAvatars
       .filter(a => a.imageData && job.userId && characterId)
       .map(async ({ category, imageData }) => {
-        const url = await saveAvatarToR2(job.userId, characterId, category, imageData);
+        const url = await saveAvatarToR2(job.userId, characterId, category, imageData, r2Version);
         return { category, url };
       });
     const r2Results = await Promise.all(r2UploadPromises);
@@ -2605,7 +2619,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             results.faceThumbnails[category] = splitResult.faceThumbnail;
             log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
             if (job.userId && characterId) {
-              const u = await saveAvatarThumbToR2(job.userId, characterId, 'face', category, splitResult.faceThumbnail);
+              const u = await saveAvatarThumbToR2(job.userId, characterId, 'face', category, splitResult.faceThumbnail, r2Version);
               if (u) {
                 if (!results.faceThumbnailsUrl) results.faceThumbnailsUrl = {};
                 results.faceThumbnailsUrl[category] = u;
@@ -2617,7 +2631,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             results.bodyThumbnails[category] = splitResult.quadrants.bodyFront;
             log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} body thumbnail`);
             if (job.userId && characterId) {
-              const u = await saveAvatarThumbToR2(job.userId, characterId, 'body', category, splitResult.quadrants.bodyFront);
+              const u = await saveAvatarThumbToR2(job.userId, characterId, 'body', category, splitResult.quadrants.bodyFront, r2Version);
               if (u) {
                 if (!results.bodyThumbnailsUrl) results.bodyThumbnailsUrl = {};
                 results.bodyThumbnailsUrl[category] = u;
@@ -3266,12 +3280,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    // `referencePhoto` is the reference image the generator edits (typically the
-    // bg-removed body with clothing visible — Grok needs to see the clothing it
-    // transforms). Wire field accepts both `referencePhoto` (new) and `facePhoto`
-    // (legacy name) so older clients keep working through one deploy cycle.
+    // `referencePhoto` is the bg-removed body with clothing visible (what Grok edits).
+    // `facePhoto` is the high-res face crop, used as a SECOND Grok reference so
+    // identity (eyes/hair/skin) survives the 4-quadrant generation. Legacy clients
+    // sent the body under the field name `facePhoto`; we still accept that.
     const referencePhoto = req.body.referencePhoto || req.body.facePhoto;
     const { characterId, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
+    // The new face-crop second-reference. Only set when the client deliberately
+    // sends it via the `facePhoto` field *alongside* `referencePhoto` (so we
+    // don't mistake a legacy single-field call for a multi-ref call).
+    const faceRefPhoto = (req.body.referencePhoto && req.body.facePhoto) ? req.body.facePhoto : null;
     const asyncMode = req.query.async === 'true' || req.body.async === true;
 
     if (!referencePhoto) {
@@ -3822,19 +3840,26 @@ These corrections OVERRIDE what is visible in the reference photo.
     // Upload main avatars + thumbnails to R2 in parallel. R2 misconfig or
     // upload failure leaves URL undefined; the writer below then persists
     // inline as the fallback.
+    //
+    // `r2Version` (see comment in the async-job path above) is baked into
+    // every R2 key for this regen so each run produces a fresh URL. Without
+    // it, Cloudflare's edge cache + the browser HTTP cache continued to
+    // serve the previous avatar bytes for hours after a regeneration,
+    // making it look like the save failed.
+    const r2Version = Date.now().toString(36);
     const r2Uploads = [];
     if (req.user?.id && validCharacterId) {
       for (const { category, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
         if (imageData) {
-          r2Uploads.push(saveAvatarToR2(req.user.id, validCharacterId, category, imageData)
+          r2Uploads.push(saveAvatarToR2(req.user.id, validCharacterId, category, imageData, r2Version)
             .then(url => ({ kind: 'main', category, url })));
         }
         if (faceThumbnail) {
-          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'face', category, faceThumbnail)
+          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'face', category, faceThumbnail, r2Version)
             .then(url => ({ kind: 'face', category, url })));
         }
         if (bodyThumbnail) {
-          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'body', category, bodyThumbnail)
+          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'body', category, bodyThumbnail, r2Version)
             .then(url => ({ kind: 'body', category, url })));
         }
       }

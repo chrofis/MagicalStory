@@ -110,8 +110,15 @@ function keyForOrderPdf(fileId) {
 // existing keyForCharacterPhoto above is *story-scoped* and is for the
 // per-story photo uploads. Avatars live on the characters table, so they
 // need their own key shape rooted at the userId.
-function keyForCharacterAvatar(userId, characterId, slot) {
-  return `characters/${userId}/${characterId}/avatars/${slot}.jpg`;
+// Avatar keys accept an optional `version` so each regeneration writes to a
+// unique R2 path. Without versioning, the URL stayed identical across regens
+// while the bytes changed — Cloudflare and the browser served the stale
+// cached image (Cache-Control: max-age=14400) and the user saw "save failed"
+// even though the new bytes were on R2 and the new URL was in the DB. With a
+// version suffix, every regen produces a fresh URL → no cache collision.
+function keyForCharacterAvatar(userId, characterId, slot, version) {
+  const suffix = version ? `-v${version}` : '';
+  return `characters/${userId}/${characterId}/avatars/${slot}${suffix}.jpg`;
 }
 
 function keyForCharacterStyledAvatar(userId, characterId, key) {
@@ -123,8 +130,9 @@ function keyForCharacterSheet2x4(userId, characterId, sheetField) {
   return `characters/${userId}/${characterId}/avatars/sheet2x4/${sheetField}.png`;
 }
 
-function keyForCharacterThumb(userId, characterId, kind, slot) {
-  return `characters/${userId}/${characterId}/avatars/thumbs/${kind}-${slot}.jpg`;
+function keyForCharacterThumb(userId, characterId, kind, slot, version) {
+  const suffix = version ? `-v${version}` : '';
+  return `characters/${userId}/${characterId}/avatars/thumbs/${kind}-${slot}${suffix}.jpg`;
 }
 
 function keyForVbReference(storyId, entryId) {

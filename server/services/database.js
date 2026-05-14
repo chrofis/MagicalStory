@@ -2003,12 +2003,12 @@ async function upsertStory(storyId, userId, storyData) {
  * @param {string} imageData      - base64 (with or without data: prefix)
  * @returns {Promise<string|null>} public R2 URL, or null on failure
  */
-async function saveAvatarToR2(userId, characterId, slot, imageData) {
+async function saveAvatarToR2(userId, characterId, slot, imageData, version) {
   if (!imageData || !userId || !characterId || !slot) return null;
   try {
     const r2 = require('../lib/r2');
     if (!r2.isConfigured()) return null;
-    const key = r2.keyForCharacterAvatar(userId, characterId, slot);
+    const key = r2.keyForCharacterAvatar(userId, characterId, slot, version);
     return await r2.uploadImage(imageData, key);
   } catch (err) {
     console.warn(`[R2] saveAvatarToR2 upload skipped (${userId}/${characterId}/${slot}): ${err.message}`);
@@ -2140,12 +2140,12 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
  * @param {string} imageData      - base64
  * @returns {Promise<string|null>}
  */
-async function saveAvatarThumbToR2(userId, characterId, kind, slot, imageData) {
+async function saveAvatarThumbToR2(userId, characterId, kind, slot, imageData, version) {
   if (!imageData || !userId || !characterId || !kind || !slot) return null;
   try {
     const r2 = require('../lib/r2');
     if (!r2.isConfigured()) return null;
-    const key = r2.keyForCharacterThumb(userId, characterId, kind, slot);
+    const key = r2.keyForCharacterThumb(userId, characterId, kind, slot, version);
     return await r2.uploadImage(imageData, key);
   } catch (err) {
     console.warn(`[R2] saveAvatarThumbToR2 upload skipped (${userId}/${characterId}/${kind}/${slot}): ${err.message}`);
