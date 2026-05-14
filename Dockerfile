@@ -5,8 +5,10 @@
 # `# check=skip=` next to the ARG itself doesn't work.
 # check=skip=SecretsUsedInArgOrEnv
 
-# Use Node.js 18 base image with Python pre-installed
-FROM node:18
+# Use Node.js 22 LTS base image with Python pre-installed.
+# Bumped from Node 18 (EOL for AWS SDK v3 in Jan 2026); Node 22 is the
+# current LTS, supported through April 2027.
+FROM node:22
 
 # Install Python and pip
 RUN apt-get update && apt-get install -y \
