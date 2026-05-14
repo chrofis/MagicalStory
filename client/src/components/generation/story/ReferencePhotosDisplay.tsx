@@ -536,8 +536,13 @@ export function ReferencePhotosDisplay({
         </details>
       )}
 
-      {/* ═══ Pass 2: Character Placement ═══ */}
-      {displayEmptySceneImage && (
+      {/* ═══ Pass 2: Character Placement ═══
+          Direct-path only — when composite ran, the 🧩 Szene-Composite section
+          above shows the actual cutout/paste pipeline. Hiding Pass 2 here
+          prevents both renderers from showing for the same page (composite
+          doesn't place via character ref images, so the Pass-2 'Eingaben' chips
+          are misleading for composite stories). */}
+      {displayEmptySceneImage && !hasCompositeStages && (
         <div className="mt-3 bg-pink-50 border border-pink-200 rounded-lg p-3 space-y-2">
           <div className="text-xs font-semibold text-pink-700 flex items-center gap-1">
             👥 {language === 'de' ? 'Pass 2: Charaktere platzieren' : 'Pass 2: Character Placement'}
