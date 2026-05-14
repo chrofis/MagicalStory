@@ -5473,23 +5473,38 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     || pageData.emptyScenePrompt
                     || pageData.scene?.sceneDescription
                     || pageData.prompt;
+                  // Strip the scene-prose (first 1-3 paragraphs) from
+                  // pageData.prompt — the composited image already shows the
+                  // staged scene; keeping the prose in the brief blows past
+                  // Grok's 8000-char edit limit on 4-5 cast pages. Start the
+                  // brief at the first structured section header.
+                  const rawBrief = pageData.prompt || '';
+                  const headerIdx = rawBrief.search(/\*\*(THIS IMAGE DEPICTS|Clothing|HEIGHT ORDER|REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)/i);
+                  let compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
+                  if (compositeBrief.length > 5500) {
+                    compositeBrief = compositeBrief.slice(0, 5500).trim();
+                  }
+                  // Visual Bible grid: buildVisualBibleGrid returns a Buffer
+                  // at this point in the pipeline (R2 upload runs later). Grok
+                  // edit needs each ref as a data URI string — a raw Buffer
+                  // serialises into {"type":"Buffer","data":[...]} which the
+                  // xAI API rejects with 422 "invalid type: map".
+                  const vbGrid = pageData.visualBibleGrid;
+                  const vbGridUri = Buffer.isBuffer(vbGrid)
+                    ? `data:image/jpeg;base64,${vbGrid.toString('base64')}`
+                    : (typeof vbGrid === 'string' && vbGrid ? vbGrid : null);
                   const compResult = await generateSceneComposite({
                     cleanBackgroundPrompt: cleanBgPrompt,
                     existingCleanBackground: existingEmptyScene,
                     scene: {
                       description: pageData.scene?.sceneDescription || '',
                       action: pageData.scene?.text || '',
-                      // Pass the fully-built page prompt (clothing per char,
-                      // height order, required objects, EXACT POSES, scene
-                      // intent) as the blend brief — same source of truth as
-                      // the legacy direct-prompt path.
-                      pageBrief: pageData.prompt || '',
+                      pageBrief: compositeBrief,
                       artStyle: inputData?.artStyle || 'watercolor',
                     },
                     cast: compositeCast,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-                    // Labelled portrait grid → blend step uses it as Image 2.
-                    visualBibleGridImage: pageData.visualBibleGrid || null,
+                    visualBibleGridImage: vbGridUri,
                     // Phantom-pose render: per-story opt-in, falls back to
                     // MODEL_DEFAULTS.phantomPoseRender (default false).
                     phantomPoseRender: typeof inputData?.phantomPoseRender === 'boolean'
