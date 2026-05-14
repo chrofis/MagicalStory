@@ -5309,6 +5309,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           || [];
         const sceneChars = Array.isArray(metaChars) ? metaChars : [];
         if (!sceneChars.length) return null;
+        // Per-character action lookup from interactions[] — the blocking prompt
+        // needs to know what each character is DOING (affects silhouette pose/arms),
+        // not what they look like (silhouette is solid colour, identity comes later).
+        const interactionsList = pageData.sceneMetadata?.fullData?.interactions
+          || pageData.sceneMetadata?.interactions
+          || pageData.scene?.interactions
+          || [];
+        const actionsByChar = new Map();
+        if (Array.isArray(interactionsList)) {
+          // Essentials first, then normal, then low — keeps the most important action.
+          const prio = { essential: 0, normal: 1, low: 2 };
+          const sorted = [...interactionsList].sort((a, b) =>
+            (prio[a.priority] ?? 1) - (prio[b.priority] ?? 1));
+          for (const it of sorted) {
+            if (!it?.character || !it?.where) continue;
+            const key = String(it.character).toLowerCase();
+            if (!actionsByChar.has(key)) actionsByChar.set(key, it.where);
+          }
+        }
         const { generateCharacter2x4Sheet } = require('./server/lib/character2x4Sheet');
         const artStyleKey = inputData.artStyle || 'watercolor';
         const out = [];
@@ -5378,7 +5397,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sheetBuf,
             pose,
             flip,
-            description: sc.description || character.description || name,
+            action: actionsByChar.get(name.toLowerCase()) || null,
             position: sc.position || 'in the scene',
             sizeHint: sc.depth === 'background' ? 'small in the distance' : (sc.depth === 'midground' ? 'medium' : undefined),
           });

@@ -260,10 +260,14 @@ function buildBlockingEditPrompt(scene, cast) {
       profile:      `profile view, ${direction}`,
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || `three-quarter view, ${direction}`;
-    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.description || c.name}, ${posHint}, ${poseLabel}. Size: ${sizeHint}.`;
+    // Action shapes the silhouette (arms reaching, hands together, kneeling, etc.).
+    // Identity (hair, eyes, features) is intentionally NOT here — silhouette is one
+    // solid colour, those details belong to the final blend step.
+    const actionClause = c.action ? `, ${c.action}` : '';
+    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.`;
   }).join('\n');
 
-  return `Keep the scene background EXACTLY as it is in this image — every pixel of the setting must remain pixel-identical. Only ADD ${cast.length} flat-colour silhouette figures into the scene at the positions below. The silhouettes are solid uniform colour shapes — no faces, no clothing details, no texture.
+  return `Keep the scene background EXACTLY as it is in this image — every pixel of the setting must remain pixel-identical. Only ADD ${cast.length} flat-colour silhouette figures into the scene at the positions below. The silhouettes are solid uniform colour shapes — no faces, no clothing details, no texture. The action phrase for each character determines posture, arm placement, and gaze direction so the silhouette shape reads correctly; ignore appearance.
 
 ${lines}
 
