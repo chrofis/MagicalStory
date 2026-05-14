@@ -60,7 +60,7 @@ async function regenerateAvatars() {
       },
       body: JSON.stringify({
         characterId: char.characterId,
-        facePhoto: char.photo_url,
+        referencePhoto: char.photo_url,
         name: char.name,
         age: char.age,
         gender: char.gender,

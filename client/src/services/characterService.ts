@@ -569,7 +569,7 @@ export const characterService = {
         error?: string;
       }>('/api/generate-clothing-avatars?async=true', {
         characterId: character.id,
-        facePhoto: inputPhoto,
+        referencePhoto: inputPhoto,  // body-no-bg with clothing visible (Grok edits this)
         physicalDescription,
         name: character.name,
         age: character.age,
@@ -822,7 +822,7 @@ export const characterService = {
         error?: string;
       }>('/api/generate-clothing-avatars?async=true', {
         characterId: character.id,
-        facePhoto: inputPhoto,
+        referencePhoto: inputPhoto,  // body-no-bg with clothing visible (Grok edits this)
         physicalDescription,
         name: character.name,
         age: character.age,

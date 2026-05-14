@@ -2255,7 +2255,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.message = 'Generating avatars...';
     job.progress = 10;
 
-    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
+    // `referencePhoto` is the reference image the generator edits — typically the
+    // bg-removed body photo with the user's clothing visible. Despite the
+    // old field name "facePhoto" (kept on the wire as `referencePhoto` since
+    // the 2026-05 rename), this is NOT a face crop — Grok's edit endpoint
+    // needs to see the clothing it's transforming.
+    const { characterId, referencePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
 
     // Import the actual generation logic (reuse from sync path)
     // For now, we'll make a simplified version that calls the same helpers
@@ -2288,20 +2293,19 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     };
 
     // Log photo info
-    const photoSizeKB = Math.round(facePhoto.length / 1024);
-    log.info(`[AVATAR JOB ${jobId}] 📸 Input face photo: ${photoSizeKB}KB`);
+    const photoSizeKB = Math.round(referencePhoto.length / 1024);
+    log.info(`[AVATAR JOB ${jobId}] 📸 Input reference photo: ${photoSizeKB}KB`);
 
-    // Keep face photo at 768px for quality — Gemini 2.5 Flash handles this fine
-    // Face photo is already a tight HQ crop from Python service (768x768 JPEG q95)
+    // Resize to 768px so Grok/Gemini get a consistent input size.
     const sharp = require('sharp');
-    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = referencePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 92 })
       .toBuffer();
     const finalPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`[AVATAR JOB ${jobId}] Prepared face photo: ${Math.round(finalPhoto.length / 1024)}KB for Gemini (was ${photoSizeKB}KB)`);
+    log.info(`[AVATAR JOB ${jobId}] Prepared reference photo: ${Math.round(finalPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
     const base64Data = finalPhoto.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
       finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
@@ -2650,11 +2654,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
       try {
         // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
-        const photoTraitsPromise = extractTraitsWithGemini(facePhoto);
+        const photoTraitsPromise = extractTraitsWithGemini(referencePhoto);
 
         // Evaluate all avatars in parallel
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-          const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
+          const faceMatchResult = await evaluateAvatarFaceMatch(referencePhoto, imageData, geminiApiKey);
           return { category, faceMatchResult };
         });
 
@@ -2810,7 +2814,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             // Re-evaluate
-            const retryEval = await evaluateAvatarFaceMatch(facePhoto, retryGen.imageData, geminiApiKey);
+            const retryEval = await evaluateAvatarFaceMatch(referencePhoto, retryGen.imageData, geminiApiKey);
             const retryScore = retryEval?.score ?? 0;
             log.debug(`🔄 [AVATAR JOB ${jobId}] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 
@@ -3253,11 +3257,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
+    // `referencePhoto` is the reference image the generator edits (typically the
+    // bg-removed body with clothing visible — Grok needs to see the clothing it
+    // transforms). Wire field accepts both `referencePhoto` (new) and `facePhoto`
+    // (legacy name) so older clients keep working through one deploy cycle.
+    const referencePhoto = req.body.referencePhoto || req.body.facePhoto;
+    const { characterId, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
     const asyncMode = req.query.async === 'true' || req.body.async === true;
 
-    if (!facePhoto) {
-      return res.status(400).json({ error: 'Missing facePhoto' });
+    if (!referencePhoto) {
+      return res.status(400).json({ error: 'Missing referencePhoto' });
     }
 
     // Validate characterId - must be a valid number for DB lookup
@@ -3297,8 +3306,10 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         message: 'Avatar generation started. Poll /api/avatar-jobs/' + jobId + ' for status.'
       });
 
-      // Update body with validated characterId for background processing
-      const validatedBody = { ...req.body, characterId: validCharacterId };
+      // Update body with validated characterId for background processing.
+      // Normalize the legacy `facePhoto` wire field into `referencePhoto`
+      // so processAvatarJobInBackground sees a single canonical name.
+      const validatedBody = { ...req.body, characterId: validCharacterId, referencePhoto };
 
       // Continue processing in background (don't await)
       processAvatarJobInBackground(jobId, validatedBody, req.user, geminiApiKey).catch(err => {
@@ -3349,13 +3360,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     };
 
     // SYNC PATH: Resize photos for Gemini to avoid IMAGE_OTHER errors (matches async path logic)
-    const photoSizeKB = Math.round(facePhoto.length / 1024);
-    const isPNG = facePhoto.startsWith('data:image/png');
-    log.info(`👔 [CLOTHING AVATARS] 📸 Input photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+    const photoSizeKB = Math.round(referencePhoto.length / 1024);
+    const isPNG = referencePhoto.startsWith('data:image/png');
+    log.info(`👔 [CLOTHING AVATARS] 📸 Input reference photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
 
-    // Keep face photo at 768px for quality — Gemini 2.5 Flash handles this fine
+    // Resize reference photo to 768px so the generator gets a consistent input size.
     const sharp = require('sharp');
-    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = referencePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
@@ -3433,7 +3444,7 @@ These corrections OVERRIDE what is visible in the reference photo.
     // safety refusals on adult-face photos left avatars permanently 'pending'.
     const generateAvatarWithGrok = async (category, avatarPrompt) => {
       try {
-        const result = await editWithGrok(avatarPrompt, [facePhoto], {
+        const result = await editWithGrok(avatarPrompt, [referencePhoto], {
           aspectRatio: '9:16',
           resolution: '1k',
           model: modelConfig?.modelId || 'grok-imagine-image',
@@ -3474,7 +3485,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         log.debug(`🎨 [ACE++] Generating ${category} avatar with face reference`);
         log.debug(`🎨 [ACE++] Prompt length: ${acePrompt.length} chars`);
 
-        const result = await generateAvatarWithACE(facePhoto, acePrompt, {
+        const result = await generateAvatarWithACE(referencePhoto, acePrompt, {
           width: 768,
           height: 1024,
           identityStrength: 0.8
@@ -3509,7 +3520,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           width: 576,  // 9:16 aspect ratio
           height: 1024,
           steps: 4,
-          referenceImages: [facePhoto]  // Use face photo as reference
+          referenceImages: [referencePhoto]  // Reference body/face photo for IP-Adapter
         });
 
         if (result?.imageData) {
@@ -3594,8 +3605,8 @@ These corrections OVERRIDE what is visible in the reference photo.
           if (isGrokConfigured()) {
             try {
               const grokModel = selectedModel === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-              // Use face photo as reference image
-              const refImages = [facePhoto];
+              // Use the body-clothed reference photo as input — Grok edits it.
+              const refImages = [referencePhoto];
               const result = await editWithGrok(avatarPrompt, refImages, { model: grokModel, aspectRatio: '9:16' });
               if (result.imageData) {
                 log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok Imagine`);
@@ -3869,10 +3880,10 @@ These corrections OVERRIDE what is visible in the reference photo.
       const evalStart = Date.now();
 
       // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
-      const photoTraitsPromise = extractTraitsWithGemini(facePhoto);
+      const photoTraitsPromise = extractTraitsWithGemini(referencePhoto);
 
       const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
+        const faceMatchResult = await evaluateAvatarFaceMatch(referencePhoto, imageData, geminiApiKey);
         return { category, faceMatchResult };
       });
 
@@ -4008,7 +4019,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
 
           // Re-evaluate
-          const retryEval = await evaluateAvatarFaceMatch(facePhoto, retryResult.imageData, geminiApiKey);
+          const retryEval = await evaluateAvatarFaceMatch(referencePhoto, retryResult.imageData, geminiApiKey);
           const retryScore = retryEval?.score ?? 0;
           log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 
