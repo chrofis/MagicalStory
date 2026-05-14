@@ -33,9 +33,6 @@ export default defineConfig((env) => {
               if (id.includes('node_modules/lucide-react')) {
                 return 'vendor-icons';
               }
-              if (id.includes('node_modules/html2pdf') || id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
-                return 'vendor-pdf';
-              }
 
               // EVERYTHING ELSE from node_modules goes into one vendor-react chunk.
               //

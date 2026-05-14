@@ -10,10 +10,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-
-// Extend Window for html2pdf
-declare global {
-  interface Window {
-    html2pdf: typeof import('html2pdf.js');
-  }
-}

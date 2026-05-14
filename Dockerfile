@@ -27,8 +27,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY requirements.txt ./
 
-# Install Node.js dependencies for server
-RUN npm install --production
+# Install Node.js dependencies for server (--omit=dev replaces the deprecated
+# --production flag).
+RUN npm install --omit=dev
 
 # Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
 # files.pythonhosted.org occasionally stalls mid-download — give pip more
