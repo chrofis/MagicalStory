@@ -149,7 +149,7 @@ Write one continuous paragraph, 250–350 words. Open with the main subject and 
 ```
 METADATA:
 {
-  "sceneIntent": "One present-tense sentence naming the single moment this image depicts. Names every character physically present in that moment and the action between them.",
+  "sceneIntent": "2-3 present-tense sentences naming the single moment this image depicts. First sentence: who is doing what to whom, where. Second sentence: what each named character physically holds, reaches for, or gazes at. Third sentence: setting + lighting + mood. Every character physically present must be named.",
   "characters": [
     { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed:type", "depth": "foreground", "pose": "profile", "flip": false },
     { "name": "Name", "position": "behind Roger, gripping the boat's far side", "clothing": "standard", "depth": "midground", "perspective": "back view", "pose": "back", "flip": false }
@@ -173,7 +173,7 @@ METADATA:
 }
 ```
 
-**`sceneIntent`** (required): one sentence, present tense, naming the single moment the image depicts. Every named person in `sceneIntent` MUST appear in `characters[]` with a `position`. Every entry in `characters[]` MUST be doing something visible in `sceneIntent` or in an `interactions[]` entry. The sentence answers: who is doing what to whom, where. Pick ONE temporal moment — bolt mid-flight OR aftermath, not both. Do not stitch cause+effect ("X shoots Y, the horse stands riderless" = two moments; pick the one the image will render). Do not include characters who appear in adjacent paragraphs of the page text but are not physically present at this chosen moment.
+**`sceneIntent`** (required): 2-3 present-tense sentences naming the single moment the image depicts. Every named person in `sceneIntent` MUST appear in `characters[]` with a `position`. Every entry in `characters[]` MUST be doing something visible in `sceneIntent` or in an `interactions[]` entry. The sentences answer: who is doing what to whom and where (sentence 1), what each character physically holds / reaches for / gazes at (sentence 2), setting + lighting + mood (sentence 3). Pick ONE temporal moment — bolt mid-flight OR aftermath, not both. Do not stitch cause+effect ("X shoots Y, the horse stands riderless" = two moments; pick the one the image will render). Do not include characters who appear in adjacent paragraphs of the page text but are not physically present at this chosen moment.
 
 **Coherence self-check (mandatory before returning each page):**
 1. Does the prose visually describe what `sceneIntent` says? If `sceneIntent` says "X shoots Y" but the prose only describes Y's empty horse with no Y on it, REWRITE the prose to place Y in the frame.
