@@ -135,8 +135,9 @@ async function findColorBbox(buf, hex) {
 
 // ─── Sheet cell helpers ───────────────────────────────────────────────────
 
-/** Crop one of 8 cells from a 2×4 sheet. 1-indexed. */
-async function cropSheetCell(sheetBuf, cellIdx) {
+/** Crop one of 8 cells from a 2×4 sheet by fixed math. 1-indexed.
+ *  Used as the fallback when edge-detected splitting is unavailable. */
+async function cropSheetCellFixed(sheetBuf, cellIdx) {
   const meta = await sharp(sheetBuf).metadata();
   const cellW = Math.floor(meta.width / 4);
   const cellH = Math.floor(meta.height / 2);
@@ -146,6 +147,51 @@ async function cropSheetCell(sheetBuf, cellIdx) {
     .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
     .png()
     .toBuffer();
+}
+
+/**
+ * Split a 2×4 sheet into 8 cells by EDGE DETECTION (Python /split-reference-sheet,
+ * variance-based separator search), not fixed math. Returns an array of 8
+ * PNG buffers in row-major order: cells[0..3] = top-row face cells,
+ * cells[4..7] = bottom-row body cells. Cell index 1-8 maps to array index 0-7.
+ *
+ * On failure (Python service unreachable / errors), throws — caller falls
+ * back to cropSheetCellFixed per-cell.
+ */
+async function splitSheetByEdgeDetection(sheetBuf) {
+  const b64 = sheetBuf.toString('base64');
+  const r = await fetch(`${PHOTO_ANALYZER_URL}/split-reference-sheet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: `data:image/png;base64,${b64}`, count: 8, cols: 4, rows: 2 }),
+  });
+  if (!r.ok) throw new Error(`split-reference-sheet HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.success || !Array.isArray(data.cells)) {
+    throw new Error(`split-reference-sheet bad response: ${data.error || JSON.stringify(data).slice(0,120)}`);
+  }
+  return data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
+}
+
+/**
+ * Get one cell from a sheet — uses edge detection when possible, falls back to
+ * fixed math. The split result is memoised per sheetBuf so all 8 cells share a
+ * single Python call.
+ */
+const _sheetSplitCache = new WeakMap();
+async function cropSheetCell(sheetBuf, cellIdx) {
+  if (!_sheetSplitCache.has(sheetBuf)) {
+    try {
+      const cells = await splitSheetByEdgeDetection(sheetBuf);
+      _sheetSplitCache.set(sheetBuf, cells);
+    } catch (err) {
+      log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop`);
+      _sheetSplitCache.set(sheetBuf, null);
+    }
+  }
+  const cells = _sheetSplitCache.get(sheetBuf);
+  if (cells && cells[cellIdx - 1]) return cells[cellIdx - 1];
+  return cropSheetCellFixed(sheetBuf, cellIdx);
 }
 
 /** Background-remove via the Python rembg service; white-threshold fallback. */

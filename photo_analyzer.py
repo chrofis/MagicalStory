@@ -1829,10 +1829,10 @@ def split_reference_sheet():
             }), 400
 
         count = int(data['count'])
-        if count < 1 or count > 6:
+        if count < 1 or count > 12:
             return jsonify({
                 "success": False,
-                "error": f"count must be 1-6, got {count}"
+                "error": f"count must be 1-12, got {count}"
             }), 400
 
         # Decode base64 image
