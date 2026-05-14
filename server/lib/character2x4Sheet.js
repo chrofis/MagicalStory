@@ -38,41 +38,18 @@ function loadPhantom() {
   return phantomCache;
 }
 
-// Art-style descriptors — keep aligned with ART_STYLE_PROMPTS in
-// server/lib/styledAvatars.js. Only the strings we actually use here.
-const ART_STYLE_LINES = {
-  watercolor:   "soft watercolor children's storybook illustration style — gentle washes, simple outlines",
-  pixar:        "Pixar 3D illustration style — smooth shading, clean rim light",
-  anime:        "anime line-art style — clean lines, flat shading",
-  cartoon:      "modern flat cartoon, bold outlines, clean shapes",
-  oil:          "oil painting style with visible brushwork",
-};
-
 function buildPrompt(artStyle, costumeDescription) {
-  const styleLine = ART_STYLE_LINES[artStyle] || ART_STYLE_LINES.watercolor;
-  return `Image 1 (POSE TEMPLATE): a 2×4 grid of wooden mannequins. It indicates ONLY the camera angle and the head/body facing direction in each cell. IGNORE the mannequin's silhouette, body proportions, face shape, and surface texture — they are NOT the character. The character has their own natural body and face from Images 2 and 3.
+  return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face.
+Image 2 is the character's body. Image 3 is the character's face.
 
-Image 2 (STANDARD AVATAR): authoritative reference for the character's body shape, build, and proportions.
-Image 3 (CHARACTER PHOTO): authoritative reference for the face identity (features, hair, skin tone).
+Costume: ${costumeDescription}
 
-Output a 2×4 grid with thin black dividing lines and pure white background, same cell layout as Image 1.
+Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
 
-COSTUME (must appear in every bottom-row cell, head to toe):
-${costumeDescription}
+Cells 1-4 (top row): head and neck only, no shoulders, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head.
+Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back.
 
-Cell-by-cell content:
-  Cell 1 (top-left): the character's head and neck only, facing the camera straight on. No shoulders, no clothing.
-  Cell 2 (top): head and neck only, rotated to the three-quarter angle shown in Image 1's cell 2 — both eyes still visible, head clearly rotated. No shoulders, no clothing.
-  Cell 3 (top): head and neck only, rotated to the profile angle shown in Image 1's cell 3 — one eye visible, sharp side silhouette. No shoulders, no clothing.
-  Cell 4 (top-right): BACK OF THE HEAD ONLY — camera behind the character. Back of the hair and neck only; NO eye, NO nose, NO mouth, NO hat, NO clothing.
-  Cell 5 (bottom-left): full body from head to feet wearing the costume above, facing the camera straight on. The character's own natural body shape (NOT the mannequin's).
-  Cell 6 (bottom): full body wearing the same costume, rotated to the three-quarter angle shown in Image 1's cell 6 — leading shoulder forward, both feet visible, chest partly facing the viewer.
-  Cell 7 (bottom): full body wearing the same costume, rotated to the profile angle shown in Image 1's cell 7.
-  Cell 8 (bottom-right): FULL BODY BACK VIEW — camera behind the character. Back of the costume only; heels closer to camera than toes.
-
-Costume continuity is mandatory: every accessory (hat, sash, weapons, footwear, etc.) described in the costume block must appear in cells 5, 6, 7, AND 8 — not just cell 5.
-
-Render in ${styleLine}. ABSOLUTELY NO TEXT — no numbers, no degree symbols, no labels.`;
+Every cell faces in the same direction as the matching cell in Image 1. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels.`;
 }
 
 /**
