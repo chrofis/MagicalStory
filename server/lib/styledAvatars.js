@@ -303,39 +303,99 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       || (clothingCategory.startsWith('costumed:')
             ? `${clothingCategory.split(':')[1]} costume`
             : 'standard outfit');
-    log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok`);
-    const result = await generateCharacter2x4Sheet(adHocChar, {
-      clothingCategory,
-      costumeDescription,
-      artStyle,
-      usageTracker: addUsage,
-    });
-    if (result?.imageData) {
+    const maxRetries = skipQualityEval ? 1 : MAX_STYLED_AVATAR_RETRIES;
+    let lastDownsized = null;
+    let lastResult = null;
+    let lastFace = null;
+    let lastClothing = null;
+    let lastEvalDetails = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok (attempt ${attempt}/${maxRetries})`);
+      const result = await generateCharacter2x4Sheet(adHocChar, {
+        clothingCategory,
+        costumeDescription,
+        artStyle,
+        usageTracker: addUsage,
+      });
+      if (!result?.imageData) {
+        log.warn(`[STYLED AVATAR] 2×4 attempt ${attempt} returned no image for ${characterName}`);
+        continue;
+      }
       const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
+      lastResult = result;
+      lastDownsized = downsizedSheet;
+
+      // ─── Quality gate: face + costume eval via Gemini ───────────────────
+      let faceMatchScore = null;
+      let clothingMatchScore = null;
+      let evalDetails = null;
+      if (!skipQualityEval && facePhoto && process.env.GEMINI_API_KEY) {
+        try {
+          const evalResult = await evaluateAvatarFaceMatch(
+            facePhoto, downsizedSheet, process.env.GEMINI_API_KEY, costumeDescription
+          );
+          if (evalResult) {
+            faceMatchScore = evalResult.score ?? null;
+            clothingMatchScore = evalResult.clothingMatch?.score ?? null;
+            evalDetails = {
+              faceReason: evalResult.reasoning || null,
+              clothingReason: evalResult.clothingMatch?.reason || null,
+            };
+          }
+        } catch (evalErr) {
+          log.warn(`[STYLED AVATAR] 2×4 eval failed for ${characterName} (attempt ${attempt}): ${evalErr.message}`);
+        }
+      }
+      lastFace = faceMatchScore;
+      lastClothing = clothingMatchScore;
+      lastEvalDetails = evalDetails;
+
       const usedPhantom = result.refs?.phantom || null;
       const usedStandard = result.refs?.standardAvatar || originalAvatar;
       const usedFace = result.refs?.facePhoto || facePhoto;
+      const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
+      const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
+      const passed = !faceFail && !clothingFail;
+      const isFinalAttempt = attempt === maxRetries;
+
       styledAvatarGenerationLog.push({
         timestamp: new Date().toISOString(),
         characterName, artStyle, clothingCategory,
         durationMs: Date.now() - startTime,
-        success: true,
-        attempt: 1,
+        success: passed || isFinalAttempt, // accept last attempt even if eval failed
+        attempt,
         sheetFormat: '2x4',
         prompt: result.prompt || null,
+        faceMatchScore,
+        clothingMatchScore,
+        faceMatchDetails: evalDetails?.faceReason || null,
+        clothingMatchReason: evalDetails?.clothingReason || null,
         inputs: {
           phantom: usedPhantom ? { sizeKB: getImageSizeKB(usedPhantom), imageData: usedPhantom } : null,
           standardAvatar: usedStandard ? { sizeKB: getImageSizeKB(usedStandard), imageData: usedStandard } : null,
           facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
         },
         output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
+        ...(passed || isFinalAttempt ? {} : {
+          error: `Quality gate failed: face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10`,
+        }),
       });
       if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
         styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
       }
-      return downsizedSheet;
+
+      if (passed) {
+        log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10)`);
+        return downsizedSheet;
+      }
+      if (isFinalAttempt) {
+        log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} final attempt ${attempt} failed eval (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10) — accepting`);
+        return downsizedSheet;
+      }
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} failed eval (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10) — retrying`);
     }
-    log.warn(`[STYLED AVATAR] 2×4 generation returned no image for ${characterName} — falling back to legacy Gemini 2×2 path`);
+    // All attempts exhausted with no image — fall through to legacy path.
+    log.warn(`[STYLED AVATAR] 2×4 produced no usable image for ${characterName} after ${maxRetries} attempts — falling back to legacy Gemini 2×2 path`);
   } catch (err) {
     log.warn(`[STYLED AVATAR] 2×4 generation failed for ${characterName}: ${err.message} — falling back to legacy Gemini 2×2 path`);
   }
