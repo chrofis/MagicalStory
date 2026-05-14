@@ -50,24 +50,27 @@ const ART_STYLE_LINES = {
 
 function buildPrompt(artStyle, costumeDescription) {
   const styleLine = ART_STYLE_LINES[artStyle] || ART_STYLE_LINES.watercolor;
-  return `Treat Image 1 (POSE TEMPLATE) as a paint-by-numbers template. The wooden mannequin in each of its 8 cells defines a POSE and an ANGLE. Your job is to REPLACE the mannequin in each cell with the character from Images 2 and 3 while keeping the mannequin's exact silhouette, pose, and head/body direction unchanged.
+  return `Image 1 (POSE TEMPLATE): a 2×4 grid of wooden mannequins. It indicates ONLY the camera angle and the head/body facing direction in each cell. IGNORE the mannequin's silhouette, body proportions, face shape, and surface texture — they are NOT the character. The character has their own natural body and face from Images 2 and 3.
 
-Image 2 (STYLED 2×2 AVATAR) — authoritative reference for the costume worn in the bottom row and the art style of the rendering.
-Image 3 (CHARACTER PHOTO) — authoritative reference for the face identity.
+Image 2 (STANDARD AVATAR): authoritative reference for the character's body shape, build, and proportions.
+Image 3 (CHARACTER PHOTO): authoritative reference for the face identity (features, hair, skin tone).
 
-Output a 2×4 grid with thin black dividing lines and pure white background, same dimensions and cell layout as Image 1.
+Output a 2×4 grid with thin black dividing lines and pure white background, same cell layout as Image 1.
+
+COSTUME (must appear in every bottom-row cell, head to toe):
+${costumeDescription}
 
 Cell-by-cell content:
   Cell 1 (top-left): the character's head and neck only, facing the camera straight on. No shoulders, no clothing.
-  Cell 2 (top): head and neck only, in the SAME three-quarter angle as Image 1's cell 2 — both eyes still visible, head clearly rotated. No shoulders, no clothing.
-  Cell 3 (top): head and neck only, in the SAME profile angle as Image 1's cell 3 — one eye, sharp side silhouette. No shoulders, no clothing.
-  Cell 4 (top-right): BACK OF THE HEAD ONLY — the camera is behind the character. The viewer sees the BACK of the hair, the BACK of the neck, and nothing of the face. NO eye, NO nose, NO mouth, NO hat, NO clothing. Match cell 4 of Image 1.
-  Cell 5 (bottom-left): full body from head to feet in the costume — ${costumeDescription}. Every costume element from Image 2 (especially headwear if Image 2 shows one) must be present here. Facing the camera straight on.
-  Cell 6 (bottom): full body in the SAME costume, in the SAME three-quarter angle as Image 1's cell 6 — leading shoulder forward, both feet visible, chest partly facing the viewer. Same hat and accessories as cell 5.
-  Cell 7 (bottom): full body in the SAME costume, in the SAME profile angle as Image 1's cell 7. Same hat and accessories as cell 5.
-  Cell 8 (bottom-right): FULL BODY BACK VIEW — camera is behind the character. The viewer sees the BACK of the costume: back of the hat, back of the shirt, sash tied behind, back of the breeches, back of the boots, heels closer to camera than toes. Match cell 8 of Image 1.
+  Cell 2 (top): head and neck only, rotated to the three-quarter angle shown in Image 1's cell 2 — both eyes still visible, head clearly rotated. No shoulders, no clothing.
+  Cell 3 (top): head and neck only, rotated to the profile angle shown in Image 1's cell 3 — one eye visible, sharp side silhouette. No shoulders, no clothing.
+  Cell 4 (top-right): BACK OF THE HEAD ONLY — camera behind the character. Back of the hair and neck only; NO eye, NO nose, NO mouth, NO hat, NO clothing.
+  Cell 5 (bottom-left): full body from head to feet wearing the costume above, facing the camera straight on. The character's own natural body shape (NOT the mannequin's).
+  Cell 6 (bottom): full body wearing the same costume, rotated to the three-quarter angle shown in Image 1's cell 6 — leading shoulder forward, both feet visible, chest partly facing the viewer.
+  Cell 7 (bottom): full body wearing the same costume, rotated to the profile angle shown in Image 1's cell 7.
+  Cell 8 (bottom-right): FULL BODY BACK VIEW — camera behind the character. Back of the costume only; heels closer to camera than toes.
 
-Costume continuity is mandatory: cells 5, 6, 7, and 8 must show the SAME costume worn by the character — every accessory (hat, sash, etc.) visible in cell 5 must also appear in cells 6, 7, and 8.
+Costume continuity is mandatory: every accessory (hat, sash, weapons, footwear, etc.) described in the costume block must appear in cells 5, 6, 7, AND 8 — not just cell 5.
 
 Render in ${styleLine}. ABSOLUTELY NO TEXT — no numbers, no degree symbols, no labels.`;
 }
