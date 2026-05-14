@@ -5857,6 +5857,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,
           outlineCharacters: img.scene?.outlineCharacters || null,
+          // Scene-composite intermediates from server/lib/sceneComposite.js.
+          // Persisted to story_images by saveStoryData/Update so the dev panel
+          // can show the BG → blocking → composited → final pipeline. Stripped
+          // from the JSONB blob after save.
+          compositeDebug: img.compositeDebug || null,
           imageVersions: [],
         }));
       } else {
@@ -6031,7 +6036,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           textRect: textRegionResults[img.pageNumber]?.rect || null,
           textCoverageReport: textRegionResults[img.pageNumber]?.report || null,
           calmRegion: img.calmRegion || null,
-          outlineCharacters: img.scene?.outlineCharacters || null
+          outlineCharacters: img.scene?.outlineCharacters || null,
+          // Scene-composite intermediates from server/lib/sceneComposite.js.
+          // Persisted to story_images by saveStoryData/Update so the dev panel
+          // can show the BG → blocking → composited → final pipeline.
+          compositeDebug: img.compositeDebug || null
         }));
 
         // Extract covers from pipeline results back into coverImages (updated with eval data)
