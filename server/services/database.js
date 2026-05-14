@@ -2065,10 +2065,11 @@ async function persistCharacter2x4Sheet(userId, characterId, sheetField, imageDa
     console.warn(`[R2] persistCharacter2x4Sheet upload skipped (${userId}/${characterId}/${sheetField}): ${err.message}`);
   }
 
-  // Build the value to persist. When R2 succeeded, store an object with both
-  // url + lightweight metadata so the front-end can pick either.
+  // R2-stored sheets are persisted as { imageUrl, generatedAt } — same shape
+  // the rest of the codebase uses for character avatar fields. Inline fallback
+  // (R2 not configured) is a raw data URI string. One reader path, one writer.
   const value = url
-    ? { url, generatedAt: new Date().toISOString() }
+    ? { imageUrl: url, generatedAt: new Date().toISOString() }
     : imageData;
 
   const rowId = `characters_${userId}`;

@@ -1949,14 +1949,13 @@ export function CharacterForm({
         const styledAvatars = (av.styledAvatars as Record<string, Record<string, unknown>>) || {};
         const artStyles = Object.keys(styledAvatars);
 
+        // 2×4 sheets and styled 2×2s are persisted as either a raw data URI
+        // string (inline fallback when R2 isn't configured) or { imageUrl }
+        // (R2 success path). Other shapes are a bug — don't paper over them.
         const resolveImg = (v: unknown): string | null => {
           if (!v) return null;
           if (typeof v === 'string') return v;
-          if (typeof v === 'object') {
-            const o = v as Record<string, string>;
-            return o.imageUrl || o.imageData || o.data || null;
-          }
-          return null;
+          return (v as { imageUrl?: string }).imageUrl ?? null;
         };
 
         // Map sheet2x4_<key> back to a styled-2×2 if one exists. For
