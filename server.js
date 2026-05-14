@@ -5473,17 +5473,40 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     || pageData.emptyScenePrompt
                     || pageData.scene?.sceneDescription
                     || pageData.prompt;
-                  // Strip the scene-prose (first 1-3 paragraphs) from
-                  // pageData.prompt — the composited image already shows the
-                  // staged scene; keeping the prose in the brief blows past
-                  // Grok's 8000-char edit limit on 4-5 cast pages. Start the
-                  // brief at the first structured section header.
-                  const rawBrief = pageData.prompt || '';
-                  const headerIdx = rawBrief.search(/\*\*(THIS IMAGE DEPICTS|Clothing|HEIGHT ORDER|REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)/i);
-                  let compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
-                  if (compositeBrief.length > 5500) {
-                    compositeBrief = compositeBrief.slice(0, 5500).trim();
-                  }
+                  // Build a tight page brief for the blend step. The composited
+                  // image already shows the staged scene — the brief only needs
+                  // to anchor IDENTITY (who looks like what, who's tallest, what
+                  // objects must look like). Scene prose, composition rules,
+                  // "reference photo is a location" instructions, and the
+                  // character-action paragraph are HARMFUL here: they tell Grok
+                  // to redraw / restage / interact, contradicting our DON'T list.
+                  //
+                  // We extract a few labelled sections from pageData.prompt:
+                  //   - THIS IMAGE DEPICTS (sceneIntent)
+                  //   - Clothing for each named character
+                  //   - HEIGHT ORDER
+                  //   - REQUIRED OBJECTS / ERFORDERLICHE OBJEKTE / OBJETS REQUIS
+                  //   - EXACT POSES (Sonnet appends at the tail)
+                  // and drop everything else.
+                  const compositeBrief = (() => {
+                    const src = pageData.prompt || '';
+                    if (!src) return '';
+                    const wanted = [
+                      /\*\*THIS IMAGE DEPICTS:\*\*[\s\S]*?(?=\n\n|$)/i,
+                      /\*\*Clothing for each named character[\s\S]*?(?=\n\n|$)/i,
+                      /\*\*HEIGHT ORDER[\s\S]*?(?=\n\n|$)/i,
+                      /\*\*(?:REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)[\s\S]*?(?=\n\n|$)/i,
+                      /EXACT POSES:[\s\S]*$/i,
+                    ];
+                    const blocks = [];
+                    for (const re of wanted) {
+                      const m = src.match(re);
+                      if (m) blocks.push(m[0].trim());
+                    }
+                    let out = blocks.join('\n\n');
+                    if (out.length > 5500) out = out.slice(0, 5500).trim();
+                    return out;
+                  })();
                   // Visual Bible grid: buildVisualBibleGrid returns a Buffer
                   // at this point in the pipeline (R2 upload runs later). Grok
                   // edit needs each ref as a data URI string — a raw Buffer
@@ -5499,6 +5522,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     scene: {
                       description: pageData.scene?.sceneDescription || '',
                       action: pageData.scene?.text || '',
+                      // sceneIntent (1-3 sentences from the outline) — used by
+                      // the blocking prompt to tell Grok what the figures are
+                      // doing and how they interact, so silhouettes are placed
+                      // in physically-correct relationships.
+                      intent: pageData.scene?.sceneIntent
+                        || pageData.sceneMetadata?.sceneIntent
+                        || pageData.sceneMetadata?.fullData?.sceneIntent
+                        || '',
                       pageBrief: compositeBrief,
                       artStyle: inputData?.artStyle || 'watercolor',
                     },

@@ -261,18 +261,25 @@ function buildBlockingEditPrompt(scene, cast) {
       profile:      `profile view, ${direction}`,
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || `three-quarter view, ${direction}`;
-    // Action shapes the silhouette (arms reaching, hands together, kneeling, etc.).
-    // Identity (hair, eyes, features) is intentionally NOT here — silhouette is one
-    // solid colour, those details belong to the final blend step.
     const actionClause = c.action ? `, ${c.action}` : '';
     return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.`;
   }).join('\n');
 
-  return `Keep the scene background EXACTLY as it is in this image — every pixel of the setting must remain pixel-identical. Only ADD ${cast.length} flat-colour silhouette figures into the scene at the positions below. The silhouettes are solid uniform colour shapes — no faces, no clothing details, no texture. The action phrase for each character determines posture, arm placement, and gaze direction so the silhouette shape reads correctly; ignore appearance.
+  const sceneIntentBlock = scene?.intent
+    ? `Scene: ${String(scene.intent).trim()}\n\n`
+    : '';
 
-${lines}
+  return `Keep the scene background EXACTLY as it is in this image — every pixel of the setting must remain pixel-identical. Only ADD ${cast.length} flat-colour silhouette figures into the scene at the positions below.
 
-Every silhouette is one solid uniform colour, painted directly into the scene at a position that makes physical sense (feet on the ground, sized for depth). NO TEXT. Do not modify the background in any way.`;
+${sceneIntentBlock}${lines}
+
+SILHOUETTE RULES:
+- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex value above — no gradient, no transparency, no watercolor wash, no shading. A flat block of pure colour.
+- No faces, no clothing details, no texture inside the silhouette. The action phrase shapes the outline (posture, arm placement, gaze direction); inside it is uniform colour.
+- Each silhouette's feet must rest on a SOLID surface visible in the scene (dock, floor, ground, rock, deck, path, stairs) — NEVER on water, NEVER mid-air, NEVER overlapping another character's body. If two characters share the same depth band, separate them sideways.
+- Size scales with depth: foreground silhouettes are largest, midground medium, background small.
+
+NO TEXT in the output. Do not modify the background in any way.`;
 }
 
 // Art-style descriptors — must stay aligned with character2x4Sheet.js ART_STYLE_LINES.
