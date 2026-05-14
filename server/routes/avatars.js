@@ -3042,6 +3042,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
               ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
               ...(results.clothing && { clothing: results.clothing }),
+              // Dev-mode diagnostics — small payload, lets the "Show prompt" /
+              // "Face eval" details panels in CharacterForm read after a page
+              // reload instead of only during the fresh wizard session.
+              ...(results.prompts && Object.keys(results.prompts).length > 0 && { prompts: results.prompts }),
+              ...(results.faceMatch && Object.keys(results.faceMatch).length > 0 && { faceMatch: results.faceMatch }),
+              ...(results.extractedTraits && { extractedTraits: results.extractedTraits }),
+              ...(results.structuredClothing && Object.keys(results.structuredClothing).length > 0 && { structuredClothing: results.structuredClothing }),
             };
 
             // Lightweight metadata: prefer URL standard slot, fall back to
@@ -4251,6 +4258,11 @@ These corrections OVERRIDE what is visible in the reference photo.
               ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
               ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
               ...(results.clothing && { clothing: results.clothing }),
+              // Dev-mode diagnostics persisted (mirrors async-path persistence).
+              ...(results.prompts && Object.keys(results.prompts).length > 0 && { prompts: results.prompts }),
+              ...(results.faceMatch && Object.keys(results.faceMatch).length > 0 && { faceMatch: results.faceMatch }),
+              ...(results.extractedTraits && { extractedTraits: results.extractedTraits }),
+              ...(results.structuredClothing && Object.keys(results.structuredClothing).length > 0 && { structuredClothing: results.structuredClothing }),
             };
 
             // Lightweight metadata: prefer URL standard slot, fall back to inline only when missing.
