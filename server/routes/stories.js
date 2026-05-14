@@ -1126,6 +1126,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         success: entry.success,
         error: entry.error,
         attempt: entry.attempt,
+        sheetFormat: entry.sheetFormat || null,
         prompt: entry.prompt,
         faceMatchScore: entry.faceMatchScore ?? null,
         clothingMatchScore: entry.clothingMatchScore ?? null,
@@ -1134,7 +1135,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         inputs: entry.inputs ? {
           facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
           originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,
-          styleSample: entry.inputs.styleSample ? { identifier: entry.inputs.styleSample.identifier, sizeKB: entry.inputs.styleSample.sizeKB } : null
+          styleSample: entry.inputs.styleSample ? { identifier: entry.inputs.styleSample.identifier, sizeKB: entry.inputs.styleSample.sizeKB } : null,
+          phantom: entry.inputs.phantom ? { sizeKB: entry.inputs.phantom.sizeKB } : null,
+          standardAvatar: entry.inputs.standardAvatar ? { sizeKB: entry.inputs.standardAvatar.sizeKB } : null
         } : null,
         output: entry.output ? { identifier: entry.output.identifier, sizeKB: entry.output.sizeKB } : null
       })),
@@ -1729,6 +1732,9 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
         case 'standardAvatar':
           result = { standardAvatar: slotSrc(entry.inputs?.standardAvatar) };
           break;
+        case 'phantom':
+          result = { phantom: slotSrc(entry.inputs?.phantom) };
+          break;
         case 'output':
           result = { output: slotSrc(entry.output) };
           break;
@@ -1741,6 +1747,7 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
         originalAvatar: slotSrc(entry.inputs?.originalAvatar),
         styleSample: slotSrc(entry.inputs?.styleSample),
         standardAvatar: slotSrc(entry.inputs?.standardAvatar),
+        phantom: slotSrc(entry.inputs?.phantom),
         output: slotSrc(entry.output)
       };
     }

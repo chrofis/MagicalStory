@@ -160,7 +160,16 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     usageTracker('grok', result.usage, 'character_2x4_sheet', result.modelId);
   }
 
-  return { imageData: result.imageData, usage: result.usage };
+  return {
+    imageData: result.imageData,
+    usage: result.usage,
+    prompt,
+    refs: {
+      phantom,
+      standardAvatar: standardAvatar || null,
+      facePhoto,
+    },
+  };
 }
 
 module.exports = {

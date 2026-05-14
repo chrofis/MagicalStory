@@ -34,13 +34,16 @@ interface StyledAvatarGenerationEntry {
   faceMatchDetails?: string | null;
   clothingMatchReason?: string | null;
   attempt?: number;
+  sheetFormat?: '2x4' | '2x2';
   inputs: {
-    facePhoto: { identifier: string; sizeKB: number; imageData?: string } | null;
-    originalAvatar: { identifier: string; sizeKB: number; imageData?: string };
+    facePhoto: { identifier?: string; sizeKB: number; imageData?: string } | null;
+    originalAvatar?: { identifier: string; sizeKB: number; imageData?: string };
     styleSample?: { identifier: string; sizeKB: number; imageData?: string } | null;
+    phantom?: { sizeKB: number; imageData?: string } | null;
+    standardAvatar?: { sizeKB: number; imageData?: string } | null;
   };
   prompt?: string;
-  output?: { identifier: string; sizeKB: number; imageData?: string };
+  output?: { identifier?: string; sizeKB: number; imageData?: string };
 }
 
 interface CostumedAvatarGenerationEntry {
@@ -515,6 +518,7 @@ export function StoryDisplay({
     styleSample?: string | null;
     standardAvatar?: string | null;
     referenceAvatar?: string | null;
+    phantom?: string | null;
     output?: string | null;
   }>>({});
   const [loadingAvatarGenImages, setLoadingAvatarGenImages] = useState<Set<string>>(new Set());
@@ -711,7 +715,7 @@ export function StoryDisplay({
     type: 'styled' | 'costumed',
     index: number,
     entry: StyledAvatarGenerationEntry | CostumedAvatarGenerationEntry,
-    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'output'
+    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'phantom' | 'output'
   ): string | null => {
     const key = `${type}-${index}`;
     const loaded = loadedAvatarGenImages[key];
@@ -740,6 +744,9 @@ export function StoryDisplay({
     if (field === 'referenceAvatar' && 'referenceAvatar' in entry.inputs && entry.inputs.referenceAvatar?.imageData) {
       return (entry.inputs.referenceAvatar as { imageData?: string }).imageData || null;
     }
+    if (field === 'phantom' && 'phantom' in entry.inputs && (entry.inputs as { phantom?: { imageData?: string } }).phantom?.imageData) {
+      return (entry.inputs as { phantom?: { imageData?: string } }).phantom?.imageData || null;
+    }
 
     return null;
   };
@@ -749,7 +756,7 @@ export function StoryDisplay({
     type: 'styled' | 'costumed',
     index: number,
     entry: StyledAvatarGenerationEntry | CostumedAvatarGenerationEntry,
-    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'output',
+    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'phantom' | 'output',
     label: string,
     sizeKB?: number
   ) => {
@@ -3109,11 +3116,23 @@ export function StoryDisplay({
                     <div className="mt-3 space-y-3">
                       {/* Inputs */}
                       <div className="bg-blue-50 p-2 rounded text-xs">
-                        <span className="font-semibold text-blue-700">Inputs:</span>
+                        <span className="font-semibold text-blue-700">
+                          Inputs{entry.sheetFormat ? ` (${entry.sheetFormat})` : ''}:
+                        </span>
                         <div className="mt-2 flex flex-wrap gap-3">
-                          {renderAvatarGenImage('styled', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
-                          {renderAvatarGenImage('styled', index, entry, 'originalAvatar', 'Original Avatar', entry.inputs.originalAvatar?.sizeKB)}
-                          {entry.inputs.styleSample && renderAvatarGenImage('styled', index, entry, 'styleSample', 'Style Sample', entry.inputs.styleSample.sizeKB)}
+                          {entry.sheetFormat === '2x4' ? (
+                            <>
+                              {entry.inputs.phantom && renderAvatarGenImage('styled', index, entry, 'phantom', 'Phantom (pose template)', entry.inputs.phantom?.sizeKB)}
+                              {entry.inputs.standardAvatar && renderAvatarGenImage('styled', index, entry, 'standardAvatar', 'Standard Avatar', entry.inputs.standardAvatar?.sizeKB)}
+                              {entry.inputs.facePhoto && renderAvatarGenImage('styled', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
+                            </>
+                          ) : (
+                            <>
+                              {renderAvatarGenImage('styled', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
+                              {renderAvatarGenImage('styled', index, entry, 'originalAvatar', 'Original Avatar', entry.inputs.originalAvatar?.sizeKB)}
+                              {entry.inputs.styleSample && renderAvatarGenImage('styled', index, entry, 'styleSample', 'Style Sample', entry.inputs.styleSample.sizeKB)}
+                            </>
+                          )}
                         </div>
                       </div>
 

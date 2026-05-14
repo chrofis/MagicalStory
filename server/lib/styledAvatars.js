@@ -312,6 +312,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     });
     if (result?.imageData) {
       const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
+      const usedPhantom = result.refs?.phantom || null;
+      const usedStandard = result.refs?.standardAvatar || originalAvatar;
+      const usedFace = result.refs?.facePhoto || facePhoto;
       styledAvatarGenerationLog.push({
         timestamp: new Date().toISOString(),
         characterName, artStyle, clothingCategory,
@@ -319,9 +322,11 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         success: true,
         attempt: 1,
         sheetFormat: '2x4',
+        prompt: result.prompt || null,
         inputs: {
-          facePhoto: facePhoto ? { sizeKB: getImageSizeKB(facePhoto), imageData: facePhoto } : null,
-          originalAvatar: { sizeKB: getImageSizeKB(originalAvatar), imageData: originalAvatar },
+          phantom: usedPhantom ? { sizeKB: getImageSizeKB(usedPhantom), imageData: usedPhantom } : null,
+          standardAvatar: usedStandard ? { sizeKB: getImageSizeKB(usedStandard), imageData: usedStandard } : null,
+          facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
         },
         output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
       });
