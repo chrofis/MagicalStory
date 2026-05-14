@@ -36,6 +36,8 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
     generateStyledAvatarWithSignature
   } = require('../routes/avatars');
   const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
+  const { persistStyledAvatar } = require('../services/database');
+  const userId = options.userId || null;
 
   const generated = [];
   const failed = [];
@@ -103,6 +105,17 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
                 setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, sheet.imageData);
                 if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
                 char.avatars.clothing.costumed[costumeKey] = costumeDescription;
+                // Persist immediately to both data + metadata columns (and R2)
+                // so subsequent stories on this account reuse the sheet and
+                // the UI tile picks it up. Mirrors what buildCompositeCast's
+                // lazy-gen path does.
+                if (userId && char.id) {
+                  try {
+                    await persistStyledAvatar(userId, char.id, artStyle, `costumed:${costumeKey}`, sheet.imageData);
+                  } catch (persistErr) {
+                    log.warn(`[AVATAR-GEN] persistStyledAvatar failed for ${char.name}/${costumeKey}: ${persistErr.message}`);
+                  }
+                }
                 result = { success: true, imageData: sheet.imageData };
                 generated.push(`${char.name}:${logCategory}@${artStyle}`);
                 log.debug(`[AVATAR-GEN] ✅ Generated 2×4 costumed:${costumeKey}@${artStyle} for ${char.name}`);

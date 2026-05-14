@@ -1453,32 +1453,7 @@ async function saveStoryData(storyId, storyData) {
         imagesSaved++;
         img.hasEmptySceneImage = true;
       }
-      // Save scene-composite intermediate stages so the dev panel can show
-      // the pipeline step-by-step (clean BG → blocking → composited → final).
-      // Skipped silently when the page was generated through the direct path.
-      if (img.compositeDebug) {
-        const cd = img.compositeDebug;
-        if (cd.cleanBackground) {
-          await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
-          imagesSaved++;
-        }
-        if (cd.blocking) {
-          await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
-          imagesSaved++;
-        }
-        if (cd.composited) {
-          await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
-          imagesSaved++;
-        }
-        // Keep bbox metadata + blocking prompt on the JSONB blob (small, useful
-        // for the dev panel labels). Strip the heavy image data.
-        if (cd.bboxes) img.compositeBboxes = cd.bboxes;
-        if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
-        if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
-        if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
-        img.hasCompositeStages = true;
-      }
-      delete img.compositeDebug;
+      imagesSaved += await persistCompositeDebug(storyId, img);
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;
@@ -1874,28 +1849,7 @@ async function upsertStory(storyId, userId, storyData) {
         imagesSaved++;
         img.hasEmptySceneImage = true;
       }
-      // Save scene-composite intermediate stages (same as saveStoryData above).
-      if (img.compositeDebug) {
-        const cd = img.compositeDebug;
-        if (cd.cleanBackground) {
-          await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
-          imagesSaved++;
-        }
-        if (cd.blocking) {
-          await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
-          imagesSaved++;
-        }
-        if (cd.composited) {
-          await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
-          imagesSaved++;
-        }
-        if (cd.bboxes) img.compositeBboxes = cd.bboxes;
-        if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
-        if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
-        if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
-        img.hasCompositeStages = true;
-      }
-      delete img.compositeDebug;
+      imagesSaved += await persistCompositeDebug(storyId, img);
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;
@@ -2059,10 +2013,30 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   if (!isDatabaseMode()) return false;
   if (!imageData || !userId || !characterId || !artStyle || !clothingCategory) return false;
 
-  // Build the R2 key (one-deep namespace per art style) — reuse the existing
-  // keyForCharacterStyledAvatar shape so paths stay consistent.
+  // SECURITY: validate every component of the JSONB path before it goes near
+  // the database. These strings reach jsonb_set's `text[]` path; while we use
+  // parameterized arrays (see below) so injection can't reach SQL syntax, we
+  // still refuse weird values up-front so a typo or hostile input fails loud
+  // instead of writing to a malformed JSONB subtree.
+  const { ART_STYLES } = require('../lib/storyHelpers');
+  if (!Object.prototype.hasOwnProperty.call(ART_STYLES, artStyle)) {
+    throw new Error(`persistStyledAvatar: unknown artStyle "${artStyle}" (not in ART_STYLES)`);
+  }
+  // clothingCategory is one of: 'standard' | 'winter' | 'summer' | 'formal' |
+  // 'costumed:<costumeKey>'. Anything else is a bug.
+  const CLOTHING_BARE_RE = /^[a-z][a-z0-9_]{0,30}$/;
   const isCostumed = clothingCategory.startsWith('costumed:');
   const costumeKey = isCostumed ? clothingCategory.slice('costumed:'.length) : null;
+  const categoryBare = isCostumed ? null : clothingCategory;
+  if (categoryBare && !CLOTHING_BARE_RE.test(categoryBare)) {
+    throw new Error(`persistStyledAvatar: invalid clothing category "${clothingCategory}"`);
+  }
+  if (costumeKey && !CLOTHING_BARE_RE.test(costumeKey)) {
+    throw new Error(`persistStyledAvatar: invalid costume key "${costumeKey}"`);
+  }
+
+  // Build the R2 key (one-deep namespace per art style) — reuse the existing
+  // keyForCharacterStyledAvatar shape so paths stay consistent.
   const r2KeySuffix = isCostumed ? `${artStyle}/costumed/${costumeKey}` : `${artStyle}/${clothingCategory}`;
 
   let url = null;
@@ -2087,31 +2061,33 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   const charIndex = characters.findIndex(c => String(c.id) === String(characterId));
   if (charIndex < 0) return false;
 
-  // jsonb_set with create_missing builds the path incrementally. We merge into
-  // the existing styledAvatars[artStyle] (or .costumed) object so other
-  // clothing variants on the same art style aren't clobbered.
-  const path = isCostumed
-    ? `{characters,${charIndex},avatars,styledAvatars,${artStyle},costumed,${costumeKey}}`
-    : `{characters,${charIndex},avatars,styledAvatars,${artStyle},${clothingCategory}}`;
+  // Build the JSONB path as a parameterized text[] (Postgres accepts text[]
+  // bind values for jsonb_set's path arg). This keeps every user-controllable
+  // string (artStyle, costumeKey, clothingCategory) firmly on the data side
+  // of the parameter boundary — no string interpolation into SQL.
+  const idxStr = String(charIndex);
+  const ROOT_PATH    = ['characters', idxStr, 'avatars', 'styledAvatars'];
+  const STYLE_PATH   = [...ROOT_PATH, artStyle];
+  const COSTUMED_PATH = [...STYLE_PATH, 'costumed'];
+  const LEAF_PATH = isCostumed
+    ? [...COSTUMED_PATH, costumeKey]
+    : [...STYLE_PATH, clothingCategory];
 
-  // Build the path up step by step so each missing intermediate object gets
-  // a defaulted {} via two-step jsonb_set(... '{}', true).
+  // Step up: create each missing intermediate object with `{}` so jsonb_set's
+  // create_missing flag has a parent to write into. One round-trip per column.
   const ensureStyledAvatarsPath = async (col) => {
-    // 1. ensure avatars.styledAvatars exists
     await dbQuery(
-      `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars', '{}'::jsonb), true) WHERE id = $1`,
-      [rowId, `{characters,${charIndex},avatars,styledAvatars}`]
+      `UPDATE characters SET ${col} = jsonb_set(${col}, $2::text[], COALESCE(${col} #> $2::text[], '{}'::jsonb), true) WHERE id = $1`,
+      [rowId, ROOT_PATH]
     );
-    // 2. ensure avatars.styledAvatars[artStyle] exists
     await dbQuery(
-      `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars'->$3, '{}'::jsonb), true) WHERE id = $1`,
-      [rowId, `{characters,${charIndex},avatars,styledAvatars,${artStyle}}`, artStyle]
+      `UPDATE characters SET ${col} = jsonb_set(${col}, $2::text[], COALESCE(${col} #> $2::text[], '{}'::jsonb), true) WHERE id = $1`,
+      [rowId, STYLE_PATH]
     );
-    // 3. ensure .costumed sub-object exists when needed
     if (isCostumed) {
       await dbQuery(
-        `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars'->$3->'costumed', '{}'::jsonb), true) WHERE id = $1`,
-        [rowId, `{characters,${charIndex},avatars,styledAvatars,${artStyle},costumed}`, artStyle]
+        `UPDATE characters SET ${col} = jsonb_set(${col}, $2::text[], COALESCE(${col} #> $2::text[], '{}'::jsonb), true) WHERE id = $1`,
+        [rowId, COSTUMED_PATH]
       );
     }
   };
@@ -2119,13 +2095,13 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   await ensureStyledAvatarsPath('data');
   await ensureStyledAvatarsPath('metadata');
 
-  // 4. write the leaf value
+  // Write the leaf value.
   await dbQuery(
     `UPDATE characters
-     SET data = jsonb_set(data, $2, $3::jsonb, true),
-         metadata = jsonb_set(metadata, $2, $3::jsonb, true)
+     SET data = jsonb_set(data, $2::text[], $3::jsonb, true),
+         metadata = jsonb_set(metadata, $2::text[], $3::jsonb, true)
      WHERE id = $1`,
-    [rowId, path, JSON.stringify(value)]
+    [rowId, LEAF_PATH, JSON.stringify(value)]
   );
   return true;
 }
@@ -2172,6 +2148,45 @@ async function saveVbReferenceToR2(storyId, entryId, imageData) {
     console.warn(`[R2] saveVbReferenceToR2 upload skipped (${storyId}/${entryId}): ${err.message}`);
     return null;
   }
+}
+
+/**
+ * Persist scene-composite intermediate stages for one page. Called by both
+ * saveStoryData (initial save) and the upsert/update path so the dev panel
+ * has the clean BG → blocking → composited progression available for any
+ * page that ran through server/lib/sceneComposite.js.
+ *
+ * Side effects on `img`:
+ *   - sets img.hasCompositeStages = true when intermediates were persisted
+ *   - copies bbox metadata + prompts onto the JSONB blob (small, useful for
+ *     the dev panel labels)
+ *   - strips img.compositeDebug (heavy image bytes) before the JSONB save
+ *
+ * @returns number of story_images rows written
+ */
+async function persistCompositeDebug(storyId, img) {
+  const cd = img.compositeDebug;
+  if (!cd) return 0;
+  let saved = 0;
+  if (cd.cleanBackground) {
+    await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
+    saved++;
+  }
+  if (cd.blocking) {
+    await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
+    saved++;
+  }
+  if (cd.composited) {
+    await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
+    saved++;
+  }
+  if (cd.bboxes) img.compositeBboxes = cd.bboxes;
+  if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+  if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
+  if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
+  img.hasCompositeStages = true;
+  delete img.compositeDebug;
+  return saved;
 }
 
 async function saveStoryImage(storyId, imageType, pageNumber, imageData, options = {}) {
