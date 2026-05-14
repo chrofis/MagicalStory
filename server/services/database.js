@@ -2185,6 +2185,35 @@ async function persistCompositeDebug(storyId, img) {
   if (cd.blendPrompt) img.compositeBlendPrompt = cd.blendPrompt;
   if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
   if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
+
+  // Phantom-pose render persistence (per character):
+  //   - heavy output bytes go to story_images under a per-character version index
+  //   - light metadata (phantom crop, prompt, bbox) goes inline on the JSONB
+  //     blob (~50KB per char — acceptable for a prototype)
+  if (cd.phantomPoseRenders && typeof cd.phantomPoseRenders === 'object') {
+    const names = Object.keys(cd.phantomPoseRenders);
+    const meta = {};
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const entry = cd.phantomPoseRenders[name] || {};
+      if (entry.output) {
+        await saveStoryImage(storyId, 'composite_phantom_pose', img.pageNumber, entry.output, { versionIndex: i });
+        saved++;
+      }
+      meta[name] = {
+        phantomCrop: entry.phantomCrop || null,
+        prompt: entry.prompt || null,
+        bbox: entry.bbox || null,
+        colorName: entry.colorName || null,
+        action: entry.action || null,
+      };
+    }
+    if (names.length > 0) {
+      img.compositePhantomCharOrder = names;
+      img.compositePhantomRenders = meta;
+    }
+  }
+
   img.hasCompositeStages = true;
   delete img.compositeDebug;
   return saved;

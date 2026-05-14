@@ -93,6 +93,14 @@ export function ReferencePhotosDisplay({
     cleanBgPrompt: string | null;
     cleanBgSource: string | null;
     sheets: Record<string, { url: string; clothing: string }>;
+    phantomRenders: Record<string, {
+      output: string | null;
+      phantomCrop: string | null;
+      prompt: string | null;
+      bbox: { x: number; y: number; width: number; height: number } | null;
+      colorName: string | null;
+      action: string | null;
+    }> | null;
   } | null>(null);
   const [compositeStagesLoading, setCompositeStagesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,6 +172,7 @@ export function ReferencePhotosDisplay({
           cleanBgPrompt: data.cleanBgPrompt,
           cleanBgSource: data.cleanBgSource,
           sheets: data.sheets || {},
+          phantomRenders: data.phantomRenders || null,
         });
       }
     } finally {
@@ -540,6 +549,75 @@ export function ReferencePhotosDisplay({
               <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blend-Prompt anzeigen (Schritt 4)' : 'Show blend prompt (step 4)'}</summary>
               <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blendPrompt}</pre>
             </details>
+          )}
+
+          {/* ═══ Phantom-pose render: per-character mid-pipeline output ═══
+              Only present when MODEL_DEFAULTS.phantomPoseRender (or per-story
+              override) is on. Shows: the cropped phantom silhouette sent to
+              Grok, the character on white that Grok returned, and the prompt. */}
+          {compositeStages?.phantomRenders && Object.keys(compositeStages.phantomRenders).length > 0 && (
+            <div className="mt-3 pt-3 border-t border-purple-200">
+              <div className="text-[11px] font-semibold text-purple-700 mb-2">
+                {language === 'de' ? '👤 Phantom-Pose-Render (pro Figur)' : '👤 Phantom-pose render (per character)'}
+                <span className="ml-2 text-[10px] font-normal text-purple-500">
+                  {Object.keys(compositeStages.phantomRenders).length} {language === 'de' ? 'Figuren' : 'characters'}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(compositeStages.phantomRenders).map(([name, pr]) => (
+                  <div key={name} className="bg-white border border-purple-200 rounded p-2">
+                    <div className="text-[10px] font-medium text-purple-700 mb-1.5 flex items-center gap-2">
+                      <span>{name}</span>
+                      {pr.colorName && (
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded text-[9px]">{pr.colorName}</span>
+                      )}
+                      {pr.action && (
+                        <span className="text-[9px] text-gray-500 italic">{pr.action}</span>
+                      )}
+                      {pr.bbox && (
+                        <span className="text-[9px] text-gray-400 ml-auto">{pr.bbox.width}×{pr.bbox.height} @ ({pr.bbox.x},{pr.bbox.y})</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 items-start">
+                      {pr.phantomCrop && (
+                        <div className="text-center">
+                          <img
+                            src={pr.phantomCrop}
+                            alt={`${name} phantom`}
+                            className="h-24 rounded border border-purple-200 cursor-pointer hover:opacity-80"
+                            onClick={() => setLightboxImage(pr.phantomCrop!)}
+                          />
+                          <div className="text-[8px] text-gray-500 mt-0.5">{language === 'de' ? 'Phantom-Crop' : 'phantom crop'}</div>
+                        </div>
+                      )}
+                      <div className="text-[10px] text-purple-500 self-center">→</div>
+                      {pr.output && (
+                        <div className="text-center">
+                          <img
+                            src={pr.output}
+                            alt={`${name} pose render`}
+                            className="h-24 rounded border border-emerald-300 cursor-pointer hover:opacity-80"
+                            onClick={() => setLightboxImage(pr.output!)}
+                          />
+                          <div className="text-[8px] text-gray-500 mt-0.5">{language === 'de' ? 'Grok-Ausgabe' : 'Grok output'}</div>
+                        </div>
+                      )}
+                      {!pr.output && (
+                        <div className="text-[10px] text-amber-600 italic self-center">
+                          {language === 'de' ? '(Output fehlt — Fallback auf statische Zelle)' : '(no output — fell back to static cell)'}
+                        </div>
+                      )}
+                    </div>
+                    {pr.prompt && (
+                      <details className="mt-1.5">
+                        <summary className="text-[9px] text-purple-500 cursor-pointer">{language === 'de' ? 'Prompt anzeigen' : 'Show prompt'}</summary>
+                        <pre className="mt-1 text-[9px] bg-purple-50 p-1.5 rounded border border-purple-100 max-h-32 overflow-auto whitespace-pre-wrap text-purple-700">{pr.prompt}</pre>
+                      </details>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </details>
       )}

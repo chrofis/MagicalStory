@@ -757,6 +757,14 @@ export const storyService = {
     cleanBgPrompt: string | null;
     cleanBgSource: 'reused-empty-scene' | 'grok-generate' | null;
     sheets: Record<string, { url: string; clothing: string }>;
+    phantomRenders: Record<string, {
+      output: string | null;
+      phantomCrop: string | null;
+      prompt: string | null;
+      bbox: { x: number; y: number; width: number; height: number } | null;
+      colorName: string | null;
+      action: string | null;
+    }> | null;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');

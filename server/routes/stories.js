@@ -1836,18 +1836,45 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     const wrap = (row) => row ? { imageData: normalizeImageData(row.imageData), imageUrl: row.imageUrl, generatedAt: row.generatedAt } : null;
 
     // Bbox metadata + prompts + source flag are on the JSONB blob — pull them
-    // out for the dev panel label.
+    // out for the dev panel label. Phantom-pose render metadata likewise lives
+    // inline (heavy output bytes are in story_images, fetched below).
     const metaRows = await dbQuery(
       `SELECT scene->'compositeBboxes' AS bboxes,
               scene->>'compositeBlockingPrompt' AS blocking_prompt,
               scene->>'compositeBlendPrompt' AS blend_prompt,
               scene->>'compositeCleanBgPrompt' AS clean_bg_prompt,
-              scene->>'compositeCleanBgSource' AS clean_bg_source
+              scene->>'compositeCleanBgSource' AS clean_bg_source,
+              scene->'compositePhantomCharOrder' AS phantom_char_order,
+              scene->'compositePhantomRenders' AS phantom_renders
        FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
        WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
       [id, pageNum]
     );
     const meta = metaRows[0] || {};
+
+    // Phantom-pose render outputs: one story_images row per character at
+    // image_type='composite_phantom_pose', versionIndex = order index.
+    const phantomCharOrder = Array.isArray(meta.phantom_char_order) ? meta.phantom_char_order : [];
+    const phantomMeta = meta.phantom_renders && typeof meta.phantom_renders === 'object' ? meta.phantom_renders : {};
+    const phantomRenders = {};
+    if (phantomCharOrder.length > 0) {
+      const outputs = await Promise.all(
+        phantomCharOrder.map((_, i) => getStoryImage(id, 'composite_phantom_pose', pageNum, i)),
+      );
+      for (let i = 0; i < phantomCharOrder.length; i++) {
+        const name = phantomCharOrder[i];
+        const out = outputs[i];
+        const m = phantomMeta[name] || {};
+        phantomRenders[name] = {
+          output: out ? (out.imageUrl || (out.imageData ? normalizeImageData(out.imageData) : null)) : null,
+          phantomCrop: m.phantomCrop || null,
+          prompt: m.prompt || null,
+          bbox: m.bbox || null,
+          colorName: m.colorName || null,
+          action: m.action || null,
+        };
+      }
+    }
 
     // Look up each cast member's 2×4 styled avatar (the reference sheet that
     // was cropped from to produce the cutouts). Canonical location:
@@ -1921,9 +1948,11 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
       },
       bboxes: meta.bboxes || null,
       blockingPrompt: meta.blocking_prompt || null,
+      blendPrompt: meta.blend_prompt || null,
       cleanBgPrompt: meta.clean_bg_prompt || null,
       cleanBgSource: meta.clean_bg_source || null,
       sheets: sheetsByCharacter,
+      phantomRenders: Object.keys(phantomRenders).length > 0 ? phantomRenders : null,
     });
   } catch (err) {
     console.error('❌ Error fetching composite stages:', err);
