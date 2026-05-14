@@ -256,9 +256,19 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
   // Collapse clothing category to one of 4 canonical buckets BEFORE building
   // the key. This guarantees write and read produce identical keys regardless
   // of AI variability (case, language, costume subtype). See clothingCategories.js.
-  const canonical = normalizeClothingCategory(clothingCategory);
+  //
+  // EXCEPTION for costumed:<subtype>: preserve the full string so two distinct
+  // costumes for the same character (costumed:pirate vs costumed:wizard) end
+  // up at different cache keys, AND so exportStyledAvatarsForPersistence (which
+  // greps cache keys for `_costumed:` substrings) can locate them. Without
+  // this, both costumes collapsed to the same `_costumed_` slot and the
+  // exporter never saw them.
+  const raw = String(clothingCategory || '').trim().toLowerCase();
+  const keyCategory = raw.startsWith('costumed:')
+    ? raw
+    : normalizeClothingCategory(clothingCategory);
   const name = String(characterName || '').trim().toLowerCase();
-  return `${getCacheScope()}${name}_${canonical}_${artStyle}`;
+  return `${getCacheScope()}${name}_${keyCategory}_${artStyle}`;
 }
 
 /**
