@@ -1766,6 +1766,67 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
   }
 });
 
+// GET /api/stories/:id/composite-stages/:pageNumber - Dev-only: fetch the
+// scene-composite pipeline intermediates for a page (clean BG → blocking →
+// composited → final). Returns null fields for stages not persisted (pre-
+// migration stories or pages that fell back to the direct path).
+router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    if (isNaN(pageNum)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify access (impersonation-aware, same shape as retry-images)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const stageTypes = ['composite_clean_bg', 'composite_blocking', 'composite_composited', 'scene'];
+    const [cleanBg, blocking, composited, finalScene] = await Promise.all(
+      stageTypes.map(t => getStoryImage(id, t, pageNum, 0))
+    );
+    const wrap = (row) => row ? { imageData: normalizeImageData(row.imageData), imageUrl: row.imageUrl, generatedAt: row.generatedAt } : null;
+
+    // Bbox metadata is on the JSONB blob — pull it out for the dev panel label.
+    const metaRows = await dbQuery(
+      `SELECT scene->'compositeBboxes' AS bboxes, scene->>'compositeBlockingPrompt' AS prompt
+       FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+      [id, pageNum]
+    );
+    const bboxes = metaRows[0]?.bboxes || null;
+    const blockingPrompt = metaRows[0]?.prompt || null;
+
+    res.json({
+      pageNumber: pageNum,
+      stages: {
+        clean_bg: wrap(cleanBg),
+        blocking: wrap(blocking),
+        composited: wrap(composited),
+        final: wrap(finalScene),
+      },
+      bboxes,
+      blockingPrompt,
+    });
+  } catch (err) {
+    console.error('❌ Error fetching composite stages:', err);
+    res.status(500).json({ error: 'Failed to fetch composite stages', details: err.message });
+  }
+});
+
 // GET /api/stories/:id/reference-sheet-sources - Dev-only: fetch reference sheet
 // source grids that were used to generate VB element images. Lets developers
 // inspect what got cut and verify the splitter is finding cell boundaries correctly.

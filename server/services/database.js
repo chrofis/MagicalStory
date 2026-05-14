@@ -363,10 +363,10 @@ async function initializeDatabase() {
               // Log to activity table so it shows in admin dashboard
               try {
                 await dbPool.query(
-                  `INSERT INTO activity_log (user_id, username, action, details) VALUES ($1, $2, $3, $4)`,
+                  `INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)`,
                   [row.id, row.username || 'unknown', 'REFERRAL_CODE_GENERATION_FAILED', JSON.stringify({ attempts: 10, username: row.username })]
                 );
-              } catch { /* activity_log may not exist yet during init */ }
+              } catch (logErr) { console.error('Failed to record REFERRAL_CODE_GENERATION_FAILED:', logErr.message); }
             }
           }
         }
@@ -1453,6 +1453,30 @@ async function saveStoryData(storyId, storyData) {
         imagesSaved++;
         img.hasEmptySceneImage = true;
       }
+      // Save scene-composite intermediate stages so the dev panel can show
+      // the pipeline step-by-step (clean BG → blocking → composited → final).
+      // Skipped silently when the page was generated through the direct path.
+      if (img.compositeDebug) {
+        const cd = img.compositeDebug;
+        if (cd.cleanBackground) {
+          await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
+          imagesSaved++;
+        }
+        if (cd.blocking) {
+          await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
+          imagesSaved++;
+        }
+        if (cd.composited) {
+          await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
+          imagesSaved++;
+        }
+        // Keep bbox metadata + blocking prompt on the JSONB blob (small, useful
+        // for the dev panel labels). Strip the heavy image data.
+        if (cd.bboxes) img.compositeBboxes = cd.bboxes;
+        if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+        img.hasCompositeStages = true;
+      }
+      delete img.compositeDebug;
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;
@@ -1848,6 +1872,26 @@ async function upsertStory(storyId, userId, storyData) {
         imagesSaved++;
         img.hasEmptySceneImage = true;
       }
+      // Save scene-composite intermediate stages (same as saveStoryData above).
+      if (img.compositeDebug) {
+        const cd = img.compositeDebug;
+        if (cd.cleanBackground) {
+          await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
+          imagesSaved++;
+        }
+        if (cd.blocking) {
+          await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
+          imagesSaved++;
+        }
+        if (cd.composited) {
+          await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
+          imagesSaved++;
+        }
+        if (cd.bboxes) img.compositeBboxes = cd.bboxes;
+        if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+        img.hasCompositeStages = true;
+      }
+      delete img.compositeDebug;
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;

@@ -32,6 +32,8 @@ interface ReferencePhotosDisplayProps {
   emptySceneImage?: string | null;  // Pre-generated empty scene (Pass 1)
   emptyScenePrompt?: string | null;  // Prompt used for empty scene
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
+  hasCompositeStages?: boolean;  // Flag when scene-composite intermediates exist (lazy load)
+  compositeBboxes?: Record<string, { x: number; y: number; width: number; height: number }> | null;  // Per-character bbox metadata from blocking pass
   emptySceneQc?: { v1ImageData?: string; v1Issues?: string[]; visionFeedback?: string; retryPrompt?: string } | null;
   textAreaMask?: string | null;  // Black/white mask sent to Grok marking the text-overlay calm zone
   emptySceneVbGrid?: string | null;  // Filtered VB grid (vehicles + non-landmark locations) sent to the empty-scene call — the main-scene visualBibleGrid is different
@@ -66,6 +68,8 @@ export function ReferencePhotosDisplay({
   emptySceneImage,
   emptyScenePrompt,
   hasEmptySceneImage,
+  hasCompositeStages,
+  compositeBboxes,
   emptySceneQc,
   textAreaMask,
   emptySceneVbGrid,
@@ -79,6 +83,14 @@ export function ReferencePhotosDisplay({
   const [loadedLandmarkPhotos, setLoadedLandmarkPhotos] = useState<LandmarkPhoto[] | null>(null);
   const [loadedVBGrid, setLoadedVBGrid] = useState<string | null>(null);
   const [loadedEmptyScene, setLoadedEmptyScene] = useState<{ image: string; prompt?: string } | null>(null);
+  const [compositeStages, setCompositeStages] = useState<{
+    clean_bg: string | null;
+    blocking: string | null;
+    composited: string | null;
+    final: string | null;
+    blockingPrompt: string | null;
+  } | null>(null);
+  const [compositeStagesLoading, setCompositeStagesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -129,6 +141,28 @@ export function ReferencePhotosDisplay({
     }
   }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark, needsLazyLoadVBGrid, needsLazyLoadEmptyScene]);
 
+  // Lazy-load scene-composite intermediates on first open of the section.
+  const loadCompositeStages = useCallback(async () => {
+    if (!storyId || !pageNumber || compositeStages || compositeStagesLoading) return;
+    setCompositeStagesLoading(true);
+    try {
+      const data = await storyService.getCompositeStages(storyId, pageNumber);
+      if (data?.stages) {
+        const pick = (s: { imageData?: string; imageUrl?: string } | null) =>
+          s ? (s.imageUrl || s.imageData || null) : null;
+        setCompositeStages({
+          clean_bg: pick(data.stages.clean_bg),
+          blocking: pick(data.stages.blocking),
+          composited: pick(data.stages.composited),
+          final: pick(data.stages.final),
+          blockingPrompt: data.blockingPrompt,
+        });
+      }
+    } finally {
+      setCompositeStagesLoading(false);
+    }
+  }, [storyId, pageNumber, compositeStages, compositeStagesLoading]);
+
   // Use loaded photos if available, otherwise use props
   const displayRefPhotos = loadedReferencePhotos || referencePhotos;
   const displayLandmarkPhotos = loadedLandmarkPhotos || landmarkPhotos;
@@ -142,7 +176,7 @@ export function ReferencePhotosDisplay({
   const displayEmptySceneImage = loadedEmptyScene?.image || emptySceneImage;
   const displayEmptyScenePrompt = loadedEmptyScene?.prompt || emptyScenePrompt;
 
-  if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid && !displayEmptySceneImage && !hasEmptySceneImage) return null;
+  if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid && !displayEmptySceneImage && !hasEmptySceneImage && !hasCompositeStages) return null;
 
   const totalCount = (referencePhotos?.length || 0) + (landmarkPhotos?.length || 0) + (hasVBGrid ? 1 : 0);
 
@@ -336,6 +370,84 @@ export function ReferencePhotosDisplay({
                   />
                 </div>
               </div>
+            </details>
+          )}
+
+          {/* ═══ Scene Composite Stages (4-step pipeline) ═══
+              Renders the BG → blocking → composited → final progression
+              when the page was generated through server/lib/sceneComposite.js.
+              Lazy-loads via /api/stories/:id/composite-stages/:pageNumber on
+              first open. */}
+          {hasCompositeStages && (
+            <details
+              className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-3"
+              onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) loadCompositeStages(); }}
+            >
+              <summary className="cursor-pointer text-xs font-semibold text-purple-700 flex items-center gap-2">
+                <span>🧩</span>
+                {language === 'de' ? 'Szene-Composite (4 Stufen)' : language === 'fr' ? 'Composite de scène (4 étapes)' : 'Scene Composite (4 stages)'}
+                {compositeStagesLoading && <span className="text-purple-500 animate-pulse">— loading…</span>}
+                {compositeBboxes && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded">
+                    {Object.keys(compositeBboxes).length} {language === 'de' ? 'Figuren' : 'figures'}
+                  </span>
+                )}
+              </summary>
+
+              {/* 4-up grid: BG → blocking → composited → final */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                {[
+                  { key: 'clean_bg' as const, label: '1. Clean BG', desc: language === 'de' ? 'Leerer Hintergrund (Grok generate)' : 'Empty background (Grok generate)' },
+                  { key: 'blocking' as const, label: '2. Blocking', desc: language === 'de' ? 'Silhouetten platziert (Grok edit)' : 'Coloured silhouettes (Grok edit)' },
+                  { key: 'composited' as const, label: '3. Composited', desc: language === 'de' ? 'Figuren eingefügt (lokal)' : 'Cutouts pasted (local sharp)' },
+                  { key: 'final' as const, label: '4. Final', desc: language === 'de' ? 'Geblendet (Grok edit)' : 'Blend pass (Grok edit)' },
+                ].map(({ key, label, desc }) => {
+                  const url = compositeStages?.[key] || null;
+                  return (
+                    <div key={key} className="text-center">
+                      <div className="text-[10px] font-semibold text-purple-700 mb-1">{label}</div>
+                      {url ? (
+                        <img
+                          draggable={false}
+                          src={url}
+                          alt={label}
+                          className="w-full h-32 object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => setLightboxImage(url)}
+                          title={`${label} — ${desc}`}
+                        />
+                      ) : (
+                        <div className="w-full h-32 rounded border border-dashed border-purple-200 bg-purple-50/50 flex items-center justify-center text-purple-300 text-[10px]">
+                          {compositeStagesLoading ? '…' : '—'}
+                        </div>
+                      )}
+                      <div className="text-[9px] text-purple-500 mt-1 leading-tight">{desc}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Per-character bbox metadata — useful for diagnosing
+                  silhouette-detection misses. */}
+              {compositeBboxes && Object.keys(compositeBboxes).length > 0 && (
+                <div className="mt-2 text-[10px] text-purple-600">
+                  <div className="font-semibold mb-0.5">{language === 'de' ? 'Erkannte Bounding-Boxes' : 'Detected bounding boxes'}:</div>
+                  <ul className="space-y-0.5 ml-3 list-disc">
+                    {Object.entries(compositeBboxes).map(([name, b]) => (
+                      <li key={name}>
+                        <span className="font-medium">{name}</span> — {b.width}×{b.height} @ ({b.x},{b.y})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Blocking prompt (handy when silhouettes don't show up) */}
+              {compositeStages?.blockingPrompt && (
+                <details className="mt-2">
+                  <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blocking-Prompt anzeigen' : 'Show blocking prompt'}</summary>
+                  <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blockingPrompt}</pre>
+                </details>
+              )}
             </details>
           )}
 

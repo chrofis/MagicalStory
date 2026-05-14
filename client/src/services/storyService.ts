@@ -736,6 +736,40 @@ export const storyService = {
     }
   },
 
+  // Lazy load scene-composite intermediates for a page (dev mode).
+  // Returns the 4 pipeline stages (clean BG, blocking, composited, final scene)
+  // plus bbox metadata. Each stage can be null for pre-migration stories or
+  // pages that fell back to the direct generation path.
+  async getCompositeStages(
+    storyId: string,
+    pageNumber: number
+  ): Promise<{
+    pageNumber: number;
+    stages: {
+      clean_bg: { imageData?: string; imageUrl?: string; generatedAt?: string } | null;
+      blocking: { imageData?: string; imageUrl?: string; generatedAt?: string } | null;
+      composited: { imageData?: string; imageUrl?: string; generatedAt?: string } | null;
+      final: { imageData?: string; imageUrl?: string; generatedAt?: string } | null;
+    };
+    bboxes: Record<string, { x: number; y: number; width: number; height: number }> | null;
+    blockingPrompt: string | null;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/composite-stages/${pageNumber}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        console.warn(`Failed to fetch composite stages: HTTP ${response.status}`);
+        return null;
+      }
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch composite stages:', err);
+      return null;
+    }
+  },
+
   // Get individual page image
   async getPageImage(storyId: string, pageNumber: number): Promise<{ imageData: string; imageVersions?: unknown[] } | null> {
     try {

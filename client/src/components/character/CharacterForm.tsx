@@ -1936,116 +1936,118 @@ export function CharacterForm({
         </div>
       )}
 
-      {/* Styled Avatars (developer only - pre-converted to art styles) */}
-      {(developerMode || isImpersonating) && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
-        <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-indigo-700 mb-3 flex items-center gap-2">
-            🎨 {language === 'de' ? 'Stilisierte Avatare' : language === 'fr' ? 'Avatars stylisés' : 'Styled Avatars'}
-            <span className="text-xs font-normal text-indigo-500">
-              ({Object.keys(character.avatars.styledAvatars).length} {language === 'de' ? 'Stile' : 'styles'})
-            </span>
-          </h4>
-          <div className="space-y-4">
-            {Object.entries(character.avatars.styledAvatars).map(([artStyle, avatars]) => {
-              const styleLabels: Record<string, { en: string; de: string; emoji: string }> = {
-                'pixar': { en: 'Pixar 3D', de: 'Pixar 3D', emoji: '🎬' },
-                'watercolor': { en: 'Watercolor', de: 'Aquarell', emoji: '🎨' },
-                'comic-book': { en: 'Comic Book', de: 'Comic', emoji: '💥' },
-                'anime': { en: 'Anime', de: 'Anime', emoji: '🌸' },
-                'oil-painting': { en: 'Oil Painting', de: 'Ölmalerei', emoji: '🖼️' },
-                'colored-pencil': { en: 'Colored Pencil', de: 'Buntstift', emoji: '✏️' },
-                'storybook': { en: 'Storybook', de: 'Bilderbuch', emoji: '📖' },
-              };
-              const styleInfo = styleLabels[artStyle] || { en: artStyle, de: artStyle, emoji: '🎭' };
-              const clothingOrder = ['standard', 'winter', 'summer'] as const;
-              const clothingEmojis: Record<string, string> = {
-                'standard': '👕',
-                'winter': '❄️',
-                'summer': '☀️',
-              };
+      {/* Stilisierte Avatare (dev-only) — shows the 2×4 reference sheets that
+          actually feed the scene-composite pipeline. The earlier 2×2 styled
+          avatars are the *input* to the 2×4 generator (face photo + styled-2×2
+          + phantom → 2×4 via Grok edit) — they're shown here as small thumbs
+          beside their derived 2×4 for context, not as the primary artefact. */}
+      {(() => {
+        const av = (character.avatars as unknown as Record<string, unknown>) || {};
+        const sheetEntries = Object.entries(av).filter(([k]) => k.startsWith('sheet2x4_'));
+        if (!(developerMode || isImpersonating) || sheetEntries.length === 0) return null;
 
-              // Get costumed avatars if they exist
-              const costumedAvatars = (avatars as Record<string, unknown>).costumed as Record<string, string> | undefined;
-              const costumeTypes = costumedAvatars ? Object.keys(costumedAvatars) : [];
+        const styledAvatars = (av.styledAvatars as Record<string, Record<string, unknown>>) || {};
+        const artStyles = Object.keys(styledAvatars);
 
-              return (
-                <div key={artStyle} className="border border-indigo-200 rounded-lg p-3 bg-white">
-                  <h5 className="text-xs font-semibold text-indigo-500 mb-2">
-                    {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
-                  </h5>
-                  {/* Standard clothing avatars */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {clothingOrder.map((category) => {
-                      const raw = avatars[category];
-                      const avatar = typeof raw === 'string'
-                        ? raw
-                        : (raw && typeof raw === 'object' ? ((raw as any).imageUrl || (raw as any).imageData) : null);
-                      return (
-                        <div key={category} className="text-center">
-                          <div className="text-[10px] text-gray-500 mb-1">
-                            {clothingEmojis[category]} {category}
-                          </div>
-                          {avatar ? (
-                            <img
-                    draggable={false}
-                              src={avatar}
-                              alt={`${character.name} - ${artStyle} - ${category}`}
-                              className="w-full h-32 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => setLightboxImage(avatar)}
-                              title="Click to enlarge"
-                            />
-                          ) : (
-                            <div className="w-full h-32 rounded border border-dashed border-indigo-200 bg-indigo-50/50 flex items-center justify-center text-indigo-300 text-[10px]">
-                              —
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Costumed avatars (from visual bible) */}
-                  {costumeTypes.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-indigo-200">
-                      <div className="text-[10px] font-medium text-orange-600 mb-2">
-                        🎭 {language === 'de' ? 'Kostümierte Avatare' : 'Costumed Avatars'}
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {costumeTypes.map((costumeType) => {
-                          const raw = costumedAvatars![costumeType];
-                          const avatar = typeof raw === 'string'
-                            ? raw
-                            : (raw && typeof raw === 'object' ? ((raw as any).imageUrl || (raw as any).imageData) : null);
-                          return (
-                            <div key={costumeType} className="text-center">
-                              <div className="text-[10px] text-orange-500 mb-1 truncate" title={costumeType}>
-                                🎭 {costumeType}
-                              </div>
-                              {avatar ? (
-                                <img
-                    draggable={false}
-                                  src={avatar}
-                                  alt={`${character.name} - ${artStyle} - ${costumeType}`}
-                                  className="w-full h-32 object-contain rounded border border-orange-200 bg-orange-50/50 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => setLightboxImage(avatar)}
-                                  title="Click to enlarge"
-                                />
-                              ) : (
-                                <div className="w-full h-32 rounded border border-dashed border-orange-200 bg-orange-50/50 flex items-center justify-center text-orange-300 text-[10px]">
-                                  —
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+        const resolveImg = (v: unknown): string | null => {
+          if (!v) return null;
+          if (typeof v === 'string') return v;
+          if (typeof v === 'object') {
+            const o = v as Record<string, string>;
+            return o.imageUrl || o.imageData || o.data || null;
+          }
+          return null;
+        };
+
+        // Map sheet2x4_<key> back to a styled-2×2 if one exists. For
+        // standard/winter/summer the key matches the category directly; for
+        // costumed_<theme> the key needs un-mangling: "costumed_pirate" →
+        // styledAvatars[<style>].costumed.pirate.
+        const find2x2For = (sheetKey: string): { url: string; artStyle: string } | null => {
+          const k = sheetKey.replace(/^sheet2x4_/, '');
+          for (const style of artStyles) {
+            const bucket = styledAvatars[style];
+            if (k.startsWith('costumed_')) {
+              const costume = k.slice('costumed_'.length);
+              const cos = bucket?.costumed as Record<string, unknown> | undefined;
+              const u = resolveImg(cos?.[costume]);
+              if (u) return { url: u, artStyle: style };
+            } else {
+              const u = resolveImg(bucket?.[k]);
+              if (u) return { url: u, artStyle: style };
+            }
+          }
+          return null;
+        };
+
+        const labelFor = (sheetKey: string): { label: string; emoji: string } => {
+          const k = sheetKey.replace(/^sheet2x4_/, '');
+          if (k === 'standard') return { label: 'Standard', emoji: '👕' };
+          if (k === 'winter') return { label: 'Winter', emoji: '❄️' };
+          if (k === 'summer') return { label: 'Sommer', emoji: '☀️' };
+          if (k.startsWith('costumed_')) return { label: k.slice('costumed_'.length).replace(/_/g, ' '), emoji: '🎭' };
+          return { label: k, emoji: '🎨' };
+        };
+
+        return (
+          <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-indigo-700 mb-3 flex items-center gap-2">
+              🎨 {language === 'de' ? 'Stilisierte Avatare (2×4)' : language === 'fr' ? 'Avatars stylisés (2×4)' : 'Styled Avatars (2×4)'}
+              <span className="text-xs font-normal text-indigo-500">
+                ({sheetEntries.length} {language === 'de' ? 'Blätter' : language === 'fr' ? 'feuilles' : 'sheets'})
+              </span>
+            </h4>
+            <div className="space-y-4">
+              {sheetEntries.map(([sheetKey, sheetVal]) => {
+                const sheetUrl = resolveImg(sheetVal);
+                const info = labelFor(sheetKey);
+                const source = find2x2For(sheetKey);
+                return (
+                  <div key={sheetKey} className="border border-indigo-200 rounded-lg p-3 bg-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
+                        <span>{info.emoji}</span>
+                        <span>{info.label}</span>
+                        <span className="text-[10px] font-normal text-indigo-400">— 2×4 (8 angles)</span>
+                      </h5>
+                      {source && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-indigo-600"
+                          onClick={() => setLightboxImage(source.url)}
+                          title={`Source styled 2×2 (${source.artStyle}) — input to the 2×4 generator`}
+                        >
+                          <img
+                            draggable={false}
+                            src={source.url}
+                            alt="source 2×2"
+                            className="w-8 h-8 object-cover rounded border border-gray-200"
+                          />
+                          <span>source 2×2</span>
+                        </button>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    {sheetUrl ? (
+                      <img
+                        draggable={false}
+                        src={sheetUrl}
+                        alt={`${character.name} – ${info.label} 2×4 sheet`}
+                        className="w-full max-h-72 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setLightboxImage(sheetUrl)}
+                        title="Click to enlarge"
+                      />
+                    ) : (
+                      <div className="w-full h-32 rounded border border-dashed border-indigo-200 bg-indigo-50/50 flex items-center justify-center text-indigo-300 text-xs">
+                        —
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Developer Mode: Full API Response (readable, full-width) */}
       {(developerMode || isImpersonating) && character.avatars?.rawEvaluation && (

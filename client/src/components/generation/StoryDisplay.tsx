@@ -5336,7 +5336,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.grokRefImages) && image && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.hasCompositeStages || (image as any)?.grokRefImages) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -5345,6 +5345,8 @@ export function StoryDisplay({
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
+                                hasCompositeStages={(image as any).hasCompositeStages}
+                                compositeBboxes={(image as any).compositeBboxes}
                                 emptySceneQc={image.emptySceneQc}
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
@@ -6015,7 +6017,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage || image.hasEmptySceneImage) && (
+                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage || image.hasEmptySceneImage || (image as any).hasCompositeStages) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -6024,6 +6026,8 @@ export function StoryDisplay({
                                 emptySceneImage={image.emptySceneImage}
                                 emptyScenePrompt={image.emptyScenePrompt}
                                 hasEmptySceneImage={image.hasEmptySceneImage}
+                                hasCompositeStages={(image as any).hasCompositeStages}
+                                compositeBboxes={(image as any).compositeBboxes}
                                 emptySceneQc={image.emptySceneQc}
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
