@@ -1474,6 +1474,8 @@ async function saveStoryData(storyId, storyData) {
         // for the dev panel labels). Strip the heavy image data.
         if (cd.bboxes) img.compositeBboxes = cd.bboxes;
         if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+        if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
+        if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
         img.hasCompositeStages = true;
       }
       delete img.compositeDebug;
@@ -1889,6 +1891,8 @@ async function upsertStory(storyId, userId, storyData) {
         }
         if (cd.bboxes) img.compositeBboxes = cd.bboxes;
         if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+        if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
+        if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
         img.hasCompositeStages = true;
       }
       delete img.compositeDebug;

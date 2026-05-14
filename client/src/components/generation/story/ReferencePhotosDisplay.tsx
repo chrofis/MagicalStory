@@ -89,6 +89,8 @@ export function ReferencePhotosDisplay({
     composited: string | null;
     final: string | null;
     blockingPrompt: string | null;
+    cleanBgPrompt: string | null;
+    cleanBgSource: string | null;
   } | null>(null);
   const [compositeStagesLoading, setCompositeStagesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -156,6 +158,8 @@ export function ReferencePhotosDisplay({
           composited: pick(data.stages.composited),
           final: pick(data.stages.final),
           blockingPrompt: data.blockingPrompt,
+          cleanBgPrompt: data.cleanBgPrompt,
+          cleanBgSource: data.cleanBgSource,
         });
       }
     } finally {
@@ -482,6 +486,20 @@ export function ReferencePhotosDisplay({
             </div>
           )}
 
+          {compositeStages?.cleanBgPrompt && (
+            <details className="mt-2">
+              <summary className="text-[10px] text-purple-600 cursor-pointer">
+                {language === 'de' ? 'Clean-BG Prompt anzeigen' : 'Show clean-BG prompt'}
+                {compositeStages.cleanBgSource === 'reused-empty-scene' && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px]">{language === 'de' ? 'wiederverwendet' : 'reused'}</span>
+                )}
+                {compositeStages.cleanBgSource === 'grok-generate' && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px]">{language === 'de' ? 'neu generiert' : 'regenerated'}</span>
+                )}
+              </summary>
+              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.cleanBgPrompt}</pre>
+            </details>
+          )}
           {compositeStages?.blockingPrompt && (
             <details className="mt-2">
               <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blocking-Prompt anzeigen' : 'Show blocking prompt'}</summary>

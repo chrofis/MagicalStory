@@ -753,6 +753,8 @@ export const storyService = {
     };
     bboxes: Record<string, { x: number; y: number; width: number; height: number }> | null;
     blockingPrompt: string | null;
+    cleanBgPrompt: string | null;
+    cleanBgSource: 'reused-empty-scene' | 'grok-generate' | null;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');

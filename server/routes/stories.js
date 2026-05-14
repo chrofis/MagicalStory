@@ -1825,15 +1825,18 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     );
     const wrap = (row) => row ? { imageData: normalizeImageData(row.imageData), imageUrl: row.imageUrl, generatedAt: row.generatedAt } : null;
 
-    // Bbox metadata is on the JSONB blob — pull it out for the dev panel label.
+    // Bbox metadata + prompts + source flag are on the JSONB blob — pull them
+    // out for the dev panel label.
     const metaRows = await dbQuery(
-      `SELECT scene->'compositeBboxes' AS bboxes, scene->>'compositeBlockingPrompt' AS prompt
+      `SELECT scene->'compositeBboxes' AS bboxes,
+              scene->>'compositeBlockingPrompt' AS blocking_prompt,
+              scene->>'compositeCleanBgPrompt' AS clean_bg_prompt,
+              scene->>'compositeCleanBgSource' AS clean_bg_source
        FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
        WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
       [id, pageNum]
     );
-    const bboxes = metaRows[0]?.bboxes || null;
-    const blockingPrompt = metaRows[0]?.prompt || null;
+    const meta = metaRows[0] || {};
 
     res.json({
       pageNumber: pageNum,
@@ -1843,8 +1846,10 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
         composited: wrap(composited),
         final: wrap(finalScene),
       },
-      bboxes,
-      blockingPrompt,
+      bboxes: meta.bboxes || null,
+      blockingPrompt: meta.blocking_prompt || null,
+      cleanBgPrompt: meta.clean_bg_prompt || null,
+      cleanBgSource: meta.clean_bg_source || null,
     });
   } catch (err) {
     console.error('❌ Error fetching composite stages:', err);
