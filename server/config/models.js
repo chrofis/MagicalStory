@@ -148,10 +148,10 @@ const MODEL_DEFAULTS = {
   // composite step 3 that renders the character (from their 2×4 sheet) in
   // the pose of the blocking-pass silhouette, instead of pasting a static
   // standing cell. Decouples pose correctness from the final blend pass at
-  // the cost of +1 Grok call per character per page (~$0.02 each). Default
-  // off until validated against the static-cell path. Per-story opt-in via
-  // inputData.phantomPoseRender === true.
-  phantomPoseRender: false,
+  // the cost of +1 Grok call per character per page (~$0.02 each).
+  // TEMPORARILY true on staging to validate the technique. Flip back to
+  // false after the comparison run is reviewed.
+  phantomPoseRender: true,
   enableSceneComposite: true,          // Scene composite mode: route page generation through
                                        // server/lib/sceneComposite.js (3 Grok calls per page —
                                        // clean BG, blocking with colour silhouettes, blend pass —
