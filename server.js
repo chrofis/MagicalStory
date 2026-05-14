@@ -5338,6 +5338,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Cache on the character for downstream pages in this story.
               character.avatars = character.avatars || {};
               character.avatars[sheetField] = sheetUri;
+              // Persist back to the characters table so subsequent stories on
+              // this account reuse the sheet (no $0.02 Grok call per page per
+              // costume per story) and the UI "Stilisierte Avatare (2×4)" tile
+              // can render them. Fire-and-forget — DB hiccups don't fail the
+              // page; the next run will re-upload.
+              try {
+                const { persistCharacter2x4Sheet } = require('./server/services/database');
+                await persistCharacter2x4Sheet(userId, character.id, sheetField, sheetUri);
+              } catch (persistErr) {
+                log.warn(`[SCENE COMPOSITE] persistCharacter2x4Sheet failed for ${name}/${sheetField}: ${persistErr.message}`);
+              }
             } catch (err) {
               log.warn(`[SCENE COMPOSITE] cannot generate 2×4 sheet for ${name} (${clothing}): ${err.message}`);
               return null;

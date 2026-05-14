@@ -421,6 +421,27 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       // Get active version metadata
       const activeVersions = await getAllActiveVersions(id);
 
+      // Pull per-scene composite flags + bbox metadata from the JSONB blob.
+      // These travel on the page object, not on story_images rows, so we need
+      // a separate jsonb_array_elements query. The dev panel needs both to
+      // render the 4-stage composite viewer and label cutouts by bbox.
+      const compositeMetaByPage = new Map();
+      const compositeMetaQuery = await dbQuery(
+        `SELECT (scene->>'pageNumber')::int AS page_number,
+                (scene->>'hasCompositeStages')::boolean AS has_stages,
+                scene->'compositeBboxes' AS bboxes
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE id = $1`,
+        [id]
+      );
+      for (const row of compositeMetaQuery) {
+        if (row.page_number == null) continue;
+        compositeMetaByPage.set(row.page_number, {
+          hasCompositeStages: row.has_stages === true,
+          compositeBboxes: row.bboxes || null,
+        });
+      }
+
       // Get version metadata (description, prompt, modelId, type) from data blob
       // Only needed for dev mode — skip this expensive jsonb_array_elements subquery for normal users
       const isDevMode = req.query.devMode === 'true';
@@ -499,13 +520,17 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         if (row.image_type === 'scene') {
           const activeVersion = activeVersions[row.page_number] ?? 0;
           if (!sceneImagesMap.has(row.page_number)) {
+            const compositeMeta = compositeMetaByPage.get(row.page_number) || {};
             sceneImagesMap.set(row.page_number, {
               pageNumber: row.page_number,
               hasImage: true,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               imageVersions: [],
-              activeVersion: activeVersion  // Track which version is active
+              activeVersion: activeVersion,  // Track which version is active
+              // Composite pipeline flags — gate the 4-stage dev panel viewer.
+              hasCompositeStages: compositeMeta.hasCompositeStages || false,
+              compositeBboxes: compositeMeta.compositeBboxes || null,
             });
           }
           // Add all versions (including version 0) to imageVersions array

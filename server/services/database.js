@@ -2035,6 +2035,70 @@ async function saveStyledAvatarToR2(userId, characterId, key, imageData) {
 }
 
 /**
+ * Persist a 2×4 character reference sheet onto the user's characters row.
+ *
+ * Writes both:
+ *   - characters.data->'characters'[i]->'avatars'->{sheetField}   (heavy data path)
+ *   - characters.metadata->'characters'[i]->'avatars'->{sheetField}  (lightweight UI path)
+ *
+ * R2 is used when configured (image_url stored on the field); otherwise the
+ * raw data URI is persisted inline. Returns true on success, false if the
+ * character couldn't be located.
+ *
+ * @param {string|number} userId
+ * @param {string|number} characterId
+ * @param {string} sheetField     - e.g. 'sheet2x4_standard' or 'sheet2x4_costumed_pirate'
+ * @param {string} imageData      - data:image/png;base64,...
+ */
+async function persistCharacter2x4Sheet(userId, characterId, sheetField, imageData) {
+  if (!isDatabaseMode()) return false;
+  if (!imageData || !userId || !characterId || !sheetField) return false;
+
+  // Upload to R2 if available — otherwise fall back to inline.
+  let url = null;
+  try {
+    const r2 = require('../lib/r2');
+    if (r2.isConfigured()) {
+      url = await r2.uploadImage(imageData, r2.keyForCharacterSheet2x4(userId, characterId, sheetField));
+    }
+  } catch (err) {
+    console.warn(`[R2] persistCharacter2x4Sheet upload skipped (${userId}/${characterId}/${sheetField}): ${err.message}`);
+  }
+
+  // Build the value to persist. When R2 succeeded, store an object with both
+  // url + lightweight metadata so the front-end can pick either.
+  const value = url
+    ? { url, generatedAt: new Date().toISOString() }
+    : imageData;
+
+  const rowId = `characters_${userId}`;
+  const rowRes = await dbQuery(`SELECT data FROM characters WHERE id = $1`, [rowId]);
+  if (rowRes.length === 0) return false;
+  const characters = rowRes[0].data?.characters || [];
+  const charIndex = characters.findIndex(c => String(c.id) === String(characterId));
+  if (charIndex < 0) return false;
+
+  await dbQuery(
+    `UPDATE characters
+     SET data = jsonb_set(
+                  data,
+                  $2,
+                  COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb,
+                  true
+                ),
+         metadata = jsonb_set(
+                      metadata,
+                      $2,
+                      COALESCE(metadata->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb,
+                      true
+                    )
+     WHERE id = $1`,
+    [rowId, `{characters,${charIndex},avatars}`, JSON.stringify({ [sheetField]: value })]
+  );
+  return true;
+}
+
+/**
  * Upload an avatar thumbnail (face or body) for a clothing slot.
  * Key format: characters/{userId}/{characterId}/avatars/thumbs/{kind}-{slot}.jpg
  * @param {string|number} userId
@@ -2841,6 +2905,7 @@ module.exports = {
   imgBytesAsync,
   saveAvatarToR2,
   saveStyledAvatarToR2,
+  persistCharacter2x4Sheet,
   saveAvatarThumbToR2,
   saveVbReferenceToR2,
   getStoryImageWithVersions,

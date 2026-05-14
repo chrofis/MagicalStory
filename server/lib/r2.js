@@ -118,6 +118,11 @@ function keyForCharacterStyledAvatar(userId, characterId, key) {
   return `characters/${userId}/${characterId}/avatars/styled/${key}.jpg`;
 }
 
+function keyForCharacterSheet2x4(userId, characterId, sheetField) {
+  // sheetField is already the full key (e.g. 'sheet2x4_costumed_pirate')
+  return `characters/${userId}/${characterId}/avatars/sheet2x4/${sheetField}.png`;
+}
+
 function keyForCharacterThumb(userId, characterId, kind, slot) {
   return `characters/${userId}/${characterId}/avatars/thumbs/${kind}-${slot}.jpg`;
 }
@@ -384,6 +389,7 @@ module.exports = {
   keyForCharacterPhoto,
   keyForCharacterAvatar,
   keyForCharacterStyledAvatar,
+  keyForCharacterSheet2x4,
   keyForCharacterThumb,
   keyForVbReference,
   keyForGrokRef,
