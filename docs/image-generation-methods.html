@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image Generation Methods — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Image Generation Methods</h1>
+<p class="lede">Inventory of every image-generation entry point in the codebase, the provider it calls, and the situations it's used for. Use this when you need to know <em>which function to call</em> for a new feature, or <em>why</em> a specific path uses one model and not another. The defaults in <code>server/config/models.js</code> are the source of truth; this page mirrors them.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#defaults">1. Active configuration (what's the current default?)</a></li>
+    <li><a href="#providers">2. Providers &amp; their idiosyncrasies</a></li>
+    <li><a href="#methods">3. Code-level methods (inventory)</a></li>
+    <li><a href="#usecases">4. By task: which method handles what</a></li>
+    <li><a href="#aspect">5. Aspect-ratio behaviour by provider</a></li>
+    <li><a href="#dispatch">6. Dispatch &amp; override layers</a></li>
+    <li><a href="#history">7. Why-not table (rejected approaches)</a></li>
+  </ol>
+</nav>
+
+<h2 id="defaults">1. Active configuration</h2>
+
+<p>Current defaults from <code>server/config/models.js</code> → <code>MODEL_DEFAULTS</code>. Every dispatch falls back to these unless an explicit <code>imageModelOverride</code> / <code>imageBackendOverride</code> is passed at the call site (dev-mode panels do this).</p>
+
+<table>
+<thead><tr><th>Task</th><th>Default model</th><th>Provider</th><th>Cost / image</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Page (scene) image</td><td><code>grok-imagine</code></td><td>Grok (xAI)</td><td>$0.02</td><td>Half the price of Gemini, accepts reference images, "good enough" for storybook style.</td></tr>
+<tr><td>Cover image</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Same as scenes. Cover-composite mode (default ON) layers Grok edits on a hand-built composite for stronger character placement.</td></tr>
+<tr><td>Avatar (clothing variants)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Gemini 2.5 Flash Image silently <code>IMAGE_OTHER</code>-refuses adult-face photos, leaving avatars stuck at <code>status='pending'</code> forever. Grok edit handles the same photos cleanly.</td></tr>
+<tr><td>Inpaint (auto-repair)</td><td><code>grok</code> (edit)</td><td>Grok</td><td>$0.02</td><td>Switched from Runware SDXL ($0.002) for face-quality reasons. Edit endpoint preserves identity better in the unmasked area.</td></tr>
+<tr><td>Character repair (cutout/blended)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Single function (<code>repairCharacterMismatchWithGrok</code>) with three modes — the unmasked area of the original survives the edit.</td></tr>
+<tr><td>Quality eval / bbox</td><td><code>gemini-2.5-flash</code></td><td>Gemini</td><td>text-tier</td><td>2.5 Flash returns bboxes reliably; Lite and 2.0 Flash miss small objects. (Not an image generator — vision-only.)</td></tr>
+</tbody>
+</table>
+
+<p><strong>Aspect ratios:</strong> <code>pageAspect</code> and <code>coverAspect</code> default to <code>3:4</code> (A4 portrait, matches the print book). <code>avatarAspect</code> defaults to <code>9:16</code>. All three are read from <code>MODEL_DEFAULTS</code> by every generation function — change the value, every image follows.</p>
+
+<h2 id="providers">2. Providers</h2>
+
+<table>
+<thead><tr><th>Provider</th><th>Endpoint we call</th><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Grok Imagine</strong> (xAI Aurora)</td>
+  <td><code>/v1/images/edits</code> (multi-ref) &amp; <code>/v1/images/generations</code></td>
+  <td>Fast (2–4× Gemini), cheap ($0.02), accepts up to 3 reference images on Standard, scene-composite-friendly.</td>
+  <td>Style consistency across pages is the weakest of any model we use. Identity preservation on the 2×2 avatar sheet is weak. No negative prompts. Output aspect <strong>= input image aspect</strong> — the <code>aspect_ratio</code> param is silently ignored on edit. Standard model: max 3 refs. Pro model: max 1 ref (we stitch).</td>
+</tr>
+<tr>
+  <td><strong>Gemini Imagen / 2.5 Flash Image</strong></td>
+  <td><code>generateContent</code> with image part</td>
+  <td>Strongest prompt adherence, most consistent style across pages, best at structured illustration / watercolor / whimsical, handles complex scenes well.</td>
+  <td>$0.04/image (double Grok). Adult-face photos trigger <code>IMAGE_OTHER</code> safety refusals — unusable for avatar generation from real user photos. 30 KB prompt limit (vs Grok's 7.5 KB) is the only context where it has more room than Grok.</td>
+</tr>
+<tr>
+  <td><strong>Runware FLUX</strong> (Schnell / Dev)</td>
+  <td>Runware HTTP API</td>
+  <td>Ultra-cheap ($0.0006–$0.004/image), good for dev-mode A/B testing. Schnell is 4-step, very fast.</td>
+  <td>3 KB prompt limit. No multi-image reference (only IP-Adapter style hints). Not used in production page/cover generation.</td>
+</tr>
+<tr>
+  <td><strong>Runware ACE++</strong></td>
+  <td>Runware HTTP API (<code>ace-plus-plus</code> model)</td>
+  <td>Face-consistent generation: reference image's face survives the prompt change. Used as the secondary avatar backend for explicit identity-preservation requests.</td>
+  <td>$0.005/image. Slower than Grok. The output composition is harder to control via prompt — best for "same face, different scene" tasks, not for "render this prose precisely".</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="methods">3. Code-level methods (inventory)</h2>
+
+<p>Every function below either dispatches to one of the providers above, or wraps a higher-level decision tree.</p>
+
+<table>
+<thead><tr><th>Function</th><th>File</th><th>Provider(s) used</th><th>Inputs</th><th>Output</th></tr></thead>
+<tbody>
+
+<tr>
+  <td><code>editWithGrok(prompt, refImages, options)</code></td>
+  <td><code>server/lib/grok.js:153</code></td>
+  <td>Grok edit endpoint</td>
+  <td>Prompt (text) + 1–3 reference images (data-URI base64). Options: <code>aspectRatio</code>, <code>model</code> (Standard/Pro), <code>padInput</code> (pad vs crop refs to match output aspect).</td>
+  <td><code>{ imageData, usage, modelId }</code>. Output aspect = input image's aspect (the <code>aspectRatio</code> param controls input-coercion, not output).</td>
+</tr>
+
+<tr>
+  <td><code>generateWithGrok(prompt, options)</code></td>
+  <td><code>server/lib/grok.js:49</code></td>
+  <td>Grok generate endpoint</td>
+  <td>Prompt only (no reference). Options: <code>aspectRatio</code>, <code>resolution</code>.</td>
+  <td><code>{ imageData, usage, modelId }</code>. Used for text-only "concept" pages where no character refs are sent.</td>
+</tr>
+
+<tr>
+  <td><code>callGeminiAPIForImage(prompt, charPhotos, prev, evalType, …)</code></td>
+  <td><code>server/lib/images.js:3406</code></td>
+  <td>Gemini 2.5 Flash Image / Gemini 3 Pro Image Preview</td>
+  <td>Long parameter list — prompt, character photos, previous image (iteration), landmarks, VB grid, scene background, characters, story text, aspect override.</td>
+  <td><code>{ imageData, usage, modelId, prompt }</code>. Direct provider call — not a dispatcher.</td>
+</tr>
+
+<tr>
+  <td><code>generateWithRunware(prompt, options)</code></td>
+  <td><code>server/lib/runware.js:185</code></td>
+  <td>Runware FLUX (Schnell, Dev, …)</td>
+  <td>Prompt + model id + optional <code>referenceImages</code> (IP-Adapter style hint).</td>
+  <td><code>{ imageData, usage, modelId }</code>. Direct provider call.</td>
+</tr>
+
+<tr>
+  <td><code>generateAvatarWithACE(refImage, prompt, options)</code></td>
+  <td><code>server/lib/runware.js:308</code></td>
+  <td>Runware ACE++</td>
+  <td>Single reference image (face) + prompt + <code>identityStrength</code>.</td>
+  <td><code>{ imageData }</code>. Face-locked variant generation.</td>
+</tr>
+
+<tr>
+  <td><code>inpaintWithRunware(seed, mask, prompt, options)</code></td>
+  <td><code>server/lib/runware.js:61</code></td>
+  <td>Runware SDXL / FLUX-Fill</td>
+  <td>Seed image, white-on-black mask, prompt, model id.</td>
+  <td><code>{ imageData }</code>. Pixel-level inpaint only — preserves unmasked region byte-for-byte.</td>
+</tr>
+
+<tr>
+  <td><code>generateImageOnly(prompt, charPhotos, options)</code></td>
+  <td><code>server/lib/images.js:4195</code></td>
+  <td><strong>Dispatcher</strong> → Grok / Gemini / Runware</td>
+  <td>Prompt + character photos + options (<code>imageBackendOverride</code>, <code>imageModelOverride</code>, scene metadata).</td>
+  <td><code>{ imageData, prompt, modelId, usage }</code>. Single-shot generation, no quality retry.</td>
+</tr>
+
+<tr>
+  <td><code>generateImageWithQualityRetry(prompt, charPhotos, …)</code></td>
+  <td><code>server/lib/images.js:9689</code></td>
+  <td><strong>Dispatcher + retry loop</strong> → Grok / Gemini</td>
+  <td>Same as <code>generateImageOnly</code> + quality eval callback.</td>
+  <td>Loops up to <code>maxPasses</code>: generate → eval → redo on low score / many issues. Returns best version. Primary entry point for scenes, covers, empty backgrounds.</td>
+</tr>
+
+<tr>
+  <td><code>generateWithIterativePlacement(prompt, charPhotos, sceneMeta, options)</code></td>
+  <td><code>server/lib/images.js:4739</code></td>
+  <td>Grok edit (two passes)</td>
+  <td>Prompt + character photos + scene metadata with depth info.</td>
+  <td>Two-pass: render background, then composite characters at scene-prescribed positions. Used when scene metadata has foreground/background depth markers.</td>
+</tr>
+
+<tr>
+  <td><code>inpaintPage(imageData, evaluation, options)</code></td>
+  <td><code>server/lib/images.js:5437</code></td>
+  <td>Configurable backend (default Grok edit)</td>
+  <td>Source image + evaluation report (fixable issues with bboxes) + options.</td>
+  <td>Auto-repair entry. Selects backend per <code>MODEL_DEFAULTS.inpaintBackend</code>: <code>'grok'</code> uses edit endpoint; <code>'runware'</code> uses SDXL/FLUX-Fill; <code>'gemini'</code> uses Gemini imagen.</td>
+</tr>
+
+<tr>
+  <td><code>repairCharacterMismatchWithGrok(imageData, charPhoto, bbox, charName, options)</code></td>
+  <td><code>server/lib/images.js:8286</code></td>
+  <td>Grok edit</td>
+  <td>Source scene image + character avatar reference + bbox + name + repair mode (<code>cutout</code> | <code>blended</code> | <code>blackout</code>).</td>
+  <td>Character-specific repair pipeline. Default mode <code>blended</code>; <code>cutout</code> for preset-aligned bbox extract; <code>blackout</code> for full-scene regen with overlay.</td>
+</tr>
+
+<tr>
+  <td><code>applyStyleTransfer(imageData, artStyle, options)</code></td>
+  <td><code>server/lib/images.js:13209</code></td>
+  <td>Configurable (Grok / Gemini)</td>
+  <td>Source image + target art style name + optional model override.</td>
+  <td>Re-renders the same scene composition in a different art style — used by the dev-mode "Style Transfer" button to compare models on the same scene.</td>
+</tr>
+
+<tr>
+  <td><strong>Scene composite</strong> (multiple Grok edits)</td>
+  <td><code>server/lib/sceneComposite.js</code></td>
+  <td>Grok edit ×3</td>
+  <td>Empty-scene plate + 2×4 character sheet + scene metadata.</td>
+  <td>Three Grok edit calls: clean BG → blocking with silhouettes → final blend. Active when <code>MODEL_DEFAULTS.enableSceneComposite</code> is true (current default) and <code>inputData.composite</code> isn't <code>false</code> for the story. See <code>docs/SCENE-COMPOSITE-PIPELINE.html</code>.</td>
+</tr>
+
+<tr>
+  <td><strong>Cover composite</strong> (two-pass Grok edit)</td>
+  <td><code>server/lib/coverComposite.js</code></td>
+  <td>Grok edit ×2</td>
+  <td>Manually composited canvas (costumed avatars + landmark photo) + cover hint.</td>
+  <td>Pass 1: pose-redraw on white background. Pass 2: composite onto landmark, watercolor finish. Active when <code>MODEL_DEFAULTS.compositeCovers</code> is true.</td>
+</tr>
+
+</tbody>
+</table>
+
+<h2 id="usecases">4. By task: which method handles what</h2>
+
+<p>Read this section as the answer to "<em>I'm working on feature X, which function do I call?</em>"</p>
+
+<table>
+<thead><tr><th>Task</th><th>Entry function</th><th>Dispatched to</th><th>Notes</th></tr></thead>
+<tbody>
+
+<tr>
+  <td>Generate a story page image (initial)</td>
+  <td><code>generateImageWithQualityRetry</code></td>
+  <td>Grok edit (default) → composite path if <code>enableSceneComposite</code></td>
+  <td>Routed by <code>simplePageImage</code> / <code>complexPageImage</code> defaults (both Grok). Iterate-page uses the same function.</td>
+</tr>
+
+<tr>
+  <td>Iterate / redo a page (user-triggered or auto-repair)</td>
+  <td><code>POST /api/stories/:id/iterate/:pageNumber</code> → <code>generateImageWithQualityRetry</code></td>
+  <td>Same as initial</td>
+  <td>Re-expands scene description, regenerates, replaces active version.</td>
+</tr>
+
+<tr>
+  <td>Generate front cover / initial page / back cover</td>
+  <td><code>server/lib/coverIterate.js</code> → <code>coverComposite</code> (if <code>compositeCovers</code>) or <code>generateImageWithQualityRetry</code></td>
+  <td>Grok edit</td>
+  <td>Composite mode is the current default. Direct path is the fallback / older behaviour.</td>
+</tr>
+
+<tr>
+  <td>Generate empty scene background</td>
+  <td><code>generateImageWithQualityRetry</code> with <code>emptyScenePrompt</code></td>
+  <td>Grok edit (no character refs)</td>
+  <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.</td>
+</tr>
+
+<tr>
+  <td>Generate clothing avatars (winter / standard / summer)</td>
+  <td><code>POST /api/generate-clothing-avatars</code> → <code>editWithGrok</code></td>
+  <td>Grok edit, 1–2 ref images (body + optional face crop)</td>
+  <td>Async job + sync route both go through the same Grok call. <code>padInput: true</code> so the face isn't cropped off tall body photos.</td>
+</tr>
+
+<tr>
+  <td>Generate styled avatar (watercolor, ghibli, …)</td>
+  <td><code>server/lib/styledAvatars.js</code> → <code>convertAvatarToStyle</code> → <code>editWithGrok</code></td>
+  <td>Grok edit</td>
+  <td>Used when story art style differs from the realistic avatar — re-renders the avatar in the target style.</td>
+</tr>
+
+<tr>
+  <td>Repair a single character in a scene (face/identity off)</td>
+  <td><code>repairCharacterMismatchWithGrok</code></td>
+  <td>Grok edit</td>
+  <td>Default mode <code>blended</code>. Triggered by the repair workflow's character-repair step.</td>
+</tr>
+
+<tr>
+  <td>Repair a non-character flaw (missing prop, wrong scale)</td>
+  <td><code>inpaintPage</code></td>
+  <td>Grok edit (default) / Runware / Gemini per <code>inpaintBackend</code></td>
+  <td>Auto-repair step in the global pass loop. Currently disabled by default (<code>enableAutoRepair: false</code>).</td>
+</tr>
+
+<tr>
+  <td>Style transfer (dev-mode comparison)</td>
+  <td><code>applyStyleTransfer</code></td>
+  <td>Configurable (model override at call site)</td>
+  <td>Used by the dev-mode "Style Transfer" panel in StoryDisplay.</td>
+</tr>
+
+<tr>
+  <td>Test multiple models on the same scene (dev mode)</td>
+  <td><code>POST /api/stories/:id/test-models/:pageNumber</code> → <code>generateImageOnly</code> per model</td>
+  <td>Parallel calls, one per selected model</td>
+  <td>UI: TestModelsPanel. Doesn't replace the active image — populates a results grid with "Use This" buttons.</td>
+</tr>
+
+<tr>
+  <td>Visual Bible reference image</td>
+  <td><code>server/lib/visualBible.js</code> → <code>editWithGrok</code></td>
+  <td>Grok edit</td>
+  <td>Generated once per character/entity per story to anchor identity across pages.</td>
+</tr>
+
+<tr>
+  <td>2×4 character sheet (composite pre-render)</td>
+  <td><code>server/lib/character2x4Sheet.js</code> → <code>editWithGrok</code></td>
+  <td>Grok edit</td>
+  <td>Pre-renders each character in 4 poses on a clean BG; the scene-composite pipeline cuts figures out of this sheet.</td>
+</tr>
+
+</tbody>
+</table>
+
+<h2 id="aspect">5. Aspect-ratio behaviour by provider</h2>
+
+<p>This trips people up when switching providers. The output aspect is determined differently per provider:</p>
+
+<table>
+<thead><tr><th>Provider</th><th>How output aspect is determined</th><th>What our wrapper does</th></tr></thead>
+<tbody>
+<tr>
+  <td>Grok edit</td>
+  <td>Matches the <strong>input image's aspect</strong>. The API's <code>aspect_ratio</code> param is silently ignored on edit calls.</td>
+  <td><code>editWithGrok</code> coerces every input image to the requested <code>aspectRatio</code> before the API call. <code>padInput: false</code> (default) crops the longer axis (fit:cover); <code>padInput: true</code> pads the shorter axis with white (fit:contain). Use <code>padInput</code> for avatar inputs that are already on a white background.</td>
+</tr>
+<tr>
+  <td>Grok generate (text-to-image)</td>
+  <td>Honours the <code>aspect_ratio</code> param.</td>
+  <td><code>generateWithGrok</code> passes it through directly.</td>
+</tr>
+<tr>
+  <td>Gemini imagen</td>
+  <td>Honours <code>imageConfig.aspectRatio</code> in the request body.</td>
+  <td><code>callGeminiAPIForImage</code> passes it through. Output exactly matches.</td>
+</tr>
+<tr>
+  <td>Runware</td>
+  <td>Width × height in pixels (not a ratio string).</td>
+  <td>Caller computes <code>width</code> and <code>height</code> from the desired aspect.</td>
+</tr>
+</tbody>
+</table>
+
+<p>This is the single most common cause of "the new model produces weird shapes" — switching from Gemini to Grok without realising the wrapper now crops the input. See <code>tests/avatar-debug/</code> for a worked example.</p>
+
+<h2 id="dispatch">6. Dispatch &amp; override layers</h2>
+
+<p>Three places control which model runs for a given image:</p>
+
+<ol>
+  <li><strong>Global defaults</strong> — <code>server/config/models.js</code> → <code>MODEL_DEFAULTS</code>. Change here to retune the whole pipeline.</li>
+  <li><strong>Per-story override</strong> — values set on the <code>story_jobs.input_data</code> blob at creation time (<code>imageBackend</code>, <code>imageModel</code>, <code>scoreModel</code>, etc.) snapshot the defaults so re-runs of the same story behave identically.</li>
+  <li><strong>Per-call override</strong> — every generation function accepts <code>imageBackendOverride</code> / <code>imageModelOverride</code> kwargs. Used by the dev-mode "Test Models" and "Style Transfer" UIs to bypass the configured default for one image.</li>
+</ol>
+
+<p>Auth: the dev-mode UIs route through the admin JWT path; the per-call overrides only fire when the request has an admin token. End-users always get the default config.</p>
+
+<h2 id="history">7. Why-not table</h2>
+
+<p>Approaches we tried, evaluated, and dropped — so future "let's just use X" suggestions can be checked against actual evidence.</p>
+
+<table>
+<thead><tr><th>Approach</th><th>Status</th><th>One-line reason</th></tr></thead>
+<tbody>
+<tr><td>FLUX Dev / Schnell for pages</td><td>❌ rejected</td><td>Identity preservation across characters is unusable for storybook pages.</td></tr>
+<tr><td>Gemini for clothing avatars</td><td>❌ rejected</td><td><code>IMAGE_OTHER</code> safety filter rejects adult-face inputs, leaving avatars permanently <code>status='pending'</code>.</td></tr>
+<tr><td>ACE++ as default avatar backend</td><td>🟡 conditional</td><td>Locks identity well, but composition control is weaker than Grok edit. Used only as the explicit-opt-in route.</td></tr>
+<tr><td>Single Gemini call for everything</td><td>❌ rejected</td><td>Cost (2× Grok) and the IMAGE_OTHER issue make it unusable for the avatar path even if scenes still suited it.</td></tr>
+<tr><td>Grok Pro everywhere</td><td>🟡 conditional</td><td>$0.07/image (3.5× Standard). Reserved for situations where Standard's quality is genuinely insufficient and a single regen will save more than the price difference.</td></tr>
+<tr><td>Single-portrait avatars (no 2×2 grid)</td><td>🟡 candidate</td><td>3 calls/character instead of 1, but each gets full attention → better identity. Open lever, not yet shipped.</td></tr>
+<tr><td>Kontext LoRA for character locking</td><td>🟡 conditional</td><td>1 training image, $2–5 per character, 99% identity. Too expensive for the current pricing model; revisit if a tier supports it.</td></tr>
+</tbody>
+</table>
+
+<p class="note">When adding a new provider or model, update this page in the same PR that introduces it — otherwise the doc starts lying within a week.</p>
+
+<footer>
+  <p>Last reviewed: 2026-05-14. Source of truth: <code>server/config/models.js</code> + the call sites linked above.</p>
+</footer>
+
+</body>
+</html>
