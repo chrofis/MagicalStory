@@ -307,7 +307,7 @@ async function generateSceneComposite(opts) {
   // ── Step 2: add silhouettes via Grok edit
   log.info('[SCENE COMPOSITE] step 2/4 — blocking (add silhouettes)');
   const blockingPrompt = buildBlockingEditPrompt(scene, cast);
-  const blocking = await editWithGrok(blockingPrompt, [bg.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  const blocking = await editWithGrok(blockingPrompt, [bgImageData], { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', blocking.usage, 'scene_composite_blocking', blocking.modelId);
   totalCost += blocking.usage?.cost || 0;
   const blockingBuf = Buffer.from(blocking.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
