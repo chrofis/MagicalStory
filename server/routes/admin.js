@@ -65,6 +65,10 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
 
     log.info(`👤 [ADMIN] ${req.user.username} is impersonating user ${targetUser.username}`);
     log.info(`👤 [ADMIN] [DEBUG] Impersonation token user ID: "${targetUser.id}" (type: ${typeof targetUser.id})`);
+    await logActivity(req.user.id, req.user.username, 'ADMIN_IMPERSONATE_START', {
+      targetUserId: targetUser.id,
+      targetUsername: targetUser.username,
+    });
 
     const impersonationToken = signToken(
       {
@@ -133,6 +137,10 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
     }
 
     log.info(`👤 [ADMIN] ${req.user.originalAdminUsername} stopped impersonating ${req.user.username}`);
+    await logActivity(originalAdminId, req.user.originalAdminUsername, 'ADMIN_IMPERSONATE_STOP', {
+      targetUserId: req.user.id,
+      targetUsername: req.user.username,
+    });
 
     const adminToken = signToken(
       {

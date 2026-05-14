@@ -1665,6 +1665,14 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
         succeeded.push({ orderId: order.orderId, refundId: refund.id, amountCents: refundAmount });
         remaining -= refundAmount;
         log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${refund.id} (PI ${order.paymentIntentId})`);
+        await logActivity(userId, req.user.username, 'REFERRAL_CASHOUT_REFUND', {
+          orderId: order.orderId,
+          sessionId: order.sessionId,
+          paymentIntentId: order.paymentIntentId,
+          refundId: refund.id,
+          amountCents: refundAmount,
+          stripeMode: order.stripeMode,
+        });
       } catch (stripeErr) {
         failed.push({ orderId: order.orderId, error: stripeErr.message, code: stripeErr.code });
         log.warn(`⚠️ [REFERRAL CASHOUT] Refund failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${stripeErr.message}`);

@@ -3318,6 +3318,10 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
     const shareUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/s/${shareToken}`;
 
     console.log(`✅ Sharing enabled for story ${id}, token: ${shareToken.substring(0, 8)}...`);
+    await logActivity(req.user.id, req.user.username, 'STORY_SHARE_ENABLED', {
+      storyId: id,
+      shareTokenPrefix: shareToken.substring(0, 8),
+    });
 
     res.json({
       isShared: true,
@@ -3358,6 +3362,9 @@ router.delete('/:id/share', authenticateToken, async (req, res) => {
     );
 
     console.log(`🚫 Sharing disabled for story ${id}`);
+    await logActivity(req.user.id, req.user.username, 'STORY_SHARE_DISABLED', {
+      storyId: id,
+    });
 
     res.json({ isShared: false, shareToken: null, shareUrl: null });
   } catch (err) {

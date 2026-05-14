@@ -789,6 +789,14 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`]);
 
             log.debug('💾 [STRIPE WEBHOOK] Credits transaction recorded');
+            await logActivity(userId, null, 'CREDITS_PURCHASED', {
+              sessionId: fullSession.id,
+              creditsAdded: creditsToAdd,
+              amountCents: amountPaid,
+              currency: fullSession.currency,
+              balanceAfter: newCredits,
+              isTestPayment,
+            });
           }
 
           res.json({ received: true, type: 'credits' });
@@ -897,6 +905,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             fullSession.amount_total, fullSession.currency, fullSession.payment_status,
             orderQuantity, stripeMode
           ]);
+          await logActivity(userId, customerInfo.email, 'ORDER_PLACED', {
+            sessionId: fullSession.id,
+            paymentIntentId: fullSession.payment_intent,
+            primaryStoryId,
+            amountCents: fullSession.amount_total,
+            currency: fullSession.currency,
+            quantity: orderQuantity,
+            coverType: orderCoverType,
+            bookFormat: orderBookFormat,
+            stripeMode,
+          });
 
           // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
           const totalPages = parseInt(fullSession.metadata?.totalPages) || 0;

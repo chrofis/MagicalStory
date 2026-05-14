@@ -233,6 +233,12 @@ router.post('/:userId/role', authenticateToken, requireAdmin, async (req, res) =
     await dbQuery('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
 
     log.info(`[ADMIN] Role for user ${user.username} changed: ${previousRole} -> ${role} (by ${req.user.username})`);
+    await logActivity(req.user.id, req.user.username, 'ADMIN_USER_ROLE_CHANGED', {
+      targetUserId: userId,
+      targetUsername: user.username,
+      previousRole,
+      newRole: role,
+    });
 
     res.json({
       message: 'User role updated',
@@ -673,15 +679,31 @@ router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
 
     let deletedLogsCount = 0;
     try {
-      const deletedLogs = await pool.query('DELETE FROM activity_log WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      const deletedLogs = await pool.query('DELETE FROM logs WHERE user_id = $1 RETURNING id', [userIdToDelete]);
       deletedLogsCount = deletedLogs.rows.length;
     } catch (err) {
-      // Activity log table may not exist
+      log.warn(`[ADMIN] Failed to cleanup logs for deleted user ${userIdToDelete}: ${err.message}`);
     }
 
     await pool.query('DELETE FROM users WHERE id = $1', [userIdToDelete]);
 
     log.info(`[ADMIN] Successfully deleted user ${user.username} and all associated data`);
+    // Audit the admin action AFTER the user is deleted so we don't write a row
+    // that the per-user log cleanup just removed. user_id on the audit row
+    // points at the admin (the actor); the deleted user's identity is in details.
+    await logActivity(req.user.id, req.user.username, 'ADMIN_DELETE_USER', {
+      deletedUserId: userIdToDelete,
+      deletedUsername: user.username,
+      deletedEmail: user.email,
+      counts: {
+        jobs: deletedJobs.rows.length,
+        orders: deletedOrders.rows.length,
+        stories: deletedStories.rows.length,
+        characters: deletedCharacters.rows.length,
+        files: deletedFiles.rows.length,
+        logs: deletedLogsCount,
+      },
+    });
 
     res.json({
       success: true,
