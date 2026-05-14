@@ -274,8 +274,39 @@ ${lines}
 Every silhouette is one solid uniform colour, painted directly into the scene at a position that makes physical sense (feet on the ground, sized for depth). NO TEXT. Do not modify the background in any way.`;
 }
 
+// Art-style descriptors — must stay aligned with character2x4Sheet.js ART_STYLE_LINES.
+const BLEND_STYLE_LINES = {
+  watercolor:   "soft watercolor children's storybook illustration style — gentle washes, simple outlines",
+  pixar:        "Pixar 3D illustration style — smooth shading, clean rim light",
+  anime:        "anime line-art style — clean lines, flat shading",
+  cartoon:      "modern flat cartoon, bold outlines, clean shapes",
+  oil:          "oil painting style with visible brushwork",
+};
+
 function buildBlendEditPrompt(scene) {
-  return `Refine this children's book illustration. Real characters have been pasted onto a clean scene background at the correct positions, sizes, and body directions. Blend each character into the scene: harmonise watercolor lighting, soften pasted edges, add subtle shadows on the ground. Preserve each character's identity, face, hair, costume, position, size, and body direction EXACTLY — do not move, resize, rotate, or change facing direction. Apply the scene action: ${scene.action || scene.description || ''}. Render in the scene's art style. NO TEXT in the output.`;
+  const styleLine = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
+  const brief = (scene.pageBrief || '').trim();
+  const briefBlock = brief
+    ? `\n\nPAGE BRIEF — these blocks define the canonical look of every character, costume, object, and pose in this scene. The composited image (Image 1) is already staged correctly; the brief tells you WHAT each silhouette is supposed to look like once blended. Image 2 (when provided) is the labelled portrait grid — use it as the authoritative face/clothing reference.\n\n${brief}`
+    : '';
+
+  return `Refine Image 1 into a single cohesive children's book illustration in ${styleLine}.
+
+Image 1 (THIS IMAGE) already contains real characters pasted onto a clean scene background. They are at the correct positions, sizes, and body directions. Your job is to BLEND them into the scene — not to redraw, restage, or add anything.
+
+DO:
+- Harmonise the lighting on each character so it matches the scene's light direction and colour temperature.
+- Soften pasted cutout edges so they read as painted, not stickered.
+- Add a subtle ground shadow under each character's feet, consistent with the scene light.
+- If any solid red, blue, green, orange, magenta or yellow outlines or fringes are visible around or beneath a character (silhouette residue from the blocking step), paint over them with the surrounding scene colour. The final image must contain NO solid-colour outlines.
+
+DO NOT:
+- Move, resize, rotate, mirror, or change the facing direction of any character — their pixel position and pose are already correct.
+- Add, remove, or substitute any character.
+- Change any character's face, hair, age, body proportions, costume, or accessories — match the labelled portrait grid (Image 2) exactly.
+- Add or remove any object from a character's hands.
+- Modify the background scenery, props, or composition.
+- Add text, captions, numbers, or signatures of any kind.${briefBlock}`;
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────
@@ -304,6 +335,7 @@ async function generateSceneComposite(opts) {
     cast = [],
     aspectRatio = '16:9',
     usageTracker = null,
+    visualBibleGridImage = null,
   } = opts;
 
   if (!cleanBackgroundPrompt && !existingCleanBackground) throw new Error('cleanBackgroundPrompt or existingCleanBackground required');
@@ -404,7 +436,13 @@ async function generateSceneComposite(opts) {
   log.info('[SCENE COMPOSITE] step 4/4 — blend pass');
   const blendPrompt = buildBlendEditPrompt(scene);
   debug.blendPrompt = blendPrompt;
-  const pass1 = await editWithGrok(blendPrompt, [compositedData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  // VB grid as Image 2 — labelled portrait grid serves as the authoritative face /
+  // clothing reference. The composited image stays as Image 1 (the canvas to refine).
+  const blendRefs = visualBibleGridImage
+    ? [compositedData, visualBibleGridImage]
+    : [compositedData];
+  debug.blendRefCount = blendRefs.length;
+  const pass1 = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', pass1.usage, 'scene_composite_blend', pass1.modelId);
   totalCost += pass1.usage?.cost || 0;
 

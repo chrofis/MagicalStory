@@ -5479,9 +5479,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     scene: {
                       description: pageData.scene?.sceneDescription || '',
                       action: pageData.scene?.text || '',
+                      // Pass the fully-built page prompt (clothing per char,
+                      // height order, required objects, EXACT POSES, scene
+                      // intent) as the blend brief — same source of truth as
+                      // the legacy direct-prompt path.
+                      pageBrief: pageData.prompt || '',
+                      artStyle: inputData?.artStyle || 'watercolor',
                     },
                     cast: compositeCast,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                    // Labelled portrait grid → blend step uses it as Image 2.
+                    visualBibleGridImage: pageData.visualBibleGrid || null,
                     usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
                   });
                   return {
