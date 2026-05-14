@@ -2,535 +2,143 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PRICING.html</title>
+<title>Pricing &amp; Cost Structure — MagicalStory</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-  :root {
-    --fg: #1f2328;
-    --bg: #ffffff;
-    --muted: #59636e;
-    --border: #d1d9e0;
-    --code-bg: #f6f8fa;
-    --link: #0969da;
-    --accent: #0969da;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
-    color: var(--fg);
-    background: var(--bg);
-    line-height: 1.6;
-    max-width: 920px;
-    margin: 0 auto;
-    padding: 32px 24px 80px;
-  }
-  h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
-  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
-  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
-  h3 { font-size: 1.25em; }
-  h4 { font-size: 1em; }
-  h5 { font-size: 0.875em; }
-  h6 { font-size: 0.85em; color: var(--muted); }
-  p, ul, ol, blockquote, table, pre { margin: 0 0 16px; }
-  a { color: var(--link); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  code {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 85%;
-    background: var(--code-bg);
-    padding: 0.2em 0.4em;
-    border-radius: 6px;
-  }
-  pre {
-    background: var(--code-bg);
-    padding: 16px;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-size: 85%;
-    line-height: 1.45;
-  }
-  pre code { background: transparent; padding: 0; font-size: 100%; border-radius: 0; }
-  blockquote {
-    border-left: 4px solid var(--border);
-    color: var(--muted);
-    padding: 0 1em;
-    margin: 0 0 16px;
-  }
-  ul, ol { padding-left: 2em; }
-  li { margin: 0.25em 0; }
-  table { border-collapse: collapse; display: block; overflow: auto; width: max-content; max-width: 100%; }
-  th, td { border: 1px solid var(--border); padding: 6px 13px; }
-  th { background: var(--code-bg); font-weight: 600; }
-  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
-  img { max-width: 100%; height: auto; }
-  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
-</style>
-
+<link rel="stylesheet" href="_style.css">
 </head>
 <body>
-<main>
-<h1>Pricing &amp; Cost Structure</h1>
-<p><strong>Last updated</strong>: April 2026</p>
-<h2>Credit Packages</h2>
-<p>Users purchase credits in fixed packages via Stripe (CHF):</p>
-<table>
-<thead>
-<tr>
-<th>Package</th>
-<th>Credits</th>
-<th>Price</th>
-<th>Per Credit</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Starter</td>
-<td>300</td>
-<td>CHF 5.-</td>
-<td>CHF 0.017</td>
-</tr>
-<tr>
-<td>Popular</td>
-<td>700</td>
-<td>CHF 10.-</td>
-<td>CHF 0.014</td>
-</tr>
-<tr>
-<td>Best Value</td>
-<td>1,500</td>
-<td>CHF 20.-</td>
-<td>CHF 0.013</td>
-</tr>
-<tr>
-<td>Pro</td>
-<td>4,000</td>
-<td>CHF 50.-</td>
-<td>CHF 0.013</td>
-</tr>
-</tbody></table>
-<p>New users receive <strong>500 free credits</strong> on signup (~1-2 stories).</p>
-<p>Config: <code>server/config/credits.js</code> → <code>CREDIT_CONFIG.PRICING.PACKAGES</code></p>
-<h2>Credit Costs Per Operation</h2>
-<table>
-<thead>
-<tr>
-<th>Operation</th>
-<th>Credits</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Story page</td>
-<td>10</td>
-<td>Text generation + image generation</td>
-</tr>
-<tr>
-<td>Image regeneration</td>
-<td>5</td>
-<td>Re-roll a single scene image</td>
-</tr>
-<tr>
-<td>Cover regeneration</td>
-<td>5</td>
-<td>Re-roll a cover image</td>
-</tr>
-</tbody></table>
-<p>Config: <code>server/config/credits.js</code> → <code>CREDIT_CONFIG.COSTS</code></p>
-<h3>Story Examples</h3>
-<table>
-<thead>
-<tr>
-<th>Story Size</th>
-<th>Pages</th>
-<th>Credits</th>
-<th>Cheapest Package</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Short</td>
-<td>10</td>
-<td>100</td>
-<td>300 for CHF 5</td>
-</tr>
-<tr>
-<td>Medium</td>
-<td>20</td>
-<td>200</td>
-<td>300 for CHF 5</td>
-</tr>
-<tr>
-<td>Standard</td>
-<td>30</td>
-<td>300</td>
-<td>300 for CHF 5</td>
-</tr>
-<tr>
-<td>Long</td>
-<td>50</td>
-<td>500</td>
-<td>700 for CHF 10</td>
-</tr>
-</tbody></table>
-<h2>API Cost Breakdown (per story)</h2>
-<p>Approximate generation costs for a <strong>30-page story with ~15 images</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Provider</th>
-<th>Usage</th>
-<th>Est. Cost</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Anthropic</td>
-<td>Outline + text + scene descriptions</td>
-<td>~CHF 0.50</td>
-</tr>
-<tr>
-<td>Gemini</td>
-<td>Image generation (~15 images)</td>
-<td>~CHF 1.50</td>
-</tr>
-<tr>
-<td>Gemini</td>
-<td>Quality evaluation</td>
-<td>~CHF 0.20</td>
-</tr>
-<tr>
-<td>Gemini</td>
-<td>Covers (front, back, dedication)</td>
-<td>~CHF 0.30</td>
-</tr>
-<tr>
-<td><strong>Total</strong></td>
-<td></td>
-<td><strong>~CHF 2.50</strong></td>
-</tr>
-</tbody></table>
-<p>With repair workflow (optional, adds re-evaluations and redos): <strong>~CHF 3-4</strong>.</p>
-<h2>Margin Analysis</h2>
-<table>
-<thead>
-<tr>
-<th>Scenario</th>
-<th>Revenue</th>
-<th>API Cost</th>
-<th>Margin</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>30-page story (Starter package)</td>
-<td>CHF 5</td>
-<td>~CHF 2.50</td>
-<td>~50%</td>
-</tr>
-<tr>
-<td>30-page story (Popular package, credits left over)</td>
-<td>CHF 10</td>
-<td>~CHF 2.50</td>
-<td>&gt;50%</td>
-</tr>
-<tr>
-<td>50-page story (Popular package)</td>
-<td>CHF 10</td>
-<td>~CHF 4</td>
-<td>~60%</td>
-</tr>
-<tr>
-<td>Heavy repair (30-page + full workflow)</td>
-<td>CHF 5</td>
-<td>~CHF 3.50</td>
-<td>~30%</td>
-</tr>
-</tbody></table>
-<p><strong>Target margin: ~50%</strong> on the smallest package (Starter). Larger packages give better per-credit rates to the user but also benefit from volume (users generate multiple stories, not all 30 pages).</p>
-<h2>Book Printing (Physical)</h2>
-<p>Print orders go through Gelato. Prices charged to users (April 2026):</p>
-<table>
-<thead>
-<tr>
-<th>Seiten</th>
-<th align="right">Softcover<br>21 × 28 cm</th>
-<th align="right">Hardcover<br>21 × 28 cm</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>1-30</td>
-<td align="right">CHF 29.-</td>
-<td align="right">CHF 37.-</td>
-</tr>
-<tr>
-<td>31-40</td>
-<td align="right">CHF 35.-</td>
-<td align="right">CHF 43.-</td>
-</tr>
-<tr>
-<td>41-50</td>
-<td align="right">CHF 41.-</td>
-<td align="right">CHF 49.-</td>
-</tr>
-<tr>
-<td>51-60</td>
-<td align="right">CHF 47.-</td>
-<td align="right">CHF 55.-</td>
-</tr>
-<tr>
-<td>61-70</td>
-<td align="right">CHF 52.-</td>
-<td align="right">CHF 60.-</td>
-</tr>
-<tr>
-<td>71-80</td>
-<td align="right">CHF 58.-</td>
-<td align="right">CHF 66.-</td>
-</tr>
-<tr>
-<td>81-90</td>
-<td align="right">CHF 64.-</td>
-<td align="right">CHF 72.-</td>
-</tr>
-<tr>
-<td>91-100</td>
-<td align="right">CHF 69.-</td>
-<td align="right">CHF 77.-</td>
-</tr>
-</tbody></table>
-<p><strong>Pricing model:</strong></p>
-<ul>
-<li>Softcover anchored at CHF 29 for 30p, scaling linearly to CHF 69 at 100p</li>
-<li>Hardcover = Softcover + flat CHF 8 across all tiers</li>
-<li>Margin scales from CHF 12 (soft 30p) up to CHF 25 (soft/hard 100p)</li>
-<li>Shipping: separate flat CHF 10 line at checkout</li>
-<li>Promo budget: CHF 10 discount keeps every tier profitable</li>
-</ul>
-<p>Config: Pricing tiers stored in <code>pricing_tiers</code> DB table, seeded on first run. Endpoint: <code>GET /api/pricing</code>.</p>
-<h3>Credit Reward on Book Purchase</h3>
-<p>Book purchases reward credits: <strong>10 credits/page x 2 (double promo) = 20 credits/page</strong>.</p>
-<p>The promo multiplier is configurable via admin (<code>token_promo_multiplier</code> in <code>config</code> table, currently 2x).</p>
-<p>Credit value at best rate: CHF 50 / 4000 credits = <strong>CHF 0.0125/credit</strong>.</p>
-<table>
-<thead>
-<tr>
-<th>Pages</th>
-<th>Credits Back (2x)</th>
-<th>Credit Value (CHF)</th>
-<th>Softcover Price</th>
-<th>Net Effective Price</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>30</td>
-<td>600</td>
-<td>7.50</td>
-<td>29</td>
-<td>21.50</td>
-</tr>
-<tr>
-<td>40</td>
-<td>800</td>
-<td>10.00</td>
-<td>35</td>
-<td>25.00</td>
-</tr>
-<tr>
-<td>50</td>
-<td>1000</td>
-<td>12.50</td>
-<td>41</td>
-<td>28.50</td>
-</tr>
-<tr>
-<td>60</td>
-<td>1200</td>
-<td>15.00</td>
-<td>47</td>
-<td>32.00</td>
-</tr>
-<tr>
-<td>70</td>
-<td>1400</td>
-<td>17.50</td>
-<td>52</td>
-<td>34.50</td>
-</tr>
-<tr>
-<td>80</td>
-<td>1600</td>
-<td>20.00</td>
-<td>58</td>
-<td>38.00</td>
-</tr>
-<tr>
-<td>90</td>
-<td>1800</td>
-<td>22.50</td>
-<td>64</td>
-<td>41.50</td>
-</tr>
-<tr>
-<td>100</td>
-<td>2000</td>
-<td>25.00</td>
-<td>69</td>
-<td>44.00</td>
-</tr>
-</tbody></table>
-<h3>Gelato Cost Breakdown (Switzerland, April 2026)</h3>
-<p>Gelato charges us per book (manufacturing only, CHF). Shipping is a separate
-CHF 10 line item charged to the customer at checkout. AI cost is assumed at
-CHF 0.20/page for the high-quality model with ~5 images per page.</p>
-<table>
-<thead>
-<tr>
-<th align="right">Pages</th>
-<th align="right">Gelato Soft</th>
-<th align="right">Gelato Hard</th>
-<th align="right">AI cost</th>
-<th align="right">Soft total</th>
-<th align="right">Hard total</th>
-<th align="right">Soft retail</th>
-<th align="right">Hard retail</th>
-<th align="right">Soft margin</th>
-<th align="right">Hard margin</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="right">30</td>
-<td align="right">11.08</td>
-<td align="right">14.44</td>
-<td align="right">6.00</td>
-<td align="right">17.08</td>
-<td align="right">20.44</td>
-<td align="right">29</td>
-<td align="right">37</td>
-<td align="right">11.92</td>
-<td align="right">16.56</td>
-</tr>
-<tr>
-<td align="right">40</td>
-<td align="right">12.86</td>
-<td align="right">16.88</td>
-<td align="right">8.00</td>
-<td align="right">20.86</td>
-<td align="right">24.88</td>
-<td align="right">35</td>
-<td align="right">43</td>
-<td align="right">14.14</td>
-<td align="right">18.12</td>
-</tr>
-<tr>
-<td align="right">50</td>
-<td align="right">14.63</td>
-<td align="right">19.32</td>
-<td align="right">10.00</td>
-<td align="right">24.63</td>
-<td align="right">29.32</td>
-<td align="right">41</td>
-<td align="right">49</td>
-<td align="right">16.37</td>
-<td align="right">19.68</td>
-</tr>
-<tr>
-<td align="right">60</td>
-<td align="right">16.41</td>
-<td align="right">21.76</td>
-<td align="right">12.00</td>
-<td align="right">28.41</td>
-<td align="right">33.76</td>
-<td align="right">47</td>
-<td align="right">55</td>
-<td align="right">18.59</td>
-<td align="right">21.24</td>
-</tr>
-<tr>
-<td align="right">70</td>
-<td align="right">18.18</td>
-<td align="right">24.21</td>
-<td align="right">14.00</td>
-<td align="right">32.18</td>
-<td align="right">38.21</td>
-<td align="right">52</td>
-<td align="right">60</td>
-<td align="right">19.82</td>
-<td align="right">21.79</td>
-</tr>
-<tr>
-<td align="right">80</td>
-<td align="right">19.96</td>
-<td align="right">26.64</td>
-<td align="right">16.00</td>
-<td align="right">35.96</td>
-<td align="right">42.64</td>
-<td align="right">58</td>
-<td align="right">66</td>
-<td align="right">22.04</td>
-<td align="right">23.36</td>
-</tr>
-<tr>
-<td align="right">90</td>
-<td align="right">21.73</td>
-<td align="right">29.10</td>
-<td align="right">18.00</td>
-<td align="right">39.73</td>
-<td align="right">47.10</td>
-<td align="right">64</td>
-<td align="right">72</td>
-<td align="right">24.27</td>
-<td align="right">24.90</td>
-</tr>
-<tr>
-<td align="right">100</td>
-<td align="right">23.51</td>
-<td align="right">31.53</td>
-<td align="right">20.00</td>
-<td align="right">43.51</td>
-<td align="right">51.53</td>
-<td align="right">69</td>
-<td align="right">77</td>
-<td align="right">25.49</td>
-<td align="right">25.47</td>
-</tr>
-</tbody></table>
-<p><strong>Margin model</strong>: linear 12 → 25 (soft) and 16 → 25 (hard). Hardcover is a flat CHF 8 above softcover.</p>
-<p><strong>Promo budget</strong>: A CHF 10 discount keeps even the smallest tier profitable —
-soft 30p still earns CHF 1.92, hard 30p still earns CHF 6.56.</p>
-<p>Source: Gelato CHF prices for <code>photobooks-softcover/hardcover_pf_210x280-mm-8x11-inch</code>, April 2026.</p>
-<h2>Key Files</h2>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>What</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>server/config/credits.js</code></td>
-<td>Package definitions, credit costs, limits</td>
-</tr>
-<tr>
-<td><code>server/routes/print.js</code></td>
-<td>Stripe checkout endpoints, pricing API</td>
-</tr>
-<tr>
-<td><code>server.js</code></td>
-<td>Stripe webhook (credit fulfillment)</td>
-</tr>
-<tr>
-<td><code>client/src/components/common/CreditsModal.tsx</code></td>
-<td>Package selection UI</td>
-</tr>
-<tr>
-<td><code>client/src/services/storyService.ts</code></td>
-<td><code>createCreditsCheckout()</code> API call</td>
-</tr>
-<tr>
-<td><code>docs/business-review-2025.md</code></td>
-<td>Competitive pricing analysis</td>
-</tr>
-</tbody></table>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
 
-</main>
+<h1>Pricing &amp; Cost Structure</h1>
+<p class="lede">Customer-facing prices, credit packages, per-operation costs, and the config files that drive them.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#prices">1. Customer prices</a></li>
+    <li><a href="#credits">2. Credit packages</a></li>
+    <li><a href="#operations">3. Per-operation cost</a></li>
+    <li><a href="#providers">4. Provider unit costs</a></li>
+    <li><a href="#story-cost">5. Worked story cost</a></li>
+    <li><a href="#referral">6. Referral economics</a></li>
+    <li><a href="#config">7. Configuration files</a></li>
+  </ol>
+</nav>
+
+<h2 id="prices">1. Customer prices</h2>
+
+<p>All prices in CHF, inclusive of Swiss VAT.</p>
+
+<table>
+<thead><tr><th>Item</th><th>Price</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Trial story</td><td>Free</td><td>Anonymous account, limited pages, watermarked download.</td></tr>
+<tr><td>Printed book (A4 hardcover)</td><td>CHF 39.00 + shipping</td><td>Gelato print + ship from EU.</td></tr>
+<tr><td>Promo discount (referral)</td><td>−CHF 10</td><td>Buyer uses a friend's code; one per buyer ever.</td></tr>
+<tr><td>Shipping (Switzerland)</td><td>CHF 9.00</td><td>5-7 business days.</td></tr>
+</tbody>
+</table>
+
+<h2 id="credits">2. Credit packages</h2>
+
+<p>Stories are paid in credits. Configured in <code>server/config/credits.js</code> → <code>CREDIT_PACKAGES</code>.</p>
+
+<table>
+<thead><tr><th>Package</th><th>Credits</th><th>Price (CHF)</th><th>Effective per credit</th></tr></thead>
+<tbody>
+<tr><td>Starter</td><td>350</td><td>10</td><td>~2.9 ¢</td></tr>
+<tr><td>Standard</td><td>1000</td><td>25</td><td>~2.5 ¢</td></tr>
+<tr><td>Family</td><td>2500</td><td>50</td><td>~2.0 ¢</td></tr>
+</tbody>
+</table>
+
+<p>New users get a one-time <code>INITIAL_USER_CREDITS</code> grant on signup (see <code>client/src/constants/credits.ts</code>).</p>
+
+<h2 id="operations">3. Per-operation cost</h2>
+
+<p>Configured in <code>server/config/credits.js</code>:</p>
+
+<table>
+<thead><tr><th>Operation</th><th>Credits</th></tr></thead>
+<tbody>
+<tr><td>Story page (generation + eval + repair)</td><td><code>CREDITS_PER_PAGE</code> = 25</td></tr>
+<tr><td>Cover (front / initial / back, each)</td><td>~25</td></tr>
+<tr><td>Avatar regeneration</td><td>~10</td></tr>
+<tr><td>Style transfer (per image)</td><td>~10</td></tr>
+<tr><td>Iterate page (full re-gen)</td><td>~25</td></tr>
+<tr><td>Character repair (Grok cutout / blended)</td><td>~3</td></tr>
+</tbody>
+</table>
+
+<h2 id="providers">4. Provider unit costs</h2>
+
+<p>Direct API costs paid by us, in USD (rounded). Used to calibrate credit pricing.</p>
+
+<table>
+<thead><tr><th>Provider / model</th><th>Unit</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>Anthropic Claude Sonnet</td><td>1M input tokens</td><td>~$3.00</td></tr>
+<tr><td>Anthropic Claude Sonnet</td><td>1M output tokens</td><td>~$15.00</td></tr>
+<tr><td>Gemini 2.5 Flash</td><td>per image generation</td><td>~$0.039</td></tr>
+<tr><td>Gemini 2.5 Flash</td><td>per vision eval (~1 MP)</td><td>~$0.0008</td></tr>
+<tr><td>Grok Imagine standard</td><td>per image edit / generate</td><td>~$0.02</td></tr>
+<tr><td>Grok Imagine pro</td><td>per image edit / generate</td><td>~$0.07</td></tr>
+<tr><td>Runware FLUX SDXL</td><td>per image</td><td>~$0.002</td></tr>
+<tr><td>Runware ACE++</td><td>per image</td><td>~$0.005</td></tr>
+<tr><td>Cloudflare R2</td><td>per GB stored / month</td><td>~$0.015</td></tr>
+<tr><td>Postgres (Railway)</td><td>per GB stored / month</td><td>~$25</td></tr>
+</tbody>
+</table>
+
+<h2 id="story-cost">5. Worked story cost</h2>
+
+<p>A representative 12-page story with 2 characters, 3 covers, default settings, full repair cycle:</p>
+
+<table>
+<thead><tr><th>Item</th><th>Calls</th><th>Cost (USD)</th></tr></thead>
+<tbody>
+<tr><td>Unified Claude pass</td><td>1</td><td>~$0.05</td></tr>
+<tr><td>Scene expansion</td><td>12</td><td>~$0.30</td></tr>
+<tr><td>Page images (Gemini)</td><td>12 × ~1.5 attempts</td><td>~$0.70</td></tr>
+<tr><td>Quality + semantic + entity eval</td><td>12 × 3</td><td>~$0.04</td></tr>
+<tr><td>Character repair (~3 pages)</td><td>3</td><td>~$0.06</td></tr>
+<tr><td>Covers (3 × ~1.3 attempts)</td><td>4</td><td>~$0.20</td></tr>
+<tr><td>Avatars (already cached)</td><td>0 (one-time per character)</td><td>—</td></tr>
+<tr><td><strong>Total per story</strong></td><td></td><td><strong>~$1.35</strong></td></tr>
+</tbody>
+</table>
+
+<p>At 25 credits / page × 12 pages = 300 credits, the customer paid ~CHF 8.5 in package value. Margin covers Stripe fees, R2 storage, infra, and labour.</p>
+
+<h2 id="referral">6. Referral economics</h2>
+
+<p>Configured in <code>server/config/credits.js</code> → <code>REFERRAL</code>:</p>
+
+<ul>
+  <li>Buyer gets <strong>CHF 10 off</strong> the printed book at checkout.</li>
+  <li>Referrer gets <strong>350 credits</strong> (= CHF 10 starter pack) granted on confirmed payment.</li>
+  <li>One referral code per buyer, ever (<code>users.referred_by</code>). No self-referral. Code format: <code>MagicName{NNN}</code> with 900 slots per first-name.</li>
+</ul>
+
+<p>Endpoints in <code>server/routes/print.js</code>: <code>GET /api/referral/my-code</code>, <code>POST /api/referral/validate</code>. Webhook in <code>server.js</code> credits the referrer transactionally with an atomic <code>referred_by</code> lock.</p>
+
+<h2 id="config">7. Configuration files</h2>
+
+<table>
+<tbody>
+<tr><td><code>server/config/credits.js</code></td><td>Credit packages, per-op costs, referral block.</td></tr>
+<tr><td><code>server/config/models.js</code></td><td>Default models, aspect ratios, repair thresholds.</td></tr>
+<tr><td><code>client/src/pages/Pricing.tsx</code></td><td>Public pricing page; shipping cost constant.</td></tr>
+<tr><td><code>pricing_tiers</code> table</td><td>DB-driven price overrides (admin can edit).</td></tr>
+<tr><td><code>gelato_products</code> table</td><td>Print product mapping (size / paper / cover / Gelato UID).</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="story-pipeline.html">story pipeline</a> for what each cost line corresponds to, <a href="operations.html">operations</a> for Stripe + Gelato setup.</p>
+
 <footer class="doc-footer">
-  Rendered from <code>PRICING.md</code>.
+  <a href="index.html">← Documentation index</a>
 </footer>
+
 </body>
 </html>

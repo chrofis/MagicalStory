@@ -6,74 +6,145 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
+  :root {
+    --fg: #1f2328;
+    --muted: #59636e;
+    --link: #0969da;
+    --border: #d1d9e0;
+    --hover: #f6f8fa;
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
-    color: #1f2328;
+    color: var(--fg);
     background: #ffffff;
-    line-height: 1.6;
-    max-width: 920px;
+    line-height: 1.55;
+    max-width: 1080px;
     margin: 0 auto;
     padding: 32px 24px 80px;
   }
-  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid #d1d9e0; }
-  ul { list-style: none; padding-left: 0; }
-  li { margin: 8px 0; padding: 8px 12px; border-radius: 6px; }
-  li:hover { background: #f6f8fa; }
-  a { color: #0969da; text-decoration: none; font-size: 1.05em; font-weight: 500; }
-  a:hover { text-decoration: underline; }
-  .filename { color: #59636e; font-family: ui-monospace, monospace; font-size: 0.85em; margin-left: 8px; }
-  .doc-footer { color: #59636e; font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid #d1d9e0; }
+  h1 {
+    font-size: 2em;
+    margin: 0 0 4px;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border);
+  }
+  .lede { color: var(--muted); margin: 0 0 28px; font-size: 0.95em; }
+  .toc {
+    background: var(--hover);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 32px;
+    font-size: 0.95em;
+  }
+  .toc strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; }
+  .toc a { color: var(--link); text-decoration: none; margin-right: 14px; line-height: 2; white-space: nowrap; display: inline-block; }
+  .toc a:hover { text-decoration: underline; }
+  section.topic { margin: 0 0 36px; scroll-margin-top: 16px; }
+  section.topic h2 {
+    font-size: 1.35em;
+    margin: 0 0 4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topic-blurb { color: var(--muted); margin: 0 0 12px; font-size: 0.9em; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { margin: 4px 0; padding: 6px 10px; border-radius: 6px; }
+  li:hover { background: var(--hover); }
+  a.doc { color: var(--link); text-decoration: none; font-weight: 500; }
+  a.doc:hover { text-decoration: underline; }
+  .filename { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82em; margin-left: 10px; }
+  details.archive { margin-top: 36px; }
+  details.archive > summary { cursor: pointer; font-weight: 600; font-size: 1em; color: var(--muted); padding: 6px 0; }
+  details.archive .topic-blurb { margin-bottom: 8px; }
+  details.archive li { font-size: 0.9em; }
+  details.archive a.doc { color: var(--muted); }
+  .doc-footer { color: var(--muted); font-size: 0.85em; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); }
 </style>
 
 </head>
 <body>
 <h1>MagicalStory Documentation</h1>
-<p>43 documents.</p>
-<ul>
-  <li><a href="ADMIN_DASHBOARD.html">Admin Dashboard Design Document</a><span class="filename">ADMIN_DASHBOARD.html</span></li>
-  <li><a href="API-ENDPOINTS.html">MagicalStory API Endpoints</a><span class="filename">API-ENDPOINTS.html</span></li>
-  <li><a href="ARCHITECTURE.html">MagicalStory Architecture &amp; Deployment</a><span class="filename">ARCHITECTURE.html</span></li>
-  <li><a href="AUDIT_REPORT.html">Comprehensive Feature Quality Audit - MagicalStory</a><span class="filename">AUDIT_REPORT.html</span></li>
-  <li><a href="CHARACTER-REPLACEMENT-TESTS.html">Character Replacement Technology Tests</a><span class="filename">CHARACTER-REPLACEMENT-TESTS.html</span></li>
-  <li><a href="CHARACTER-SYSTEM-REQUIREMENTS.html">Character Creation &amp; Modification System - Requirements Document</a><span class="filename">CHARACTER-SYSTEM-REQUIREMENTS.html</span></li>
-  <li><a href="CHARACTER-SYSTEM.html">MagicalStory Character System</a><span class="filename">CHARACTER-SYSTEM.html</span></li>
-  <li><a href="CHARAKTER-ERSTELLUNG.html">Charaktererstellung - Detaillierte Dokumentation</a><span class="filename">CHARAKTER-ERSTELLUNG.html</span></li>
-  <li><a href="COVER_SYSTEM_IMPLEMENTATION_PLAN.html">Cover System Implementation Plan</a><span class="filename">COVER_SYSTEM_IMPLEMENTATION_PLAN.html</span></li>
-  <li><a href="DATABASE_MIGRATION_SUMMARY.html">Database Migration Summary - December 6, 2025</a><span class="filename">DATABASE_MIGRATION_SUMMARY.html</span></li>
-  <li><a href="DEPLOYMENT_GUIDE.html">MagicalStory - Deployment Guide</a><span class="filename">DEPLOYMENT_GUIDE.html</span></li>
-  <li><a href="DOCUMENTATION.html">MagicalStory Documentation Index</a><span class="filename">DOCUMENTATION.html</span></li>
-  <li><a href="EMAIL_SETUP_GUIDE.html">Email Messaging Setup Guide for MagicalStory</a><span class="filename">EMAIL_SETUP_GUIDE.html</span></li>
-  <li><a href="FACE-EMBEDDINGS-RESEARCH.html">Face Embeddings &amp; Identity Preservation Research</a><span class="filename">FACE-EMBEDDINGS-RESEARCH.html</span></li>
-  <li><a href="FAIRY-TALES-RESEARCH.html">Fairy Tales (Märchen) — Story Category Research</a><span class="filename">FAIRY-TALES-RESEARCH.html</span></li>
-  <li><a href="IMPLEMENTATION_DIFFERENCES.html">MagicalStory: Old vs New Implementation Comparison</a><span class="filename">IMPLEMENTATION_DIFFERENCES.html</span></li>
-  <li><a href="INCREMENTAL-CONSISTENCY-REQUIREMENTS.html">Incremental Consistency Check - Requirements Document</a><span class="filename">INCREMENTAL-CONSISTENCY-REQUIREMENTS.html</span></li>
-  <li><a href="LANDMARK-DATA-FLOW.html">Landmark Data Flow</a><span class="filename">LANDMARK-DATA-FLOW.html</span></li>
-  <li><a href="LEGAL.html">Legal Implementation Tasks</a><span class="filename">LEGAL.html</span></li>
-  <li><a href="MULTI-CHARACTER-COVER-TESTS.html">Multi-Character Cover Generation Tests</a><span class="filename">MULTI-CHARACTER-COVER-TESTS.html</span></li>
-  <li><a href="PERFORMANCE_OPTIMIZATIONS.html">Performance Optimizations - December 6, 2025</a><span class="filename">PERFORMANCE_OPTIMIZATIONS.html</span></li>
-  <li><a href="PIPELINE_OPTIMIZATIONS.html">Pipeline Optimization Analysis</a><span class="filename">PIPELINE_OPTIMIZATIONS.html</span></li>
-  <li><a href="PLAN.html">Complete Review: Character Creation &amp; Avatar Management</a><span class="filename">PLAN.html</span></li>
-  <li><a href="PRICING.html">Pricing &amp; Cost Structure</a><span class="filename">PRICING.html</span></li>
-  <li><a href="REPAIR-MECHANISMS.html">Image Repair Mechanisms</a><span class="filename">REPAIR-MECHANISMS.html</span></li>
-  <li><a href="SEEDREAM-4.5-RESEARCH.html">Seedream 4.5 (ByteDance) — Research for MagicalStory</a><span class="filename">SEEDREAM-4.5-RESEARCH.html</span></li>
-  <li><a href="STORAGE-PROPOSAL.html">Long-Term Storage Management Proposal for MagicalStory</a><span class="filename">STORAGE-PROPOSAL.html</span></li>
-  <li><a href="STORY-GENERATION-ANALYSIS.html">Story Generation System - Technical Analysis</a><span class="filename">STORY-GENERATION-ANALYSIS.html</span></li>
-  <li><a href="STORY-GENERATION.html">MagicalStory Story Generation Pipeline</a><span class="filename">STORY-GENERATION.html</span></li>
-  <li><a href="TODO.html">MagicalStory TODO</a><span class="filename">TODO.html</span></li>
-  <li><a href="VIDEO-GENERATION-RESEARCH.html">Video Generation API Research (January 2026)</a><span class="filename">VIDEO-GENERATION-RESEARCH.html</span></li>
-  <li><a href="bbox-system.html">Bounding Box (Bbox) Detection System</a><span class="filename">bbox-system.html</span></li>
-  <li><a href="business-review-2025.html">MagicalStory Business Review &amp; Competitive Analysis</a><span class="filename">business-review-2025.html</span></li>
-  <li><a href="calm-zone-pipeline.html">Calm-Zone Text Overlay Pipeline</a><span class="filename">calm-zone-pipeline.html</span></li>
-  <li><a href="char-repair-decisions.html">Character-repair (grok_inpaint) decision log</a><span class="filename">char-repair-decisions.html</span></li>
-  <li><a href="code-review-2026-03-10.html">Full Code Review — MagicalStory</a><span class="filename">code-review-2026-03-10.html</span></li>
-  <li><a href="code-review-2026-04-12.html">Code Review — April 12, 2026</a><span class="filename">code-review-2026-04-12.html</span></li>
-  <li><a href="demo-stories.html">Demo Story Generation (Showcase)</a><span class="filename">demo-stories.html</span></li>
-  <li><a href="gemini3-thinking-cover-strategy.html">Gemini 3 Pro Image: Thinking Mode &amp; Multi-Character Cover Strategy</a><span class="filename">gemini3-thinking-cover-strategy.html</span></li>
-  <li><a href="grok-imagine-test-results.html">Grok Imagine Character Reproduction Tests</a><span class="filename">grok-imagine-test-results.html</span></li>
-  <li><a href="scoring.html">Image scoring &amp; version selection</a><span class="filename">scoring.html</span></li>
-  <li><a href="showcase-job_1778400519362_xwufe7ptv-improvements.html">Showcase analysis — job_1778400519362_xwufe7ptv</a><span class="filename">showcase-job_1778400519362_xwufe7ptv-improvements.html</span></li>
-  <li><a href="staging-setup.html">Staging Environment Setup</a><span class="filename">staging-setup.html</span></li>
-</ul>
-<footer class="doc-footer">Regenerate with <code>node scripts/admin/build-docs-index.js</code></footer>
+<p class="lede">12 canonical docs across 4 topics · 20 in <a href="#archive">archive</a>.</p>
+
+<nav class="toc">
+  <strong>Topics</strong>
+  <a href="#core">Core</a>
+  <a href="#pipeline">Story Generation</a>
+  <a href="#product">Product &amp; Operations</a>
+  <a href="#meta">Research, Compliance &amp; Backlog</a>
+</nav>
+
+<section class="topic" id="core">
+  <h2>Core</h2>
+  <p class="topic-blurb">Start here — the system at a glance and the REST surface.</p>
+  <ul>
+    <li><a class="doc" href="architecture.html">Architecture</a><span class="filename">architecture.html</span></li>
+    <li><a class="doc" href="api-reference.html">API Reference</a><span class="filename">api-reference.html</span></li>
+  </ul>
+</section>
+
+<section class="topic" id="pipeline">
+  <h2>Story Generation</h2>
+  <p class="topic-blurb">How a story goes from &quot;create&quot; click to a finished, illustrated book.</p>
+  <ul>
+    <li><a class="doc" href="story-pipeline.html">Story Generation Pipeline</a><span class="filename">story-pipeline.html</span></li>
+    <li><a class="doc" href="character-system.html">Character System</a><span class="filename">character-system.html</span></li>
+    <li><a class="doc" href="image-quality.html">Image Quality Stack</a><span class="filename">image-quality.html</span></li>
+    <li><a class="doc" href="covers-and-composite.html">Covers &amp;amp; Scene Composite</a><span class="filename">covers-and-composite.html</span></li>
+    <li><a class="doc" href="text-overlay.html">Text Overlay (Calm-Zone) Pipeline</a><span class="filename">text-overlay.html</span></li>
+    <li><a class="doc" href="landmarks.html">Landmarks &amp;amp; Locations</a><span class="filename">landmarks.html</span></li>
+  </ul>
+</section>
+
+<section class="topic" id="product">
+  <h2>Product &amp; Operations</h2>
+  <p class="topic-blurb">Pricing, deployment, day-to-day running of the platform.</p>
+  <ul>
+    <li><a class="doc" href="pricing.html">Pricing &amp;amp; Cost Structure</a><span class="filename">pricing.html</span></li>
+    <li><a class="doc" href="operations.html">Operations</a><span class="filename">operations.html</span></li>
+  </ul>
+</section>
+
+<section class="topic" id="meta">
+  <h2>Research, Compliance &amp; Backlog</h2>
+  <p class="topic-blurb">What we evaluated, what is open, and what we still owe.</p>
+  <ul>
+    <li><a class="doc" href="research-log.html">Research &amp;amp; Vendor Evaluation Log</a><span class="filename">research-log.html</span></li>
+    <li><a class="doc" href="compliance-and-todo.html">Compliance &amp;amp; Active TODO</a><span class="filename">compliance-and-todo.html</span></li>
+  </ul>
+</section>
+
+<details class="archive" id="archive">
+  <summary>Archive (20 historical docs)</summary>
+  <p class="topic-blurb">Earlier requirements specs, code reviews, migration writeups, and dead-letter proposals. Kept for context — do not treat as current guidance.</p>
+  <ul>
+    <li><a class="doc" href="archive/ADMIN_DASHBOARD.html">Admin Dashboard Design Document</a><span class="filename">ADMIN_DASHBOARD.html</span></li>
+    <li><a class="doc" href="archive/AUDIT_REPORT.html">Comprehensive Feature Quality Audit - MagicalStory</a><span class="filename">AUDIT_REPORT.html</span></li>
+    <li><a class="doc" href="archive/CHARACTER-SYSTEM-REQUIREMENTS.html">Character Creation &amp;amp; Modification System - Requirements Document</a><span class="filename">CHARACTER-SYSTEM-REQUIREMENTS.html</span></li>
+    <li><a class="doc" href="archive/CHARAKTER-ERSTELLUNG.html">Charaktererstellung - Detaillierte Dokumentation</a><span class="filename">CHARAKTER-ERSTELLUNG.html</span></li>
+    <li><a class="doc" href="archive/COVER_SYSTEM_IMPLEMENTATION_PLAN.html">Cover System Implementation Plan</a><span class="filename">COVER_SYSTEM_IMPLEMENTATION_PLAN.html</span></li>
+    <li><a class="doc" href="archive/DATABASE_MIGRATION_SUMMARY.html">Database Migration Summary - December 6, 2025</a><span class="filename">DATABASE_MIGRATION_SUMMARY.html</span></li>
+    <li><a class="doc" href="archive/DOCUMENTATION.html">MagicalStory Documentation Index</a><span class="filename">DOCUMENTATION.html</span></li>
+    <li><a class="doc" href="archive/IMPLEMENTATION_DIFFERENCES.html">MagicalStory: Old vs New Implementation Comparison</a><span class="filename">IMPLEMENTATION_DIFFERENCES.html</span></li>
+    <li><a class="doc" href="archive/INCREMENTAL-CONSISTENCY-REQUIREMENTS.html">Incremental Consistency Check - Requirements Document</a><span class="filename">INCREMENTAL-CONSISTENCY-REQUIREMENTS.html</span></li>
+    <li><a class="doc" href="archive/MULTI-CHARACTER-COVER-TESTS.html">Multi-Character Cover Generation Tests</a><span class="filename">MULTI-CHARACTER-COVER-TESTS.html</span></li>
+    <li><a class="doc" href="archive/PERFORMANCE_OPTIMIZATIONS.html">Performance Optimizations - December 6, 2025</a><span class="filename">PERFORMANCE_OPTIMIZATIONS.html</span></li>
+    <li><a class="doc" href="archive/PIPELINE_OPTIMIZATIONS.html">Pipeline Optimization Analysis</a><span class="filename">PIPELINE_OPTIMIZATIONS.html</span></li>
+    <li><a class="doc" href="archive/PLAN.html">Complete Review: Character Creation &amp;amp; Avatar Management</a><span class="filename">PLAN.html</span></li>
+    <li><a class="doc" href="archive/STORAGE-PROPOSAL.html">Long-Term Storage Management Proposal for MagicalStory</a><span class="filename">STORAGE-PROPOSAL.html</span></li>
+    <li><a class="doc" href="archive/STORY-GENERATION-ANALYSIS.html">Story Generation System - Technical Analysis</a><span class="filename">STORY-GENERATION-ANALYSIS.html</span></li>
+    <li><a class="doc" href="archive/TODO.html">MagicalStory TODO</a><span class="filename">TODO.html</span></li>
+    <li><a class="doc" href="archive/code-review-2026-03-10.html">Full Code Review — MagicalStory</a><span class="filename">code-review-2026-03-10.html</span></li>
+    <li><a class="doc" href="archive/code-review-2026-04-12.html">Code Review — April 12, 2026</a><span class="filename">code-review-2026-04-12.html</span></li>
+    <li><a class="doc" href="archive/gemini3-thinking-cover-strategy.html">Gemini 3 Pro Image: Thinking Mode &amp;amp; Multi-Character Cover Strategy</a><span class="filename">gemini3-thinking-cover-strategy.html</span></li>
+    <li><a class="doc" href="archive/showcase-job_1778400519362_xwufe7ptv-improvements.html">Showcase analysis — job_1778400519362_xwufe7ptv</a><span class="filename">showcase-job_1778400519362_xwufe7ptv-improvements.html</span></li>
+  </ul>
+</details>
+
+<footer class="doc-footer">
+  Regenerate with <code>node scripts/admin/build-docs-index.js</code>.
+  Categorise new docs by adding them to <code>TOPICS</code> in that script.
+</footer>
 </body>
 </html>

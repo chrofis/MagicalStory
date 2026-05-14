@@ -1,0 +1,140 @@
+/* MagicalStory documentation — shared stylesheet (linked by every doc) */
+
+:root {
+  --fg: #1f2328;
+  --muted: #59636e;
+  --link: #0969da;
+  --border: #d1d9e0;
+  --hover: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --callout-info: #ddf4ff;
+  --callout-info-border: #54aeff;
+  --callout-warn: #fff8c5;
+  --callout-warn-border: #d4a72c;
+  --callout-danger: #ffebe9;
+  --callout-danger-border: #ff8182;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif;
+  color: var(--fg);
+  background: #ffffff;
+  line-height: 1.55;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+/* Top breadcrumb / back-to-index */
+.breadcrumb {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.breadcrumb a { color: var(--link); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+h1 {
+  font-size: 2em;
+  margin: 0 0 4px;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.lede { color: var(--muted); margin: 0 0 24px; font-size: 0.95em; }
+
+h2 {
+  font-size: 1.4em;
+  margin: 36px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.1em; margin: 24px 0 6px; }
+h4 { font-size: 1em; margin: 18px 0 4px; }
+
+p, ul, ol { margin: 8px 0 12px; }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.88em;
+}
+
+pre {
+  background: var(--code-bg);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+pre code { background: none; padding: 0; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 0.92em;
+}
+th, td {
+  text-align: left;
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  vertical-align: top;
+}
+th { background: var(--hover); font-weight: 600; }
+
+/* Inline TOC at the top of each doc */
+.toc {
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 0 0 28px;
+  font-size: 0.92em;
+}
+.toc strong { display: block; color: var(--muted); font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.toc ol { list-style: none; padding: 0; margin: 0; }
+.toc ol li { margin: 2px 0; }
+.toc a { color: var(--link); }
+
+/* Callouts */
+.callout {
+  border-left: 4px solid var(--callout-info-border);
+  background: var(--callout-info);
+  padding: 10px 14px;
+  margin: 14px 0;
+  border-radius: 4px;
+  font-size: 0.93em;
+}
+.callout.warn { border-left-color: var(--callout-warn-border); background: var(--callout-warn); }
+.callout.danger { border-left-color: var(--callout-danger-border); background: var(--callout-danger); }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+
+/* "See also" link cluster shown at the bottom of each section */
+.see-also {
+  font-size: 0.88em;
+  color: var(--muted);
+  margin: 6px 0 18px;
+  font-style: italic;
+}
+.see-also a { color: var(--link); margin-right: 10px; }
+
+/* Footer */
+.doc-footer {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}

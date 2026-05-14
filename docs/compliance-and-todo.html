@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Compliance &amp; Active TODO — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Compliance &amp; Active TODO</h1>
+<p class="lede">Legal / compliance status and the live work-in-progress backlog. Stale items belong elsewhere — this doc is curated.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#legal-done">1. Legal — done</a></li>
+    <li><a href="#legal-pending">2. Legal — pending</a></li>
+    <li><a href="#gdpr">3. GDPR &amp; data retention</a></li>
+    <li><a href="#geo">4. Geo-blocking &amp; payment restrictions</a></li>
+    <li><a href="#product-todo">5. Active product backlog</a></li>
+    <li><a href="#cleanup">6. Tech debt &amp; cleanup</a></li>
+  </ol>
+</nav>
+
+<h2 id="legal-done">1. Legal — done</h2>
+
+<ul>
+  <li>Terms of Service — published at <code>/terms</code>; covers AI generation, payment, refunds, IP.</li>
+  <li>Privacy Policy — published at <code>/privacy</code>; covers data collection, processors, user rights.</li>
+  <li>Impressum — published at <code>/impressum</code> (Swiss legal requirement).</li>
+  <li>Photo consent — gated at first character upload; <code>users.photoConsentAt</code> recorded.</li>
+  <li>Trial bot protection — Turnstile + form-start-time + honeypot fields.</li>
+  <li>Cookie banner — minimal, consent-based.</li>
+  <li>Stripe + Resend + Cloudflare — DPAs in place.</li>
+</ul>
+
+<h2 id="legal-pending">2. Legal — pending</h2>
+
+<table>
+<thead><tr><th>Item</th><th>Why</th><th>Owner</th></tr></thead>
+<tbody>
+<tr><td>30-day order retention policy</td><td>GDPR — orders held longer than necessary.</td><td>Backend</td></tr>
+<tr><td>"Right to be forgotten" hard delete</td><td>GDPR Art. 17 — soft delete only today.</td><td>Backend</td></tr>
+<tr><td>AI-generation disclosure on every image</td><td>EU AI Act transparency requirements (incoming).</td><td>Frontend + PDF</td></tr>
+<tr><td>Age-of-consent gate (under-13 in some jurisdictions)</td><td>Children using the trial flow.</td><td>Trial wizard</td></tr>
+<tr><td>Data processing record (Verzeichnis)</td><td>Swiss FADP requirement.</td><td>Docs only</td></tr>
+</tbody>
+</table>
+
+<h2 id="gdpr">3. GDPR &amp; data retention</h2>
+
+<p>Currently soft-delete is the only delete path. A real hard-delete needs to:</p>
+
+<ul>
+  <li>Wipe Postgres rows (cascade through stories, characters, story_jobs, story_images, orders, referral_events, credit_transactions, activity_log).</li>
+  <li>Wipe R2 objects (avatars, page images, VB references, original photos).</li>
+  <li>Honour Stripe / Gelato retention requirements (we can't delete invoices; need to store anonymised stubs).</li>
+  <li>Provide a confirmation flow + email receipt of deletion.</li>
+</ul>
+
+<p>Implementation note: a <code>POST /api/user/delete-account</code> endpoint is the right shape; queue the deletion as a background job with a 7-day grace period.</p>
+
+<h2 id="geo">4. Geo-blocking &amp; payment restrictions</h2>
+
+<p>Pending. The product is currently sold globally with shipping limited to Switzerland. Open questions:</p>
+
+<ul>
+  <li>Restrict checkout to CH/EU/UK only? Need to match Gelato's print regions.</li>
+  <li>Block sanctioned jurisdictions at the Cloudflare edge? Acceptable false-positive rate?</li>
+  <li>VAT collection for EU customers — Stripe Tax can handle this when enabled.</li>
+</ul>
+
+<h2 id="product-todo">5. Active product backlog</h2>
+
+<p>Live items only — historical TODOs are in archive. Format: priority, then one-line scope.</p>
+
+<h3>P0 — blocking next release</h3>
+<ul>
+  <li>Verify on staging (and then ask) before the 29-commit master promotion.</li>
+  <li>Confirm location-verify + landing #418 fix work end-to-end with a fresh showcase run.</li>
+</ul>
+
+<h3>P1 — current sprint</h3>
+<ul>
+  <li>Sentry integration for error alerting (see <a href="research-log.html#monitoring">research §monitoring</a>).</li>
+  <li>Plausible / Umami for page analytics.</li>
+  <li>Activate the referral programme on the marketing site (code is shipped, surface still hidden).</li>
+  <li>R2 Phase 2 — rewire all readers to prefer URL field; Phase 3 — drop inline base64 from existing rows.</li>
+  <li>Audio narration prototype (TTS for the story text on the shared viewer).</li>
+</ul>
+
+<h3>P2 — soon</h3>
+<ul>
+  <li>Life Skills story library (SEL / therapeutic) — marketing strategy in memory; needs SEO content + theme curation.</li>
+  <li>Subscription tier (vs one-off credit packs) — pricing experiment.</li>
+  <li>Fairy tales as a story category — research done (see <a href="research-log.html#fairy">research §fairy tales</a>); needs prompt templates + curated locations.</li>
+  <li>Hard-delete account endpoint (see <a href="#gdpr">§GDPR</a>).</li>
+  <li>Test-models panel UX cleanup — usable but not pretty.</li>
+  <li>UI text cleanup backlog (see memory: <code>project_ui_cleanup_backlog.md</code>).</li>
+</ul>
+
+<h3>P3 — later / deferred</h3>
+<ul>
+  <li>Video story trailers (see <a href="research-log.html#video">research §video</a>).</li>
+  <li>Kontext LoRA per character once volume justifies $2-5/char.</li>
+  <li>Gemini 3 Pro Image multi-character covers.</li>
+</ul>
+
+<h2 id="cleanup">6. Tech debt &amp; cleanup</h2>
+
+<ul>
+  <li>Migration drift between prod and staging — <code>scripts/admin/compare-schemas.js</code> exists; integrate into CI.</li>
+  <li>Numerous <code>scripts/_tmp_*.js</code> investigation scripts in tracked git status — periodically prune.</li>
+  <li>40+ <code>scripts/admin/refine-tell-vN.js</code> versioned refine scripts — collapse to one parametrised script.</li>
+  <li>Replace remaining inline base64 in old <code>characters.data</code> / <code>stories.data</code> rows with R2 URLs (Phase 3 migration).</li>
+  <li>Drop legacy <code>pictureBook</code> / <code>outlineAndText</code> mode code paths once we confirm no story still uses them.</li>
+  <li>Consolidate "test image generation" panels — Test Models, Style Transfer, Iterative Placement all overlap.</li>
+</ul>
+
+<p class="see-also">See also: <a href="operations.html">operations</a> for deploy procedure, <a href="research-log.html">research log</a> for the backlog of evaluated-but-deferred technologies.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

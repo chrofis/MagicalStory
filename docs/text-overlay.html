@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Text Overlay (Calm-Zone) — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Text Overlay (Calm-Zone) Pipeline</h1>
+<p class="lede">Story text is overlaid directly on the page image to match the printed book layout. The pipeline picks a calm region of each image, lightens it, and renders text there.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#overview">1. Overview</a></li>
+    <li><a href="#position">2. textPosition decision (Claude)</a></li>
+    <li><a href="#spread">3. Spread rule (left / right by parity)</a></li>
+    <li><a href="#calm">4. Calmness detection &amp; white wash</a></li>
+    <li><a href="#frontend">5. Frontend overlay &amp; toggle</a></li>
+    <li><a href="#pdf">6. PDF rendering</a></li>
+    <li><a href="#flags">7. Feature flags</a></li>
+  </ol>
+</nav>
+
+<h2 id="overview">1. Overview</h2>
+
+<ol>
+  <li>Scene expansion (Claude) picks a <code>textPosition</code> per page (one of six positions).</li>
+  <li>Image prompt includes a COPY SPACE instruction telling the model to keep the chosen area calm and light.</li>
+  <li>Post-generation, <code>server/lib/textRegion.js</code> computes a calmness heatmap from the actual image, builds a pixel-level alpha mask within the correct spread side, and composites a white wash directly into the stored image.</li>
+  <li><code>enforceSpreadTextPosition</code> corrects Claude's mistakes (flips left ↔ right when on the wrong side).</li>
+  <li>Frontend / PDF render text on top of the (already washed) image at the detected rect.</li>
+</ol>
+
+<h2 id="position">2. textPosition decision (Claude)</h2>
+
+<p>One of six positions, set during scene expansion (<code>prompts/scene-expansion.txt</code>):</p>
+
+<pre><code>top-left      top-center      top-right
+bottom-left   bottom-center   bottom-right</code></pre>
+
+<p>Claude chooses based on the scene composition. The accompanying scene prose is written so the chosen area is calm and light — e.g. an open sky for top positions, a smooth wall behind a character for bottom-side positions.</p>
+
+<h2 id="spread">3. Spread rule (left / right by parity)</h2>
+
+<p>To match a printed book spread:</p>
+
+<ul>
+  <li>Odd page numbers (1, 3, 5, …) → text on the <strong>left</strong> side.</li>
+  <li>Even page numbers (2, 4, 6, …) → text on the <strong>right</strong> side.</li>
+</ul>
+
+<p><code>enforceSpreadTextPosition</code> in <code>server/lib/storyHelpers.js</code> flips the position if Claude picked the wrong side (e.g. <code>bottom-right</code> on an odd page becomes <code>bottom-left</code>). The COPY SPACE instruction in the image prompt then asks the model to keep <em>that</em> side calm.</p>
+
+<h2 id="calm">4. Calmness detection &amp; white wash</h2>
+
+<p><code>server/lib/textRegion.js</code>:</p>
+
+<ol>
+  <li>Loads the generated page image.</li>
+  <li>Computes per-block brightness and variance — low variance + high brightness = calm + light.</li>
+  <li>Builds a pixel-level alpha mask within a candidate rect on the correct spread side.</li>
+  <li>Composites a <strong>white wash at 45% opacity</strong> through the mask, lightening the region without erasing the underlying art.</li>
+  <li>Returns the detected rect (<code>textRect</code>) so the PDF renderer knows where to place text.</li>
+</ol>
+
+<div class="callout">
+The wash modifies the stored image. There is no "original without wash" — this is intentional, the wash is part of the final image so frontend and PDF only need one source.
+</div>
+
+<h2 id="frontend">5. Frontend overlay &amp; toggle</h2>
+
+<p>Two views render text on top of the washed image:</p>
+
+<ul>
+  <li><strong>StoryDisplay</strong> (editor) — text overlay on by default, eye-icon toggle button to hide.</li>
+  <li><strong>SharedStoryViewer</strong> — text overlay on by default with toggle, uses <code>textPosition</code> from the API response.</li>
+</ul>
+
+<p>Positioning logic: <code>client/src/utils/textOverlay.ts</code> — six standard positions plus an explicit <code>textRect</code> override when the calmness detector found a non-corner zone.</p>
+
+<h2 id="pdf">6. PDF rendering</h2>
+
+<p><code>server/lib/pdf.js</code> reads <code>textPosition</code> + <code>textRect</code> from each page and places text at the detected rect. Falls back to the corner positions if no rect is present (older stories). Same pipeline serves on-screen download and the print path.</p>
+
+<h2 id="flags">7. Feature flags</h2>
+
+<p>The text-overlay pipeline is always on for new stories; only the rendering toggle is user-facing. Older stories without <code>textRect</code> data still render via corner fallback.</p>
+
+<p>For developer testing: <code>scripts/test-scene.js</code> can run a single page through the current pipeline including the wash, with overlays and masks rendered into the output directory.</p>
+
+<p class="see-also">See also: <a href="story-pipeline.html">story pipeline</a>, <a href="image-quality.html">image quality stack</a> — quality eval treats the washed image as canonical.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

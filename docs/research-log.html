@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Research &amp; Vendor Evaluation Log — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Research &amp; Vendor Evaluation Log</h1>
+<p class="lede">What we tried, what we kept, what we rejected. Consult before recommending any vendor or model — past evaluations are recorded here so they don't get re-litigated.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#summary">1. Verdict summary</a></li>
+    <li><a href="#flux">2. FLUX (Runware) — character replacement</a></li>
+    <li><a href="#grok">3. Grok Imagine — edit + multi-character</a></li>
+    <li><a href="#seedream">4. Seedream 4.5 (ByteDance)</a></li>
+    <li><a href="#face-emb">5. Face embeddings (InsightFace / ArcFace)</a></li>
+    <li><a href="#video">6. Video generation APIs</a></li>
+    <li><a href="#fairy">7. Fairy tales as a story category</a></li>
+    <li><a href="#monitoring">8. Monitoring &amp; analytics backlog</a></li>
+  </ol>
+</nav>
+
+<h2 id="summary">1. Verdict summary</h2>
+
+<table>
+<thead><tr><th>Tech</th><th>Verdict</th><th>One-line reason</th></tr></thead>
+<tbody>
+<tr><td>Gemini 2.5 Flash (page images)</td><td>✅ kept</td><td>Best prompt adherence + style consistency across a 12-page story.</td></tr>
+<tr><td>Grok Imagine (repair, concept art)</td><td>✅ kept</td><td>Best for edits, repair, anime / Studio Ghibli styles. 2-4× faster than Gemini.</td></tr>
+<tr><td>Runware FLUX SDXL (cheap iter)</td><td>✅ kept</td><td>Dev mode + inpaint sketches at $0.002/img.</td></tr>
+<tr><td>Runware ACE++ (face swap)</td><td>🟡 conditional</td><td>Cheap face consistency; quality below Grok. Used selectively.</td></tr>
+<tr><td>FLUX Kontext (Runware) for character replacement</td><td>❌ rejected</td><td>Reference images ignored; stitching workaround inadequate.</td></tr>
+<tr><td>FLUX Dev / FLUX Schnell for pages</td><td>❌ rejected</td><td>Style/character consistency too poor for storybooks.</td></tr>
+<tr><td>Seedream 4.5</td><td>❌ rejected (for now)</td><td>Pricing + ref-image limits not competitive with current stack.</td></tr>
+<tr><td>InsightFace / ArcFace face embeddings</td><td>❌ rejected</td><td>Adds complexity; current avatar-as-reference approach reaches good identity preservation.</td></tr>
+<tr><td>Kontext LoRA per character</td><td>🟡 deferred</td><td>1 image, $2-5/char, 99% consistency. Too expensive at current scale, revisit later.</td></tr>
+<tr><td>Gemini 3 Pro Image (multi-char covers)</td><td>🟡 deferred</td><td>14 refs + thinking mode could fix multi-char covers, not yet integrated.</td></tr>
+<tr><td>Video generation APIs</td><td>🟡 deferred</td><td>Hailuo / Grok / Runway / Kling / Veo evaluated; no current product fit.</td></tr>
+<tr><td>Sentry (error alerting)</td><td>🟡 backlog</td><td>Planned, not yet integrated.</td></tr>
+<tr><td>Plausible / Umami (page analytics)</td><td>🟡 backlog</td><td>Planned, not yet integrated.</td></tr>
+</tbody>
+</table>
+
+<h2 id="flux">2. FLUX (Runware) — character replacement</h2>
+
+<p><strong>Tested:</strong> February 2025. <strong>Verdict:</strong> ❌ rejected for character replacement; ✅ kept for cheap iteration only.</p>
+
+<p>FLUX Kontext via Runware claimed reference-image conditioning for character preservation. In practice <code>referenceImages</code> were silently ignored by the model — the output didn't track the reference identity. Stitching the reference into the prompt as a base64 image worked partially but produced visible seams and ghosting. Not viable for production page generation.</p>
+
+<p>FLUX Dev / Schnell tested for page generation: style and character consistency degraded across pages — same prompt, same seed produced visibly different characters. Storybooks need cross-page consistency; FLUX falls short.</p>
+
+<h2 id="grok">3. Grok Imagine — edit + multi-character</h2>
+
+<p><strong>Tested:</strong> March 2026. <strong>Verdict:</strong> ✅ kept for repair / edit; primary for character repair.</p>
+
+<p>Findings:</p>
+<ul>
+  <li>Grok edit endpoint does <strong>full regeneration</strong>, not true inpainting. The cutout approach (extract bbox + 20% padding, send cutout + avatar, composite back) is what makes it work for repair.</li>
+  <li>Sweet spot: <strong>3-5 characters per generation</strong>. Beyond that, identity degrades.</li>
+  <li>Red-box swap test confirmed Grok can replace a character cleanly when the cutout is properly sized.</li>
+  <li>Aurora model is autoregressive — prompt order matters (scene → style → lighting → camera).</li>
+  <li>No negative prompt support — use positive phrasing only.</li>
+  <li>Best for: anime / Studio Ghibli / cinematic / photorealistic. Weak for: flat illustration, watercolor, minimalist (adds unwanted polish).</li>
+</ul>
+
+<p>Grok inpaint <strong>can</strong> handle structural changes (body rotation, pose, gaze) when instructions use visual identifiers, not character names. Don't route facing-direction issues to a full iterate when an inpaint pass works.</p>
+
+<h2 id="seedream">4. Seedream 4.5 (ByteDance)</h2>
+
+<p><strong>Tested:</strong> February 2026. <strong>Verdict:</strong> ❌ not integrated.</p>
+
+<p>ByteDance Seedream 4.5 advertises strong character consistency. Pricing and reference-image limits at the time of evaluation didn't beat the current Gemini + Grok mix. Worth re-evaluating if pricing changes or if their character-consistency claims hold up on a real 12-page test.</p>
+
+<h2 id="face-emb">5. Face embeddings (InsightFace / ArcFace)</h2>
+
+<p><strong>Verdict:</strong> ❌ not adopted.</p>
+
+<p>Embedding-based identity preservation (compute a face embedding from the user photo, condition generation on that embedding) was investigated as an alternative to the avatar-as-reference approach. Adds significant complexity (model hosting, dimensional alignment per backend) for a quality lift that the current avatar pipeline already achieves at acceptable consistency levels.</p>
+
+<h2 id="video">6. Video generation APIs</h2>
+
+<p><strong>Evaluated:</strong> January 2026. <strong>Verdict:</strong> 🟡 deferred — no current product fit.</p>
+
+<table>
+<thead><tr><th>Provider</th><th>Pricing model</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Hailuo</td><td>per-second</td><td>Cheap, average quality.</td></tr>
+<tr><td>Grok video</td><td>per-second</td><td>Fast, integrates with existing xAI account.</td></tr>
+<tr><td>Runway</td><td>per-second</td><td>Best quality, most expensive.</td></tr>
+<tr><td>Kling</td><td>per-second</td><td>Strong character consistency claims.</td></tr>
+<tr><td>Veo (Google)</td><td>per-second</td><td>Limited availability.</td></tr>
+</tbody>
+</table>
+
+<p>Use case TBD — could be a "story trailer" upsell or a video-clip page type. Not a current priority.</p>
+
+<h2 id="fairy">7. Fairy tales as a story category</h2>
+
+<p><strong>Verdict:</strong> ✅ research canonical — Märchen is the next planned story category.</p>
+
+<p>Curated catalog of Swiss + international fairy tales suitable for the platform: title, source culture, age range, key motifs, typical visual elements. Used to seed prompt templates and curated <code>historical_locations</code> for fairy-tale settings (forest, castle, cottage). Wilhelm Tell was the first historical theme; fairy tales are next.</p>
+
+<h2 id="monitoring">8. Monitoring &amp; analytics backlog</h2>
+
+<ul>
+  <li><strong>Sentry</strong> for error alerting — planned, not yet integrated. Would catch React errors, API errors, and pipeline failures with stack traces in production.</li>
+  <li><strong>Plausible</strong> or <strong>Umami</strong> for privacy-respecting page analytics — planned, not yet integrated.</li>
+</ul>
+
+<p class="see-also">See also: <a href="image-quality.html#decisions">image quality decision log</a>, <a href="character-system.html">character system</a>, archive for full FLUX / Grok / Seedream test transcripts.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

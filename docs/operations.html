@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operations — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Operations</h1>
+<p class="lede">Running the platform: deploy flow, staging environment, email setup, demo / showcase tooling, log analysis, and database migrations.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#deploy">1. Deploy flow</a></li>
+    <li><a href="#staging">2. Staging environment</a></li>
+    <li><a href="#auth-gate">3. Staging Basic-Auth gate</a></li>
+    <li><a href="#email">4. Email (Resend)</a></li>
+    <li><a href="#showcase">5. Demo / showcase command</a></li>
+    <li><a href="#logs">6. Log analysis</a></li>
+    <li><a href="#migrations">7. Database migrations</a></li>
+    <li><a href="#issues">8. Common ops issues</a></li>
+  </ol>
+</nav>
+
+<h2 id="deploy">1. Deploy flow</h2>
+
+<div class="callout danger">
+<strong>Never push to <code>master</code> without explicit per-push approval.</strong> Each prod deploy auto-runs Railway, kills any in-flight story generation (real users mid-creation lose their work), and causes brief downtime. "Functionally safe", "additive", "trivial typo fix" are not valid reasons to skip the approval step — they all have the same downtime + in-flight-job cost.
+</div>
+
+<p>Mandatory flow for any change:</p>
+
+<ol>
+  <li><code>git push origin staging</code> (or push a feature branch + PR-merge into staging).</li>
+  <li>Verify on <code>https://staging.magicalstory.ch</code> — page loads, smoke-test the affected area.</li>
+  <li>Ask the user explicitly: <em>"OK to push to master?"</em></li>
+  <li>Only after an explicit yes (not silence, not "looks good", not earlier authorisation for a different change): <code>git push origin master</code>.</li>
+</ol>
+
+<p>Each prod push is its own approval moment.</p>
+
+<h2 id="staging">2. Staging environment</h2>
+
+<p>One-time provisioning (already done; documented for reference):</p>
+
+<ul>
+  <li><strong>Railway service</strong> — separate from prod, autodeploys from <code>staging</code> branch.</li>
+  <li><strong>Postgres</strong> — separate database, migrations run on first boot via <code>server/services/database.js</code>.</li>
+  <li><strong>R2 bucket</strong> — separate bucket, Cloudflare DNS for <code>images.staging.magicalstory.ch</code>.</li>
+  <li><strong>Cloudflare DNS</strong> — <code>staging.magicalstory.ch</code> CNAME → Railway-provided host.</li>
+  <li><strong>Stripe</strong> — test-mode keys; orders never charge.</li>
+  <li><strong>Env vars</strong> — same set as prod with <code>BASE_URL=https://staging.magicalstory.ch</code> and the staging Postgres / R2 credentials.</li>
+</ul>
+
+<h2 id="auth-gate">3. Staging Basic-Auth gate</h2>
+
+<p>Optional HTTP Basic Auth gate set via <code>STAGING_AUTH_USER</code> / <code>STAGING_AUTH_PASSWORD</code> in <code>server.js</code>. Bypassed for:</p>
+
+<ul>
+  <li>All <code>/api/*</code> routes (browsers don't replay Basic Auth on XHR reliably).</li>
+  <li>PWA / SEO statics: <code>/manifest.json</code>, <code>/robots.txt</code>, <code>/sitemap.xml</code>, favicons, <code>og-image*</code>.</li>
+</ul>
+
+<p>The gate prevents random Google indexing of staging while keeping login / register / static / SEO infrastructure functional.</p>
+
+<h2 id="email">4. Email (Resend)</h2>
+
+<p>Resend is the transactional email provider. Configured via <code>RESEND_API_KEY</code>, <code>EMAIL_FROM</code>, <code>EMAIL_REPLY_TO</code>. Implementation: <code>email.js</code> at the project root.</p>
+
+<p>Email types in use:</p>
+<ul>
+  <li>Email verification (after signup or trial → full upgrade).</li>
+  <li>Password reset.</li>
+  <li>Order confirmation (post-payment).</li>
+  <li>Print status updates (Gelato webhook → email).</li>
+  <li>Story-ready notification (when a long generation completes after the user closed the tab).</li>
+</ul>
+
+<p>Templates are React Email components; the <code>react-email</code> skill is the recommended workflow when adding a new template.</p>
+
+<h2 id="showcase">5. Demo / showcase command</h2>
+
+<p>The orchestrator <code>scripts/admin/showcase.js</code> (alias <code>npm run showcase</code>) runs an end-to-end demo story with a fresh account, real characters, and real photos.</p>
+
+<h3>What it does</h3>
+<ol>
+  <li>Picks a rotation entry (default = next from <code>tests/demo-rotation-state.json</code>; override via <code>--entry=N</code>).</li>
+  <li>Creates a fresh timestamped account: <code>demo-{family}-{YYYYMMDD-HHmm}@magicalstory.ch</code>.</li>
+  <li>Uploads characters + curated photos from <code>tests/fixtures/demo-photos/{family}/</code>.</li>
+  <li>Triggers a Playwright spec (<code>tests/demo-story.spec.ts</code>) that drives the wizard and starts story generation.</li>
+</ol>
+
+<p>Each run is fully isolated — old stories stay accessible on their original accounts. Default backend is <strong>production</strong>; for local: <code>npm run showcase:local</code>; for staging: <code>SHOWCASE_API_BASE=https://staging.magicalstory.ch npm run showcase</code>.</p>
+
+<h3>Family rotation</h3>
+<p><code>tests/helpers/demo-rotation.json</code> lists the demo families (Bergers, Millers, …) with index. The user might say "showcase the Bergers" → look up the matching index and pass <code>--entry=N</code>.</p>
+
+<h3>Generating photos</h3>
+<p>If photos for a family don't exist on disk: <code>node scripts/admin/generate-demo-photos.js --family=&lt;id&gt; --save-to=true --no-upload</code>. Inspect, then proceed.</p>
+
+<div class="callout warn">
+Demo family portraits are locked. Do not regenerate generate-demo-photos.js on approved files unless explicitly asked for that specific character.
+</div>
+
+<h2 id="logs">6. Log analysis</h2>
+
+<p><code>scripts/analyze-story-log.js</code> parses Railway log dumps:</p>
+
+<pre><code>node scripts/analyze-story-log.js                           # Latest log in ~/Downloads
+node scripts/analyze-story-log.js ~/Downloads/logs.X.log   # Specific log file</code></pre>
+
+<p>Output: story info (title, language, characters, pages), timing per stage, costs per provider, errors / warnings / fallbacks / low scores.</p>
+
+<div class="callout">
+<strong>Timezone:</strong> Railway timestamps are UTC; the user lives in Switzerland (CEST = UTC+2 in summer, CET = UTC+1 in winter). Always translate before correlating with user-mentioned times. Quote both when reporting: "23:50 UTC (01:50 CEST)".
+</div>
+
+<h2 id="migrations">7. Database migrations</h2>
+
+<p>Migrations are file-based (committed in <code>server/migrations/</code>) and run on boot from <code>server/services/database.js</code>. Each migration is idempotent (<code>CREATE TABLE IF NOT EXISTS</code>, <code>ALTER TABLE … ADD COLUMN IF NOT EXISTS</code>, etc.).</p>
+
+<p>Adding a new migration:</p>
+<ol>
+  <li>Drop a new <code>NNN_name.sql</code> in <code>server/migrations/</code>.</li>
+  <li>Make every statement idempotent — staging may run it on a half-migrated DB.</li>
+  <li>Verify on staging first; staging Postgres started life partially divergent from prod.</li>
+  <li><code>scripts/admin/compare-schemas.js</code> diffs prod vs staging schemas to catch drift.</li>
+</ol>
+
+<p>Long-standing gotcha: <code>story_images</code> was created manually on prod years ago and only had <code>ALTER</code>s in code, not <code>CREATE</code>. A fresh DB (e.g. staging) needed an explicit <code>CREATE TABLE IF NOT EXISTS story_images</code> (now in place).</p>
+
+<h2 id="issues">8. Common ops issues</h2>
+
+<table>
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>"Server restarted during generation" mid-pipeline</td><td>Someone pushed to master.</td><td>Check Railway deploy log; if avoidable, follow the <a href="#deploy">deploy approval flow</a>.</td></tr>
+<tr><td>"relation X does not exist" on staging</td><td>Migration drift — table created manually on prod, never in code.</td><td>Add idempotent CREATE in <code>server/services/database.js</code> startup path.</td></tr>
+<tr><td>React #418 hydration mismatch on landing</td><td>Component reads <code>searchParams</code> in <code>useState</code> initialiser.</td><td>Move URL read into <code>useEffect</code>; initial state must match SSR.</td></tr>
+<tr><td>Trial photo upload fails locally</td><td>Python service not running on :5000.</td><td><code>npm run dev:python</code></td></tr>
+<tr><td>Stripe webhook 400</td><td>JSON middleware applied before raw-body parser.</td><td>Webhook must be defined BEFORE <code>app.use(express.json())</code>.</td></tr>
+<tr><td>Avatar QA passing adult-as-child</td><td>finalScore was averaging dimensions.</td><td>finalScore = MIN(face, age, clothing) per <code>prompts/avatar-evaluation.txt</code>.</td></tr>
+<tr><td>Cover missing iconic landmark</td><td>Cover scene metadata didn't merge <code>hint.objects</code> LOC IDs.</td><td>Always merge before cover generation (current behaviour in <code>server.js</code>).</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="architecture.html#env">architecture §env vars</a>, <a href="story-pipeline.html#trigger">story pipeline §job lifecycle</a>, <a href="compliance-and-todo.html">compliance &amp; todo</a> for outstanding work.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

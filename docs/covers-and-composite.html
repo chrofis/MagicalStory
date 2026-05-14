@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Covers &amp; Scene Composite — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Covers &amp; Scene Composite</h1>
+<p class="lede">Cover generation (front, initial page, back) and the optional scene-composite pipeline that splits a busy scene into multiple Grok calls and stitches the result.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#types">1. Cover types</a></li>
+    <li><a href="#generation">2. Cover generation flow</a></li>
+    <li><a href="#multichar">3. Multi-character limits</a></li>
+    <li><a href="#composite">4. Scene composite pipeline</a></li>
+    <li><a href="#cellmap">5. Composite cell map</a></li>
+    <li><a href="#flags">6. Feature flags</a></li>
+  </ol>
+</nav>
+
+<h2 id="types">1. Cover types</h2>
+
+<p>Each story has three cover items, all stored under <code>stories.data.coverImages</code>:</p>
+
+<table>
+<thead><tr><th>Type</th><th>Purpose</th><th>Source prompt</th></tr></thead>
+<tbody>
+<tr><td><code>frontCover</code></td><td>Title image — main characters in a hero composition.</td><td><code>prompts/front-cover.txt</code></td></tr>
+<tr><td><code>initialPage</code></td><td>Inside-front / dedication page.</td><td><code>prompts/initial-page-*.txt</code> (per language)</td></tr>
+<tr><td><code>backCover</code></td><td>Back cover with story summary blurb space.</td><td><code>prompts/back-cover.txt</code></td></tr>
+</tbody>
+</table>
+
+<p>Each cover type has its own <code>imageVersions[]</code> with the same pick-best logic as story pages — see <a href="image-quality.html#pickbest">image quality §pick-best</a>.</p>
+
+<h2 id="generation">2. Cover generation flow</h2>
+
+<ol>
+  <li><strong>Cover scene metadata</strong> — assembled from the story outline. The cover scene <strong>always</strong> merges <code>LOC###</code> IDs from <code>hint.objects</code> so curated landmark photos reach the cover (without this, covers regularly missed the iconic location).</li>
+  <li><strong>Reference packing</strong> — same shot-aware logic as page images (<a href="character-system.html#shot-aware">character system §shot-aware</a>). Cover usually wants 2-3 hero characters at medium shot.</li>
+  <li><strong>Title text injection</strong> — <code>coverText</code> option passes the story title into the prompt so the model leaves room for it. The PDF renderer overlays the actual text.</li>
+  <li><strong>Quality gate</strong> — same evaluators as pages.</li>
+  <li><strong>Iteration</strong> — UI exposes "Iterate cover" which calls <code>POST /:id/covers/iterate</code> with feedback.</li>
+</ol>
+
+<p>Implementation: <code>server/lib/coverIterate.js</code>. Frontend: <code>client/src/components/generation/CoverPanel.tsx</code>.</p>
+
+<h2 id="multichar">3. Multi-character limits</h2>
+
+<p>Empirical limit: <strong>3-4 hero characters</strong> per cover with the standard pipeline. Tests with 6-10 characters hit recurring issues — face mismatch, character drop-out, cluttered composition. See archive (<code>MULTI-CHARACTER-COVER-TESTS</code>) for the full test log.</p>
+
+<p>For families / classrooms / large casts, the scene-composite pipeline (next section) is the alternative path.</p>
+
+<h2 id="composite">4. Scene composite pipeline</h2>
+
+<p>Behind a feature flag (<code>enableSceneComposite</code>). Splits a busy scene into three Grok calls:</p>
+
+<ol>
+  <li><strong>Phantom call</strong> — generate the empty scene background (no characters).</li>
+  <li><strong>Cell calls</strong> — generate each character or character-group as an isolated cell against a neutral background.</li>
+  <li><strong>Stitch call</strong> — composite all cells onto the phantom and pass through Grok edit for blending.</li>
+</ol>
+
+<p>Output: a 2×4 sheet showing each intermediate stage (phantom + cells + final). Useful for debugging large casts and for diagnosing which character broke. Implementation: <code>scripts/test-scene-composite-smoke.js</code> for smoke tests; production code lives in <code>server/lib/sceneComposite.js</code> (gated by flag).</p>
+
+<h3>Why three calls instead of one</h3>
+<p>Single-prompt multi-character generation degrades roughly with character count (face quality, prompt adherence, costume drift). Isolating each character preserves identity at the cost of more API calls and a stitch step that introduces seams. The composite pipeline accepts that trade for high-cast scenes only.</p>
+
+<h2 id="cellmap">5. Composite cell map</h2>
+
+<p>The cell map (Visual Bible-aware) declares per cell:</p>
+
+<ul>
+  <li>Character ID(s) inside the cell.</li>
+  <li>Target placement on the phantom (xy + scale).</li>
+  <li>Costume / pose overrides if the scene calls for non-default clothing.</li>
+  <li>Outline schema reference (which scene event the cell renders).</li>
+</ul>
+
+<p>The phantom has a coordinate system; cells declare their target box; the stitch step composites with feathering. Costume overrides flow through <code>resolveStyled2x2</code> which reads the canonical <code>styledAvatars</code> path.</p>
+
+<h2 id="flags">6. Feature flags</h2>
+
+<table>
+<thead><tr><th>Flag</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>enableSceneComposite</code> (env)</td><td>off in prod, on in staging</td><td>Use the 3-Grok-call pipeline for high-cast scenes.</td></tr>
+<tr><td><code>generateEmptyScenes</code> (<code>server/config/models.js</code>)</td><td>false</td><td>Generate empty plates as style anchors before page images. Disabled by default — didn't justify the call cost.</td></tr>
+<tr><td><code>compositeDebug</code> (per-image flag)</td><td>off</td><td>Emits the 2×4 debug sheet alongside the final image.</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="story-pipeline.html#covers">story pipeline §covers</a>, <a href="image-quality.html">image quality stack</a>, <a href="research-log.html">research log</a> (Gemini 3 Pro Image proposal lives in archive).</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

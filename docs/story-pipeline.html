@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Story Generation Pipeline — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Story Generation Pipeline</h1>
+<p class="lede">End-to-end flow from "create story" click to a finished, illustrated, evaluated, repaired book — the unified mode that drives every new story.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#overview">1. Overview &amp; modes</a></li>
+    <li><a href="#trigger">2. Trigger &amp; job lifecycle</a></li>
+    <li><a href="#unified">3. Unified Claude pass</a></li>
+    <li><a href="#expand">4. Scene expansion (Art Director)</a></li>
+    <li><a href="#images">5. Image generation</a></li>
+    <li><a href="#eval">6. Evaluation &amp; repair</a></li>
+    <li><a href="#covers">7. Covers</a></li>
+    <li><a href="#persistence">8. Persistence &amp; output</a></li>
+  </ol>
+</nav>
+
+<h2 id="overview">1. Overview &amp; modes</h2>
+
+<p>Three modes have existed historically; only <strong>unified</strong> is supported for new features. Legacy <code>pictureBook</code> and <code>outlineAndText</code> modes remain only to read older stories.</p>
+
+<table>
+<thead><tr><th>Stage</th><th>What happens</th><th>Provider</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Generate full story in one Claude call (outline + visual bible + text + scene hints)</td><td>Claude (<code>server/lib/textModels.js</code>)</td></tr>
+<tr><td>2</td><td>Per-scene Art Director expansion (descriptions, interactions, textPosition, emptyScenePrompt)</td><td>Claude (prompt: <code>scene-expansion.txt</code>)</td></tr>
+<tr><td>3</td><td>Optional empty-scene plates as style anchors (default off)</td><td>Gemini / Grok</td></tr>
+<tr><td>4</td><td>Page image generation in parallel</td><td>Gemini (default), Grok</td></tr>
+<tr><td>5</td><td>Text region detection + white wash for text overlay</td><td><code>server/lib/textRegion.js</code></td></tr>
+<tr><td>6</td><td>Quality + semantic + entity consistency in parallel</td><td>Gemini 2.5 Flash + Python detector</td></tr>
+<tr><td>7</td><td>Auto-repair loop: redo low-scoring pages (≤3 passes)</td><td>Same image providers</td></tr>
+<tr><td>8</td><td>Character repair: fix mismatched characters</td><td>Grok cutout / blended</td></tr>
+<tr><td>9</td><td>Pick best version per page</td><td><code>server/lib/repairLogic.js</code></td></tr>
+<tr><td>10</td><td>Generate covers (front, initial / dedication, back)</td><td>See <a href="covers-and-composite.html">covers</a></td></tr>
+</tbody>
+</table>
+
+<h2 id="trigger">2. Trigger &amp; job lifecycle</h2>
+
+<ul>
+  <li>Frontend wizard (<code>client/src/pages/StoryWizard.tsx</code>) calls <code>POST /api/jobs/create-story</code> with characters, settings, art style, language, optional location.</li>
+  <li>Server creates a <code>story_jobs</code> row, returns <code>jobId</code> immediately, and runs the pipeline in the background.</li>
+  <li>Client polls <code>GET /api/jobs/:id/status</code>; the response carries the partial story (sceneImages start <code>null</code>, fill in as stages complete).</li>
+  <li>The job records timestamps per stage and a <code>partial</code> JSON checkpoint so the UI can render incrementally and the server can resume on crash.</li>
+  <li>Cancellation: <code>POST /api/jobs/:id/cancel</code> trips an <code>AbortController</code> propagated through every async stage.</li>
+</ul>
+
+<div class="callout warn">
+A push to <code>master</code> auto-deploys to Railway, kills the Node process, and aborts every in-flight job. Real users mid-story lose their work. See <a href="operations.html#deploy">operations §deploy</a> for the mandatory approval flow.
+</div>
+
+<h2 id="unified">3. Unified Claude pass</h2>
+
+<p>One <code>messages.create</code> call returns the entire story payload — outline, visual bible (characters + objects + locations), per-page text, and per-scene hints (shot, framing, primary characters, optional location reference). Prompt: <code>prompts/unified-pipeline.txt</code> (and language-specific variants).</p>
+
+<p>Why one call: keeping outline + text + scene hints in the same context guarantees consistency. A page's text references the same hat the outline introduced; a scene hint about "the marketplace at dusk" aligns with the outline's Act II setup.</p>
+
+<h3>What the unified pass produces</h3>
+<ul>
+  <li><code>title</code>, <code>titleCandidates</code> (alternatives extracted by <code>parser.extractTitleCandidates</code>).</li>
+  <li><code>outline</code> with act structure.</li>
+  <li><code>visualBible</code> — characters, objects, locations, with <code>id</code>, name, traits, dbKey for DB-linked entities.</li>
+  <li><code>scenes[]</code> — one per page; includes <code>text</code>, <code>shot</code>, <code>framing</code>, <code>primaryCharacters</code>, <code>hint.objects</code> (location IDs), <code>hint.events</code>.</li>
+  <li><code>language</code>, <code>artStyleId</code>, <code>readingLevel</code>.</li>
+</ul>
+
+<h2 id="expand">4. Scene expansion (Art Director)</h2>
+
+<p>For each scene, a second Claude call (<code>scene-expansion.txt</code>) produces the illustration brief used downstream:</p>
+
+<ul>
+  <li><code>sceneDescription</code> — Art Director prose with character interactions, props, mood.</li>
+  <li><code>textPosition</code> — one of 6 positions; spread rule: odd pages = left, even pages = right. Corrected by <code>enforceSpreadTextPosition</code> if Claude picks the wrong side. See <a href="text-overlay.html">text overlay</a>.</li>
+  <li><code>emptyScenePrompt</code> — background-only prompt used if iterative placement is enabled.</li>
+  <li><code>interactions</code> — declared character interactions; the semantic eval scores against these.</li>
+</ul>
+
+<p>Locations: when a scene's <code>hint.objects</code> contains a <code>LOC###</code> ID matching a curated <code>historical_locations</code> row, the prompt is augmented with the location name + dbKey + context. See <a href="landmarks.html">landmarks</a>.</p>
+
+<h2 id="images">5. Image generation</h2>
+
+<p>Generation lives in <code>server/lib/images.js</code>. The image prompt is built by <code>buildImagePrompt()</code> in <code>server/lib/storyHelpers.js</code> and combines:</p>
+
+<ul>
+  <li>Art style block (loaded from <code>client/src/constants/artStyles.ts</code>).</li>
+  <li>Scene description (Art Director output).</li>
+  <li>Character lines (one per primary character, with shot-aware reference packing — see <a href="character-system.html#shot-aware">character system §shot-aware</a>).</li>
+  <li>COPY SPACE instruction for the calm text zone.</li>
+  <li>No-character-name rendering rule (no labels, signs, captions reading the prompt's character names).</li>
+</ul>
+
+<p>Reference modes (per character): <code>strict</code> (full grid), <code>loose</code> (face + body crops), <code>styled-only</code>, <code>off</code>. Default is <code>loose</code>. Wide shots receive only the body crop; non-wide shots receive face + body as separate refs.</p>
+
+<h3>Iterative placement (optional)</h3>
+<p><code>generateWithIterativePlacement()</code> generates the empty scene first, then composites characters via Grok edit. Improves multi-character placement when the scene metadata declares background-depth characters. Disabled by default (<code>generateEmptyScenes: false</code> in <code>server/config/models.js</code>).</p>
+
+<h2 id="eval">6. Evaluation &amp; repair</h2>
+
+<p>Three evaluators run in parallel after image generation:</p>
+
+<ol>
+  <li><strong>Quality eval</strong> (Gemini 2.5 Flash) — <code>qualityScore</code> 0-100 + <code>fixableIssues[]</code>. Prompt: <code>image-evaluation.txt</code>.</li>
+  <li><strong>Semantic eval</strong> — does the image match the scene description? Penalties baked into <code>finalScore</code>. Prompt: <code>image-semantic.txt</code>.</li>
+  <li><strong>Entity consistency</strong> — bbox detection + cascade face merge + character-presence check. <code>finalChecksReport.entity</code>.</li>
+</ol>
+
+<p>The repair workflow is a separate piece — full details in <a href="image-quality.html">image quality stack</a>. Summary: pages scoring below threshold or with too many fixable issues are redone; up to 3 global passes; character repair runs before pick-best so all variants compete.</p>
+
+<h2 id="covers">7. Covers</h2>
+
+<p>Three cover types per story:</p>
+<ul>
+  <li><code>frontCover</code> — title image with a few characters.</li>
+  <li><code>initialPage</code> — dedication / inside-front image.</li>
+  <li><code>backCover</code> — back image with story summary blurb.</li>
+</ul>
+
+<p>Generated by <code>server/lib/coverIterate.js</code>. The cover scene metadata always merges <code>LOC###</code> IDs from <code>hint.objects</code> so curated landmark photos reach the cover. See <a href="covers-and-composite.html">covers &amp; composite</a> for the full cover stack and the alternative scene-composite path.</p>
+
+<h2 id="persistence">8. Persistence &amp; output</h2>
+
+<p>The final story is written to:</p>
+
+<ul>
+  <li><code>stories.data</code> JSONB — full payload (sceneImages with imageData/imageUrl, textPosition, textRect, sceneDescription, retryHistory, imageVersions; coverImages; characters snapshot).</li>
+  <li><code>story_images</code> table — versioned rows per page (active + history) with R2 URLs.</li>
+  <li><code>story_jobs.partial</code> updates throughout for resumability.</li>
+</ul>
+
+<p>PDF rendering (<code>server/lib/pdf.js</code>) reads from this payload on demand for download / print. Print path uses Gelato (<code>server/routes/print.js</code>).</p>
+
+<p class="see-also">See also: <a href="character-system.html">character system</a>, <a href="image-quality.html">image quality stack</a>, <a href="covers-and-composite.html">covers</a>, <a href="text-overlay.html">text overlay</a>, <a href="pricing.html">pricing</a> (per-stage cost breakdown).</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

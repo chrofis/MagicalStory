@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Landmarks &amp; Locations — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Landmarks &amp; Locations</h1>
+<p class="lede">How real places get into stories — IP-based detection, user-entered location with verification, automatic landmark discovery, and curated period-location data.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#sources">1. Three location sources</a></li>
+    <li><a href="#ip">2. IP-based detection</a></li>
+    <li><a href="#verify">3. User-entered + Nominatim verify</a></li>
+    <li><a href="#discovery">4. Landmark discovery</a></li>
+    <li><a href="#curated">5. Curated historical_locations</a></li>
+    <li><a href="#vb">6. Visual Bible injection</a></li>
+    <li><a href="#tell">7. Wilhelm Tell case study</a></li>
+  </ol>
+</nav>
+
+<h2 id="sources">1. Three location sources</h2>
+
+<table>
+<thead><tr><th>Source</th><th>When used</th><th>Endpoint / table</th></tr></thead>
+<tbody>
+<tr><td>IP geolocation</td><td>First wizard load — defaults the location field.</td><td><code>GET /api/user/location</code> via ip-api.com</td></tr>
+<tr><td>User input + Nominatim</td><td>User edits city / PLZ / country in the wizard.</td><td><code>POST /api/user/verify-location</code> via OSM Nominatim</td></tr>
+<tr><td>Curated historical</td><td>Story is set in a historical period (e.g. Wilhelm Tell).</td><td><code>historical_locations</code> + <code>historical_objects</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="ip">2. IP-based detection</h2>
+
+<p><code>GET /api/user/location</code> in <code>server/routes/user.js</code>. Reads forwarded headers (<code>x-forwarded-for</code>, <code>cf-connecting-ip</code>, <code>x-real-ip</code>) to find the original client IP, calls ip-api.com (free, 45 req/min), returns <code>{ city, region, country }</code>. Returns nulls for localhost / private IPs.</p>
+
+<p>Used by the wizard to pre-fill the location field; not authoritative — the user can edit or clear it.</p>
+
+<h2 id="verify">3. User-entered + Nominatim verify</h2>
+
+<p><code>POST /api/user/verify-location</code> body: <code>{ city?, plz?, country? }</code> (country defaults to Switzerland). Calls Nominatim (OpenStreetMap), 24h in-memory cache.</p>
+
+<p>Response: <code>{ verified, city, country, plz, displayName, lat, lon }</code>.</p>
+
+<h3>Wizard UX</h3>
+<ul>
+  <li>Country is pre-filled to Schweiz / Suisse / Switzerland based on the UI language.</li>
+  <li>4-digit Swiss PLZ input — entering only PLZ resolves the city via Nominatim and back-fills the city input.</li>
+  <li>Debounced (500 ms) verify on every keystroke; ✓ (green check), ✗ (red x), or spinner.</li>
+  <li>On not-found: explicit error message with a "Continue without location" action that clears the field.</li>
+  <li>OK button disabled while a check is in flight.</li>
+</ul>
+
+<p>Frontend: <code>client/src/pages/wizard/WizardStep3BookSettings.tsx</code>. Service: <code>storyService.verifyLocation</code>.</p>
+
+<h2 id="discovery">4. Landmark discovery</h2>
+
+<p>Once a location is set, the frontend fires <code>POST /api/landmarks/discover</code> (fire-and-forget) so landmark data is ready by the time story generation starts.</p>
+
+<p>Backend (<code>server.js</code>):</p>
+<ol>
+  <li>Check <code>landmark_index</code> table for cached rows for the city.</li>
+  <li>Check the in-memory cache (<code>LANDMARK_CACHE_TTL</code>).</li>
+  <li>Call <code>discoverLandmarksForLocation(city, country)</code> — Wikipedia/Wikidata geosearch + categorisation. Implementation: <code>server/lib/landmarkPhotos.js</code>.</li>
+  <li>Stash results in both caches.</li>
+</ol>
+
+<p>Discovery returns landmark name, lat/lon, Wikipedia summary, and category (mountain / castle / square / monument). The story pipeline picks 0-3 landmarks per story based on the outline.</p>
+
+<h2 id="curated">5. Curated historical_locations</h2>
+
+<p>For period stories, generic Wikipedia data is too thin. <code>historical_locations</code> rows hold:</p>
+
+<ul>
+  <li>Stable <code>id</code> (e.g. <code>LOC_TELL_ALTDORF_PLATZ</code>) and <code>dbKey</code> slug.</li>
+  <li>Display name in DE/FR/IT/EN.</li>
+  <li>Period (e.g. "13th century").</li>
+  <li>Reference photo (R2 URL) — typically a curated Grok-generated period view.</li>
+  <li>Linked story type / theme.</li>
+</ul>
+
+<p>Companion table <code>historical_objects</code> for period props (hat, crossbow, spear). Same shape, parallel use.</p>
+
+<p>Curation scripts live in <code>scripts/admin/curate-tell-locations.js</code>, <code>refine-tell-vN.js</code> (40+ iterative refinement rounds), <code>generate-tell-locations.js</code>.</p>
+
+<h2 id="vb">6. Visual Bible injection</h2>
+
+<p>When the unified Claude pass produces an outline, the linker (<code>server/lib/visualBible.js</code> → <code>injectHistoricalLocations</code>) matches outline-mentioned places against <code>historical_locations</code> by:</p>
+
+<ol>
+  <li><code>existing.dbKey === loc.dbKey</code> (preferred — stable slug match).</li>
+  <li>Name fuzzy match (fallback).</li>
+</ol>
+
+<p>Matched locations are added to the Visual Bible with <code>id: LOC###</code>, the curated reference photo, and <code>dbKey</code>. Scenes whose <code>hint.objects</code> contains the LOC ID get the location injected into the image prompt as PRE-POPULATED LOCATIONS, with rules forbidding generic substitution.</p>
+
+<p>Reference packing (<code>server/lib/grok.js</code> → <code>packReferences</code>) places landmark slot at <strong>position 1</strong> (before character slots). Accepts both raw base64 and data URI for landmark bytes.</p>
+
+<h2 id="tell">7. Wilhelm Tell case study</h2>
+
+<p>Wilhelm Tell is the first historical theme with full curated coverage. Curated assets:</p>
+
+<ul>
+  <li>~7 historical_locations: Altdorf marketplace, Bürglen, Hohle Gasse, Tellsplatte, Lake Lucerne (storm), Bristen view, Altdorf church.</li>
+  <li>~3 historical_objects: medieval crossbow, Gessler's hat, Tell's hat.</li>
+</ul>
+
+<p>The historical-guides prompt (<code>prompts/historical-guides.txt</code>) carries the Tell-specific guidance. Each location went through 5-30 Grok refinement passes to land on a usable reference photo. See <code>scripts/admin/refine-tell-v40.js</code> for the latest refinement scaffolding.</p>
+
+<p class="see-also">See also: <a href="story-pipeline.html#expand">story pipeline §scene expansion</a>, <a href="api-reference.html#auth">API §user</a> for the verify-location endpoint, <a href="research-log.html">research log</a> for fairy-tales as the next planned period theme.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

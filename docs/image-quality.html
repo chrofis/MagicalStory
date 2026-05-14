@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image Quality Stack — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>Image Quality Stack</h1>
+<p class="lede">How generated images are evaluated, scored, repaired, and selected. Covers bounding-box detection, the unified score, the repair workflow loop, character repair, and version selection.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#bbox">1. Bounding-box detection</a></li>
+    <li><a href="#evals">2. Three evaluators</a></li>
+    <li><a href="#score">3. The unified score</a></li>
+    <li><a href="#workflow">4. Repair workflow loop</a></li>
+    <li><a href="#charrepair">5. Character repair</a></li>
+    <li><a href="#scale">6. Scale repair</a></li>
+    <li><a href="#pickbest">7. Pick-best version selection</a></li>
+    <li><a href="#decisions">8. Decision log (kept &amp; rejected knobs)</a></li>
+  </ol>
+</nav>
+
+<h2 id="bbox">1. Bounding-box detection</h2>
+
+<p>Bbox detection is the foundation: it tells every downstream check which characters and props are where. Implementation: <code>server/lib/entityConsistency.js</code> + Python cascade detector.</p>
+
+<h3>Two-pass flow</h3>
+<ol>
+  <li><strong>Pass 1</strong> — Gemini 2.5 Flash runs the prompt in <code>prompts/bbox-detection.txt</code> and returns figures with <code>bbox: [ymin, xmin, ymax, xmax]</code> normalised 0-1.</li>
+  <li><strong>Pass 2 (refine)</strong> — Cascade face detector (Python anime + Haar) runs on the same image; results merged with Gemini bboxes. Catches faces Gemini missed.</li>
+  <li><strong>Object name canonicalisation</strong> — detected names mapped back to Visual Bible IDs (e.g. "the wooden bow" → <code>ART012</code>).</li>
+</ol>
+
+<h3>Persistence</h3>
+<p>Bbox results land on <code>sceneImage.bboxDetection</code> per page. <strong>Not</strong> shared across versions: each round of repair runs fresh detection on the new image. Reusing <code>sharedBboxDetection</code> across rounds caused a long-running bug where v3's bbox showed v0's figures.</p>
+
+<h2 id="evals">2. Three evaluators</h2>
+
+<p>Run in parallel after image generation:</p>
+
+<table>
+<thead><tr><th>Evaluator</th><th>Model</th><th>Output</th><th>Prompt</th></tr></thead>
+<tbody>
+<tr><td>Quality</td><td>Gemini 2.5 Flash</td><td><code>qualityScore</code> 0-100, <code>fixableIssues[]</code></td><td><code>image-evaluation.txt</code></td></tr>
+<tr><td>Semantic</td><td>Gemini 2.5 Flash</td><td>Semantic penalties (already deducted from final)</td><td><code>image-semantic.txt</code></td></tr>
+<tr><td>Entity</td><td>Gemini + Python cascade</td><td><code>finalChecksReport.entity</code> with severities</td><td>see §1</td></tr>
+</tbody>
+</table>
+
+<p>Evaluators are <em>tolerant</em> by design: pose mirror (left/right body-part swap), minor framing nits, and aesthetic preferences don't deduct. The <a href="#decisions">decision log</a> records which deductions were rejected and why.</p>
+
+<h2 id="score">3. The unified score</h2>
+
+<p>One number drives every redo decision:</p>
+
+<pre><code>finalScore = qualityScore − semanticPenalties − entityPenalties</code></pre>
+
+<p>Severity bands (used by both eval paths and the consolidator):</p>
+
+<table>
+<thead><tr><th>Severity</th><th>Deduction</th></tr></thead>
+<tbody>
+<tr><td>CRITICAL</td><td>−30</td></tr>
+<tr><td>MAJOR</td><td>−15 (entity: −20)</td></tr>
+<tr><td>MODERATE</td><td>−7</td></tr>
+<tr><td>MINOR</td><td>−2 (entity: −10)</td></tr>
+</tbody>
+</table>
+
+<p>Quality-eval issues are NOT double-counted — they're already inside <code>qualityScore</code>. The dev panel reconciles by showing <code>Endwert = max(0, 100 − totalPenalty)</code> alongside the raw backend score; if they differ, the backend score is shown as a small annotation.</p>
+
+<h3>Final score from the consolidator</h3>
+<p><code>server/lib/feedbackConsolidator.js</code> validates and clamps <code>plan.final_score</code> to [0, 100] and stores <code>final_score_reason</code>. <code>findBadPages</code> in <code>server/lib/repairLogic.js</code> prefers <code>consolidatorFinalScore</code> when present.</p>
+
+<h2 id="workflow">4. Repair workflow loop</h2>
+
+<p>Triggered by <code>RepairWorkflowPanel</code> → <code>useRepairWorkflow.runFullWorkflow()</code>. Up to <code>maxPasses = 3</code> global passes:</p>
+
+<pre><code>Pass 1:
+  EVALUATE ALL pages          (quality + semantic + entity-from-generation)
+  IDENTIFY BAD PAGES          (score < 60 OR issues >= 5)
+  REDO bad pages once each    (POST /:id/iterate/:pageNum)
+
+Pass 2..3:
+  RUN ENTITY CONSISTENCY      (fresh bbox on new images)
+  EVALUATE ALL pages          (with fresh entity data)
+  IDENTIFY BAD PAGES
+  REDO bad pages once each
+
+FINAL:
+  ENTITY CONSISTENCY (last)
+  EVALUATE ALL (final)
+  CHARACTER REPAIR (max 3 pages, critical first, Grok blended)
+  PICK BEST VERSIONS</code></pre>
+
+<p>Thresholds in <code>server/config/models.js</code> → <code>REPAIR_DEFAULTS</code>:</p>
+
+<table>
+<tbody>
+<tr><td><code>scoreThreshold</code></td><td>60 — pages below this get redone</td></tr>
+<tr><td><code>issueThreshold</code></td><td>5 — pages with 5+ fixable issues get redone</td></tr>
+<tr><td><code>maxPasses</code></td><td>3 — global passes</td></tr>
+<tr><td><code>maxCharRepairPages</code></td><td>3 — max pages for char repair per run</td></tr>
+</tbody>
+</table>
+
+<div class="callout">
+The threshold dropped from 80 → 60 to stop redoing pages with cumulative-but-minor issues. Three checks each deducting 5 points used to trigger a costly redo for what was actually a fine image.
+</div>
+
+<h2 id="charrepair">5. Character repair</h2>
+
+<p>When entity consistency flags a character mismatch (wrong hair, wrong outfit, wrong age), character repair fixes <em>only</em> that character, preserving the background. Three modes (<code>server/lib/images.js</code> → <code>repairCharacterMismatchWithGrok</code>):</p>
+
+<table>
+<thead><tr><th>Mode</th><th>How</th><th>Cost</th><th>When</th></tr></thead>
+<tbody>
+<tr><td><strong>Cutout</strong> (default)</td><td>Extract bbox + 20% padding → send cutout + avatar to Grok → composite back with feathered edge (~8% of smaller dimension).</td><td>$0.02</td><td>Background untouched. Default for body / outfit fixes.</td></tr>
+<tr><td>Blended</td><td>Blur character region → Grok regenerates → 30px feathered blend onto bbox + 50% padding.</td><td>$0.02</td><td>Face-only repairs.</td></tr>
+<tr><td>Blackout</td><td>Full scene with blackout overlay → Grok regenerates entire scene.</td><td>$0.02</td><td>Background and character both wrong.</td></tr>
+</tbody>
+</table>
+
+<h3>Preset-aligned cutout</h3>
+<p><code>computePresetAlignedExtract()</code> picks one of Grok's 13 aspect presets and grows one axis to match — no letterbox padding, just more scene context.</p>
+
+<h2 id="scale">6. Scale repair</h2>
+
+<p>Separate from character repair. Used when a character is correctly rendered but in the wrong place / wrong size (e.g. should be a small figure in the background, drawn as foreground). <code>server/lib/scaleRepair.js</code>.</p>
+
+<p>Prompt is framed as <strong>MOVE / RELOCATE</strong>, not ADD: "every named character is already drawn somewhere in the input image — do not add new figures; find the existing figure of [visual identifier] and MOVE+SHRINK it to the target position [metadata position]". Repaints the abandoned area. No name leakage (uses visual identifiers, not character names).</p>
+
+<h2 id="pickbest">7. Pick-best version selection</h2>
+
+<p>After all repair passes finish, every page has 1..N versions stored under <code>imageVersions[]</code>. <code>POST /:id/repair-workflow/pick-best-versions</code> activates the highest-scoring version per page. Character-repair outputs are also versions, so they compete with the original + redo attempts.</p>
+
+<h2 id="decisions">8. Decision log (kept &amp; rejected knobs)</h2>
+
+<p>Curated decisions for <code>grok_inpaint</code> and the wider repair stack. Each entry: ✅ kept / ❌ rejected / 🟡 conditional + one-line reason.</p>
+
+<table>
+<thead><tr><th>Knob</th><th>Verdict</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>Grok inpaint for body / pose / gaze repairs</td><td>✅</td><td>Handles structural changes (body rotation, pose, gaze) when instructions use visual identifiers, not names.</td></tr>
+<tr><td>Pose mirror penalty in semantic eval</td><td>❌</td><td>Left/right body-part swaps (foot, arm, hand) are not semantic defects. Strengthen the prompt instead.</td></tr>
+<tr><td>Position phrasing as "left foreground / right midground"</td><td>❌</td><td>Use relational phrasing ("on the boat", "behind Roger") unless cross-page continuity / text-zone / ultra-wide demands LR.</td></tr>
+<tr><td>"For white text" in prompts</td><td>❌</td><td>Says "calm/smooth" instead. Saturated colour fine; don't bake dark-band language into unified prose.</td></tr>
+<tr><td>Single bbox detection reused across rounds</td><td>❌</td><td>Caused v3 to inherit v0's bbox. Each round runs fresh detection.</td></tr>
+<tr><td>scoreThreshold = 80</td><td>❌</td><td>Redid too many pages with merely cumulative minor issues. Lowered to 60.</td></tr>
+<tr><td>generateEmptyScenes = true</td><td>❌</td><td>Empty plates didn't help final quality enough to justify the call. Default off.</td></tr>
+<tr><td>Hatch / mask shape variations on cutout</td><td>❌</td><td>Tested several mask shapes; feathered rectangle outperformed.</td></tr>
+<tr><td>Bbox + 40% min padding for cutout</td><td>✅</td><td>Smaller padding clipped hands and hair; larger pulled in too much background.</td></tr>
+<tr><td>Per-page version accumulation</td><td>✅</td><td>Don't overwrite — let pick-best compare all versions.</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="story-pipeline.html#eval">story pipeline §6</a>, <a href="character-system.html">character system</a>, <a href="research-log.html">research log</a> for vendor evaluations behind these decisions.</p>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>

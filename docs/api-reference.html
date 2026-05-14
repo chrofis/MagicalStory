@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>API Reference — MagicalStory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="_style.css">
+</head>
+<body>
+<p class="breadcrumb"><a href="index.html">← Documentation index</a></p>
+
+<h1>API Reference</h1>
+<p class="lede">REST endpoints exposed by the Express backend, grouped by domain. Mount points live in <code>server.js</code>; per-domain routers live under <code>server/routes/</code>.</p>
+
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#auth">1. Auth &amp; user</a></li>
+    <li><a href="#characters">2. Characters &amp; avatars</a></li>
+    <li><a href="#stories">3. Stories &amp; jobs</a></li>
+    <li><a href="#regen">4. Regeneration &amp; repair</a></li>
+    <li><a href="#sharing">5. Sharing &amp; viewer</a></li>
+    <li><a href="#trial">6. Trial flow</a></li>
+    <li><a href="#print">7. Print, checkout &amp; referral</a></li>
+    <li><a href="#admin">8. Admin</a></li>
+    <li><a href="#webhooks">9. Webhooks</a></li>
+    <li><a href="#misc">10. Misc</a></li>
+  </ol>
+</nav>
+
+<div class="callout">
+Auth: most endpoints require a JWT (<code>Authorization: Bearer &lt;token&gt;</code>) issued by <code>/api/auth/login</code>. Public endpoints are noted explicitly. Routes under <code>/api</code> bypass the staging Basic-Auth gate so XHR calls work without credentials reuse.
+</div>
+
+<h2 id="auth">1. Auth &amp; user</h2>
+
+<p>Files: <code>server/routes/auth.js</code>, <code>server/routes/user.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/auth/register</code></td><td>Email/password + Turnstile + bot-protection.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/login</code></td><td>Returns 7-day JWT.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/refresh</code></td><td>Refresh JWT before expiry.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/logout</code></td><td>Client-side cleanup hook.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/google</code></td><td>Google Identity Services token exchange.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/reset-password</code></td><td>Email magic-link.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/set-password</code></td><td>Set password after trial → full account upgrade.</td></tr>
+<tr><td>POST</td><td><code>/api/auth/change-password</code></td><td>Authenticated.</td></tr>
+<tr><td>GET</td><td><code>/api/auth/verify-email</code></td><td>Email-verification link handler.</td></tr>
+<tr><td>GET</td><td><code>/api/user/location</code></td><td>IP-based city/country (ip-api.com).</td></tr>
+<tr><td>POST</td><td><code>/api/user/verify-location</code></td><td>Confirm city/PLZ via Nominatim — see <a href="landmarks.html#verify">landmarks §verify</a>.</td></tr>
+<tr><td>GET</td><td><code>/api/user/quota</code></td><td>Credits + photoConsentAt.</td></tr>
+<tr><td>GET / POST</td><td><code>/api/user/shipping-address</code></td><td>Read / update shipping address.</td></tr>
+<tr><td>GET</td><td><code>/api/user/orders</code></td><td>Order history.</td></tr>
+</tbody>
+</table>
+
+<h2 id="characters">2. Characters &amp; avatars</h2>
+
+<p>Files: <code>server/routes/characters.js</code>, <code>server/routes/avatars.js</code>, <code>server/routes/photos.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/characters</code></td><td>List user's characters (metadata only).</td></tr>
+<tr><td>POST</td><td><code>/api/characters</code></td><td>Create character (name, traits, relationships).</td></tr>
+<tr><td>GET</td><td><code>/api/characters/:id</code></td><td>Full character incl. avatars (R2 URLs).</td></tr>
+<tr><td>PATCH</td><td><code>/api/characters/:id</code></td><td>Edit traits/clothing/relationships.</td></tr>
+<tr><td>DELETE</td><td><code>/api/characters/:id</code></td><td>Soft delete.</td></tr>
+<tr><td>POST</td><td><code>/api/analyze-photo</code></td><td>Send photo bytes → Python analyzer → traits + face.</td></tr>
+<tr><td>POST</td><td><code>/api/avatar-prompt</code></td><td>Build avatar prompt from traits.</td></tr>
+<tr><td>POST</td><td><code>/api/generate-clothing-avatars</code></td><td>Spawn body+face crops per clothing slot.</td></tr>
+<tr><td>POST</td><td><code>/api/avatars/:characterId</code></td><td>Generate / regenerate the standard 2×2 grid avatar.</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="character-system.html">character system</a> for the data model and avatar lifecycle.</p>
+
+<h2 id="stories">3. Stories &amp; jobs</h2>
+
+<p>Files: <code>server/routes/stories.js</code>, <code>server/routes/storyDraft.js</code>, <code>server/routes/jobs.js</code>, <code>server/routes/storyIdeas.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/stories</code></td><td>Paginated list of the caller's stories.</td></tr>
+<tr><td>GET</td><td><code>/api/stories/:id</code></td><td>Full story payload.</td></tr>
+<tr><td>PATCH</td><td><code>/api/stories/:id/page/:pageNum</code></td><td>Edit page text / sceneDescription / image.</td></tr>
+<tr><td>DELETE</td><td><code>/api/stories/:id</code></td><td>Delete story.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/create-story</code></td><td>Kick off the unified pipeline. Returns <code>jobId</code>.</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/:id/status</code></td><td>Poll progress; payload includes partial result.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/:id/cancel</code></td><td>Cancel an in-flight job.</td></tr>
+<tr><td>POST</td><td><code>/api/story-draft</code></td><td>Save / merge in-progress wizard input.</td></tr>
+<tr><td>POST</td><td><code>/api/story-ideas</code></td><td>Seed a story from a prompt or theme.</td></tr>
+<tr><td>POST</td><td><code>/api/landmarks/discover</code></td><td>Background landmark discovery for a city.</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="story-pipeline.html">story pipeline</a> for the end-to-end flow these endpoints orchestrate.</p>
+
+<h2 id="regen">4. Regeneration &amp; repair</h2>
+
+<p>File: <code>server/routes/regeneration.js</code>. Mounted at <code>/api/stories</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/:id/iterate/:pageNum</code></td><td>Re-expand scene + regenerate page image.</td></tr>
+<tr><td>POST</td><td><code>/:id/repair-workflow/re-evaluate</code></td><td>Quality + semantic eval, applies entity penalties.</td></tr>
+<tr><td>POST</td><td><code>/:id/repair-workflow/consistency-check</code></td><td>Entity grid analysis (fresh bbox).</td></tr>
+<tr><td>POST</td><td><code>/:id/repair-workflow/character-repair</code></td><td>Grok cutout / blended / blackout repair.</td></tr>
+<tr><td>POST</td><td><code>/:id/repair-workflow/pick-best-versions</code></td><td>Activate the highest-scoring version per page.</td></tr>
+<tr><td>POST</td><td><code>/:id/test-models/:pageNum</code></td><td>Run multiple image models in parallel for one page.</td></tr>
+<tr><td>POST</td><td><code>/:id/style-transfer/:pageNum</code></td><td>Re-render a page in the story's art style via a different model.</td></tr>
+<tr><td>POST</td><td><code>/:id/covers/:coverType/active-image</code></td><td>Switch active cover version.</td></tr>
+</tbody>
+</table>
+
+<p class="see-also">See also: <a href="image-quality.html">image quality stack</a> for the scoring + repair logic that drives these endpoints.</p>
+
+<h2 id="sharing">5. Sharing &amp; viewer</h2>
+
+<p>File: <code>server/routes/sharing.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/stories/:id/share</code></td><td>Issue a public share token.</td></tr>
+<tr><td>GET</td><td><code>/api/share/:token</code></td><td>Public read-only story payload (no auth).</td></tr>
+<tr><td>GET</td><td><code>/shared/:token</code></td><td>HTML viewer route — server-rendered with OG tags + cover preload.</td></tr>
+</tbody>
+</table>
+
+<h2 id="trial">6. Trial flow</h2>
+
+<p>File: <code>server/routes/trial.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/trial/start</code></td><td>Create anonymous trial account (Turnstile + fingerprint; admin bypass).</td></tr>
+<tr><td>POST</td><td><code>/api/trial/upgrade</code></td><td>Convert trial → full account (set password).</td></tr>
+</tbody>
+</table>
+
+<h2 id="print">7. Print, checkout &amp; referral</h2>
+
+<p>File: <code>server/routes/print.js</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/checkout</code></td><td>Create Stripe Checkout session (book, credits, gift, promo discount).</td></tr>
+<tr><td>GET</td><td><code>/api/referral/my-code</code></td><td>Caller's personal promo code.</td></tr>
+<tr><td>POST</td><td><code>/api/referral/validate</code></td><td>Validate a code at checkout (rejects self / repeat).</td></tr>
+<tr><td>POST</td><td><code>/api/print/:storyId</code></td><td>Submit print job to Gelato after payment.</td></tr>
+<tr><td>GET</td><td><code>/api/print/pricing</code></td><td>Public price table.</td></tr>
+</tbody>
+</table>
+
+<h2 id="admin">8. Admin</h2>
+
+<p>Files: <code>server/routes/admin.js</code>, <code>server/routes/admin/</code>.</p>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/admin/users</code></td><td>Paginated user list.</td></tr>
+<tr><td>GET</td><td><code>/api/admin/users/:id</code></td><td>User details + credit transactions.</td></tr>
+<tr><td>POST</td><td><code>/api/admin/impersonate/:userId</code></td><td>Issue impersonation JWT.</td></tr>
+<tr><td>GET</td><td><code>/api/admin/stats</code></td><td>Dashboard KPIs.</td></tr>
+<tr><td>GET</td><td><code>/api/admin/jobs/failed</code></td><td>Recent failed story jobs.</td></tr>
+<tr><td>GET</td><td><code>/api/admin/tokens</code></td><td>AI token / cost usage by day / month / user.</td></tr>
+</tbody>
+</table>
+
+<h2 id="webhooks">9. Webhooks</h2>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/stripe/webhook</code></td><td>Defined in <code>server.js</code> BEFORE <code>express.json()</code>. Signature verified; on success grants credits or marks order paid.</td></tr>
+<tr><td>POST</td><td><code>/api/gelato/webhook</code></td><td>Print-status updates.</td></tr>
+</tbody>
+</table>
+
+<h2 id="misc">10. Misc</h2>
+
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/health</code></td><td>Liveness probe.</td></tr>
+<tr><td>GET</td><td><code>/api/check-ip</code></td><td>Echo of client IP for debugging.</td></tr>
+<tr><td>POST</td><td><code>/api/log-error</code></td><td>Forward client-side errors to backend log.</td></tr>
+<tr><td>GET</td><td><code>/api/files/:key</code></td><td>R2 object proxy (auth-aware) — see <code>server/routes/files.js</code>.</td></tr>
+<tr><td>GET</td><td><code>/api/swiss-stories</code></td><td>Static city / sage / story-idea catalog used by SEO routes.</td></tr>
+</tbody>
+</table>
+
+<footer class="doc-footer">
+  <a href="index.html">← Documentation index</a>
+</footer>
+
+</body>
+</html>
