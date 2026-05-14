@@ -5490,6 +5490,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     // Labelled portrait grid → blend step uses it as Image 2.
                     visualBibleGridImage: pageData.visualBibleGrid || null,
+                    // Phantom-pose render: per-story opt-in, falls back to
+                    // MODEL_DEFAULTS.phantomPoseRender (default false).
+                    phantomPoseRender: typeof inputData?.phantomPoseRender === 'boolean'
+                      ? inputData.phantomPoseRender
+                      : !!MODEL_DEFAULTS.phantomPoseRender,
                     usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
                   });
                   return {

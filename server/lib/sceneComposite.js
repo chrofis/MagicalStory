@@ -23,6 +23,7 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
+const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
@@ -336,6 +337,12 @@ async function generateSceneComposite(opts) {
     aspectRatio = '16:9',
     usageTracker = null,
     visualBibleGridImage = null,
+    // Per-call override for the phantom-pose render technique. When true,
+    // step 3 renders each character in their phantom's pose via an extra
+    // Grok edit call (full 2×4 sheet + cropped phantom) before pasting,
+    // instead of cutting a static standing cell from the 2×4 sheet.
+    // Default reads from MODEL_DEFAULTS.phantomPoseRender (false).
+    phantomPoseRender = false,
   } = opts;
 
   if (!cleanBackgroundPrompt && !existingCleanBackground) throw new Error('cleanBackgroundPrompt or existingCleanBackground required');
@@ -397,9 +404,10 @@ async function generateSceneComposite(opts) {
   debug.blockingPrompt = blockingPrompt;
 
   // ── Step 3: detect bboxes + composite cutouts on the clean background
-  log.info('[SCENE COMPOSITE] step 3/4 — detect bboxes + composite');
+  log.info(`[SCENE COMPOSITE] step 3/4 — detect bboxes + composite${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
   const bboxes = {};
   const placements = [];
+  const phantomPoseRenders = {};
   for (const c of cast) {
     const bbox = await findColorBbox(blockingBuf, c.color);
     if (!bbox) {
@@ -409,10 +417,46 @@ async function generateSceneComposite(opts) {
     bboxes[c.name] = bbox;
     log.info(`[SCENE COMPOSITE]   ${c.name} (${c.color}): bbox ${bbox.width}×${bbox.height} @ (${bbox.x},${bbox.y}); cell ${POSE_CELL[c.pose]} (${c.pose})${c.flip ? ' flipped' : ''}`);
 
-    const cellBuf = await cropSheetCell(c.sheetBuf, POSE_CELL[c.pose]);
-    let cutBuf = await removeBackground(cellBuf);
-    cutBuf = await trimTransparent(cutBuf);
-    if (c.flip) cutBuf = await flipHorizontal(cutBuf);
+    // Source the character cutout. Two paths:
+    //   - phantom-pose render (flag on): Grok renders the character in the
+    //     phantom's pose from the full 2×4 sheet + cropped phantom. No flip
+    //     needed afterwards — the pose already encodes facing direction.
+    //   - static cell (default): cut the matching cell from the 2×4 sheet,
+    //     flip if the cast entry asks for the opposite facing direction.
+    let cutBuf;
+    let usedPhantomPose = false;
+    if (phantomPoseRender) {
+      try {
+        const ppr = await renderCharacterInPhantomPose({
+          charSheet2x4: c.sheetBuf,
+          blockingImageBuf: blockingBuf,
+          bbox,
+          charName: c.name,
+          colorName: c.colorName,
+          action: c.action,
+          aspectRatio: '9:16',
+          model: GROK_MODELS.STANDARD,
+          usageTracker,
+        });
+        totalCost += ppr.usage?.cost || 0;
+        phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
+        const renderedBuf = Buffer.from(
+          ppr.imageData.replace(/^data:image\/\w+;base64,/, ''),
+          'base64',
+        );
+        cutBuf = await removeBackground(renderedBuf);
+        cutBuf = await trimTransparent(cutBuf);
+        usedPhantomPose = true;
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE] phantom-pose render failed for ${c.name}: ${err.message} — falling back to static cell`);
+      }
+    }
+    if (!usedPhantomPose) {
+      const cellBuf = await cropSheetCell(c.sheetBuf, POSE_CELL[c.pose]);
+      cutBuf = await removeBackground(cellBuf);
+      cutBuf = await trimTransparent(cutBuf);
+      if (c.flip) cutBuf = await flipHorizontal(cutBuf);
+    }
     const scaled = await scaleToHeight(cutBuf, bbox.height);
 
     const sMeta = await sharp(scaled).metadata();
@@ -423,6 +467,7 @@ async function generateSceneComposite(opts) {
     placements.push({ input: scaled, left, top });
   }
   debug.bboxes = bboxes;
+  if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
 
   if (placements.length === 0) {
     throw new Error('[SCENE COMPOSITE] no characters placed — bbox detection failed for every cast entry');
