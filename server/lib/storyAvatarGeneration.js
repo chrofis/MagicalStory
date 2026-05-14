@@ -33,9 +33,9 @@ const { setStyledAvatar, invalidateStyledAvatarForCategory } = require('./styled
 async function generateStoryAvatars(characters, clothingRequirements, artStyle, addUsage, options = {}) {
   const {
     generateDynamicAvatar,
-    generateStyledCostumedAvatar,
     generateStyledAvatarWithSignature
   } = require('../routes/avatars');
+  const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 
   const generated = [];
   const failed = [];
@@ -84,22 +84,36 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
           let isCostumed = false;
 
           if (category === 'costumed' && config.costume) {
-            // Costumed: generate styled version directly (costume + art style in one call)
-            result = await generateStyledCostumedAvatar(char, config, artStyle);
+            // Costumed: generate the 2×4 reference sheet (the styled avatar IS the
+            // 2×4 — phantom + standard avatar + face → Grok edit). No more Gemini
+            // styled-2×2 step; the costume description carries everything Grok
+            // needs to render the bottom-row body cells correctly.
             isCostumed = true;
-
-            if (result.success && result.imageData) {
-              const costumeKey = result.costumeType;
-              char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
-              setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
-              if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-              if (result.clothing) {
-                char.avatars.clothing.costumed[costumeKey] = result.clothing;
+            const costumeKey = String(config.costume).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const costumeDescription = config.description || config.costume || 'costume';
+            try {
+              const sheet = await generateCharacter2x4Sheet(char, {
+                clothingCategory: `costumed:${costumeKey}`,
+                costumeDescription,
+                artStyle,
+                usageTracker: addUsage,
+              });
+              if (sheet?.imageData) {
+                char.avatars.styledAvatars[artStyle].costumed[costumeKey] = sheet.imageData;
+                setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, sheet.imageData);
+                if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                char.avatars.clothing.costumed[costumeKey] = costumeDescription;
+                result = { success: true, imageData: sheet.imageData };
+                generated.push(`${char.name}:${logCategory}@${artStyle}`);
+                log.debug(`[AVATAR-GEN] ✅ Generated 2×4 costumed:${costumeKey}@${artStyle} for ${char.name}`);
+              } else {
+                failed.push(`${char.name}:${logCategory}`);
+                result = { success: false };
               }
-              generated.push(`${char.name}:${logCategory}@${artStyle}`);
-              log.debug(`[AVATAR-GEN] ✅ Generated styled costumed:${costumeKey}@${artStyle} for ${char.name}`);
-            } else {
+            } catch (err) {
+              log.warn(`[AVATAR-GEN] 2×4 costumed:${costumeKey}@${artStyle} for ${char.name} failed: ${err.message}`);
               failed.push(`${char.name}:${logCategory}`);
+              result = { success: false };
             }
           } else if (config.signature) {
             // Signature: generate styled avatar directly (1 API call)

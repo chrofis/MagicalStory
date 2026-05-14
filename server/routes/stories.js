@@ -1841,33 +1841,45 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     );
     const meta = metaRows[0] || {};
 
-    // Look up each cast member's 2×4 reference sheet so the dev panel can
-    // show what was cropped from to produce the cutouts. We resolve the
-    // clothing key per character from the page-level perCharClothing on the
-    // JSONB blob — falls back to sheet2x4_standard if a specific costume
-    // sheet isn't cached.
+    // Look up each cast member's 2×4 styled avatar (the reference sheet that
+    // was cropped from to produce the cutouts). Canonical location:
+    //   character.avatars.styledAvatars[<artStyle>].costumed[<costumeKey>]
+    //   character.avatars.styledAvatars[<artStyle>][<category>]
     const sheetsByCharacter = {};
     if (meta.bboxes && typeof meta.bboxes === 'object') {
-      const perCharRow = await dbQuery(
-        `SELECT scene->'sceneCharacterClothing' AS clothing
+      const ctxRow = await dbQuery(
+        `SELECT data->>'artStyle' AS art_style,
+                scene->'sceneCharacterClothing' AS clothing
          FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
          WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
         [id, pageNum]
       );
-      const perChar = perCharRow[0]?.clothing || {};
+      const artStyleKey = ctxRow[0]?.art_style || 'watercolor';
+      const perChar = ctxRow[0]?.clothing || {};
       const charsRow = await dbQuery(
         `SELECT data->'characters' AS chars FROM characters WHERE id = $1`,
         [`characters_${storyUserId}`]
       );
       const chars = charsRow[0]?.chars || [];
+      const resolveImg = (v) => {
+        if (!v) return null;
+        if (typeof v === 'string') return v;
+        if (typeof v === 'object') return v.imageUrl || v.imageData || v.data || null;
+        return null;
+      };
       for (const name of Object.keys(meta.bboxes)) {
         const char = chars.find(c => (c?.name || '').toLowerCase() === name.toLowerCase());
-        if (!char?.avatars) continue;
-        const clothing = (perChar[name] || 'standard').toLowerCase();
-        const sheetField = `sheet2x4_${clothing.replace(/[^a-z0-9]/gi, '_')}`;
-        const v = char.avatars[sheetField] || char.avatars.sheet2x4_standard;
-        if (!v) continue;
-        const url = typeof v === 'string' ? v : (v.imageUrl || null);
+        if (!char?.avatars?.styledAvatars) continue;
+        const clothing = String(perChar[name] || 'standard').toLowerCase();
+        const styledForStyle = char.avatars.styledAvatars[artStyleKey] || {};
+        let raw = null;
+        if (clothing.startsWith('costumed:')) {
+          const ck = clothing.slice('costumed:'.length);
+          raw = styledForStyle.costumed?.[ck];
+        } else {
+          raw = styledForStyle[clothing];
+        }
+        const url = resolveImg(raw);
         if (url) sheetsByCharacter[name] = { url, clothing };
       }
     }

@@ -5290,20 +5290,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // ── Scene composite — cast builder ──────────────────────────────────
       // For each character on the page:
       //   1. Locate the 2×4 reference sheet for the costume worn on this page.
-      //      Cached on character.avatars.sheet2x4_<clothing> after first
-      //      generation. If missing, generate it lazily via
-      //      generateCharacter2x4Sheet (one Grok call, ~$0.02 per character
-      //      per costume).
+      //      The canonical write location is
+      //        character.avatars.styledAvatars[artStyle].costumed[costumeKey]
+      //        character.avatars.styledAvatars[artStyle][category]
+      //      i.e. the same field the rest of the codebase calls "styled
+      //      avatar" — there is no separate styled-2×2, the 2×4 IS the
+      //      styled avatar. Lazy-generated via generateCharacter2x4Sheet
+      //      when missing (one Grok call, ~$0.02 per character per costume).
       //   2. Pull pose + flip from the scene metadata (Sonnet outline emits
       //      these alongside position/perspective when scene composite is on).
       //
       // Returns null if any cast character can't be set up — the caller
       // then falls through to the legacy direct-prompt path.
       const buildCompositeCast = async (pageData, inputData) => {
-        // Read the per-scene character metadata (with pose/flip/position/depth)
-        // from sceneMetadata.fullData.characters — that's the raw JSON block
-        // Sonnet emitted in the outline. Fall back to sceneCharacters (just
-        // names) if metadata is missing.
         const metaChars = pageData.sceneMetadata?.fullData?.characters
           || pageData.sceneMetadata?.characters
           || pageData.sceneCharacters
@@ -5311,6 +5310,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const sceneChars = Array.isArray(metaChars) ? metaChars : [];
         if (!sceneChars.length) return null;
         const { generateCharacter2x4Sheet } = require('./server/lib/character2x4Sheet');
+        const artStyleKey = inputData.artStyle || 'watercolor';
         const out = [];
         for (const sc of sceneChars) {
           const name = typeof sc === 'string' ? sc : (sc.name || '');
@@ -5318,36 +5318,51 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
           if (!character) return null;
           const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
-          const sheetField = `sheet2x4_${clothing.replace(/[^a-z0-9]/gi, '_')}`;
-          // Step 1: try the cached sheet on the character record.
-          let sheetData = character.avatars?.[sheetField] || character.avatars?.sheet2x4_standard;
-          let sheetUri = sheetData ? (typeof sheetData === 'string' ? sheetData : sheetData.data || sheetData.imageData) : null;
+          const costumeKey = clothing.startsWith('costumed:')
+            ? clothing.slice('costumed:'.length).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+            : null;
+
+          // Step 1: try the styled-avatar (2×4) for this art style + clothing.
+          const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
+          const cachedSheet = costumeKey
+            ? styledForStyle.costumed?.[costumeKey]
+            : styledForStyle[clothing];
+          let sheetUri = cachedSheet
+            ? (typeof cachedSheet === 'string' ? cachedSheet : (cachedSheet.imageUrl || cachedSheet.imageData || cachedSheet.data || null))
+            : null;
+
           // Step 2: lazy-generate if missing.
-          if (!sheetUri || !sheetUri.startsWith('data:')) {
+          if (!sheetUri || (!sheetUri.startsWith('data:') && !sheetUri.startsWith('http'))) {
             try {
               const costumeDesc = inputData.clothingRequirements?.[name]?.costumed?.description
                 || inputData.clothingRequirements?.[name]?.description
-                || (clothing.startsWith('costumed:') ? clothing.split(':').slice(1).join(':') : 'standard outfit');
+                || (costumeKey || 'standard outfit');
               const gen = await generateCharacter2x4Sheet(character, {
                 clothingCategory: clothing,
                 costumeDescription: costumeDesc,
-                artStyle: inputData.artStyle || 'watercolor',
+                artStyle: artStyleKey,
                 usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
               });
               sheetUri = gen.imageData;
-              // Cache on the character for downstream pages in this story.
+              // Cache on the in-memory character at the canonical styled-avatar
+              // field so downstream pages in this story reuse it.
               character.avatars = character.avatars || {};
-              character.avatars[sheetField] = sheetUri;
-              // Persist back to the characters table so subsequent stories on
-              // this account reuse the sheet (no $0.02 Grok call per page per
-              // costume per story) and the UI "Stilisierte Avatare (2×4)" tile
-              // can render them. Fire-and-forget — DB hiccups don't fail the
-              // page; the next run will re-upload.
+              character.avatars.styledAvatars = character.avatars.styledAvatars || {};
+              character.avatars.styledAvatars[artStyleKey] = character.avatars.styledAvatars[artStyleKey] || {};
+              if (costumeKey) {
+                character.avatars.styledAvatars[artStyleKey].costumed = character.avatars.styledAvatars[artStyleKey].costumed || {};
+                character.avatars.styledAvatars[artStyleKey].costumed[costumeKey] = sheetUri;
+              } else {
+                character.avatars.styledAvatars[artStyleKey][clothing] = sheetUri;
+              }
+              // Persist back to the characters table at the SAME canonical
+              // location so subsequent stories on this account reuse the
+              // sheet and the UI "Stilisierte Avatare" tile picks it up.
               try {
-                const { persistCharacter2x4Sheet } = require('./server/services/database');
-                await persistCharacter2x4Sheet(userId, character.id, sheetField, sheetUri);
+                const { persistStyledAvatar } = require('./server/services/database');
+                await persistStyledAvatar(userId, character.id, artStyleKey, costumeKey ? `costumed:${costumeKey}` : clothing, sheetUri);
               } catch (persistErr) {
-                log.warn(`[SCENE COMPOSITE] persistCharacter2x4Sheet failed for ${name}/${sheetField}: ${persistErr.message}`);
+                log.warn(`[SCENE COMPOSITE] persistStyledAvatar failed for ${name}/${clothing}: ${persistErr.message}`);
               }
             } catch (err) {
               log.warn(`[SCENE COMPOSITE] cannot generate 2×4 sheet for ${name} (${clothing}): ${err.message}`);

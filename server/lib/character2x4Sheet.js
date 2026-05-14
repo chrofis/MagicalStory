@@ -96,46 +96,32 @@ function resolveFacePhoto(character) {
 }
 
 /**
- * Resolve the styled 2×2 costumed avatar for the given clothing key.
- * The canonical write location (storyAvatarGeneration.js) is
- *   character.avatars.styledAvatars[artStyle].costumed[costumeKey]
- *   character.avatars.styledAvatars[artStyle][category]   // standard/winter/summer
- * Older fields are kept as fallbacks for legacy character records.
+ * Resolve the character's base standard avatar (the Grok-generated single-shot
+ * body avatar produced by the clothing-avatars pipeline). This is the body /
+ * identity reference fed to the 2×4 generator. No more styled-2×2 middleman.
+ *
+ * Returns a data URI / R2 URL string, or null when the standard avatar is
+ * missing — the caller can fall back to the face photo alone.
  */
-function resolveStyled2x2(character, clothingCategory, artStyle) {
+function resolveStandardAvatar(character) {
   if (!character?.avatars) return null;
-  const costumeKey = (clothingCategory || '').startsWith('costumed:')
-    ? clothingCategory.split(':')[1]
-    : null;
-  const styledForStyle = artStyle ? character.avatars.styledAvatars?.[artStyle] : null;
-  const candidates = [
-    // Canonical: storyAvatarGeneration writes here.
-    costumeKey ? styledForStyle?.costumed?.[costumeKey] : styledForStyle?.[clothingCategory],
-    // Some art-style entries may be stored without a wrapper category key —
-    // fall through any styledAvatars entry that matches our category.
-    costumeKey ? character.avatars.styledAvatars?.['*']?.costumed?.[costumeKey] : null,
-    // Legacy fields, kept for older character records.
-    character.avatars[clothingCategory],
-    character.avatars.costumed?.[costumeKey],
-    character.avatars.costumed,
-    character.avatars[`styled_${clothingCategory}`],
-    character.avatars.standard,
-  ];
-  for (const c of candidates) {
-    if (!c) continue;
-    if (typeof c === 'string' && c.startsWith('data:')) return c;
-    if (typeof c === 'object' && c.data && c.data.startsWith('data:')) return c.data;
-    if (typeof c === 'object' && c.imageData && c.imageData.startsWith('data:')) return c.imageData;
-  }
+  const v = character.avatars.standard;
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v.imageUrl || v.imageData || v.data || null;
   return null;
 }
 
 /**
- * Generate a 2×4 reference sheet for one character + costume.
+ * Generate a 2×4 reference sheet for one character + costume in one Grok call.
+ *
+ * Inputs to Grok: phantom (pose template) + standard avatar (body / clothing
+ * identity) + face photo (face identity). No Gemini styled-2×2 step — the 2×4
+ * IS the styled avatar.
  *
  * @param {Object} character - character record (with .avatars and .photos)
  * @param {Object} opts
- * @param {string} opts.clothingCategory - 'standard' | 'costumed:<theme>' | etc.
+ * @param {string} opts.clothingCategory - 'standard' | 'costumed:<theme>' | 'winter' | 'summer'
  * @param {string} opts.costumeDescription - prose for the costume worn in the bottom row.
  * @param {string} [opts.artStyle='watercolor']
  * @param {Function} [opts.usageTracker] - (provider, usage, fn, modelId) => void
@@ -150,19 +136,22 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   } = opts;
 
   const phantom = loadPhantom();
-  const styled2x2 = resolveStyled2x2(character, clothingCategory, artStyle);
-  if (!styled2x2) {
-    throw new Error(`No styled 2×2 avatar for ${character?.name || 'character'} (${clothingCategory}). Generate the styled-costumed avatar first.`);
-  }
   const facePhoto = resolveFacePhoto(character);
   if (!facePhoto) {
     throw new Error(`No face photo for ${character?.name || 'character'}.`);
   }
+  const standardAvatar = resolveStandardAvatar(character);
+  // The standard avatar is the preferred body reference. If it's missing
+  // (e.g. avatar generation failed earlier), fall back to face-only —
+  // Grok will rebuild the body from the prompt.
+  const refs = standardAvatar
+    ? [phantom, standardAvatar, facePhoto]
+    : [phantom, facePhoto];
 
   const prompt = buildPrompt(artStyle, costumeDescription);
-  log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle})`);
+  log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle}, refs=${refs.length})`);
 
-  const result = await editWithGrok(prompt, [phantom, styled2x2, facePhoto], {
+  const result = await editWithGrok(prompt, refs, {
     aspectRatio: '16:9',
     model: GROK_MODELS.STANDARD,
   });

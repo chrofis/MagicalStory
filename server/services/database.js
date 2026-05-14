@@ -2039,39 +2039,43 @@ async function saveStyledAvatarToR2(userId, characterId, key, imageData) {
 }
 
 /**
- * Persist a 2×4 character reference sheet onto the user's characters row.
+ * Persist a styled avatar (the 2×4 reference sheet) onto the user's characters
+ * row at the canonical location:
  *
- * Writes both:
- *   - characters.data->'characters'[i]->'avatars'->{sheetField}   (heavy data path)
- *   - characters.metadata->'characters'[i]->'avatars'->{sheetField}  (lightweight UI path)
+ *   character.avatars.styledAvatars[<artStyle>][<category>]
+ *   character.avatars.styledAvatars[<artStyle>].costumed[<costumeKey>]
  *
  * R2 is used when configured (image_url stored on the field); otherwise the
- * raw data URI is persisted inline. Returns true on success, false if the
- * character couldn't be located.
+ * raw data URI is persisted inline. The styled-2×2 Gemini pipeline is
+ * deprecated — these fields now hold the 2×4 sheets directly.
  *
  * @param {string|number} userId
  * @param {string|number} characterId
- * @param {string} sheetField     - e.g. 'sheet2x4_standard' or 'sheet2x4_costumed_pirate'
- * @param {string} imageData      - data:image/png;base64,...
+ * @param {string} artStyle           - e.g. 'watercolor', 'pixar'
+ * @param {string} clothingCategory   - 'standard' | 'winter' | 'summer' | 'costumed:<key>'
+ * @param {string} imageData          - data:image/png;base64,...
  */
-async function persistCharacter2x4Sheet(userId, characterId, sheetField, imageData) {
+async function persistStyledAvatar(userId, characterId, artStyle, clothingCategory, imageData) {
   if (!isDatabaseMode()) return false;
-  if (!imageData || !userId || !characterId || !sheetField) return false;
+  if (!imageData || !userId || !characterId || !artStyle || !clothingCategory) return false;
 
-  // Upload to R2 if available — otherwise fall back to inline.
+  // Build the R2 key (one-deep namespace per art style) — reuse the existing
+  // keyForCharacterStyledAvatar shape so paths stay consistent.
+  const isCostumed = clothingCategory.startsWith('costumed:');
+  const costumeKey = isCostumed ? clothingCategory.slice('costumed:'.length) : null;
+  const r2KeySuffix = isCostumed ? `${artStyle}/costumed/${costumeKey}` : `${artStyle}/${clothingCategory}`;
+
   let url = null;
   try {
     const r2 = require('../lib/r2');
     if (r2.isConfigured()) {
-      url = await r2.uploadImage(imageData, r2.keyForCharacterSheet2x4(userId, characterId, sheetField));
+      url = await r2.uploadImage(imageData, r2.keyForCharacterStyledAvatar(userId, characterId, r2KeySuffix));
     }
   } catch (err) {
-    console.warn(`[R2] persistCharacter2x4Sheet upload skipped (${userId}/${characterId}/${sheetField}): ${err.message}`);
+    console.warn(`[R2] persistStyledAvatar upload skipped (${userId}/${characterId}/${r2KeySuffix}): ${err.message}`);
   }
 
-  // R2-stored sheets are persisted as { imageUrl, generatedAt } — same shape
-  // the rest of the codebase uses for character avatar fields. Inline fallback
-  // (R2 not configured) is a raw data URI string. One reader path, one writer.
+  // R2-stored avatars: { imageUrl, generatedAt }. Inline fallback: raw data URI.
   const value = url
     ? { imageUrl: url, generatedAt: new Date().toISOString() }
     : imageData;
@@ -2083,22 +2087,45 @@ async function persistCharacter2x4Sheet(userId, characterId, sheetField, imageDa
   const charIndex = characters.findIndex(c => String(c.id) === String(characterId));
   if (charIndex < 0) return false;
 
+  // jsonb_set with create_missing builds the path incrementally. We merge into
+  // the existing styledAvatars[artStyle] (or .costumed) object so other
+  // clothing variants on the same art style aren't clobbered.
+  const path = isCostumed
+    ? `{characters,${charIndex},avatars,styledAvatars,${artStyle},costumed,${costumeKey}}`
+    : `{characters,${charIndex},avatars,styledAvatars,${artStyle},${clothingCategory}}`;
+
+  // Build the path up step by step so each missing intermediate object gets
+  // a defaulted {} via two-step jsonb_set(... '{}', true).
+  const ensureStyledAvatarsPath = async (col) => {
+    // 1. ensure avatars.styledAvatars exists
+    await dbQuery(
+      `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars', '{}'::jsonb), true) WHERE id = $1`,
+      [rowId, `{characters,${charIndex},avatars,styledAvatars}`]
+    );
+    // 2. ensure avatars.styledAvatars[artStyle] exists
+    await dbQuery(
+      `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars'->$3, '{}'::jsonb), true) WHERE id = $1`,
+      [rowId, `{characters,${charIndex},avatars,styledAvatars,${artStyle}}`, artStyle]
+    );
+    // 3. ensure .costumed sub-object exists when needed
+    if (isCostumed) {
+      await dbQuery(
+        `UPDATE characters SET ${col} = jsonb_set(${col}, $2, COALESCE(${col}->'characters'->${charIndex}->'avatars'->'styledAvatars'->$3->'costumed', '{}'::jsonb), true) WHERE id = $1`,
+        [rowId, `{characters,${charIndex},avatars,styledAvatars,${artStyle},costumed}`, artStyle]
+      );
+    }
+  };
+
+  await ensureStyledAvatarsPath('data');
+  await ensureStyledAvatarsPath('metadata');
+
+  // 4. write the leaf value
   await dbQuery(
     `UPDATE characters
-     SET data = jsonb_set(
-                  data,
-                  $2,
-                  COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb,
-                  true
-                ),
-         metadata = jsonb_set(
-                      metadata,
-                      $2,
-                      COALESCE(metadata->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb,
-                      true
-                    )
+     SET data = jsonb_set(data, $2, $3::jsonb, true),
+         metadata = jsonb_set(metadata, $2, $3::jsonb, true)
      WHERE id = $1`,
-    [rowId, `{characters,${charIndex},avatars}`, JSON.stringify({ [sheetField]: value })]
+    [rowId, path, JSON.stringify(value)]
   );
   return true;
 }
@@ -2910,7 +2937,7 @@ module.exports = {
   imgBytesAsync,
   saveAvatarToR2,
   saveStyledAvatarToR2,
-  persistCharacter2x4Sheet,
+  persistStyledAvatar,
   saveAvatarThumbToR2,
   saveVbReferenceToR2,
   getStoryImageWithVersions,
