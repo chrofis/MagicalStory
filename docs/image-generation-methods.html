@@ -21,7 +21,8 @@
     <li><a href="#usecases">4. By task: which method handles what</a></li>
     <li><a href="#aspect">5. Aspect-ratio behaviour by provider</a></li>
     <li><a href="#dispatch">6. Dispatch &amp; override layers</a></li>
-    <li><a href="#history">7. Why-not table (rejected approaches)</a></li>
+    <li><a href="#routing">7. Routing — when each method works best</a></li>
+    <li><a href="#history">8. Why-not table (rejected approaches)</a></li>
   </ol>
 </nav>
 
@@ -337,7 +338,68 @@
 
 <p>Auth: the dev-mode UIs route through the admin JWT path; the per-call overrides only fire when the request has an admin token. End-users always get the default config.</p>
 
-<h2 id="history">7. Why-not table</h2>
+<h2 id="routing">7. Routing — when each method works best</h2>
+
+<p>Three orthogonal dispatch dimensions decide what runs for any given page. Today only one of them (scene complexity) ramifies fully; the others have proposed but un-shipped rules captured here as the next routing iteration.</p>
+
+<h3>Dimension A — Direct vs Composite (cast size)</h3>
+
+<p><strong>Why it matters:</strong> direct path is one Grok call (~$0.02). Composite is three Grok calls (~$0.06) + optional phantom-pose render (+~$0.02 per character). Each extra call buys better character placement, depth handling, and pose correctness. Past a certain cast complexity the direct path produces artefacts the blend pass can't fix.</p>
+
+<table>
+<thead><tr><th>Scene</th><th>Recommended path</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td><strong>0 characters</strong> (empty scene / landmark only)</td><td>Direct (text-only Grok generate)</td><td>No identity to preserve. Composite adds overhead with no benefit.</td></tr>
+<tr><td><strong>1 character</strong></td><td>Direct (Grok edit with character ref + VB grid)</td><td>One subject, one reference image. Grok handles single-character identity well in one pass.</td></tr>
+<tr><td><strong>2 characters, simple</strong> (both at similar depth, side-by-side)</td><td>Direct</td><td>Two refs still fit in the one-call attention budget. The direct prompt's "left/right" placement language is reliable here.</td></tr>
+<tr><td><strong>2 characters, complex</strong> (one foreground, one background; one occludes the other; very different scales)</td><td>Composite (3-pass) — optional phantom-pose render per character</td><td>Direct prompt can't reliably control depth, scale, and occlusion all at once. Composite stages BG → blocking → blend, giving each layer a dedicated pass.</td></tr>
+<tr><td><strong>3+ characters</strong></td><td>Composite — phantom-pose render recommended</td><td>Direct prompt's attention is too divided across 3+ identities. Composite + phantom-pose locks each character's pose individually before the blend.</td></tr>
+</tbody>
+</table>
+
+<p><strong>Current implementation:</strong> the cast-size routing is <em>not yet</em> in the dispatcher. <code>enableSceneComposite: true</code> (in <code>MODEL_DEFAULTS</code>) routes <em>every</em> page through the composite path. Per-story opt-out via <code>inputData.composite === false</code> drops to the direct path universally. The cast-size-aware automatic decision is on the roadmap; the table above is the design.</p>
+
+<h3>Dimension B — Reference mode (identity strictness)</h3>
+
+<p>Set via <code>MODEL_DEFAULTS.referenceMode</code> (current default: <code>'loose'</code>). Controls what reference images are attached to a direct-path page generation. Looser modes trade identity stability for painterly cohesion in the output.</p>
+
+<table>
+<thead><tr><th>Mode</th><th>What's attached</th><th>Best for</th></tr></thead>
+<tbody>
+<tr><td><code>strict</code></td><td>Body-no-bg photos + costumed avatars + styled avatars + full VB grid</td><td>Hero pages with named characters who must look recognisably like the user. Highest identity preservation; sometimes too tight, output looks photographic rather than illustrated.</td></tr>
+<tr><td><code>loose</code> (default)</td><td>Costumed + styled; photo only on close-ups; identity cells without grid frame</td><td>Most pages. Identity stays consistent across pages because styled avatars carry the look forward; output reads as illustration, not photo.</td></tr>
+<tr><td><code>styled-only</code></td><td>Only the in-art-style avatar; identity cells without grid frame</td><td>Stylised pages where photographic identity would clash with the art style (e.g. stylised fairy-tale opener).</td></tr>
+<tr><td><code>off</code></td><td>No character refs, no VB grid (text-only)</td><td>Empty scenes / pure environment shots. Faster, cheaper, and avoids "phantom character" hallucinations from refs that aren't relevant.</td></tr>
+</tbody>
+</table>
+
+<h3>Dimension C — Per-page model (scene complexity)</h3>
+
+<p>Set via <code>MODEL_DEFAULTS.sceneRouting</code> and the scene metadata's <code>sceneComplexity</code> field (Sonnet emits this during outline expansion). Today both <code>simplePageImage</code> and <code>complexPageImage</code> default to <code>grok-imagine</code>, so this dimension is dormant — but the wiring exists to route complex scenes to a different model if we want to A/B it.</p>
+
+<table>
+<thead><tr><th><code>sceneRouting</code> value</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td><code>'auto'</code> (default)</td><td>Reads <code>sceneMetadata.sceneComplexity</code> ('simple' | 'complex'). Routes to <code>simplePageImage</code> or <code>complexPageImage</code> respectively.</td></tr>
+<tr><td><code>'grok'</code></td><td>Force Grok for every page.</td></tr>
+<tr><td><code>'gemini'</code></td><td>Force Gemini for every page (only useful as a comparison run; not recommended for production after the Gemini→Grok switch).</td></tr>
+<tr><td>any model id</td><td>Force the named model for every page.</td></tr>
+</tbody>
+</table>
+
+<h3>Composing all three dimensions</h3>
+
+<p>The current dispatcher (<code>server.js</code>, story-job processing) evaluates them in this order:</p>
+<ol>
+  <li><strong>Composite vs direct</strong> (Dimension A) — currently a global flag (<code>enableSceneComposite</code>) + per-story opt-out.</li>
+  <li><strong>Phantom-pose render</strong> (sub-flag of composite) — <code>MODEL_DEFAULTS.phantomPoseRender</code> or per-story override. Default off.</li>
+  <li><strong>Reference mode</strong> (Dimension B) — only affects the direct path. Composite's blocking + blend pass have their own reference shape (VB grid in Image 2 of blend).</li>
+  <li><strong>Per-page model</strong> (Dimension C) — only affects the direct path. Composite always runs through Grok edit.</li>
+</ol>
+
+<p>Next roadmap step on routing: replace the global <code>enableSceneComposite</code> with a cast-size-aware dispatcher that picks direct vs composite per page based on the resolved cast count + complexity flag, per the table at the top of this section.</p>
+
+<h2 id="history">8. Why-not table</h2>
 
 <p>Approaches we tried, evaluated, and dropped — so future "let's just use X" suggestions can be checked against actual evidence.</p>
 
