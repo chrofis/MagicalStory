@@ -353,6 +353,7 @@ async function generateSceneComposite(opts) {
   // ── Step 4: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 4/4 — blend pass');
   const blendPrompt = buildBlendEditPrompt(scene);
+  debug.blendPrompt = blendPrompt;
   const pass1 = await editWithGrok(blendPrompt, [compositedData], { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', pass1.usage, 'scene_composite_blend', pass1.modelId);
   totalCost += pass1.usage?.cost || 0;

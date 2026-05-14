@@ -1833,6 +1833,7 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     const metaRows = await dbQuery(
       `SELECT scene->'compositeBboxes' AS bboxes,
               scene->>'compositeBlockingPrompt' AS blocking_prompt,
+              scene->>'compositeBlendPrompt' AS blend_prompt,
               scene->>'compositeCleanBgPrompt' AS clean_bg_prompt,
               scene->>'compositeCleanBgSource' AS clean_bg_source
        FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
@@ -1879,8 +1880,27 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
         } else {
           raw = styledForStyle[clothing];
         }
+        // Fallback: if the canonical key is missing (pre-migration record),
+        // surface ANY entry the character has at this art style so the panel
+        // can show *something* and we know to regenerate. Logged once per gap.
+        let fallbackClothing = clothing;
+        if (!raw) {
+          const candidateKey = Object.keys(styledForStyle).find(k => k !== 'cells' && k !== 'costumed' && styledForStyle[k]);
+          if (candidateKey) {
+            raw = styledForStyle[candidateKey];
+            fallbackClothing = candidateKey;
+            console.warn(`[composite-stages] ${char?.name || name}: canonical ${clothing} missing, falling back to ${candidateKey} for display`);
+          } else if (styledForStyle.costumed) {
+            const firstCostume = Object.keys(styledForStyle.costumed)[0];
+            if (firstCostume) {
+              raw = styledForStyle.costumed[firstCostume];
+              fallbackClothing = `costumed:${firstCostume}`;
+              console.warn(`[composite-stages] ${char?.name || name}: canonical ${clothing} missing, falling back to costumed:${firstCostume} for display`);
+            }
+          }
+        }
         const url = resolveImg(raw);
-        if (url) sheetsByCharacter[name] = { url, clothing };
+        if (url) sheetsByCharacter[name] = { url, clothing: fallbackClothing };
       }
     }
 

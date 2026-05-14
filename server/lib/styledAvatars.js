@@ -275,6 +275,57 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  */
 async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   const startTime = Date.now();
+
+  // CANONICAL PATH (2026-05-14): styled avatars are 2×4 reference sheets
+  // (face×4 + body×4 angles) generated in one Grok edit call with phantom +
+  // standard avatar + face photo as references. No more Gemini styled-2×2;
+  // the 2×4 IS the styled avatar. Everything below this block is the legacy
+  // 2×2 Gemini path, kept for fallback when generateCharacter2x4Sheet throws
+  // (e.g. XAI_API_KEY missing).
+  try {
+    const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
+    const adHocChar = {
+      name: characterName,
+      avatars: { standard: originalAvatar },
+      photos: { face: facePhoto || originalAvatar },
+    };
+    const costumeDescription = clothingDescription
+      || (clothingCategory.startsWith('costumed:')
+            ? `${clothingCategory.split(':')[1]} costume`
+            : 'standard outfit');
+    log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok`);
+    const result = await generateCharacter2x4Sheet(adHocChar, {
+      clothingCategory,
+      costumeDescription,
+      artStyle,
+      usageTracker: addUsage,
+    });
+    if (result?.imageData) {
+      const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
+      styledAvatarGenerationLog.push({
+        timestamp: new Date().toISOString(),
+        characterName, artStyle, clothingCategory,
+        durationMs: Date.now() - startTime,
+        success: true,
+        attempt: 1,
+        sheetFormat: '2x4',
+        inputs: {
+          facePhoto: facePhoto ? { sizeKB: getImageSizeKB(facePhoto), imageData: facePhoto } : null,
+          originalAvatar: { sizeKB: getImageSizeKB(originalAvatar), imageData: originalAvatar },
+        },
+        output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
+      });
+      if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
+        styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+      }
+      return downsizedSheet;
+    }
+    log.warn(`[STYLED AVATAR] 2×4 generation returned no image for ${characterName} — falling back to legacy Gemini 2×2 path`);
+  } catch (err) {
+    log.warn(`[STYLED AVATAR] 2×4 generation failed for ${characterName}: ${err.message} — falling back to legacy Gemini 2×2 path`);
+  }
+
+  // ── Legacy 2×2 Gemini path (fallback only) ────────────────────────────
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
   log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'}, ${hasClothing ? 'with clothing desc' : 'no clothing desc'})...`);

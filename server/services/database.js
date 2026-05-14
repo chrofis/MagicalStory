@@ -2182,6 +2182,7 @@ async function persistCompositeDebug(storyId, img) {
   }
   if (cd.bboxes) img.compositeBboxes = cd.bboxes;
   if (cd.blockingPrompt) img.compositeBlockingPrompt = cd.blockingPrompt;
+  if (cd.blendPrompt) img.compositeBlendPrompt = cd.blendPrompt;
   if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
   if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
   img.hasCompositeStages = true;

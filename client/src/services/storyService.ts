@@ -753,6 +753,7 @@ export const storyService = {
     };
     bboxes: Record<string, { x: number; y: number; width: number; height: number }> | null;
     blockingPrompt: string | null;
+    blendPrompt: string | null;
     cleanBgPrompt: string | null;
     cleanBgSource: 'reused-empty-scene' | 'grok-generate' | null;
     sheets: Record<string, { url: string; clothing: string }>;

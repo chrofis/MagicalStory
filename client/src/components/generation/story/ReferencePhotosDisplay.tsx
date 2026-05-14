@@ -89,6 +89,7 @@ export function ReferencePhotosDisplay({
     composited: string | null;
     final: string | null;
     blockingPrompt: string | null;
+    blendPrompt: string | null;
     cleanBgPrompt: string | null;
     cleanBgSource: string | null;
     sheets: Record<string, { url: string; clothing: string }>;
@@ -159,6 +160,7 @@ export function ReferencePhotosDisplay({
           composited: pick(data.stages.composited),
           final: pick(data.stages.final),
           blockingPrompt: data.blockingPrompt,
+          blendPrompt: data.blendPrompt,
           cleanBgPrompt: data.cleanBgPrompt,
           cleanBgSource: data.cleanBgSource,
           sheets: data.sheets || {},
@@ -531,6 +533,12 @@ export function ReferencePhotosDisplay({
             <details className="mt-2">
               <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blocking-Prompt anzeigen' : 'Show blocking prompt'}</summary>
               <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blockingPrompt}</pre>
+            </details>
+          )}
+          {compositeStages?.blendPrompt && (
+            <details className="mt-2">
+              <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blend-Prompt anzeigen (Schritt 4)' : 'Show blend prompt (step 4)'}</summary>
+              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blendPrompt}</pre>
             </details>
           )}
         </details>
