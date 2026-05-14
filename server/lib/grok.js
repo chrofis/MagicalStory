@@ -156,6 +156,11 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     aspectRatio = '1:1',
     resolution = '1k',
     skipOutputPadding = true, // Don't letterbox-pad Grok's output — callers handle varying aspects
+    padInput = false,         // PAD inputs to target aspect instead of CROP. Use when the
+                              // reference image is on a uniform/white background (avatars)
+                              // — padding adds invisible margins. Don't use for inputs with
+                              // full backgrounds (scenes/covers) — pad bars survive through
+                              // the edit and bake into the output as visible letterboxing.
   } = options;
 
   if (!XAI_API_KEY) {
@@ -182,11 +187,17 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
   // Grok edit output matches the input image aspect ratio (ignores aspect_ratio
   // param). To get a specific output aspect we must normalise every input image
-  // to that aspect. We CROP (fit: cover) rather than PAD (fit: contain+white)
-  // because white-bar padding on inputs survives through Grok's editing and ends
-  // up baked into every output — visible as letterbox bars on the stored image.
-  // Cropping loses a sliver of edge content on one axis but keeps the illustration
-  // edge-to-edge. Parses aspectRatio strings like '3:4', '1:1', '9:16'.
+  // to that aspect.
+  //
+  // Two strategies — caller picks via the `padInput` option:
+  //   - default (crop): fit:cover. Loses edge content but preserves edge-to-edge
+  //     visuals. Right for scenes/covers where the input is a full illustration.
+  //   - padInput=true: EXPAND the shorter axis with white padding. Preserves
+  //     every pixel of the source — the bug fix for clothing avatars, where the
+  //     bodyNoBg input is a tall portrait and cover-crop was slicing the face
+  //     off the top of the image. Safe when the source is already on a white
+  //     background; for full-background inputs the bars survive into the output.
+  // Parses aspectRatio strings like '3:4', '1:1', '9:16'.
   const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
   const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
   for (let i = 0; i < images.length; i++) {
@@ -198,26 +209,43 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const currentRatio = meta.width / meta.height;
       // Skip if already within 1% of target (avoid gratuitous re-encode)
       if (Math.abs(currentRatio - targetRatio) / targetRatio < 0.01) continue;
-      // Pick the crop target so the SHORTER relative dimension stays intact
-      // and the LONGER is trimmed to match aspect.
-      let targetW, targetH;
-      if (currentRatio > targetRatio) {
-        // Source wider than target — keep height, crop width
-        targetH = meta.height;
-        targetW = Math.round(meta.height * targetRatio);
+      let targetW, targetH, fit, background;
+      if (padInput) {
+        // EXPAND the shorter axis. Add white margins; keep all source pixels.
+        if (currentRatio > targetRatio) {
+          // Source wider than target — keep width, expand height.
+          targetW = meta.width;
+          targetH = Math.round(meta.width / targetRatio);
+        } else {
+          // Source taller than target — keep height, expand width.
+          targetH = meta.height;
+          targetW = Math.round(meta.height * targetRatio);
+        }
+        fit = 'contain';
+        background = { r: 255, g: 255, b: 255 };
       } else {
-        // Source taller than target — keep width, crop height
-        targetW = meta.width;
-        targetH = Math.round(meta.width / targetRatio);
+        // CROP the longer axis. Trim edge content; preserve edge-to-edge visuals.
+        if (currentRatio > targetRatio) {
+          // Source wider than target — keep height, crop width.
+          targetH = meta.height;
+          targetW = Math.round(meta.height * targetRatio);
+        } else {
+          // Source taller than target — keep width, crop height.
+          targetW = meta.width;
+          targetH = Math.round(meta.width / targetRatio);
+        }
+        fit = 'cover';
       }
-      const cropped = await sharp(buf)
-        .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
+      const resizeOpts = { fit, position: 'centre' };
+      if (background) resizeOpts.background = background;
+      const out = await sharp(buf)
+        .resize(targetW, targetH, resizeOpts)
         .jpeg({ quality: 90 })
         .toBuffer();
-      images[i] = `data:image/jpeg;base64,${cropped.toString('base64')}`;
-      log.debug(`🎨 [GROK] Cropped edit input ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
+      images[i] = `data:image/jpeg;base64,${out.toString('base64')}`;
+      log.debug(`🎨 [GROK] ${padInput ? 'Padded' : 'Cropped'} edit input ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
     } catch (padErr) {
-      log.warn(`⚠️ [GROK] Failed to crop edit image ${i}: ${padErr.message}`);
+      log.warn(`⚠️ [GROK] Failed to normalise edit image ${i} aspect: ${padErr.message}`);
     }
   }
 

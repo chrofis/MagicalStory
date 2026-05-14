@@ -2394,6 +2394,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
                 aspectRatio: '9:16',
                 resolution: '1k',
                 model: modelConfig?.modelId || 'grok-imagine-image',
+                padInput: true,  // Body cutout is on white bg already; pad instead
+                                 // of crop so the face isn't sliced off the top.
               });
               if (result?.imageData) {
                 const compressedImage = await compressImageToJPEG(result.imageData);
@@ -3455,6 +3457,8 @@ These corrections OVERRIDE what is visible in the reference photo.
           aspectRatio: '9:16',
           resolution: '1k',
           model: modelConfig?.modelId || 'grok-imagine-image',
+          padInput: true,  // Avatars: pad to preserve the face/head when the
+                           // bodyNoBg input is a taller-than-9:16 portrait.
         });
         if (result?.imageData) {
           const compressed = await compressImageToJPEG(result.imageData, 85, 768);
@@ -3614,7 +3618,11 @@ These corrections OVERRIDE what is visible in the reference photo.
               const grokModel = selectedModel === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
               // Use the body-clothed reference photo as input — Grok edits it.
               const refImages = [referencePhoto];
-              const result = await editWithGrok(avatarPrompt, refImages, { model: grokModel, aspectRatio: '9:16' });
+              const result = await editWithGrok(avatarPrompt, refImages, {
+                model: grokModel,
+                aspectRatio: '9:16',
+                padInput: true,  // Same reason as the generateAvatarWithGrok path.
+              });
               if (result.imageData) {
                 log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok Imagine`);
                 return { category, prompt: avatarPrompt, imageData: result.imageData, usage: result.usage };
