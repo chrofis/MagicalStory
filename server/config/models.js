@@ -138,11 +138,12 @@ const MODEL_DEFAULTS = {
   enableQualityRetry: false,           // Quality retry: regenerate images scoring below threshold
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
-  generateEmptyScenes: false,          // Off by default — page generation takes the curated landmark
-                                       // photo straight from historical_locations as its scene anchor
-                                       // (slot 1 in packReferences). Set to true to re-enable the
-                                       // old "generate an empty AI scene first, then re-render with
-                                       // characters" flow.
+  generateEmptyScenes: true,           // Pre-generate one empty scene per page (no characters) so
+                                       // scene-composite step 1 can REUSE it instead of regenerating
+                                       // (saves ~$0.02 + ~5s per page, and keeps the BG consistent
+                                       // with anything else that wants to use it). When false,
+                                       // composite generates its own clean BG from emptyScenePrompt
+                                       // and direct-path pages skip the empty-scene step entirely.
   enableSceneComposite: true,          // Scene composite mode: route page generation through
                                        // server/lib/sceneComposite.js (3 Grok calls per page —
                                        // clean BG, blocking with colour silhouettes, blend pass —
