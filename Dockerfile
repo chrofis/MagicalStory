@@ -30,8 +30,13 @@ COPY requirements.txt ./
 # Install Node.js dependencies for server
 RUN npm install --production
 
-# Install Python dependencies (--break-system-packages is safe in Docker containers)
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+# Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
+# files.pythonhosted.org occasionally stalls mid-download — give pip more
+# breathing room and let it retry rather than failing the whole build.
+# (--break-system-packages is safe in Docker containers.)
+RUN pip3 install --no-cache-dir --break-system-packages \
+    --timeout 120 --retries 5 \
+    -r requirements.txt
 
 # Copy client package files and install dependencies
 COPY client/package*.json ./client/
