@@ -342,22 +342,30 @@
 
 <p>Three orthogonal dispatch dimensions decide what runs for any given page. Today only one of them (scene complexity) ramifies fully; the others have proposed but un-shipped rules captured here as the next routing iteration.</p>
 
-<h3>Dimension A — Direct vs Composite (cast size)</h3>
+<h3>Dimension A — Direct vs Composite (by cast size + interaction)</h3>
 
-<p><strong>Why it matters:</strong> direct path is one Grok call (~$0.02). Composite is three Grok calls (~$0.06) + optional phantom-pose render (+~$0.02 per character). Each extra call buys better character placement, depth handling, and pose correctness. Past a certain cast complexity the direct path produces artefacts the blend pass can't fix.</p>
+<p><strong>Why it matters:</strong> direct path is one Grok call (~$0.02). Composite is three Grok calls (~$0.06) + optional phantom-pose render (+~$0.02 per <em>cast</em> character — so a 6-cast composite page with phantom-pose is ~9 calls / ~$0.18). Composite buys structural control (position, depth, pose) at the cost of latency, $/page, and accumulated style drift across 3-4 sequential edits.</p>
+
+<p><strong>"Cast" vs "background figures":</strong> "cast" means named characters in <code>sceneCharacters[]</code> who must look like their reference photo. Anonymous background extras described inline ("a crowd of villagers in the marketplace", "two guards by the gate") are <strong>not</strong> cast — they go into <code>emptyScenePrompt</code> and are painted as part of the background. They do NOT drive composite routing.</p>
+
+<p><strong>"Interaction" means characters acting on each other</strong> — chasing, fighting, embracing, pulling a rope between them, one shooting at another, handing an object across. Two named characters standing side-by-side, or one in foreground and another in background not interacting, is NOT an interaction scene.</p>
 
 <table>
-<thead><tr><th>Scene</th><th>Recommended path</th><th>Why</th></tr></thead>
+<thead><tr><th>Cast (named)</th><th>Interaction?</th><th>Recommended path</th><th>Why</th></tr></thead>
 <tbody>
-<tr><td><strong>0 characters</strong> (empty scene / landmark only)</td><td>Direct (text-only Grok generate)</td><td>No identity to preserve. Composite adds overhead with no benefit.</td></tr>
-<tr><td><strong>1 character</strong></td><td>Direct (Grok edit with character ref + VB grid)</td><td>One subject, one reference image. Grok handles single-character identity well in one pass.</td></tr>
-<tr><td><strong>2 characters, simple</strong> (both at similar depth, side-by-side)</td><td>Direct</td><td>Two refs still fit in the one-call attention budget. The direct prompt's "left/right" placement language is reliable here.</td></tr>
-<tr><td><strong>2 characters, complex</strong> (one foreground, one background; one occludes the other; very different scales)</td><td>Composite (3-pass) — optional phantom-pose render per character</td><td>Direct prompt can't reliably control depth, scale, and occlusion all at once. Composite stages BG → blocking → blend, giving each layer a dedicated pass.</td></tr>
-<tr><td><strong>3+ characters</strong></td><td>Composite — phantom-pose render recommended</td><td>Direct prompt's attention is too divided across 3+ identities. Composite + phantom-pose locks each character's pose individually before the blend.</td></tr>
+<tr><td><strong>0</strong></td><td>n/a</td><td>Direct, text-only Grok generate, refMode <code>off</code></td><td>No identity to preserve.</td></tr>
+<tr><td><strong>1</strong></td><td>n/a</td><td>Direct, refMode <code>loose</code></td><td>One subject, one reference. Grok handles single-character identity well in one pass.</td></tr>
+<tr><td><strong>2</strong></td><td>any</td><td>Direct</td><td>Two refs fit Grok's attention budget. Even when they interact, two-character direct generations are usually clean.</td></tr>
+<tr><td><strong>3</strong></td><td>any</td><td>Direct</td><td>Three refs still within Grok's reliable range — costume drift creeps in but identity holds. Composite's overhead doesn't pay off yet.</td></tr>
+<tr><td><strong>4+</strong></td><td>any</td><td>Composite (3-pass) — phantom-pose render recommended at 5+</td><td>Direct's attention divides too thin across 4+ named characters; faces and costumes start swapping. Composite stages BG → blocking → blend, locking each character's position and pose separately.</td></tr>
 </tbody>
 </table>
 
-<p><strong>Current implementation:</strong> the cast-size routing is <em>not yet</em> in the dispatcher. <code>enableSceneComposite: true</code> (in <code>MODEL_DEFAULTS</code>) routes <em>every</em> page through the composite path. Per-story opt-out via <code>inputData.composite === false</code> drops to the direct path universally. The cast-size-aware automatic decision is on the roadmap; the table above is the design.</p>
+<p class="note"><strong>The "interaction" column is currently advisory, not a separate decision branch.</strong> The simpler rule "cast ≥ 4 → composite, cast ≤ 3 → direct" works for ~95% of cases. Interaction matters most as a tiebreaker for 3-cast pages where direct sometimes fumbles a wrestling / hand-off / pull-rope scene; the per-page test panel (see below) is the right tool for those edge cases.</p>
+
+<p><strong>Current implementation:</strong> the cast-aware routing is <em>not yet</em> in the dispatcher. <code>enableSceneComposite: true</code> (in <code>MODEL_DEFAULTS</code>) routes <em>every</em> page through the composite path. Per-story opt-out via <code>inputData.composite === false</code> drops to the direct path universally. The cast-aware automatic decision is on the roadmap; the table above is the design.</p>
+
+<p><strong>Per-image rerun (planned):</strong> in admin/dev mode, every page should expose a "rerun with method X" panel that picks model × path × refMode × phantom-pose × empty-scene-source and rebuilds just that image. The outline and scene-expansion are reused verbatim (no token cost there), so a single experiment costs only the image-gen calls of the chosen method. See <a href="covers-and-composite.html#composite">covers-and-composite §4</a> for the per-method cost table.</p>
 
 <h3>Dimension B — Reference mode (identity strictness)</h3>
 
