@@ -94,10 +94,12 @@ async function findColorBbox(buf, hex) {
     }
   }
 
-  // 4-connected flood fill; keep the largest blob.
+  // 4-connected flood fill; collect every qualifying blob (>=200 px), then
+  // merge vertically-stacked fragments of the same character (e.g. when a
+  // table or fence cuts the figure in half).
   const visited = new Uint8Array(W * H);
-  let best = null;
   const stack = new Int32Array(W * H);
+  const blobs = [];
   for (let p = 0; p < W * H; p++) {
     if (!mask[p] || visited[p]) continue;
     let top = 0;
@@ -125,13 +127,41 @@ async function findColorBbox(buf, hex) {
       }
     }
     if (count < 200) continue;
-    const w = maxX - minX + 1, h = maxY - minY + 1;
-    if (h / w < 1.1) continue;
-    if (!best || count > best.pixels) {
-      best = { x: minX, y: minY, width: w, height: h, pixels: count };
-    }
+    blobs.push({ minX, minY, maxX, maxY, count });
   }
-  return best;
+  if (blobs.length === 0) return null;
+
+  // Sort by pixel count descending — the largest blob anchors the merge.
+  blobs.sort((a, b) => b.count - a.count);
+  const anchor = blobs[0];
+  let merged = { ...anchor, pixels: anchor.count };
+
+  // For each smaller blob, fold it in only if it lies in the same vertical
+  // column as the anchor (horizontal overlap ≥30% of the smaller blob's
+  // width) and isn't far above / below (vertical gap ≤ 50% of the running
+  // bbox's height). Anything outside that window is treated as an unrelated
+  // saturated patch in the scene and ignored.
+  for (let i = 1; i < blobs.length; i++) {
+    const b = blobs[i];
+    const bW = b.maxX - b.minX + 1;
+    const mW = merged.maxX - merged.minX + 1;
+    const mH = merged.maxY - merged.minY + 1;
+    const overlapW = Math.max(0, Math.min(merged.maxX, b.maxX) - Math.max(merged.minX, b.minX) + 1);
+    const overlapRatio = overlapW / Math.min(mW, bW);
+    const vGap = Math.max(0, Math.max(merged.minY, b.minY) - Math.min(merged.maxY, b.maxY));
+    if (overlapRatio < 0.3) continue;
+    if (vGap > mH * 0.5) continue;
+    merged.minX = Math.min(merged.minX, b.minX);
+    merged.minY = Math.min(merged.minY, b.minY);
+    merged.maxX = Math.max(merged.maxX, b.maxX);
+    merged.maxY = Math.max(merged.maxY, b.maxY);
+    merged.pixels += b.count;
+  }
+
+  const w = merged.maxX - merged.minX + 1;
+  const h = merged.maxY - merged.minY + 1;
+  if (h / w < 1.1) return null;
+  return { x: merged.minX, y: merged.minY, width: w, height: h, pixels: merged.pixels };
 }
 
 // ─── Sheet cell helpers ───────────────────────────────────────────────────
@@ -262,7 +292,28 @@ function buildBlockingEditPrompt(scene, cast) {
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || `three-quarter view, ${direction}`;
     const actionClause = c.action ? `, ${c.action}` : '';
-    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.`;
+    // Per-pose facing markers — small white dots/triangle painted INSIDE the
+    // silhouette's head area. These give the downstream phantom-pose-render
+    // pass an unambiguous direction cue without changing the silhouette's
+    // outer shape.
+    const markerSpec = (() => {
+      const flipSide = c.flip ? 'right' : 'left';
+      const oppSide = c.flip ? 'left' : 'right';
+      switch (c.pose) {
+        case 'front':
+          return 'two small WHITE dots side by side (eyes) + a tiny WHITE triangle below them pointing OUT of the page (nose)';
+        case 'threeQuarter':
+          return `two small WHITE dots in the head area offset toward the silhouette's ${oppSide} half (eyes) + a tiny WHITE triangle pointing camera-${flipSide} (nose)`;
+        case 'profile':
+          return `ONE small WHITE dot near the silhouette's ${oppSide} edge of the head (eye) + a tiny WHITE triangle clearly pointing camera-${flipSide} (nose)`;
+        case 'back':
+          return 'NO eye dots, NO nose — back-of-head only';
+        default:
+          return null;
+      }
+    })();
+    const markerLine = markerSpec ? `\n    Facing markers (inside the head area): ${markerSpec}.` : '';
+    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.${markerLine}`;
   }).join('\n');
 
   const sceneIntentBlock = scene?.intent
@@ -275,7 +326,7 @@ ${sceneIntentBlock}${lines}
 
 SILHOUETTE RULES:
 - Each silhouette is filled with FULLY SATURATED solid colour at the exact hex value above — no gradient, no transparency, no watercolor wash, no shading. A flat block of pure colour.
-- No faces, no clothing details, no texture inside the silhouette. The action phrase shapes the outline (posture, arm placement, gaze direction); inside it is uniform colour.
+- No faces, no clothing details, no texture inside the silhouette EXCEPT the small WHITE facing markers (eye dots + nose triangle) specified per cast entry above. Markers are tiny: each eye-dot ≈ 5% of the silhouette's head width, nose triangle ≈ 7-10% of head width. Pure white (#FFFFFF). The markers tell the downstream pipeline which way the figure is facing.
 - Each silhouette's feet must rest on a SOLID surface visible in the scene (dock, floor, ground, rock, deck, path, stairs) — NEVER on water, NEVER mid-air, NEVER overlapping another character's body. If two characters share the same depth band, separate them sideways.
 - Size scales with depth: foreground silhouettes are largest, midground medium, background small.
 
