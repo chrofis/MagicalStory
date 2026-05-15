@@ -1,0 +1,56 @@
+You are evaluating a 2×4 character reference sheet produced by an image model.
+
+The image is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. The intended layout is:
+
+  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY — no shoulders, no torso, no arms, no legs, no clothing visible below the collarbone. Four facing angles: front, three-quarter, profile, back of head.
+  Row 2 (cells 5–8, bottom):  FULL BODY — head to feet, wearing the requested costume. Four facing angles in the same order.
+
+A common failure: the model draws 4 full bodies in a single row and the horizontal gutter cuts each figure across the waist. That is INVALID — there must be 4 head portraits in the top row, separate from 4 full bodies in the bottom row.
+
+Your job: rate the sheet on three checks and return a JSON verdict. If ANY check fails, the sheet is rejected and regenerated.
+
+TASK 1: LAYOUT
+- Top row contains 4 head-and-neck portraits only. No shoulders or torso visible. Score 1-10.
+- Bottom row contains 4 full-body figures, head to feet. Score 1-10.
+- The horizontal gutter between rows runs through clean white space — no figure crosses it. Score 1-10.
+- `layoutScore` = lowest of the three. A waist-cutting failure must score 1-3.
+
+TASK 2: IDENTITY CONSISTENCY
+- The 4 head portraits show THE SAME PERSON: identical face shape, eyes, nose, mouth, skin tone, hair colour, hairstyle (and length), glasses (if any). Differences are only the camera angle. Score 1-10.
+- The 4 body figures show the same person AND the same person as the heads — same proportions, same age, same skin tone. Score 1-10.
+- `identityScore` = lower of the two. Different hair colour, age, or face between cells must score 1-3.
+
+TASK 3: OUTFIT CONSISTENCY (only if REQUESTED_OUTFIT is given below)
+- All 4 full-body figures wear the SAME outfit — every accessory, every garment colour, every cut. Score 1-10.
+- The outfit matches REQUESTED_OUTFIT (when provided): right type, right colours, right pieces. Score 1-10.
+- `outfitScore` = lower of the two. Different outfits across cells must score 1-3.
+- If REQUESTED_OUTFIT is not provided, set `outfitScore` based on cross-cell outfit consistency alone (no match check).
+
+`finalScore` MUST equal the LOWEST of layoutScore, identityScore, outfitScore.
+`valid` is `true` only when finalScore ≥ 6.
+
+Return EXACTLY this JSON shape:
+
+{
+  "layout": {
+    "topRowHeadsOnly":   {"score": 9, "reason": "All 4 top cells show head + neck only, no torso"},
+    "bottomRowFullBody": {"score": 8, "reason": "All 4 bottom cells show head-to-feet figures"},
+    "cleanGutter":       {"score": 10, "reason": "Horizontal gutter is white; no figure crosses it"},
+    "layoutScore": 8
+  },
+  "identity": {
+    "headsSamePerson":   {"score": 9, "reason": "Same face, hair, glasses across all 4 head cells"},
+    "bodiesSamePerson":  {"score": 9, "reason": "Same proportions and identity in all 4 body cells; matches the heads"},
+    "identityScore": 9
+  },
+  "outfit": {
+    "crossCellConsistency": {"score": 9, "reason": "Vest, blouse, skirt, boots identical across cells 5-8"},
+    "matchesRequested":     {"score": 8, "reason": "Burgundy vest + cream blouse + dark skirt matches REQUESTED_OUTFIT"},
+    "outfitScore": 8
+  },
+  "finalScore": 8,
+  "valid": true,
+  "failureReasons": []
+}
+
+If invalid, populate `failureReasons` with short strings naming each failed sub-check (e.g. "topRowHeadsOnly: row 1 cells show full bodies cut at the waist", "headsSamePerson: cell 3 hair colour differs from cells 1, 2, 4").
