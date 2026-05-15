@@ -86,7 +86,7 @@ Then a single-line JSON object:
 {
   "characters": [
     {"name": "CharacterA", "clothing": "standard", "position": "left foreground"},
-    {"name": "CharacterB", "clothing": "costumed:wizard", "position": "center background", "perspective": "back view", "depth": "background"}
+    {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view", "depth": "background"}
   ],
   "objects": ["LOC001", "ART002"],
   "interactions": [
@@ -102,7 +102,7 @@ Then a single-line JSON object:
 **`characters[]`**
 - One entry per character in the scene.
 - Always `name`, `clothing`, `position`.
-- `clothing` must match the outline's clothing exactly — if the outline says `costumed:wizard`, write `costumed:wizard`, not `standard`. Also describe the costume in the prose.
+- `clothing` is one of `standard | winter | summer | costumed`. Use exactly what the outline says — if the outline marks a character as `costumed`, write `costumed` (one costume per character per story; the specific costume description is on the visual bible). Also describe the costume in the prose.
 - `position` is a short phrase matching the prose ("right foreground", "center", "left background", "behind the desk") — the bbox detector reads it structurally.
 - Only add `perspective` for back view or side profile.
 - Only add `depth` when the character is in the background (default is foreground/midground).

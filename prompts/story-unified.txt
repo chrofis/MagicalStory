@@ -151,7 +151,7 @@ METADATA:
 {
   "sceneIntent": "2-3 present-tense sentences naming the single moment this image depicts. First sentence: who is doing what to whom, where. Second sentence: what each named character physically holds, reaches for, or gazes at. Third sentence: setting + lighting + mood. Every character physically present must be named.",
   "characters": [
-    { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed:type", "depth": "foreground", "pose": "profile", "flip": false },
+    { "name": "Name", "position": "on the boat's rim", "clothing": "standard|winter|summer|costumed", "depth": "foreground", "pose": "profile", "flip": false },
     { "name": "Name", "position": "behind Roger, gripping the boat's far side", "clothing": "standard", "depth": "midground", "perspective": "back view", "pose": "back", "flip": false }
   ],
   "objects": ["LOC001", "ANI001"],
@@ -242,7 +242,7 @@ A reader comparing SCENE and `emptyScenePrompt` side by side must see the same g
   - BAD: description mentions 7 characters but only 2 are in the array
   - GOOD: 5-person reunion → list all 5 in array, description references each by name
   - GOOD: solo moment → 1 character in array
-- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it!
+- **COSTUME USAGE** - When a character has a `costumed` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it!
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **ACTION MATCHES TEXT** - The `description` must depict the same action the page text narrates.
@@ -467,7 +467,7 @@ Probes (apply to every character):
 
 15. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
 16. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
-17. **Clothing** — Are costumed characters using `costumed:type` in ALL scenes (except scene 1, before the adventure starts)?
+17. **Clothing** — Are costumed characters using `costumed` in ALL scenes (except scene 1, before the adventure starts)?
 18. **Action match** — Does each scene hint's action match what the page text narrates?
 19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: Manuel described as tiny silhouette but depth=foreground → depth=background`.
 19a. **Position phrase matches depth** — The depth word inside `position` (`foreground` / `midground` / `background`) MUST equal the separate `depth` field. Flag any character where they disagree, e.g. `Page 4: Roger position='far left foreground' but depth='background' → position='far left background'`.
@@ -556,13 +556,13 @@ TITLE_CANDIDATES:
 Based on the story draft, determine which clothing variants each character needs.
 
 **Guidelines:**
-- **COSTUME PRIORITY**: Any story with a theme, setting, or era that implies special clothing MUST use `costumed:type`. This includes:
-  - Historical stories → `costumed:medieval`, `costumed:1920s`, `costumed:roman`, etc.
-  - Fantasy stories → `costumed:wizard`, `costumed:pirate`, `costumed:knight`, etc.
-  - Profession stories → `costumed:firefighter`, `costumed:detective`, etc.
-  - Swiss historical stories → `costumed:mittelalterliche`, `costumed:1800s`, etc.
-  - ONLY use `standard` when the story is set in the present day with normal everyday clothing.
-- **Costumed is PREFERRED** — when in doubt, use `costumed:type` over `standard`. Characters in costume look better and are more immersive.
+- **COSTUME PRIORITY**: Any story with a theme, setting, or era that implies special clothing MUST set `costumed.used: true` and name the costume in `costumed.costume` (and describe it in `costumed.description`). Examples of costume names:
+  - Historical: `medieval`, `1920s`, `roman`, etc.
+  - Fantasy: `wizard`, `pirate`, `knight`, etc.
+  - Profession: `firefighter`, `detective`, etc.
+  - Swiss historical: `mittelalterliche`, `1800s`, etc.
+  - ONLY leave `costumed.used: false` when the story is set in the present day with normal everyday clothing.
+- **Costumed is PREFERRED** — when in doubt, mark `costumed.used: true`. Characters in costume look better and are more immersive.
 - **COVER IMAGES MUST use costumed when the story has costumes** — if `costumed.used: true` for any character, every cover (title page, initial page, back cover) MUST use that costumed variant for them, not `standard`. If the story is present-day with no costumes, covers use `standard` like the rest of the pages — do not invent a costume just for the cover.
 - **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
 - **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
@@ -801,7 +801,7 @@ Each cover is a STRUCTURED render spec, not a prose paragraph. The fields below 
 **COVER RULES (CRITICAL):**
 - **REAL LANDMARK ONLY:** the first entry in `Objects:` is the backdrop and must be a LOC### whose Visual Bible entry has BOTH (1) `isRealLandmark: true` AND (2) `landmarkQuery` EXACTLY matching a name from the AVAILABLE LANDMARKS list above. You may NOT invent new backdrop locations. Story-local non-landmark settings (riverbanks, town squares, family homes) are forbidden as cover backdrops — pick a real landmark from the input list even when a story-local setting fits the closing beat better.
 - **LIST EVERY CHARACTER BY NAME.** Never write "the family", "everyone", "the group", "his family behind him". List each one: `- Sophie ...`, `- Manuel ...`.
-- **CLOTHING:** must be one of `standard | winter | summer | costumed:<type>` AND must be a category this character has marked `used: true` in their `clothingRequirements`. If the story has any costumed clothing, all cover characters MUST use the costumed variant.
+- **CLOTHING:** must be one of `standard | winter | summer | costumed` AND must be a category this character has marked `used: true` in their `clothingRequirements`. If the story has any costumed clothing, all cover characters MUST use the costumed variant.
 - **HOLDS:** exactly one item per character (each character has 2 hands but a cover needs one focal prop per figure). Value is an ART### from `Objects:` or the word `nothing`. Never list 2+ items for the same character.
 - **GAZES AT:** every character MUST have a gaze target. Value is one of: an ART### from `Objects:`, another character's name, `the viewer`, `the distance`, `each other (with [Name])`. This drives head-tilt and eyeline in rendering — without it characters default to camera-facing portraits.
 - **PRIORITY:** every character is `essential | normal | low`. Essential = central action, dramatic beat (the held prop, the key gesture). Normal = supporting. Low = decorative / atmospheric / there for inclusion only. Higher-priority characters get more compositional weight.
@@ -811,7 +811,7 @@ Each cover is a STRUCTURED render spec, not a prose paragraph. The fields below 
 **Field shape (each character, one line):**
 `- Name (position): clothing, holds: ART### or nothing, gazes at: <target>, priority: <essential|normal|low>`
 
-Example: `- Emma (center-left foreground): costumed:pirate, holds: ART005, gazes at: ART005, priority: essential`
+Example: `- Emma (center-left foreground): costumed, holds: ART005, gazes at: ART005, priority: essential`
 
 **Title Page**
 (Front cover — what readers see first.)
@@ -910,7 +910,7 @@ The "FINAL pages" below means the merged story: your patches above, plus the dra
 - [ ] Every page named in FIXES REQUIRED has a `--- Page N ---` block above
 - [ ] Every section named in FIXES REQUIRED for that page (TEXT/SCENE/METADATA) has a corresponding labeled block; unrelated sections are omitted entirely
 - [ ] Visual Bible has specific colors for all elements
-- [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed:superhero`)
+- [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed`)
 - [ ] Re-tally `textPosition` across the FINAL pages (patches + unpatched draft pages): every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) sits on the side matching its page parity — odd pages on the left, even pages on the right. If a draft page has a parity violation, add a METADATA patch for that page above.
 
 **DO NOT STOP until every page and section listed in FIXES REQUIRED has a patch above.**

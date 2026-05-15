@@ -72,7 +72,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 IMPORTANT CLOTHING RULES:
 - Select clothing for each character ONLY from their available avatars listed above
 - Never assign a costume that isn't in the character's available list
-- If a `costumed:...` entry appears in a character's available list, prefer it for every page of this story unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume — the whole story takes place in the same costumed world
+- If a `costumed` entry appears in a character's available list, prefer it for every page of this story unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume — the whole story takes place in the same costumed world
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
@@ -260,7 +260,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`.
   - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
-  - `clothing` must match the outline exactly — if the outline says `costumed:wizard`, write `costumed:wizard`, not `standard`. Also describe the costume in the prose.
+  - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
   - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.
   - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.
 

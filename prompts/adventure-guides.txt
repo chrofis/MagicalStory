@@ -5,7 +5,7 @@
 # following the "Distinct Costume Colors" rule in the story generation prompt.
 
 [pirate]
-COSTUME: costumed:pirate (mandatory for adventure scenes)
+COSTUME: pirate (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full pirate adventure from start to finish
@@ -28,7 +28,7 @@ Story guidance:
 
 
 [knight]
-COSTUME: costumed:knight (mandatory for adventure scenes)
+COSTUME: knight (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full medieval adventure from the start
@@ -50,7 +50,7 @@ Story guidance:
 
 
 [princess]
-COSTUME: costumed:princess (mandatory for adventure scenes)
+COSTUME: princess (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Golden invitation arrives to a royal castle
@@ -71,7 +71,7 @@ Story guidance:
 
 
 [viking]
-COSTUME: costumed:viking (mandatory for adventure scenes)
+COSTUME: viking (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full Norse adventure from the start
@@ -92,7 +92,7 @@ Story guidance:
 - Avoid: Horned helmets (historically inaccurate), raids, violence
 
 [roman]
-COSTUME: costumed:roman (mandatory for adventure scenes)
+COSTUME: roman (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full Roman adventure from the start
@@ -129,7 +129,7 @@ Story guidance:
 
 
 [cowboy]
-COSTUME: costumed:cowboy (mandatory for adventure scenes)
+COSTUME: cowboy (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full Wild West adventure from the start
@@ -151,7 +151,7 @@ Story guidance:
 
 
 [egyptian]
-COSTUME: costumed:egyptian (mandatory for adventure scenes)
+COSTUME: egyptian (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full ancient Egypt adventure from the start
@@ -172,7 +172,7 @@ Story guidance:
 
 
 [greek]
-COSTUME: costumed:greek (mandatory for adventure scenes)
+COSTUME: greek (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full ancient Greece adventure from the start
@@ -193,7 +193,7 @@ Story guidance:
 
 
 [caveman]
-COSTUME: costumed:caveman (mandatory for adventure scenes)
+COSTUME: caveman (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full prehistoric adventure from the start
@@ -215,7 +215,7 @@ Story guidance:
 
 
 [samurai]
-COSTUME: costumed:samurai (mandatory for adventure scenes)
+COSTUME: samurai (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full feudal Japan adventure from the start
@@ -236,7 +236,7 @@ Story guidance:
 
 
 [ninja]
-COSTUME: costumed:ninja (mandatory for adventure scenes)
+COSTUME: ninja (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full ninja adventure from the start
@@ -257,7 +257,7 @@ Story guidance:
 
 
 [wizard]
-COSTUME: costumed:wizard (mandatory for adventure scenes)
+COSTUME: wizard (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full magical adventure from the start
@@ -279,7 +279,7 @@ Story guidance:
 
 
 [superhero]
-COSTUME: costumed:superhero (mandatory for adventure scenes)
+COSTUME: superhero (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full superhero adventure from the start
@@ -301,7 +301,7 @@ Story guidance:
 
 
 [mermaid]
-COSTUME: costumed:mermaid (mandatory for adventure scenes)
+COSTUME: mermaid (mandatory for adventure scenes)
 
 Story entry points (pick one or combine):
 - Full underwater adventure from the start

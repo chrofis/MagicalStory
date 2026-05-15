@@ -50,7 +50,7 @@ It must be detailed enough to illustrate without additional context.
         "position": "[left/right/center]",
         "action": "[what they're doing]",
         "expression": "[facial expression]",
-        "clothing": "[standard | costumed:{type}]",
+        "clothing": "[standard | costumed]",
         "depth": "[foreground|midground|background]",
         "perspective": "[front|side|back view|over-the-shoulder]"
       }
@@ -139,7 +139,7 @@ Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no seco
         "position": "center",
         "action": "[heroic or characteristic pose/action]",
         "expression": "[confident/happy/determined]",
-        "clothing": "costumed:[type]"
+        "clothing": "costumed"
       }
     ],
     "objects": [

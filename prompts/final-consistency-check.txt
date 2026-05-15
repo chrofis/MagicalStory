@@ -23,7 +23,7 @@ Each entry contains:
 **CRITICAL: Use the CHARACTER DESCRIPTIONS above to identify which figure is which character in each image. Use this JSON data to understand which characters appear in each image and what clothing they should wear.**
 
 - Different characters appearing in different images is EXPECTED - do NOT flag this as inconsistent
-- Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed:pirate")
+- Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed")
 - Only flag as inconsistent if:
   1. The SAME character looks different in scenes with the SAME clothing requirement
   2. A character's core features (face, hair color, skin tone) change unexpectedly

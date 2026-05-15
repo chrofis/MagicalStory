@@ -85,7 +85,7 @@ For each main character ({MAIN_CHARACTER_NAMES}), specify which clothing variati
 
 **Guidelines:**
 - **COSTUME PRIORITY RULE:**
-  1. If story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed:type`
+  1. If story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed`
   2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
   3. Winter clothing is ONLY for outdoor cold weather scenes
 - For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, vest, accessories)
@@ -204,7 +204,7 @@ Setting: [Cover scene that sets the mood for the story]
 Characters: [List ONLY characters with isMainCharacter=true by name]
 Action: [An inviting cover moment featuring the main character(s)]
 Mood: [Welcoming, magical, exciting, etc.]
-Clothing: [winter/summer/standard OR costumed:type]
+Clothing: [winter/summer/standard OR costumed]
 **CRITICAL: Include ONLY characters marked as "main characters" (isMainCharacter: true). Do NOT include parents, siblings, or supporting characters unless they are marked as main characters.**
 
 ---INITIAL PAGE---
@@ -213,7 +213,7 @@ Setting: [A warm, inviting scene that welcomes readers into the story world]
 Characters: [ALL characters from the story gathered together, with the MAIN CHARACTER positioned in the CENTER]
 Action: [A group moment showing all characters together, main character central]
 Mood: [Warm, welcoming, cozy]
-Clothing: [winter/summer/standard OR costumed:type]
+Clothing: [winter/summer/standard OR costumed]
 **CHARACTER RULE: Include ALL characters in this scene. The main character should be in the CENTER, with all other characters arranged around them.**
 
 ---BACK COVER---
@@ -222,7 +222,7 @@ Setting: [A satisfying concluding scene that provides closure]
 Characters: [ALL characters from the story together as a group, with EQUAL prominence - no character should dominate]
 Action: [A peaceful group moment showing all characters together, celebrating or content]
 Mood: [Happy, content, peaceful, hopeful]
-Clothing: [winter/summer/standard OR costumed:type]
+Clothing: [winter/summer/standard OR costumed]
 **CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
 
 ---PAGE 1---
@@ -233,7 +233,7 @@ SCENE:
 Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
 Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more] 
 Action: [What is happening - the key visual moment]
-Clothing: [winter/summer/standard OR costumed:type - pick ONE based on scene context]
+Clothing: [winter/summer/standard OR costumed - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ---PAGE 2---
@@ -244,7 +244,7 @@ SCENE:
 Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
 Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more]
 Action: [Key visual moment]
-Clothing: [winter/summer/standard OR costumed:type - pick ONE based on scene context]
+Clothing: [winter/summer/standard OR costumed - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
