@@ -199,22 +199,39 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
  */
 async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars, costumeDescriptions) {
   if (!userId || !Array.isArray(characters) || !ctx?.storyId) {
-    // eslint-disable-next-line no-console
     console.warn(`[STORY-AVATAR-HISTORY] precondition fail userId=${!!userId} chars=${characters?.length} storyId=${ctx?.storyId}`);
     return 0;
   }
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') {
-    // eslint-disable-next-line no-console
     console.warn(`[STORY-AVATAR-HISTORY] no storyCharacterAvatars`);
     return 0;
   }
-  const { getPool } = require('../services/database');
+  const { getPool, dbQuery } = require('../services/database');
   const pool = getPool();
   if (!pool) {
-    // eslint-disable-next-line no-console
     console.warn(`[STORY-AVATAR-HISTORY] getPool() returned null`);
     return 0;
   }
+
+  // The characters table layout: ONE row per user, id = `characters_<userId>`,
+  // and `data.characters[]` is the array of character objects. Each character
+  // has its own numeric id WITHIN that array. To target a character we need
+  // the array index — fetch the row, find the index, then jsonb_set both
+  // columns at path {characters, <idx>, avatars, storyHistory}.
+  const rowId = `characters_${userId}`;
+  let rowChars = [];
+  try {
+    const rowRes = await dbQuery(`SELECT data FROM characters WHERE id = $1`, [rowId]);
+    if (rowRes.length === 0) {
+      console.warn(`[STORY-AVATAR-HISTORY] no row for ${rowId}`);
+      return 0;
+    }
+    rowChars = rowRes[0].data?.characters || [];
+  } catch (err) {
+    console.warn(`[STORY-AVATAR-HISTORY] row fetch failed: ${err.message}`);
+    return 0;
+  }
+
   let appended = 0;
   let triedQueries = 0;
   const now = new Date().toISOString();
@@ -222,6 +239,11 @@ async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars
     if (!char?.id || !char?.name) continue;
     const sheets = storyCharacterAvatars[char.name];
     if (!sheets || typeof sheets !== 'object') continue;
+    const charIndex = rowChars.findIndex(c => String(c.id) === String(char.id));
+    if (charIndex < 0) {
+      console.warn(`[STORY-AVATAR-HISTORY] char ${char.name}(id=${char.id}) not in row ${rowId}`);
+      continue;
+    }
     const costumeDesc = (costumeDescriptions && costumeDescriptions[char.name]) || null;
     for (const [sheetKey, sheetUrl] of Object.entries(sheets)) {
       if (!sheetUrl) continue;
@@ -237,38 +259,49 @@ async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars
       };
       try {
         triedQueries++;
-        // Append idempotently — only push when no entry with the same
-        // (storyId, sheetKey) already exists. Cast id to text on both
-        // sides so JS number 1778709081750 matches whichever type the
-        // characters.id column has (TEXT or BIGINT — both serialize the
-        // same as a string).
-        const res = await pool.query(
-          `UPDATE characters
-           SET data = jsonb_set(
-             COALESCE(data, '{}'::jsonb),
-             '{avatars,storyHistory}',
-             COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb) || $2::jsonb,
-             true
-           )
-           WHERE id::text = $1::text
-             AND user_id::text = $3::text
-             AND NOT EXISTS (
-               SELECT 1 FROM jsonb_array_elements(COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb)) e
-               WHERE e->>'storyId' = $4 AND e->>'sheetKey' = $5
-             )
-           RETURNING id`,
-          [String(char.id), JSON.stringify([entry]), String(userId), ctx.storyId, sheetKey]
-        );
-        if (res.rowCount > 0) appended++;
-        else console.warn(`[STORY-AVATAR-HISTORY] 0 rows matched for char=${char.name}(id=${char.id},user=${userId}) sheet=${sheetKey}`);
+        // Path = data.characters[idx].avatars.storyHistory. We update both
+        // columns (data has everything; metadata is the light copy served
+        // by GET /api/characters and read by the dev panel).
+        const idxStr = String(charIndex);
+        const AVATARS_PATH = ['characters', idxStr, 'avatars'];
+        const HISTORY_PATH = [...AVATARS_PATH, 'storyHistory'];
+        // Ensure parent {characters, idx, avatars} exists so jsonb_set's
+        // create_missing for the leaf works. Idempotent.
+        for (const col of ['data', 'metadata']) {
+          await pool.query(
+            `UPDATE characters SET ${col} = jsonb_set(${col}, $2::text[], COALESCE(${col} #> $2::text[], '{}'::jsonb), true) WHERE id = $1`,
+            [rowId, AVATARS_PATH]
+          );
+        }
+        // Append idempotently — if an entry with this (storyId, sheetKey)
+        // already exists, skip. Otherwise jsonb_set replaces the array
+        // with the existing array || new entry.
+        const idempotentSql = (col) => `
+          UPDATE characters
+          SET ${col} = jsonb_set(
+            ${col},
+            $2::text[],
+            COALESCE(${col} #> $2::text[], '[]'::jsonb) || $3::jsonb,
+            true
+          )
+          WHERE id = $1
+            AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(COALESCE(${col} #> $2::text[], '[]'::jsonb)) e
+              WHERE e->>'storyId' = $4 AND e->>'sheetKey' = $5
+            )
+          RETURNING id`;
+        const params = [rowId, HISTORY_PATH, JSON.stringify([entry]), ctx.storyId, sheetKey];
+        const resData = await pool.query(idempotentSql('data'), params);
+        const resMeta = await pool.query(idempotentSql('metadata'), params);
+        if (resData.rowCount > 0 || resMeta.rowCount > 0) appended++;
+        if (resData.rowCount === 0 && resMeta.rowCount === 0) {
+          console.warn(`[STORY-AVATAR-HISTORY] 0 rows for ${char.name}@${idxStr}/${sheetKey} (already exists?)`);
+        }
       } catch (err) {
-        // Don't fail story completion if history write fails.
-        // eslint-disable-next-line no-console
         console.warn(`[STORY-AVATAR-HISTORY] append failed for ${char.name}/${sheetKey}: ${err.message}`);
       }
     }
   }
-  // eslint-disable-next-line no-console
   console.log(`[STORY-AVATAR-HISTORY] story=${ctx.storyId} chars=${characters.length} tried=${triedQueries} appended=${appended}`);
   return appended;
 }
