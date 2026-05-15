@@ -200,6 +200,135 @@ async function findColorBbox(buf, hex) {
   return { x: merged.minX, y: merged.minY, width: w, height: h, pixels: merged.pixels };
 }
 
+/**
+ * Diff-based silhouette detector — the production path.
+ *
+ * Given the populated plate and its derived clean BG (depopulate output),
+ * every saturated pixel that appears only in the populated plate belongs to
+ * a silhouette. That removes palette collision entirely — yellow grass that
+ * exists in both images diffs to ~0 and is filtered out before hue matching
+ * runs. Inside the diff mask, plain hue distance cleanly separates touching
+ * silhouettes by colour.
+ *
+ * For each cast entry (with assigned palette colour), returns:
+ *   - bbox: { x, y, width, height, pixels }
+ *   - mask: full-canvas Uint8Array (W*H) with 1 = silhouette pixel, 0 = not
+ *           (used downstream by cropPhantom to keep only the target's pixels
+ *           and repaint everything else with clean-BG context)
+ *
+ * Returns `{ canvasWidth, canvasHeight, diffMaskCount, results: { name → { bbox, mask } | null } }`.
+ *
+ * Tuning knobs are deliberate:
+ *   - diffThreshold 40  (~16% of 255): below this is JPEG noise; above this
+ *                       reliably catches silhouette vs. matching background.
+ *   - hueThreshold 35°  : Grok's actual paint variance is ~5-10°; 35° gives
+ *                       margin for sat/shadow drift without bleeding into
+ *                       adjacent palette entries (palette is spaced ≥50° apart).
+ *   - minBlobPixels 500 : drops noise specks. Real silhouettes are >5k px on
+ *                       a 1024×1024 canvas.
+ */
+async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) {
+  const DIFF_THRESHOLD = opts.diffThreshold ?? 40;
+  const HUE_THRESHOLD = opts.hueThreshold ?? 35;
+  const MIN_BLOB_PIXELS = opts.minBlobPixels ?? 500;
+
+  const popMeta = await sharp(populatedBuf).metadata();
+  const W = popMeta.width, H = popMeta.height;
+
+  const pop = await sharp(populatedBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // Align clean BG to populated dimensions (depopulate can rescale).
+  const cleanAligned = await sharp(cleanBgBuf).resize(W, H, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const popD = pop.data, clD = cleanAligned.data;
+
+  // ── 1. Diff mask: where the two images disagree.
+  const diffMask = new Uint8Array(W * H);
+  let diffMaskCount = 0;
+  for (let p = 0; p < W * H; p++) {
+    const i = p * 4;
+    const dr = Math.abs(popD[i]     - clD[i]    );
+    const dg = Math.abs(popD[i + 1] - clD[i + 1]);
+    const db = Math.abs(popD[i + 2] - clD[i + 2]);
+    if (Math.max(dr, dg, db) > DIFF_THRESHOLD) {
+      diffMask[p] = 1;
+      diffMaskCount++;
+    }
+  }
+
+  // ── 2. Per-cast colour: hue match inside diff mask, biggest blob wins.
+  const results = {};
+  const visited = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  for (const c of cast) {
+    if (!c.color) { results[c.name] = null; continue; }
+    const tr = parseInt(c.color.slice(1, 3), 16);
+    const tg = parseInt(c.color.slice(3, 5), 16);
+    const tb = parseInt(c.color.slice(5, 7), 16);
+    const targetHue = rgbToHue(tr, tg, tb);
+
+    const colourMask = new Uint8Array(W * H);
+    for (let p = 0; p < W * H; p++) {
+      if (!diffMask[p]) continue;
+      const i = p * 4;
+      const r = popD[i], g = popD[i + 1], b = popD[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = (mx - mn) / (mx || 1);
+      if (sat < 0.55 || mx < 80) continue;
+      let dh = Math.abs(rgbToHue(r, g, b) - targetHue);
+      if (dh > 180) dh = 360 - dh;
+      if (dh <= HUE_THRESHOLD) colourMask[p] = 1;
+    }
+
+    // Flood fill — track the biggest blob and remember its pixels.
+    visited.fill(0);
+    let bestCount = 0;
+    let bestPixels = null;
+    let bestMinX = 0, bestMinY = 0, bestMaxX = 0, bestMaxY = 0;
+    for (let p = 0; p < W * H; p++) {
+      if (!colourMask[p] || visited[p]) continue;
+      let top = 0;
+      stack[top++] = p; visited[p] = 1;
+      let count = 0, minX = W, minY = H, maxX = -1, maxY = -1;
+      const pixels = [];
+      while (top > 0) {
+        const q = stack[--top];
+        const x = q % W, y = Math.floor(q / W);
+        count++; pixels.push(q);
+        if (x < minX) minX = x; if (y < minY) minY = y;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+        if (x > 0)     { const n=q-1; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
+        if (x < W - 1) { const n=q+1; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
+        if (y > 0)     { const n=q-W; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
+        if (y < H - 1) { const n=q+W; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
+      }
+      if (count > bestCount) {
+        bestCount = count; bestPixels = pixels;
+        bestMinX = minX; bestMinY = minY; bestMaxX = maxX; bestMaxY = maxY;
+      }
+    }
+
+    if (bestCount < MIN_BLOB_PIXELS) { results[c.name] = null; continue; }
+
+    // Full-canvas silhouette mask: downstream needs absolute coordinates so
+    // cropPhantom can build a context window of arbitrary padding and still
+    // know which pixels belong to this character.
+    const sMask = new Uint8Array(W * H);
+    for (const q of bestPixels) sMask[q] = 1;
+
+    results[c.name] = {
+      bbox: {
+        x: bestMinX,
+        y: bestMinY,
+        width: bestMaxX - bestMinX + 1,
+        height: bestMaxY - bestMinY + 1,
+        pixels: bestCount,
+      },
+      mask: sMask,
+    };
+  }
+
+  return { canvasWidth: W, canvasHeight: H, diffMaskCount, results };
+}
+
 // ─── Sheet cell helpers ───────────────────────────────────────────────────
 
 /** Crop one of 8 cells from a 2×4 sheet by fixed math. 1-indexed.
@@ -677,25 +806,9 @@ async function generateSceneComposite(opts) {
   debug.blocking = populated.imageData;
   debug.blockingPrompt = populatedPrompt;
 
-  // ── Step 2/5: detect bboxes on the populated plate
-  log.info('[SCENE COMPOSITE] step 2/5 — bbox detect');
-  const bboxes = {};
-  for (const c of cast) {
-    const bbox = await findColorBbox(populatedBuf, c.color);
-    if (!bbox) {
-      log.warn(`[SCENE COMPOSITE] no bbox for ${c.name} (${c.color}) — Grok did not paint a recognisable silhouette`);
-      continue;
-    }
-    bboxes[c.name] = bbox;
-    log.info(`[SCENE COMPOSITE]   ${c.name} (${c.color}): bbox ${bbox.width}×${bbox.height} @ (${bbox.x},${bbox.y}); cell ${POSE_CELL[c.pose]} (${c.pose})${c.flip ? ' flipped' : ''}`);
-  }
-  if (Object.keys(bboxes).length === 0) {
-    throw new Error('[SCENE COMPOSITE] no silhouettes detected on populated plate — bbox detection failed for every cast entry');
-  }
-  debug.bboxes = bboxes;
-
-  // ── Step 3/5: depopulate to derive the clean BG (Grok edit)
-  log.info('[SCENE COMPOSITE] step 3/5 — depopulate (derive clean BG)');
+  // ── Step 2/5: depopulate to derive the clean BG (Grok edit)
+  // Done BEFORE bbox detection so the diff-based detector has both images.
+  log.info('[SCENE COMPOSITE] step 2/5 — depopulate (derive clean BG)');
   const depopulatePrompt = buildDepopulatePrompt(cast);
   const depopulated = await editWithGrok(depopulatePrompt, [populated.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_depopulate', depopulated.modelId);
@@ -706,6 +819,30 @@ async function generateSceneComposite(opts) {
   debug.cleanBackgroundPrompt = cleanBackgroundPrompt || null;
   debug.cleanBackgroundSource = 'derived-from-populated-plate';
   debug.depopulatePrompt = depopulatePrompt;
+
+  // ── Step 3/5: detect silhouettes by diffing populated against clean BG.
+  // Hue matching alone fails on palette collisions (e.g. yellow silhouette
+  // on a yellow lawn — see story job_1778865205295_c2n86mdmn p4). The diff
+  // mask removes the background palette entirely before hue runs.
+  log.info('[SCENE COMPOSITE] step 3/5 — diff-based bbox detect');
+  const detection = await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  const bboxes = {};
+  const silhouetteMasks = {};
+  for (const c of cast) {
+    const r = detection.results[c.name];
+    if (!r) {
+      log.warn(`[SCENE COMPOSITE] no silhouette for ${c.name} (${c.color}) — diff+hue found nothing`);
+      continue;
+    }
+    bboxes[c.name] = r.bbox;
+    silhouetteMasks[c.name] = r.mask;
+    log.info(`[SCENE COMPOSITE]   ${c.name} (${c.color}): bbox ${r.bbox.width}×${r.bbox.height} @ (${r.bbox.x},${r.bbox.y}) [${r.bbox.pixels} px]; cell ${POSE_CELL[c.pose]} (${c.pose})${c.flip ? ' flipped' : ''}`);
+  }
+  if (Object.keys(bboxes).length === 0) {
+    throw new Error('[SCENE COMPOSITE] no silhouettes detected — diff+hue found nothing for any cast entry');
+  }
+  debug.bboxes = bboxes;
+  log.info(`[SCENE COMPOSITE]   diff mask: ${detection.diffMaskCount} px (${(100 * detection.diffMaskCount / (detection.canvasWidth * detection.canvasHeight)).toFixed(1)}% of canvas)`);
 
   // ── Step 4/5: composite character cutouts onto the derived clean BG
   log.info(`[SCENE COMPOSITE] step 4/5 — composite cutouts${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
@@ -725,10 +862,10 @@ async function generateSceneComposite(opts) {
     let usedPhantomPose = false;
     if (phantomPoseRender) {
       try {
-        // Mask out OTHER cast members' silhouettes when they fall within
-        // this character's cropped region — repaint with derived clean-BG
-        // pixels so Grok sees only the target's silhouette + scene context.
-        const otherColors = cast.filter(o => o.name !== c.name && o.color).map(o => o.color);
+        // Pass the per-character silhouette mask so cropPhantom can repaint
+        // every non-target pixel (other silhouettes AND any palette-colliding
+        // background) with derived clean-BG pixels — Grok then sees ONLY the
+        // target's silhouette plus the surrounding scene context.
         const ppr = await renderCharacterInPhantomPose({
           charSheet2x4: c.sheetBuf,
           blockingImageBuf: populatedBuf,
@@ -740,7 +877,9 @@ async function generateSceneComposite(opts) {
           model: GROK_MODELS.STANDARD,
           usageTracker,
           cleanBgBuf: bgBuf,
-          otherColors,
+          silhouetteMask: silhouetteMasks[c.name],
+          canvasWidth: detection.canvasWidth,
+          canvasHeight: detection.canvasHeight,
         });
         totalCost += ppr.usage?.cost || 0;
         phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
@@ -832,6 +971,7 @@ module.exports = {
   // internal helpers exposed for tests
   _internal: {
     findColorBbox,
+    findSilhouettesByDiff,
     cropSheetCell,
     removeBackground,
     trimTransparent,
