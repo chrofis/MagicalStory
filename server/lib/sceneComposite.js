@@ -693,14 +693,17 @@ const BLEND_STYLE_LINES = {
   oil:          "oil painting style with visible brushwork",
 };
 
+// Grok's edit endpoint caps prompts at 8000 chars. Reserve ~300 char
+// headroom so future tweaks to the boilerplate don't silently re-blow
+// the budget. The boilerplate below is ~2400 chars; that leaves the
+// brief ~5300 chars of room.
+const BLEND_PROMPT_HARD_CAP = 7700;
+
 function buildBlendEditPrompt(scene) {
   const styleLine = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
   const brief = (scene.pageBrief || '').trim();
-  const briefBlock = brief
-    ? `\n\nPAGE BRIEF — these blocks define the canonical look of every character, costume, object, and pose in this scene. The composited image (Image 1) is already staged correctly; the brief tells you WHAT each silhouette is supposed to look like once blended. Image 2 (when provided) is the labelled portrait grid — use it as the authoritative face/clothing reference.\n\n${brief}`
-    : '';
-
-  return `Refine Image 1 into a single cohesive children's book illustration in ${styleLine}.
+  const briefHeader = `\n\nPAGE BRIEF — these blocks define the canonical look of every character, costume, object, and pose in this scene. The composited image (Image 1) is already staged correctly; the brief tells you WHAT each silhouette is supposed to look like once blended. Image 2 (when provided) is the labelled portrait grid — use it as the authoritative face/clothing reference.\n\n`;
+  const boilerplate = `Refine Image 1 into a single cohesive children's book illustration in ${styleLine}.
 
 Image 1 (THIS IMAGE) already contains real characters pasted onto a clean scene background. The characters are at the correct positions, sizes, and body directions. Your job is to BLEND them into the scene and ADD any REQUIRED OBJECTS that the brief names but the staged composite is missing.
 
@@ -717,7 +720,22 @@ DO NOT:
 - Change any character's face, hair, age, body proportions, costume, or accessories — match the labelled portrait grid (Image 2) exactly.
 - Add props or scenery that are NOT named in the brief — only required objects from the brief may be added.
 - Restructure the underlying background scenery (architecture, geography, sky). Adding a named required object at the correct position is COMPLETING the scene, not restructuring it.
-- Add text, captions, numbers, or signatures of any kind.${briefBlock}`;
+- Add text, captions, numbers, or signatures of any kind.`;
+
+  // Tight cap: trim the brief if total prompt would exceed Grok's 8000-char
+  // edit limit. The earlier 5500-char compositeBrief slice in regeneration.js
+  // left no room for boilerplate when fully populated (8058 chars in
+  // production smoke). Re-slice at the prompt builder so both the test-
+  // models route AND the main pipeline are protected.
+  const fixedLen = boilerplate.length + (brief ? briefHeader.length : 0);
+  const briefRoom = Math.max(0, BLEND_PROMPT_HARD_CAP - fixedLen);
+  const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
+  const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}` : '';
+  const full = `${boilerplate}${briefBlock}`;
+  if (full.length > 8000) {
+    log.warn(`[SCENE COMPOSITE] blend prompt at ${full.length} chars after trim — still over Grok's 8000 limit (brief input was ${brief.length})`);
+  }
+  return full;
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────
