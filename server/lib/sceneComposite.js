@@ -332,17 +332,20 @@ function buildBlockingEditPrompt(scene, cast) {
     ? `Scene: ${String(scene.intent).trim()}\n\n`
     : '';
 
-  return `Keep the scene background EXACTLY as it is in this image — every pixel of the setting must remain pixel-identical. Only ADD ${cast.length} flat-colour silhouette figures into the scene at the positions below.
+  return `Add ${cast.length} flat-colour silhouette figures to this scene. Follow the three priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+
+PRIORITY 1 — Background is sacred. Every pixel of the existing setting (sky, water, dock planks, walls, props, light) must remain pixel-identical. Do not repaint, recolour, restage, blur, or "improve" any part of the background. The only new pixels in the output are the silhouettes themselves.
+
+PRIORITY 2 — Place the figures naturally so the scene summary makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — two characters standing close, one slightly in front of the other, partial occlusion is fine and natural. A character's body may pass in front of OR behind another character; respect what the action implies.
 
 ${sceneIntentBlock}${lines}
 
-SILHOUETTE RULES:
-- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex value above — no gradient, no transparency, no watercolor wash, no shading. A flat block of pure colour.
-- No faces, no clothing details, no texture inside the silhouette EXCEPT the small BLACK eye dot(s) specified per cast entry above. Each eye-dot is tiny — about 5% of the silhouette's head width — pure black (#000000). The eye dots tell the downstream pipeline which way the figure is facing.
-- Each silhouette's feet must rest on a SOLID surface visible in the scene (dock, floor, ground, rock, deck, path, stairs) — NEVER on water, NEVER mid-air, NEVER overlapping another character's body. If two characters share the same depth band, separate them sideways.
-- Size scales with depth: foreground silhouettes are largest, midground medium, background small.
+PRIORITY 3 — Silhouette rendering details:
+- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading.
+- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.
+- Size scales with depth: foreground largest, midground medium, background small.
 
-NO TEXT in the output. Do not modify the background in any way.`;
+NO TEXT in the output.`;
 }
 
 // Art-style descriptors — must stay aligned with character2x4Sheet.js ART_STYLE_LINES.
@@ -535,7 +538,7 @@ async function generateSceneComposite(opts) {
     const bottomY = bbox.y + bbox.height;
     const left = Math.max(0, cx - Math.floor(sMeta.width / 2));
     const top = Math.max(0, bottomY - sMeta.height);
-    placements.push({ input: scaled, left, top });
+    placements.push({ input: scaled, left, top, _footY: bottomY, _name: c.name });
   }
   debug.bboxes = bboxes;
   if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
@@ -544,7 +547,17 @@ async function generateSceneComposite(opts) {
     throw new Error('[SCENE COMPOSITE] no characters placed — bbox detection failed for every cast entry');
   }
 
-  const composited = await sharp(bgBuf).composite(placements).png().toBuffer();
+  // Z-order: paint background characters first, foreground last. Lower foot-Y
+  // (higher up the frame) = farther from camera; higher foot-Y (closer to
+  // bottom edge) = closer to camera. Sort ascending so closer characters are
+  // painted on top of farther ones — preserves natural occlusion when two
+  // figures overlap.
+  placements.sort((a, b) => a._footY - b._footY);
+  log.info(`[SCENE COMPOSITE]   z-order (back → front): ${placements.map(p => `${p._name}@y${p._footY}`).join(' → ')}`);
+  // Strip the auxiliary fields before handing to sharp — it only knows input/left/top.
+  const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
+
+  const composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
 
