@@ -59,40 +59,73 @@
 
 <h2 id="composite">4. Scene composite pipeline</h2>
 
-<p>Behind a feature flag (<code>enableSceneComposite</code>). Splits a busy scene into three Grok calls:</p>
+<p>Behind <code>MODEL_DEFAULTS.enableSceneComposite</code> (on in staging). Production code: <code>server/lib/sceneComposite.js</code>. The pipeline runs <strong>per page</strong>, building each illustration from a clean empty plate plus per-character cutouts pasted at scene-prescribed positions and blended together.</p>
 
+<h3>Five steps</h3>
 <ol>
-  <li><strong>Phantom call</strong> — generate the empty scene background (no characters).</li>
-  <li><strong>Cell calls</strong> — generate each character or character-group as an isolated cell against a neutral background.</li>
-  <li><strong>Stitch call</strong> — composite all cells onto the phantom and pass through Grok edit for blending.</li>
+  <li><strong>Populated plate</strong> — Grok <em>generate</em> (text-to-image) paints the full scene + all coloured silhouettes in one call. The setting, VB props, and silhouettes are committed together so the downstream depopulate step has a single self-consistent source. This replaces the older "empty BG first, then Grok-edit silhouettes onto it" pair — the old blocking edit silently drifted the background (added a bench, swapped a VB prop, repainted the floor) so the empty plate stopped matching the silhouette plate.</li>
+  <li><strong>Detect bboxes</strong> — colour-blob detection (<code>findColorBbox</code>) finds each silhouette in the populated plate, merges any vertically-stacked fragments (table or fence cutting a figure in half).</li>
+  <li><strong>Depopulate (derive clean BG)</strong> — Grok edit on the populated plate with a "remove every flat-colour silhouette, repaint the regions with surrounding terrain, keep every other pixel identical" prompt. Produces a clean BG that is guaranteed to match the world geometry + VB props of the populated plate exactly. This is the plate the cutouts get pasted onto.</li>
+  <li><strong>Composite cutouts</strong> — the character's cutout is either:
+    <ul>
+      <li><em>Static cell</em> (default): one of 8 cells is cropped from the character's pre-generated 2×4 reference sheet, background-removed, optionally flipped, scaled to the detected bbox.</li>
+      <li><em>Phantom-pose render</em> (<code>MODEL_DEFAULTS.phantomPoseRender: true</code>): the cropped silhouette region + the 2×4 sheet are sent to Grok edit, which renders that character in the silhouette's exact pose (sitting, climbing, reaching) on a white background. One Grok call per character per page.</li>
+    </ul>
+    Cutouts are sharp-composited onto the derived clean BG at each detected bbox, z-ordered by foot-Y so closer characters paint on top.
+  </li>
+  <li><strong>Blend</strong> — Grok edit pass on the composited scene. Image 1 is the canvas; Image 2 is the Visual Bible portrait grid (labelled face/costume reference). The prompt is a tight DO/DON'T list: blend lighting, soften pasted edges, add ground shadows, paint over silhouette-residue colour fringes; do NOT move/resize/restage characters; DO add named REQUIRED OBJECTS from the brief that the staged composite is missing (treasure chest, parchment map, etc.).</li>
 </ol>
 
-<p>Output: a 2×4 sheet showing each intermediate stage (phantom + cells + final). Useful for debugging large casts and for diagnosing which character broke. Implementation: <code>scripts/test-scene-composite-smoke.js</code> for smoke tests; production code lives in <code>server/lib/sceneComposite.js</code> (gated by flag).</p>
+<h3>Cost per page</h3>
+<table>
+<thead><tr><th>Cast size</th><th>Static-cell variant</th><th>Phantom-pose-render variant</th></tr></thead>
+<tbody>
+<tr><td>2 characters</td><td>1 (populated plate) + 1 (depopulate) + 0 (sharp) + 1 (blend) = <strong>3 calls / $0.06</strong></td><td>3 + 2 (phantom-pose) = <strong>5 calls / $0.10</strong></td></tr>
+<tr><td>4 characters</td><td>3 calls / $0.06</td><td>3 + 4 = <strong>7 calls / $0.14</strong></td></tr>
+<tr><td>6 characters</td><td>3 calls / $0.06</td><td>3 + 6 = <strong>9 calls / $0.18</strong></td></tr>
+</tbody>
+</table>
+<p>Plus a <em>one-time</em> per-story sheet cost: each character × each costume × 1 Grok call ($0.02 each) for the 2×4 reference sheet. Cached on the character record, reused across pages.</p>
 
-<h3>Why three calls instead of one</h3>
-<p>Single-prompt multi-character generation degrades roughly with character count (face quality, prompt adherence, costume drift). Isolating each character preserves identity at the cost of more API calls and a stitch step that introduces seams. The composite pipeline accepts that trade for high-cast scenes only.</p>
-
-<h2 id="cellmap">5. Composite cell map</h2>
-
-<p>The cell map (Visual Bible-aware) declares per cell:</p>
-
+<h3>Pros</h3>
 <ul>
-  <li>Character ID(s) inside the cell.</li>
-  <li>Target placement on the phantom (xy + scale).</li>
-  <li>Costume / pose overrides if the scene calls for non-default clothing.</li>
-  <li>Outline schema reference (which scene event the cell renders).</li>
+  <li><strong>Character identity is very close to the source photo.</strong> The 2×4 sheet locks face + costume; phantom-pose-render then keeps that identity while reposing. End result: characters look like the real person, not a generic illustration of "a child".</li>
+  <li><strong>Position, depth, size are dictated, not suggested.</strong> The silhouette in step 2 sets the bbox; step 3 pastes the cutout at that bbox. Foreground/midground/background separation is reliable in a way prose ("Noah in left foreground") never is for a single-pass model.</li>
+  <li><strong>Per-character action is enforced by silhouette shape.</strong> If the silhouette shows arms reaching, the cutout fits that shape. The model can't quietly default to "two characters standing facing camera".</li>
+  <li><strong>Splittable figures.</strong> When an occluder (table, parapet) cuts a character into two coloured fragments, the bbox detector merges them — both halves of the character get composited correctly.</li>
+  <li><strong>Required objects get added by the blend step.</strong> Even when the empty scene omitted a treasure chest or the cutout doesn't carry a prop, the blend prompt names the object and Grok paints it in.</li>
 </ul>
 
-<p>The phantom has a coordinate system; cells declare their target box; the stitch step composites with feathering. Costume overrides flow through <code>resolveStyled2x2</code> which reads the canonical <code>styledAvatars</code> path.</p>
+<h3>Cons</h3>
+<ul>
+  <li><strong>Expensive on cast-heavy pages.</strong> 6 characters with phantom-pose-render = 9 Grok calls per page (~$0.18), versus 1 call ($0.02) for a single direct-path generation. A 14-page story with 5 main characters runs ~$2-3 in image generation alone.</li>
+  <li><strong>The image still often doesn't look fully natural.</strong> The blend step has to harmonise lighting and soften pasted edges; in practice you can sometimes still see slightly mismatched lighting, stiff posing, or compositional awkwardness that a single-pass model would have avoided by drawing the scene holistically.</li>
+  <li><strong>Many failure modes.</strong> Each of the four steps can fail: Grok desaturates the silhouette (bbox detector misses it), the 2×4 sheet has a small figure (cutout upscales to blur), the blend step paints over a needed prop, the phantom-pose Grok call drifts off-style. Quality gates and retries catch most but not all.</li>
+  <li><strong>Style adherence is weaker than a single-pass model.</strong> Three to four sequential Grok edits accumulate small style drift. Watercolor washes thin out; line work hardens. The blend step's "render in this style" instruction helps but can't fully recover.</li>
+  <li><strong>Latency.</strong> A 4-page composite story takes ~7-8 minutes wall-clock vs ~3-4 min for a direct-path story of the same size.</li>
+</ul>
+
+<h3>When to prefer composite over direct</h3>
+<p>The cast-aware dispatcher is live in <code>server/lib/imageRouter.js</code>: cast 0 → direct/refMode=off; cast 1–3 → direct/refMode=loose; cast 4–5 → composite; cast 6+ → composite + phantom-pose. <code>inputData.composite</code> / <code>inputData.phantomPoseRender</code> per-story overrides hard-pin the choice. See <a href="image-generation-methods.html#routing">image-generation-methods §routing</a>.</p>
+
+<h2 id="cellmap">5. The 2×4 character sheet</h2>
+
+<p>Per character per costume, generated once and cached on the character record. <code>server/lib/character2x4Sheet.js</code> sends three reference images to Grok edit:</p>
+<ol>
+  <li><strong>Phantom asset</strong> (<code>server/assets/phantom-watercolor.png</code>) — a 2×4 grid of wooden mannequins showing the 8 target angles. Phantom indicates camera angle and head/body facing direction only; the model is told to ignore its silhouette, face, and surface texture.</li>
+  <li><strong>Standard avatar</strong> — the character's body / proportions reference.</li>
+  <li><strong>Face photo</strong> — the character's face / hair / skin tone reference.</li>
+</ol>
+<p>Output is a 2×4 sheet: cells 1-4 are head-and-neck views (front, 3⁄4, profile, back-of-head); cells 5-8 are full-body in costume at the same four angles. A Gemini-based quality gate evaluates face + costume match scores and retries (up to <code>MAX_STYLED_AVATAR_RETRIES</code>) if either falls below threshold.</p>
 
 <h2 id="flags">6. Feature flags</h2>
 
 <table>
-<thead><tr><th>Flag</th><th>Default</th><th>Effect</th></tr></thead>
+<thead><tr><th>Flag</th><th>Default (staging)</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td><code>enableSceneComposite</code> (env)</td><td>off in prod, on in staging</td><td>Use the 3-Grok-call pipeline for high-cast scenes.</td></tr>
-<tr><td><code>generateEmptyScenes</code> (<code>server/config/models.js</code>)</td><td>false</td><td>Generate empty plates as style anchors before page images. Disabled by default — didn't justify the call cost.</td></tr>
-<tr><td><code>compositeDebug</code> (per-image flag)</td><td>off</td><td>Emits the 2×4 debug sheet alongside the final image.</td></tr>
+<tr><td><code>MODEL_DEFAULTS.enableSceneComposite</code></td><td><strong>true</strong></td><td>Route every page through the composite pipeline. Per-story opt-out via <code>inputData.composite === false</code>.</td></tr>
+<tr><td><code>MODEL_DEFAULTS.phantomPoseRender</code></td><td>true</td><td>Step 4 sends each silhouette region + 2×4 sheet to Grok for a fresh per-figure render in the silhouette's exact pose. +N Grok calls per page (N = cast size). Per-story override on <code>inputData.phantomPoseRender</code>; cast-aware router enables it automatically at cast 6+.</td></tr>
+<tr><td><code>MODEL_DEFAULTS.generateEmptyScenes</code></td><td>true</td><td>Pre-render an empty-scene plate per page (used by direct/iterative-placement paths). The new populated-plate-first composite ignores it — clean BG is derived from the populated plate via the depopulate step.</td></tr>
 </tbody>
 </table>
 

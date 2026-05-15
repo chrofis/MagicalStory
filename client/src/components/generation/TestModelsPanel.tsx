@@ -322,7 +322,7 @@ export function TestModelsPanel({
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
               <span className="text-sm text-purple-700 font-medium">Composite path</span>
-              <span className="text-[10px] text-gray-400">(4-step: BG → blocking → cutouts → blend)</span>
+              <span className="text-[10px] text-gray-400">(5-step: populated plate → bbox → depopulate → cutouts → blend)</span>
             </label>
             <label className={`flex items-center gap-2 cursor-pointer ${composite ? '' : 'opacity-50'}`}>
               <input
@@ -336,15 +336,15 @@ export function TestModelsPanel({
               <span className="text-[10px] text-gray-400">(+1 Grok call per cast member)</span>
             </label>
             <label className={`flex flex-col gap-1 flex-1 min-w-[200px] ${composite ? '' : 'opacity-50'}`}>
-              <span className="text-xs font-medium text-purple-700">Empty-Scene Source (composite step 1)</span>
+              <span className="text-xs font-medium text-purple-700">Populated plate (composite step 1)</span>
               <select
                 value={emptyScene}
                 onChange={e => setEmptyScene(e.target.value as typeof emptyScene)}
                 disabled={isRunning || !composite}
                 className="rounded border-gray-300 text-xs p-1"
               >
-                <option value="reuse">reuse saved plate</option>
                 <option value="fresh">regenerate fresh (Grok call)</option>
+                <option value="reuse">reuse last (if cached)</option>
                 <option value="skip">skip — let composite decide</option>
               </select>
             </label>

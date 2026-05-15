@@ -1,18 +1,34 @@
 /**
  * Scene composite page-generation pipeline.
  *
- * Three Grok calls per page:
- *   1. generate clean background (no people)
- *   2. edit-add coloured silhouettes at the positions Sonnet declared
- *   3. edit-blend: cut the real character sheets in at the detected bboxes,
- *      then one Grok edit pass to harmonise lighting / soften pasted edges.
+ * Three Grok calls per page (same call count as before; reordered):
+ *   1. generate populated plate — the full scene + coloured silhouettes
+ *      placed in one go (text-to-image). Anchors world geometry + VB props
+ *      WITH characters in their final positions.
+ *   2. detect silhouette bboxes from the populated plate.
+ *   3. edit-depopulate the populated plate — remove the silhouettes and
+ *      repaint the regions with surrounding terrain. Yields the derived
+ *      clean BG plate, guaranteed self-consistent with the populated one.
+ *   4. composite the real character cutouts (from 2×4 sheets or per-pose
+ *      phantom renders) onto the derived clean BG at the detected bboxes.
+ *   5. one Grok edit blend pass to harmonise lighting / soften edges / add
+ *      missing required objects from the brief.
+ *
+ * Why this order: the previous flow generated an empty scene first, then
+ * Grok-edited silhouettes onto it. The blocking edit silently drifted the
+ * background (added a bench, swapped a VB prop, repainted the floor) so
+ * the empty plate stopped matching the silhouette plate. Generating the
+ * populated plate first locks the world geometry + VB props in place with
+ * the characters; the empty plate is derived from that single source of
+ * truth.
  *
  * Characters come from pre-rendered 2×4 sheets stored on the character row
  * (character.avatars.sheet2x4_<costume>). Each cast entry on the scene says
  * { name, pose, flip, color } so the script picks the right cell + flip.
  *
- * Behind MODEL_DEFAULTS.enableSceneComposite (default false). Per-story
- * opt-out via inputData.composite === false.
+ * Behind MODEL_DEFAULTS.enableSceneComposite (default true) + cast-aware
+ * auto-routing in server/lib/imageRouter.js. Per-story opt-out via
+ * inputData.composite === false.
  *
  * See docs/SCENE-COMPOSITE-PIPELINE.html for the architecture overview and
  * scripts/test-scene-composite.js for the validation harness.
@@ -288,13 +304,11 @@ async function scaleToHeight(buf, targetH) {
 // ─── Prompt builders ──────────────────────────────────────────────────────
 
 /**
- * Build the silhouette-addition prompt for the blocking step. The cast
- * entries describe each character's role in the scene; we emit one
- * "X silhouette" line per character with the colour, size hint, and
- * direction.
+ * Build the cast-line block (one line per silhouette) used by both the
+ * populated-plate generate prompt and any future per-character spec.
  */
-function buildBlockingEditPrompt(scene, cast) {
-  const lines = cast.map((c) => {
+function buildCastLines(cast) {
+  return cast.map((c) => {
     const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
     const posHint = c.position || 'in the scene';
     const direction = c.flip ? 'facing right' : 'facing left';
@@ -305,10 +319,8 @@ function buildBlockingEditPrompt(scene, cast) {
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || `three-quarter view, ${direction}`;
     const actionClause = c.action ? `, ${c.action}` : '';
-    // Per-pose eye markers — black dot(s) painted INSIDE the silhouette's
-    // head area. Front/three-quarter show two eyes; profile shows one;
-    // back shows none. No nose marker — Grok's render of the nose triangle
-    // did not produce a usable direction cue.
+    // Per-pose eye markers — black dot(s) inside the silhouette's head.
+    // Front/three-quarter show two eyes; profile shows one; back shows none.
     const markerSpec = (() => {
       const oppSide = c.flip ? 'left' : 'right';
       switch (c.pose) {
@@ -327,25 +339,70 @@ function buildBlockingEditPrompt(scene, cast) {
     const markerLine = markerSpec ? `\n    Eye markers (inside the head area): ${markerSpec}.` : '';
     return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.${markerLine}`;
   }).join('\n');
+}
 
+/**
+ * Build the populated-plate generate prompt. Single Grok text-to-image
+ * call: paint the full scene WITH the coloured silhouettes already placed
+ * in it. The setting + VB props + silhouettes are committed together, so
+ * the later depopulate step can derive a self-consistent empty plate from
+ * the same source.
+ */
+function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt) {
+  const lines = buildCastLines(cast);
+  const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
+    || (scene?.description && String(scene.description).trim())
+    || 'an outdoor scene';
   const sceneIntentBlock = scene?.intent
-    ? `Scene: ${String(scene.intent).trim()}\n\n`
+    ? `\nScene intent: ${String(scene.intent).trim()}\n`
     : '';
 
-  return `Add ${cast.length} flat-colour silhouette figures to this scene. Follow the three priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+  return `Paint a single illustrated scene that contains ${cast.length} flat-colour silhouette figures placed inside it. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 
-PRIORITY 1 — Background is sacred. Every pixel of the existing setting (sky, water, dock planks, walls, props, light) must remain pixel-identical. Do not repaint, recolour, restage, blur, or "improve" any part of the background. The only new pixels in the output are the silhouettes themselves.
+PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate — the silhouettes will be lifted out in a later step, so the setting must be self-consistent with or without people in it.
 
-PRIORITY 2 — Place the figures naturally so the scene summary makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — two characters standing close, one slightly in front of the other, partial occlusion is fine and natural. A character's body may pass in front of OR behind another character; respect what the action implies.
+SETTING DESCRIPTION:
+${settingBlock}
+${sceneIntentBlock}
+PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
-${sceneIntentBlock}${lines}
+${lines}
 
-PRIORITY 3 — Silhouette rendering details:
-- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading.
+SILHOUETTE RENDERING DETAILS:
+- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.
 - Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.
 - Size scales with depth: foreground largest, midground medium, background small.
 
 NO TEXT in the output.`;
+}
+
+/**
+ * Build the depopulate edit prompt. Input image is the populated plate;
+ * remove every flat-colour silhouette and repaint the regions with the
+ * surrounding scenery so the result is the same world, empty of people.
+ * Every other pixel must remain identical — this is what anchors the
+ * world geometry + VB props for the rest of the pipeline.
+ */
+function buildDepopulatePrompt(cast) {
+  const colorList = cast
+    .map(c => `${c.color}${c.colorName ? ` (${c.colorName})` : ''}`)
+    .join(', ');
+  return `Remove every flat-colour silhouette figure from this image and paint over each region with the surrounding scenery, so the result reads as the same scene empty of people.
+
+The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour with small black eye dots — painted on top of the scene.
+
+DO:
+- Replace each coloured silhouette area with the terrain visible around it — extend the floor, ground, dock, path, wall, water, foliage, sky, or interior background behind it so the patch blends naturally.
+- Keep every other pixel of the scene pixel-identical. Sky, walls, named props, lighting, every detail of the setting must remain exactly as it is.
+
+DO NOT:
+- Add new characters, animals, or human figures of any kind.
+- Restructure the scene — do not move, resize, recolour, or rebuild walls, props, sky, water, or any background element.
+- Add, remove, or substitute any named prop or object in the scene.
+- Add text, captions, numbers, or signatures.
+- Leave any coloured residue, outline, or shadow where a silhouette stood — the patch must blend seamlessly with the surrounding scene.
+
+The output is the same scene as the input, empty of people, identical in every other respect.`;
 }
 
 // Art-style descriptors — must stay aligned with character2x4Sheet.js ART_STYLE_LINES.
@@ -419,8 +476,14 @@ async function generateSceneComposite(opts) {
     phantomPoseRender = false,
   } = opts;
 
-  if (!cleanBackgroundPrompt && !existingCleanBackground) throw new Error('cleanBackgroundPrompt or existingCleanBackground required');
+  if (!cleanBackgroundPrompt && !scene?.description) {
+    throw new Error('cleanBackgroundPrompt or scene.description required');
+  }
   if (!Array.isArray(cast) || cast.length === 0) throw new Error('cast must be non-empty');
+
+  if (existingCleanBackground) {
+    log.info('[SCENE COMPOSITE] existingCleanBackground passed — ignored in populated-plate-first pipeline (clean BG is now derived from the populated plate).');
+  }
 
   // Assign colours to any cast entry missing one
   const usedColors = new Set(cast.map((c) => c.color).filter(Boolean));
@@ -446,50 +509,61 @@ async function generateSceneComposite(opts) {
   const debug = {};
   let totalCost = 0;
 
-  // ── Step 1: clean background
-  // Reuse the empty-scene image already generated by the dedicated empty-scene
-  // phase (sceneBackgrounds[pageNumber].imageData) when one is passed in. Skips
-  // a Grok generate call (~$0.02 + ~5s per page) and keeps the BG consistent
-  // with what the rest of the pipeline used.
-  let bgImageData;
-  if (existingCleanBackground) {
-    log.info(`[SCENE COMPOSITE] step 1/4 — reusing existing empty scene (${cast.length} cast)`);
-    bgImageData = existingCleanBackground;
-  } else {
-    log.info(`[SCENE COMPOSITE] step 1/4 — clean background (${cast.length} cast)`);
-    const bg = await generateWithGrok(cleanBackgroundPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
-    if (usageTracker) usageTracker('grok', bg.usage, 'scene_composite_bg', bg.modelId);
-    totalCost += bg.usage?.cost || 0;
-    bgImageData = bg.imageData;
-  }
-  const bgBuf = Buffer.from(bgImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  debug.cleanBackground = bgImageData;
-  debug.cleanBackgroundPrompt = cleanBackgroundPrompt || null;
-  debug.cleanBackgroundSource = existingCleanBackground ? 'reused-empty-scene' : 'grok-generate';
+  // ── Step 1/5: populated plate (Grok generate)
+  // Paint the full scene + silhouettes in one text-to-image call. Replaces
+  // the old "empty BG then Grok-edit silhouettes onto it" pair — that flow
+  // let the blocking edit drift the background (added a bench, swapped a
+  // VB prop, repainted the floor) so the empty plate no longer matched
+  // the silhouette plate.
+  log.info(`[SCENE COMPOSITE] step 1/5 — populated plate (generate; ${cast.length} cast)`);
+  const populatedPrompt = buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt);
+  const populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', populated.usage, 'scene_composite_populated_plate', populated.modelId);
+  totalCost += populated.usage?.cost || 0;
+  const populatedBuf = Buffer.from(populated.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  debug.populatedPlate = populated.imageData;
+  debug.populatedPlatePrompt = populatedPrompt;
+  // Back-compat aliases so existing dev panels keep showing the same fields.
+  debug.blocking = populated.imageData;
+  debug.blockingPrompt = populatedPrompt;
 
-  // ── Step 2: add silhouettes via Grok edit
-  log.info('[SCENE COMPOSITE] step 2/4 — blocking (add silhouettes)');
-  const blockingPrompt = buildBlockingEditPrompt(scene, cast);
-  const blocking = await editWithGrok(blockingPrompt, [bgImageData], { aspectRatio, model: GROK_MODELS.STANDARD });
-  if (usageTracker) usageTracker('grok', blocking.usage, 'scene_composite_blocking', blocking.modelId);
-  totalCost += blocking.usage?.cost || 0;
-  const blockingBuf = Buffer.from(blocking.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  debug.blocking = blocking.imageData;
-  debug.blockingPrompt = blockingPrompt;
-
-  // ── Step 3: detect bboxes + composite cutouts on the clean background
-  log.info(`[SCENE COMPOSITE] step 3/4 — detect bboxes + composite${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
+  // ── Step 2/5: detect bboxes on the populated plate
+  log.info('[SCENE COMPOSITE] step 2/5 — bbox detect');
   const bboxes = {};
-  const placements = [];
-  const phantomPoseRenders = {};
   for (const c of cast) {
-    const bbox = await findColorBbox(blockingBuf, c.color);
+    const bbox = await findColorBbox(populatedBuf, c.color);
     if (!bbox) {
       log.warn(`[SCENE COMPOSITE] no bbox for ${c.name} (${c.color}) — Grok did not paint a recognisable silhouette`);
       continue;
     }
     bboxes[c.name] = bbox;
     log.info(`[SCENE COMPOSITE]   ${c.name} (${c.color}): bbox ${bbox.width}×${bbox.height} @ (${bbox.x},${bbox.y}); cell ${POSE_CELL[c.pose]} (${c.pose})${c.flip ? ' flipped' : ''}`);
+  }
+  if (Object.keys(bboxes).length === 0) {
+    throw new Error('[SCENE COMPOSITE] no silhouettes detected on populated plate — bbox detection failed for every cast entry');
+  }
+  debug.bboxes = bboxes;
+
+  // ── Step 3/5: depopulate to derive the clean BG (Grok edit)
+  log.info('[SCENE COMPOSITE] step 3/5 — depopulate (derive clean BG)');
+  const depopulatePrompt = buildDepopulatePrompt(cast);
+  const depopulated = await editWithGrok(depopulatePrompt, [populated.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_depopulate', depopulated.modelId);
+  totalCost += depopulated.usage?.cost || 0;
+  const bgImageData = depopulated.imageData;
+  const bgBuf = Buffer.from(bgImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  debug.cleanBackground = bgImageData;
+  debug.cleanBackgroundPrompt = cleanBackgroundPrompt || null;
+  debug.cleanBackgroundSource = 'derived-from-populated-plate';
+  debug.depopulatePrompt = depopulatePrompt;
+
+  // ── Step 4/5: composite character cutouts onto the derived clean BG
+  log.info(`[SCENE COMPOSITE] step 4/5 — composite cutouts${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
+  const placements = [];
+  const phantomPoseRenders = {};
+  for (const c of cast) {
+    const bbox = bboxes[c.name];
+    if (!bbox) continue;
 
     // Source the character cutout. Two paths:
     //   - phantom-pose render (flag on): Grok renders the character in the
@@ -501,13 +575,13 @@ async function generateSceneComposite(opts) {
     let usedPhantomPose = false;
     if (phantomPoseRender) {
       try {
-        // Mask out OTHER cast members' silhouettes when they happen to fall
-        // within this character's cropped region — repaint with clean BG
+        // Mask out OTHER cast members' silhouettes when they fall within
+        // this character's cropped region — repaint with derived clean-BG
         // pixels so Grok sees only the target's silhouette + scene context.
         const otherColors = cast.filter(o => o.name !== c.name && o.color).map(o => o.color);
         const ppr = await renderCharacterInPhantomPose({
           charSheet2x4: c.sheetBuf,
-          blockingImageBuf: blockingBuf,
+          blockingImageBuf: populatedBuf,
           bbox,
           charName: c.name,
           colorName: c.colorName,
@@ -546,7 +620,6 @@ async function generateSceneComposite(opts) {
     const top = Math.max(0, bottomY - sMeta.height);
     placements.push({ input: scaled, left, top, _footY: bottomY, _name: c.name });
   }
-  debug.bboxes = bboxes;
   if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
 
   if (placements.length === 0) {
@@ -567,8 +640,8 @@ async function generateSceneComposite(opts) {
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
 
-  // ── Step 4: Grok edit blend pass
-  log.info('[SCENE COMPOSITE] step 4/4 — blend pass');
+  // ── Step 5/5: Grok edit blend pass
+  log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
   const blendPrompt = buildBlendEditPrompt(scene);
   debug.blendPrompt = blendPrompt;
   // VB grid as Image 2 — labelled portrait grid serves as the authoritative face /
@@ -602,8 +675,10 @@ module.exports = {
     trimTransparent,
     flipHorizontal,
     scaleToHeight,
-    buildBlockingEditPrompt,
+    buildPopulatedPlatePrompt,
+    buildDepopulatePrompt,
     buildBlendEditPrompt,
+    buildCastLines,
     rgbToHue,
   },
 };
