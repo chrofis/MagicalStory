@@ -14,6 +14,21 @@ interface TestModelsPanelProps {
   language: string;
 }
 
+interface CompositeDebugBundle {
+  populatedPlate?: string;
+  populatedPlatePrompt?: string;
+  cleanBackground?: string;
+  cleanBackgroundPrompt?: string | null;
+  cleanBackgroundSource?: string;
+  depopulatePrompt?: string;
+  composited?: string;
+  blendPrompt?: string;
+  bboxes?: Record<string, { x: number; y: number; width: number; height: number; pixels: number }>;
+  phantomPoseRenders?: Record<string, { output?: string; phantomCrop?: string; prompt?: string; bbox?: unknown; action?: string | null }>;
+  zScores?: Record<string, number>;
+  zDecisions?: Array<{ a: string; b: string; aPx: number; bPx: number; winner: string }>;
+}
+
 interface ModelTestResult {
   loading: boolean;
   imageData?: string;
@@ -28,6 +43,8 @@ interface ModelTestResult {
   pass2Error?: string;
   // Exact images packed for the model (most useful for "what did it see")
   grokRefImages?: string[] | null;
+  // Composite-path intermediates (only present when composite=true was requested)
+  compositeDebug?: CompositeDebugBundle | null;
   // Snapshot of the inputs that produced this result (shared across all models in the run)
   inputSnapshot?: TestModelsInputSnapshot | null;
 }
@@ -51,19 +68,23 @@ export function TestModelsPanel({
   onClose,
   onUseImage,
 }: TestModelsPanelProps) {
-  const [selectedModels, setSelectedModels] = useState<Set<string>>(
-    new Set(['grok-imagine', 'gemini-2.5-flash-image'])
-  );
+  // The image model is a single MANDATORY choice — used by every method
+  // below. (Composite is Grok-only internally; the choice still matters
+  // for the direct-path method.)
+  const [selectedModel, setSelectedModel] = useState<string>('grok-imagine');
   const [results, setResults] = useState<Record<string, ModelTestResult>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // Method toggles — each method below has its own opt-in switch.
+  const [runDirect, setRunDirect] = useState(true);
+  const [composite, setComposite] = useState(false);
+  // Direct-method options
   const [iterativePlacement, setIterativePlacement] = useState(false);
   // Reference-mode + single-pass-scene flags. 'inherit' = use the run-level
   // server default (set in server/config/models.js MODEL_DEFAULTS).
   const [referenceMode, setReferenceMode] = useState<'inherit' | 'strict' | 'loose' | 'styled-only' | 'off'>('inherit');
   const [singlePassScene, setSinglePassScene] = useState<'inherit' | 'on' | 'off'>('inherit');
-  // Composite path toggles
-  const [composite, setComposite] = useState(false);
+  // Composite-method options
   const [phantomPoseRender, setPhantomPoseRender] = useState(false);
   const [emptyScene, setEmptyScene] = useState<'reuse' | 'fresh' | 'skip'>('reuse');
   // Direct path: send one cell of the story's 2×4 sheet (matching the page's
@@ -81,34 +102,13 @@ export function TestModelsPanel({
   const [styleResult, setStyleResult] = useState<ModelTestResult | null>(null);
   const [isStyleTransferring, setIsStyleTransferring] = useState(false);
 
-  const toggleModel = useCallback((modelId: string) => {
-    setSelectedModels(prev => {
-      const next = new Set(prev);
-      if (next.has(modelId)) {
-        next.delete(modelId);
-      } else {
-        next.add(modelId);
-      }
-      return next;
-    });
-  }, []);
-
-  const selectAll = useCallback(() => {
-    setSelectedModels(new Set(AVAILABLE_MODELS.map(m => m.id)));
-  }, []);
-
-  const deselectAll = useCallback(() => {
-    setSelectedModels(new Set());
-  }, []);
-
-  const allSelected = selectedModels.size === AVAILABLE_MODELS.length;
-
   const runTest = useCallback(async () => {
-    if (selectedModels.size === 0 && !composite) return;
+    if (!selectedModel) return;
+    if (!runDirect && !composite) return;
     setIsRunning(true);
     setResults({});
 
-    const models = Array.from(selectedModels);
+    const models = runDirect ? [selectedModel] : [];
     const baseOptions: {
       iterativePlacement?: boolean;
       referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off';
@@ -179,6 +179,7 @@ export function TestModelsPanel({
                 error: r?.error,
                 modelId: r?.modelId || 'scene-composite',
                 elapsedMs,
+                compositeDebug: (r?.compositeDebug as CompositeDebugBundle) || null,
                 inputSnapshot: response.inputSnapshot,
               },
             }));
@@ -195,7 +196,7 @@ export function TestModelsPanel({
 
     await Promise.allSettled(compositePromise ? [...directPromises, compositePromise] : directPromises);
     setIsRunning(false);
-  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells]);
+  }, [selectedModel, runDirect, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -250,48 +251,54 @@ export function TestModelsPanel({
           </button>
         </div>
 
-        {/* Model Selection */}
-        <div className="mb-4">
-          <div className="flex flex-wrap items-center gap-3 mb-3">
+        {/* ── Model (mandatory, single) — applies to every method below ── */}
+        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+          <div className="text-xs font-semibold text-blue-900 mb-2">
+            Image model <span className="text-blue-600">— picks one. Applied by every method below.</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             {AVAILABLE_MODELS.map(model => (
               <label
                 key={model.id}
                 className="flex items-center gap-1.5 cursor-pointer select-none"
               >
                 <input
-                  type="checkbox"
-                  checked={selectedModels.has(model.id)}
-                  onChange={() => toggleModel(model.id)}
+                  type="radio"
+                  name="testModelsImageModel"
+                  checked={selectedModel === model.id}
+                  onChange={() => setSelectedModel(model.id)}
                   disabled={isRunning}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">{model.label}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-mono">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-white text-gray-500 font-mono">
                   {model.cost}
                 </span>
               </label>
             ))}
           </div>
-          {/* Iterative Placement checkbox */}
-          <label className="flex items-center gap-2 cursor-pointer mb-3">
+        </div>
+
+        {/* ── Method 1: Direct path ── */}
+        <div className="mb-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
             <input
               type="checkbox"
-              checked={iterativePlacement}
-              onChange={e => setIterativePlacement(e.target.checked)}
+              checked={runDirect}
+              onChange={e => setRunDirect(e.target.checked)}
               disabled={isRunning}
               className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
-            <span className="text-sm text-orange-700 font-medium">Iterative Placement</span>
-            <span className="text-[10px] text-gray-400">(2-pass: foreground first, then background)</span>
+            <span className="text-sm font-semibold text-orange-900">Method 1 — Direct</span>
+            <span className="text-[11px] text-orange-700">One model call: prompt + character refs → page image.</span>
           </label>
-          {/* Reference Mode + Empty-Scene Plate flags */}
-          <div className="flex flex-wrap gap-3 mb-3 p-2 rounded-lg bg-orange-50 border border-orange-200">
+          <div className={`flex flex-wrap gap-3 mt-2 ${runDirect ? '' : 'opacity-50'}`}>
             <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
-              <span className="text-xs font-medium text-orange-700">Reference Mode</span>
+              <span className="text-xs font-medium text-orange-700">Reference mode</span>
               <select
                 value={referenceMode}
                 onChange={e => setReferenceMode(e.target.value as typeof referenceMode)}
-                disabled={isRunning}
+                disabled={isRunning || !runDirect}
                 className="rounded border-gray-300 text-xs p-1"
               >
                 <option value="inherit">inherit (server default)</option>
@@ -302,11 +309,11 @@ export function TestModelsPanel({
               </select>
             </label>
             <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
-              <span className="text-xs font-medium text-orange-700">Empty-Scene Plate</span>
+              <span className="text-xs font-medium text-orange-700">Empty-scene plate</span>
               <select
                 value={singlePassScene}
                 onChange={e => setSinglePassScene(e.target.value as typeof singlePassScene)}
-                disabled={isRunning}
+                disabled={isRunning || !runDirect}
                 className="rounded border-gray-300 text-xs p-1"
               >
                 <option value="inherit">inherit (server default)</option>
@@ -314,45 +321,64 @@ export function TestModelsPanel({
                 <option value="on">skip plate (single-pass)</option>
               </select>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]">
+            <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-[260px]">
               <input
                 type="checkbox"
                 checked={useStorySheetCells}
                 onChange={e => setUseStorySheetCells(e.target.checked)}
-                disabled={isRunning}
-                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                disabled={isRunning || !runDirect}
+                className="mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
               />
-              <span className="text-xs text-orange-700 font-medium">Use 2×4 cell refs</span>
-              <span className="text-[10px] text-gray-400">(one body cell per char from story sheet)</span>
+              <span className="flex flex-col">
+                <span className="text-xs text-orange-700 font-medium">Use 2×4 cell refs</span>
+                <span className="text-[10px] text-gray-500">Send ONE body cell from the story's 2×4 sheet at the scene's intended pose, instead of the full styled-avatar.</span>
+              </span>
             </label>
-          </div>
-          {/* Composite path controls — separate row, distinct colour so it's
-              clear this is a different method (not a model variant). */}
-          <div className="flex flex-wrap gap-3 mb-3 p-2 rounded-lg bg-purple-50 border border-purple-200">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-[260px]">
               <input
                 type="checkbox"
-                checked={composite}
-                onChange={e => setComposite(e.target.checked)}
-                disabled={isRunning}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                checked={iterativePlacement}
+                onChange={e => setIterativePlacement(e.target.checked)}
+                disabled={isRunning || !runDirect}
+                className="mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
               />
-              <span className="text-sm text-purple-700 font-medium">Composite path</span>
-              <span className="text-[10px] text-gray-400">(5-step: populated plate → bbox → depopulate → cutouts → blend)</span>
+              <span className="flex flex-col">
+                <span className="text-xs text-orange-700 font-medium">Iterative placement <span className="font-normal text-gray-500">(legacy)</span></span>
+                <span className="text-[10px] text-gray-500">2-pass — render characters first, then composite onto a separate empty-BG plate. Pre-dates the composite method below.</span>
+              </span>
             </label>
-            <label className={`flex items-center gap-2 cursor-pointer ${composite ? '' : 'opacity-50'}`}>
+          </div>
+        </div>
+
+        {/* ── Method 2: Composite path ── */}
+        <div className="mb-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={composite}
+              onChange={e => setComposite(e.target.checked)}
+              disabled={isRunning}
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            />
+            <span className="text-sm font-semibold text-purple-900">Method 2 — Composite (5-step)</span>
+            <span className="text-[11px] text-purple-700">populated plate → bbox detect → depopulate → cutouts → blend</span>
+          </label>
+          <div className={`flex flex-wrap gap-3 mt-2 ${composite ? '' : 'opacity-50'}`}>
+            <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-[260px]">
               <input
                 type="checkbox"
                 checked={phantomPoseRender}
                 onChange={e => setPhantomPoseRender(e.target.checked)}
                 disabled={isRunning || !composite}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="text-sm text-purple-700 font-medium">Phantom-pose render</span>
-              <span className="text-[10px] text-gray-400">(+1 Grok call per cast member)</span>
+              <span className="flex flex-col">
+                <span className="text-xs text-purple-700 font-medium">Phantom-pose render</span>
+                <span className="text-[10px] text-gray-500">Re-render each character in the silhouette's exact pose via Grok edit (+1 call per cast member).</span>
+              </span>
             </label>
-            <label className={`flex flex-col gap-1 flex-1 min-w-[200px] ${composite ? '' : 'opacity-50'}`}>
-              <span className="text-xs font-medium text-purple-700">Populated plate (composite step 1)</span>
+            <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
+              <span className="text-xs font-medium text-purple-700">Populated plate (step 1)</span>
               <select
                 value={emptyScene}
                 onChange={e => setEmptyScene(e.target.value as typeof emptyScene)}
@@ -365,35 +391,33 @@ export function TestModelsPanel({
               </select>
             </label>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={allSelected ? deselectAll : selectAll}
-              disabled={isRunning}
-              className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400"
-            >
-              {allSelected ? 'Deselect All' : 'Select All'}
-            </button>
-            <button
-              onClick={runTest}
-              disabled={isRunning || (selectedModels.size === 0 && !composite)}
-              className="px-3 py-1.5 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Running...
-                </>
-              ) : (
-                'Run Test'
-              )}
-            </button>
-            {hasResults && !isRunning && (
-              <span className="text-xs text-gray-500">
-                {Object.values(results).filter(r => !r.loading && r.imageData).length} of{' '}
-                {Object.keys(results).length} succeeded
-              </span>
+        </div>
+
+        {/* Run button */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={runTest}
+            disabled={isRunning || !selectedModel || (!runDirect && !composite)}
+            className="px-4 py-2 text-sm font-semibold rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
+          >
+            {isRunning ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Running...
+              </>
+            ) : (
+              'Run Test'
             )}
-          </div>
+          </button>
+          {!runDirect && !composite && (
+            <span className="text-xs text-red-600">Tick at least one method above.</span>
+          )}
+          {hasResults && !isRunning && (
+            <span className="text-xs text-gray-500">
+              {Object.values(results).filter(r => !r.loading && r.imageData).length} of{' '}
+              {Object.keys(results).length} succeeded
+            </span>
+          )}
         </div>
 
         {/* Results Grid */}
@@ -515,6 +539,122 @@ export function TestModelsPanel({
                           <pre className="text-xs bg-gray-50 p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">{result.pass2Prompt}</pre>
                         </div>
                       )}
+                    </details>
+                  )}
+                  {/* Composite intermediate steps — shown for every composite-method
+                      result so you can see populated plate, depopulate (derived clean
+                      BG), per-character phantom-pose renders, and the composited
+                      image before the final blend. */}
+                  {result.compositeDebug && (
+                    <details className="mt-2 border-t border-purple-200 pt-2" open>
+                      <summary className="text-[10px] font-semibold text-purple-700 cursor-pointer">
+                        Composite intermediate steps
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {/* Step 1 — populated plate */}
+                        {result.compositeDebug.populatedPlate && (
+                          <div>
+                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">1. Populated plate (Grok generate — scene + silhouettes)</div>
+                            <img
+                              src={result.compositeDebug.populatedPlate}
+                              alt="populated plate"
+                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
+                              onClick={() => setLightboxImage(result.compositeDebug!.populatedPlate!)}
+                            />
+                            {result.compositeDebug.populatedPlatePrompt && (
+                              <details className="mt-0.5">
+                                <summary className="text-[9px] text-gray-400 cursor-pointer">prompt ({result.compositeDebug.populatedPlatePrompt.length} chars)</summary>
+                                <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.populatedPlatePrompt}</pre>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                        {/* Step 2 — bbox detections */}
+                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && (
+                          <div>
+                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">2. Bbox detect — {Object.keys(result.compositeDebug.bboxes).length} silhouettes</div>
+                            <div className="text-[10px] text-gray-700 flex flex-wrap gap-1.5">
+                              {Object.entries(result.compositeDebug.bboxes).map(([name, b]) => (
+                                <span key={name} className="px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 font-mono">
+                                  {name}: {b.width}×{b.height}@({b.x},{b.y})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Step 3 — depopulate (derived clean BG) */}
+                        {result.compositeDebug.cleanBackground && (
+                          <div>
+                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">3. Depopulate — derived clean BG ({result.compositeDebug.cleanBackgroundSource || 'derived-from-populated-plate'})</div>
+                            <img
+                              src={result.compositeDebug.cleanBackground}
+                              alt="derived clean background"
+                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
+                              onClick={() => setLightboxImage(result.compositeDebug!.cleanBackground!)}
+                            />
+                            {result.compositeDebug.depopulatePrompt && (
+                              <details className="mt-0.5">
+                                <summary className="text-[9px] text-gray-400 cursor-pointer">depopulate prompt</summary>
+                                <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.depopulatePrompt}</pre>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                        {/* Step 4a — phantom-pose renders (one per character) */}
+                        {result.compositeDebug.phantomPoseRenders && Object.keys(result.compositeDebug.phantomPoseRenders).length > 0 && (
+                          <div>
+                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">4a. Phantom-pose renders ({Object.keys(result.compositeDebug.phantomPoseRenders).length} characters)</div>
+                            <div className="grid grid-cols-3 gap-1">
+                              {Object.entries(result.compositeDebug.phantomPoseRenders).map(([name, ppr]) => (
+                                <div key={name} className="flex flex-col items-center">
+                                  {ppr.output && (
+                                    <img
+                                      src={ppr.output}
+                                      alt={`${name} phantom-pose`}
+                                      className="max-h-32 w-full object-contain rounded border bg-white cursor-pointer"
+                                      onClick={() => setLightboxImage(ppr.output!)}
+                                    />
+                                  )}
+                                  <span className="text-[9px] text-gray-600 mt-0.5">{name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Step 4b — composited image (sharp paste before blend) */}
+                        {result.compositeDebug.composited && (
+                          <div>
+                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">4b. Composited — cutouts pasted onto derived BG</div>
+                            <img
+                              src={result.compositeDebug.composited}
+                              alt="composited"
+                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
+                              onClick={() => setLightboxImage(result.compositeDebug!.composited!)}
+                            />
+                          </div>
+                        )}
+                        {/* Z-order decisions (from occlusion detection) */}
+                        {result.compositeDebug.zDecisions && result.compositeDebug.zDecisions.length > 0 && (
+                          <details>
+                            <summary className="text-[9px] text-gray-500 cursor-pointer">Z-order (occlusion-based)</summary>
+                            <div className="mt-1 text-[10px] text-gray-700 space-y-0.5 font-mono">
+                              {result.compositeDebug.zDecisions.map((d, i) => (
+                                <div key={i}>{d.a}={d.aPx}px vs {d.b}={d.bPx}px → <strong>{d.winner}</strong> in front</div>
+                              ))}
+                              {result.compositeDebug.zScores && (
+                                <div className="mt-1 text-purple-700">scores: {Object.entries(result.compositeDebug.zScores).map(([n, s]) => `${n}=${s}`).join(', ')}</div>
+                              )}
+                            </div>
+                          </details>
+                        )}
+                        {/* Blend prompt (final step prompt — final image is the card image at the top) */}
+                        {result.compositeDebug.blendPrompt && (
+                          <details>
+                            <summary className="text-[9px] text-gray-500 cursor-pointer">5. Blend prompt ({result.compositeDebug.blendPrompt.length} chars)</summary>
+                            <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.blendPrompt}</pre>
+                          </details>
+                        )}
+                      </div>
                     </details>
                   )}
                   {/* Test parameters + exact inputs sent to the model — keeps the
