@@ -372,12 +372,11 @@ export function GenerationProgress({
 
   const targetPercent = checkpointToPercent(serverCheckpoint);
 
-  // Progress strategy:
-  // Phase 1 (0-35%): Linear increase at 1% per second — gives immediate visual feedback
-  // Phase 2 (35%+): Checkpoint-driven — when checkpoints arrive ahead, speed up to catch up.
-  //                  Between checkpoints, slow creep so bar never looks stuck.
-  const LINEAR_CAP = 35;
-  const LINEAR_RATE = 0.5; // 0.5% per 500ms tick = 1%/sec
+  // Progress strategy: snap on large checkpoint jumps so the modal bar always
+  // matches the nav-bar percentage (both share checkpointToPercent). Smooth
+  // animation only for small refinements between sub-checkpoints (1-12 gap).
+  // Earlier 1%/sec linear creep let the modal trail the nav bar by tens of
+  // seconds when checkpoint jumped (e.g. 8 → 32 → 75% — modal stayed at 8).
 
   const [displayProgress, setDisplayProgress] = useState(1);
   const targetRef = useRef(1);
@@ -405,18 +404,22 @@ export function GenerationProgress({
         const gap = target - prev;
         if (gap <= 0) return prev; // already at target — wait for next checkpoint
 
-        // Adaptive step toward target. Bigger gap → faster catch-up so the
-        // bar reaches a newly-arrived checkpoint within a few seconds.
+        // Large checkpoint leaps (text done → quality-eval start = +25, scenes
+        // → covers done = +18) used to crawl at 0.5%/tick which made the main
+        // bar visibly trail the nav bar by tens of seconds. Snap when the gap
+        // is wide enough that the lag is the message itself — bar stays
+        // smooth for small refinements (~1-3 points between sub-steps).
+        const SNAP_GAP = 12;
+        if (gap >= SNAP_GAP) return target;
+
+        // Adaptive step for small gaps — bar feels alive without dragging.
         let step: number;
-        if (prev < LINEAR_CAP && target > LINEAR_CAP) {
-          // Early phase with a far-away target: 1%/sec linear feels right.
-          step = LINEAR_RATE;
-        } else if (gap < 3) {
+        if (gap < 3) {
           step = 0.3;
-        } else if (gap < 10) {
-          step = 0.3 + (gap - 3) * 0.1;  // 0.3 to 1.0
+        } else if (gap < 6) {
+          step = 0.6;
         } else {
-          step = Math.min(2, 1 + (gap - 10) * 0.05);  // 1.0 to 2.0
+          step = 1.0;
         }
         return Math.min(prev + step, target);
       });

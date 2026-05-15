@@ -893,13 +893,47 @@ test.describe('Demo Story Generation', () => {
     await clickNext(page);
 
     // ── Step 4: Art Style ──
+    // Wizard groups styles into collapsible sections (Beliebt / Realistisch /
+    // Illustriert / Kreativ in DE). "Cartoon" is under Illustriert, not the
+    // default Beliebt row. So we look for the target style label directly,
+    // and if invisible expand each group header until the label appears.
     // If a default style is preselected (localStorage from a prior run, or
     // server default), Step 4 can auto-advance to Step 5 before we get a
     // chance to click. Treat the art-style button as optional.
     console.log(`Step 4: Selecting art style: ${artStyleLabel}...`);
-    const artBtn = page.locator('button').filter({ hasText: artStyleLabel }).first();
-    if (await artBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await artBtn.click();
+    async function findAndClickArtStyle(): Promise<boolean> {
+      const direct = page.locator('button').filter({ hasText: artStyleLabel }).first();
+      // First try direct — popular styles (Aquarell/Anime/Comic/Pixar) are
+      // always visible at the top.
+      try {
+        await direct.waitFor({ state: 'visible', timeout: 3000 });
+        await direct.click({ timeout: 3000 });
+        return true;
+      } catch { /* not in popular row — try groups */ }
+      // Non-popular styles live inside one of the 3 collapsible groups
+      // (Realistic / Illustrated / Creative). Try each header in turn.
+      const groupRes = [
+        /^Realistisch$|^Realistic$|^Réaliste$/,
+        /^Illustriert$|^Illustrated$|^Illustré$/,
+        /^Kreativ$|^Creative$|^Créatif$/,
+      ];
+      for (const groupRe of groupRes) {
+        const groupBtn = page.locator('button').filter({ hasText: groupRe }).first();
+        if ((await groupBtn.count()) === 0) continue;
+        try {
+          await groupBtn.click({ timeout: 3000 });
+        } catch { continue; }
+        await page.waitForTimeout(400);
+        try {
+          await direct.waitFor({ state: 'visible', timeout: 2000 });
+          await direct.click({ timeout: 3000 });
+          return true;
+        } catch { /* not in this group — try next */ }
+      }
+      return false;
+    }
+    const styleClicked = await findAndClickArtStyle();
+    if (styleClicked) {
       await page.waitForTimeout(1000);
       const nextBtnAfterArt = page.getByRole('button', { name: NEXT_BTN_RE }).first();
       if (await nextBtnAfterArt.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -909,7 +943,8 @@ test.describe('Demo Story Generation', () => {
         await page.waitForTimeout(1000);
       }
     } else {
-      console.log(`  Art style picker not visible — already on Step 5 (preselected).`);
+      // Style label genuinely absent (e.g. preselected on Step 5 already).
+      console.log(`  Art style "${artStyleLabel}" not findable in any group — assuming Step 5 already.`);
     }
 
     // ── Step 5: Summary & Generate ──
