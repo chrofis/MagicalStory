@@ -182,7 +182,14 @@ async function findColorBbox(buf, hex) {
 
   const w = merged.maxX - merged.minX + 1;
   let h = merged.maxY - merged.minY + 1;
-  if (h / w < 1.1) return null;
+  // Aspect sanity: drop horizon-stripe / banner-strap false positives (saturated
+  // sky band, painted sign, etc.). 0.3 is permissive enough to keep reclining,
+  // sitting, leaning-over and reaching-across poses — every human silhouette
+  // we've seen Grok paint has h/w ≥ 0.4. The earlier 1.1 threshold rejected
+  // any non-portrait pose and silently dropped wide-action characters (see
+  // story job_1778849489132_irowi7vq7 page 2 — red silhouette lying in a
+  // rowboat measured 845×388 = h/w 0.46 and was discarded).
+  if (h / w < 0.3) return null;
   // Belt-and-braces clamp: a single character should never need more than
   // 90% of canvas height. If the merge / detection ever overshoots, cap.
   if (h > H * 0.9) {
