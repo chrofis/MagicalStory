@@ -1112,8 +1112,11 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           phantomPoseRender,
         };
         const addUsageNoop = () => {}; // test-models doesn't bill credits
+        // Phase 4: prefer the story-scoped sheet for each character so the
+        // per-page rerun matches the canonical generation path.
         const cast = await buildCompositeCastShared(pageData, inputData, {
           userId: req.user.id, addUsage: addUsageNoop, log,
+          storyCharacterAvatars: storyData.characterAvatars || null,
         });
         if (!cast || cast.length === 0) {
           results[compositeKey] = {

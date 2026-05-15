@@ -5316,8 +5316,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Returns null if any cast character can't be set up — the caller
       // then falls through to the legacy direct-prompt path.
       const { buildCompositeCast: buildCompositeCastShared } = require('./server/lib/compositeCastBuilder');
+      // Phase 4: project per-character sheets once so compositeCastBuilder
+      // reads from the story-scoped object (story.data.characterAvatars)
+      // first. Hoisted out of the per-page loop — same data for all pages.
+      const storyCharacterAvatarsForComposite = require('./server/lib/storyAvatars')
+        .projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
       const buildCompositeCast = (pageData, inputData) =>
-        buildCompositeCastShared(pageData, inputData, { userId, addUsage, log });
+        buildCompositeCastShared(pageData, inputData, {
+          userId, addUsage, log,
+          storyCharacterAvatars: storyCharacterAvatarsForComposite,
+        });
 
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();

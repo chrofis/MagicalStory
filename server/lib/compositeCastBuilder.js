@@ -29,7 +29,7 @@ const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
 
 async function buildCompositeCast(pageData, inputData, deps = {}) {
-  const { userId, addUsage, log } = deps;
+  const { userId, addUsage, log, storyCharacterAvatars = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
 
   const metaChars = pageData.sceneMetadata?.fullData?.characters
@@ -68,14 +68,31 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       ? clothing.slice('costumed:'.length).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
       : null;
 
-    // Step 1: try the cached styled-avatar (2×4) for this art-style + clothing.
+    // Step 1: try the story-scoped sheet first (Phase 4 — the canonical
+    // source). When the story already has a costumed/styled-<clothing>
+    // sheet for this character, use that. Falls back to the character row
+    // for in-flight stories that pre-date Phase 1 (no characterAvatars
+    // shadow write was performed) and for the per-page rerun endpoint
+    // path that doesn't yet pass storyCharacterAvatars in deps.
+    let storySlot = null;
+    if (storyCharacterAvatars && storyCharacterAvatars[name]) {
+      const entry = storyCharacterAvatars[name];
+      if (costumeKey) {
+        storySlot = entry.costumed || null;
+      } else {
+        storySlot = entry[`styled-${clothing}`] || entry.costumed || null;
+      }
+    }
     const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
     const cachedSheet = costumeKey
       ? styledForStyle.costumed?.[costumeKey]
       : styledForStyle[clothing];
-    let sheetUri = cachedSheet
-      ? (typeof cachedSheet === 'string' ? cachedSheet : (cachedSheet.imageUrl || cachedSheet.imageData || cachedSheet.data || null))
-      : null;
+    let sheetUri = storySlot
+      ? (typeof storySlot === 'string' ? storySlot : (storySlot.imageUrl || storySlot.imageData || storySlot.data || null))
+      : (cachedSheet
+        ? (typeof cachedSheet === 'string' ? cachedSheet : (cachedSheet.imageUrl || cachedSheet.imageData || cachedSheet.data || null))
+        : null);
+    if (storySlot) log.debug(`[STORY-AVATAR] using story.characterAvatars[${name}] for ${clothing}`);
 
     // Step 2: lazy-generate if missing.
     if (!sheetUri || (!sheetUri.startsWith('data:') && !sheetUri.startsWith('http'))) {
