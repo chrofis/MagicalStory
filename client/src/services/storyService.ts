@@ -1348,6 +1348,7 @@ export const storyService = {
     composite?: boolean;
     phantomPoseRender?: boolean;
     emptyScene?: 'reuse' | 'fresh' | 'skip';
+    useStorySheetCells?: boolean;
   }): Promise<{
     results: Record<string, {
       imageData?: string;
@@ -1393,6 +1394,7 @@ export const storyService = {
         ...(options?.composite && { composite: true }),
         ...(options?.phantomPoseRender && { phantomPoseRender: true }),
         ...(options?.emptyScene && { emptyScene: options.emptyScene }),
+        ...(options?.useStorySheetCells && { useStorySheetCells: true }),
       }
     );
     return response;

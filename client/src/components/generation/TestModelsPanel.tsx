@@ -66,6 +66,9 @@ export function TestModelsPanel({
   const [composite, setComposite] = useState(false);
   const [phantomPoseRender, setPhantomPoseRender] = useState(false);
   const [emptyScene, setEmptyScene] = useState<'reuse' | 'fresh' | 'skip'>('reuse');
+  // Direct path: send one cell of the story's 2×4 sheet (matching the page's
+  // intended pose) instead of the full styled-avatar image.
+  const [useStorySheetCells, setUseStorySheetCells] = useState(false);
 
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
@@ -110,10 +113,12 @@ export function TestModelsPanel({
       iterativePlacement?: boolean;
       referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off';
       singlePassScene?: boolean;
+      useStorySheetCells?: boolean;
     } = {};
     if (iterativePlacement) baseOptions.iterativePlacement = true;
     if (referenceMode !== 'inherit') baseOptions.referenceMode = referenceMode;
     if (singlePassScene !== 'inherit') baseOptions.singlePassScene = singlePassScene === 'on';
+    if (useStorySheetCells) baseOptions.useStorySheetCells = true;
 
     const directPromises = models.map(async (model) => {
       setResults(prev => ({ ...prev, [model]: { loading: true } }));
@@ -190,7 +195,7 @@ export function TestModelsPanel({
 
     await Promise.allSettled(compositePromise ? [...directPromises, compositePromise] : directPromises);
     setIsRunning(false);
-  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene]);
+  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -308,6 +313,17 @@ export function TestModelsPanel({
                 <option value="off">use plate (two-pass)</option>
                 <option value="on">skip plate (single-pass)</option>
               </select>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]">
+              <input
+                type="checkbox"
+                checked={useStorySheetCells}
+                onChange={e => setUseStorySheetCells(e.target.checked)}
+                disabled={isRunning}
+                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-xs text-orange-700 font-medium">Use 2×4 cell refs</span>
+              <span className="text-[10px] text-gray-400">(one body cell per char from story sheet)</span>
             </label>
           </div>
           {/* Composite path controls — separate row, distinct colour so it's

@@ -871,6 +871,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       composite = false,           // route through scene-composite pipeline
       phantomPoseRender = false,   // composite step-3 variant (only used when composite=true)
       emptyScene = 'reuse',        // 'reuse' | 'fresh' | 'skip' — composite step-1 source
+      useStorySheetCells = false,  // direct-path: replace styled-avatar ref with cropped 2×4 cell
     } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
@@ -964,6 +965,48 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       sceneBackground: effectiveSceneBackground,
       sceneMetadata,
     });
+    // Phase 3b: optionally swap each character's styled-avatar ref for a
+    // single body cell cropped out of story.data.characterAvatars[name].
+    // Pose comes from scene-expansion metadata so the cell matches the
+    // figure's intended facing direction on this page. Falls through when
+    // the story doesn't yet have a sheet for the character.
+    if (useStorySheetCells && storyData?.characterAvatars && Array.isArray(refApplied.characterPhotos)) {
+      const { cropAvatarCell } = require('../lib/sceneComposite');
+      const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [];
+      const poseByName = new Map();
+      for (const sc of metaChars) {
+        const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
+        if (!nm) continue;
+        const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+          ? sc.pose : 'threeQuarter';
+        const flip = sc?.flip === true;
+        poseByName.set(nm.toLowerCase(), { pose, flip });
+      }
+      for (const ref of refApplied.characterPhotos) {
+        const charName = ref.name;
+        if (!charName) continue;
+        const story = storyData.characterAvatars[charName];
+        if (!story) continue;
+        const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
+        let slotKey;
+        if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
+        else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
+        else slotKey = 'costumed';
+        const sheetUri = story[slotKey] || story.costumed;
+        if (!sheetUri) continue;
+        const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false };
+        try {
+          const { body } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace: false });
+          ref.photoUrl = `data:image/png;base64,${body.toString('base64')}`;
+          ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}`;
+          ref.cellPose = pf.pose;
+          ref.cellFlip = pf.flip;
+          log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''} cell from ${slotKey}`);
+        } catch (err) {
+          log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message}`);
+        }
+      }
+    }
     // Snapshot of inputs that every model in this run was given. Surfaced in
     // the response so the panel can show "what was sent to the model" next to
     // each result image — makes the test history self-explanatory.

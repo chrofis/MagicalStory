@@ -7324,6 +7324,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // null/undefined = inherit MODEL_DEFAULTS; otherwise one of strict|loose|styled-only|off.
     referenceMode = null,
     singlePassScene = null,
+    // Phase 3b: when true, replace each character's styled-avatar reference
+    // with a single body cell cropped out of the story-scoped 2×4 sheet
+    // (story.data.characterAvatars[name][slot]). Pose comes from the scene-
+    // expansion metadata. Falls through silently when the story has no
+    // sheet for the character yet. Default off — opt-in via the per-page
+    // rerun panel.
+    useStorySheetCells = false,
   } = options;
   const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
   // Explicit boolean from caller wins over the run-level default.
@@ -7611,6 +7618,52 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   );
   if (!allAlreadyStyled && (!clothingCategory || !clothingCategory.startsWith('costumed'))) {
     referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+  }
+
+  // Phase 3b: optionally replace each character's full-image styled-avatar
+  // reference with a single body cell cropped out of the story-scoped 2×4
+  // sheet at story.data.characterAvatars[name][slotKey]. Pose comes from
+  // scene-expansion metadata so the cell matches the figure's intended
+  // facing direction on this page. Skips characters with no story sheet.
+  if (useStorySheetCells && storyData?.characterAvatars) {
+    const { cropAvatarCell } = require('./sceneComposite');
+    const metaChars = newSceneMetadata?.fullData?.characters
+      || newSceneMetadata?.characters
+      || sceneCharacters
+      || [];
+    const poseByName = new Map();
+    for (const sc of metaChars) {
+      const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
+      if (!nm) continue;
+      const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+        ? sc.pose : 'threeQuarter';
+      const flip = sc?.flip === true;
+      poseByName.set(nm.toLowerCase(), { pose, flip });
+    }
+    for (const ref of referencePhotos) {
+      const charName = ref.name;
+      if (!charName) continue;
+      const story = storyData.characterAvatars[charName];
+      if (!story) continue;
+      const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
+      let slotKey;
+      if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
+      else if (clothingRaw === 'standard' || clothingRaw === 'winter' || clothingRaw === 'summer') slotKey = `styled-${clothingRaw}`;
+      else slotKey = 'costumed';
+      const sheetUri = story[slotKey] || story.costumed;
+      if (!sheetUri) continue;
+      const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false };
+      try {
+        const { body } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace: false });
+        ref.photoUrl = `data:image/png;base64,${body.toString('base64')}`;
+        ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}`;
+        ref.cellPose = pf.pose;
+        ref.cellFlip = pf.flip;
+        log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''} cell from ${slotKey}`);
+      } catch (err) {
+        log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message} — falling back to existing ref`);
+      }
+    }
   }
 
   // Build landmark photos
