@@ -1908,9 +1908,16 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
         const clothing = String(perChar[name] || 'standard').toLowerCase();
         const styledForStyle = char.avatars.styledAvatars[artStyleKey] || {};
         let raw = null;
-        if (clothing.startsWith('costumed:')) {
-          const ck = clothing.slice('costumed:'.length);
-          raw = styledForStyle.costumed?.[ck];
+        if (clothing === 'costumed' || clothing.startsWith('costumed:')) {
+          // Bare 'costumed' — one costume per character, pick first entry.
+          if (clothing.startsWith('costumed:')) {
+            const ck = clothing.slice('costumed:'.length);
+            raw = styledForStyle.costumed?.[ck];
+          }
+          if (!raw && styledForStyle.costumed) {
+            const firstKey = Object.keys(styledForStyle.costumed)[0];
+            if (firstKey) raw = styledForStyle.costumed[firstKey];
+          }
         } else {
           raw = styledForStyle[clothing];
         }

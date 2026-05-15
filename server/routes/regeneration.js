@@ -507,14 +507,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
           ...charClothing
         };
       }
-      // Determine predominant clothing category from per-character data
+      // Determine predominant clothing category from per-character data.
+      // Phase 5: clothing is always bare 'costumed' (no subtype) — preserve as-is.
       const clothingValues = Object.values(pageClothingEntry);
       const firstClothing = clothingValues[0];
-      if (firstClothing && firstClothing.startsWith('costumed:')) {
-        clothingCategory = firstClothing; // Use first character's costume as category
-      } else {
-        clothingCategory = firstClothing || parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
-      }
+      clothingCategory = firstClothing || parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
       log.debug(`🔄 [REGEN] Using per-character clothing for page ${pageNumber}: ${JSON.stringify(pageClothingEntry)}`);
     } else {
       clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';

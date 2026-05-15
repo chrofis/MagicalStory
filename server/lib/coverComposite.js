@@ -395,9 +395,9 @@ function getCostumedAvatarSrc(c, artStyle) {
   } else if (typeof costumedObj === 'string') {
     return costumedObj;
   }
-  // Fall back to standard / formal in the same art style
-  for (const k of ['standard', 'formal']) {
-    const v = styled[k];
+  // Fall back to standard in the same art style
+  {
+    const v = styled.standard;
     if (typeof v === 'string') return v;
     if (v && typeof v === 'object') return v.imageUrl || v.imageData;
   }

@@ -2352,11 +2352,10 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 
   // Fallback priority for clothing avatars (same as getCharacterPhotoDetails)
   const clothingFallbackOrder = {
-    winter: ['standard', 'formal', 'summer'],
-    summer: ['standard', 'formal', 'winter'],
-    formal: ['standard', 'winter', 'summer'],
-    standard: ['formal', 'summer', 'winter'],
-    costumed: ['standard', 'formal']
+    winter: ['standard', 'summer'],
+    summer: ['standard', 'winter'],
+    standard: ['summer', 'winter'],
+    costumed: ['standard']
   };
 
   return characters
@@ -2380,7 +2379,7 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 
       // Try fallback clothing categories before falling back to body photos
       if (clothingCategory && avatars) {
-        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'formal', 'summer', 'winter'];
+        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'summer', 'winter'];
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
@@ -2425,12 +2424,6 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
       log.debug(`[CLOTHING] Using JSON metadata: "${clothingLower}"`);
       return clothingLower;
     }
-
-    // Backwards compatibility: map 'formal' to 'standard'
-    if (clothingLower === 'formal') {
-      log.debug(`[CLOTHING] Mapping legacy "formal" to "standard"`);
-      return 'standard';
-    }
   }
 
   // Fallback: Generic approach - find "Clothing" keyword (in any language) and look for value nearby
@@ -2442,8 +2435,8 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   // Clothing keywords in multiple languages
   const keywords = '(?:Clothing|Kleidung|Vêtements|Tenue)';
 
-  // Valid clothing values (including costumed with optional sub-type)
-  const values = '(winter|summer|standard|formal|costumed(?::[a-z]+)?)';
+  // Valid clothing values — Phase 5: bare 'costumed' only, no subtype suffix.
+  const values = '(winter|summer|standard|costumed)';
 
   // Pattern 1: Same line - keyword and value on same line with any markdown/separators
   // Handles: **Clothing:** winter, *Clothing*: **winter**, --Clothing--: winter, ## 4. Clothing: winter
@@ -2451,9 +2444,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
     new RegExp(keywords + md + ':?' + md + values, 'i')
   );
   if (sameLineMatch) {
-    const value = sameLineMatch[1].toLowerCase();
-    // Map formal to standard
-    return value === 'formal' ? 'standard' : value;
+    return sameLineMatch[1].toLowerCase();
   }
 
   // Pattern 2: Value on next line - handles any markdown formatting
@@ -2462,8 +2453,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
     new RegExp(keywords + md + ':?' + md + '\\n' + md + values + md, 'i')
   );
   if (multilineMatch) {
-    const value = multilineMatch[1].toLowerCase();
-    return value === 'formal' ? 'standard' : value;
+    return multilineMatch[1].toLowerCase();
   }
 
   // Pattern 3: Fallback - find keyword and look for value within next 100 chars
@@ -2471,17 +2461,9 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (keywordMatch) {
     const startIndex = keywordMatch.index;
     const nearbyText = sceneDescription.substring(startIndex, startIndex + 100);
-    const valueMatch = nearbyText.match(/\b(winter|summer|standard|formal|costumed(?::[a-z]+)?)\b/i);
+    const valueMatch = nearbyText.match(/\b(winter|summer|standard|costumed)\b/i);
     if (valueMatch) {
-      const value = valueMatch[1].toLowerCase();
-      return value === 'formal' ? 'standard' : value;
-    }
-
-    // Check for legacy 'formal' value
-    const formalMatch = nearbyText.match(/\bformal\b/i);
-    if (formalMatch) {
-      log.debug(`[CLOTHING] Mapping legacy "formal" to "standard"`);
-      return 'standard';
+      return valueMatch[1].toLowerCase();
     }
 
     // Found keyword but no valid value - log error and default to standard
@@ -2633,7 +2615,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
-  // Note: 'formal' replaced by 'costumed' but kept for backwards compatibility
+  // Note: 'formal' was a legacy clothing category — fully removed Phase 5.
   const clothingFallbackOrder = {
     winter: ['standard', 'summer'],
     summer: ['standard', 'winter'],
@@ -2800,25 +2782,6 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${resolvedClothing} (no styled avatar found)`);
       }
 
-      // Backwards compatibility: use legacy 'formal' avatar for costumed requests
-      if (!photoUrl && resolvedClothing === 'costumed' && avatars?.formal) {
-        log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
-        photoType = 'clothing-formal';
-        // Handle various legacy formats: arrays, {imageData, clothing} objects
-        const formalData = avatars.formal;
-        if (Array.isArray(formalData)) {
-          photoUrl = formalData[0];
-        } else if (typeof formalData === 'object' && formalData.imageData) {
-          photoUrl = formalData.imageData;
-        } else {
-          photoUrl = formalData;
-        }
-        actualClothingUsed = 'formal';
-        if (avatars.clothing?.formal) {
-          const clothingData = avatars.clothing.formal;
-          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-        }
-      }
 
       // Try fallback clothing avatars before falling back to body photo
       // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars

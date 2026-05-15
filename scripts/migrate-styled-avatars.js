@@ -50,7 +50,7 @@ async function migrateStyledAvatars() {
         let charFixed = 0;
 
         // Check regular avatar categories (standard, winter, summer, formal)
-        const regularCategories = ['standard', 'winter', 'summer', 'formal'];
+        const regularCategories = ['standard', 'winter', 'summer'];
         for (const cat of regularCategories) {
           const value = char.avatars[cat];
           if (typeof value === 'object' && value.imageData) {

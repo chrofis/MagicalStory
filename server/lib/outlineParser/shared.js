@@ -38,8 +38,8 @@ const KEYWORDS = {
   pageByPage: ['Page-by-Page', 'Seitenweise', 'Page par page'],
 };
 
-// Clothing categories (same across languages)
-// Note: 'formal' replaced by 'costumed' - existing formal avatars used as fallback
+// Clothing categories (same across languages). 'formal' was a legacy
+// category, fully removed Phase 5. 'costumed' is the bare key — no subtype.
 const CLOTHING_CATEGORIES = ['winter', 'summer', 'costumed', 'standard'];
 
 // ============================================================================

@@ -1837,8 +1837,8 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
   // Build clothing context info (new for per-clothing evaluation)
   let clothingContextInfo = '';
   if (clothingCategory) {
-    if (clothingCategory.startsWith('costumed:')) {
-      const costumeType = clothingCategory.replace('costumed:', '');
+    if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
+      const costumeType = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : 'costume';
       clothingContextInfo = `
 ## Clothing Context
 
@@ -2845,17 +2845,16 @@ function buildPhysicalTraitsDescription(character) {
 function buildClothingDescription(character, clothingCategory, artStyle) {
   const avatars = character.avatars;
 
-  // Handle costumed categories (e.g., "costumed:wizard", "costumed:pirate")
-  if (clothingCategory.startsWith('costumed:')) {
-    const costumeType = clothingCategory.replace('costumed:', '');
-
-    // Check avatars.costumed[costumeType].clothing (where costume clothing is stored)
-    if (avatars?.costumed?.[costumeType]?.clothing) {
-      return avatars.costumed[costumeType].clothing;
+  // Handle costumed clothing — bare 'costumed' (Phase 5) or legacy 'costumed:<sub>'.
+  if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
+    const colonSub = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : null;
+    // Nested-by-subtype legacy shape: prefer the matching key, else first entry.
+    if (avatars?.costumed && typeof avatars.costumed === 'object') {
+      if (colonSub && avatars.costumed[colonSub]?.clothing) return avatars.costumed[colonSub].clothing;
+      const firstEntry = Object.values(avatars.costumed)[0];
+      if (firstEntry?.clothing) return firstEntry.clothing;
     }
-
-    // Fallback: return costume type as description
-    return `${costumeType} costume as shown in reference`;
+    return `${colonSub || 'costume'} as shown in reference`;
   }
 
   // For standard categories, try to get extracted clothing from styled avatar

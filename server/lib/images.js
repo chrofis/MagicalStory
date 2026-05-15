@@ -2837,7 +2837,7 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   const isCategoryLabel = (str) => {
     if (!str || typeof str !== 'string') return false;
     const s = str.trim().toLowerCase();
-    if (['standard', 'winter', 'summer', 'formal'].includes(s)) return true;
+    if (['standard', 'winter', 'summer', 'costumed'].includes(s)) return true;
     if (s.startsWith('costumed:')) return true;
     return false;
   };
@@ -2849,12 +2849,18 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   // avatars.clothing["costumed:cowboy"] which doesn't exist.
   const resolveClothingDesc = (clothingDescriptions, category) => {
     if (!clothingDescriptions || !category) return '';
-    if (category.startsWith('costumed:')) {
-      const type = category.split(':')[1];
+    // Costumed (bare or legacy 'costumed:<type>') — one costume per character,
+    // so pick the first entry of the nested costumed object regardless of any
+    // legacy subtype string.
+    if (category === 'costumed' || category.startsWith('costumed:')) {
       const costumed = clothingDescriptions.costumed;
+      if (typeof costumed === 'string') return costumed;
       if (costumed && typeof costumed === 'object') {
-        if (costumed[type]) return costumed[type];
-        // Any costume description is better than none on a costumed page
+        // If legacy subtype-keyed, prefer the matching key; else first entry.
+        if (category.startsWith('costumed:')) {
+          const type = category.split(':')[1];
+          if (costumed[type]) return costumed[type];
+        }
         const firstCostume = Object.values(costumed).find(v => typeof v === 'string');
         if (firstCostume) return firstCostume;
       }

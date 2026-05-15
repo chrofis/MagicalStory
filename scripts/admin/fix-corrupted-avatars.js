@@ -62,7 +62,7 @@ function isCorruptedAvatar(value) {
 function hasCorruptedAvatars(char) {
   if (!char.avatars) return false;
 
-  const avatarStyles = ['standard', 'winter', 'summer', 'formal'];
+  const avatarStyles = ['standard', 'winter', 'summer'];
   for (const style of avatarStyles) {
     if (isCorruptedAvatar(char.avatars[style])) {
       return true;
@@ -142,7 +142,7 @@ function isValidAvatar(value) {
  * Find a valid avatar variant to use as fallback
  */
 function findValidVariant(avatars) {
-  const variants = ['standard', 'winter', 'summer', 'formal'];
+  const variants = ['standard', 'winter', 'summer'];
   for (const variant of variants) {
     if (isValidAvatar(avatars[variant])) {
       return { variant, value: avatars[variant] };
@@ -175,7 +175,7 @@ function fixCharacterAvatars(char) {
   if (!char.avatars) return false;
 
   let fixed = false;
-  const variants = ['standard', 'winter', 'summer', 'formal'];
+  const variants = ['standard', 'winter', 'summer'];
 
   // Find a valid variant to use as fallback
   const fallback = findValidVariant(char.avatars);

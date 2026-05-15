@@ -143,7 +143,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
         // Plain avatars (standard/summer/winter/formal) — only if still inline
         if (c.avatars && typeof c.avatars === 'object') {
-          for (const slot of ['standard', 'summer', 'winter', 'formal']) {
+          for (const slot of ['standard', 'summer', 'winter']) {
             const v = c.avatars[slot];
             if (typeof v === 'string' && looksLikeBytes(v)) {
               queue(v, r2.keyForCharacterAvatar(userId, charId, slot), (url) => {

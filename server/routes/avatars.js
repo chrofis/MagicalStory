@@ -905,8 +905,6 @@ function getClothingStylePrompt(category, isFemale) {
     tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
   } else if (category === 'summer') {
     tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
-  } else if (category === 'formal') {
-    tag = isFemale ? '[FORMAL_FEMALE]' : '[FORMAL_MALE]';
   } else {
     return 'Full outfit with shoes matching the style of the reference.';
   }
@@ -3722,7 +3720,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
           log.debug(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
 
-          const outfitDescription = category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : category === 'formal' ? 'formal attire' : 'casual clothes';
+          const outfitDescription = category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : 'casual clothes';
           const retryPrompt = fillTemplate(PROMPT_TEMPLATES.avatarRetryPrompt, {
             '{OUTFIT_DESCRIPTION}': outfitDescription
           });

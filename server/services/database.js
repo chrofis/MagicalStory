@@ -990,7 +990,7 @@ async function extractInlineImagesToR2(storyId, data) {
             });
           }
         } else {
-          // Plain category: 'standard' | 'summer' | 'winter' | 'formal'
+          // Plain category: 'standard' | 'summer' | 'winter'
           const inline = (typeof slot === 'string')
             ? slot
             : (typeof slot.imageData === 'string') ? slot.imageData : null;
@@ -1192,7 +1192,7 @@ function stripInlineImagesFromStoryData(data) {
       }
     }
     if (c.avatars && typeof c.avatars === 'object') {
-      for (const k of ['standard', 'summer', 'winter', 'formal']) c.avatars[k] = undefined;
+      for (const k of ['standard', 'summer', 'winter']) c.avatars[k] = undefined;
       c.avatars.faceThumbnails = undefined;
       c.avatars.bodyThumbnails = undefined;
       // DO NOT strip c.avatars.styledAvatars — per-story data, no other source.
@@ -2022,11 +2022,13 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   if (!Object.prototype.hasOwnProperty.call(ART_STYLES, artStyle)) {
     throw new Error(`persistStyledAvatar: unknown artStyle "${artStyle}" (not in ART_STYLES)`);
   }
-  // clothingCategory is one of: 'standard' | 'winter' | 'summer' | 'formal' |
-  // 'costumed:<costumeKey>'. Anything else is a bug.
+  // clothingCategory is one of: 'standard' | 'winter' | 'summer' | 'costumed'
+  // (bare) | 'costumed:<costumeKey>' (legacy). Anything else is a bug.
   const CLOTHING_BARE_RE = /^[a-z][a-z0-9_]{0,30}$/;
-  const isCostumed = clothingCategory.startsWith('costumed:');
-  const costumeKey = isCostumed ? clothingCategory.slice('costumed:'.length) : null;
+  const isCostumed = clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:');
+  const costumeKey = clothingCategory.startsWith('costumed:')
+    ? clothingCategory.slice('costumed:'.length)
+    : (isCostumed ? 'default' : null);
   const categoryBare = isCostumed ? null : clothingCategory;
   if (categoryBare && !CLOTHING_BARE_RE.test(categoryBare)) {
     throw new Error(`persistStyledAvatar: invalid clothing category "${clothingCategory}"`);
