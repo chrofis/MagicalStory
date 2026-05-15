@@ -501,6 +501,10 @@ async function generateSceneComposite(opts) {
     let usedPhantomPose = false;
     if (phantomPoseRender) {
       try {
+        // Mask out OTHER cast members' silhouettes when they happen to fall
+        // within this character's cropped region — repaint with clean BG
+        // pixels so Grok sees only the target's silhouette + scene context.
+        const otherColors = cast.filter(o => o.name !== c.name && o.color).map(o => o.color);
         const ppr = await renderCharacterInPhantomPose({
           charSheet2x4: c.sheetBuf,
           blockingImageBuf: blockingBuf,
@@ -511,6 +515,8 @@ async function generateSceneComposite(opts) {
           aspectRatio: '9:16',
           model: GROK_MODELS.STANDARD,
           usageTracker,
+          cleanBgBuf: bgBuf,
+          otherColors,
         });
         totalCost += ppr.usage?.cost || 0;
         phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };

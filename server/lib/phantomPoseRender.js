@@ -31,16 +31,40 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 
+// rgbToHue copied from sceneComposite (not exported there). Kept inline so this
+// module stays self-contained.
+function _rgbToHue(r, g, b) {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return h;
+}
+
 /**
  * Crop the phantom silhouette region from the blocking image with padding so
  * the model sees the shape edge-to-edge plus a small margin of context.
  *
+ * When `cleanBgBuf` + `otherColors` are provided, any pixels in the cropped
+ * region that match one of the OTHER cast members' silhouette hues are
+ * repainted with the corresponding pixels from the clean background — so the
+ * model sees ONLY the target character's silhouette plus the surrounding
+ * scene context, never another character's coloured blob.
+ *
  * @param {Buffer} blockingBuf
  * @param {{x:number,y:number,width:number,height:number}} bbox
  * @param {number} paddingRatio - extra fraction of bbox dimensions to include around it
+ * @param {object} opts
+ * @param {Buffer} [opts.cleanBgBuf] - the pre-silhouette background (same dimensions as blockingBuf)
+ * @param {string[]} [opts.otherColors] - hex colour strings (#RRGGBB) of OTHER silhouettes to mask out
  * @returns {Promise<Buffer>}
  */
-async function cropPhantom(blockingBuf, bbox, paddingRatio = 0.15) {
+async function cropPhantom(blockingBuf, bbox, paddingRatio = 0.15, opts = {}) {
   const meta = await sharp(blockingBuf).metadata();
   const padX = Math.round(bbox.width * paddingRatio);
   const padY = Math.round(bbox.height * paddingRatio);
@@ -50,8 +74,71 @@ async function cropPhantom(blockingBuf, bbox, paddingRatio = 0.15) {
   const bottom = Math.min(meta.height, bbox.y + bbox.height + padY);
   const width = right - left;
   const height = bottom - top;
-  return sharp(blockingBuf)
+
+  // Fast path: no other-colour masking requested.
+  if (!opts.cleanBgBuf || !Array.isArray(opts.otherColors) || opts.otherColors.length === 0) {
+    return sharp(blockingBuf)
+      .extract({ left, top, width, height })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+  }
+
+  // Repaint path: extract the same region from both images as raw RGBA,
+  // then walk pixels — when the blocking pixel matches one of the other-
+  // character hues, replace it with the corresponding clean-bg pixel.
+  const blockingCrop = await sharp(blockingBuf)
     .extract({ left, top, width, height })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const cleanCrop = await sharp(opts.cleanBgBuf)
+    .extract({ left, top, width, height })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  if (blockingCrop.info.width !== cleanCrop.info.width
+      || blockingCrop.info.height !== cleanCrop.info.height) {
+    log.warn('[PHANTOM-POSE] cropPhantom: blocking and clean-bg dimensions differ — skipping mask repaint');
+    return sharp(blockingBuf)
+      .extract({ left, top, width, height })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+  }
+
+  // Pre-compute target hues for fast pixel-loop comparison.
+  const otherHues = opts.otherColors.map((hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return _rgbToHue(r, g, b);
+  });
+
+  const out = Buffer.from(blockingCrop.data); // copy so we can mutate
+  const clean = cleanCrop.data;
+  let repainted = 0;
+  for (let i = 0; i < out.length; i += 4) {
+    const r = out[i], g = out[i + 1], b = out[i + 2];
+    const maxCh = Math.max(r, g, b);
+    const minCh = Math.min(r, g, b);
+    const sat = (maxCh - minCh) / (maxCh || 1);
+    if (sat < 0.55 || maxCh < 80) continue; // not a saturated silhouette pixel
+    const hue = _rgbToHue(r, g, b);
+    for (const oh of otherHues) {
+      let dh = Math.abs(hue - oh);
+      if (dh > 180) dh = 360 - dh;
+      if (dh <= 35) {
+        out[i]     = clean[i];
+        out[i + 1] = clean[i + 1];
+        out[i + 2] = clean[i + 2];
+        out[i + 3] = clean[i + 3];
+        repainted++;
+        break;
+      }
+    }
+  }
+  log.debug(`[PHANTOM-POSE] cropPhantom: repainted ${repainted} other-silhouette pixels with clean BG`);
+  return sharp(out, { raw: { width: blockingCrop.info.width, height: blockingCrop.info.height, channels: 4 } })
     .jpeg({ quality: 92 })
     .toBuffer();
 }
@@ -110,6 +197,11 @@ async function renderCharacterInPhantomPose({
   aspectRatio = '9:16',
   model = GROK_MODELS.STANDARD,
   usageTracker,
+  // When provided, cropPhantom will mask out OTHER-colour silhouettes that
+  // happen to fall within the cropped region — repaints them with pixels
+  // from the clean background so Grok sees only the target character.
+  cleanBgBuf = null,
+  otherColors = null,
 }) {
   if (!charSheet2x4) throw new Error('renderCharacterInPhantomPose: missing charSheet2x4');
   if (!blockingImageBuf) throw new Error('renderCharacterInPhantomPose: missing blockingImageBuf');
@@ -120,7 +212,7 @@ async function renderCharacterInPhantomPose({
     ? (charSheet2x4.startsWith('data:') ? charSheet2x4 : `data:image/png;base64,${charSheet2x4}`)
     : `data:image/png;base64,${charSheet2x4.toString('base64')}`;
 
-  const phantomCropBuf = await cropPhantom(blockingImageBuf, bbox);
+  const phantomCropBuf = await cropPhantom(blockingImageBuf, bbox, 0.15, { cleanBgBuf, otherColors });
   const phantomDataUrl = `data:image/jpeg;base64,${phantomCropBuf.toString('base64')}`;
 
   const prompt = buildPhantomPosePrompt({ charName, colorName, action });
