@@ -2431,11 +2431,10 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
         const sav = require('./server/lib/storyAvatars');
         const reqs = (typeof clothingRequirements !== 'undefined' && clothingRequirements) || null;
         const costumes = reqs ? sav.projectStoryCostumeDescriptions(reqs) : {};
-        if (Object.keys(costumes).length > 0) {
-          visualBible = visualBible || {};
-          visualBible.costumes = costumes;
-        }
-        return visualBible;
+        if (Object.keys(costumes).length === 0) return visualBible;
+        const vb = visualBible || {};
+        vb.costumes = costumes;
+        return vb;
       })(),
       pageClothing: pageClothingData, sceneDescriptions, sceneImages, coverImages,
       characterAvatars: require('./server/lib/storyAvatars').projectStoryCharacterAvatars(
@@ -6394,11 +6393,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // character.avatars.clothing.costumed.<subtype> on the character row.
         const sav = require('./server/lib/storyAvatars');
         const costumes = sav.projectStoryCostumeDescriptions(clothingRequirements);
-        if (Object.keys(costumes).length > 0) {
-          visualBible = visualBible || {};
-          visualBible.costumes = costumes;
-        }
-        return visualBible;
+        if (Object.keys(costumes).length === 0) return visualBible;
+        const vb = visualBible || {};
+        vb.costumes = costumes;
+        return vb;
       })(),
       // Story-scoped character avatars (Phase 1: shadow write). Projected from
       // inputData.characters[*].avatars.styledAvatars[<artStyle>]. Later phases
