@@ -200,8 +200,8 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
 async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars, costumeDescriptions) {
   if (!userId || !Array.isArray(characters) || !ctx?.storyId) return 0;
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return 0;
-  const { getDbPool } = require('../services/database');
-  const pool = getDbPool();
+  const { getPool } = require('../services/database');
+  const pool = getPool();
   let appended = 0;
   const now = new Date().toISOString();
   for (const char of characters) {
