@@ -308,6 +308,106 @@ async function scaleToHeight(buf, targetH) {
   return sharp(buf).resize({ height: targetH, withoutEnlargement: false }).png().toBuffer();
 }
 
+/**
+ * Detect z-order (paint sequence) by reading actual occlusion from the
+ * populated plate. For each pair of placements whose bboxes overlap, count
+ * saturated pixels of each character's colour inside the intersection
+ * rectangle — the character with significantly more pixels there is the
+ * one painted on top by Grok (the other character's pixels were overwritten
+ * where they were occluded).
+ *
+ * @param {Buffer} populatedBuf raw image bytes of the populated plate (any
+ *   format sharp accepts).
+ * @param {Array} placements [{ _name, _color, _bbox, _footY, ... }]
+ *   _bbox: { x, y, width, height }; _color: '#RRGGBB' hex.
+ * @returns {Promise<{order: Array, scores: Object, decisions: Array}>}
+ *   order — placements re-sorted back-to-front (paint in this order; sharp
+ *     paints first → last so the LAST entry ends up on top).
+ *   scores — per-name occlusion score (higher = more in front).
+ *   decisions — per-pair audit: [{ a, b, aPx, bPx, winner }] for log lines.
+ */
+async function detectZOrderByOcclusion(populatedBuf, placements) {
+  if (placements.length < 2) {
+    return { order: placements.slice(), scores: {}, decisions: [] };
+  }
+  const { data, info } = await sharp(populatedBuf).raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, ch = info.channels;
+
+  // Pre-compute target hue per placement.
+  const hues = placements.map((p) => {
+    const r = parseInt(p._color.slice(1, 3), 16);
+    const g = parseInt(p._color.slice(3, 5), 16);
+    const b = parseInt(p._color.slice(5, 7), 16);
+    return rgbToHue(r, g, b);
+  });
+
+  const scores = new Map(placements.map((p) => [p._name, 0]));
+  const decisions = [];
+
+  // Pixel margin to declare a winner: the front character should have at least
+  // 30% more saturated pixels of its colour in the bbox intersection than the
+  // other. Below that, the overlap is ambiguous (e.g. tall character behind
+  // shorter character — back character's head visible above front shoulders);
+  // we leave the score untouched and let the foot-Y tiebreaker decide.
+  const MARGIN = 1.3;
+  // Skip pairs whose bbox intersection is tiny — not enough signal.
+  const MIN_INTERSECTION_PX = 200;
+
+  for (let i = 0; i < placements.length; i++) {
+    for (let j = i + 1; j < placements.length; j++) {
+      const A = placements[i], B = placements[j];
+      const ax1 = A._bbox.x, ay1 = A._bbox.y;
+      const ax2 = A._bbox.x + A._bbox.width, ay2 = A._bbox.y + A._bbox.height;
+      const bx1 = B._bbox.x, by1 = B._bbox.y;
+      const bx2 = B._bbox.x + B._bbox.width, by2 = B._bbox.y + B._bbox.height;
+      const ix1 = Math.max(ax1, bx1), iy1 = Math.max(ay1, by1);
+      const ix2 = Math.min(ax2, bx2), iy2 = Math.min(ay2, by2);
+      if (ix2 <= ix1 || iy2 <= iy1) continue;
+      if ((ix2 - ix1) * (iy2 - iy1) < MIN_INTERSECTION_PX) continue;
+
+      const aHue = hues[i], bHue = hues[j];
+      let aPx = 0, bPx = 0;
+      for (let y = iy1; y < iy2; y++) {
+        for (let x = ix1; x < ix2; x++) {
+          const k = (y * W + x) * ch;
+          const r = data[k], g = data[k + 1], bb = data[k + 2];
+          const maxCh = Math.max(r, g, bb), minCh = Math.min(r, g, bb);
+          const sat = (maxCh - minCh) / (maxCh || 1);
+          if (sat < 0.55 || maxCh < 80) continue;
+          const h = rgbToHue(r, g, bb);
+          let dhA = Math.abs(h - aHue); if (dhA > 180) dhA = 360 - dhA;
+          let dhB = Math.abs(h - bHue); if (dhB > 180) dhB = 360 - dhB;
+          if (dhA <= 35) aPx++;
+          if (dhB <= 35) bPx++;
+        }
+      }
+      let winner = 'ambiguous';
+      if (aPx >= bPx * MARGIN && aPx > 0) {
+        scores.set(A._name, scores.get(A._name) + 1);
+        scores.set(B._name, scores.get(B._name) - 1);
+        winner = A._name;
+      } else if (bPx >= aPx * MARGIN && bPx > 0) {
+        scores.set(B._name, scores.get(B._name) + 1);
+        scores.set(A._name, scores.get(A._name) - 1);
+        winner = B._name;
+      }
+      decisions.push({ a: A._name, b: B._name, aPx, bPx, winner });
+    }
+  }
+
+  const ordered = placements.slice().sort((a, b) => {
+    const dz = (scores.get(a._name) || 0) - (scores.get(b._name) || 0);
+    if (dz !== 0) return dz;
+    return a._footY - b._footY;
+  });
+
+  return {
+    order: ordered,
+    scores: Object.fromEntries(scores),
+    decisions,
+  };
+}
+
 // ─── Prompt builders ──────────────────────────────────────────────────────
 
 /**
@@ -625,7 +725,10 @@ async function generateSceneComposite(opts) {
     const bottomY = bbox.y + bbox.height;
     const left = Math.max(0, cx - Math.floor(sMeta.width / 2));
     const top = Math.max(0, bottomY - sMeta.height);
-    placements.push({ input: scaled, left, top, _footY: bottomY, _name: c.name });
+    placements.push({
+      input: scaled, left, top,
+      _footY: bottomY, _name: c.name, _color: c.color, _bbox: bbox,
+    });
   }
   if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
 
@@ -633,13 +736,20 @@ async function generateSceneComposite(opts) {
     throw new Error('[SCENE COMPOSITE] no characters placed — bbox detection failed for every cast entry');
   }
 
-  // Z-order: paint background characters first, foreground last. Lower foot-Y
-  // (higher up the frame) = farther from camera; higher foot-Y (closer to
-  // bottom edge) = closer to camera. Sort ascending so closer characters are
-  // painted on top of farther ones — preserves natural occlusion when two
-  // figures overlap.
-  placements.sort((a, b) => a._footY - b._footY);
-  log.info(`[SCENE COMPOSITE]   z-order (back → front): ${placements.map(p => `${p._name}@y${p._footY}`).join(' → ')}`);
+  // Z-order: read Grok's actual painted occlusion off the populated plate.
+  // For each pair whose bboxes overlap, the character with significantly more
+  // saturated pixels of its colour in the intersection rect is the one in
+  // front (Grok painted over the other where they occlude). foot-Y is the
+  // tiebreaker for ambiguous / non-overlapping pairs.
+  const zResult = await detectZOrderByOcclusion(populatedBuf, placements);
+  placements.length = 0;
+  placements.push(...zResult.order);
+  debug.zScores = zResult.scores;
+  debug.zDecisions = zResult.decisions;
+  for (const d of zResult.decisions) {
+    log.info(`[SCENE COMPOSITE]   occlusion ${d.a} vs ${d.b}: ${d.a}=${d.aPx}px ${d.b}=${d.bPx}px → ${d.winner} in front`);
+  }
+  log.info(`[SCENE COMPOSITE]   z-order (back → front): ${placements.map(p => `${p._name}[score=${zResult.scores[p._name]},foot=${p._footY}]`).join(' → ')}`);
   // Strip the auxiliary fields before handing to sharp — it only knows input/left/top.
   const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
 
@@ -686,6 +796,7 @@ module.exports = {
     buildDepopulatePrompt,
     buildBlendEditPrompt,
     buildCastLines,
+    detectZOrderByOcclusion,
     rgbToHue,
   },
 };
