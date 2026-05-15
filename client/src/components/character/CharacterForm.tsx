@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import TraitSelector from './TraitSelector';
+import CharacterHistoryPanel from './CharacterHistoryPanel';
 import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
@@ -1497,6 +1498,14 @@ export function CharacterForm({
                   ))}
                 </div>
               </details>
+            )}
+            {/* Developer mode: per-story 2×4 sheet history — dev-only inspection */}
+            {(developerMode || isImpersonating) && (
+              <CharacterHistoryPanel
+                history={
+                  (character.avatars as unknown as { storyHistory?: Array<{ storyId: string; generatedAt: string; sheetKey: string; sheetUrl: string; costumeDescription?: string | null; artStyle?: string | null; language?: string | null; title?: string | null }> })?.storyHistory
+                }
+              />
             )}
             {/* Developer mode: show avatar generation input (source photo + user traits) */}
             {(developerMode || isImpersonating) && (

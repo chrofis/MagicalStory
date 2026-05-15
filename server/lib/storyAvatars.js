@@ -182,9 +182,80 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
   return referencePhotos;
 }
 
+/**
+ * Append one history entry per character to `character.avatars.storyHistory[]`.
+ * Dev-only inspection log — never read by generation paths. Each entry is:
+ *   { storyId, generatedAt, sheetKey, sheetUrl, costumeDescription, artStyle, language, title }
+ *
+ * Idempotent per (storyId, sheetKey) — if the entry already exists it's
+ * skipped. Safe to call multiple times for the same story.
+ *
+ * @param {string} userId - story owner's user id (for the DB update query)
+ * @param {Array<Object>} characters - inputData.characters[]
+ * @param {Object} ctx - { storyId, artStyle, language, title }
+ * @param {Object} storyCharacterAvatars - story.data.characterAvatars
+ * @param {Object} costumeDescriptions - story.data.visualBible.costumes
+ * @returns {Promise<number>} count of history entries actually appended
+ */
+async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars, costumeDescriptions) {
+  if (!userId || !Array.isArray(characters) || !ctx?.storyId) return 0;
+  if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return 0;
+  const { getDbPool } = require('../services/database');
+  const pool = getDbPool();
+  let appended = 0;
+  const now = new Date().toISOString();
+  for (const char of characters) {
+    if (!char?.id || !char?.name) continue;
+    const sheets = storyCharacterAvatars[char.name];
+    if (!sheets || typeof sheets !== 'object') continue;
+    const costumeDesc = (costumeDescriptions && costumeDescriptions[char.name]) || null;
+    for (const [sheetKey, sheetUrl] of Object.entries(sheets)) {
+      if (!sheetUrl) continue;
+      const entry = {
+        storyId: ctx.storyId,
+        generatedAt: now,
+        sheetKey,
+        sheetUrl,
+        costumeDescription: sheetKey === 'costumed' ? costumeDesc : null,
+        artStyle: ctx.artStyle || null,
+        language: ctx.language || null,
+        title: ctx.title || null,
+      };
+      try {
+        // Append idempotently — only push when no entry with the same
+        // (storyId, sheetKey) already exists.
+        const res = await pool.query(
+          `UPDATE characters
+           SET data = jsonb_set(
+             data,
+             '{avatars,storyHistory}',
+             COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb) || $2::jsonb,
+             true
+           )
+           WHERE id = $1
+             AND user_id = $3
+             AND NOT EXISTS (
+               SELECT 1 FROM jsonb_array_elements(COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb)) e
+               WHERE e->>'storyId' = $4 AND e->>'sheetKey' = $5
+             )
+           RETURNING id`,
+          [char.id, JSON.stringify([entry]), userId, ctx.storyId, sheetKey]
+        );
+        if (res.rowCount > 0) appended++;
+      } catch (err) {
+        // Don't fail story completion if history write fails.
+        // eslint-disable-next-line no-console
+        console.warn(`[STORY-AVATAR-HISTORY] append failed for ${char.name}/${sheetKey}: ${err.message}`);
+      }
+    }
+  }
+  return appended;
+}
+
 module.exports = {
   projectStoryCharacterAvatars,
   projectStoryCostumeDescriptions,
   applyStoryCellRefs,
+  appendStoryHistory,
   extractUrl,
 };

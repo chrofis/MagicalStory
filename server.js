@@ -6493,6 +6493,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
+    // Phase 8: append per-character story-history log entries so the dev
+    // UI can compare avatar consistency across stories. Best-effort; failure
+    // doesn't block story completion.
+    try {
+      const sav = require('./server/lib/storyAvatars');
+      const appended = await sav.appendStoryHistory(
+        userId,
+        inputData.characters || [],
+        {
+          storyId,
+          artStyle: inputData.artStyle || 'pixar',
+          language: inputData.language || 'en',
+          title: storyData.title || null,
+        },
+        storyData.characterAvatars || {},
+        storyData.visualBible?.costumes || {}
+      );
+      if (appended > 0) log.info(`📚 [STORY-AVATAR-HISTORY] appended ${appended} entries to character history`);
+    } catch (histErr) {
+      log.warn(`⚠️ [STORY-AVATAR-HISTORY] failed: ${histErr.message}`);
+    }
+
     // Persist reference sheet source grids for the dev panel. Each batch
     // becomes a story_images row with image_type='ref_sheet_source' and
     // page_number=batchIdx. Element names are encoded into the quality_score
