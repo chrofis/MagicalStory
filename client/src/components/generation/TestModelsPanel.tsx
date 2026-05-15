@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
 import type { TestModelsInputSnapshot } from '@/services/storyService';
@@ -62,6 +62,82 @@ const AVAILABLE_MODELS: ModelOption[] = [
   { id: 'gemini-3-pro-image-preview', label: 'Gemini Pro', cost: '$0.15' },
 ];
 
+// Distinct stable colours for bbox outlines — palette spaced > 30° in hue.
+const BBOX_COLOURS = ['#E60000', '#0050D0', '#00B050', '#F0C000', '#8B00B0', '#00B0B0', '#FF7F00', '#888888'];
+
+/**
+ * Populated-plate image with bbox overlays drawn on top. SVG viewBox is
+ * captured from the image's natural dimensions onLoad — so rect coords (in
+ * source-image pixels) map exactly onto the rendered image regardless of
+ * how CSS scales it.
+ */
+function PlateWithBboxes({
+  src,
+  bboxes,
+  onLightbox,
+  maxH = 'max-h-48',
+}: {
+  src: string;
+  bboxes: Record<string, { x: number; y: number; width: number; height: number; pixels: number }> | undefined;
+  onLightbox: (src: string) => void;
+  maxH?: string;
+}) {
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const entries = bboxes ? Object.entries(bboxes) : [];
+  return (
+    <div className="relative inline-block w-full">
+      <img
+        src={src}
+        alt="plate"
+        className={`${maxH} w-full object-contain rounded border bg-white cursor-pointer`}
+        onLoad={e => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+        onClick={() => onLightbox(src)}
+      />
+      {natural && entries.length > 0 && (
+        <svg
+          viewBox={`0 0 ${natural.w} ${natural.h}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0 w-full h-full pointer-events-none"
+        >
+          {entries.map(([name, b], i) => {
+            const colour = BBOX_COLOURS[i % BBOX_COLOURS.length];
+            return (
+              <g key={name}>
+                <rect
+                  x={b.x}
+                  y={b.y}
+                  width={b.width}
+                  height={b.height}
+                  fill="none"
+                  stroke={colour}
+                  strokeWidth={Math.max(2, Math.round(natural.w / 256))}
+                />
+                <rect
+                  x={b.x}
+                  y={Math.max(0, b.y - Math.round(natural.h / 40))}
+                  width={Math.max(60, name.length * 12 + 20)}
+                  height={Math.round(natural.h / 40)}
+                  fill={colour}
+                  opacity={0.92}
+                />
+                <text
+                  x={b.x + 4}
+                  y={Math.max(0, b.y - 4)}
+                  fill="#fff"
+                  fontSize={Math.round(natural.h / 50)}
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {name} {b.width}×{b.height}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+    </div>
+  );
+}
+
 export function TestModelsPanel({
   storyId,
   pageNumber,
@@ -101,6 +177,10 @@ export function TestModelsPanel({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [styleResult, setStyleResult] = useState<ModelTestResult | null>(null);
   const [isStyleTransferring, setIsStyleTransferring] = useState(false);
+
+  // Fullscreen toggle — composite intermediates are tall and narrow inline.
+  // Lifts the whole panel to a viewport-filling modal when on.
+  const [fullscreen, setFullscreen] = useState(false);
 
   const runTest = useCallback(async () => {
     if (!selectedModel) return;
@@ -236,19 +316,45 @@ export function TestModelsPanel({
 
   return (
     <>
-      <div className="bg-white rounded-lg border shadow-lg p-4">
+      {/* Fullscreen mode lifts the panel into a viewport-filling modal so
+          composite intermediates have room to breathe. The two-column results
+          grid and prompt expanders are hard to read in the narrow inline slot. */}
+      {fullscreen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60"
+          onClick={() => setFullscreen(false)}
+          aria-hidden
+        />
+      )}
+      <div
+        className={
+          fullscreen
+            ? 'fixed inset-4 z-50 bg-white rounded-lg border shadow-2xl p-4 overflow-y-auto'
+            : 'bg-white rounded-lg border shadow-lg p-4'
+        }
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">
             Test Models — Page {pageNumber}
           </h3>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setFullscreen(v => !v)}
+              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {fullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* ── Model (mandatory, single) — applies to every method below ── */}
@@ -422,7 +528,7 @@ export function TestModelsPanel({
 
         {/* Results Grid */}
         {hasResults && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className={fullscreen ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'grid grid-cols-2 gap-4'}>
             {[
               ...AVAILABLE_MODELS.filter(m => results[m.id]).map(m => ({ id: m.id, label: m.label, cost: m.cost })),
               // Composite-path result(s) keyed "composite" or "composite+phantomPose"
@@ -548,95 +654,117 @@ export function TestModelsPanel({
                   {result.compositeDebug && (
                     <details className="mt-2 border-t border-purple-200 pt-2" open>
                       <summary className="text-[10px] font-semibold text-purple-700 cursor-pointer">
-                        Composite intermediate steps
+                        Composite intermediate steps (actual pipeline order)
                       </summary>
-                      <div className="mt-2 space-y-2">
-                        {/* Step 1 — populated plate */}
+                      <div className="mt-2 space-y-3">
+                        {/* Step 1 — populated plate with bbox overlay */}
                         {result.compositeDebug.populatedPlate && (
                           <div>
-                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">1. Populated plate (Grok generate — scene + silhouettes)</div>
-                            <img
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              1. Populated plate <span className="text-gray-500 font-normal">— Grok generate, scene + silhouettes in one call</span>
+                            </div>
+                            <PlateWithBboxes
                               src={result.compositeDebug.populatedPlate}
-                              alt="populated plate"
-                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
-                              onClick={() => setLightboxImage(result.compositeDebug!.populatedPlate!)}
+                              bboxes={result.compositeDebug.bboxes}
+                              onLightbox={setLightboxImage}
+                              maxH={fullscreen ? 'max-h-[60vh]' : 'max-h-64'}
                             />
+                            {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && (
+                              <div className="mt-1 text-[10px] text-gray-700 flex flex-wrap gap-1.5">
+                                {Object.entries(result.compositeDebug.bboxes).map(([name, b], i) => (
+                                  <span
+                                    key={name}
+                                    className="px-1.5 py-0.5 rounded font-mono border"
+                                    style={{ borderColor: BBOX_COLOURS[i % BBOX_COLOURS.length], color: BBOX_COLOURS[i % BBOX_COLOURS.length] }}
+                                  >
+                                    {name}: {b.width}×{b.height}@({b.x},{b.y}) · {b.pixels}px
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {result.compositeDebug.populatedPlatePrompt && (
-                              <details className="mt-0.5">
-                                <summary className="text-[9px] text-gray-400 cursor-pointer">prompt ({result.compositeDebug.populatedPlatePrompt.length} chars)</summary>
-                                <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.populatedPlatePrompt}</pre>
+                              <details className="mt-1" open>
+                                <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">populated-plate prompt ({result.compositeDebug.populatedPlatePrompt.length} chars)</summary>
+                                <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.populatedPlatePrompt}</pre>
                               </details>
                             )}
                           </div>
                         )}
-                        {/* Step 2 — bbox detections */}
-                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && (
-                          <div>
-                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">2. Bbox detect — {Object.keys(result.compositeDebug.bboxes).length} silhouettes</div>
-                            <div className="text-[10px] text-gray-700 flex flex-wrap gap-1.5">
-                              {Object.entries(result.compositeDebug.bboxes).map(([name, b]) => (
-                                <span key={name} className="px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 font-mono">
-                                  {name}: {b.width}×{b.height}@({b.x},{b.y})
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {/* Step 3 — depopulate (derived clean BG) */}
+                        {/* Step 2 — depopulate (derived clean BG) */}
                         {result.compositeDebug.cleanBackground && (
                           <div>
-                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">3. Depopulate — derived clean BG ({result.compositeDebug.cleanBackgroundSource || 'derived-from-populated-plate'})</div>
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              2. Depopulate <span className="text-gray-500 font-normal">— Grok edit removes silhouettes → derived clean BG ({result.compositeDebug.cleanBackgroundSource || 'derived-from-populated-plate'})</span>
+                            </div>
                             <img
                               src={result.compositeDebug.cleanBackground}
                               alt="derived clean background"
-                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
+                              className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
                               onClick={() => setLightboxImage(result.compositeDebug!.cleanBackground!)}
                             />
                             {result.compositeDebug.depopulatePrompt && (
-                              <details className="mt-0.5">
-                                <summary className="text-[9px] text-gray-400 cursor-pointer">depopulate prompt</summary>
-                                <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.depopulatePrompt}</pre>
+                              <details className="mt-1" open>
+                                <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">depopulate prompt ({result.compositeDebug.depopulatePrompt.length} chars)</summary>
+                                <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.depopulatePrompt}</pre>
                               </details>
                             )}
                           </div>
                         )}
-                        {/* Step 4a — phantom-pose renders (one per character) */}
+                        {/* Step 3 — diff-based bbox detect (already overlaid on step 1 image above) */}
+                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              3. Bbox detect <span className="text-gray-500 font-normal">— diff(populated, clean BG) ∩ hue → {Object.keys(result.compositeDebug.bboxes).length} silhouettes (overlaid on step 1 above)</span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Step 4 — phantom-pose renders (one per character, only when phantomPoseRender=true) */}
                         {result.compositeDebug.phantomPoseRenders && Object.keys(result.compositeDebug.phantomPoseRenders).length > 0 && (
                           <div>
-                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">4a. Phantom-pose renders ({Object.keys(result.compositeDebug.phantomPoseRenders).length} characters)</div>
-                            <div className="grid grid-cols-3 gap-1">
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              4. Phantom-pose renders <span className="text-gray-500 font-normal">— Grok edit re-poses each character in the silhouette's pose ({Object.keys(result.compositeDebug.phantomPoseRenders).length} chars)</span>
+                            </div>
+                            <div className={fullscreen ? 'grid grid-cols-4 gap-2' : 'grid grid-cols-3 gap-1'}>
                               {Object.entries(result.compositeDebug.phantomPoseRenders).map(([name, ppr]) => (
                                 <div key={name} className="flex flex-col items-center">
                                   {ppr.output && (
                                     <img
                                       src={ppr.output}
                                       alt={`${name} phantom-pose`}
-                                      className="max-h-32 w-full object-contain rounded border bg-white cursor-pointer"
+                                      className={`${fullscreen ? 'max-h-48' : 'max-h-32'} w-full object-contain rounded border bg-white cursor-pointer`}
                                       onClick={() => setLightboxImage(ppr.output!)}
                                     />
                                   )}
-                                  <span className="text-[9px] text-gray-600 mt-0.5">{name}</span>
+                                  <span className="text-[10px] font-medium text-gray-700 mt-0.5">{name}</span>
+                                  {ppr.prompt && (
+                                    <details className="w-full">
+                                      <summary className="text-[9px] text-gray-400 cursor-pointer">prompt</summary>
+                                      <pre className="text-[9px] bg-gray-50 p-1 rounded max-h-24 overflow-auto whitespace-pre-wrap">{ppr.prompt}</pre>
+                                    </details>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
-                        {/* Step 4b — composited image (sharp paste before blend) */}
+                        {/* Step 5 — composited image (sharp paste before blend) */}
                         {result.compositeDebug.composited && (
                           <div>
-                            <div className="text-[9px] font-medium text-purple-600 mb-0.5">4b. Composited — cutouts pasted onto derived BG</div>
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              5. Composited <span className="text-gray-500 font-normal">— cutouts pasted onto derived clean BG (server-side sharp, z-ordered by occlusion)</span>
+                            </div>
                             <img
                               src={result.compositeDebug.composited}
                               alt="composited"
-                              className="max-h-48 w-full object-contain rounded border bg-white cursor-pointer"
+                              className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
                               onClick={() => setLightboxImage(result.compositeDebug!.composited!)}
                             />
                           </div>
                         )}
                         {/* Z-order decisions (from occlusion detection) */}
                         {result.compositeDebug.zDecisions && result.compositeDebug.zDecisions.length > 0 && (
-                          <details>
-                            <summary className="text-[9px] text-gray-500 cursor-pointer">Z-order (occlusion-based)</summary>
+                          <details open>
+                            <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">Z-order (occlusion-based)</summary>
                             <div className="mt-1 text-[10px] text-gray-700 space-y-0.5 font-mono">
                               {result.compositeDebug.zDecisions.map((d, i) => (
                                 <div key={i}>{d.a}={d.aPx}px vs {d.b}={d.bPx}px → <strong>{d.winner}</strong> in front</div>
@@ -647,12 +775,17 @@ export function TestModelsPanel({
                             </div>
                           </details>
                         )}
-                        {/* Blend prompt (final step prompt — final image is the card image at the top) */}
+                        {/* Step 6 — final blend (the top-of-card image IS this output) */}
                         {result.compositeDebug.blendPrompt && (
-                          <details>
-                            <summary className="text-[9px] text-gray-500 cursor-pointer">5. Blend prompt ({result.compositeDebug.blendPrompt.length} chars)</summary>
-                            <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{result.compositeDebug.blendPrompt}</pre>
-                          </details>
+                          <div>
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              6. Blend <span className="text-gray-500 font-normal">— Grok edit harmonises lighting/edges/required objects (final blend is the top-of-card image above)</span>
+                            </div>
+                            <details open>
+                              <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">blend prompt ({result.compositeDebug.blendPrompt.length} chars)</summary>
+                              <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.blendPrompt}</pre>
+                            </details>
+                          </div>
                         )}
                       </div>
                     </details>
