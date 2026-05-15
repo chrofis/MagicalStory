@@ -9511,7 +9511,33 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
       const buf = m ? Buffer.from(m[1], 'base64') : null;
       if (buf) {
         const meta = await sharp(buf).metadata();
-        if (meta.width && meta.height) measuredAspect = `${meta.width}:${meta.height}`;
+        if (meta.width && meta.height) {
+          // Snap to the nearest preset both Grok and Gemini accept. Raw
+          // "1024:1024" is rejected by both APIs ("unknown variant"); even
+          // GCD-reduced values like "176:249" (an 880×1245 cover) aren't on
+          // either side's allow-list. Pick the closest standard preset by
+          // ratio. Order matters only for ties — list runs portrait → square
+          // → landscape so the natural reading is preserved.
+          const PRESETS = [
+            ['9:16', 9 / 16],   // 0.5625
+            ['2:3',  2 / 3],    // 0.667
+            ['3:4',  3 / 4],    // 0.75
+            ['4:5',  4 / 5],    // 0.8
+            ['1:1',  1],        // 1.0
+            ['5:4',  5 / 4],    // 1.25
+            ['4:3',  4 / 3],    // 1.333
+            ['3:2',  3 / 2],    // 1.5
+            ['16:9', 16 / 9],   // 1.778
+          ];
+          const r = meta.width / meta.height;
+          let best = PRESETS[0];
+          let bestDelta = Math.abs(Math.log(r / best[1]));
+          for (const p of PRESETS) {
+            const delta = Math.abs(Math.log(r / p[1]));
+            if (delta < bestDelta) { best = p; bestDelta = delta; }
+          }
+          measuredAspect = best[0];
+        }
       }
     }
   } catch { /* fall through */ }
