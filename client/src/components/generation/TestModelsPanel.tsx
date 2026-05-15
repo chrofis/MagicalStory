@@ -66,6 +66,58 @@ const AVAILABLE_MODELS: ModelOption[] = [
 const BBOX_COLOURS = ['#E60000', '#0050D0', '#00B050', '#F0C000', '#8B00B0', '#00B0B0', '#FF7F00', '#888888'];
 
 /**
+ * Crop one bbox out of a source image via SVG. viewBox is the crop region
+ * in source-image pixel coords; image is rendered at its full natural size
+ * inside, so the rect outside the viewBox gets clipped. Works without
+ * knowing the source dimensions ahead of time.
+ */
+function BboxCrop({
+  src,
+  bbox,
+  colour,
+  name,
+  onLightbox,
+}: {
+  src: string;
+  bbox: { x: number; y: number; width: number; height: number; pixels: number };
+  colour: string;
+  name: string;
+  onLightbox: (src: string) => void;
+}) {
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  // Hidden <img> to capture the natural dimensions, then SVG with image href.
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-full" style={{ aspectRatio: `${bbox.width} / ${bbox.height}` }}>
+        <img
+          src={src}
+          alt=""
+          className="hidden"
+          onLoad={e => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+        />
+        {natural && (
+          <svg
+            viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="absolute inset-0 w-full h-full cursor-pointer rounded border bg-white"
+            style={{ borderColor: colour, borderWidth: 2 }}
+            onClick={() => onLightbox(src)}
+          >
+            <image href={src} x={0} y={0} width={natural.w} height={natural.h} />
+          </svg>
+        )}
+      </div>
+      <span className="text-[10px] font-medium mt-0.5" style={{ color: colour }}>
+        {name}
+      </span>
+      <span className="text-[9px] text-gray-500 font-mono">
+        {bbox.width}×{bbox.height} · {bbox.pixels}px
+      </span>
+    </div>
+  );
+}
+
+/**
  * Populated-plate image with bbox overlays drawn on top. SVG viewBox is
  * captured from the image's natural dimensions onLoad — so rect coords (in
  * source-image pixels) map exactly onto the rendered image regardless of
@@ -710,11 +762,24 @@ export function TestModelsPanel({
                             )}
                           </div>
                         )}
-                        {/* Step 3 — diff-based bbox detect (already overlaid on step 1 image above) */}
-                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && (
+                        {/* Step 3 — diff-based bbox detect. Show per-character crops
+                            from the populated plate so the result is concrete. */}
+                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && result.compositeDebug.populatedPlate && (
                           <div>
                             <div className="text-[10px] font-semibold text-purple-700 mb-1">
-                              3. Bbox detect <span className="text-gray-500 font-normal">— diff(populated, clean BG) ∩ hue → {Object.keys(result.compositeDebug.bboxes).length} silhouettes (overlaid on step 1 above)</span>
+                              3. Bbox detect <span className="text-gray-500 font-normal">— diff(populated, clean BG) ∩ hue → {Object.keys(result.compositeDebug.bboxes).length} silhouettes detected. Each crop below is the populated plate clipped to that character's bbox.</span>
+                            </div>
+                            <div className={fullscreen ? 'grid grid-cols-4 gap-3' : 'grid grid-cols-3 gap-2'}>
+                              {Object.entries(result.compositeDebug.bboxes).map(([name, b], i) => (
+                                <BboxCrop
+                                  key={name}
+                                  src={result.compositeDebug!.populatedPlate!}
+                                  bbox={b}
+                                  colour={BBOX_COLOURS[i % BBOX_COLOURS.length]}
+                                  name={name}
+                                  onLightbox={setLightboxImage}
+                                />
+                              ))}
                             </div>
                           </div>
                         )}
