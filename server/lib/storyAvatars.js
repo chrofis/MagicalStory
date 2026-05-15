@@ -95,7 +95,34 @@ function projectStoryCharacterAvatars(characters, artStyle) {
   return out;
 }
 
+/**
+ * Project per-character costume descriptions out of `clothingRequirements`
+ * (the structure Sonnet emits during outline parsing — see
+ * `prompts/story-unified.txt` for the `"costumed": { used, costume, description }`
+ * spec) into a story-scoped map:
+ *
+ *   { Emma: 'burgundy frock coat with brass buttons, tricorn hat, red sash',
+ *     Noah: '...', }
+ *
+ * Stored on `story.data.visualBible.costumes`. Stories have ONE costume per
+ * character so we don't preserve the costume-type subkey (`pirate`, `knight`).
+ * Characters with `costumed.used !== true` are omitted.
+ */
+function projectStoryCostumeDescriptions(clothingRequirements) {
+  const out = {};
+  if (!clothingRequirements || typeof clothingRequirements !== 'object') return out;
+  for (const [charName, requirements] of Object.entries(clothingRequirements)) {
+    const cc = requirements?.costumed;
+    if (!cc || cc.used !== true) continue;
+    const desc = (typeof cc.description === 'string' && cc.description.trim()) || null;
+    if (!desc) continue;
+    out[charName] = desc;
+  }
+  return out;
+}
+
 module.exports = {
   projectStoryCharacterAvatars,
+  projectStoryCostumeDescriptions,
   extractUrl,
 };

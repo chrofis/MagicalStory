@@ -2427,7 +2427,17 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
       relationships: inputData?.relationships || {}, relationshipTexts: inputData?.relationshipTexts || {},
       outline, outlinePrompt, outlineModelId, outlineUsage,
       story: fullStoryText, originalStory: fullStoryText, storyTextPrompts,
-      visualBible, pageClothing: pageClothingData, sceneDescriptions, sceneImages, coverImages,
+      visualBible: (() => {
+        const sav = require('./server/lib/storyAvatars');
+        const reqs = (typeof clothingRequirements !== 'undefined' && clothingRequirements) || null;
+        const costumes = reqs ? sav.projectStoryCostumeDescriptions(reqs) : {};
+        if (Object.keys(costumes).length > 0) {
+          visualBible = visualBible || {};
+          visualBible.costumes = costumes;
+        }
+        return visualBible;
+      })(),
+      pageClothing: pageClothingData, sceneDescriptions, sceneImages, coverImages,
       characterAvatars: require('./server/lib/storyAvatars').projectStoryCharacterAvatars(
         inputData?.characters || [], inputData?.artStyle || 'pixar'
       ),
@@ -6369,7 +6379,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlineModelId: unifiedModelId, // Model used (dev mode)
       outlineUsage: unifiedUsage, // Token usage (dev mode)
       storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
-      visualBible: visualBible, // Recurring visual elements for consistency
+      visualBible: (() => {
+        // Phase 2: project per-character costume descriptions onto the visual
+        // bible's `costumes` field so the story has a single source of truth
+        // for "what does Emma's pirate outfit look like" — independent of
+        // character.avatars.clothing.costumed.<subtype> on the character row.
+        const sav = require('./server/lib/storyAvatars');
+        const costumes = sav.projectStoryCostumeDescriptions(clothingRequirements);
+        if (Object.keys(costumes).length > 0) {
+          visualBible = visualBible || {};
+          visualBible.costumes = costumes;
+        }
+        return visualBible;
+      })(),
       // Story-scoped character avatars (Phase 1: shadow write). Projected from
       // inputData.characters[*].avatars.styledAvatars[<artStyle>]. Later phases
       // make this the only source page generation reads from.
