@@ -308,6 +308,49 @@ async function scaleToHeight(buf, targetH) {
   return sharp(buf).resize({ height: targetH, withoutEnlargement: false }).png().toBuffer();
 }
 
+// ─── Top-row face cells (head/neck views) ────────────────────────────────
+// Same four angles as POSE_CELL but in cells 1-4 (top row) — used when a page
+// generation wants the character's face/identity rather than the full body.
+const FACE_CELL = {
+  front: 1,
+  threeQuarter: 2,
+  profile: 3,
+  back: 4,
+};
+
+/**
+ * Crop one (or two) cells from a 2×4 character sheet for use as a per-page
+ * reference image during story generation. Replaces the today-default of
+ * sending the whole 2×4 sheet (or a single-body styled avatar) as a Grok
+ * reference — sending just the matching pose cell keeps the model focused
+ * on identity + costume without the other 7 pose distractions.
+ *
+ * @param {Buffer|string} sheet - the 2×4 sheet as a raw Buffer OR data URI.
+ * @param {Object} opts
+ * @param {'front'|'threeQuarter'|'profile'|'back'} opts.pose - body angle. Defaults to 'threeQuarter'.
+ * @param {boolean} [opts.flip=false] - mirror horizontally (camera-right facing).
+ * @param {boolean} [opts.includeFace=false] - also return the matching top-row face cell.
+ * @returns {Promise<{ body: Buffer, face: Buffer|null }>} PNG buffers.
+ */
+async function cropAvatarCell(sheet, opts = {}) {
+  const { pose = 'threeQuarter', flip = false, includeFace = false } = opts;
+  const sheetBuf = Buffer.isBuffer(sheet)
+    ? sheet
+    : Buffer.from(String(sheet).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+
+  const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
+  let body = await cropSheetCell(sheetBuf, bodyIdx);
+  if (flip) body = await flipHorizontal(body);
+
+  let face = null;
+  if (includeFace) {
+    const faceIdx = FACE_CELL[pose] || FACE_CELL.threeQuarter;
+    face = await cropSheetCell(sheetBuf, faceIdx);
+    if (flip) face = await flipHorizontal(face);
+  }
+  return { body, face };
+}
+
 /**
  * Detect z-order (paint sequence) by reading actual occlusion from the
  * populated plate. For each pair of placements whose bboxes overlap, count
@@ -783,7 +826,9 @@ async function generateSceneComposite(opts) {
 module.exports = {
   generateSceneComposite,
   POSE_CELL,
+  FACE_CELL,
   DEFAULT_PALETTE,
+  cropAvatarCell,
   // internal helpers exposed for tests
   _internal: {
     findColorBbox,
