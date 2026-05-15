@@ -2411,14 +2411,16 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (metadata && metadata.clothing) {
     const clothingLower = metadata.clothing.toLowerCase();
 
-    // Handle "costumed:pirate" format (return full string for sub-type parsing)
-    if (clothingLower.startsWith('costumed:')) {
-      log.debug(`[CLOTHING] Using JSON metadata: "${metadata.clothing}" (costumed with sub-type)`);
-      return metadata.clothing.toLowerCase();
+    // Phase 5: collapse legacy `costumed:<subtype>` strings to bare `costumed`.
+    // One costume per character per story — the subtype is captured separately
+    // on story.visualBible.costumes / clothingRequirements.
+    if (clothingLower.startsWith('costumed')) {
+      log.debug(`[CLOTHING] Using JSON metadata: "${metadata.clothing}" → costumed`);
+      return 'costumed';
     }
 
     // Standard categories
-    const validValues = ['winter', 'summer', 'standard', 'costumed'];
+    const validValues = ['winter', 'summer', 'standard'];
     if (validValues.includes(clothingLower)) {
       log.debug(`[CLOTHING] Using JSON metadata: "${clothingLower}"`);
       return clothingLower;

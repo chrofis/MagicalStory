@@ -503,12 +503,15 @@ class UnifiedStoryParser {
                     baseName = match.name;
                   }
                 }
-                // Normalize: only 4 valid categories
+                // Normalize: only 4 valid categories. Phase 5 — costumed is
+                // now a flat enum (no `costumed:<subtype>` colon strings).
+                // Each story has at most one costume per character, so the
+                // subtype is dead weight in the persisted clothing field.
+                // The actual costume description/name lives on
+                // story.visualBible.costumes and clothingRequirements.
                 const raw = char.clothing.toLowerCase();
-                const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
                 let clothing = 'standard';
-                if (costumedMatch) clothing = `costumed:${costumedMatch[1].trim()}`;
-                else if (raw.includes('costumed')) clothing = 'costumed';
+                if (raw.includes('costumed')) clothing = 'costumed';
                 else if (raw.includes('winter')) clothing = 'winter';
                 else if (raw.includes('summer')) clothing = 'summer';
                 characterClothing[baseName] = clothing;
