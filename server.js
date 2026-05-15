@@ -2428,6 +2428,9 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
       outline, outlinePrompt, outlineModelId, outlineUsage,
       story: fullStoryText, originalStory: fullStoryText, storyTextPrompts,
       visualBible, pageClothing: pageClothingData, sceneDescriptions, sceneImages, coverImages,
+      characterAvatars: require('./server/lib/storyAvatars').projectStoryCharacterAvatars(
+        inputData?.characters || [], inputData?.artStyle || 'pixar'
+      ),
       isPartial: true, failureReason, generatedPages: sceneImages.length,
       totalPages: inputData?.pages || 15,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
@@ -6367,6 +6370,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlineUsage: unifiedUsage, // Token usage (dev mode)
       storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
       visualBible: visualBible, // Recurring visual elements for consistency
+      // Story-scoped character avatars (Phase 1: shadow write). Projected from
+      // inputData.characters[*].avatars.styledAvatars[<artStyle>]. Later phases
+      // make this the only source page generation reads from.
+      characterAvatars: require('./server/lib/storyAvatars').projectStoryCharacterAvatars(
+        inputData.characters || [],
+        inputData.artStyle || 'pixar'
+      ),
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
       story: fullStoryText, // Canonical field name — frontend reads 'story'
