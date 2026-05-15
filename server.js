@@ -3178,7 +3178,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             for (const char of (inputData.characters || [])) {
               const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
               if (isMain) {
-                perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+                perCharClothing[char.name] = 'costumed';
               }
             }
           }
@@ -3205,6 +3205,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Get character photos with styled avatars applied
           let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
           pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+          // Phase 7: cell-crop refs from the story-scoped 2×4 sheet when one
+          // exists. Mutates pagePhotos in place; characters without a story
+          // sheet keep the styled-avatar URL produced above.
+          {
+            const sav = require('./server/lib/storyAvatars');
+            const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
+            await sav.applyStoryCellRefs(pagePhotos, storyAvatars, sceneCharacters);
+          }
 
           // Build the image prompt — trial uses rich scene hint as scene description
           const sceneDescription = page.sceneHint || page.text || '';
@@ -3500,6 +3508,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           mergedClothingRequirements
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
+        // Phase 7: cell-crop refs from story sheets. For covers we use front
+        // pose by default (head-on shot) — no per-page scene metadata at this point.
+        {
+          const sav = require('./server/lib/storyAvatars');
+          const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], artStyle || 'pixar');
+          const fakeMeta = charactersForCover.map(c => ({ name: c.name, pose: 'front', flip: false }));
+          await sav.applyStoryCellRefs(coverPhotos, storyAvatars, fakeMeta);
+        }
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
@@ -3890,7 +3906,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!coverClothingReqs[char.name]?._currentClothing) {
                   coverClothingReqs[char.name] = {
                     ...(coverClothingReqs[char.name] || {}),
-                    _currentClothing: `costumed:${inputData._trialCostumeType}`
+                    _currentClothing: 'costumed'
                   };
                 }
               }
@@ -4429,7 +4445,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           };
           if (inputData._trialCostumeType) {
             for (const char of (inputData.characters || [])) {
-              defaultHint.characterClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+              defaultHint.characterClothing[char.name] = 'costumed';
             }
           }
           startCoverGeneration(coverType, defaultHint);
@@ -4762,8 +4778,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           for (const char of (inputData.characters || [])) {
             const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
             if (isMain) {
-              perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
-              log.debug(`🎭 [TRIAL COSTUME] Page ${pageNum}: Fallback — no clothing parsed, using costumed:${inputData._trialCostumeType} for ${char.name}`);
+              perCharClothing[char.name] = 'costumed';
+              log.debug(`🎭 [TRIAL COSTUME] Page ${pageNum}: Fallback — no clothing parsed, using costumed for ${char.name}`);
             }
           }
         }
@@ -4782,9 +4798,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Fallback: if not in per-scene data, check global clothingRequirements for a costumed variant
           if (!charClothing) {
             const globalReqs = clothingRequirements?.[char.name] || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
-            if (globalReqs?.costumed?.used && globalReqs.costumed.costume) {
-              charClothing = `costumed:${globalReqs.costumed.costume}`;
-              log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed:${globalReqs.costumed.costume}`);
+            if (globalReqs?.costumed?.used) {
+              charClothing = 'costumed';
+              log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed (${globalReqs.costumed.costume || 'unnamed'})`);
             } else {
               charClothing = defaultClothing;
             }
@@ -4798,7 +4814,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // applyStyledAvatars now skips costumed-* entries internally (see
         // styledAvatars.js), so it's safe to call on a mixed-clothing scene.
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+        // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
         let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        {
+          const sav = require('./server/lib/storyAvatars');
+          const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
+          const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
+          await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars);
+        }
         // over-the-shoulder: the target character is tiny, soft-focused, in the
         // distance — attaching its reference photo would force Grok to render it
         // at portrait scale. Keep only the first character (the acting one) as a

@@ -206,6 +206,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
   if (!allAlreadyStyled && !coverClothing.startsWith('costumed')) {
     coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
   }
+  // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
+  // Covers use front pose by default (head-on shot).
+  {
+    const sav = require('./storyAvatars');
+    const fakeMeta = (coverCharacterPhotos || []).map(p => ({ name: p.name, pose: 'front', flip: false }));
+    await sav.applyStoryCellRefs(coverCharacterPhotos, storyData.characterAvatars || null, fakeMeta);
+  }
 
   log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
 

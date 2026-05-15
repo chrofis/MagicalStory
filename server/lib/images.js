@@ -7330,13 +7330,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // null/undefined = inherit MODEL_DEFAULTS; otherwise one of strict|loose|styled-only|off.
     referenceMode = null,
     singlePassScene = null,
-    // Phase 3b: when true, replace each character's styled-avatar reference
-    // with a single body cell cropped out of the story-scoped 2×4 sheet
-    // (story.data.characterAvatars[name][slot]). Pose comes from the scene-
-    // expansion metadata. Falls through silently when the story has no
-    // sheet for the character yet. Default off — opt-in via the per-page
-    // rerun panel.
-    useStorySheetCells = false,
+    // Phase 7: cell-crop refs from story-scoped 2×4 sheet (default on).
+    // Each character's full-image styled-avatar reference is replaced with a
+    // single body cell cropped out of story.data.characterAvatars[name][slot]
+    // at the scene-expansion-prescribed pose. Falls through silently when
+    // the story has no sheet for the character yet (legacy stories pre-Phase-1).
+    useStorySheetCells = true,
   } = options;
   const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
   // Explicit boolean from caller wins over the run-level default.

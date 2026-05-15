@@ -529,6 +529,12 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // Build landmark photos and Visual Bible grid for this page
     // Extract scene metadata from expanded description to find which landmarks are needed
     const sceneMetadata = extractSceneMetadata(expandedDescription);
+    // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
+    {
+      const sav = require('../lib/storyAvatars');
+      const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
+      await sav.applyStoryCellRefs(referencePhotos, storyData.characterAvatars || null, metaChars);
+    }
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
     if (pageLandmarkPhotos.length > 0) {
       log.debug(`🌍 [REGEN] Page ${pageNumber} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
@@ -1583,6 +1589,12 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       const sceneMetadata = extractSceneMetadata(desc);
+      // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
+      {
+        const sav = require('../lib/storyAvatars');
+        const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || chars || [];
+        await sav.applyStoryCellRefs(characterPhotos, storyData.characterAvatars || null, metaChars);
+      }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
       if (visualBible) {
         const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);

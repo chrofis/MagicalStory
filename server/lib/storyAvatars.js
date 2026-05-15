@@ -121,8 +121,70 @@ function projectStoryCostumeDescriptions(clothingRequirements) {
   return out;
 }
 
+/**
+ * Replace each character's full-image reference with a single body cell
+ * cropped out of the story-scoped 2×4 sheet at
+ * `story.data.characterAvatars[name][slotKey]`. Pose + flip come from the
+ * scene-expansion metadata so the cell matches the figure's intended
+ * facing direction on this page.
+ *
+ * Falls through silently when the story has no sheet for the character
+ * (legacy stories pre-Phase-1, or characters with no costumed sheet).
+ * Mutates the array elements in place AND returns the same array.
+ *
+ * @param {Array<Object>} referencePhotos - per-character refs with
+ *   `name`, `photoUrl`, `clothingCategory` (mutated)
+ * @param {Object} storyCharacterAvatars - story.data.characterAvatars blob
+ * @param {Array<Object>} sceneCharacters - scene-expansion characters with
+ *   `name`, `pose`, `flip`
+ * @returns {Promise<Array<Object>>} the same array, with photoUrl swapped
+ *   to data-URI cell crops where applicable.
+ */
+async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters) {
+  if (!Array.isArray(referencePhotos) || referencePhotos.length === 0) return referencePhotos;
+  if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return referencePhotos;
+  const { cropAvatarCell } = require('./sceneComposite');
+
+  const poseByName = new Map();
+  for (const sc of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) {
+    const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
+    if (!nm) continue;
+    const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+      ? sc.pose : 'threeQuarter';
+    const flip = sc?.flip === true;
+    poseByName.set(nm.toLowerCase(), { pose, flip });
+  }
+
+  for (const ref of referencePhotos) {
+    const charName = ref?.name;
+    if (!charName) continue;
+    const story = storyCharacterAvatars[charName];
+    if (!story) continue;
+    const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
+    let slotKey;
+    if (clothingRaw === 'costumed' || clothingRaw.startsWith('costumed:')) slotKey = 'costumed';
+    else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
+    else slotKey = 'costumed';
+    const sheetUri = story[slotKey] || story.costumed;
+    if (!sheetUri) continue;
+    const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false };
+    try {
+      const { body } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace: false });
+      ref.photoUrl = `data:image/png;base64,${body.toString('base64')}`;
+      ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}`;
+      ref.cellPose = pf.pose;
+      ref.cellFlip = pf.flip;
+    } catch (err) {
+      // Fall through to the existing full-image ref. Logged at debug level
+      // by the caller if it tracks errors.
+    }
+  }
+  return referencePhotos;
+}
+
 module.exports = {
   projectStoryCharacterAvatars,
   projectStoryCostumeDescriptions,
+  applyStoryCellRefs,
   extractUrl,
 };
