@@ -198,11 +198,25 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
  * @returns {Promise<number>} count of history entries actually appended
  */
 async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars, costumeDescriptions) {
-  if (!userId || !Array.isArray(characters) || !ctx?.storyId) return 0;
-  if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return 0;
+  if (!userId || !Array.isArray(characters) || !ctx?.storyId) {
+    // eslint-disable-next-line no-console
+    console.warn(`[STORY-AVATAR-HISTORY] precondition fail userId=${!!userId} chars=${characters?.length} storyId=${ctx?.storyId}`);
+    return 0;
+  }
+  if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') {
+    // eslint-disable-next-line no-console
+    console.warn(`[STORY-AVATAR-HISTORY] no storyCharacterAvatars`);
+    return 0;
+  }
   const { getPool } = require('../services/database');
   const pool = getPool();
+  if (!pool) {
+    // eslint-disable-next-line no-console
+    console.warn(`[STORY-AVATAR-HISTORY] getPool() returned null`);
+    return 0;
+  }
   let appended = 0;
+  let triedQueries = 0;
   const now = new Date().toISOString();
   for (const char of characters) {
     if (!char?.id || !char?.name) continue;
@@ -222,26 +236,31 @@ async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars
         title: ctx.title || null,
       };
       try {
+        triedQueries++;
         // Append idempotently — only push when no entry with the same
-        // (storyId, sheetKey) already exists.
+        // (storyId, sheetKey) already exists. Cast id to text on both
+        // sides so JS number 1778709081750 matches whichever type the
+        // characters.id column has (TEXT or BIGINT — both serialize the
+        // same as a string).
         const res = await pool.query(
           `UPDATE characters
            SET data = jsonb_set(
-             data,
+             COALESCE(data, '{}'::jsonb),
              '{avatars,storyHistory}',
              COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb) || $2::jsonb,
              true
            )
-           WHERE id = $1
-             AND user_id = $3
+           WHERE id::text = $1::text
+             AND user_id::text = $3::text
              AND NOT EXISTS (
                SELECT 1 FROM jsonb_array_elements(COALESCE(data -> 'avatars' -> 'storyHistory', '[]'::jsonb)) e
                WHERE e->>'storyId' = $4 AND e->>'sheetKey' = $5
              )
            RETURNING id`,
-          [char.id, JSON.stringify([entry]), userId, ctx.storyId, sheetKey]
+          [String(char.id), JSON.stringify([entry]), String(userId), ctx.storyId, sheetKey]
         );
         if (res.rowCount > 0) appended++;
+        else console.warn(`[STORY-AVATAR-HISTORY] 0 rows matched for char=${char.name}(id=${char.id},user=${userId}) sheet=${sheetKey}`);
       } catch (err) {
         // Don't fail story completion if history write fails.
         // eslint-disable-next-line no-console
@@ -249,6 +268,8 @@ async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars
       }
     }
   }
+  // eslint-disable-next-line no-console
+  console.log(`[STORY-AVATAR-HISTORY] story=${ctx.storyId} chars=${characters.length} tried=${triedQueries} appended=${appended}`);
   return appended;
 }
 
