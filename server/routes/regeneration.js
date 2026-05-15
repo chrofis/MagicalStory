@@ -862,17 +862,28 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { models, iterativePlacement, referenceMode, singlePassScene } = req.body;
+    const {
+      models,
+      iterativePlacement,
+      referenceMode,
+      singlePassScene,
+      // New flags — per-page rerun panel
+      composite = false,           // route through scene-composite pipeline
+      phantomPoseRender = false,   // composite step-3 variant (only used when composite=true)
+      emptyScene = 'reuse',        // 'reuse' | 'fresh' | 'skip' — composite step-1 source
+    } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
     // Admin only
     const userResult = await getDbPool().query('SELECT role FROM users WHERE id = $1', [req.user.id]);
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
-    // Validate models
-    if (!Array.isArray(models) || models.length === 0) return res.status(400).json({ error: 'models array required' });
-    const unknown = models.filter(m => !IMAGE_MODELS[m]);
-    if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
+    // Validate models (only required when running direct path — composite uses its own pipeline)
+    if (!composite) {
+      if (!Array.isArray(models) || models.length === 0) return res.status(400).json({ error: 'models array required (or set composite: true)' });
+      const unknown = (models || []).filter(m => !IMAGE_MODELS[m]);
+      if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
+    }
     // Load story
     const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
@@ -978,7 +989,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     };
     // Run all models in parallel
     const results = {};
-    const settled = await Promise.allSettled(models.map(async (model) => {
+    const modelsToRun = composite ? [] : (models || []); // composite is its own method; skip the per-model loop when composite=true
+    const settled = await Promise.allSettled(modelsToRun.map(async (model) => {
       const start = Date.now();
       let result;
       if (iterativePlacement && sceneMetadata) {
@@ -1014,9 +1026,111 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           pass2Failed: r.pass2Failed, pass2Error: r.pass2Error, grokRefImages: r.grokRefImages,
         };
       } else {
-        results[models[i]] = { error: s.reason?.message || 'Unknown error', modelId: models[i], elapsed: 0 };
+        results[modelsToRun[i]] = { error: s.reason?.message || 'Unknown error', modelId: modelsToRun[i], elapsed: 0 };
       }
     }
+
+    // ─── Composite-path branch ────────────────────────────────────────────
+    // When composite=true the panel wants to compare composite vs direct on
+    // the same page. We run the composite pipeline once with the current
+    // story's saved scene metadata and post the result alongside any direct-
+    // path results in the same `results` map under key "composite" (or
+    // "composite+phantomPose" when phantomPoseRender is on).
+    if (composite && pageNumber >= 0) {
+      const compositeKey = phantomPoseRender ? 'composite+phantomPose' : 'composite';
+      const compositeStart = Date.now();
+      try {
+        const { buildCompositeCast: buildCompositeCastShared } = require('../lib/compositeCastBuilder');
+        const { generateSceneComposite } = require('../lib/sceneComposite');
+        const savedSceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+        // Build the pageData shape that the cast builder + composite call need.
+        // sceneMetadata is the parsed JSON-or-prose metadata block from the scene.
+        const pageData = {
+          pageNumber,
+          prompt,                                   // saved scene prompt — used as page brief
+          scene: {
+            sceneDescription: savedSceneImage?.sceneDescription || savedSceneImage?.description || '',
+            text: savedSceneImage?.text || '',
+            emptyScenePrompt: savedSceneImage?.emptyScenePrompt || sceneMetadata?.emptyScenePrompt || '',
+            sceneIntent: sceneMetadata?.sceneIntent || sceneMetadata?.fullData?.sceneIntent || '',
+            interactions: sceneMetadata?.interactions || sceneMetadata?.fullData?.interactions || [],
+          },
+          sceneMetadata,
+          sceneCharacters: getCharactersInScene(savedSceneImage?.sceneDescription || '', storyData.characters || []),
+          perCharClothing: storyData.perCharClothing || {},
+          visualBibleGrid,
+          emptySceneImage: savedSceneBackground,
+        };
+        const inputData = {
+          artStyle: storyData.artStyle || 'pixar',
+          characters: storyData.characters || [],
+          clothingRequirements: clothingReqs || {},
+          composite: true,
+          phantomPoseRender,
+        };
+        const addUsageNoop = () => {}; // test-models doesn't bill credits
+        const cast = await buildCompositeCastShared(pageData, inputData, {
+          userId: req.user.id, addUsage: addUsageNoop, log,
+        });
+        if (!cast || cast.length === 0) {
+          results[compositeKey] = {
+            error: 'Composite cast is empty (no resolvable named characters on this page)',
+            modelId: 'scene-composite', elapsed: Date.now() - compositeStart,
+          };
+        } else {
+          // Empty-scene source: 'reuse' uses the saved plate, 'fresh' forces
+          // step-1 Grok regenerate, 'skip' passes neither (composite will then
+          // throw — guarded below).
+          let existingCleanBackground = null;
+          if (emptyScene === 'reuse') existingCleanBackground = savedSceneBackground || null;
+          // 'fresh' or 'skip' → leave null (fresh: composite generates one;
+          //                    skip: only valid if cleanBackgroundPrompt exists)
+          const cleanBgPrompt = pageData.scene.emptyScenePrompt
+            || pageData.scene.sceneDescription
+            || pageData.prompt;
+          // Strip scene prose from the brief (same logic as server.js).
+          const rawBrief = pageData.prompt || '';
+          const headerIdx = rawBrief.search(/\*\*(THIS IMAGE DEPICTS|Clothing|HEIGHT ORDER|REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)/i);
+          let compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
+          if (compositeBrief.length > 5500) compositeBrief = compositeBrief.slice(0, 5500).trim();
+          // VB grid normalisation — buildVisualBibleGrid returns Buffer here.
+          const vbGridUri = Buffer.isBuffer(visualBibleGrid)
+            ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`
+            : (typeof visualBibleGrid === 'string' && visualBibleGrid ? visualBibleGrid : null);
+          const compResult = await generateSceneComposite({
+            cleanBackgroundPrompt: cleanBgPrompt,
+            existingCleanBackground,
+            scene: {
+              description: pageData.scene.sceneDescription,
+              action: pageData.scene.text,
+              intent: pageData.scene.sceneIntent,
+              pageBrief: compositeBrief,
+              artStyle: inputData.artStyle,
+            },
+            cast,
+            aspectRatio: storyData.layout?.imageAspect || DEFAULTS.pageAspect || '3:4',
+            visualBibleGridImage: vbGridUri,
+            phantomPoseRender,
+            usageTracker: addUsageNoop,
+          });
+          results[compositeKey] = {
+            imageData: compResult.imageData,
+            modelId: 'scene-composite',
+            elapsed: Date.now() - compositeStart,
+            usage: compResult.usage || null,
+            compositeDebug: compResult.debug || null,
+          };
+          log.info(`🧪 [TEST-MODELS] Composite path complete for page ${pageNumber} in ${Date.now() - compositeStart}ms (phantomPose=${phantomPoseRender}, emptyScene=${emptyScene})`);
+        }
+      } catch (compErr) {
+        log.error(`🧪 [TEST-MODELS] Composite path failed for page ${pageNumber}: ${compErr.message}`);
+        results[compositeKey] = {
+          error: compErr.message || 'Composite generation failed',
+          modelId: 'scene-composite', elapsed: Date.now() - compositeStart,
+        };
+      }
+    }
+
     res.json({ success: true, pageNumber, results, inputSnapshot });
   } catch (err) {
     log.error('Error in test-models:', err);

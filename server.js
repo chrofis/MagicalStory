@@ -5302,108 +5302,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       //
       // Returns null if any cast character can't be set up — the caller
       // then falls through to the legacy direct-prompt path.
-      const buildCompositeCast = async (pageData, inputData) => {
-        const metaChars = pageData.sceneMetadata?.fullData?.characters
-          || pageData.sceneMetadata?.characters
-          || pageData.sceneCharacters
-          || [];
-        const sceneChars = Array.isArray(metaChars) ? metaChars : [];
-        if (!sceneChars.length) return null;
-        // Per-character action lookup from interactions[] — the blocking prompt
-        // needs to know what each character is DOING (affects silhouette pose/arms),
-        // not what they look like (silhouette is solid colour, identity comes later).
-        const interactionsList = pageData.sceneMetadata?.fullData?.interactions
-          || pageData.sceneMetadata?.interactions
-          || pageData.scene?.interactions
-          || [];
-        const actionsByChar = new Map();
-        if (Array.isArray(interactionsList)) {
-          // Essentials first, then normal, then low — keeps the most important action.
-          const prio = { essential: 0, normal: 1, low: 2 };
-          const sorted = [...interactionsList].sort((a, b) =>
-            (prio[a.priority] ?? 1) - (prio[b.priority] ?? 1));
-          for (const it of sorted) {
-            if (!it?.character || !it?.where) continue;
-            const key = String(it.character).toLowerCase();
-            if (!actionsByChar.has(key)) actionsByChar.set(key, it.where);
-          }
-        }
-        const { generateCharacter2x4Sheet } = require('./server/lib/character2x4Sheet');
-        const artStyleKey = inputData.artStyle || 'watercolor';
-        const out = [];
-        for (const sc of sceneChars) {
-          const name = typeof sc === 'string' ? sc : (sc.name || '');
-          if (!name) continue;
-          const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
-          if (!character) return null;
-          const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
-          const costumeKey = clothing.startsWith('costumed:')
-            ? clothing.slice('costumed:'.length).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-            : null;
-
-          // Step 1: try the styled-avatar (2×4) for this art style + clothing.
-          const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
-          const cachedSheet = costumeKey
-            ? styledForStyle.costumed?.[costumeKey]
-            : styledForStyle[clothing];
-          let sheetUri = cachedSheet
-            ? (typeof cachedSheet === 'string' ? cachedSheet : (cachedSheet.imageUrl || cachedSheet.imageData || cachedSheet.data || null))
-            : null;
-
-          // Step 2: lazy-generate if missing.
-          if (!sheetUri || (!sheetUri.startsWith('data:') && !sheetUri.startsWith('http'))) {
-            try {
-              const costumeDesc = inputData.clothingRequirements?.[name]?.costumed?.description
-                || inputData.clothingRequirements?.[name]?.description
-                || (costumeKey || 'standard outfit');
-              const gen = await generateCharacter2x4Sheet(character, {
-                clothingCategory: clothing,
-                costumeDescription: costumeDesc,
-                artStyle: artStyleKey,
-                usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
-              });
-              sheetUri = gen.imageData;
-              // Cache on the in-memory character at the canonical styled-avatar
-              // field so downstream pages in this story reuse it.
-              character.avatars = character.avatars || {};
-              character.avatars.styledAvatars = character.avatars.styledAvatars || {};
-              character.avatars.styledAvatars[artStyleKey] = character.avatars.styledAvatars[artStyleKey] || {};
-              if (costumeKey) {
-                character.avatars.styledAvatars[artStyleKey].costumed = character.avatars.styledAvatars[artStyleKey].costumed || {};
-                character.avatars.styledAvatars[artStyleKey].costumed[costumeKey] = sheetUri;
-              } else {
-                character.avatars.styledAvatars[artStyleKey][clothing] = sheetUri;
-              }
-              // Persist back to the characters table at the SAME canonical
-              // location so subsequent stories on this account reuse the
-              // sheet and the UI "Stilisierte Avatare" tile picks it up.
-              try {
-                const { persistStyledAvatar } = require('./server/services/database');
-                await persistStyledAvatar(userId, character.id, artStyleKey, costumeKey ? `costumed:${costumeKey}` : clothing, sheetUri);
-              } catch (persistErr) {
-                log.warn(`[SCENE COMPOSITE] persistStyledAvatar failed for ${name}/${clothing}: ${persistErr.message}`);
-              }
-            } catch (err) {
-              log.warn(`[SCENE COMPOSITE] cannot generate 2×4 sheet for ${name} (${clothing}): ${err.message}`);
-              return null;
-            }
-          }
-          const sheetBuf = Buffer.from(sheetUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-            ? sc.pose : 'threeQuarter';
-          const flip = sc.flip === true;
-          out.push({
-            name,
-            sheetBuf,
-            pose,
-            flip,
-            action: actionsByChar.get(name.toLowerCase()) || null,
-            position: sc.position || 'in the scene',
-            sizeHint: sc.depth === 'background' ? 'small in the distance' : (sc.depth === 'midground' ? 'medium' : undefined),
-          });
-        }
-        return out;
-      };
+      const { buildCompositeCast: buildCompositeCastShared } = require('./server/lib/compositeCastBuilder');
+      const buildCompositeCast = (pageData, inputData) =>
+        buildCompositeCastShared(pageData, inputData, { userId, addUsage, log });
 
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();
@@ -5448,15 +5349,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           try {
-            // ── Scene composite gate ─────────────────────────────────────
-            // When MODEL_DEFAULTS.enableSceneComposite is true AND every
-            // cast character on this page has a pre-rendered 2×4 sheet,
-            // route through server/lib/sceneComposite.js (3 Grok calls,
-            // colour-silhouette blocking + character cut-in + blend).
-            // Otherwise fall through to the legacy direct-prompt path.
-            // See docs/SCENE-COMPOSITE-PIPELINE.html.
-            const compositeEnabled = MODEL_DEFAULTS.enableSceneComposite === true
-              && inputData?.composite !== false;
+            // ── Per-page image-route dispatcher ──────────────────────────
+            // decidePageRoute picks direct vs composite (plus phantom-pose
+            // and refMode) based on cast size, sceneIntent, and per-story
+            // overrides. See docs/image-generation-methods.html §7 and
+            // server/lib/imageRouter.js for the decision table.
+            const { decidePageRoute } = require('./server/lib/imageRouter');
+            const route = decidePageRoute(pageData, inputData, MODEL_DEFAULTS);
+            // Surface the route on pageData so downstream code (eval, dev
+            // panel, story-data snapshot) can see which method ran.
+            pageData.routeDecision = route;
+            log.info(`🧭 [ROUTE] P${pageData.pageNumber}: ${route.path}${route.phantomPoseRender ? '+phantomPose' : ''} (cast=${route.cast}, refMode=${route.refMode}) — ${route.reason}`);
+            const compositeEnabled = route.path === 'composite';
             if (compositeEnabled) {
               try {
                 const { generateSceneComposite } = require('./server/lib/sceneComposite');
@@ -5536,11 +5440,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     cast: compositeCast,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     visualBibleGridImage: vbGridUri,
-                    // Phantom-pose render: per-story opt-in, falls back to
-                    // MODEL_DEFAULTS.phantomPoseRender (default false).
-                    phantomPoseRender: typeof inputData?.phantomPoseRender === 'boolean'
-                      ? inputData.phantomPoseRender
-                      : !!MODEL_DEFAULTS.phantomPoseRender,
+                    // Phantom-pose render: the router's decision wins.
+                    // The router already honoured per-story overrides
+                    // (inputData.phantomPoseRender) and the cast-size rule.
+                    phantomPoseRender: route.phantomPoseRender,
                     usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
                   });
                   return {
@@ -5571,10 +5474,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             }
             // Apply reference-mode flag — strips refs/grid per the chosen mode.
-            // singlePassScene already prevented the empty-scene plate from being
-            // generated above, so sceneBackground is naturally null in that mode.
+            // Per-page route decision (from decidePageRoute) wins over the
+            // run-level default. The router picks 'off' for 0-cast pages and
+            // 'loose' for 1-3 cast pages.
+            const effectiveRefMode = (route && route.refMode) || runReferenceMode;
             const refApplied = require('./server/lib/storyHelpers').applyReferenceMode({
-              mode: runReferenceMode,
+              mode: effectiveRefMode,
               characterPhotos: pageData.characterPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
               landmarkPhotos: pageData.landmarkPhotos,

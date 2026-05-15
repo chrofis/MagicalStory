@@ -62,6 +62,10 @@ export function TestModelsPanel({
   // server default (set in server/config/models.js MODEL_DEFAULTS).
   const [referenceMode, setReferenceMode] = useState<'inherit' | 'strict' | 'loose' | 'styled-only' | 'off'>('inherit');
   const [singlePassScene, setSinglePassScene] = useState<'inherit' | 'on' | 'off'>('inherit');
+  // Composite path toggles
+  const [composite, setComposite] = useState(false);
+  const [phantomPoseRender, setPhantomPoseRender] = useState(false);
+  const [emptyScene, setEmptyScene] = useState<'reuse' | 'fresh' | 'skip'>('reuse');
 
   // Style Transfer state
   const [styleTargetModel, setStyleTargetModel] = useState<string>('gemini-2.5-flash-image');
@@ -97,22 +101,26 @@ export function TestModelsPanel({
   const allSelected = selectedModels.size === AVAILABLE_MODELS.length;
 
   const runTest = useCallback(async () => {
-    if (selectedModels.size === 0) return;
+    if (selectedModels.size === 0 && !composite) return;
     setIsRunning(true);
     setResults({});
 
     const models = Array.from(selectedModels);
-    const options: { iterativePlacement?: boolean; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean } = {};
-    if (iterativePlacement) options.iterativePlacement = true;
-    if (referenceMode !== 'inherit') options.referenceMode = referenceMode;
-    if (singlePassScene !== 'inherit') options.singlePassScene = singlePassScene === 'on';
+    const baseOptions: {
+      iterativePlacement?: boolean;
+      referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off';
+      singlePassScene?: boolean;
+    } = {};
+    if (iterativePlacement) baseOptions.iterativePlacement = true;
+    if (referenceMode !== 'inherit') baseOptions.referenceMode = referenceMode;
+    if (singlePassScene !== 'inherit') baseOptions.singlePassScene = singlePassScene === 'on';
 
-    const promises = models.map(async (model) => {
+    const directPromises = models.map(async (model) => {
       setResults(prev => ({ ...prev, [model]: { loading: true } }));
       const startTime = Date.now();
 
       try {
-        const response = await storyService.testModels(storyId, pageNumber, [model], Object.keys(options).length > 0 ? options : undefined);
+        const response = await storyService.testModels(storyId, pageNumber, [model], Object.keys(baseOptions).length > 0 ? baseOptions : undefined);
         const result = response.results[model];
         const elapsedMs = Date.now() - startTime;
         setResults(prev => ({
@@ -142,9 +150,47 @@ export function TestModelsPanel({
       }
     });
 
-    await Promise.allSettled(promises);
+    // Composite path — independent request alongside the direct-path models.
+    // Result key is "composite" or "composite+phantomPose" (matches backend).
+    const compositeKey = phantomPoseRender ? 'composite+phantomPose' : 'composite';
+    const compositePromise = composite
+      ? (async () => {
+          setResults(prev => ({ ...prev, [compositeKey]: { loading: true } }));
+          const startTime = Date.now();
+          try {
+            const response = await storyService.testModels(storyId, pageNumber, [], {
+              ...baseOptions,
+              composite: true,
+              phantomPoseRender,
+              emptyScene,
+            });
+            const r = response.results[compositeKey];
+            const elapsedMs = Date.now() - startTime;
+            setResults(prev => ({
+              ...prev,
+              [compositeKey]: {
+                loading: false,
+                imageData: r?.imageData,
+                error: r?.error,
+                modelId: r?.modelId || 'scene-composite',
+                elapsedMs,
+                inputSnapshot: response.inputSnapshot,
+              },
+            }));
+          } catch (err: unknown) {
+            const elapsedMs = Date.now() - startTime;
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setResults(prev => ({
+              ...prev,
+              [compositeKey]: { loading: false, error: message, elapsedMs },
+            }));
+          }
+        })()
+      : null;
+
+    await Promise.allSettled(compositePromise ? [...directPromises, compositePromise] : directPromises);
     setIsRunning(false);
-  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene]);
+  }, [selectedModels, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -264,6 +310,45 @@ export function TestModelsPanel({
               </select>
             </label>
           </div>
+          {/* Composite path controls — separate row, distinct colour so it's
+              clear this is a different method (not a model variant). */}
+          <div className="flex flex-wrap gap-3 mb-3 p-2 rounded-lg bg-purple-50 border border-purple-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={composite}
+                onChange={e => setComposite(e.target.checked)}
+                disabled={isRunning}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              />
+              <span className="text-sm text-purple-700 font-medium">Composite path</span>
+              <span className="text-[10px] text-gray-400">(4-step: BG → blocking → cutouts → blend)</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer ${composite ? '' : 'opacity-50'}`}>
+              <input
+                type="checkbox"
+                checked={phantomPoseRender}
+                onChange={e => setPhantomPoseRender(e.target.checked)}
+                disabled={isRunning || !composite}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              />
+              <span className="text-sm text-purple-700 font-medium">Phantom-pose render</span>
+              <span className="text-[10px] text-gray-400">(+1 Grok call per cast member)</span>
+            </label>
+            <label className={`flex flex-col gap-1 flex-1 min-w-[200px] ${composite ? '' : 'opacity-50'}`}>
+              <span className="text-xs font-medium text-purple-700">Empty-Scene Source (composite step 1)</span>
+              <select
+                value={emptyScene}
+                onChange={e => setEmptyScene(e.target.value as typeof emptyScene)}
+                disabled={isRunning || !composite}
+                className="rounded border-gray-300 text-xs p-1"
+              >
+                <option value="reuse">reuse saved plate</option>
+                <option value="fresh">regenerate fresh (Grok call)</option>
+                <option value="skip">skip — let composite decide</option>
+              </select>
+            </label>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={allSelected ? deselectAll : selectAll}
@@ -274,7 +359,7 @@ export function TestModelsPanel({
             </button>
             <button
               onClick={runTest}
-              disabled={isRunning || selectedModels.size === 0}
+              disabled={isRunning || (selectedModels.size === 0 && !composite)}
               className="px-3 py-1.5 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
             >
               {isRunning ? (
@@ -298,7 +383,15 @@ export function TestModelsPanel({
         {/* Results Grid */}
         {hasResults && (
           <div className="grid grid-cols-2 gap-4">
-            {AVAILABLE_MODELS.filter(m => results[m.id]).map(model => {
+            {[
+              ...AVAILABLE_MODELS.filter(m => results[m.id]).map(m => ({ id: m.id, label: m.label, cost: m.cost })),
+              // Composite-path result(s) keyed "composite" or "composite+phantomPose"
+              ...Object.keys(results).filter(k => k.startsWith('composite')).map(k => ({
+                id: k,
+                label: k === 'composite+phantomPose' ? 'Composite + Phantom-Pose' : 'Composite (4-step)',
+                cost: 'method',
+              })),
+            ].map(model => {
               const result = results[model.id];
               return (
                 <div
@@ -311,7 +404,7 @@ export function TestModelsPanel({
                       <span className="text-sm font-medium text-gray-800">
                         {model.label}
                       </span>
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 font-mono">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-mono ${model.cost === 'method' ? 'bg-purple-200 text-purple-700' : 'bg-gray-200 text-gray-600'}`}>
                         {model.cost}
                       </span>
                     </div>

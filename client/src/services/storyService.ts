@@ -1341,7 +1341,14 @@ export const storyService = {
   },
 
   // Test multiple image models on the same page (admin only, no credits, ephemeral)
-  async testModels(storyId: string, pageNumber: number, models: string[], options?: { iterativePlacement?: boolean; referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off'; singlePassScene?: boolean }): Promise<{
+  async testModels(storyId: string, pageNumber: number, models: string[], options?: {
+    iterativePlacement?: boolean;
+    referenceMode?: 'strict' | 'loose' | 'styled-only' | 'off';
+    singlePassScene?: boolean;
+    composite?: boolean;
+    phantomPoseRender?: boolean;
+    emptyScene?: 'reuse' | 'fresh' | 'skip';
+  }): Promise<{
     results: Record<string, {
       imageData?: string;
       modelId: string;
@@ -1354,6 +1361,7 @@ export const storyService = {
       pass2Failed?: boolean;
       pass2Error?: string;
       grokRefImages?: string[] | null;
+      compositeDebug?: unknown;
     }>;
     inputSnapshot?: TestModelsInputSnapshot;
   }> {
@@ -1372,6 +1380,7 @@ export const storyService = {
         pass2Failed?: boolean;
         pass2Error?: string;
         grokRefImages?: string[] | null;
+        compositeDebug?: unknown;
       }>;
       inputSnapshot?: TestModelsInputSnapshot;
     }>(
@@ -1381,6 +1390,9 @@ export const storyService = {
         ...(options?.iterativePlacement && { iterativePlacement: true }),
         ...(options?.referenceMode && { referenceMode: options.referenceMode }),
         ...(typeof options?.singlePassScene === 'boolean' && { singlePassScene: options.singlePassScene }),
+        ...(options?.composite && { composite: true }),
+        ...(options?.phantomPoseRender && { phantomPoseRender: true }),
+        ...(options?.emptyScene && { emptyScene: options.emptyScene }),
       }
     );
     return response;
