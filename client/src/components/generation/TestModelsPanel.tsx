@@ -284,7 +284,12 @@ export function TestModelsPanel({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   // Method toggles — each method below has its own opt-in switch.
   const [runDirect, setRunDirect] = useState(true);
-  const [composite, setComposite] = useState(false);
+  // Method 2: legacy silhouette-for-everyone composite (5 steps, optional
+  // phantom-pose render per character).
+  const [runUniform, setRunUniform] = useState(false);
+  // Method 3: stratified composite (back stratum rendered natively in the
+  // anchor plate, front stratum cropped from a separate front-figure plate).
+  const [runStratified, setRunStratified] = useState(false);
   // Direct-method options
   const [iterativePlacement, setIterativePlacement] = useState(false);
   // Reference-mode + single-pass-scene flags. 'inherit' = use the run-level
@@ -294,10 +299,6 @@ export function TestModelsPanel({
   // Composite-method options
   const [phantomPoseRender, setPhantomPoseRender] = useState(false);
   const [emptyScene, setEmptyScene] = useState<'reuse' | 'fresh' | 'skip'>('reuse');
-  // Composite pipeline variant: stratified renders back-stratum chars
-  // natively in the anchor plate and insets only the front stratum; uniform
-  // is the legacy silhouette-for-everyone path.
-  const [compositeStrategy, setCompositeStrategy] = useState<'stratified' | 'uniform'>('stratified');
   // Direct path: send one cell of the story's 2×4 sheet (matching the page's
   // intended pose) instead of the full styled-avatar image.
   const [useStorySheetCells, setUseStorySheetCells] = useState(false);
@@ -319,7 +320,7 @@ export function TestModelsPanel({
 
   const runTest = useCallback(async () => {
     if (!selectedModel) return;
-    if (!runDirect && !composite) return;
+    if (!runDirect && !runUniform && !runStratified) return;
     setIsRunning(true);
     setResults({});
 
@@ -370,53 +371,56 @@ export function TestModelsPanel({
       }
     });
 
-    // Composite path — independent request alongside the direct-path models.
-    // Result key matches backend: "composite" | "composite+phantomPose" with
-    // an optional "+uniform" suffix when the uniform pipeline is selected.
-    const stratSuffix = compositeStrategy === 'uniform' ? '+uniform' : '';
-    const compositeKey = phantomPoseRender
-      ? `composite+phantomPose${stratSuffix}`
-      : `composite${stratSuffix}`;
-    const compositePromise = composite
-      ? (async () => {
-          setResults(prev => ({ ...prev, [compositeKey]: { loading: true } }));
-          const startTime = Date.now();
-          try {
-            const response = await storyService.testModels(storyId, pageNumber, [], {
-              ...baseOptions,
-              composite: true,
-              phantomPoseRender,
-              emptyScene,
-              compositeStrategy,
-            });
-            const r = response.results[compositeKey];
-            const elapsedMs = Date.now() - startTime;
-            setResults(prev => ({
-              ...prev,
-              [compositeKey]: {
-                loading: false,
-                imageData: r?.imageData,
-                error: r?.error,
-                modelId: r?.modelId || 'scene-composite',
-                elapsedMs,
-                compositeDebug: (r?.compositeDebug as CompositeDebugBundle) || null,
-                inputSnapshot: response.inputSnapshot,
-              },
-            }));
-          } catch (err: unknown) {
-            const elapsedMs = Date.now() - startTime;
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            setResults(prev => ({
-              ...prev,
-              [compositeKey]: { loading: false, error: message, elapsedMs },
-            }));
-          }
-        })()
-      : null;
+    // Composite paths — one independent request per ticked strategy. The
+    // server's result-key naming matches: "composite" (stratified, no
+    // phantom), "composite+phantomPose" (uniform-with-phantom), and the
+    // legacy uniform path adds a "+uniform" suffix.
+    const runComposite = async (strategy: 'stratified' | 'uniform', withPhantom: boolean) => {
+      const stratSuffix = strategy === 'uniform' ? '+uniform' : '';
+      const compositeKey = withPhantom
+        ? `composite+phantomPose${stratSuffix}`
+        : `composite${stratSuffix}`;
+      setResults(prev => ({ ...prev, [compositeKey]: { loading: true } }));
+      const startTime = Date.now();
+      try {
+        const response = await storyService.testModels(storyId, pageNumber, [], {
+          ...baseOptions,
+          composite: true,
+          phantomPoseRender: withPhantom,
+          emptyScene,
+          compositeStrategy: strategy,
+        });
+        const r = response.results[compositeKey];
+        const elapsedMs = Date.now() - startTime;
+        setResults(prev => ({
+          ...prev,
+          [compositeKey]: {
+            loading: false,
+            imageData: r?.imageData,
+            error: r?.error,
+            modelId: r?.modelId || 'scene-composite',
+            elapsedMs,
+            compositeDebug: (r?.compositeDebug as CompositeDebugBundle) || null,
+            inputSnapshot: response.inputSnapshot,
+          },
+        }));
+      } catch (err: unknown) {
+        const elapsedMs = Date.now() - startTime;
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setResults(prev => ({
+          ...prev,
+          [compositeKey]: { loading: false, error: message, elapsedMs },
+        }));
+      }
+    };
 
-    await Promise.allSettled(compositePromise ? [...directPromises, compositePromise] : directPromises);
+    const compositePromises: Array<Promise<void>> = [];
+    if (runUniform) compositePromises.push(runComposite('uniform', phantomPoseRender));
+    if (runStratified) compositePromises.push(runComposite('stratified', false));
+
+    await Promise.allSettled([...directPromises, ...compositePromises]);
     setIsRunning(false);
-  }, [selectedModel, runDirect, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells, compositeStrategy]);
+  }, [selectedModel, runDirect, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, runUniform, runStratified, phantomPoseRender, emptyScene, useStorySheetCells]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -596,43 +600,31 @@ export function TestModelsPanel({
           </div>
         </div>
 
-        {/* ── Method 2: Composite path ── */}
+        {/* ── Method 2: Uniform Composite (legacy) ── */}
         <div className="mb-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
           <label className="flex items-center gap-2 cursor-pointer mb-2">
             <input
               type="checkbox"
-              checked={composite}
-              onChange={e => setComposite(e.target.checked)}
+              checked={runUniform}
+              onChange={e => setRunUniform(e.target.checked)}
               disabled={isRunning}
               className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
             />
-            <span className="text-sm font-semibold text-purple-900">Method 2 — Composite (5-step)</span>
-            <span className="text-[11px] text-purple-700">populated plate → bbox detect → depopulate → cutouts → blend</span>
+            <span className="text-sm font-semibold text-purple-900">Method 2 — Uniform Composite (legacy)</span>
+            <span className="text-[11px] text-purple-700">populated plate (all silhouettes) → depopulate → bbox detect → cutouts from 2×4 sheet → blend</span>
           </label>
-          <div className={`flex flex-wrap gap-3 mt-2 ${composite ? '' : 'opacity-50'}`}>
-            <label className="flex flex-col gap-1 flex-1 min-w-[220px]">
-              <span className="text-xs font-medium text-purple-700">Strategy</span>
-              <select
-                value={compositeStrategy}
-                onChange={e => setCompositeStrategy(e.target.value as typeof compositeStrategy)}
-                disabled={isRunning || !composite}
-                className="rounded border-gray-300 text-xs p-1"
-              >
-                <option value="stratified">Stratified — back native, front inset</option>
-                <option value="uniform">Uniform — silhouettes for all (legacy)</option>
-              </select>
-            </label>
+          <div className={`flex flex-wrap gap-3 mt-2 ${runUniform ? '' : 'opacity-50'}`}>
             <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-[260px]">
               <input
                 type="checkbox"
                 checked={phantomPoseRender}
                 onChange={e => setPhantomPoseRender(e.target.checked)}
-                disabled={isRunning || !composite || compositeStrategy === 'stratified'}
+                disabled={isRunning || !runUniform}
                 className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
               <span className="flex flex-col">
                 <span className="text-xs text-purple-700 font-medium">Phantom-pose render</span>
-                <span className="text-[10px] text-gray-500">Uniform-only. Re-render each character in the silhouette's exact pose via Grok edit (+1 call per cast member).</span>
+                <span className="text-[10px] text-gray-500">Re-render each character in the silhouette's exact pose via Grok edit (+1 call per cast member).</span>
               </span>
             </label>
             <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
@@ -640,7 +632,7 @@ export function TestModelsPanel({
               <select
                 value={emptyScene}
                 onChange={e => setEmptyScene(e.target.value as typeof emptyScene)}
-                disabled={isRunning || !composite}
+                disabled={isRunning || (!runUniform && !runStratified)}
                 className="rounded border-gray-300 text-xs p-1"
               >
                 <option value="fresh">regenerate fresh (Grok call)</option>
@@ -651,11 +643,29 @@ export function TestModelsPanel({
           </div>
         </div>
 
+        {/* ── Method 3: Stratified Composite (new) ── */}
+        <div className="mb-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={runStratified}
+              onChange={e => setRunStratified(e.target.checked)}
+              disabled={isRunning}
+              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-sm font-semibold text-emerald-900">Method 3 — Stratified Composite</span>
+            <span className="text-[11px] text-emerald-700">anchor plate (back native + front silhouettes) → depopulate front → front-figure plate → crop + composite → blend</span>
+          </label>
+          <p className={`text-[11px] mt-1 ${runStratified ? 'text-emerald-700' : 'text-gray-500'}`}>
+            Cast is split by depth: back half rendered natively in step 1 (no cutout), front half drawn together in step 3 then diff-cropped onto the depopulated back plate. Flat 4 Grok calls regardless of cast size. N=1 short-circuits to the anchor plate only.
+          </p>
+        </div>
+
         {/* Run button */}
         <div className="flex items-center gap-2 mb-4">
           <button
             onClick={runTest}
-            disabled={isRunning || !selectedModel || (!runDirect && !composite)}
+            disabled={isRunning || !selectedModel || (!runDirect && !runUniform && !runStratified)}
             className="px-4 py-2 text-sm font-semibold rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors flex items-center gap-1.5"
           >
             {isRunning ? (
@@ -667,7 +677,7 @@ export function TestModelsPanel({
               'Run Test'
             )}
           </button>
-          {!runDirect && !composite && (
+          {!runDirect && !runUniform && !runStratified && (
             <span className="text-xs text-red-600">Tick at least one method above.</span>
           )}
           {hasResults && !isRunning && (
@@ -683,12 +693,19 @@ export function TestModelsPanel({
           <div className={fullscreen ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'grid grid-cols-2 gap-4'}>
             {[
               ...AVAILABLE_MODELS.filter(m => results[m.id]).map(m => ({ id: m.id, label: m.label, cost: m.cost })),
-              // Composite-path result(s) keyed "composite" or "composite+phantomPose"
-              ...Object.keys(results).filter(k => k.startsWith('composite')).map(k => ({
-                id: k,
-                label: k === 'composite+phantomPose' ? 'Composite + Phantom-Pose' : 'Composite (4-step)',
-                cost: 'method',
-              })),
+              // Composite-path result(s). Possible keys:
+              //   "composite"                      → stratified
+              //   "composite+uniform"              → uniform, no phantom-pose
+              //   "composite+phantomPose+uniform"  → uniform + phantom-pose
+              ...Object.keys(results).filter(k => k.startsWith('composite')).map(k => {
+                const isUniform = k.includes('+uniform');
+                const hasPhantom = k.includes('+phantomPose');
+                let label: string;
+                if (!isUniform) label = 'Stratified Composite';
+                else if (hasPhantom) label = 'Uniform Composite + Phantom-Pose';
+                else label = 'Uniform Composite';
+                return { id: k, label, cost: 'method' };
+              }),
             ].map(model => {
               const result = results[model.id];
               return (
