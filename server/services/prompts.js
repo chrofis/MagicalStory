@@ -67,6 +67,7 @@ async function loadPromptTemplates() {
     ['avatarRetryPrompt', 'avatar-retry-prompt.txt'],
     ['avatarEvaluation', 'avatar-evaluation.txt'],
     ['sheet2x4Evaluation', 'sheet-2x4-evaluation.txt'],
+    ['sheet2x4StyleEval', 'sheet-2x4-style-eval.txt'],
     ['styledCostumedAvatar', 'styled-costumed-avatar.txt'],
     ['visualBibleAnalysis', 'visual-bible-analysis.txt'],
     ['illustrationEdit', 'illustration-edit.txt'],

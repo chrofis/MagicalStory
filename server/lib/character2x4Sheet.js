@@ -226,6 +226,82 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   return JSON.parse(text);
 }
 
+// Art-style descriptors injected into the Pass 2 style-transfer prompt.
+// Stay aligned with sceneComposite.js BLEND_STYLE_LINES so the downstream
+// page blend lands on the same surface treatment as the styled sheet.
+const STYLE_LINES = {
+  watercolor: "soft watercolour children's storybook illustration — gentle washes, simple ink outlines, subtle colour layering",
+  pixar:      "Pixar 3D illustration style — smooth volumetric shading, clean rim light, subtle subsurface scattering",
+  anime:      "anime line-art style — clean black outlines, flat cel-shaded colour fills, simplified facial features",
+  cartoon:    "modern flat cartoon — bold outlines, clean shapes, flat fills with simple shading",
+  oil:        "oil painting style — visible brushwork, layered colour mixing, painterly texture",
+  ghibli:     "Studio Ghibli illustration style — soft watercolour backgrounds with hand-drawn line work, warm palette",
+  comic:      "western comic-book style — bold ink outlines, halftone shading, saturated colours",
+};
+
+function buildStyleTransferPrompt(artStyle) {
+  const styleLine = STYLE_LINES[artStyle] || STYLE_LINES.watercolor;
+  return `Re-render this 2×4 character reference sheet in ${styleLine}.
+
+Preserve EVERYTHING except the visual style:
+- Same 4-column × 2-row grid layout, same thin black dividers, same pure white background.
+- Top row cells 1-4: head and neck only, in the same order (front, three-quarter, profile, back). Same hair, same beard if any, same skin tone, same facial features — the same person.
+- Bottom row cells 5-8: full body in the same poses (front, three-quarter, profile, back). Same proportions, same age. Same costume — every accessory, every garment colour, every cut identical.
+- No text, no numbers, no labels.
+
+Only the surface treatment changes from photographic to ${styleLine}.`;
+}
+
+/**
+ * Pass 2 evaluator — verifies the style-transferred sheet preserves identity
+ * + costume + layout, AND that the requested style was actually applied
+ * (rather than the model returning the source unchanged, as Gemini tends to).
+ *
+ * Receives THREE images in order: source face photo, Pass 1 realistic sheet,
+ * Pass 2 styled sheet. Returns parsed JSON verdict from
+ * prompts/sheet-2x4-style-eval.txt.
+ */
+async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey) {
+  const styleLabel = STYLE_LINES[artStyle] || STYLE_LINES.watercolor;
+
+  let prompt = PROMPT_TEMPLATES.sheet2x4StyleEval;
+  if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
+  prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
+
+  const toInlinePart = (dataUri) => {
+    const b64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
+    const mime = dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    return { inline_data: { mime_type: mime, data: b64 } };
+  };
+
+  const body = {
+    contents: [{
+      parts: [
+        toInlinePart(sourcePhoto),
+        toInlinePart(realisticSheet),
+        toInlinePart(styledSheet),
+        { text: prompt },
+      ],
+    }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2500, responseMimeType: 'application/json' },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
+  };
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
+  );
+  if (!resp.ok) throw new Error(`Gemini style-eval HTTP ${resp.status}`);
+  const j = await resp.json();
+  const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini style-eval returned no text');
+  return JSON.parse(text);
+}
+
 /**
  * Generate a 2×4 reference sheet for one character + costume in one Grok call.
  *
@@ -333,8 +409,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       layoutScore: verdict.layout?.layoutScore,
       identityScore: verdict.identity?.identityScore,
       outfitScore: verdict.outfit?.outfitScore,
+      sourceMatchScore: verdict.sourceMatch?.sourceMatchScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
+      sentToGrok: result.sentToGrok || null,
     });
     if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
     if (verdict.valid) break;
@@ -345,24 +423,127 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     throw new Error(`[CHARACTER 2×4] no usable image produced after ${totalAttempts} attempts for ${character?.name}`);
   }
   if (attemptHistory.length > 1) {
-    log.info(`[CHARACTER 2×4] ${character?.name} best-of-${attemptHistory.length}: attempt ${bestAttempt.attempt} (score=${bestAttempt.score})`);
+    log.info(`[CHARACTER 2×4] ${character?.name} Pass 1 best-of-${attemptHistory.length}: attempt ${bestAttempt.attempt} (score=${bestAttempt.score})`);
   }
 
-  return {
+  const pass1 = {
     imageData: bestAttempt.result.imageData,
-    usage: bestAttempt.result.usage,
+    selectedAttempt: bestAttempt.attempt,
+    finalScore: bestAttempt.score,
+    finalVerdict: bestAttempt.verdict,
+    attempts: attemptHistory,
     prompt,
+    sentToGrok: bestAttempt.result.sentToGrok || null,
+  };
+
+  // ── PASS 2: style transfer (skip when artStyle is realistic or eval skipped) ─
+  const wantStyleTransfer = !skipQualityEval && artStyle && artStyle !== 'realistic';
+  let pass2 = null;
+  if (wantStyleTransfer) {
+    pass2 = await runStyleTransferPass({
+      pass1ImageData: pass1.imageData,
+      facePhoto,
+      artStyle,
+      characterName: character?.name,
+      usageTracker,
+    });
+  }
+
+  // The function's primary return value (`imageData`) is the styled sheet
+  // when Pass 2 ran successfully, otherwise the realistic Pass 1 output.
+  // Downstream consumers (composite, ref attachment) get the story-style
+  // sheet by default. Pass 1's realistic anchor is on `realisticImageData`
+  // for inspection.
+  const finalImage = pass2?.imageData || pass1.imageData;
+  return {
+    imageData: finalImage,
+    realisticImageData: pass1.imageData,
+    usage: bestAttempt.result.usage,
+    prompt: pass1.prompt,
     refs: {
       phantom,
       standardAvatar: standardAvatar || null,
       facePhoto,
     },
-    // Surfaced so the dev panel can show all attempts side-by-side with
-    // their eval scores. The chosen attempt has `score === bestAttempt.score`.
-    attemptHistory,
-    selectedAttempt: bestAttempt.attempt,
-    finalScore: bestAttempt.score,
-    finalVerdict: bestAttempt.verdict,
+    passes: { pass1, pass2 },
+    // Legacy fields — kept so existing callers don't break. The styled
+    // (Pass 2) attempt history is what the dev panel renders by default.
+    attemptHistory: pass2?.attempts || pass1.attempts,
+    selectedAttempt: pass2?.selectedAttempt ?? pass1.selectedAttempt,
+    finalScore: pass2?.finalScore ?? pass1.finalScore,
+    finalVerdict: pass2?.finalVerdict || pass1.finalVerdict,
+  };
+}
+
+/**
+ * Pass 2 — take the realistic Pass 1 sheet and re-render it in the story's
+ * art style via Grok edit. Best-of-N retry. Eval via
+ * evaluateStyledSheetWithGemini: layout + identity (vs source photo) +
+ * style match + costume preserved. Returns the same shape as Pass 1's
+ * collected fields so the dev panel can render both passes uniformly.
+ */
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, usageTracker }) {
+  const prompt = buildStyleTransferPrompt(artStyle);
+  const totalAttempts = 1 + MAX_SHEET_RETRIES;
+  const attempts = [];
+  let best = null;
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}) attempt ${attempt}/${totalAttempts}`);
+    const result = await editWithGrok(prompt, [pass1ImageData], { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    if (usageTracker && result.usage) usageTracker('grok', result.usage, 'character_2x4_style_transfer', result.modelId);
+
+    if (!process.env.GEMINI_API_KEY) {
+      log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
+      best = { result, attempt, score: 10, verdict: null };
+      attempts.push({ attempt, stage: 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      break;
+    }
+
+    let verdict = null;
+    try {
+      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+    } catch (err) {
+      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — accepting as best-effort`);
+      best = { result, attempt, score: 10, verdict: null };
+      attempts.push({ attempt, stage: 'eval-error', score: 10, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      break;
+    }
+    const score = verdict.finalScore ?? 0;
+    attempts.push({
+      attempt,
+      stage: verdict.valid ? 'valid' : 'invalid',
+      score,
+      layoutScore: verdict.layoutScore,
+      identityScore: verdict.identityScore,
+      styleScore: verdict.styleScore,
+      outfitScore: verdict.outfitScore,
+      reasons: verdict.failureReasons || [],
+      imageData: result.imageData,
+      sentToGrok: result.sentToGrok || null,
+    });
+    const candidate = { result, attempt, score, verdict };
+    if (!best || candidate.score > best.score) best = candidate;
+    if (verdict.valid) break;
+    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
+  }
+
+  if (!best) {
+    log.error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image after ${totalAttempts} attempts — returning Pass 1 unchanged`);
+    return { imageData: null, attempts, selectedAttempt: null, finalScore: 0, finalVerdict: null, prompt };
+  }
+  if (attempts.length > 1) {
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 best-of-${attempts.length}: attempt ${best.attempt} (score=${best.score})`);
+  }
+  return {
+    imageData: best.result.imageData,
+    selectedAttempt: best.attempt,
+    finalScore: best.score,
+    finalVerdict: best.verdict,
+    attempts,
+    prompt,
+    sentToGrok: best.result.sentToGrok || null,
   };
 }
 
@@ -370,5 +551,5 @@ module.exports = {
   generateCharacter2x4Sheet,
   loadPhantom,
   // exposed for tests
-  _internal: { buildPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini },
+  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass },
 };

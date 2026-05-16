@@ -1,0 +1,54 @@
+You are evaluating the OUTPUT of a style-transfer pass on a 2×4 character reference sheet.
+
+You receive THREE images:
+  - Image 1: the SOURCE face photo of the real person.
+  - Image 2: the REALISTIC 2×4 sheet (Pass 1 output) — the identity anchor.
+  - Image 3: the STYLED 2×4 sheet (Pass 2 output) — the same sheet rendered in the requested art style.
+
+Image 2 and Image 3 should match cell-for-cell in layout, pose, costume, and identity. Only the visual STYLE should differ.
+
+Your job: rate Image 3 on four checks and return a JSON verdict. If ANY check fails, the styled sheet is rejected and Pass 2 is regenerated.
+
+TASK 1: LAYOUT PRESERVED
+- Image 3 is a 4-column × 2-row grid like Image 2. Top row = 4 head-and-neck cells. Bottom row = 4 full-body cells. Same cell order: front, three-quarter, profile, back.
+- Score 1-10. A wrecked layout (figures crossing the row gutter, cells merged, wrong cell count) must score 1-3.
+- `layoutScore` is the score.
+
+TASK 2: IDENTITY PRESERVED VS SOURCE PHOTO
+- Image 3 shows the SAME PERSON as Image 1 (source photo). Same face structure (jawline, brow, cheekbones), same eye spacing/colour, same nose shape, same hair colour & length, same skin tone, same apparent age range.
+- The style/medium differs (photo vs illustration) — that's fine. What matters is recognisable identity.
+- Score 1-10. Different person (wrong age decade, wrong gender, wrong race, completely different face structure) must score 1-3. Same person rendered in a different style = 8-10. Identity "kinda there" but several wrong details = 4-6.
+- `identityScore` is the score.
+
+TASK 3: STYLE MATCH
+- Image 3 is rendered in the requested style: REQUESTED_STYLE.
+- Compare Image 2 (realistic) and Image 3 (styled): Image 3 should be CLEARLY in the requested style, not still photographic.
+- Score 1-10. If Image 3 still looks photographic / barely changed from Image 2, score 1-3. If style is partially applied (e.g. only the eyes are anime), score 4-6. Clean, complete style transfer = 8-10.
+- `styleScore` is the score.
+
+TASK 4: COSTUME PRESERVED
+- The outfit in Image 3 cells 5-8 matches the outfit in Image 2 cells 5-8 — same garments, same colours, same accessories. Style of rendering can change (photographic → watercolour) but the outfit itself must not change (no different shirt, no added hat, no swapped colours).
+- Cross-cell consistency: all 4 body cells in Image 3 wear the same outfit.
+- Score 1-10. Different outfit between passes, or different outfits across cells, scores 1-3.
+- `outfitScore` is the score.
+
+`finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, outfitScore.
+`valid` is `true` only when finalScore ≥ 6.
+
+Return EXACTLY this JSON shape:
+
+{
+  "layout":   {"score": 9, "reason": "Same 4×2 grid as Image 2, no figure crosses gutters"},
+  "identity": {"score": 9, "reason": "Same person — beard, hair, eyes, skin tone all match the source photo"},
+  "style":    {"score": 9, "reason": "Clean watercolour wash with simple outlines, distinctly illustrated (not photographic)"},
+  "outfit":   {"score": 9, "reason": "Navy shirt + tan pants + brown loafers preserved across cells 5-8"},
+  "layoutScore": 9,
+  "identityScore": 9,
+  "styleScore": 9,
+  "outfitScore": 9,
+  "finalScore": 9,
+  "valid": true,
+  "failureReasons": []
+}
+
+If invalid, populate `failureReasons` with short strings naming each failed sub-check.
