@@ -5188,7 +5188,7 @@ ${adventureGuide}` : ''}`;
   const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
 
   if (PROMPT_TEMPLATES.storyUnified) {
-    const prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
+    let prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
       LANGUAGE: getLanguageNameEnglish(language),
@@ -5207,7 +5207,22 @@ ${adventureGuide}` : ''}`;
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene
     });
-    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars`);
+    // Hard gate for all text-overlay-only instructions. Layouts that render
+    // text BELOW the image (square-below, advanced reading level) don't
+    // need textPosition / textZoneDescription / forbidden-side / calm-zone
+    // rules — keeping them in the prompt makes Sonnet emit the fields and
+    // bake the calm-corner constraints into scene prose, polluting non-
+    // overlay stories. story-unified.txt wraps every overlay-only block
+    // in <!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->. With
+    // overlay ON we strip just the markers; with overlay OFF we strip
+    // the markers AND their contents.
+    const textInImage = inputData.layout?.textInImage === true;
+    if (textInImage) {
+      prompt = prompt.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '');
+    } else {
+      prompt = prompt.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
+    }
+    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars (textInImage=${textInImage})`);
     return prompt;
   }
 
