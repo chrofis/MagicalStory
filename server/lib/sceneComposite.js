@@ -1700,17 +1700,34 @@ async function _stratifiedBody(ctx) {
     tg: parseInt(c.color.slice(3, 5), 16),
     tb: parseInt(c.color.slice(5, 7), 16),
   }));
+  // Each colour match is RESTRICTED to inside its detected bbox (plus a
+  // small padding for anti-aliased edges). Without this, a stray scene
+  // pixel matching the silhouette colour (water reflection, sunset glare,
+  // etc.) gets included in the mask and Grok sees an extra coloured blob
+  // to "replace with a character".
+  const BBOX_PAD = 8;
+  const colourRegions = frontCast.map((c, idx) => {
+    const bb = bboxes[c.name];
+    if (!bb) return null;
+    return {
+      x1: Math.max(0, bb.x - BBOX_PAD),
+      y1: Math.max(0, bb.y - BBOX_PAD),
+      x2: Math.min(canvasW, bb.x + bb.width + BBOX_PAD),
+      y2: Math.min(canvasH, bb.y + bb.height + BBOX_PAD),
+      target: targets[idx],
+    };
+  }).filter(Boolean);
   const fullMask = Buffer.alloc(canvasW * canvasH);
   let maskedCount = 0;
-  for (let y = 0; y < canvasH; y++) {
-    for (let x = 0; x < canvasW; x++) {
-      const i = (y * canvasW + x) * anchorCh;
-      const r = anchorRgb[i], g = anchorRgb[i + 1], b = anchorRgb[i + 2];
-      for (const t of targets) {
-        if (isSilhouetteMatch(r, g, b, t.tr, t.tg, t.tb)) {
+  for (const region of colourRegions) {
+    const { x1, y1, x2, y2, target } = region;
+    for (let y = y1; y < y2; y++) {
+      for (let x = x1; x < x2; x++) {
+        const i = (y * canvasW + x) * anchorCh;
+        if (fullMask[y * canvasW + x]) continue; // already counted by another colour
+        if (isSilhouetteMatch(anchorRgb[i], anchorRgb[i + 1], anchorRgb[i + 2], target.tr, target.tg, target.tb)) {
           fullMask[y * canvasW + x] = 255;
           maskedCount++;
-          break;
         }
       }
     }
