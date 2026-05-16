@@ -1041,13 +1041,13 @@ async function buildIdentityPack(cast, options = {}) {
 // ─── Stratified-composite prompt builders ─────────────────────────────────
 
 /**
- * Per-character prose line for a back-stratum character. No colour, no
- * silhouette markers — Grok renders them as real characters using the
- * reference sheet image that ships alongside the prompt.
+ * Per-character prose line for a real character (no silhouette colour).
+ * Grok renders them using the reference sheet image that ships alongside
+ * the prompt. Used for the foreground stratum in the new pipeline.
  */
-function buildBackCharLines(backCast) {
-  return backCast.map((c) => {
-    const sizeHint = c.sizeHint || 'small to medium in the distance';
+function buildBackCharLines(cast) {
+  return cast.map((c) => {
+    const sizeHint = c.sizeHint || (c.depth === 'background' ? 'small in the distance' : 'medium, closer to camera');
     const posHint = c.position || 'in the scene';
     const direction = c.flip ? 'facing right' : 'facing left';
     const poseLabel = {
@@ -1057,7 +1057,7 @@ function buildBackCharLines(backCast) {
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || `three-quarter view, ${direction}`;
     const actionClause = c.action ? `, ${c.action}` : '';
-    return `- ${c.name} (back-stratum character, render fully): ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
+    return `- ${c.name}: ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
   }).join('\n');
 }
 
@@ -1072,68 +1072,81 @@ function buildBackCharLines(backCast) {
 // headroom so future prompt tweaks don't silently re-blow the budget.
 const STRATIFIED_PROMPT_HARD_CAP = 7700;
 
-function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasIdentityPack = false) {
-  const backNames = backCast.map(c => c.name).filter(Boolean);
+// Foreground-first anchor-plate prompt. Renders the FRONT stratum
+// (closer-to-camera characters) as REAL characters using the identity pack,
+// and places the BACK stratum (farther characters) as flat-colour
+// silhouettes. Replaces the previous order which rendered the back stratum
+// real and placed the front as silhouettes — Grok was pulling silhouettes
+// to the back of the scene, which gave wrong z-order on the composite.
+//
+// In the new flow:
+//   step 1: foreground real + background silhouettes
+//   step 2: silhouettes → real (background characters)
+//   step 3: layered composite — empty scene → real back → real front
+function buildAnchorPlatePrompt(scene, frontCast, backCast, cleanBackgroundPrompt, hasIdentityPack = false) {
   const frontNames = frontCast.map(c => c.name).filter(Boolean);
-  // For substitution, refer to front chars by their silhouette colour name.
-  const frontSubs = Object.fromEntries(
-    frontCast.map(c => [c.name, `the ${c.colorName || (c.color || 'coloured').toLowerCase()} silhouette`])
+  const backNames = backCast.map(c => c.name).filter(Boolean);
+  // For substitution, refer to back chars (the silhouettes here) by their
+  // silhouette colour name. Front chars are rendered as real so their names
+  // stay in the prompt.
+  const backSubs = Object.fromEntries(
+    backCast.map(c => [c.name, `the ${c.colorName || (c.color || 'coloured').toLowerCase()} silhouette`])
   );
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
-  // Scene intent gets the same stratum filter — drop sentences naming only
-  // front chars; substitute front names with their silhouette colour in
-  // co-mention sentences. Without this, the intent block at the top of the
-  // prompt names "Noah" and "Emma" long before the silhouette rules appear.
+  // Scene intent gets the stratum filter — drop sentences naming only
+  // back-stratum chars (the silhouettes); substitute back names with their
+  // silhouette colour in co-mention sentences. Front-stratum chars (the
+  // real ones) keep their names.
   const filteredIntent = scene?.intent
-    ? filterBriefByStratum(String(scene.intent).trim(), backNames, frontNames, frontSubs)
+    ? filterBriefByStratum(String(scene.intent).trim(), frontNames, backNames, backSubs)
     : '';
   const sceneIntentBlock = filteredIntent ? `\nScene intent: ${filteredIntent}\n` : '';
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: empty scene canvas. Paint your output ON TOP of it — keep its setting, lighting, and named props intact.\n- Image 2: labelled identity pack — one body panel per BACKGROUND character with the name on a black bar below. Match each background character's face, hair, and clothing to the matching panel.\n`
+    ? `\nINPUT IMAGES:\n- Image 1: empty scene canvas. Paint your output ON TOP of it — keep its setting, lighting, and named props intact.\n- Image 2: labelled identity pack — one body panel per FOREGROUND character with the name on a black bar below. Match each foreground character's face, hair, and clothing to the matching panel.\n`
     : '';
-  // Substitute front-character names inside each back-cast entry's free-text
-  // fields (position + action). Scene-expansion can write "Daniel kneels
-  // between the camera and Noah" — the relative position is useful but
-  // "Noah" itself is a leak. Same pattern as the brief substitution.
-  const subFrontNames = (s) => {
+  // Substitute back-character names inside front-cast entries' free-text
+  // fields (position + action). Scene-expansion can write "Noah stands
+  // beside Daniel" — Noah is the foreground char (real, name OK), but
+  // Daniel is the back stratum (silhouette now) so his name leaks.
+  const subBackNames = (s) => {
     if (!s) return s;
     let out = s;
-    for (const fc of frontCast) {
-      const n = fc.name;
+    for (const bc of backCast) {
+      const n = bc.name;
       if (!n) continue;
       const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const sub = `the ${fc.colorName || (fc.color || 'coloured').toLowerCase()} silhouette`;
+      const sub = `the ${bc.colorName || (bc.color || 'coloured').toLowerCase()} silhouette`;
       out = out.replace(new RegExp(`\\b${esc}'s\\b`, 'gi'), `${sub}'s`);
       out = out.replace(new RegExp(`\\b${esc}\\b`, 'gi'), sub);
     }
     return out;
   };
-  const sanitisedBackCast = backCast.map(c => ({ ...c, position: subFrontNames(c.position), action: subFrontNames(c.action) }));
-  const backBlock = backCast.length > 0
-    ? `BACKGROUND (real characters, painted INTO the scene) — render these ${backCast.length} character(s) using the identity pack for face/hair/clothing.\n\n${buildBackCharLines(sanitisedBackCast)}\n`
-    : '';
+  const sanitisedFrontCast = frontCast.map(c => ({ ...c, position: subBackNames(c.position), action: subBackNames(c.action) }));
   const frontBlock = frontCast.length > 0
-    ? `FOREGROUND (silhouette placeholders, IN FRONT of background characters) — paint ${frontCast.length} flat-colour silhouette shape(s) ON TOP of the scene, between the camera and the background characters. When a silhouette's position overlaps a background character, the silhouette MUST occlude the background character (paint over them) — silhouettes ALWAYS win over background figures because they are closer to camera. The silhouettes are NOT real characters; they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real characters will be inset in a later step.\n\n${buildAnonymousCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Flat human-shaped block filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no skin tone, no face, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head per the marker spec above.\n- A correctly drawn silhouette looks like a paper cutout pasted ON TOP of the scene.`
+    ? `FOREGROUND (real characters, painted INTO the scene, closer to camera) — render these ${frontCast.length} character(s) using the identity pack for face/hair/clothing. These foreground figures sit IN FRONT of any silhouettes they overlap; paint them ON TOP, occluding background silhouettes wherever they cross.\n\n${buildBackCharLines(sanitisedFrontCast)}\n`
     : '';
-  const totalCount = backCast.length + frontCast.length;
+  const backBlock = backCast.length > 0
+    ? `BACKGROUND (silhouette placeholders, farther from camera, BEHIND the foreground) — paint ${backCast.length} flat-colour silhouette shape(s) on the scene, at the back of the cast layout. The foreground characters above will be drawn IN FRONT of these silhouettes — wherever a foreground character overlaps a silhouette, the foreground character wins (paint over the silhouette). The silhouettes are NOT real characters; they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real background characters will be inset in a later step.\n\n${buildAnonymousCastLines(backCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Flat human-shaped block filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no skin tone, no face, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head per the marker spec above.\n- A correctly drawn silhouette looks like a paper cutout pasted onto the scene.`
+    : '';
+  const totalCount = frontCast.length + backCast.length;
 
-  const briefHeader = `\nPAGE BRIEF (background characters only) — canonical descriptions of the background characters, costumes, props, and required objects. All mentions of the foreground silhouette characters have been replaced with their silhouette colour reference; do not render them as real characters here.\n\n`;
-  const head = `Paint a single illustrated scene. ${backCast.length} BACKGROUND character(s) rendered as real people drawn into the scene; ${frontCast.length} FOREGROUND silhouette placeholder(s) painted ON TOP. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+  const briefHeader = `\nPAGE BRIEF (foreground characters only) — canonical descriptions of the foreground characters, costumes, props, and required objects. All mentions of the background silhouette characters have been replaced with their silhouette colour reference; do not render them as real characters here.\n\n`;
+  const head = `Paint a single illustrated scene. ${frontCast.length} FOREGROUND character(s) rendered as real people closer to camera; ${backCast.length} BACKGROUND silhouette placeholder(s) drawn behind them. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 ${refsBlock}
 PRIORITY 1 — Setting + lighting + named props must match the description. This image is the canonical world plate. Do NOT invent props that are not described.
 
 SETTING:
 ${settingBlock}
 ${sceneIntentBlock}
-PRIORITY 2 — Cast placement. Characters stand on a SOLID surface visible in the scene. Foreground silhouettes are IN FRONT of background characters when their positions overlap — paint silhouettes over background figures.
+PRIORITY 2 — Cast placement. Characters stand on a SOLID surface visible in the scene. Foreground REAL characters are IN FRONT of background silhouettes when they overlap — paint real characters over silhouettes.
 
-${backBlock}
-${frontBlock}`;
+${frontBlock}
+${backBlock}`;
   const tail = `\nNO TEXT in the output.`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
-  const filteredBrief = filterBriefByStratum(rawBrief, backNames, frontNames, frontSubs);
+  const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
   const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
   const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
@@ -1602,16 +1615,18 @@ async function _stratifiedBody(ctx) {
   if (backIdentityPack) debug.backIdentityPack = backIdentityPack;
   if (frontIdentityPack) debug.frontIdentityPack = frontIdentityPack;
 
-  // ── Step 1/5: Anchor plate (back rendered native, front as silhouettes)
-  // Refs: [emptyScene, backIdentityPack]. The front identity pack is
-  // INTENTIONALLY omitted — passing front faces here makes Grok render the
-  // front characters as real people instead of flat silhouettes, which
-  // breaks the diff-based bbox detection in step 4.
-  log.info(`[SCENE COMPOSITE/STRATIFIED] step 1/5 — anchor plate (back=${backCast.length}, front=${frontCast.length})`);
-  const hasAnchorIdentity = !!backIdentityPack;
-  const anchorPrompt = buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasAnchorIdentity);
+  // ── Step 1/4: Anchor plate. FOREGROUND-FIRST: render FRONT stratum
+  // (closer-to-camera chars) as REAL using the identity pack, place BACK
+  // stratum (farther chars) as flat-colour silhouettes BEHIND the
+  // foreground. Refs: [emptyScene, frontIdentityPack]. Back identity pack
+  // is INTENTIONALLY omitted — Grok would render the silhouette stratum
+  // as real characters if shown their faces, which breaks the silhouette
+  // detection step.
+  log.info(`[SCENE COMPOSITE/STRATIFIED] step 1/4 — anchor plate (front-real=${frontCast.length}, back-silhouettes=${backCast.length})`);
+  const hasAnchorIdentity = !!frontIdentityPack;
+  const anchorPrompt = buildAnchorPlatePrompt(scene, frontCast, backCast, cleanBackgroundPrompt, hasAnchorIdentity);
   const anchorRefs = [emptySceneData];
-  if (backIdentityPack) anchorRefs.push(backIdentityPack);
+  if (frontIdentityPack) anchorRefs.push(frontIdentityPack);
   const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
   totalCost += anchor.usage?.cost || 0;
@@ -1626,12 +1641,11 @@ async function _stratifiedBody(ctx) {
   debug.blocking = anchor.imageData;
   debug.blockingPrompt = anchorPrompt;
 
-  // N=1 short-circuit: a single character was rendered natively into the
-  // anchor plate. No silhouettes to lift, no cutouts to inset. Return the
-  // anchor plate as the final image (no blend pass — the blend prompt
-  // assumes pasted cutouts and would degrade an already-coherent scene).
-  if (frontCast.length === 0) {
-    log.info(`[SCENE COMPOSITE/STRATIFIED] short-circuit — front stratum empty; anchor plate is final ($${totalCost.toFixed(4)})`);
+  // N=1 short-circuit: only one character total, and they're rendered
+  // natively in the anchor plate. No silhouettes to lift, no inset. Return
+  // the anchor plate directly.
+  if (backCast.length === 0) {
+    log.info(`[SCENE COMPOSITE/STRATIFIED] short-circuit — back stratum empty; anchor plate is final ($${totalCost.toFixed(4)})`);
     return {
       imageData: anchor.imageData,
       usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-stratified' },
@@ -1639,16 +1653,16 @@ async function _stratifiedBody(ctx) {
     };
   }
 
-  // ── Step 1.5: detect silhouette bboxes from the anchor plate so we can
-  // crop step 3's input. findColorBbox doesn't need a diff baseline — it
-  // finds the largest saturated blob of each cast colour. If Grok didn't
-  // paint the silhouettes at all, this fails fast with the anchor plate in
-  // the partial debug so the dev panel can show what Grok produced.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 1.5 — detect silhouette bboxes on anchor plate');
+  // ── Step 1.5: detect BACK-stratum silhouette bboxes on the anchor plate
+  // — these are the placeholders we'll replace with real characters in
+  // step 2. If Grok didn't paint the silhouettes at all, fail fast with
+  // the anchor plate in partialDebug so the dev panel can show what Grok
+  // produced.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 1.5 — detect background silhouette bboxes on anchor plate');
   const anchorMeta = await sharp(anchorBuf).metadata();
   const canvasW = anchorMeta.width, canvasH = anchorMeta.height;
   const bboxes = {};
-  for (const c of frontCast) {
+  for (const c of backCast) {
     const r = await findColorBbox(anchorBuf, c.color);
     if (!r) {
       log.warn(`[SCENE COMPOSITE/STRATIFIED] no ${c.color} silhouette on anchor plate`);
@@ -1659,7 +1673,7 @@ async function _stratifiedBody(ctx) {
   }
   debug.bboxes = bboxes;
   if (Object.keys(bboxes).length === 0) {
-    throw new Error('[SCENE COMPOSITE/STRATIFIED] no front silhouettes detected on anchor plate — Grok did not paint any of the requested colours');
+    throw new Error('[SCENE COMPOSITE/STRATIFIED] no background silhouettes detected on anchor plate — Grok did not paint any of the requested colours');
   }
 
   // Union bbox of all detected silhouettes + 20% padding. This region is
@@ -1697,7 +1711,9 @@ async function _stratifiedBody(ctx) {
   log.info('[SCENE COMPOSITE/STRATIFIED] building silhouette mask from anchor plate');
   const { data: anchorRgb, info: anchorInfo } = await sharp(anchorBuf).raw().toBuffer({ resolveWithObject: true });
   const anchorCh = anchorInfo.channels;
-  const targets = frontCast.map(c => ({
+  // Targets are the BACK-stratum colours — those are the silhouettes in the
+  // anchor plate.
+  const targets = backCast.map(c => ({
     tr: parseInt(c.color.slice(1, 3), 16),
     tg: parseInt(c.color.slice(3, 5), 16),
     tb: parseInt(c.color.slice(5, 7), 16),
@@ -1708,7 +1724,7 @@ async function _stratifiedBody(ctx) {
   // etc.) gets included in the mask and Grok sees an extra coloured blob
   // to "replace with a character".
   const BBOX_PAD = 8;
-  const colourRegions = frontCast.map((c, idx) => {
+  const colourRegions = backCast.map((c, idx) => {
     const bb = bboxes[c.name];
     if (!bb) return null;
     return {
@@ -1736,12 +1752,12 @@ async function _stratifiedBody(ctx) {
   }
   log.info(`[SCENE COMPOSITE/STRATIFIED]   mask: ${maskedCount} silhouette px (${(100 * maskedCount / (canvasW * canvasH)).toFixed(2)}% of canvas)`);
 
-  // ── Step 2/4: front-figure plate — crop the anchor to union bbox + 20%
+  // ── Step 2/4: background fill plate — crop the anchor to union bbox +
   // pad, replace non-silhouette pixels with WHITE inside the crop, send to
-  // Grok edit. Grok sees only the silhouettes on a white field; identity
-  // pack as Image 2 binds name↔face. No back-character pixels in the input
-  // means zero risk of Grok modifying them.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 2/4 — front figure plate (silhouettes on white)');
+  // Grok edit. Grok sees only the back-stratum silhouettes on a white
+  // field; back identity pack as Image 2 binds name↔face. No foreground
+  // pixels in the input means zero risk of Grok modifying them.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 2/4 — background fill plate (silhouettes on white)');
   const maskedInputRgb = Buffer.alloc(cropW * cropH * 3);
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
@@ -1784,21 +1800,22 @@ async function _stratifiedBody(ctx) {
   debug.step3Input = maskedInputData;
   debug.step3PaddedSize = { width: paddedW, height: paddedH, padLeft, padTop };
 
-  const hasFrontIdentity = !!frontIdentityPack;
-  const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
-  const frontInsetRefs = [maskedInputData];
-  if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
+  // Step 2 fills the BACK silhouettes with real characters using the back
+  // identity pack. The front cast is unrelated to this call — they were
+  // already rendered real in step 1 and aren't in this crop at all.
+  const hasBackIdentity = !!backIdentityPack;
+  const fillPrompt = buildFrontInsetPrompt(backCast, scene, hasBackIdentity, frontCast);
+  const fillRefs = [maskedInputData];
+  if (backIdentityPack) fillRefs.push(backIdentityPack);
   // padInput:true → Grok's aspect normalizer PADS each input with white
   // to match preset.name instead of cover-cropping. Both refs here have
   // white backgrounds (silhouette crop's surround is white; identity
-  // pack's background is white) so the pad bars are invisible. This
-  // replaces an earlier bug where the horizontal identity pack got
-  // sliced in half when step 2's aspect was narrow (1:2, 9:16, etc.).
-  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD, padInput: true });
-  if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
+  // pack's background is white) so the pad bars are invisible.
+  const frontPlate = await editWithGrok(fillPrompt, fillRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD, padInput: true });
+  if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_back_fill', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
-  debug.frontPlate = frontPlate.imageData;
-  debug.frontPlatePrompt = frontInsetPrompt;
+  debug.frontPlate = frontPlate.imageData; // panel reads "frontPlate"; semantically this is the bg-fill plate
+  debug.frontPlatePrompt = fillPrompt;
   debug.frontPlateSentToGrok = frontPlate.sentToGrok || null;
 
   // ── Step 3/4: composite the rendered characters back onto the ORIGINAL
@@ -1991,13 +2008,75 @@ async function _stratifiedBody(ctx) {
     rgba[i * 4 + 2] = alignedRgb[i * 3 + 2];
     rgba[i * 4 + 3] = fData[i * fStride];
   }
-  const maskedFrontPng = await sharp(rgba, { raw: { width: cropW, height: cropH, channels: 4 } }).png().toBuffer();
-  const composited = await sharp(anchorBuf)
-    .composite([{ input: maskedFrontPng, left: cropX, top: cropY }])
+  const maskedBgFillPng = await sharp(rgba, { raw: { width: cropW, height: cropH, channels: 4 } }).png().toBuffer();
+
+  // ── Layered composite (NEW order):
+  //   Layer 1: empty scene (base)
+  //   Layer 2: real background characters (from step-2 bg-fill plate)
+  //            at the silhouette region with figure-mask alpha
+  //   Layer 3: real foreground characters (from step-1 anchor plate)
+  //            on top, using a foreground mask = anchor pixels that
+  //            differ from empty scene AND are NOT silhouette colours.
+  //
+  // This preserves z-order: foreground occludes background wherever
+  // their canvas positions overlap, because Grok drew foreground ON
+  // TOP of silhouettes in the anchor plate.
+  const emptySceneRawBuf = Buffer.from(emptySceneData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const emptyScaledPng = await sharp(emptySceneRawBuf)
+    .resize(canvasW, canvasH, { fit: 'fill' })
+    .png()
+    .toBuffer();
+  const { data: emptyRgb, info: emptyInfo } = await sharp(emptyScaledPng).raw().toBuffer({ resolveWithObject: true });
+  const emptyCh = emptyInfo.channels;
+
+  // Foreground mask: anchor pixel differs from empty scene AND is not in
+  // the silhouette mask. Threshold tuned so shadows / faint diff are not
+  // counted (we don't want noise pixels making it through).
+  const FG_DIFF_THRESHOLD_SQ = 45 * 45;
+  const fgCanvasMask = Buffer.alloc(canvasW * canvasH);
+  let fgCount = 0;
+  for (let y = 0; y < canvasH; y++) {
+    for (let x = 0; x < canvasW; x++) {
+      const i = y * canvasW + x;
+      if (fullMask[i]) continue;
+      const aI = i * anchorCh;
+      const eI = i * emptyCh;
+      const dr = anchorRgb[aI]     - emptyRgb[eI];
+      const dg = anchorRgb[aI + 1] - emptyRgb[eI + 1];
+      const db = anchorRgb[aI + 2] - emptyRgb[eI + 2];
+      if (dr * dr + dg * dg + db * db > FG_DIFF_THRESHOLD_SQ) {
+        fgCanvasMask[i] = 255;
+        fgCount++;
+      }
+    }
+  }
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   foreground mask: ${fgCount} px (${((100 * fgCount) / (canvasW * canvasH)).toFixed(1)}% of canvas)`);
+
+  // Feather the foreground mask so the seam between fg and bg is soft.
+  const fgFeathered = await sharp(fgCanvasMask, { raw: { width: canvasW, height: canvasH, channels: 1 } })
+    .blur(3)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const fgStride = fgFeathered.info.channels;
+  const anchorRgbaForFg = Buffer.alloc(canvasW * canvasH * 4);
+  for (let i = 0; i < canvasW * canvasH; i++) {
+    anchorRgbaForFg[i * 4]     = anchorRgb[i * anchorCh];
+    anchorRgbaForFg[i * 4 + 1] = anchorRgb[i * anchorCh + 1];
+    anchorRgbaForFg[i * 4 + 2] = anchorRgb[i * anchorCh + 2];
+    anchorRgbaForFg[i * 4 + 3] = fgFeathered.data[i * fgStride];
+  }
+  const anchorFgMaskedPng = await sharp(anchorRgbaForFg, { raw: { width: canvasW, height: canvasH, channels: 4 } }).png().toBuffer();
+
+  const composited = await sharp(emptyScaledPng)
+    .composite([
+      { input: maskedBgFillPng, left: cropX, top: cropY }, // back chars (real)
+      { input: anchorFgMaskedPng, left: 0, top: 0 },       // foreground chars (real, from anchor)
+    ])
     .png()
     .toBuffer();
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
+  debug.foregroundMask = `data:image/png;base64,${await sharp(fgCanvasMask, { raw: { width: canvasW, height: canvasH, channels: 1 } }).png().toBuffer().then(b => b.toString('base64'))}`;
 
   // ── Step 4/4: blend pass (same as uniform path)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 4/4 — blend pass');
