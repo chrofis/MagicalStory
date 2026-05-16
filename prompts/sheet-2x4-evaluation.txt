@@ -1,13 +1,17 @@
 You are evaluating a 2×4 character reference sheet produced by an image model.
 
-The image is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. The intended layout is:
+You receive TWO images:
+  - Image 1: the SOURCE face photo of the real person the sheet is supposed to depict.
+  - Image 2: the GENERATED 2×4 sheet to evaluate.
+
+Image 2 is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. The intended layout is:
 
   Row 1 (cells 1–4, top):     HEAD AND NECK ONLY — no shoulders, no torso, no arms, no legs, no clothing visible below the collarbone. Four facing angles: front, three-quarter, profile, back of head.
   Row 2 (cells 5–8, bottom):  FULL BODY — head to feet, wearing the requested costume. Four facing angles in the same order.
 
 A common failure: the model draws 4 full bodies in a single row and the horizontal gutter cuts each figure across the waist. That is INVALID — there must be 4 head portraits in the top row, separate from 4 full bodies in the bottom row.
 
-Your job: rate the sheet on three checks and return a JSON verdict. If ANY check fails, the sheet is rejected and regenerated.
+Your job: rate the sheet on FOUR checks and return a JSON verdict. If ANY check fails, the sheet is rejected and regenerated.
 
 TASK 1: LAYOUT
 - Top row contains 4 head-and-neck portraits only. No shoulders or torso visible. Score 1-10.
@@ -26,7 +30,15 @@ TASK 3: OUTFIT CONSISTENCY (only if REQUESTED_OUTFIT is given below)
 - `outfitScore` = lower of the two. Different outfits across cells must score 1-3.
 - If REQUESTED_OUTFIT is not provided, set `outfitScore` based on cross-cell outfit consistency alone (no match check).
 
-`finalScore` MUST equal the LOWEST of layoutScore, identityScore, outfitScore.
+TASK 4: SOURCE-PHOTO IDENTITY MATCH
+- Compare Image 1 (source photo) against the heads in Image 2 (generated sheet's cells 1-4).
+- Is this the SAME PERSON? Same face structure (jawline, brow, cheekbones), same eye spacing/colour, same nose shape, same hair colour & general style, same skin tone, same apparent age range. Style/medium can differ (photo vs illustration) — what matters is recognisable identity.
+- Score 1-10. `sourceMatchScore` = the score.
+- Different person (wrong race, wrong age decade, wrong gender, completely different face structure) must score 1-3.
+- Same person rendered in a different style = 8-10.
+- Identity is "kinda there" but a few wrong details = 4-6.
+
+`finalScore` MUST equal the LOWEST of layoutScore, identityScore, outfitScore, sourceMatchScore.
 `valid` is `true` only when finalScore ≥ 6.
 
 Return EXACTLY this JSON shape:
@@ -47,6 +59,10 @@ Return EXACTLY this JSON shape:
     "crossCellConsistency": {"score": 9, "reason": "Vest, blouse, skirt, boots identical across cells 5-8"},
     "matchesRequested":     {"score": 8, "reason": "Burgundy vest + cream blouse + dark skirt matches REQUESTED_OUTFIT"},
     "outfitScore": 8
+  },
+  "sourceMatch": {
+    "sourceMatchScore": 8,
+    "reason": "Same person — recognisable jawline, eye colour, hair colour. Sheet stylised as cartoon but identity preserved."
   },
   "finalScore": 8,
   "valid": true,

@@ -156,14 +156,23 @@ async function quickLayoutCheck(imageData) {
  *   2. Bottom row contains full bodies, head to feet.
  *   3. All 4 heads show the same person (same face, hair, glasses).
  *   4. All 4 bodies show the same person AND the same outfit.
+ *   5. The person in the sheet matches the source face photo (Task 4 — only
+ *      when sourcePhoto is provided). Catches the "different person entirely"
+ *      failure mode where Grok renders a coherent sheet of the WRONG identity.
  * Prompt: prompts/sheet-2x4-evaluation.txt.
  *
  * Returns the parsed JSON verdict { valid, finalScore, failureReasons, … }.
  * Throws on Gemini errors so the retry loop decides whether to retry or fail.
+ *
+ * @param {string} imageData  generated 2×4 sheet (data URI)
+ * @param {string} costumeDescription  prose for outfit-match check
+ * @param {string} geminiApiKey
+ * @param {string} [sourcePhoto]  source face photo (data URI). When provided,
+ *   sent as Image 1 and the source-match task fires; the sheet becomes Image 2.
  */
-async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey) {
-  const b64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  const mime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null) {
+  const sheetB64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const sheetMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   let prompt = PROMPT_TEMPLATES.sheet2x4Evaluation;
   if (!prompt) throw new Error('sheet2x4Evaluation prompt template not loaded');
@@ -171,13 +180,21 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
     prompt = prompt.replace(/REQUESTED_OUTFIT/g, `REQUESTED_OUTFIT: ${costumeDescription}`);
   }
 
+  // Image order matters — the prompt explicitly labels Image 1 = source,
+  // Image 2 = generated sheet. When no sourcePhoto provided, fall back to
+  // sheet-only (Task 4 won't have a baseline; the evaluator should still
+  // return a verdict with sourceMatchScore=null or 10 as documented).
+  const parts = [];
+  if (sourcePhoto) {
+    const srcB64 = sourcePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const srcMime = sourcePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    parts.push({ inline_data: { mime_type: srcMime, data: srcB64 } });
+  }
+  parts.push({ inline_data: { mime_type: sheetMime, data: sheetB64 } });
+  parts.push({ text: prompt });
+
   const body = {
-    contents: [{
-      parts: [
-        { inline_data: { mime_type: mime, data: b64 } },
-        { text: prompt },
-      ],
-    }],
+    contents: [{ parts }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 2000, responseMimeType: 'application/json' },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
@@ -244,55 +261,97 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
 
   const prompt = buildPrompt(artStyle, costumeDescription);
 
-  const attempts = [];
-  let lastResult = null;
-  for (let attempt = 1; attempt <= 1 + MAX_SHEET_RETRIES; attempt++) {
-    log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle}, refs=${refs.length}, attempt ${attempt}/${1 + MAX_SHEET_RETRIES})`);
+  // Track every attempt — when all retries fail to produce a `valid` sheet
+  // (per the eval), we pick the highest-scoring attempt instead of throwing.
+  // Better to ship the least-bad sheet and surface the attempt history in
+  // the dev panel than to fail the whole story on a marginal eval miss.
+  const attemptHistory = [];
+  let bestAttempt = null;  // { result, score, verdict|null, quick|null }
+  const totalAttempts = 1 + MAX_SHEET_RETRIES;
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle}, refs=${refs.length}, attempt ${attempt}/${totalAttempts})`);
     const result = await editWithGrok(prompt, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
     if (usageTracker && result.usage) usageTracker('grok', result.usage, 'character_2x4_sheet', result.modelId);
-    lastResult = result;
 
-    if (skipQualityEval) break;
+    if (skipQualityEval) {
+      // Caller bypassed eval — first attempt's result IS the result.
+      bestAttempt = { result, score: 10, verdict: null, quick: null, attempt };
+      attemptHistory.push({ attempt, stage: 'skipped', score: 10, imageData: result.imageData });
+      break;
+    }
 
     // Cheap pixel check first — catches the row-gutter failure for free.
     const quick = await quickLayoutCheck(result.imageData);
     if (!quick.valid) {
       log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} failed quick layout check: ${quick.reason}`);
-      attempts.push({ attempt, stage: 'quick', reason: quick.reason });
-      if (attempt < 1 + MAX_SHEET_RETRIES) continue;
-      throw new Error(`[CHARACTER 2×4] all ${1 + MAX_SHEET_RETRIES} attempts failed layout: ${attempts.map(a => `#${a.attempt} ${a.stage}:${a.reason}`).join(' | ')}`);
+      // Score the failed-quick attempt as 0 so any later attempt that
+      // passes quick wins, but if every attempt fails quick we still have
+      // SOMETHING to return rather than throwing.
+      const candidate = { result, score: 0, verdict: null, quick, attempt };
+      attemptHistory.push({ attempt, stage: 'quick-fail', score: 0, reason: quick.reason, imageData: result.imageData });
+      if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
+      continue;
     }
 
     // Gemini eval — verifies heads-only / bodies / identity / outfit.
     if (!process.env.GEMINI_API_KEY) {
       log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting after quick-check only');
+      bestAttempt = { result, score: 10, verdict: null, quick, attempt };
+      attemptHistory.push({ attempt, stage: 'no-eval-key', score: 10, imageData: result.imageData });
       break;
     }
+    let verdict = null;
     try {
-      const verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY);
-      log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
-      if (verdict.valid) break;
-      const reasons = (verdict.failureReasons || []).join('; ') || `finalScore=${verdict.finalScore}`;
-      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} failed Gemini eval: ${reasons}`);
-      attempts.push({ attempt, stage: 'gemini', reason: reasons });
-      if (attempt >= 1 + MAX_SHEET_RETRIES) {
-        throw new Error(`[CHARACTER 2×4] all ${1 + MAX_SHEET_RETRIES} attempts failed eval: ${attempts.map(a => `#${a.attempt} ${a.stage}:${a.reason}`).join(' | ')}`);
-      }
+      // Pass the source face photo so Task 4 (sourceMatchScore) fires —
+      // catches sheets that are structurally fine but show a different
+      // person than the user uploaded (e.g. Grok hallucinating identity).
+      verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY, facePhoto);
+      log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
-      log.warn(`[CHARACTER 2×4] Gemini eval error on attempt ${attempt}: ${err.message} — accepting result (eval is best-effort)`);
+      log.warn(`[CHARACTER 2×4] Gemini eval error on attempt ${attempt}: ${err.message} — treating as best-effort accept`);
+      bestAttempt = { result, score: 10, verdict: null, quick, attempt };
+      attemptHistory.push({ attempt, stage: 'eval-error', score: 10, reason: err.message, imageData: result.imageData });
       break;
     }
+    const score = verdict.finalScore ?? 0;
+    const candidate = { result, score, verdict, quick, attempt };
+    attemptHistory.push({
+      attempt,
+      stage: verdict.valid ? 'valid' : 'invalid',
+      score,
+      layoutScore: verdict.layout?.layoutScore,
+      identityScore: verdict.identity?.identityScore,
+      outfitScore: verdict.outfit?.outfitScore,
+      reasons: verdict.failureReasons || [],
+      imageData: result.imageData,
+    });
+    if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
+    if (verdict.valid) break;
+    log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} eval finalScore=${score} (valid=false): ${(verdict.failureReasons || []).join('; ')}`);
+  }
+
+  if (!bestAttempt) {
+    throw new Error(`[CHARACTER 2×4] no usable image produced after ${totalAttempts} attempts for ${character?.name}`);
+  }
+  if (attemptHistory.length > 1) {
+    log.info(`[CHARACTER 2×4] ${character?.name} best-of-${attemptHistory.length}: attempt ${bestAttempt.attempt} (score=${bestAttempt.score})`);
   }
 
   return {
-    imageData: lastResult.imageData,
-    usage: lastResult.usage,
+    imageData: bestAttempt.result.imageData,
+    usage: bestAttempt.result.usage,
     prompt,
     refs: {
       phantom,
       standardAvatar: standardAvatar || null,
       facePhoto,
     },
+    // Surfaced so the dev panel can show all attempts side-by-side with
+    // their eval scores. The chosen attempt has `score === bestAttempt.score`.
+    attemptHistory,
+    selectedAttempt: bestAttempt.attempt,
+    finalScore: bestAttempt.score,
+    finalVerdict: bestAttempt.verdict,
   };
 }
 

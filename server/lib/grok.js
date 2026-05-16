@@ -120,6 +120,22 @@ async function generateWithGrok(prompt, options = {}) {
 
     log.info(`✅ [GROK] Generation complete in ${elapsed}ms. Cost: $${cost}`);
 
+    // sentToGrok — verbatim snapshot of the actual API request (see
+    // matching block in editWithGrok above). Single source of truth for
+    // dev-panel "what was sent" — guaranteed correct because it's captured
+    // at the API call site, not synthesised by every caller.
+    const sentToGrok = {
+      endpoint: '/v1/images/generations',
+      model,
+      aspectRatio,
+      resolution,
+      prompt,
+      promptLength: prompt.length,
+      referenceImages: [],  // generate endpoint has no input images
+      capturedAt: new Date().toISOString(),
+      elapsedMs: elapsed,
+    };
+
     return {
       imageData,
       usage: {
@@ -128,6 +144,7 @@ async function generateWithGrok(prompt, options = {}) {
         inferenceTime: elapsed,
       },
       modelId: model,
+      sentToGrok,
     };
   } catch (error) {
     const elapsed = Date.now() - startTime;
@@ -379,6 +396,29 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
     log.info(`✅ [GROK] Edit complete in ${elapsed}ms. Cost: $${cost}. Refs: ${images.length}`);
 
+    // sentToGrok — verbatim snapshot of the actual API request. Bake it
+    // here so every caller's dev-panel debug has the SAME source of truth as
+    // what hit Grok's wire. If a future caller forgets to update its own
+    // debug bundle, the snapshot is still correct because it comes from this
+    // single call site, not a parallel code path.
+    const sentToGrok = {
+      endpoint: '/v1/images/edits',
+      model,
+      aspectRatio,
+      prompt,
+      promptLength: prompt.length,
+      referenceImages: images.map((url, idx) => {
+        const u = typeof url === 'string' ? url : (url?.url || '');
+        const role = (typeof url === 'object' && url?._role) || null;
+        const sizeKb = u.startsWith('data:')
+          ? Math.round((u.length - u.indexOf(',') - 1) * 0.75 / 1024)
+          : null;
+        return { slot: idx + 1, role, dataUri: u, sizeKb };
+      }),
+      capturedAt: new Date().toISOString(),
+      elapsedMs: elapsed,
+    };
+
     return {
       imageData,
       usage: {
@@ -387,6 +427,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
         inferenceTime: elapsed,
       },
       modelId: model,
+      sentToGrok,
     };
   } catch (error) {
     const elapsed = Date.now() - startTime;

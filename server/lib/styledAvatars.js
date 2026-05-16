@@ -297,11 +297,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
               ? 'costume'
               : 'standard outfit');
     const maxRetries = skipQualityEval ? 1 : MAX_STYLED_AVATAR_RETRIES;
-    let lastDownsized = null;
-    let lastResult = null;
-    let lastFace = null;
-    let lastClothing = null;
-    let lastEvalDetails = null;
+    // Best-of-N retry: keep every attempt, return the highest-scoring one.
+    // Each attempt scores on face match (identity) + clothing match. The
+    // generator inside (generateCharacter2x4Sheet) also has its own best-of-N
+    // layout/identity/outfit eval — by the time we get a result here, that
+    // inner eval has already picked the best Grok output for this attempt.
+    // We score it AGAIN here against the user's photo to verify identity
+    // survived the style conversion.
+    const allAttempts = [];  // { downsized, faceScore, clothingScore, combinedScore, ... }
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok (attempt ${attempt}/${maxRetries})`);
       const result = await generateCharacter2x4Sheet(adHocChar, {
@@ -315,8 +318,6 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         continue;
       }
       const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
-      lastResult = result;
-      lastDownsized = downsizedSheet;
 
       // ─── Quality gate: face + costume eval via Gemini ───────────────────
       let faceMatchScore = null;
@@ -339,28 +340,38 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
           log.warn(`[STYLED AVATAR] 2×4 eval failed for ${characterName} (attempt ${attempt}): ${evalErr.message}`);
         }
       }
-      lastFace = faceMatchScore;
-      lastClothing = clothingMatchScore;
-      lastEvalDetails = evalDetails;
-
       const usedPhantom = result.refs?.phantom || null;
       const usedStandard = result.refs?.standardAvatar || originalAvatar;
       const usedFace = result.refs?.facePhoto || facePhoto;
       const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
       const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
       const passed = !faceFail && !clothingFail;
-      const isFinalAttempt = attempt === maxRetries;
 
-      styledAvatarGenerationLog.push({
+      // Combined score for best-of-N selection. Use the inner generator's
+      // verdict (layout/identity/outfit) too when available — that score
+      // catches structural defects (Sarah's 2-column "sheet") that the
+      // face-match eval can't see.
+      const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 10;
+      const face = faceMatchScore ?? 10;       // missing eval = neutral
+      const clothing = clothingMatchScore ?? 10;
+      const combined = Math.min(innerFinal, face, clothing);
+
+      const logEntry = {
         timestamp: new Date().toISOString(),
         characterName, artStyle, clothingCategory,
         durationMs: Date.now() - startTime,
-        success: passed || isFinalAttempt, // accept last attempt even if eval failed
+        success: passed,
         attempt,
         sheetFormat: '2x4',
         prompt: result.prompt || null,
         faceMatchScore,
         clothingMatchScore,
+        innerLayoutScore: result.finalVerdict?.layout?.layoutScore ?? null,
+        innerIdentityScore: result.finalVerdict?.identity?.identityScore ?? null,
+        innerOutfitScore: result.finalVerdict?.outfit?.outfitScore ?? null,
+        innerFinalScore: innerFinal,
+        combinedScore: combined,
+        innerAttemptHistory: result.attemptHistory || null,
         faceMatchDetails: evalDetails?.faceReason || null,
         clothingMatchReason: evalDetails?.clothingReason || null,
         inputs: {
@@ -369,271 +380,33 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
           facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
         },
         output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
-        ...(passed || isFinalAttempt ? {} : {
-          error: `Quality gate failed: face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10`,
-        }),
-      });
+        ...(passed ? {} : { warning: `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
+      };
+      styledAvatarGenerationLog.push(logEntry);
       if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
         styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
       }
+      allAttempts.push({ attempt, downsized: downsizedSheet, faceMatchScore, clothingMatchScore, combinedScore: combined, passed, logEntry });
 
       if (passed) {
-        log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10)`);
+        log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10) — using this`);
         return downsizedSheet;
       }
-      if (isFinalAttempt) {
-        log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} final attempt ${attempt} failed eval (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10) — accepting`);
-        return downsizedSheet;
-      }
-      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} failed eval (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10) — retrying`);
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} score=${combined} (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — keeping as candidate`);
     }
-    // All attempts exhausted with no image — fall through to legacy path.
-    log.warn(`[STYLED AVATAR] 2×4 produced no usable image for ${characterName} after ${maxRetries} attempts — falling back to legacy Gemini 2×2 path`);
+    // No attempt passed cleanly — pick the best of the candidates so the
+    // story ships SOMETHING and the dev panel surfaces all attempts. The
+    // legacy 2×2 Gemini fallback used to fire here; we kill it because it
+    // silently saved sheets that bypassed the structural eval.
+    if (allAttempts.length === 0) {
+      throw new Error(`[STYLED AVATAR] 2×4 produced no usable image for ${characterName}/${clothingCategory}/${artStyle} after ${maxRetries} attempts`);
+    }
+    const best = allAttempts.reduce((a, b) => (b.combinedScore > a.combinedScore ? b : a));
+    log.warn(`[STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} best-of-${allAttempts.length}: attempt ${best.attempt} (combined=${best.combinedScore}/10, face=${best.faceMatchScore}, clothing=${best.clothingMatchScore})`);
+    return best.downsized;
   } catch (err) {
-    log.warn(`[STYLED AVATAR] 2×4 generation failed for ${characterName}: ${err.message} — falling back to legacy Gemini 2×2 path`);
-  }
-
-  // ── Legacy 2×2 Gemini path (fallback only) ────────────────────────────
-  const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
-  const hasClothing = !!clothingDescription;
-  log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'}, ${hasClothing ? 'with clothing desc' : 'no clothing desc'})...`);
-  if (hasClothing) {
-    log.debug(`👕 [STYLED AVATAR] ${characterName} clothing: ${clothingDescription.substring(0, 100)}${clothingDescription.length > 100 ? '...' : ''}`);
-  }
-
-  // Get art style prompt from loaded prompts
-  // Use character-specific art style (without scene elements like "rainy streets")
-  const characterArtStyle = `${artStyle}-character`;
-  const artStylePrompt = ART_STYLE_PROMPTS[characterArtStyle] || ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS['pixar-character'];
-  if (!artStylePrompt) {
-    log.error(`[STYLED AVATAR] No art style prompt found for "${artStyle}"`);
-    return originalAvatar;
-  }
-  log.debug(`[STYLED AVATAR] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
-
-  // Declare outside try so it's accessible in catch error handler
-  let styleSample = null;
-
-  try {
-    // Build full prompt using the unified styled-costumed-avatar template
-    // (same template used by generateStyledAvatarWithSignature in avatars.js)
-    // Use clothing description if provided, otherwise fallback to "clothing from reference image"
-    const clothingText = clothingDescription || 'the clothing shown in Image 2 (reference avatar)';
-
-    const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
-    let fullPrompt;
-
-    if (template) {
-      const physicalTraits = buildPhysicalTraitsString(character);
-      log.debug(`🎨 [STYLED AVATAR] ${characterName} physical traits: ${physicalTraits.substring(0, 100)}${physicalTraits.length > 100 ? '...' : ''}`);
-      fullPrompt = fillTemplate(template, {
-        'ART_STYLE_PROMPT': artStylePrompt,
-        'COSTUME_DESCRIPTION': clothingText,
-        'COSTUME_TYPE': clothingCategory.startsWith('costumed:') ? clothingCategory.split(':')[1] + ' costume' : (clothingCategory === 'costumed' ? 'costume' : 'standard outfit'),
-        'PHYSICAL_TRAITS': physicalTraits
-      });
-    } else {
-      // Fallback if template not loaded
-      const physicalTraits = buildPhysicalTraitsString(character);
-      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features. Wearing: ${clothingText}\n\nPHYSICAL TRAITS TO PRESERVE:\n${physicalTraits}`;
-    }
-
-    // Build reference photos array
-    // Image 1: Face photo (for identity) - if available
-    // Image 2: Original avatar (for body/clothing)
-    //
-    // `name` is omitted on purpose. The character name only matters when the
-    // model has to bind a name↔face across multiple distinct people. Avatar
-    // generation has ONE person, so any label there is wasted text that the
-    // model bakes into the rendered 2x2 grid (Gemini renders "[Name]:" text
-    // before each image; Grok's packReferences stamps the name onto the slot
-    // via labelCharacterImage). Both surfaced as the character's name written
-    // twice across the avatar quadrants. Without `name`, Gemini falls back to
-    // a generic "[Character N]:" label and labelCharacterImage no-ops.
-    const referencePhotos = [];
-
-    if (hasMultipleRefs) {
-      referencePhotos.push({ photoUrl: facePhoto });
-    }
-
-    referencePhotos.push({ photoUrl: originalAvatar });
-
-    // Image 3: Art style sample (for style reference)
-    styleSample = loadStyleSampleImage(artStyle);
-    if (styleSample) {
-      // No `name` — same reasoning as the references above. The text prompt
-      // already explains which slot is the style sample.
-      referencePhotos.push({ photoUrl: styleSample });
-      fullPrompt += `\n\nImage ${referencePhotos.length} is a STYLE SAMPLE - match this exact art style for the output.`;
-      log.debug(`🎨 [STYLED AVATAR] Added style sample as Image ${referencePhotos.length}`);
-    }
-
-    // Retry loop: generate image, evaluate face/clothing match, retry if poor quality
-    let downsized = null;
-    let faceMatchScore = null;
-    let clothingMatchScore = null;
-    let faceMatchDetails = null;
-    let clothingMatchReason = null;
-    let successAttempt = 1;
-
-    const maxRetries = skipQualityEval ? 1 : MAX_STYLED_AVATAR_RETRIES;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      // Call image API to convert the avatar
-      // Use 'avatar' evaluation type (lightweight, no quality retry)
-      const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar', null, imageModelOverride, null, '');
-
-      if (!result || !result.imageData || typeof result.imageData !== 'string') {
-        log.warn(`⚠️ [STYLED AVATAR] No valid image returned (attempt ${attempt}/${maxRetries})`);
-        continue;
-      }
-
-      // Track usage if callback provided
-      if (addUsage && result.imageUsage) {
-        const isGrok = result.modelId && result.modelId.startsWith('grok-imagine');
-        const provider = isGrok ? 'grok' : 'gemini_image';
-        addUsage(provider, result.imageUsage, 'avatar_styled', result.modelId);
-      }
-
-      // Downsize the result for efficient storage (512px is enough for reference)
-      downsized = await compressImageToJPEG(result.imageData, 85, 512);
-
-      // Evaluate face/clothing match if we have a face photo to compare against
-      // Skip in trial/fast mode — speed over quality
-      if (hasMultipleRefs && facePhoto && !skipQualityEval) {
-        const evalResult = await evaluateAvatarFaceMatch(facePhoto, downsized, process.env.GEMINI_API_KEY, clothingDescription);
-        if (evalResult) {
-          faceMatchScore = evalResult.score || null;
-          clothingMatchScore = evalResult.clothingMatch?.score || null;
-          faceMatchDetails = evalResult.details || null;
-          clothingMatchReason = evalResult.clothingMatch?.reason || null;
-
-          const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
-          const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
-
-          if ((faceFail || clothingFail) && attempt < maxRetries) {
-            log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — retrying`);
-            // Log the failed attempt so dev mode can show it
-            styledAvatarGenerationLog.push({
-              timestamp: new Date().toISOString(),
-              characterName,
-              artStyle,
-              clothingCategory,
-              durationMs: Date.now() - startTime,
-              success: false,
-              error: `Quality gate failed: face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10`,
-              faceMatchScore,
-              clothingMatchScore,
-              faceMatchDetails,
-              clothingMatchReason,
-              attempt,
-              inputs: {
-                facePhoto: hasMultipleRefs ? { identifier: getImageIdentifier(facePhoto), sizeKB: getImageSizeKB(facePhoto), imageData: facePhoto } : null,
-                originalAvatar: { identifier: getImageIdentifier(originalAvatar), sizeKB: getImageSizeKB(originalAvatar), imageData: originalAvatar },
-                styleSample: styleSample ? { identifier: getImageIdentifier(styleSample), sizeKB: getImageSizeKB(styleSample), imageData: styleSample } : null
-              },
-              output: { identifier: `${characterName}_${artStyle}_attempt${attempt}`, sizeKB: Math.round(downsized.length / 1024), imageData: downsized },
-              prompt: fullPrompt
-            });
-            downsized = null; // Clear so we retry
-            continue;
-          }
-
-          if (faceFail || clothingFail) {
-            log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (final attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — accepting`);
-          }
-        }
-      }
-
-      // Accept this result
-      successAttempt = attempt;
-      break;
-    }
-
-    if (!downsized) {
-      throw new Error(`All ${maxRetries} attempts failed to produce a valid image`);
-    }
-
-    const duration = Date.now() - startTime;
-    log.debug(`✅ [STYLED AVATAR] ${characterName} converted to ${artStyle} in ${duration}ms${successAttempt > 1 ? ` (attempt ${successAttempt})` : ''}${faceMatchScore != null ? ` face=${faceMatchScore}/10` : ''}${clothingMatchScore != null ? ` clothing=${clothingMatchScore}/10` : ''}`);
-
-    // Log generation details for developer mode auditing
-    styledAvatarGenerationLog.push({
-      timestamp: new Date().toISOString(),
-      characterName,
-      artStyle,
-      clothingCategory,
-      durationMs: duration,
-      success: true,
-      faceMatchScore,
-      clothingMatchScore,
-      faceMatchDetails,
-      clothingMatchReason,
-      attempt: successAttempt,
-      inputs: {
-        facePhoto: hasMultipleRefs ? {
-          identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto),
-          imageData: facePhoto // Full image for dev mode display
-        } : null,
-        originalAvatar: {
-          identifier: getImageIdentifier(originalAvatar),
-          sizeKB: getImageSizeKB(originalAvatar),
-          imageData: originalAvatar // Full image for dev mode display
-        },
-        styleSample: styleSample ? {
-          identifier: getImageIdentifier(styleSample),
-          sizeKB: getImageSizeKB(styleSample),
-          imageData: styleSample // Full image for dev mode display
-        } : null
-      },
-      prompt: fullPrompt,
-      output: {
-        identifier: getImageIdentifier(downsized),
-        sizeKB: getImageSizeKB(downsized),
-        imageData: downsized // Full image for dev mode display
-      }
-    });
-    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
-      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
-    }
-
-    return downsized;
-  } catch (error) {
-    log.error(`❌ [STYLED AVATAR] Failed to convert ${characterName} to ${artStyle}:`, error.message);
-
-    // Log failed generation
-    styledAvatarGenerationLog.push({
-      timestamp: new Date().toISOString(),
-      characterName,
-      artStyle,
-      clothingCategory,
-      durationMs: Date.now() - startTime,
-      success: false,
-      error: error.message,
-      inputs: {
-        facePhoto: hasMultipleRefs ? {
-          identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto),
-          imageData: facePhoto
-        } : null,
-        originalAvatar: {
-          identifier: getImageIdentifier(originalAvatar),
-          sizeKB: getImageSizeKB(originalAvatar),
-          imageData: originalAvatar
-        },
-        styleSample: styleSample ? {
-          identifier: getImageIdentifier(styleSample),
-          sizeKB: getImageSizeKB(styleSample),
-          imageData: styleSample
-        } : null
-      }
-    });
-    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
-      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
-    }
-
-    // Return original avatar as fallback
-    return originalAvatar;
+    log.error(`[STYLED AVATAR] 2×4 generation threw for ${characterName}/${clothingCategory}/${artStyle}: ${err.message}`);
+    throw err;
   }
 }
 

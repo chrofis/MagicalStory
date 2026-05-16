@@ -820,6 +820,10 @@ async function generateSceneComposite(opts) {
   const populatedBuf = Buffer.from(populated.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
   debug.populatedPlate = populated.imageData;
   debug.populatedPlatePrompt = populatedPrompt;
+  // sentToGrok comes verbatim from the Grok API wrapper — every byte +
+  // every prompt char captured at the call site. The dev panel reads this
+  // instead of synthesising its own snapshot.
+  debug.populatedPlateSentToGrok = populated.sentToGrok || null;
   // Back-compat aliases so existing dev panels keep showing the same fields.
   debug.blocking = populated.imageData;
   debug.blockingPrompt = populatedPrompt;
@@ -837,6 +841,7 @@ async function generateSceneComposite(opts) {
   debug.cleanBackgroundPrompt = cleanBackgroundPrompt || null;
   debug.cleanBackgroundSource = 'derived-from-populated-plate';
   debug.depopulatePrompt = depopulatePrompt;
+  debug.depopulateSentToGrok = depopulated.sentToGrok || null;
 
   // ── Step 3/5: detect silhouettes by diffing populated against clean BG.
   // Hue matching alone fails on palette collisions (e.g. yellow silhouette
@@ -970,6 +975,7 @@ async function generateSceneComposite(opts) {
   const pass1 = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', pass1.usage, 'scene_composite_blend', pass1.modelId);
   totalCost += pass1.usage?.cost || 0;
+  debug.blendSentToGrok = pass1.sentToGrok || null;
 
   log.info(`[SCENE COMPOSITE] complete — total cost $${totalCost.toFixed(4)}, ${placements.length}/${cast.length} characters placed`);
 
