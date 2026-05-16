@@ -17,7 +17,8 @@ TASK 1: LAYOUT
 - Top row contains 4 head-and-neck portraits only. No shoulders or torso visible. Score 1-10.
 - Bottom row contains 4 full-body figures, head to feet. Score 1-10.
 - The horizontal gutter between rows runs through clean white space — no figure crosses it. Score 1-10.
-- `layoutScore` = lowest of the three. A waist-cutting failure must score 1-3.
+- Cell containment: every figure stays fully inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
+- `layoutScore` = lowest of the four. A waist-cutting failure or any figure spanning two cells must score 1-3.
 
 TASK 2: IDENTITY CONSISTENCY
 - The 4 head portraits show THE SAME PERSON: identical face shape, eyes, nose, mouth, skin tone, hair colour, hairstyle (and length), glasses (if any). Differences are only the camera angle. Score 1-10.
@@ -48,6 +49,7 @@ Return EXACTLY this JSON shape:
     "topRowHeadsOnly":   {"score": 9, "reason": "All 4 top cells show head + neck only, no torso"},
     "bottomRowFullBody": {"score": 8, "reason": "All 4 bottom cells show head-to-feet figures"},
     "cleanGutter":       {"score": 10, "reason": "Horizontal gutter is white; no figure crosses it"},
+    "cellContainment":   {"score": 9, "reason": "Each figure sits inside its cell with white margin on all four sides"},
     "layoutScore": 8
   },
   "identity": {

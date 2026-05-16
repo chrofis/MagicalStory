@@ -64,8 +64,10 @@ Render every cell as a REALISTIC reference — the same visual style as the sour
 
 Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
 
-Cells 1-4 (top row): head and neck only, no shoulders, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head.
-Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back.
+The horizontal mid-row divider must be drawn as one unbroken thin black line running edge to edge. The three vertical column dividers must be drawn the same way. Nothing crosses any divider: every figure stays fully inside its own cell, surrounded by white space on all four sides. No head, no hair, no hand, no foot, no shadow, no clothing detail extends beyond the cell's borders. If a figure would not fit inside its cell, scale it down so it fits.
+
+Cells 1-4 (top row): head and neck only, no shoulders, no torso, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head. The head occupies roughly the middle of the cell with white margin above the hairline and below the neck — the neck stops cleanly, it never continues into the bottom row.
+Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row.
 
 Every cell faces in the same direction as the matching cell in Image 1. Every head in cells 1-4 and every body in cells 5-8 shows THE SAME PERSON as Image 3 — same face structure, same hair, same skin tone, same apparent age. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels.`;
 }
