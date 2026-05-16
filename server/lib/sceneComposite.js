@@ -1183,7 +1183,7 @@ function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false, backCa
     .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
     .join('\n');
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: flat-colour silhouettes on a pure WHITE background. Each silhouette marks where a character must be drawn. Everything outside the silhouettes is WHITE — keep it white in the output, do NOT invent a scene around them.\n- Image 2: labelled identity pack — one body panel per character with the name on a black bar below. Use Image 2 to bind name↔face↔clothing for every silhouette listed below.\n`
+    ? `\nINPUT IMAGES:\n- Image 1: flat-colour silhouettes on a pure WHITE background. Each silhouette marks where a character must be drawn IN THE OUTPUT. The number, positions, and sizes of silhouettes in Image 1 are binding — the OUTPUT must contain EXACTLY the same number of characters at EXACTLY the same positions/sizes/orientations as the silhouettes in Image 1. Everything outside the silhouettes is WHITE — keep it white in the output.\n- Image 2: labelled identity pack — one body panel per character with the character's name on a BLACK BAR BELOW the panel. Image 2 is for IDENTITY REFERENCE ONLY: it tells you which name maps to which face/clothing. DO NOT COPY the black name bars, the labels, or the side-by-side identity-pack layout into the output. The output must look like Image 1 with each silhouette replaced by a real character — NOT like Image 2.\n`
     : '';
   const head = `Replace each flat-colour silhouette in Image 1 with the corresponding REAL character. Keep the rest of Image 1 PURE WHITE — the characters will be composited onto a separate scene afterward, so any non-white pixels outside the silhouettes will appear as artefacts.
 ${refsBlock}
@@ -1199,7 +1199,8 @@ DO NOT:
 - Move, resize, rotate, or flip any character relative to where its silhouette sits in Image 1.
 - Add, remove, or substitute any character beyond replacing the listed silhouettes.
 - Paint a scene, background, ground, or sky around the characters — those exist on the separate plate they will be composited onto.
-- Add text, captions, numbers, or signatures.
+- Add text, captions, numbers, signatures, name labels, or the BLACK NAME BARS from Image 2. The output has NO labels and NO text anywhere.
+- Copy Image 2's side-by-side identity-pack layout. The output's character positions come from Image 1's silhouettes, NOT Image 2.
 - Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.`;
   const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
   const backNames = backCast.map(c => c.name).filter(Boolean);
