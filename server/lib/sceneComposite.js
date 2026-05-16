@@ -1125,22 +1125,22 @@ function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false, backCa
     .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
     .join('\n');
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: the anchor plate. This is the canvas to refine. Replace each flat-colour silhouette with the matching REAL character; keep everything else pixel-identical.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one front-stratum character, with the character's name on a black bar below the panel. Use Image 2 to bind name↔face↔clothing for every silhouette listed below.\n`
+    ? `\nINPUT IMAGES:\n- Image 1: flat-colour silhouettes on a pure WHITE background. Each silhouette marks where a character must be drawn. Everything outside the silhouettes is WHITE — keep it white in the output, do NOT invent a scene around them.\n- Image 2: labelled identity pack — one body panel per character with the name on a black bar below. Use Image 2 to bind name↔face↔clothing for every silhouette listed below.\n`
     : '';
-  const head = `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character.
+  const head = `Replace each flat-colour silhouette in Image 1 with the corresponding REAL character. Keep the rest of Image 1 PURE WHITE — the characters will be composited onto a separate scene afterward, so any non-white pixels outside the silhouettes will appear as artefacts.
 ${refsBlock}
 Silhouette → character mapping:
 ${colorList}
 
 DO:
-- For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the identity pack panel and the descriptions in the page brief.
-- All ${frontCast.length} front-stratum characters appear in ONE image together — they share the scene's lighting, eye-line continuity, and any pose interactions implied by their positions.
-- Keep everything else in Image 1 pixel-identical. The background scenery, every named prop, and any back-stratum characters already drawn into the scene must remain exactly as they are.
+- For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the identity pack panel and the page brief.
+- All ${frontCast.length} characters appear in ONE image together — share lighting, eye-line continuity, and pose interactions implied by their relative positions.
+- Outside the silhouettes: keep the canvas pure WHITE. No scene, no shadow, no extra elements.
 
 DO NOT:
 - Move, resize, rotate, or flip any character relative to where its silhouette sits in Image 1.
 - Add, remove, or substitute any character beyond replacing the listed silhouettes.
-- Change the background scenery, props, or any other figure that is not a flat-colour silhouette.
+- Paint a scene, background, ground, or sky around the characters — those exist on the separate plate they will be composited onto.
 - Add text, captions, numbers, or signatures.
 - Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.`;
   const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
@@ -1625,32 +1625,66 @@ async function _stratifiedBody(ctx) {
   debug.step3CropBox = cropBox;
   log.info(`[SCENE COMPOSITE/STRATIFIED]   step-3 crop: ${cropW}×${cropH} @ (${cropX},${cropY}) [${(100 * cropW * cropH / (canvasW * canvasH)).toFixed(1)}% of canvas]`);
 
-  // ── Step 2/5: depopulate FRONT silhouettes only (back chars stay intact)
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 2/5 — depopulate front silhouettes');
-  const depopulatePrompt = buildFrontDepopulatePrompt(frontCast);
-  const depopulated = await editWithGrok(depopulatePrompt, [anchor.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
-  if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_strat_depopulate', depopulated.modelId);
-  totalCost += depopulated.usage?.cost || 0;
-  const backPlateData = depopulated.imageData;
-  const backPlateBuf = Buffer.from(backPlateData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  debug.cleanBackground = backPlateData;
-  debug.cleanBackgroundSource = 'derived-from-anchor-plate-front-only';
-  debug.depopulatePrompt = depopulatePrompt;
-  debug.depopulateSentToGrok = depopulated.sentToGrok || null;
+  // ── Build a per-pixel silhouette mask of the anchor plate. Any pixel
+  // within RGB distance ≤ 50 of one of the front-cast colours is a
+  // silhouette pixel. The mask doubles as (a) input mask (drives the
+  // white-out step before sending to Grok) and (b) output alpha (drives
+  // the composite-back step). No depopulate Grok call needed — we already
+  // know exactly which pixels are silhouette.
+  log.info('[SCENE COMPOSITE/STRATIFIED] building silhouette mask from anchor plate');
+  const { data: anchorRgb, info: anchorInfo } = await sharp(anchorBuf).raw().toBuffer({ resolveWithObject: true });
+  const anchorCh = anchorInfo.channels;
+  const targets = frontCast.map(c => ({
+    tr: parseInt(c.color.slice(1, 3), 16),
+    tg: parseInt(c.color.slice(3, 5), 16),
+    tb: parseInt(c.color.slice(5, 7), 16),
+  }));
+  const MASK_THRESHOLD_SQ = 50 * 50;
+  const fullMask = Buffer.alloc(canvasW * canvasH);
+  let maskedCount = 0;
+  for (let y = 0; y < canvasH; y++) {
+    for (let x = 0; x < canvasW; x++) {
+      const i = (y * canvasW + x) * anchorCh;
+      const r = anchorRgb[i], g = anchorRgb[i + 1], b = anchorRgb[i + 2];
+      for (const t of targets) {
+        const dr = r - t.tr, dg = g - t.tg, db = b - t.tb;
+        if (dr * dr + dg * dg + db * db <= MASK_THRESHOLD_SQ) {
+          fullMask[y * canvasW + x] = 255;
+          maskedCount++;
+          break;
+        }
+      }
+    }
+  }
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   mask: ${maskedCount} silhouette px (${(100 * maskedCount / (canvasW * canvasH)).toFixed(2)}% of canvas)`);
 
-  // ── Step 3/5: front-figure plate — crop the anchor plate to the union
-  // bbox + 20% pad, send the crop to Grok edit. The model only sees the
-  // silhouettes + a thin band of local context, not the whole scene.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate (on cropped anchor)');
-  const anchorCropBuf = await sharp(anchorBuf).extract(cropBox).png().toBuffer();
-  const anchorCropData = `data:image/png;base64,${anchorCropBuf.toString('base64')}`;
-  debug.step3Input = anchorCropData;
+  // ── Step 2/4: front-figure plate — crop the anchor to union bbox + 20%
+  // pad, replace non-silhouette pixels with WHITE inside the crop, send to
+  // Grok edit. Grok sees only the silhouettes on a white field; identity
+  // pack as Image 2 binds name↔face. No back-character pixels in the input
+  // means zero risk of Grok modifying them.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 2/4 — front figure plate (silhouettes on white)');
+  const maskedInputRgb = Buffer.alloc(cropW * cropH * 3);
+  for (let y = 0; y < cropH; y++) {
+    for (let x = 0; x < cropW; x++) {
+      const srcI = ((cropY + y) * canvasW + (cropX + x)) * anchorCh;
+      const dstI = (y * cropW + x) * 3;
+      if (fullMask[(cropY + y) * canvasW + (cropX + x)]) {
+        maskedInputRgb[dstI]     = anchorRgb[srcI];
+        maskedInputRgb[dstI + 1] = anchorRgb[srcI + 1];
+        maskedInputRgb[dstI + 2] = anchorRgb[srcI + 2];
+      } else {
+        maskedInputRgb[dstI] = maskedInputRgb[dstI + 1] = maskedInputRgb[dstI + 2] = 255;
+      }
+    }
+  }
+  const maskedInputBuf = await sharp(maskedInputRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer();
+  const maskedInputData = `data:image/png;base64,${maskedInputBuf.toString('base64')}`;
+  debug.step3Input = maskedInputData;
+
   const hasFrontIdentity = !!frontIdentityPack;
-  // Grok only accepts preset aspect strings (1:1, 3:4, 9:16, 'auto', etc.) —
-  // pass 'auto' so the model uses the cropped input's own aspect verbatim
-  // and doesn't try to normalise it to a wider/narrower preset.
   const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
-  const frontInsetRefs = [anchorCropData];
+  const frontInsetRefs = [maskedInputData];
   if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
   const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: 'auto', model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
@@ -1659,26 +1693,47 @@ async function _stratifiedBody(ctx) {
   debug.frontPlatePrompt = frontInsetPrompt;
   debug.frontPlateSentToGrok = frontPlate.sentToGrok || null;
 
-  // ── Step 4/5: resize the step-3 output back to the crop dimensions and
-  // paste it onto the back plate at the original crop coordinates. No diff,
-  // no per-character cutout — the crop output IS the final figures region.
-  // Grok preserved the surrounding context (which mostly matches the back
-  // plate's neighbourhood), so direct paste produces a coherent composite.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 4/5 — paste step-3 crop back onto back plate');
+  // ── Step 3/4: composite the rendered characters back onto the ORIGINAL
+  // anchor plate using a feathered version of the silhouette mask as
+  // alpha. Inside the mask: Grok output. Outside: anchor plate (which
+  // already has background characters + scene baked in). The depopulate
+  // step is gone — the anchor plate's non-silhouette pixels ARE the back
+  // plate we need.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/4 — mask-compose front plate onto anchor');
   const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const frontPlateResized = await sharp(frontPlateRawBuf)
-    .resize(cropW, cropH, { fit: 'fill' })
-    .png()
+  const frontPlateResized = await sharp(frontPlateRawBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
+  // Crop the silhouette mask to the same region, feather it (gaussian
+  // blur) so the composite boundary doesn't show a hard edge. Dilate
+  // slightly before feathering so the alpha reaches max value across the
+  // silhouette interior even after blur softens the boundary.
+  const cropMaskRaw = Buffer.alloc(cropW * cropH);
+  for (let y = 0; y < cropH; y++) {
+    for (let x = 0; x < cropW; x++) {
+      cropMaskRaw[y * cropW + x] = fullMask[(cropY + y) * canvasW + (cropX + x)];
+    }
+  }
+  const featheredMask = await sharp(cropMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
+    .blur(4)
+    .raw()
     .toBuffer();
-  const composited = await sharp(backPlateBuf)
-    .composite([{ input: frontPlateResized, left: cropX, top: cropY }])
+  // Combine Grok output + alpha mask into a 4-channel buffer.
+  const rgba = Buffer.alloc(cropW * cropH * 4);
+  for (let i = 0; i < cropW * cropH; i++) {
+    rgba[i * 4]     = frontPlateResized[i * 3];
+    rgba[i * 4 + 1] = frontPlateResized[i * 3 + 1];
+    rgba[i * 4 + 2] = frontPlateResized[i * 3 + 2];
+    rgba[i * 4 + 3] = featheredMask[i];
+  }
+  const maskedFrontPng = await sharp(rgba, { raw: { width: cropW, height: cropH, channels: 4 } }).png().toBuffer();
+  const composited = await sharp(anchorBuf)
+    .composite([{ input: maskedFrontPng, left: cropX, top: cropY }])
     .png()
     .toBuffer();
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
 
-  // ── Step 5/5: blend pass (same as uniform path)
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 5/5 — blend pass');
+  // ── Step 4/4: blend pass (same as uniform path)
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 4/4 — blend pass');
   const blendPrompt = buildBlendEditPrompt(scene);
   debug.blendPrompt = blendPrompt;
   const blendRefs = visualBibleGridImage
