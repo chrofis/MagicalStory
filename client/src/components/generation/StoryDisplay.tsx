@@ -9,7 +9,6 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
-import { getTextOverlayPosition, getOverlayClasses, getOverlayPositionStyle, getTextContainerStyle, OVERLAY_FONT_SIZE, OVERLAY_TEXT_STROKE_STYLE } from '@/utils/textOverlay';
 
 interface StoryTextPrompt {
   batch: number;
@@ -5092,37 +5091,15 @@ export function StoryDisplay({
                           className={`w-full rounded-lg shadow-md object-contain ${isPageBusy(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
-                        {/* Text overlay on image — server-rendered with calm region detection.
-                            Skipped when scene has textInImage=false (square layout, advanced level)
-                            OR while in edit mode (the editor below is the source of truth there;
-                            the overlay PNG can be stale and is just visual noise during editing). */}
-                        {textOverlay && !isGenerating && !isEditMode && pageText.trim() && image?.textInImage !== false && (
-                          overlayImages[pageNumber] ? (
-                            <img
-                              src={overlayImages[pageNumber]}
-                              alt=""
-                              className="absolute inset-0 w-full h-full object-contain rounded-lg pointer-events-none"
-                              draggable={false}
-                            />
-                          ) : (() => {
-                            // CSS fallback while server overlay loads
-                            const layout = getTextOverlayPosition(pageNumber, pageText, (image as any)?.textPosition);
-                            const isFullWidth = layout.position.includes('full');
-                            return (
-                              <div
-                                className={getOverlayClasses(layout)}
-                                style={getOverlayPositionStyle(layout)}
-                              >
-                                <div className="p-3 md:p-4" style={getTextContainerStyle(layout)}>
-                                  <p className={`leading-snug whitespace-pre-wrap font-serif ${isFullWidth ? 'text-center' : ''}`}
-                                     style={{ fontSize: OVERLAY_FONT_SIZE, ...OVERLAY_TEXT_STROKE_STYLE }}>
-                                    {pageText.trim()}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })()
-                        )}
+                        {/* Inline on-image text overlay was removed (2026-05-16) because
+                            the indigo text-box below the image always renders too, so the
+                            same sentence appeared twice — once painted on top of the image,
+                            once in the editable box. PDF export still uses the server
+                            overlay path; the `textOverlay` toggle and the overlayImages
+                            fetcher remain wired (the toggle now only controls PDF behaviour
+                            and pre-fetching). To re-enable on-screen overlay, gate it on
+                            `!isEditMode` AND also hide the text-below at line 5766 — never
+                            both at once. */}
                         {/* Busy spinner overlay — any image operation */}
                         {isPageBusy(pageNumber) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
