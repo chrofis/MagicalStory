@@ -372,6 +372,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         innerFinalScore: innerFinal,
         combinedScore: combined,
         innerAttemptHistory: result.attemptHistory || null,
+        // Two-pass payload — Pass 1 (realistic) + Pass 2 (style-transferred).
+        // Frontend dev panel renders each pass's attempts side-by-side, with
+        // per-task scores (layout/identity/outfit/sourceMatch for Pass 1;
+        // layout/identity/style/outfit for Pass 2) and the selected attempt
+        // highlighted. realisticImageData is Pass 1's selected output so the
+        // panel can show the identity anchor alongside the styled output.
+        passes: result.passes || null,
+        realisticImageData: result.realisticImageData || null,
         faceMatchDetails: evalDetails?.faceReason || null,
         clothingMatchReason: evalDetails?.clothingReason || null,
         inputs: {
