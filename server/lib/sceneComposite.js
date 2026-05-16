@@ -67,6 +67,48 @@ const DEFAULT_PALETTE = [
   '#00B0B0', // cyan
 ];
 
+// ─── Silhouette colour match (handles solid + translucent variants) ──────
+//
+// A silhouette painted with target colour T at opacity α on a white BG
+// blends to: pixel = α·T + (1-α)·white. Rearranging: (white - pixel) =
+// α·(white - T). So the vector (white - pixel) is parallel to (white - T)
+// with magnitude α relative to it. We check:
+//   - per axis where (255-T) is significant, opacity ratio = (255-pixel)/(255-T)
+//   - all ratios are in [0.3, 1.3]  (at least 30% opacity, not "past" target)
+//   - all ratios agree within 0.4   (pixel lies on the gradient line, not off-axis)
+// Robust to JPEG noise AND translucent silhouettes; rejects scene colours
+// that share hue but sit off the white-to-target gradient (orange near red,
+// sky blue near silhouette blue, etc.).
+function isSilhouetteMatch(r, g, b, tr, tg, tb) {
+  const wdr = 255 - tr, wdg = 255 - tg, wdb = 255 - tb;
+  const wpr = 255 - r,  wpg = 255 - g,  wpb = 255 - b;
+  let minR = Infinity, maxR = -Infinity, count = 0;
+  // Only consider axes where the target differs from white by more than 30
+  // — small differences amplify pixel noise into huge ratio swings.
+  if (wdr >= 30) {
+    const x = wpr / wdr;
+    if (x < minR) minR = x;
+    if (x > maxR) maxR = x;
+    count++;
+  }
+  if (wdg >= 30) {
+    const x = wpg / wdg;
+    if (x < minR) minR = x;
+    if (x > maxR) maxR = x;
+    count++;
+  }
+  if (wdb >= 30) {
+    const x = wpb / wdb;
+    if (x < minR) minR = x;
+    if (x > maxR) maxR = x;
+    count++;
+  }
+  if (count === 0) return false;
+  if (minR < 0.3 || maxR > 1.3) return false;
+  if (maxR - minR > 0.4) return false;
+  return true;
+}
+
 // ─── Hue helpers (for the bbox detector) ──────────────────────────────────
 function rgbToHue(r, g, b) {
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -94,21 +136,17 @@ async function findColorBbox(buf, hex) {
   const W = info.width, H = info.height, ch = info.channels;
   const mask = new Uint8Array(W * H);
 
-  // RGB Euclidean distance ≤ 50 to the target colour. Grok returns flat-fill
-  // silhouettes with only minor JPEG noise — sampled interior pixels sit at
-  // distance ~20-25 from target, edge anti-alias goes up to ~45, scene
-  // pixels are >100. A single distance threshold is more robust than the
-  // old hue+saturation+brightness gating, which dropped legitimate flat-
-  // colour pixels at JPEG block edges AND grabbed half the canvas when a
-  // natural colour (yellow sunset, amber bushes) shared the silhouette's
-  // hue. Verified on tests/avatar-debug/.../populated.jpg with all four
-  // palette colours — single-blob detection on every silhouette.
-  const THRESHOLD_SQ = 50 * 50;
+  // Gradient-from-white silhouette match. Handles both solid silhouettes
+  // (when Grok paints exactly the target colour) AND translucent variants
+  // (Grok occasionally blends silhouettes with the white background at
+  // anti-aliased edges, or rendered the whole silhouette at 70-90% opacity).
+  // See isSilhouetteMatch comment block for the math.
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * ch;
-      const dr = data[i] - tr, dg = data[i + 1] - tg, db = data[i + 2] - tb;
-      if (dr * dr + dg * dg + db * db <= THRESHOLD_SQ) mask[y * W + x] = 1;
+      if (isSilhouetteMatch(data[i], data[i + 1], data[i + 2], tr, tg, tb)) {
+        mask[y * W + x] = 1;
+      }
     }
   }
 
@@ -1606,7 +1644,10 @@ async function _stratifiedBody(ctx) {
   // the input to step 3 (Grok edit): just the silhouettes plus a bit of
   // local scene context, never the whole canvas. Cuts prompt-irrelevant
   // pixels Grok could "fix" and keeps the model focused on the silhouettes.
-  const UNION_PAD_RATIO = 0.20;
+  // 30% padding (was 20%) — gives breathing room when the silhouette bbox
+  // underestimates the true silhouette (e.g. anti-aliased translucent edges
+  // that gradient-match still misses) so the crop doesn't clip the figure.
+  const UNION_PAD_RATIO = 0.30;
   let minX = canvasW, minY = canvasH, maxX = 0, maxY = 0;
   for (const r of Object.values(bboxes)) {
     if (r.x < minX) minX = r.x;
@@ -1625,9 +1666,9 @@ async function _stratifiedBody(ctx) {
   debug.step3CropBox = cropBox;
   log.info(`[SCENE COMPOSITE/STRATIFIED]   step-3 crop: ${cropW}×${cropH} @ (${cropX},${cropY}) [${(100 * cropW * cropH / (canvasW * canvasH)).toFixed(1)}% of canvas]`);
 
-  // ── Build a per-pixel silhouette mask of the anchor plate. Any pixel
-  // within RGB distance ≤ 50 of one of the front-cast colours is a
-  // silhouette pixel. The mask doubles as (a) input mask (drives the
+  // ── Build a per-pixel silhouette mask of the anchor plate using the
+  // gradient-from-white match (catches translucent silhouettes Grok
+  // sometimes paints). The mask doubles as (a) input mask (drives the
   // white-out step before sending to Grok) and (b) output alpha (drives
   // the composite-back step). No depopulate Grok call needed — we already
   // know exactly which pixels are silhouette.
@@ -1639,7 +1680,6 @@ async function _stratifiedBody(ctx) {
     tg: parseInt(c.color.slice(3, 5), 16),
     tb: parseInt(c.color.slice(5, 7), 16),
   }));
-  const MASK_THRESHOLD_SQ = 50 * 50;
   const fullMask = Buffer.alloc(canvasW * canvasH);
   let maskedCount = 0;
   for (let y = 0; y < canvasH; y++) {
@@ -1647,8 +1687,7 @@ async function _stratifiedBody(ctx) {
       const i = (y * canvasW + x) * anchorCh;
       const r = anchorRgb[i], g = anchorRgb[i + 1], b = anchorRgb[i + 2];
       for (const t of targets) {
-        const dr = r - t.tr, dg = g - t.tg, db = b - t.tb;
-        if (dr * dr + dg * dg + db * db <= MASK_THRESHOLD_SQ) {
+        if (isSilhouetteMatch(r, g, b, t.tr, t.tg, t.tb)) {
           fullMask[y * canvasW + x] = 255;
           maskedCount++;
           break;
@@ -1699,29 +1738,101 @@ async function _stratifiedBody(ctx) {
   // already has background characters + scene baked in). The depopulate
   // step is gone — the anchor plate's non-silhouette pixels ARE the back
   // plate we need.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/4 — mask-compose front plate onto anchor');
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/4 — align + mask-compose front plate onto anchor');
   const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const frontPlateResized = await sharp(frontPlateRawBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
-  // Crop the silhouette mask to the same region, feather it (gaussian
-  // blur) so the composite boundary doesn't show a hard edge. Dilate
-  // slightly before feathering so the alpha reaches max value across the
-  // silhouette interior even after blur softens the boundary.
+  const grokAtCrop = await sharp(frontPlateRawBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
+
+  // Crop the silhouette mask to the same region. This is both the alpha
+  // mask for composite AND the reference for output→input alignment.
   const cropMaskRaw = Buffer.alloc(cropW * cropH);
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
       cropMaskRaw[y * cropW + x] = fullMask[(cropY + y) * canvasW + (cropX + x)];
     }
   }
+
+  // ── Alignment: Grok often pads its edit output with white margins, so
+  // the rendered characters sit in a smaller sub-rectangle of the crop
+  // than where the silhouettes were. Find the non-white content bbox in
+  // Grok output and the silhouette bbox in input. Scale + translate the
+  // output content so its bbox lands on top of the input silhouette bbox.
+  // Treats all front figures as one group — preserves their relative
+  // positions, only fixes group-level offset/scale.
+  let inMinX = cropW, inMinY = cropH, inMaxX = -1, inMaxY = -1;
+  for (let y = 0; y < cropH; y++) {
+    for (let x = 0; x < cropW; x++) {
+      if (cropMaskRaw[y * cropW + x]) {
+        if (x < inMinX) inMinX = x;
+        if (y < inMinY) inMinY = y;
+        if (x > inMaxX) inMaxX = x;
+        if (y > inMaxY) inMaxY = y;
+      }
+    }
+  }
+  let outMinX = cropW, outMinY = cropH, outMaxX = -1, outMaxY = -1;
+  const WHITE_TOL_SQ = 35 * 35; // pixel further than ~35 from pure white counts as content
+  for (let y = 0; y < cropH; y++) {
+    for (let x = 0; x < cropW; x++) {
+      const i = (y * cropW + x) * 3;
+      const dr = grokAtCrop[i] - 255, dg = grokAtCrop[i + 1] - 255, db = grokAtCrop[i + 2] - 255;
+      if (dr * dr + dg * dg + db * db > WHITE_TOL_SQ) {
+        if (x < outMinX) outMinX = x;
+        if (y < outMinY) outMinY = y;
+        if (x > outMaxX) outMaxX = x;
+        if (y > outMaxY) outMaxY = y;
+      }
+    }
+  }
+
+  let alignedRgb;
+  if (inMaxX >= 0 && outMaxX >= 0) {
+    const inBoxW = inMaxX - inMinX + 1, inBoxH = inMaxY - inMinY + 1;
+    const outBoxW = outMaxX - outMinX + 1, outBoxH = outMaxY - outMinY + 1;
+    debug.alignment = { input: { x: inMinX, y: inMinY, w: inBoxW, h: inBoxH }, output: { x: outMinX, y: outMinY, w: outBoxW, h: outBoxH } };
+    log.info(`[SCENE COMPOSITE/STRATIFIED]   align: grok content ${outBoxW}×${outBoxH}@(${outMinX},${outMinY}) → input silhouettes ${inBoxW}×${inBoxH}@(${inMinX},${inMinY})`);
+    // Extract Grok content sub-rectangle.
+    const contentRgb = Buffer.alloc(outBoxW * outBoxH * 3);
+    for (let y = 0; y < outBoxH; y++) {
+      for (let x = 0; x < outBoxW; x++) {
+        const srcI = ((outMinY + y) * cropW + (outMinX + x)) * 3;
+        const dstI = (y * outBoxW + x) * 3;
+        contentRgb[dstI]     = grokAtCrop[srcI];
+        contentRgb[dstI + 1] = grokAtCrop[srcI + 1];
+        contentRgb[dstI + 2] = grokAtCrop[srcI + 2];
+      }
+    }
+    const contentScaled = await sharp(contentRgb, { raw: { width: outBoxW, height: outBoxH, channels: 3 } })
+      .resize(inBoxW, inBoxH, { fit: 'fill' })
+      .raw()
+      .toBuffer();
+    // Place on a white crop-sized canvas at input bbox position.
+    alignedRgb = Buffer.alloc(cropW * cropH * 3, 255);
+    for (let y = 0; y < inBoxH; y++) {
+      for (let x = 0; x < inBoxW; x++) {
+        const srcI = (y * inBoxW + x) * 3;
+        const dstI = ((inMinY + y) * cropW + (inMinX + x)) * 3;
+        alignedRgb[dstI]     = contentScaled[srcI];
+        alignedRgb[dstI + 1] = contentScaled[srcI + 1];
+        alignedRgb[dstI + 2] = contentScaled[srcI + 2];
+      }
+    }
+  } else {
+    log.warn(`[SCENE COMPOSITE/STRATIFIED]   align: bbox detection failed (in=${inMaxX < 0}, out=${outMaxX < 0}); using raw Grok output unaligned`);
+    alignedRgb = grokAtCrop;
+  }
+  debug.alignedFrontPlate = `data:image/png;base64,${await sharp(alignedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer().then(b => b.toString('base64'))}`;
+
+  // Feather the silhouette mask for the alpha compose so the composite
+  // boundary doesn't show a hard edge.
   const featheredMask = await sharp(cropMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
     .blur(4)
     .raw()
     .toBuffer();
-  // Combine Grok output + alpha mask into a 4-channel buffer.
   const rgba = Buffer.alloc(cropW * cropH * 4);
   for (let i = 0; i < cropW * cropH; i++) {
-    rgba[i * 4]     = frontPlateResized[i * 3];
-    rgba[i * 4 + 1] = frontPlateResized[i * 3 + 1];
-    rgba[i * 4 + 2] = frontPlateResized[i * 3 + 2];
+    rgba[i * 4]     = alignedRgb[i * 3];
+    rgba[i * 4 + 1] = alignedRgb[i * 3 + 1];
+    rgba[i * 4 + 2] = alignedRgb[i * 3 + 2];
     rgba[i * 4 + 3] = featheredMask[i];
   }
   const maskedFrontPng = await sharp(rgba, { raw: { width: cropW, height: cropH, channels: 4 } }).png().toBuffer();

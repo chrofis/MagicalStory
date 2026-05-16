@@ -45,16 +45,26 @@ interface CompositeDebugBundle {
   populatedPlate?: string;
   populatedPlatePrompt?: string;
   populatedPlateSentToGrok?: SentToGrok | null;
-  // Step 2 — depopulate.
+  // Step 2 — depopulate (uniform pipeline only; stratified skips this).
   cleanBackground?: string;
   cleanBackgroundPrompt?: string | null;
   cleanBackgroundSource?: string;
   depopulatePrompt?: string;
   depopulateSentToGrok?: SentToGrok | null;
-  // Step 3 — stratified-only front-figure plate.
+  // Stratified-only: the masked white-bg crop that's sent to Grok as Image 1.
+  step3Input?: string;
+  step3CropBox?: { left: number; top: number; width: number; height: number };
+  // Front-figure plate (stratified) — Grok output.
   frontPlate?: string;
   frontPlatePrompt?: string;
   frontPlateSentToGrok?: SentToGrok | null;
+  // Stratified-only: post-alignment view of the Grok output (scaled +
+  // translated so its content bbox matches the input silhouette bbox).
+  alignedFrontPlate?: string;
+  alignment?: {
+    input:  { x: number; y: number; w: number; h: number };
+    output: { x: number; y: number; w: number; h: number };
+  };
   // Step 4 — composited intermediate.
   composited?: string;
   // Step 5 — blend pass.
@@ -970,12 +980,49 @@ export function TestModelsPanel({
                             )}
                           </div>
                         )}
-                        {/* Stratified-only: Step 3 — front-figure plate (real front
-                            chars rendered together where the silhouettes were). */}
+                        {/* Bbox detect — runs immediately after the anchor plate so the
+                            crop coordinates for step 3 can be derived. Per-character
+                            crops from the anchor plate make the bbox quality visible. */}
+                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && result.compositeDebug.populatedPlate && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
+                              {result.compositeDebug.strategy === 'stratified' ? '1.5' : '3'}. Bbox detect <span className="text-gray-500 font-normal">— {result.compositeDebug.strategy === 'stratified' ? 'RGB gradient match on anchor plate' : 'diff(populated, clean BG) ∩ hue'} → {Object.keys(result.compositeDebug.bboxes).length} silhouettes. Each crop below is the anchor plate clipped to that character's bbox.</span>
+                            </div>
+                            <div className={fullscreen ? 'grid grid-cols-4 gap-3' : 'grid grid-cols-3 gap-2'}>
+                              {Object.entries(result.compositeDebug.bboxes).map(([name, b], i) => (
+                                <BboxCrop
+                                  key={name}
+                                  src={result.compositeDebug!.populatedPlate!}
+                                  bbox={b}
+                                  colour={BBOX_COLOURS[i % BBOX_COLOURS.length]}
+                                  name={name}
+                                  onLightbox={setLightboxImage}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Stratified-only: Step 2 input — the masked white-bg crop sent
+                            to Grok. Shows what Grok actually saw: just the silhouettes on
+                            a clean white field. */}
+                        {result.compositeDebug.step3Input && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-emerald-800 mb-1">
+                              2a. Step-2 input <span className="text-gray-500 font-normal">— crop of anchor plate (union bbox + 30% pad); non-silhouette pixels masked to WHITE before sending to Grok{result.compositeDebug.step3CropBox && ` · ${result.compositeDebug.step3CropBox.width}×${result.compositeDebug.step3CropBox.height} @ (${result.compositeDebug.step3CropBox.left},${result.compositeDebug.step3CropBox.top})`}</span>
+                            </div>
+                            <img
+                              src={result.compositeDebug.step3Input}
+                              alt="step-3 input (silhouettes on white)"
+                              className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
+                              onClick={() => setLightboxImage(result.compositeDebug!.step3Input!)}
+                            />
+                          </div>
+                        )}
+                        {/* Stratified-only: Step 2 output — Grok's rendered version */}
                         {result.compositeDebug.frontPlate && (
                           <div>
                             <div className="text-[10px] font-semibold text-emerald-800 mb-1">
-                              3. Front-figure plate <span className="text-gray-500 font-normal">— Grok edit replaces front silhouettes with real characters (one call, all front chars together)</span>
+                              2b. Front-figure plate <span className="text-gray-500 font-normal">— Grok edit output: real characters replacing the silhouettes (one call, all front chars together)</span>
                             </div>
                             <img
                               src={result.compositeDebug.frontPlate}
@@ -996,25 +1043,20 @@ export function TestModelsPanel({
                             )}
                           </div>
                         )}
-                        {/* Step 3/4 — diff-based bbox detect. Show per-character crops
-                            from the populated plate so the result is concrete. */}
-                        {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && result.compositeDebug.populatedPlate && (
+                        {/* Stratified-only: aligned front plate — Grok output after
+                            content-bbox scale+translate registration to match input
+                            silhouettes. This is the plate that actually gets composited. */}
+                        {result.compositeDebug.alignedFrontPlate && (
                           <div>
-                            <div className="text-[10px] font-semibold text-purple-700 mb-1">
-                              3. Bbox detect <span className="text-gray-500 font-normal">— diff(populated, clean BG) ∩ hue → {Object.keys(result.compositeDebug.bboxes).length} silhouettes detected. Each crop below is the populated plate clipped to that character's bbox.</span>
+                            <div className="text-[10px] font-semibold text-emerald-800 mb-1">
+                              2c. Aligned front plate <span className="text-gray-500 font-normal">— Grok output's content bbox scaled + translated to match the input silhouette bbox so characters land where the silhouettes were{result.compositeDebug.alignment && ` · in ${result.compositeDebug.alignment.input.w}×${result.compositeDebug.alignment.input.h}@(${result.compositeDebug.alignment.input.x},${result.compositeDebug.alignment.input.y}) ← out ${result.compositeDebug.alignment.output.w}×${result.compositeDebug.alignment.output.h}@(${result.compositeDebug.alignment.output.x},${result.compositeDebug.alignment.output.y})`}</span>
                             </div>
-                            <div className={fullscreen ? 'grid grid-cols-4 gap-3' : 'grid grid-cols-3 gap-2'}>
-                              {Object.entries(result.compositeDebug.bboxes).map(([name, b], i) => (
-                                <BboxCrop
-                                  key={name}
-                                  src={result.compositeDebug!.populatedPlate!}
-                                  bbox={b}
-                                  colour={BBOX_COLOURS[i % BBOX_COLOURS.length]}
-                                  name={name}
-                                  onLightbox={setLightboxImage}
-                                />
-                              ))}
-                            </div>
+                            <img
+                              src={result.compositeDebug.alignedFrontPlate}
+                              alt="aligned front plate"
+                              className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
+                              onClick={() => setLightboxImage(result.compositeDebug!.alignedFrontPlate!)}
+                            />
                           </div>
                         )}
                         {/* Step 4 — phantom-pose renders (one per character, only when phantomPoseRender=true) */}
