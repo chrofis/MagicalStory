@@ -752,7 +752,7 @@ DO NOT:
  * @returns {Promise<string>} data URI of the stitched pack (jpeg).
  */
 async function buildIdentityPack(cast, options = {}) {
-  const { targetHeight = 512, labelHeight = 32 } = options;
+  const { targetHeight = 512, labelHeight = 32, aspectRatio = null } = options;
   if (!Array.isArray(cast) || cast.length === 0) return null;
 
   // Resize every sheet to the same height; collect dims + raw buffers.
@@ -796,12 +796,43 @@ async function buildIdentityPack(cast, options = {}) {
     x += p.w;
     return c;
   });
-  const out = await sharp({
+  let out = await sharp({
     create: { width: totalW, height: maxH, channels: 3, background: '#ffffff' },
   })
     .composite(composites)
     .jpeg({ quality: 88 })
     .toBuffer();
+
+  // Pre-pad to the caller's target aspect ratio so Grok's input aspect
+  // cropper (cover-crop in editWithGrok) doesn't slice off the side panels.
+  // The pack is on a white background so the extension is invisible.
+  if (aspectRatio) {
+    const [aW, aH] = String(aspectRatio).split(':').map(Number);
+    if (aW > 0 && aH > 0) {
+      const target = aW / aH;
+      const current = totalW / maxH;
+      if (Math.abs(current - target) / target > 0.01) {
+        let padW = 0, padH = 0;
+        if (current > target) {
+          // pack is wider than target → grow height (pad top+bottom)
+          padH = Math.round(totalW / target) - maxH;
+        } else {
+          // pack is taller than target → grow width (pad left+right)
+          padW = Math.round(maxH * target) - totalW;
+        }
+        out = await sharp(out)
+          .extend({
+            top: Math.floor(padH / 2),
+            bottom: Math.ceil(padH / 2),
+            left: Math.floor(padW / 2),
+            right: Math.ceil(padW / 2),
+            background: '#ffffff',
+          })
+          .jpeg({ quality: 88 })
+          .toBuffer();
+      }
+    }
+  }
   return `data:image/jpeg;base64,${out.toString('base64')}`;
 }
 
@@ -851,13 +882,13 @@ function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPromp
   // horizontally with a name bar below each panel. Image 3 (when present) =
   // labelled front-stratum identity pack. The prompt names the slots explicitly.
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: the empty scene canvas. Paint your output ON TOP of this — keep the setting, lighting, and named props from Image 1 intact unless the priority list below says otherwise.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one back-stratum character, with the character's name on a black bar below the panel. Match every back-stratum character's face, hair, and clothing to the matching panel.\n${frontCast.length > 0 ? '- Image 3: labelled identity pack for the front-stratum characters (the ones rendered as flat-colour silhouettes). DO NOT draw their real faces or clothing here — only the flat silhouettes. Image 3 is provided so the silhouette regions sit where the named character will go.\n' : ''}`
+    ? `\nINPUT IMAGES:\n- Image 1: the empty scene canvas. Paint your output ON TOP of this — keep the setting, lighting, and named props from Image 1 intact unless the priority list below says otherwise.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one back-stratum character ONLY, with the character's name on a black bar below the panel. Match every back-stratum character's face, hair, and clothing to the matching panel. The front-stratum characters are NOT in Image 2 — render them as flat coloured silhouettes per the rules below.\n`
     : '';
   const backBlock = backCast.length > 0
     ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. ${hasIdentityPack ? 'Match each character\'s face, hair, and clothing to the matching panel of Image 2.' : 'Use the descriptions in the page brief below for each character\'s face, hair, and clothing.'}\n\n${buildBackCharLines(backCast)}\n`
     : '';
   const frontBlock = frontCast.length > 0
-    ? `FRONT STRATUM — place ${frontCast.length} flat-colour silhouette figure(s) on top of the scene. These mark the regions where real characters will be inset in a later step. Use the cast entries below for size, depth and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it. ${hasIdentityPack ? 'IGNORE Image 3 for the silhouette appearance — those characters are NOT to be drawn as real characters in this image, only as the flat-colour silhouettes specified below.' : ''}\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.`
+    ? `FRONT STRATUM — place ${frontCast.length} flat-colour SILHOUETTE shapes on top of the scene. These are NOT real characters — they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real characters will be inset in a later step. Use the cast entries below for size, position and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it.\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS (MANDATORY for every front-stratum figure):\n- Each silhouette is a flat human-shaped block FILLED with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no watercolor wash, no skin tone, no face features, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.\n- A correctly drawn silhouette would look like a single-colour paper cutout pasted onto the scene. If you find yourself drawing a face or clothes inside a silhouette region, STOP — draw flat colour only.`
     : '';
   const totalCount = backCast.length + frontCast.length;
 
@@ -1315,19 +1346,25 @@ async function generateStratifiedComposite(opts) {
   debug.emptyScene = emptySceneData;
   debug.emptySceneSource = emptySceneSource;
 
-  // ── Identity packs (one stitched reference per stratum that has chars)
-  const backIdentityPack = await buildIdentityPack(backCast);
-  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast) : null;
+  // ── Identity packs (one stitched reference per stratum that has chars).
+  // Pre-pad each pack to the call's target aspect ratio so Grok's edit-input
+  // cropper doesn't slice the side panels off — a horizontally stitched pack
+  // at 1:1 target gets center-cropped to a 30%-wide window otherwise.
+  const backIdentityPack = await buildIdentityPack(backCast, { aspectRatio });
+  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast, { aspectRatio }) : null;
   if (backIdentityPack) debug.backIdentityPack = backIdentityPack;
   if (frontIdentityPack) debug.frontIdentityPack = frontIdentityPack;
 
   // ── Step 1/5: Anchor plate (back rendered native, front as silhouettes)
+  // Refs: [emptyScene, backIdentityPack]. The front identity pack is
+  // INTENTIONALLY omitted — passing front faces here makes Grok render the
+  // front characters as real people instead of flat silhouettes, which
+  // breaks the diff-based bbox detection in step 4.
   log.info(`[SCENE COMPOSITE/STRATIFIED] step 1/5 — anchor plate (back=${backCast.length}, front=${frontCast.length})`);
   const hasAnchorIdentity = !!backIdentityPack;
   const anchorPrompt = buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasAnchorIdentity);
   const anchorRefs = [emptySceneData];
   if (backIdentityPack) anchorRefs.push(backIdentityPack);
-  if (frontIdentityPack && anchorRefs.length < 3) anchorRefs.push(frontIdentityPack);
   const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
   totalCost += anchor.usage?.cost || 0;
