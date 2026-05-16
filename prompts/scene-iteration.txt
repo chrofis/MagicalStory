@@ -13,11 +13,13 @@
 7. **Physically possible.** Two hands = max two items. Fix conflicts.
 8. **Honor perspectives.** If the outline lists `perspective: back view`, render shoulders, head, hips, both feet turned away; heels visible, toes pointing away. For `over-the-shoulder`, the OTS character fills the near foreground (back view, shoulder + head visible), the watched subject sits midground/background.
 9. **Body-facing vocabulary (discrete only).** Pick one of: `facing the camera`, `facing left`, `facing right`, `back view`. Never write fractional turns ("three-quarters", "two-thirds toward", "45-degree", "angled three-quarters"). For a glance back, write `back view, glancing over the shoulder toward [target]`.
-10. **Position language is relational.** Describe positions by what the character touches, faces, or is near (`on the boat`, `behind the desk`, `at the doorway`, `beside the tree`, `in the foreground`, `in the background`). Reach for `left`/`right` only when the action genuinely demands it — pointing/aiming/reaching at a specific target across the frame, the textPosition rule below, distance separation in an ultra-wide shot, or when cross-page continuity must be preserved (same location, characters were on the same side last scene).
+10. **Position language is relational.** Describe positions by what the character touches, faces, or is near (`on the boat`, `behind the desk`, `at the doorway`, `beside the tree`, `in the foreground`, `in the background`). Reach for `left`/`right` only when the action genuinely demands it — pointing/aiming/reaching at a specific target across the frame,<!-- TEXT_OVERLAY_BEGIN --> the textPosition rule below,<!-- TEXT_OVERLAY_END --> distance separation in an ultra-wide shot, or when cross-page continuity must be preserved (same location, characters were on the same side last scene).
 11. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age boy`, `teenager`, `middle-aged man`). Never numeric years.
 12. **No collective nouns.** ❌ "the children" ✅ name each character, or "all three", "the group".
 13. **No closed eyes, no pointing-as-cliché.** Open eyes; use looking, walking toward, reaching, discovering instead of pointing.
+<!-- TEXT_OVERLAY_BEGIN -->
 14. **No closed pose for the calm zone.** The page's `textPosition` is locked from first generation. The corner it names must read as calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground). Do NOT place a named character, an active figure, a weapon, or a busy crowd in that corner. If the previous render put a figure there, move that figure to a different region in the rewrite.
+<!-- TEXT_OVERLAY_END -->
 15. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood.
 
 ---
@@ -66,7 +68,9 @@ Clothing rules:
 **Step 3 — Validate the draft for internal consistency:**
 - Pose vs action: a `back view` character cannot be "looking at" something between them and the camera.
 - Holding vs action: a hand holding X cannot simultaneously do another action.
+<!-- TEXT_OVERLAY_BEGIN -->
 - Calm zone: scan the prose — no named character, weapon, or crowd in the textPosition corner.
+<!-- TEXT_OVERLAY_END -->
 - Face count: count visible faces; reduce via depth/back-view/object/cropping if over the cap.
 - One focal point: one main action draws the eye; if the prose has two equally weighted moments, cut one.
 
@@ -96,7 +100,9 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   "corrections": ["short bullets describing the fixes applied to the prose"],
   "draftValidation": {
     "poseActionCheck": "...",
+<!-- TEXT_OVERLAY_BEGIN -->
     "calmZoneCheck": "textPosition=top-right; upper-right corner contains only sky → OK",
+<!-- TEXT_OVERLAY_END -->
     "contradictionsFound": [],
     "fixesApplied": []
   },
@@ -119,13 +125,15 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 - `diagnosis[]`: one entry per evaluator finding or preview mismatch. Each entry names the root cause in one short sentence — not the symptom. Empty array if there were no findings.
 - `previewMismatches[]`: array of `"Intent: X. Preview: Y."` strings. Empty array if preview matched intent.
 - `issues[]`, `corrections[]`: short bullets. Empty arrays if none.
+<!-- TEXT_OVERLAY_BEGIN -->
 - `draftValidation`: must include `calmZoneCheck` confirming no named character / weapon / crowd in the textPosition corner.
+<!-- TEXT_OVERLAY_END -->
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`. `position` is a short relational phrase matching the prose (`on the boat`, `behind Roger`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures.
 - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
 - `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. For landmarks with photo variants use `LOC003.2` format — pick the variant matching the scene's perspective.
 - `interactions[]`: visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`. Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`. Omit entirely: pure ground/floor/path contact, leaning on walls, sitting on generic chairs. Field shape `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action — no body-part positioning, no pose details. Cap: 1–4 entries, 0–2 with `storyRelevant: true`. Distance verbs (`shoots`, `aims at`, `calls to`) require an explicit separation phrase in `where` (`across the room`, `down the valley`); for these scenes the shot must be `ultra-wide` and the prose must place each figure at the correct end of the frame.
 - `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused. `false` if setting / location / camera angle / lighting changed significantly.
-- `emptyScenePrompt`: 2-3 sentences describing only the background — location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). EXCLUDE named characters, tracked animals, handheld artifacts. Describe anonymous extras with density/distance/silhouette only, kept away from the zone reserved for named characters. The corner matching `textPosition` must read as calm, uncluttered scene content.
+- `emptyScenePrompt`: 2-3 sentences describing only the background — location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). EXCLUDE named characters, tracked animals, handheld artifacts. Describe anonymous extras with density/distance/silhouette only, kept away from the zone reserved for named characters.<!-- TEXT_OVERLAY_BEGIN --> The corner matching `textPosition` must read as calm, uncluttered scene content.<!-- TEXT_OVERLAY_END -->
 - `translatedSummary`: one-line translation of the prose summary into the target language, for frontend display.
 
 ---

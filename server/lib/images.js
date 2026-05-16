@@ -7480,6 +7480,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   // Step 3: Build the scene description prompt with preview feedback
+  // Per-scene textInImage gates the overlay-only rules in scene-iteration.txt
+  // / scene-iteration-free.txt. Pulled from storyData.sceneImages (preserved
+  // by the unified pipeline at server.js:5980), falling back to story-level
+  // layout. Defaults false so non-overlay stories never carry calm-zone
+  // instructions through iterate.
+  const iterateTextInImage = (
+    storyData?.sceneImages?.find(s => s.pageNumber === pageNumber)?.textInImage
+    ?? storyData?.layout?.textInImage
+    ?? false
+  ) === true;
   const scenePrompt = buildSceneDescriptionPrompt(
     pageNumber,
     pageText,
@@ -7493,7 +7503,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     availableAvatars,
     null,  // rawOutlineContext
     previewFeedback,  // The actual image analysis feedback!
-    { freeIterate }
+    { freeIterate, textInImage: iterateTextInImage }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).

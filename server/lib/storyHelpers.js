@@ -4092,7 +4092,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
-  const { freeIterate = false } = options;
+  const { freeIterate = false, textInImage = false } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -4374,7 +4374,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     const iterImageModelKey = MODEL_DEFAULTS.pageImage;
     const iterImageModelConfig = IMAGE_MODELS[iterImageModelKey];
 
-    return fillTemplate(activeTemplate, {
+    let filled = fillTemplate(activeTemplate, {
       DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
       PREVIOUS_SCENES: previousScenesText,
       PREVIEW_FEEDBACK: previewFeedbackText,
@@ -4393,6 +4393,19 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3
     });
+    // Same gate as buildUnifiedStoryPrompt: text-overlay-only rules
+    // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
+    // emptyScenePrompt corner instruction) are wrapped in
+    // <!-- TEXT_OVERLAY_BEGIN --> ... <!-- TEXT_OVERLAY_END --> markers in
+    // scene-iteration.txt / scene-iteration-free.txt. When textInImage is
+    // false, strip markers AND inner content so iterate prompts don't carry
+    // overlay rules into non-overlay pages.
+    if (textInImage) {
+      filled = filled.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '');
+    } else {
+      filled = filled.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
+    }
+    return filled;
   }
 
   // Fallback to hardcoded prompt if template not loaded
