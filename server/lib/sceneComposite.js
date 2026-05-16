@@ -67,6 +67,46 @@ const DEFAULT_PALETTE = [
   '#00B0B0', // cyan
 ];
 
+// ─── Grok aspect preset picker ────────────────────────────────────────────
+//
+// Grok's edit endpoint only accepts a fixed set of aspect_ratio strings:
+//   1:1, 3:4, 4:3, 9:16, 16:9, 2:3, 3:2, 1:2, 2:1, 9:19.5, 19.5:9, 9:20, 20:9
+//
+// 'auto' is documented as accepted by the body but the editWithGrok helper
+// uses the aspect string to drive its own input-cover-cropper — when the
+// string isn't a parseable W:H it falls back to ratio 1 and crops the
+// input to square, which clipped silhouettes off the edges of our crop.
+//
+// Strategy: pick the preset closest to the actual crop ratio, then white-
+// pad the crop to that exact preset BEFORE sending. The padding is on the
+// background (which is already white inside the masked crop), so we lose
+// no silhouette pixels. After Grok returns, we extract the original crop
+// region back out of the padded output.
+const GROK_ASPECT_PRESETS = [
+  { name: '1:1',    ratio: 1 },
+  { name: '3:4',    ratio: 3 / 4 },
+  { name: '4:3',    ratio: 4 / 3 },
+  { name: '9:16',   ratio: 9 / 16 },
+  { name: '16:9',   ratio: 16 / 9 },
+  { name: '2:3',    ratio: 2 / 3 },
+  { name: '3:2',    ratio: 3 / 2 },
+  { name: '1:2',    ratio: 0.5 },
+  { name: '2:1',    ratio: 2 },
+  { name: '9:19.5', ratio: 9 / 19.5 },
+  { name: '19.5:9', ratio: 19.5 / 9 },
+  { name: '9:20',   ratio: 9 / 20 },
+  { name: '20:9',   ratio: 20 / 9 },
+];
+function nearestGrokAspect(w, h) {
+  const r = w / h;
+  let best = GROK_ASPECT_PRESETS[0], bestDiff = Math.abs(r - best.ratio);
+  for (const p of GROK_ASPECT_PRESETS) {
+    const d = Math.abs(r - p.ratio);
+    if (d < bestDiff) { bestDiff = d; best = p; }
+  }
+  return best;
+}
+
 // ─── Silhouette colour match (handles solid + translucent variants) ──────
 //
 // A silhouette painted with target colour T at opacity α on a white BG
@@ -1717,15 +1757,39 @@ async function _stratifiedBody(ctx) {
       }
     }
   }
-  const maskedInputBuf = await sharp(maskedInputRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer();
+
+  // Pad the masked crop with WHITE to a Grok aspect preset so editWithGrok's
+  // input cover-cropper doesn't slice the crop edges off. Outside the
+  // silhouettes is already white, so the pad is invisible at composite time.
+  // Track the pad offsets so we can extract the original cropW×cropH region
+  // back out of the Grok output before alignment.
+  const preset = nearestGrokAspect(cropW, cropH);
+  const targetRatio = preset.ratio;
+  const currentRatio = cropW / cropH;
+  let paddedW = cropW, paddedH = cropH, padLeft = 0, padTop = 0;
+  if (currentRatio < targetRatio) {
+    paddedW = Math.round(cropH * targetRatio);
+    padLeft = Math.floor((paddedW - cropW) / 2);
+  } else if (currentRatio > targetRatio) {
+    paddedH = Math.round(cropW / targetRatio);
+    padTop = Math.floor((paddedH - cropH) / 2);
+  }
+  const padRight = paddedW - cropW - padLeft;
+  const padBottom = paddedH - cropH - padTop;
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   pad to preset ${preset.name}: ${cropW}×${cropH} → ${paddedW}×${paddedH} (pad L${padLeft} T${padTop} R${padRight} B${padBottom})`);
+  const maskedInputBuf = await sharp(maskedInputRgb, { raw: { width: cropW, height: cropH, channels: 3 } })
+    .extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, background: '#ffffff' })
+    .png()
+    .toBuffer();
   const maskedInputData = `data:image/png;base64,${maskedInputBuf.toString('base64')}`;
   debug.step3Input = maskedInputData;
+  debug.step3PaddedSize = { width: paddedW, height: paddedH, padLeft, padTop };
 
   const hasFrontIdentity = !!frontIdentityPack;
   const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
   const frontInsetRefs = [maskedInputData];
   if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
-  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: 'auto', model: GROK_MODELS.STANDARD });
+  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
   debug.frontPlate = frontPlate.imageData;
@@ -1738,12 +1802,19 @@ async function _stratifiedBody(ctx) {
   // already has background characters + scene baked in). The depopulate
   // step is gone — the anchor plate's non-silhouette pixels ARE the back
   // plate we need.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/4 — align + mask-compose front plate onto anchor');
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/4 — per-figure align + mask-compose onto anchor');
+  // Extract the ORIGINAL crop region (cropW × cropH) back out of Grok's
+  // padded-aspect output. resize the output to the padded dimensions, then
+  // extract the (padLeft, padTop, cropW, cropH) sub-rectangle.
   const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const grokAtCrop = await sharp(frontPlateRawBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
+  const grokAtCrop = await sharp(frontPlateRawBuf)
+    .resize(paddedW, paddedH, { fit: 'fill' })
+    .extract({ left: padLeft, top: padTop, width: cropW, height: cropH })
+    .raw()
+    .toBuffer();
 
-  // Crop the silhouette mask to the same region. This is both the alpha
-  // mask for composite AND the reference for output→input alignment.
+  // Crop the silhouette mask to the same region (drives the alpha for the
+  // final composite, plus per-character bbox lookup below).
   const cropMaskRaw = Buffer.alloc(cropW * cropH);
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
@@ -1751,13 +1822,13 @@ async function _stratifiedBody(ctx) {
     }
   }
 
-  // ── Alignment: Grok often pads its edit output with white margins, so
-  // the rendered characters sit in a smaller sub-rectangle of the crop
-  // than where the silhouettes were. Find the non-white content bbox in
-  // Grok output and the silhouette bbox in input. Scale + translate the
-  // output content so its bbox lands on top of the input silhouette bbox.
-  // Treats all front figures as one group — preserves their relative
-  // positions, only fixes group-level offset/scale.
+  // ── Group alignment. We must PRESERVE the relative distances between
+  // figures (those distances ARE the layout Grok was asked to honour), so
+  // we scale + translate the output AS ONE GROUP — never per-figure. Find
+  // the output content bbox (union of all non-white pixels), find the
+  // input silhouette bbox (union of all silhouette pixels), then map one
+  // onto the other.
+  const WHITE_TOL_SQ = 35 * 35;
   let inMinX = cropW, inMinY = cropH, inMaxX = -1, inMaxY = -1;
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
@@ -1770,7 +1841,6 @@ async function _stratifiedBody(ctx) {
     }
   }
   let outMinX = cropW, outMinY = cropH, outMaxX = -1, outMaxY = -1;
-  const WHITE_TOL_SQ = 35 * 35; // pixel further than ~35 from pure white counts as content
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
       const i = (y * cropW + x) * 3;
@@ -1789,8 +1859,7 @@ async function _stratifiedBody(ctx) {
     const inBoxW = inMaxX - inMinX + 1, inBoxH = inMaxY - inMinY + 1;
     const outBoxW = outMaxX - outMinX + 1, outBoxH = outMaxY - outMinY + 1;
     debug.alignment = { input: { x: inMinX, y: inMinY, w: inBoxW, h: inBoxH }, output: { x: outMinX, y: outMinY, w: outBoxW, h: outBoxH } };
-    log.info(`[SCENE COMPOSITE/STRATIFIED]   align: grok content ${outBoxW}×${outBoxH}@(${outMinX},${outMinY}) → input silhouettes ${inBoxW}×${inBoxH}@(${inMinX},${inMinY})`);
-    // Extract Grok content sub-rectangle.
+    log.info(`[SCENE COMPOSITE/STRATIFIED]   group align: grok content ${outBoxW}×${outBoxH}@(${outMinX},${outMinY}) → input silhouettes ${inBoxW}×${inBoxH}@(${inMinX},${inMinY})`);
     const contentRgb = Buffer.alloc(outBoxW * outBoxH * 3);
     for (let y = 0; y < outBoxH; y++) {
       for (let x = 0; x < outBoxW; x++) {
@@ -1805,7 +1874,6 @@ async function _stratifiedBody(ctx) {
       .resize(inBoxW, inBoxH, { fit: 'fill' })
       .raw()
       .toBuffer();
-    // Place on a white crop-sized canvas at input bbox position.
     alignedRgb = Buffer.alloc(cropW * cropH * 3, 255);
     for (let y = 0; y < inBoxH; y++) {
       for (let x = 0; x < inBoxW; x++) {
@@ -1817,15 +1885,28 @@ async function _stratifiedBody(ctx) {
       }
     }
   } else {
-    log.warn(`[SCENE COMPOSITE/STRATIFIED]   align: bbox detection failed (in=${inMaxX < 0}, out=${outMaxX < 0}); using raw Grok output unaligned`);
+    log.warn(`[SCENE COMPOSITE/STRATIFIED]   group align: bbox detection failed (in=${inMaxX < 0}, out=${outMaxX < 0}); using raw output`);
     alignedRgb = grokAtCrop;
   }
   debug.alignedFrontPlate = `data:image/png;base64,${await sharp(alignedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer().then(b => b.toString('base64'))}`;
 
-  // Feather the silhouette mask for the alpha compose so the composite
-  // boundary doesn't show a hard edge.
-  const featheredMask = await sharp(cropMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
-    .blur(4)
+  // ── Alpha mask is derived from the FIGURE PIXELS in the aligned plate,
+  // not from the input silhouette mask. We only want to paste the actual
+  // characters back onto the anchor — never the surrounding white pixels.
+  // Build a binary figure mask (255 = figure pixel, 0 = white-ish), then
+  // feather it for a soft composite edge.
+  const figureMaskRaw = Buffer.alloc(cropW * cropH);
+  for (let i = 0; i < cropW * cropH; i++) {
+    const j = i * 3;
+    const dr = alignedRgb[j] - 255, dg = alignedRgb[j + 1] - 255, db = alignedRgb[j + 2] - 255;
+    figureMaskRaw[i] = (dr * dr + dg * dg + db * db > WHITE_TOL_SQ) ? 255 : 0;
+  }
+
+  // Feather the FIGURE mask (not the silhouette mask) so we paste only
+  // figure pixels onto the anchor — never the white surround. Small blur
+  // softens the boundary so the composite seam isn't visible.
+  const featheredMask = await sharp(figureMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
+    .blur(3)
     .raw()
     .toBuffer();
   const rgba = Buffer.alloc(cropW * cropH * 4);
