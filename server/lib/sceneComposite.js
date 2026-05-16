@@ -1690,7 +1690,7 @@ async function _stratifiedBody(ctx) {
   totalCost += pass1.usage?.cost || 0;
   debug.blendSentToGrok = pass1.sentToGrok || null;
 
-  log.info(`[SCENE COMPOSITE/STRATIFIED] complete — total cost $${totalCost.toFixed(4)}, back=${backCast.length} front=${placements.length}/${frontCast.length}`);
+  log.info(`[SCENE COMPOSITE/STRATIFIED] complete — total cost $${totalCost.toFixed(4)}, back=${backCast.length} front=${Object.keys(bboxes).length}/${frontCast.length}`);
 
   return {
     imageData: pass1.imageData,
