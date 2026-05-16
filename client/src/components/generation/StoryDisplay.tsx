@@ -34,16 +34,58 @@ interface StyledAvatarGenerationEntry {
   faceMatchDetails?: string | null;
   clothingMatchReason?: string | null;
   attempt?: number;
-  sheetFormat?: '2x4' | '2x2';
+  sheetFormat?: string;
+  innerLayoutScore?: number | null;
+  innerIdentityScore?: number | null;
+  innerOutfitScore?: number | null;
+  innerFinalScore?: number | null;
+  combinedScore?: number | null;
   inputs: {
-    facePhoto: { identifier?: string; sizeKB: number; imageData?: string } | null;
-    originalAvatar?: { identifier: string; sizeKB: number; imageData?: string };
-    styleSample?: { identifier: string; sizeKB: number; imageData?: string } | null;
-    phantom?: { sizeKB: number; imageData?: string } | null;
-    standardAvatar?: { sizeKB: number; imageData?: string } | null;
+    facePhoto?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+    originalAvatar?: { identifier?: string; sizeKB?: number; imageData?: string };
+    styleSample?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+    phantom?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+    standardAvatar?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
   };
   prompt?: string;
-  output?: { identifier?: string; sizeKB: number; imageData?: string };
+  output?: { identifier?: string; sizeKB?: number; imageData?: string };
+  // Two-pass pipeline payload (Pass 1 realistic identity anchor, Pass 2 style transfer).
+  // Each pass keeps every best-of-N attempt with its per-task Gemini scores.
+  realisticImageData?: string | null;
+  passes?: {
+    pass1: {
+      prompt?: string;
+      selectedAttempt: number | null;
+      finalScore: number | null;
+      attempts: Array<{
+        attempt: number;
+        stage: string;
+        score: number;
+        layoutScore?: number | null;
+        identityScore?: number | null;
+        outfitScore?: number | null;
+        sourceMatchScore?: number | null;
+        reasons?: string[];
+        imageData?: string | null;
+      }>;
+    };
+    pass2: {
+      prompt?: string;
+      selectedAttempt: number | null;
+      finalScore: number | null;
+      attempts: Array<{
+        attempt: number;
+        stage: string;
+        score: number;
+        layoutScore?: number | null;
+        identityScore?: number | null;
+        styleScore?: number | null;
+        outfitScore?: number | null;
+        reasons?: string[];
+        imageData?: string | null;
+      }>;
+    } | null;
+  } | null;
 }
 
 interface CostumedAvatarGenerationEntry {
@@ -3155,6 +3197,113 @@ export function StoryDisplay({
                           <div className="mt-2">
                             {renderAvatarGenImage('styled', index, entry, 'output', 'Styled Avatar Output', entry.output.sizeKB)}
                           </div>
+                        </div>
+                      )}
+
+                      {/* 2-Pass Pipeline (Pass 1 realistic + Pass 2 style transfer) */}
+                      {entry.passes && (entry.passes.pass1 || entry.passes.pass2) && (
+                        <div className="bg-purple-50 border border-purple-200 p-3 rounded text-xs space-y-3">
+                          <div className="font-semibold text-purple-800">2-Pass Pipeline</div>
+
+                          {entry.passes.pass1 && entry.passes.pass1.attempts && entry.passes.pass1.attempts.length > 0 && (
+                            <div>
+                              <div className="font-semibold text-purple-700 mb-2">
+                                Pass 1: Realistic (identity anchor) — {entry.passes.pass1.attempts.length} attempt{entry.passes.pass1.attempts.length > 1 ? 's' : ''}
+                                {entry.passes.pass1.selectedAttempt != null && (
+                                  <span className="ml-2 text-[10px] font-normal text-purple-600">
+                                    selected #{entry.passes.pass1.selectedAttempt}
+                                    {entry.passes.pass1.finalScore != null ? ` · score ${entry.passes.pass1.finalScore}/10` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {entry.passes.pass1.attempts.map((a, i) => {
+                                  const isSelected = entry.passes!.pass1.selectedAttempt === a.attempt;
+                                  return (
+                                    <div key={i} className={`border-2 rounded p-1.5 ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white'} w-[180px]`}>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-bold text-gray-700">#{a.attempt} {a.stage}</span>
+                                        {isSelected && <span className="text-[9px] px-1 rounded bg-emerald-500 text-white">SELECTED</span>}
+                                      </div>
+                                      {a.imageData && (
+                                        <img
+                                          src={a.imageData}
+                                          alt={`Pass 1 attempt ${a.attempt}`}
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => { const w = window.open(); if (w) { w.document.write(`<img src="${a.imageData}" style="max-width:100%;height:auto" />`); }}}
+                                        />
+                                      )}
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        {a.score != null && (
+                                          <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${a.score >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>final {a.score}</span>
+                                        )}
+                                        {a.layoutScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-blue-100 text-blue-700">L {a.layoutScore}</span>}
+                                        {a.identityScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-indigo-100 text-indigo-700">I {a.identityScore}</span>}
+                                        {a.outfitScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-amber-100 text-amber-700">O {a.outfitScore}</span>}
+                                        {a.sourceMatchScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-pink-100 text-pink-700">S {a.sourceMatchScore}</span>}
+                                      </div>
+                                      {a.reasons && a.reasons.length > 0 && (
+                                        <div className="mt-1 text-[9px] text-gray-600 line-clamp-3">{a.reasons.join(' · ')}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {entry.passes.pass2 && entry.passes.pass2.attempts && entry.passes.pass2.attempts.length > 0 && (
+                            <div>
+                              <div className="font-semibold text-purple-700 mb-2">
+                                Pass 2: Style transfer ({entry.artStyle}) — {entry.passes.pass2.attempts.length} attempt{entry.passes.pass2.attempts.length > 1 ? 's' : ''}
+                                {entry.passes.pass2.selectedAttempt != null && (
+                                  <span className="ml-2 text-[10px] font-normal text-purple-600">
+                                    selected #{entry.passes.pass2.selectedAttempt}
+                                    {entry.passes.pass2.finalScore != null ? ` · score ${entry.passes.pass2.finalScore}/10` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {entry.passes.pass2.attempts.map((a, i) => {
+                                  const isSelected = entry.passes!.pass2!.selectedAttempt === a.attempt;
+                                  return (
+                                    <div key={i} className={`border-2 rounded p-1.5 ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white'} w-[180px]`}>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-bold text-gray-700">#{a.attempt} {a.stage}</span>
+                                        {isSelected && <span className="text-[9px] px-1 rounded bg-emerald-500 text-white">SELECTED</span>}
+                                      </div>
+                                      {a.imageData && (
+                                        <img
+                                          src={a.imageData}
+                                          alt={`Pass 2 attempt ${a.attempt}`}
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => { const w = window.open(); if (w) { w.document.write(`<img src="${a.imageData}" style="max-width:100%;height:auto" />`); }}}
+                                        />
+                                      )}
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        {a.score != null && (
+                                          <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${a.score >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>final {a.score}</span>
+                                        )}
+                                        {a.layoutScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-blue-100 text-blue-700">L {a.layoutScore}</span>}
+                                        {a.identityScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-indigo-100 text-indigo-700">I {a.identityScore}</span>}
+                                        {a.styleScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-fuchsia-100 text-fuchsia-700">St {a.styleScore}</span>}
+                                        {a.outfitScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-amber-100 text-amber-700">O {a.outfitScore}</span>}
+                                      </div>
+                                      {a.reasons && a.reasons.length > 0 && (
+                                        <div className="mt-1 text-[9px] text-gray-600 line-clamp-3">{a.reasons.join(' · ')}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {entry.realisticImageData && !entry.passes.pass2 && (
+                            <div className="text-[10px] text-purple-600">
+                              No style transfer was applied — final output is the realistic Pass 1 sheet.
+                            </div>
+                          )}
                         </div>
                       )}
 

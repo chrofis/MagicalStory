@@ -386,15 +386,63 @@ export default function StoryWizard() {
     timestamp: string;
     characterName: string;
     artStyle: string;
+    clothingCategory?: string;
     durationMs: number;
     success: boolean;
     error?: string;
+    attempt?: number;
+    sheetFormat?: string;
+    faceMatchScore?: number | null;
+    clothingMatchScore?: number | null;
+    innerLayoutScore?: number | null;
+    innerIdentityScore?: number | null;
+    innerOutfitScore?: number | null;
+    innerFinalScore?: number | null;
+    combinedScore?: number | null;
     inputs: {
-      facePhoto: { identifier: string; sizeKB: number } | null;
-      originalAvatar: { identifier: string; sizeKB: number };
+      facePhoto?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+      originalAvatar?: { identifier?: string; sizeKB?: number; imageData?: string };
+      phantom?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+      standardAvatar?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
+      styleSample?: { identifier?: string; sizeKB?: number; imageData?: string };
     };
     prompt?: string;
-    output?: { identifier: string; sizeKB: number };
+    output?: { identifier?: string; sizeKB?: number; imageData?: string };
+    realisticImageData?: string | null;
+    passes?: {
+      pass1: {
+        prompt?: string;
+        selectedAttempt: number | null;
+        finalScore: number | null;
+        attempts: Array<{
+          attempt: number;
+          stage: string;
+          score: number;
+          layoutScore?: number | null;
+          identityScore?: number | null;
+          outfitScore?: number | null;
+          sourceMatchScore?: number | null;
+          reasons?: string[];
+          imageData?: string | null;
+        }>;
+      };
+      pass2: {
+        prompt?: string;
+        selectedAttempt: number | null;
+        finalScore: number | null;
+        attempts: Array<{
+          attempt: number;
+          stage: string;
+          score: number;
+          layoutScore?: number | null;
+          identityScore?: number | null;
+          styleScore?: number | null;
+          outfitScore?: number | null;
+          reasons?: string[];
+          imageData?: string | null;
+        }>;
+      } | null;
+    } | null;
   }>>([]); // Styled avatar generation log (dev mode)
   const [costumedAvatarGeneration, setCostumedAvatarGeneration] = useState<Array<{
     timestamp: string;
