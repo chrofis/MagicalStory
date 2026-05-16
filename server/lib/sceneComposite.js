@@ -1591,13 +1591,14 @@ async function _stratifiedBody(ctx) {
   debug.emptyScene = emptySceneData;
   debug.emptySceneSource = emptySceneSource;
 
-  // ── Identity packs (one stitched reference per stratum that has chars).
-  // Use cropMode='body' so each panel is just the body cell matching the
-  // char's pose (not the full 2×4 sheet) — smaller pack, less Grok noise,
-  // tighter identity binding. Pre-pad each pack to the call's target aspect
-  // so Grok's edit-input cropper doesn't slice the side panels off.
+  // ── Identity packs. Built once at page aspect; the editWithGrok call
+  // for step 2 uses padInput:true so the cropper pads (instead of
+  // cropping) to match the step-2 preset aspect — no characters get
+  // sliced down the middle even when step 2's aspect is much narrower.
   const backIdentityPack = await buildIdentityPack(backCast, { aspectRatio, cropMode: 'body' });
-  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast, { aspectRatio, cropMode: 'body' }) : null;
+  const frontIdentityPack = frontCast.length > 0
+    ? await buildIdentityPack(frontCast, { aspectRatio, cropMode: 'body' })
+    : null;
   if (backIdentityPack) debug.backIdentityPack = backIdentityPack;
   if (frontIdentityPack) debug.frontIdentityPack = frontIdentityPack;
 
@@ -1787,7 +1788,13 @@ async function _stratifiedBody(ctx) {
   const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
   const frontInsetRefs = [maskedInputData];
   if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
-  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD });
+  // padInput:true → Grok's aspect normalizer PADS each input with white
+  // to match preset.name instead of cover-cropping. Both refs here have
+  // white backgrounds (silhouette crop's surround is white; identity
+  // pack's background is white) so the pad bars are invisible. This
+  // replaces an earlier bug where the horizontal identity pack got
+  // sliced in half when step 2's aspect was narrow (1:2, 9:16, etc.).
+  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD, padInput: true });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
   debug.frontPlate = frontPlate.imageData;
