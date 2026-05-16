@@ -1917,16 +1917,26 @@ async function _stratifiedBody(ctx) {
   // Feather the FIGURE mask (not the silhouette mask) so we paste only
   // figure pixels onto the anchor — never the white surround. Small blur
   // softens the boundary so the composite seam isn't visible.
-  const featheredMask = await sharp(figureMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
+  //
+  // CRITICAL: sharp's .blur() converts a 1-channel raw input into a
+  // 3-channel raw output (verified: 470×962×1 → 1,356,420 bytes = 3
+  // channels packed). Without resolveWithObject we'd silently read R/G/B
+  // bytes at stride 1 instead of the per-pixel value at stride 3, which
+  // scrambles the alpha mask and makes most figure pixels composite as
+  // alpha=0 (kids invisible, leaving just a tiny black-bar artifact —
+  // exactly the bug the user reported).
+  const featheredRaw = await sharp(figureMaskRaw, { raw: { width: cropW, height: cropH, channels: 1 } })
     .blur(3)
     .raw()
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
+  const fData = featheredRaw.data;
+  const fStride = featheredRaw.info.channels; // 1 or 3 depending on sharp's internal path
   const rgba = Buffer.alloc(cropW * cropH * 4);
   for (let i = 0; i < cropW * cropH; i++) {
     rgba[i * 4]     = alignedRgb[i * 3];
     rgba[i * 4 + 1] = alignedRgb[i * 3 + 1];
     rgba[i * 4 + 2] = alignedRgb[i * 3 + 2];
-    rgba[i * 4 + 3] = featheredMask[i];
+    rgba[i * 4 + 3] = fData[i * fStride];
   }
   const maskedFrontPng = await sharp(rgba, { raw: { width: cropW, height: cropH, channels: 4 } }).png().toBuffer();
   const composited = await sharp(anchorBuf)
