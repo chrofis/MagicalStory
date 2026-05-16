@@ -1901,18 +1901,64 @@ async function _stratifiedBody(ctx) {
   }
   debug.alignedFrontPlate = `data:image/png;base64,${await sharp(alignedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer().then(b => b.toString('base64'))}`;
 
-  // ── Alpha mask is derived from FIGURE PIXELS in the aligned plate — same
-  // isFigurePx test (not near-white, not near-black) used for the bbox
-  // detection. The near-black filter is the defence-in-depth against Grok
-  // copying the identity-pack's "Noah | Emma" black name bar into the
-  // output: even if the prompt's no-labels directive is ignored, the bar
-  // pixels are excluded from both the bbox computation AND the alpha mask,
-  // so they never get composited onto the anchor.
-  const figureMaskRaw = Buffer.alloc(cropW * cropH);
-  for (let i = 0; i < cropW * cropH; i++) {
-    const j = i * 3;
-    figureMaskRaw[i] = isFigurePx(alignedRgb[j], alignedRgb[j + 1], alignedRgb[j + 2]) ? 255 : 0;
+  // ── Alpha mask. Per-pixel near-white-and-near-black classification (the
+  // old approach) had a serious failure mode: it rejected near-WHITE pixels
+  // INSIDE the character (e.g. the white skeleton print on Noah's hoodie,
+  // white teeth, white shoe soles) — those pixels became transparent in
+  // the composite, leaving holes in the character.
+  //
+  // Better: flood-fill from the image border to identify the OUTSIDE
+  // background (only near-pure-white pixels reachable from the border).
+  // Mask = NOT(reachable background) — everything else, including the
+  // white prints inside the character outline. Then subtract near-black
+  // pixels so any leaked label bar still gets excluded.
+  const WHITE_TIGHT_SQ = 30 * 30;
+  const isNearPureWhite = (r, g, b) => {
+    const dr = r - 255, dg = g - 255, db = b - 255;
+    return dr * dr + dg * dg + db * db <= WHITE_TIGHT_SQ;
+  };
+  const bgMask = new Uint8Array(cropW * cropH);
+  const stack = new Int32Array(cropW * cropH);
+  let top = 0;
+  const pushIfWhite = (p) => {
+    if (bgMask[p]) return;
+    const ni = p * 3;
+    if (isNearPureWhite(alignedRgb[ni], alignedRgb[ni + 1], alignedRgb[ni + 2])) {
+      bgMask[p] = 1;
+      stack[top++] = p;
+    }
+  };
+  // Seed from all four borders.
+  for (let x = 0; x < cropW; x++) {
+    pushIfWhite(x);
+    pushIfWhite((cropH - 1) * cropW + x);
   }
+  for (let y = 0; y < cropH; y++) {
+    pushIfWhite(y * cropW);
+    pushIfWhite(y * cropW + cropW - 1);
+  }
+  // Flood-fill outward (4-connected).
+  while (top > 0) {
+    const p = stack[--top];
+    const x = p % cropW, y = (p - x) / cropW;
+    if (x > 0)            pushIfWhite(p - 1);
+    if (x < cropW - 1)    pushIfWhite(p + 1);
+    if (y > 0)            pushIfWhite(p - cropW);
+    if (y < cropH - 1)    pushIfWhite(p + cropW);
+  }
+  // Mask = everything not reached by the flood, MINUS any near-black
+  // pixels (defence against Grok leaking the identity-pack label bar).
+  const figureMaskRaw = Buffer.alloc(cropW * cropH);
+  let maskedFigureCount = 0;
+  for (let i = 0; i < cropW * cropH; i++) {
+    if (bgMask[i]) continue;
+    const j = i * 3;
+    const r = alignedRgb[j], g = alignedRgb[j + 1], b = alignedRgb[j + 2];
+    if (r * r + g * g + b * b <= BLACK_TOL_SQ) continue; // near-black, reject
+    figureMaskRaw[i] = 255;
+    maskedFigureCount++;
+  }
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   figure-mask: ${maskedFigureCount} px (${((100 * maskedFigureCount) / (cropW * cropH)).toFixed(1)}% of crop)`);
 
   // Feather the FIGURE mask (not the silhouette mask) so we paste only
   // figure pixels onto the anchor — never the white surround. Small blur
