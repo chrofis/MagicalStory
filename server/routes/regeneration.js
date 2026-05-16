@@ -1181,6 +1181,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         results[compositeKey] = {
           error: compErr.message || 'Composite generation failed',
           modelId: 'scene-composite', elapsed: Date.now() - compositeStart,
+          // Partial debug bundle attached by generateStratifiedComposite when
+          // a step throws — lets the dev panel still show the anchor plate,
+          // depopulate output, etc. produced before the failure.
+          compositeDebug: compErr.partialDebug || null,
         };
       }
     }

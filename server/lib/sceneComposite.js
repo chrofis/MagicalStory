@@ -621,6 +621,86 @@ function buildCastLines(cast) {
 }
 
 /**
+ * Anonymous-cast variant of buildCastLines: same structural data (position,
+ * pose, action, size, eye markers) but with the character's NAME and ACTION
+ * stripped. Used in Stratified Composite step 1 so Grok has no name handle
+ * for the front-stratum figures — the prompt refers to them by colour only.
+ * Names + actions are reserved for step 3 where the real figures get drawn.
+ */
+function buildAnonymousCastLines(cast) {
+  return cast.map((c) => {
+    const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
+    const posHint = c.position || 'in the scene';
+    const direction = c.flip ? 'facing right' : 'facing left';
+    const poseLabel = {
+      front:        'front view, body facing the camera',
+      threeQuarter: `three-quarter view, ${direction}`,
+      profile:      `profile view, ${direction}`,
+      back:         'back view, viewer sees the back of the head',
+    }[c.pose] || `three-quarter view, ${direction}`;
+    const markerSpec = (() => {
+      const oppSide = c.flip ? 'left' : 'right';
+      switch (c.pose) {
+        case 'front':        return 'two small BLACK dots side by side in the head area (eyes)';
+        case 'threeQuarter': return `two small BLACK dots in the head area offset toward the silhouette's ${oppSide} half (eyes)`;
+        case 'profile':      return `ONE small BLACK dot near the silhouette's ${oppSide} edge of the head (eye)`;
+        case 'back':         return 'NO eye dots — back-of-head only';
+        default:             return null;
+      }
+    })();
+    const markerLine = markerSpec ? `\n    Eye markers (inside the head area): ${markerSpec}.` : '';
+    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${posHint}, ${poseLabel}. Size: ${sizeHint}.${markerLine}`;
+  }).join('\n');
+}
+
+/**
+ * Filter a page-brief string sentence-by-sentence: keep sentences that
+ * mention any "keep" character name; drop sentences that mention ONLY
+ * "drop" names; keep sentences that mention neither.
+ *
+ * Sentence splitter is line-level (split on newlines) then within each line
+ * on `.`/`;`/`!` followed by whitespace. Each sentence's name set is
+ * checked case-insensitively. The match needs a word boundary so substrings
+ * like "Daniela" inside a name like "Dan" aren't accidental hits.
+ *
+ * Used in Stratified Composite to prevent step-1 from receiving any prose
+ * about front-stratum characters (their faces/clothing would tempt Grok to
+ * render them as real instead of silhouettes), and step-3 from receiving
+ * prose about back-stratum characters (they're already painted in the
+ * anchor plate and don't need to be redrawn).
+ */
+function filterBriefByStratum(brief, keepNames = [], dropNames = []) {
+  if (!brief || typeof brief !== 'string') return '';
+  const keep = keepNames.filter(Boolean).map(n => String(n).toLowerCase());
+  const drop = dropNames.filter(Boolean).map(n => String(n).toLowerCase());
+  if (drop.length === 0) return brief;
+  const mentions = (text, names) => {
+    const lc = text.toLowerCase();
+    return names.some(n => {
+      const re = new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      return re.test(lc);
+    });
+  };
+  const outLines = [];
+  for (const line of brief.split('\n')) {
+    if (!line.trim()) { outLines.push(line); continue; }
+    // Quick path: line mentions no drop names → keep verbatim.
+    if (!mentions(line, drop)) { outLines.push(line); continue; }
+    // Split by sentence terminator (keep terminators by using a lookbehind).
+    const sentences = line.split(/(?<=[.;!?])\s+/);
+    const kept = sentences.filter(s => {
+      const hasDrop = mentions(s, drop);
+      if (!hasDrop) return true;
+      const hasKeep = mentions(s, keep);
+      return hasKeep; // drop sentences that mention ONLY drop names
+    });
+    if (kept.length > 0) outLines.push(kept.join(' '));
+    // else drop the whole line
+  }
+  return outLines.join('\n').trim();
+}
+
+/**
  * Build the populated-plate generate prompt. Single Grok text-to-image
  * call: paint the full scene WITH the coloured silhouettes already placed
  * in it. The setting + VB props + silhouettes are committed together, so
@@ -887,8 +967,11 @@ function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPromp
   const backBlock = backCast.length > 0
     ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. ${hasIdentityPack ? 'Match each character\'s face, hair, and clothing to the matching panel of Image 2.' : 'Use the descriptions in the page brief below for each character\'s face, hair, and clothing.'}\n\n${buildBackCharLines(backCast)}\n`
     : '';
+  // Front block is anonymous on purpose — no names, no actions, no
+  // descriptions. Grok only knows there are coloured placeholder shapes at
+  // these positions. Real identities arrive in step 3.
   const frontBlock = frontCast.length > 0
-    ? `FRONT STRATUM — place ${frontCast.length} flat-colour SILHOUETTE shapes on top of the scene. These are NOT real characters — they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real characters will be inset in a later step. Use the cast entries below for size, position and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it.\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS (MANDATORY for every front-stratum figure):\n- Each silhouette is a flat human-shaped block FILLED with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no watercolor wash, no skin tone, no face features, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.\n- A correctly drawn silhouette would look like a single-colour paper cutout pasted onto the scene. If you find yourself drawing a face or clothes inside a silhouette region, STOP — draw flat colour only.`
+    ? `FRONT STRATUM — place ${frontCast.length} flat-colour SILHOUETTE shapes on top of the scene. These are NOT real characters — they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. Refer to them by their colour, not by any name. They mark where real characters will be inset in a later step. The colour and position spec below is binding.\n\n${buildAnonymousCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS (MANDATORY for every front-stratum figure):\n- Each silhouette is a flat human-shaped block FILLED with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no watercolor wash, no skin tone, no face features, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.\n- A correctly drawn silhouette would look like a single-colour paper cutout pasted onto the scene. If you find yourself drawing a face or clothes inside a silhouette region, STOP — draw flat colour only.`
     : '';
   const totalCount = backCast.length + frontCast.length;
 
@@ -896,7 +979,15 @@ function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPromp
   // budget is left for the brief, then slice the brief to fit. Same pattern
   // as buildBlendEditPrompt — keeps the prompt under Grok's 8000-char cap
   // even when the brief is huge.
-  const briefHeader = `\nPAGE BRIEF — canonical descriptions of every named character, costume, prop, and required object. Use these descriptions ONLY for the back-stratum characters listed above (and for setting props). The front-stratum characters are silhouettes here — their descriptions are reserved for a later step.\n\n`;
+  //
+  // The brief is filtered to drop any sentence that mentions a front-stratum
+  // name without a back-stratum name. Step 1 must not see front character
+  // descriptions — those would tempt Grok to render the front figures as
+  // real characters instead of the flat silhouettes the bbox detector
+  // expects.
+  const backNames = backCast.map(c => c.name).filter(Boolean);
+  const frontNames = frontCast.map(c => c.name).filter(Boolean);
+  const briefHeader = `\nPAGE BRIEF (back-stratum only) — canonical descriptions of the back-stratum characters, costumes, props, and required objects. Every mention of the front-stratum characters has been stripped from this brief on purpose; do not infer their faces or clothing.\n\n`;
   const head = `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 ${refsBlock}
 PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate.
@@ -909,14 +1000,15 @@ PRIORITY 2 — Populate the scene with the cast below in two strata. Characters 
 ${backBlock}
 ${frontBlock}`;
   const tail = `\nNO TEXT in the output.`;
-  const brief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
-  const fixedLen = head.length + tail.length + (brief ? briefHeader.length + 1 /* trailing newline */ : 0);
+  const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
+  const filteredBrief = filterBriefByStratum(rawBrief, backNames, frontNames);
+  const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
-  const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
+  const trimmedBrief = filteredBrief.length > briefRoom ? filteredBrief.slice(0, briefRoom).trim() + '\n[...]' : filteredBrief;
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${briefBlock}${tail}`;
   if (full.length > 8000) {
-    log.warn(`[SCENE COMPOSITE/STRATIFIED] anchor prompt ${full.length} chars after trim — still over 8000 (brief input ${brief.length}, fixed ${fixedLen})`);
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] anchor prompt ${full.length} chars after trim — still over 8000 (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
   }
   return full;
 }
@@ -954,7 +1046,7 @@ The output is the same scene as the input, with only the coloured silhouettes re
  * Reference images shipped alongside: anchor plate first, then one 2×4
  * sheet per front-stratum character.
  */
-function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false) {
+function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false, backCast = []) {
   const colorList = frontCast
     .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
     .join('\n');
@@ -978,15 +1070,22 @@ DO NOT:
 - Add text, captions, numbers, or signatures.
 - Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.`;
   const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
-  const briefHeader = `\nPAGE BRIEF — canonical descriptions of the named characters and their costumes. Use these descriptions (combined with the identity pack panels) for face, hair, and clothing of the front-stratum characters below.\n\n`;
-  const brief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
-  const fixedLen = head.length + tail.length + (brief ? briefHeader.length + 1 : 0);
+  // Mirror image of step 1's filter: drop sentences that mention only
+  // back-stratum names. Back characters are already painted in Image 1 and
+  // must stay pixel-identical — their descriptions in this prompt are noise
+  // and risk Grok re-drawing them.
+  const backNames = backCast.map(c => c.name).filter(Boolean);
+  const frontNames = frontCast.map(c => c.name).filter(Boolean);
+  const briefHeader = `\nPAGE BRIEF (front-stratum only) — canonical descriptions of the front-stratum characters and their costumes. Use these (combined with the identity pack panels) for face, hair, and clothing of the front characters. Back-stratum mentions have been stripped — those characters are already in Image 1 and must stay pixel-identical.\n\n`;
+  const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
+  const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames);
+  const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
-  const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
+  const trimmedBrief = filteredBrief.length > briefRoom ? filteredBrief.slice(0, briefRoom).trim() + '\n[...]' : filteredBrief;
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${briefBlock}${tail}`;
   if (full.length > 8000) {
-    log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${full.length} chars after trim — still over 8000 (brief input ${brief.length}, fixed ${fixedLen})`);
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${full.length} chars after trim — still over 8000 (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
   }
   return full;
 }
@@ -1321,6 +1420,20 @@ async function generateStratifiedComposite(opts) {
 
   log.info(`[STRATIFIED] cast split — back=[${backCast.map(c=>c.name).join(',')}] front=[${frontCast.map(c=>c.name).join(',')}]`);
 
+  // Any throw inside the body re-emitted with the partial debug bundle
+  // attached so the dev panel can still show what Grok produced up to the
+  // point of failure (anchor plate, depopulate output, etc.).
+  try {
+    return await _stratifiedBody({ debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage });
+  } catch (err) {
+    err.partialDebug = debug;
+    throw err;
+  }
+}
+
+async function _stratifiedBody(ctx) {
+  let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage } = ctx;
+
   // ── Step 0: empty-scene canvas
   // Stratified step 1 is a Grok EDIT so we can attach identity packs as
   // reference images. Edit needs Image 1 = a canvas. Reuse a saved
@@ -1408,7 +1521,7 @@ async function generateStratifiedComposite(opts) {
   // ── Step 3/5: front-figure plate (real front chars in place of silhouettes)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate');
   const hasFrontIdentity = !!frontIdentityPack;
-  const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity);
+  const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
   // Refs: anchor plate as Image 1 (canvas to refine), front identity pack
   // as Image 2 (face/clothing binding for the silhouette → character map).
   // VB grid still attached as Image 3 when available — Grok stitches refs
@@ -1543,6 +1656,9 @@ module.exports = {
     buildFrontInsetPrompt,
     buildBlendEditPrompt,
     buildCastLines,
+    buildAnonymousCastLines,
+    filterBriefByStratum,
+    buildIdentityPack,
     detectZOrderByOcclusion,
     rgbToHue,
   },
