@@ -90,23 +90,25 @@ async function findColorBbox(buf, hex) {
   const tr = parseInt(hex.slice(1, 3), 16);
   const tg = parseInt(hex.slice(3, 5), 16);
   const tb = parseInt(hex.slice(5, 7), 16);
-  const targetHue = rgbToHue(tr, tg, tb);
-  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const W = info.width, H = info.height;
+  const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, ch = info.channels;
   const mask = new Uint8Array(W * H);
 
+  // RGB Euclidean distance ≤ 50 to the target colour. Grok returns flat-fill
+  // silhouettes with only minor JPEG noise — sampled interior pixels sit at
+  // distance ~20-25 from target, edge anti-alias goes up to ~45, scene
+  // pixels are >100. A single distance threshold is more robust than the
+  // old hue+saturation+brightness gating, which dropped legitimate flat-
+  // colour pixels at JPEG block edges AND grabbed half the canvas when a
+  // natural colour (yellow sunset, amber bushes) shared the silhouette's
+  // hue. Verified on tests/avatar-debug/.../populated.jpg with all four
+  // palette colours — single-blob detection on every silhouette.
+  const THRESHOLD_SQ = 50 * 50;
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4;
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      const maxCh = Math.max(r, g, b);
-      const minCh = Math.min(r, g, b);
-      const sat = (maxCh - minCh) / (maxCh || 1);
-      if (sat < 0.55 || maxCh < 80) continue;
-      const hue = rgbToHue(r, g, b);
-      let dh = Math.abs(hue - targetHue);
-      if (dh > 180) dh = 360 - dh;
-      if (dh <= 35) mask[y * W + x] = 1;
+      const i = (y * W + x) * ch;
+      const dr = data[i] - tr, dg = data[i + 1] - tg, db = data[i + 2] - tb;
+      if (dr * dr + dg * dg + db * db <= THRESHOLD_SQ) mask[y * W + x] = 1;
     }
   }
 
