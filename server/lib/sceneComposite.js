@@ -835,6 +835,10 @@ function buildBackCharLines(backCast) {
  * Reference images shipped alongside: one 2×4 sheet per back-stratum char,
  * so Grok knows who they are without consuming a front-stratum cutout pass.
  */
+// Grok edit/generate endpoint hard limit is 8000 chars. Leave 300 char
+// headroom so future prompt tweaks don't silently re-blow the budget.
+const STRATIFIED_PROMPT_HARD_CAP = 7700;
+
 function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasIdentityPack = false) {
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
@@ -855,11 +859,14 @@ function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPromp
   const frontBlock = frontCast.length > 0
     ? `FRONT STRATUM — place ${frontCast.length} flat-colour silhouette figure(s) on top of the scene. These mark the regions where real characters will be inset in a later step. Use the cast entries below for size, depth and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it. ${hasIdentityPack ? 'IGNORE Image 3 for the silhouette appearance — those characters are NOT to be drawn as real characters in this image, only as the flat-colour silhouettes specified below.' : ''}\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.`
     : '';
-  const briefBlock = scene?.pageBrief && String(scene.pageBrief).trim()
-    ? `\nPAGE BRIEF — canonical descriptions of every named character, costume, prop, and required object. Use these descriptions ONLY for the back-stratum characters listed above (and for setting props). The front-stratum characters are silhouettes here — their descriptions are reserved for a later step.\n\n${String(scene.pageBrief).trim()}\n`
-    : '';
   const totalCount = backCast.length + frontCast.length;
-  return `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+
+  // Build the prompt skeleton WITHOUT the brief first so we know how much
+  // budget is left for the brief, then slice the brief to fit. Same pattern
+  // as buildBlendEditPrompt — keeps the prompt under Grok's 8000-char cap
+  // even when the brief is huge.
+  const briefHeader = `\nPAGE BRIEF — canonical descriptions of every named character, costume, prop, and required object. Use these descriptions ONLY for the back-stratum characters listed above (and for setting props). The front-stratum characters are silhouettes here — their descriptions are reserved for a later step.\n\n`;
+  const head = `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 ${refsBlock}
 PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate.
 
@@ -869,9 +876,18 @@ ${sceneIntentBlock}
 PRIORITY 2 — Populate the scene with the cast below in two strata. Characters must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a character with their feet on water or empty sky.
 
 ${backBlock}
-${frontBlock}
-${briefBlock}
-NO TEXT in the output.`;
+${frontBlock}`;
+  const tail = `\nNO TEXT in the output.`;
+  const brief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
+  const fixedLen = head.length + tail.length + (brief ? briefHeader.length + 1 /* trailing newline */ : 0);
+  const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
+  const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
+  const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
+  const full = `${head}${briefBlock}${tail}`;
+  if (full.length > 8000) {
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] anchor prompt ${full.length} chars after trim — still over 8000 (brief input ${brief.length}, fixed ${fixedLen})`);
+  }
+  return full;
 }
 
 /**
@@ -914,10 +930,7 @@ function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false) {
   const refsBlock = hasIdentityPack
     ? `\nINPUT IMAGES:\n- Image 1: the anchor plate. This is the canvas to refine. Replace each flat-colour silhouette with the matching REAL character; keep everything else pixel-identical.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one front-stratum character, with the character's name on a black bar below the panel. Use Image 2 to bind name↔face↔clothing for every silhouette listed below.\n`
     : '';
-  const briefBlock = scene?.pageBrief && String(scene.pageBrief).trim()
-    ? `\nPAGE BRIEF — canonical descriptions of the named characters and their costumes. Use these descriptions (combined with the identity pack panels) for face, hair, and clothing of the front-stratum characters below.\n\n${String(scene.pageBrief).trim()}\n`
-    : '';
-  return `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character.
+  const head = `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character.
 ${refsBlock}
 Silhouette → character mapping:
 ${colorList}
@@ -932,9 +945,19 @@ DO NOT:
 - Add, remove, or substitute any character beyond replacing the listed silhouettes.
 - Change the background scenery, props, or any other figure that is not a flat-colour silhouette.
 - Add text, captions, numbers, or signatures.
-- Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.
-${briefBlock}
-The output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
+- Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.`;
+  const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
+  const briefHeader = `\nPAGE BRIEF — canonical descriptions of the named characters and their costumes. Use these descriptions (combined with the identity pack panels) for face, hair, and clothing of the front-stratum characters below.\n\n`;
+  const brief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
+  const fixedLen = head.length + tail.length + (brief ? briefHeader.length + 1 : 0);
+  const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
+  const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
+  const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
+  const full = `${head}${briefBlock}${tail}`;
+  if (full.length > 8000) {
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${full.length} chars after trim — still over 8000 (brief input ${brief.length}, fixed ${fixedLen})`);
+  }
+  return full;
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────
