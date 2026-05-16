@@ -654,50 +654,100 @@ function buildAnonymousCastLines(cast) {
 }
 
 /**
- * Filter a page-brief string sentence-by-sentence: keep sentences that
- * mention any "keep" character name; drop sentences that mention ONLY
- * "drop" names; keep sentences that mention neither.
+ * Filter a page-brief string in three passes:
+ *   1. Paragraph pre-pass: drop paragraphs (separated by blank lines) that
+ *      mention zero "keep" names AND zero "drop" names — these are generic
+ *      boilerplate ("When the FIRST reference photo shows a real
+ *      location...") that aren't useful here.
+ *   2. Sentence filter: within each remaining paragraph, drop sentences
+ *      that mention ONLY drop names. Sentences with no names at all are
+ *      kept (they're scene context).
+ *   3. Name substitution: in surviving sentences that still co-mention a
+ *      drop name, replace the drop name with its substitute (e.g. the
+ *      silhouette colour). Prevents leaked names from reaching Grok.
  *
- * Sentence splitter is line-level (split on newlines) then within each line
- * on `.`/`;`/`!` followed by whitespace. Each sentence's name set is
- * checked case-insensitively. The match needs a word boundary so substrings
- * like "Daniela" inside a name like "Dan" aren't accidental hits.
- *
- * Used in Stratified Composite to prevent step-1 from receiving any prose
- * about front-stratum characters (their faces/clothing would tempt Grok to
- * render them as real instead of silhouettes), and step-3 from receiving
- * prose about back-stratum characters (they're already painted in the
- * anchor plate and don't need to be redrawn).
+ * @param {string} brief
+ * @param {string[]} keepNames
+ * @param {string[]} dropNames
+ * @param {Object<string, string>} [substitutes] - map of dropName → replacement (e.g. {Noah: 'the red silhouette'})
  */
-function filterBriefByStratum(brief, keepNames = [], dropNames = []) {
+function filterBriefByStratum(brief, keepNames = [], dropNames = [], substitutes = {}) {
   if (!brief || typeof brief !== 'string') return '';
-  const keep = keepNames.filter(Boolean).map(n => String(n).toLowerCase());
-  const drop = dropNames.filter(Boolean).map(n => String(n).toLowerCase());
+  const keep = keepNames.filter(Boolean).map(n => String(n));
+  const drop = dropNames.filter(Boolean).map(n => String(n));
   if (drop.length === 0) return brief;
+
+  const escape = (n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const mentions = (text, names) => {
-    const lc = text.toLowerCase();
-    return names.some(n => {
-      const re = new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-      return re.test(lc);
-    });
+    if (names.length === 0) return false;
+    return names.some(n => new RegExp(`\\b${escape(n)}\\b`, 'i').test(text));
   };
-  const outLines = [];
-  for (const line of brief.split('\n')) {
-    if (!line.trim()) { outLines.push(line); continue; }
-    // Quick path: line mentions no drop names → keep verbatim.
-    if (!mentions(line, drop)) { outLines.push(line); continue; }
-    // Split by sentence terminator (keep terminators by using a lookbehind).
-    const sentences = line.split(/(?<=[.;!?])\s+/);
-    const kept = sentences.filter(s => {
-      const hasDrop = mentions(s, drop);
-      if (!hasDrop) return true;
-      const hasKeep = mentions(s, keep);
-      return hasKeep; // drop sentences that mention ONLY drop names
-    });
-    if (kept.length > 0) outLines.push(kept.join(' '));
-    // else drop the whole line
+  const substituteDropNames = (text) => {
+    let out = text;
+    for (const n of drop) {
+      const sub = substitutes[n] || `the figure`;
+      out = out.replace(new RegExp(`\\b${escape(n)}'s\\b`, 'gi'), `${sub}'s`);
+      out = out.replace(new RegExp(`\\b${escape(n)}\\b`, 'gi'), sub);
+    }
+    return out;
+  };
+
+  // Step 1 — paragraph pre-pass. Paragraphs separated by `\n\n+`. A
+  // paragraph that mentions zero names from either list is generic prose
+  // and gets dropped.
+  const paragraphs = brief.split(/\n{2,}/);
+  const keptParagraphs = paragraphs.filter(p => {
+    const t = p.trim();
+    if (!t) return false;
+    return mentions(t, keep) || mentions(t, drop);
+  });
+
+  // Step 2 + 3 — sentence filter + name substitution.
+  const outParagraphs = [];
+  for (const p of keptParagraphs) {
+    const outLines = [];
+    for (const line of p.split('\n')) {
+      if (!line.trim()) { outLines.push(line); continue; }
+      if (!mentions(line, drop)) { outLines.push(line); continue; }
+      const sentences = line.split(/(?<=[.;!?])\s+/);
+      const kept = [];
+      for (const s of sentences) {
+        const hasDrop = mentions(s, drop);
+        if (!hasDrop) { kept.push(s); continue; }
+        const hasKeep = mentions(s, keep);
+        if (!hasKeep) continue; // drop sentence mentioning ONLY drop names
+        kept.push(substituteDropNames(s));
+      }
+      if (kept.length > 0) outLines.push(kept.join(' '));
+    }
+    const joined = outLines.join('\n').trim();
+    if (joined) outParagraphs.push(joined);
   }
-  return outLines.join('\n').trim();
+  return outParagraphs.join('\n\n').trim();
+}
+
+/**
+ * Slice a brief at a sentence-or-paragraph boundary to fit a budget. Avoids
+ * the truncated-mid-sentence ("(e.g.") problem of a raw `.slice(0, n)`.
+ */
+function sliceBriefAtSentence(brief, maxChars) {
+  if (!brief || brief.length <= maxChars) return brief || '';
+  const slice = brief.slice(0, maxChars);
+  // Prefer paragraph boundary if there's one in the last 25% of the slice.
+  const lastBreak = Math.max(
+    slice.lastIndexOf('\n\n'),
+    slice.lastIndexOf('. '),
+    slice.lastIndexOf('.\n'),
+    slice.lastIndexOf('!\n'),
+    slice.lastIndexOf('?\n'),
+  );
+  if (lastBreak > maxChars * 0.5) {
+    return slice.slice(0, lastBreak + 1).trim() + '\n[...]';
+  }
+  // Fallback: trim to the last whitespace.
+  const lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace > 0) return slice.slice(0, lastSpace).trim() + ' [...]';
+  return slice.trim() + ' [...]';
 }
 
 /**
@@ -832,14 +882,26 @@ DO NOT:
  * @returns {Promise<string>} data URI of the stitched pack (jpeg).
  */
 async function buildIdentityPack(cast, options = {}) {
-  const { targetHeight = 512, labelHeight = 32, aspectRatio = null } = options;
+  const { targetHeight = 512, labelHeight = 32, aspectRatio = null, cropMode = 'full' } = options;
   if (!Array.isArray(cast) || cast.length === 0) return null;
 
   // Resize every sheet to the same height; collect dims + raw buffers.
+  // cropMode='body' picks just the body cell matching the char's pose so
+  // the identity pack is much smaller and binds tighter (no head-only cells
+  // distracting Grok). cropMode='full' keeps the original 2×4 sheet.
   const panels = [];
   for (const c of cast) {
     if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) continue;
-    const resized = await sharp(c.sheetBuf)
+    let srcBuf = c.sheetBuf;
+    if (cropMode === 'body') {
+      const cell = POSE_CELL[c.pose] || POSE_CELL.threeQuarter;
+      try {
+        srcBuf = await cropSheetCell(c.sheetBuf, cell);
+      } catch (err) {
+        log.warn(`[STRATIFIED] cropSheetCell failed for ${c.name}: ${err.message} — falling back to full sheet`);
+      }
+    }
+    const resized = await sharp(srcBuf)
       .resize({ height: targetHeight, withoutEnlargement: false })
       .toBuffer({ resolveWithObject: true });
     panels.push({ buf: resized.data, w: resized.info.width, h: resized.info.height, name: c.name });
@@ -951,60 +1013,70 @@ function buildBackCharLines(backCast) {
 const STRATIFIED_PROMPT_HARD_CAP = 7700;
 
 function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasIdentityPack = false) {
+  const backNames = backCast.map(c => c.name).filter(Boolean);
+  const frontNames = frontCast.map(c => c.name).filter(Boolean);
+  // For substitution, refer to front chars by their silhouette colour name.
+  const frontSubs = Object.fromEntries(
+    frontCast.map(c => [c.name, `the ${c.colorName || (c.color || 'coloured').toLowerCase()} silhouette`])
+  );
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
-  const sceneIntentBlock = scene?.intent
-    ? `\nScene intent: ${String(scene.intent).trim()}\n`
+  // Scene intent gets the same stratum filter — drop sentences naming only
+  // front chars; substitute front names with their silhouette colour in
+  // co-mention sentences. Without this, the intent block at the top of the
+  // prompt names "Noah" and "Emma" long before the silhouette rules appear.
+  const filteredIntent = scene?.intent
+    ? filterBriefByStratum(String(scene.intent).trim(), backNames, frontNames, frontSubs)
     : '';
-  // Inputs Grok sees: Image 1 = empty-scene canvas to populate. Image 2 (when
-  // present) = labelled identity pack of back-stratum characters stitched
-  // horizontally with a name bar below each panel. Image 3 (when present) =
-  // labelled front-stratum identity pack. The prompt names the slots explicitly.
+  const sceneIntentBlock = filteredIntent ? `\nScene intent: ${filteredIntent}\n` : '';
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: the empty scene canvas. Paint your output ON TOP of this — keep the setting, lighting, and named props from Image 1 intact unless the priority list below says otherwise.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one back-stratum character ONLY, with the character's name on a black bar below the panel. Match every back-stratum character's face, hair, and clothing to the matching panel. The front-stratum characters are NOT in Image 2 — render them as flat coloured silhouettes per the rules below.\n`
+    ? `\nINPUT IMAGES:\n- Image 1: empty scene canvas. Paint your output ON TOP of it — keep its setting, lighting, and named props intact.\n- Image 2: labelled identity pack — one body panel per BACKGROUND character with the name on a black bar below. Match each background character's face, hair, and clothing to the matching panel.\n`
     : '';
+  // Substitute front-character names inside each back-cast entry's free-text
+  // fields (position + action). Scene-expansion can write "Daniel kneels
+  // between the camera and Noah" — the relative position is useful but
+  // "Noah" itself is a leak. Same pattern as the brief substitution.
+  const subFrontNames = (s) => {
+    if (!s) return s;
+    let out = s;
+    for (const fc of frontCast) {
+      const n = fc.name;
+      if (!n) continue;
+      const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sub = `the ${fc.colorName || (fc.color || 'coloured').toLowerCase()} silhouette`;
+      out = out.replace(new RegExp(`\\b${esc}'s\\b`, 'gi'), `${sub}'s`);
+      out = out.replace(new RegExp(`\\b${esc}\\b`, 'gi'), sub);
+    }
+    return out;
+  };
+  const sanitisedBackCast = backCast.map(c => ({ ...c, position: subFrontNames(c.position), action: subFrontNames(c.action) }));
   const backBlock = backCast.length > 0
-    ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. ${hasIdentityPack ? 'Match each character\'s face, hair, and clothing to the matching panel of Image 2.' : 'Use the descriptions in the page brief below for each character\'s face, hair, and clothing.'}\n\n${buildBackCharLines(backCast)}\n`
+    ? `BACKGROUND (real characters, painted INTO the scene) — render these ${backCast.length} character(s) using the identity pack for face/hair/clothing.\n\n${buildBackCharLines(sanitisedBackCast)}\n`
     : '';
-  // Front block is anonymous on purpose — no names, no actions, no
-  // descriptions. Grok only knows there are coloured placeholder shapes at
-  // these positions. Real identities arrive in step 3.
   const frontBlock = frontCast.length > 0
-    ? `FRONT STRATUM — place ${frontCast.length} flat-colour SILHOUETTE shapes on top of the scene. These are NOT real characters — they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. Refer to them by their colour, not by any name. They mark where real characters will be inset in a later step. The colour and position spec below is binding.\n\n${buildAnonymousCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS (MANDATORY for every front-stratum figure):\n- Each silhouette is a flat human-shaped block FILLED with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no watercolor wash, no skin tone, no face features, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.\n- A correctly drawn silhouette would look like a single-colour paper cutout pasted onto the scene. If you find yourself drawing a face or clothes inside a silhouette region, STOP — draw flat colour only.`
+    ? `FOREGROUND (silhouette placeholders, IN FRONT of background characters) — paint ${frontCast.length} flat-colour silhouette shape(s) ON TOP of the scene, between the camera and the background characters. When a silhouette's position overlaps a background character, the silhouette MUST occlude the background character (paint over them) — silhouettes ALWAYS win over background figures because they are closer to camera. The silhouettes are NOT real characters; they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real characters will be inset in a later step.\n\n${buildAnonymousCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Flat human-shaped block filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no skin tone, no face, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head per the marker spec above.\n- A correctly drawn silhouette looks like a paper cutout pasted ON TOP of the scene.`
     : '';
   const totalCount = backCast.length + frontCast.length;
 
-  // Build the prompt skeleton WITHOUT the brief first so we know how much
-  // budget is left for the brief, then slice the brief to fit. Same pattern
-  // as buildBlendEditPrompt — keeps the prompt under Grok's 8000-char cap
-  // even when the brief is huge.
-  //
-  // The brief is filtered to drop any sentence that mentions a front-stratum
-  // name without a back-stratum name. Step 1 must not see front character
-  // descriptions — those would tempt Grok to render the front figures as
-  // real characters instead of the flat silhouettes the bbox detector
-  // expects.
-  const backNames = backCast.map(c => c.name).filter(Boolean);
-  const frontNames = frontCast.map(c => c.name).filter(Boolean);
-  const briefHeader = `\nPAGE BRIEF (back-stratum only) — canonical descriptions of the back-stratum characters, costumes, props, and required objects. Every mention of the front-stratum characters has been stripped from this brief on purpose; do not infer their faces or clothing.\n\n`;
-  const head = `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+  const briefHeader = `\nPAGE BRIEF (background characters only) — canonical descriptions of the background characters, costumes, props, and required objects. All mentions of the foreground silhouette characters have been replaced with their silhouette colour reference; do not render them as real characters here.\n\n`;
+  const head = `Paint a single illustrated scene. ${backCast.length} BACKGROUND character(s) rendered as real people drawn into the scene; ${frontCast.length} FOREGROUND silhouette placeholder(s) painted ON TOP. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 ${refsBlock}
-PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate.
+PRIORITY 1 — Setting + lighting + named props must match the description. This image is the canonical world plate. Do NOT invent props that are not described.
 
-SETTING DESCRIPTION:
+SETTING:
 ${settingBlock}
 ${sceneIntentBlock}
-PRIORITY 2 — Populate the scene with the cast below in two strata. Characters must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a character with their feet on water or empty sky.
+PRIORITY 2 — Cast placement. Characters stand on a SOLID surface visible in the scene. Foreground silhouettes are IN FRONT of background characters when their positions overlap — paint silhouettes over background figures.
 
 ${backBlock}
 ${frontBlock}`;
   const tail = `\nNO TEXT in the output.`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
-  const filteredBrief = filterBriefByStratum(rawBrief, backNames, frontNames);
+  const filteredBrief = filterBriefByStratum(rawBrief, backNames, frontNames, frontSubs);
   const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
-  const trimmedBrief = filteredBrief.length > briefRoom ? filteredBrief.slice(0, briefRoom).trim() + '\n[...]' : filteredBrief;
+  const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${briefBlock}${tail}`;
   if (full.length > 8000) {
@@ -1070,18 +1142,17 @@ DO NOT:
 - Add text, captions, numbers, or signatures.
 - Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.`;
   const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
-  // Mirror image of step 1's filter: drop sentences that mention only
-  // back-stratum names. Back characters are already painted in Image 1 and
-  // must stay pixel-identical — their descriptions in this prompt are noise
-  // and risk Grok re-drawing them.
   const backNames = backCast.map(c => c.name).filter(Boolean);
   const frontNames = frontCast.map(c => c.name).filter(Boolean);
-  const briefHeader = `\nPAGE BRIEF (front-stratum only) — canonical descriptions of the front-stratum characters and their costumes. Use these (combined with the identity pack panels) for face, hair, and clothing of the front characters. Back-stratum mentions have been stripped — those characters are already in Image 1 and must stay pixel-identical.\n\n`;
+  // For sentences that co-mention a back name, substitute it with a neutral
+  // "a background figure" so Grok doesn't try to redraw the back character.
+  const backSubs = Object.fromEntries(backNames.map(n => [n, 'a background figure']));
+  const briefHeader = `\nPAGE BRIEF (foreground characters only) — canonical descriptions of the foreground characters and their costumes. Use these (with the identity pack) for face, hair, clothing.\n\n`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
-  const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames);
+  const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
   const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
-  const trimmedBrief = filteredBrief.length > briefRoom ? filteredBrief.slice(0, briefRoom).trim() + '\n[...]' : filteredBrief;
+  const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${briefBlock}${tail}`;
   if (full.length > 8000) {
@@ -1460,11 +1531,12 @@ async function _stratifiedBody(ctx) {
   debug.emptySceneSource = emptySceneSource;
 
   // ── Identity packs (one stitched reference per stratum that has chars).
-  // Pre-pad each pack to the call's target aspect ratio so Grok's edit-input
-  // cropper doesn't slice the side panels off — a horizontally stitched pack
-  // at 1:1 target gets center-cropped to a 30%-wide window otherwise.
-  const backIdentityPack = await buildIdentityPack(backCast, { aspectRatio });
-  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast, { aspectRatio }) : null;
+  // Use cropMode='body' so each panel is just the body cell matching the
+  // char's pose (not the full 2×4 sheet) — smaller pack, less Grok noise,
+  // tighter identity binding. Pre-pad each pack to the call's target aspect
+  // so Grok's edit-input cropper doesn't slice the side panels off.
+  const backIdentityPack = await buildIdentityPack(backCast, { aspectRatio, cropMode: 'body' });
+  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast, { aspectRatio, cropMode: 'body' }) : null;
   if (backIdentityPack) debug.backIdentityPack = backIdentityPack;
   if (frontIdentityPack) debug.frontIdentityPack = frontIdentityPack;
 
@@ -1505,6 +1577,52 @@ async function _stratifiedBody(ctx) {
     };
   }
 
+  // ── Step 1.5: detect silhouette bboxes from the anchor plate so we can
+  // crop step 3's input. findColorBbox doesn't need a diff baseline — it
+  // finds the largest saturated blob of each cast colour. If Grok didn't
+  // paint the silhouettes at all, this fails fast with the anchor plate in
+  // the partial debug so the dev panel can show what Grok produced.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 1.5 — detect silhouette bboxes on anchor plate');
+  const anchorMeta = await sharp(anchorBuf).metadata();
+  const canvasW = anchorMeta.width, canvasH = anchorMeta.height;
+  const bboxes = {};
+  for (const c of frontCast) {
+    const r = await findColorBbox(anchorBuf, c.color);
+    if (!r) {
+      log.warn(`[SCENE COMPOSITE/STRATIFIED] no ${c.color} silhouette on anchor plate`);
+      continue;
+    }
+    bboxes[c.name] = r;
+    log.info(`[SCENE COMPOSITE/STRATIFIED]   ${c.name} (${c.color}): bbox ${r.width}×${r.height} @ (${r.x},${r.y}) [${r.pixels} px]`);
+  }
+  debug.bboxes = bboxes;
+  if (Object.keys(bboxes).length === 0) {
+    throw new Error('[SCENE COMPOSITE/STRATIFIED] no front silhouettes detected on anchor plate — Grok did not paint any of the requested colours');
+  }
+
+  // Union bbox of all detected silhouettes + 20% padding. This region is
+  // the input to step 3 (Grok edit): just the silhouettes plus a bit of
+  // local scene context, never the whole canvas. Cuts prompt-irrelevant
+  // pixels Grok could "fix" and keeps the model focused on the silhouettes.
+  const UNION_PAD_RATIO = 0.20;
+  let minX = canvasW, minY = canvasH, maxX = 0, maxY = 0;
+  for (const r of Object.values(bboxes)) {
+    if (r.x < minX) minX = r.x;
+    if (r.y < minY) minY = r.y;
+    if (r.x + r.width > maxX) maxX = r.x + r.width;
+    if (r.y + r.height > maxY) maxY = r.y + r.height;
+  }
+  const unionW = maxX - minX, unionH = maxY - minY;
+  const padX = Math.round(unionW * UNION_PAD_RATIO);
+  const padY = Math.round(unionH * UNION_PAD_RATIO);
+  const cropX = Math.max(0, minX - padX);
+  const cropY = Math.max(0, minY - padY);
+  const cropW = Math.min(canvasW - cropX, unionW + 2 * padX);
+  const cropH = Math.min(canvasH - cropY, unionH + 2 * padY);
+  const cropBox = { left: cropX, top: cropY, width: cropW, height: cropH };
+  debug.step3CropBox = cropBox;
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   step-3 crop: ${cropW}×${cropH} @ (${cropX},${cropY}) [${(100 * cropW * cropH / (canvasW * canvasH)).toFixed(1)}% of canvas]`);
+
   // ── Step 2/5: depopulate FRONT silhouettes only (back chars stay intact)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 2/5 — depopulate front silhouettes');
   const depopulatePrompt = buildFrontDepopulatePrompt(frontCast);
@@ -1518,95 +1636,42 @@ async function _stratifiedBody(ctx) {
   debug.depopulatePrompt = depopulatePrompt;
   debug.depopulateSentToGrok = depopulated.sentToGrok || null;
 
-  // ── Step 3/5: front-figure plate (real front chars in place of silhouettes)
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate');
+  // ── Step 3/5: front-figure plate — crop the anchor plate to the union
+  // bbox + 20% pad, send the crop to Grok edit. The model only sees the
+  // silhouettes + a thin band of local context, not the whole scene.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate (on cropped anchor)');
+  const anchorCropBuf = await sharp(anchorBuf).extract(cropBox).png().toBuffer();
+  const anchorCropData = `data:image/png;base64,${anchorCropBuf.toString('base64')}`;
+  debug.step3Input = anchorCropData;
   const hasFrontIdentity = !!frontIdentityPack;
+  // Crop aspect drives Grok's edit aspect — pass that explicitly so the
+  // model doesn't try to fit the crop into the page's main aspect.
+  const cropAspect = `${cropW}:${cropH}`;
   const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
-  // Refs: anchor plate as Image 1 (canvas to refine), front identity pack
-  // as Image 2 (face/clothing binding for the silhouette → character map).
-  // VB grid still attached as Image 3 when available — Grok stitches refs
-  // on Pro so we stay within budget either way.
-  const frontInsetRefs = [anchor.imageData];
+  const frontInsetRefs = [anchorCropData];
   if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
-  if (visualBibleGridImage && frontInsetRefs.length < 3) frontInsetRefs.push(visualBibleGridImage);
-  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: cropAspect, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
-  const frontPlateBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
   debug.frontPlate = frontPlate.imageData;
   debug.frontPlatePrompt = frontInsetPrompt;
   debug.frontPlateSentToGrok = frontPlate.sentToGrok || null;
 
-  // ── Step 4/5: per-front-char bboxes from anchor↔backPlate diff, then cut
-  // the rendered front figures out of frontPlate inside those bboxes and
-  // paste onto the back plate.
-  log.info('[SCENE COMPOSITE/STRATIFIED] step 4/5 — crop front figures + composite');
-  const detection = await findSilhouettesByDiff(anchorBuf, backPlateBuf, frontCast);
-  const bboxes = {};
-  for (const c of frontCast) {
-    const r = detection.results[c.name];
-    if (!r) {
-      log.warn(`[SCENE COMPOSITE/STRATIFIED] no silhouette for front-stratum ${c.name} (${c.color}) — diff+hue found nothing`);
-      continue;
-    }
-    bboxes[c.name] = r.bbox;
-    log.info(`[SCENE COMPOSITE/STRATIFIED]   ${c.name} (${c.color}): bbox ${r.bbox.width}×${r.bbox.height} @ (${r.bbox.x},${r.bbox.y}) [${r.bbox.pixels} px]`);
-  }
-  if (Object.keys(bboxes).length === 0) {
-    throw new Error('[SCENE COMPOSITE/STRATIFIED] no front silhouettes detected on anchor plate');
-  }
-  debug.bboxes = bboxes;
-
-  // Cut each front character out of frontPlate using its bbox, then paste
-  // onto the back plate. Add 8% padding around each bbox so the cutout
-  // includes a soft edge that survives the later blend.
-  const PAD_RATIO = 0.08;
-  const anchorMeta = await sharp(anchorBuf).metadata();
-  const canvasW = anchorMeta.width, canvasH = anchorMeta.height;
-  const placements = [];
-  for (const c of frontCast) {
-    const bbox = bboxes[c.name];
-    if (!bbox) continue;
-    const padX = Math.round(bbox.width * PAD_RATIO);
-    const padY = Math.round(bbox.height * PAD_RATIO);
-    const cx1 = Math.max(0, bbox.x - padX);
-    const cy1 = Math.max(0, bbox.y - padY);
-    const cx2 = Math.min(canvasW, bbox.x + bbox.width + padX);
-    const cy2 = Math.min(canvasH, bbox.y + bbox.height + padY);
-    const cropW = cx2 - cx1, cropH = cy2 - cy1;
-    const cutBuf = await sharp(frontPlateBuf)
-      .extract({ left: cx1, top: cy1, width: cropW, height: cropH })
-      .png()
-      .toBuffer();
-    placements.push({
-      input: cutBuf,
-      left: cx1,
-      top: cy1,
-      _footY: bbox.y + bbox.height,
-      _name: c.name,
-      _color: c.color,
-      _bbox: bbox,
-    });
-  }
-  if (placements.length === 0) {
-    throw new Error('[SCENE COMPOSITE/STRATIFIED] no placements produced — every bbox failed');
-  }
-
-  // Z-order: read the anchor plate's occlusion for the front stratum. Front
-  // figures are still flat silhouettes there, so the colour-pixel count
-  // method works the same as in the uniform pipeline.
-  const zResult = await detectZOrderByOcclusion(anchorBuf, placements);
-  placements.length = 0;
-  placements.push(...zResult.order);
-  debug.zScores = zResult.scores;
-  debug.zDecisions = zResult.decisions;
-  for (const d of zResult.decisions) {
-    log.info(`[SCENE COMPOSITE/STRATIFIED]   occlusion ${d.a} vs ${d.b}: ${d.a}=${d.aPx}px ${d.b}=${d.bPx}px → ${d.winner} in front`);
-  }
-  log.info(`[SCENE COMPOSITE/STRATIFIED]   z-order (back → front): ${placements.map(p => `${p._name}[score=${zResult.scores[p._name]},foot=${p._footY}]`).join(' → ')}`);
-
-  const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
-  const composited = await sharp(backPlateBuf).composite(compositeInputs).png().toBuffer();
+  // ── Step 4/5: resize the step-3 output back to the crop dimensions and
+  // paste it onto the back plate at the original crop coordinates. No diff,
+  // no per-character cutout — the crop output IS the final figures region.
+  // Grok preserved the surrounding context (which mostly matches the back
+  // plate's neighbourhood), so direct paste produces a coherent composite.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 4/5 — paste step-3 crop back onto back plate');
+  const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const frontPlateResized = await sharp(frontPlateRawBuf)
+    .resize(cropW, cropH, { fit: 'fill' })
+    .png()
+    .toBuffer();
+  const composited = await sharp(backPlateBuf)
+    .composite([{ input: frontPlateResized, left: cropX, top: cropY }])
+    .png()
+    .toBuffer();
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
 
