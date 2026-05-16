@@ -143,10 +143,64 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       flip,
       action: actionsByChar.get(name.toLowerCase()) || null,
       position: sc.position || 'in the scene',
+      // Preserve raw depth flag for downstream stratum split. sizeHint is the
+      // human-readable string the prompt builders consume; depth is the rank
+      // signal the stratified composite reads.
+      depth: sc.depth || 'foreground',
       sizeHint: sc.depth === 'background' ? 'small in the distance' : (sc.depth === 'midground' ? 'medium' : undefined),
     });
   }
   return out;
 }
 
-module.exports = { buildCompositeCast };
+/**
+ * Split a composite cast into back/front strata for Stratified Composite.
+ *
+ * Sort order (back → front):
+ *   1. depth-rank: background (0) < midground (1) < foreground/default (2)
+ *   2. size hint:  smaller-sounding first ("small in the distance" < "medium" < default)
+ *   3. position:   "background" in the position string < "midground" < "foreground"
+ *   4. declaration order (preserve stable ordering for ties)
+ *
+ * Split: ceil(N/2) into back, floor(N/2) into front. When N=1 the lone entry
+ * goes into back and the front stratum is empty — caller short-circuits to
+ * a single-pass render (no foreground inset step).
+ *
+ * @param {Array<Object>} cast — entries with at least `name` and `depth`.
+ * @returns {{ backCast: Array<Object>, frontCast: Array<Object> }}
+ */
+function splitCastByStratum(cast) {
+  if (!Array.isArray(cast) || cast.length === 0) {
+    return { backCast: [], frontCast: [] };
+  }
+  const DEPTH_RANK = { background: 0, midground: 1, foreground: 2 };
+  const SIZE_RANK = { 'small in the distance': 0, medium: 1 };
+  const positionRank = (pos) => {
+    const s = String(pos || '').toLowerCase();
+    if (s.includes('background')) return 0;
+    if (s.includes('midground')) return 1;
+    if (s.includes('foreground')) return 2;
+    return 1.5;
+  };
+  const indexed = cast.map((c, i) => ({ c, i }));
+  indexed.sort((A, B) => {
+    const dA = DEPTH_RANK[A.c.depth] ?? 2;
+    const dB = DEPTH_RANK[B.c.depth] ?? 2;
+    if (dA !== dB) return dA - dB;
+    const sA = SIZE_RANK[A.c.sizeHint] ?? 2;
+    const sB = SIZE_RANK[B.c.sizeHint] ?? 2;
+    if (sA !== sB) return sA - sB;
+    const pA = positionRank(A.c.position);
+    const pB = positionRank(B.c.position);
+    if (pA !== pB) return pA - pB;
+    return A.i - B.i;
+  });
+  const sorted = indexed.map(x => x.c);
+  const backCount = Math.ceil(sorted.length / 2);
+  return {
+    backCast: sorted.slice(0, backCount),
+    frontCast: sorted.slice(backCount),
+  };
+}
+
+module.exports = { buildCompositeCast, splitCastByStratum };

@@ -294,6 +294,10 @@ export function TestModelsPanel({
   // Composite-method options
   const [phantomPoseRender, setPhantomPoseRender] = useState(false);
   const [emptyScene, setEmptyScene] = useState<'reuse' | 'fresh' | 'skip'>('reuse');
+  // Composite pipeline variant: stratified renders back-stratum chars
+  // natively in the anchor plate and insets only the front stratum; uniform
+  // is the legacy silhouette-for-everyone path.
+  const [compositeStrategy, setCompositeStrategy] = useState<'stratified' | 'uniform'>('stratified');
   // Direct path: send one cell of the story's 2×4 sheet (matching the page's
   // intended pose) instead of the full styled-avatar image.
   const [useStorySheetCells, setUseStorySheetCells] = useState(false);
@@ -367,8 +371,12 @@ export function TestModelsPanel({
     });
 
     // Composite path — independent request alongside the direct-path models.
-    // Result key is "composite" or "composite+phantomPose" (matches backend).
-    const compositeKey = phantomPoseRender ? 'composite+phantomPose' : 'composite';
+    // Result key matches backend: "composite" | "composite+phantomPose" with
+    // an optional "+uniform" suffix when the uniform pipeline is selected.
+    const stratSuffix = compositeStrategy === 'uniform' ? '+uniform' : '';
+    const compositeKey = phantomPoseRender
+      ? `composite+phantomPose${stratSuffix}`
+      : `composite${stratSuffix}`;
     const compositePromise = composite
       ? (async () => {
           setResults(prev => ({ ...prev, [compositeKey]: { loading: true } }));
@@ -379,6 +387,7 @@ export function TestModelsPanel({
               composite: true,
               phantomPoseRender,
               emptyScene,
+              compositeStrategy,
             });
             const r = response.results[compositeKey];
             const elapsedMs = Date.now() - startTime;
@@ -407,7 +416,7 @@ export function TestModelsPanel({
 
     await Promise.allSettled(compositePromise ? [...directPromises, compositePromise] : directPromises);
     setIsRunning(false);
-  }, [selectedModel, runDirect, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells]);
+  }, [selectedModel, runDirect, storyId, pageNumber, iterativePlacement, referenceMode, singlePassScene, composite, phantomPoseRender, emptyScene, useStorySheetCells, compositeStrategy]);
 
   const runStyleTransfer = useCallback(async () => {
     if (!styleTargetModel) return;
@@ -601,17 +610,29 @@ export function TestModelsPanel({
             <span className="text-[11px] text-purple-700">populated plate → bbox detect → depopulate → cutouts → blend</span>
           </label>
           <div className={`flex flex-wrap gap-3 mt-2 ${composite ? '' : 'opacity-50'}`}>
+            <label className="flex flex-col gap-1 flex-1 min-w-[220px]">
+              <span className="text-xs font-medium text-purple-700">Strategy</span>
+              <select
+                value={compositeStrategy}
+                onChange={e => setCompositeStrategy(e.target.value as typeof compositeStrategy)}
+                disabled={isRunning || !composite}
+                className="rounded border-gray-300 text-xs p-1"
+              >
+                <option value="stratified">Stratified — back native, front inset</option>
+                <option value="uniform">Uniform — silhouettes for all (legacy)</option>
+              </select>
+            </label>
             <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-[260px]">
               <input
                 type="checkbox"
                 checked={phantomPoseRender}
                 onChange={e => setPhantomPoseRender(e.target.checked)}
-                disabled={isRunning || !composite}
+                disabled={isRunning || !composite || compositeStrategy === 'stratified'}
                 className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
               <span className="flex flex-col">
                 <span className="text-xs text-purple-700 font-medium">Phantom-pose render</span>
-                <span className="text-[10px] text-gray-500">Re-render each character in the silhouette's exact pose via Grok edit (+1 call per cast member).</span>
+                <span className="text-[10px] text-gray-500">Uniform-only. Re-render each character in the silhouette's exact pose via Grok edit (+1 call per cast member).</span>
               </span>
             </label>
             <label className="flex flex-col gap-1 flex-1 min-w-[200px]">

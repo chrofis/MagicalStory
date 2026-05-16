@@ -5487,6 +5487,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // The router already honoured per-story overrides
                     // (inputData.phantomPoseRender) and the cast-size rule.
                     phantomPoseRender: route.phantomPoseRender,
+                    // Composite strategy: per-story opt-out via inputData,
+                    // otherwise the new Stratified Composite is the default.
+                    compositeStrategy: inputData?.compositeStrategy || 'stratified',
                     usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
                   });
                   return {

@@ -481,71 +481,6 @@ async function cropAvatarCell(sheet, opts = {}) {
 }
 
 /**
- * Pick the right cell(s) from a 2×4 sheet for use as a per-scene reference
- * tile (typically as one slot in the VB grid). Composes a single PNG.
- *
- *   depth='foreground' / close-up    → face cell stacked above body cell
- *   depth='midground' / 'background' → body cell only
- *
- * Both cropped at the scene-intended pose (front/threeQuarter/profile/back)
- * and flipped if the cast entry asks for the opposite facing direction.
- *
- * Sending a whole 2×4 sheet as a VB-grid tile is wrong — it concats 8 views
- * into a tile the page generator was never meant to see. This helper is the
- * source-side fix.
- *
- * @param {Buffer|string} sheet  the 2×4 sheet (buffer or data URI)
- * @param {Object} opts
- * @param {'front'|'threeQuarter'|'profile'|'back'} [opts.pose]
- * @param {boolean} [opts.flip]
- * @param {'foreground'|'midground'|'background'} [opts.depth]
- * @returns {Promise<Buffer>} a PNG buffer ready to slot into the VB grid.
- */
-async function sceneCellRefForCharacter(sheet, opts = {}) {
-  const { pose = 'threeQuarter', flip = false, depth = 'foreground' } = opts;
-  const includeFace = depth === 'foreground';
-  const { body, face } = await cropAvatarCell(sheet, { pose, flip, includeFace });
-  if (!includeFace || !face) return body;
-
-  // Stack face on top, body below, on a white background, sized to a
-  // common width so sharp can composite cleanly. Face cell is short
-  // (head only) so the combined tile reads as "this is the character,
-  // shown both head-up-close AND full-body in pose".
-  const TARGET_W = 256;
-  const facePng = await sharp(face).resize({ width: TARGET_W }).png().toBuffer();
-  const bodyPng = await sharp(body).resize({ width: TARGET_W }).png().toBuffer();
-  const fm = await sharp(facePng).metadata();
-  const bm = await sharp(bodyPng).metadata();
-  const totalH = (fm.height || 0) + (bm.height || 0);
-  return sharp({
-    create: { width: TARGET_W, height: totalH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
-  })
-    .composite([
-      { input: facePng, top: 0, left: 0 },
-      { input: bodyPng, top: fm.height || 0, left: 0 },
-    ])
-    .png()
-    .toBuffer();
-}
-
-/**
- * Heuristic: is this image likely a 2×4 character sheet (8 cells, 4 cols × 2
- * rows)? We use aspect ratio: a sheet generated at 16:9 has W/H ≈ 1.78. A
- * normal single-portrait reference (~3:4 or 9:16) has W/H ≤ ~0.75. Anything
- * with aspect > 1.4 is treated as a 2×4 sheet.
- */
-async function looksLike2x4Sheet(imageData) {
-  const buf = Buffer.isBuffer(imageData)
-    ? imageData
-    : Buffer.from(String(imageData).replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  try {
-    const meta = await sharp(buf).metadata();
-    if (!meta.width || !meta.height) return false;
-    return (meta.width / meta.height) > 1.4;
-  } catch { return false; }
-}
-
-/**
  * Detect z-order (paint sequence) by reading actual occlusion from the
  * populated plate. For each pair of placements whose bboxes overlap, count
  * saturated pixels of each character's colour inside the intersection
@@ -803,6 +738,122 @@ DO NOT:
   return full;
 }
 
+// ─── Stratified-composite prompt builders ─────────────────────────────────
+
+/**
+ * Per-character prose line for a back-stratum character. No colour, no
+ * silhouette markers — Grok renders them as real characters using the
+ * reference sheet image that ships alongside the prompt.
+ */
+function buildBackCharLines(backCast) {
+  return backCast.map((c) => {
+    const sizeHint = c.sizeHint || 'small to medium in the distance';
+    const posHint = c.position || 'in the scene';
+    const direction = c.flip ? 'facing right' : 'facing left';
+    const poseLabel = {
+      front:        'front view, body facing the camera',
+      threeQuarter: `three-quarter view, ${direction}`,
+      profile:      `profile view, ${direction}`,
+      back:         'back view, viewer sees the back of the head',
+    }[c.pose] || `three-quarter view, ${direction}`;
+    const actionClause = c.action ? `, ${c.action}` : '';
+    return `- ${c.name} (back-stratum character, render fully): ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
+  }).join('\n');
+}
+
+/**
+ * Anchor-plate prompt for Stratified Composite. Renders the scene with:
+ *   - back-stratum characters drawn as real characters (prose, no colour)
+ *   - front-stratum characters as the existing flat-colour silhouettes
+ * Reference images shipped alongside: one 2×4 sheet per back-stratum char,
+ * so Grok knows who they are without consuming a front-stratum cutout pass.
+ */
+function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt) {
+  const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
+    || (scene?.description && String(scene.description).trim())
+    || 'an outdoor scene';
+  const sceneIntentBlock = scene?.intent
+    ? `\nScene intent: ${String(scene.intent).trim()}\n`
+    : '';
+  const backBlock = backCast.length > 0
+    ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. Identity references for each follow this prompt as separate images (one 2×4 sheet per back-stratum character). Match each character's face, hair, and clothing from the matching reference sheet.\n\n${buildBackCharLines(backCast)}\n`
+    : '';
+  const frontBlock = frontCast.length > 0
+    ? `FRONT STRATUM — place ${frontCast.length} flat-colour silhouette figure(s) on top of the scene. These mark the regions where real characters will be inset in a later step. Use the cast entries below for size, depth and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it.\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.`
+    : '';
+  const totalCount = backCast.length + frontCast.length;
+  return `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+
+PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate.
+
+SETTING DESCRIPTION:
+${settingBlock}
+${sceneIntentBlock}
+PRIORITY 2 — Populate the scene with the cast below in two strata. Characters must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a character with their feet on water or empty sky.
+
+${backBlock}
+${frontBlock}
+
+NO TEXT in the output.`;
+}
+
+/**
+ * Depopulate only the front-stratum silhouettes. Back-stratum characters
+ * (drawn as real characters on the anchor plate) must be preserved.
+ */
+function buildFrontDepopulatePrompt(frontCast) {
+  const colorList = frontCast
+    .map(c => `${c.color}${c.colorName ? ` (${c.colorName})` : ''}`)
+    .join(', ');
+  return `Remove every flat-colour silhouette figure from this image and paint over each region with the surrounding scenery, so the result reads as the same scene with the silhouettes erased.
+
+The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour with small black eye dots — painted on top of the scene.
+
+DO:
+- Replace each coloured silhouette area with the terrain visible around it — extend the floor, ground, dock, path, wall, water, foliage, sky, or interior background behind it so the patch blends naturally.
+- PRESERVE every other character drawn in the scene. Any real (non-silhouette) character must remain whole — if a silhouette partially overlaps a real character, restore the hidden parts of that character from what is visible around the overlap so they read as complete figures.
+- Keep every other pixel of the scene pixel-identical. Sky, walls, named props, lighting, every detail of the setting must remain exactly as it is.
+
+DO NOT:
+- Add new characters, animals, or human figures of any kind.
+- Restructure the scene — do not move, resize, recolour, or rebuild walls, props, sky, water, or any background element.
+- Add, remove, or substitute any named prop or object in the scene.
+- Add text, captions, numbers, or signatures.
+- Leave any coloured residue, outline, or shadow where a silhouette stood — the patch must blend seamlessly with the surrounding scene.
+
+The output is the same scene as the input, with only the coloured silhouettes removed. Every real character drawn into the scene must remain in place and intact.`;
+}
+
+/**
+ * Front-figure-plate prompt. Replaces each colour silhouette on the anchor
+ * plate with the corresponding real character from the reference sheets.
+ * Reference images shipped alongside: anchor plate first, then one 2×4
+ * sheet per front-stratum character.
+ */
+function buildFrontInsetPrompt(frontCast) {
+  const colorList = frontCast
+    .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
+    .join('\n');
+  return `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character drawn from the matching reference sheet (Images 2 onward, one 2×4 sheet per front-stratum character in order).
+
+Silhouette → character mapping:
+${colorList}
+
+DO:
+- For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the reference sheet for that character.
+- All ${frontCast.length} front-stratum characters appear in ONE image together — they share the scene's lighting, eye-line continuity, and any pose interactions implied by their positions.
+- Keep everything else in Image 1 pixel-identical. The background scenery, every named prop, and any back-stratum characters already drawn into the scene must remain exactly as they are.
+
+DO NOT:
+- Move, resize, rotate, or flip any character relative to where its silhouette sits in Image 1.
+- Add, remove, or substitute any character beyond replacing the listed silhouettes.
+- Change the background scenery, props, or any other figure that is not a flat-colour silhouette.
+- Add text, captions, numbers, or signatures.
+- Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.
+
+The output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
+}
+
 // ─── Public entry point ───────────────────────────────────────────────────
 
 /**
@@ -822,6 +873,17 @@ DO NOT:
  *   imageData is a data URI.
  */
 async function generateSceneComposite(opts) {
+  // Dispatch: 'stratified' (default) renders back-stratum chars natively in
+  // the anchor plate and insets only the front stratum. 'uniform' is the
+  // original silhouette-for-everyone pipeline kept available for A/B compare.
+  const strategy = opts.compositeStrategy || 'stratified';
+  if (strategy === 'stratified') {
+    return generateStratifiedComposite(opts);
+  }
+  if (strategy !== 'uniform') {
+    throw new Error(`unknown compositeStrategy: ${strategy} (expected 'stratified' | 'uniform')`);
+  }
+
   const {
     cleanBackgroundPrompt,
     existingCleanBackground = null,
@@ -1051,14 +1113,239 @@ async function generateSceneComposite(opts) {
   };
 }
 
+// ─── Stratified composite pipeline ────────────────────────────────────────
+
+/**
+ * Stratified Composite — render back-stratum characters natively in the
+ * anchor plate, render front-stratum characters as one foreground figure
+ * plate, crop them out, paste onto the depopulated back plate, blend.
+ *
+ * Same opts signature as generateSceneComposite (cast, scene, aspectRatio,
+ * visualBibleGridImage, usageTracker, cleanBackgroundPrompt). Additional
+ * opts:
+ *   - backCast, frontCast: pre-split strata. When omitted, the function
+ *     splits internally via splitCastByStratum from compositeCastBuilder.
+ */
+async function generateStratifiedComposite(opts) {
+  const {
+    cleanBackgroundPrompt,
+    scene = {},
+    cast = [],
+    aspectRatio = '16:9',
+    usageTracker = null,
+    visualBibleGridImage = null,
+  } = opts;
+
+  if (!cleanBackgroundPrompt && !scene?.description) {
+    throw new Error('cleanBackgroundPrompt or scene.description required');
+  }
+  if (!Array.isArray(cast) || cast.length === 0) throw new Error('cast must be non-empty');
+
+  // Split into strata. Caller may pre-split; otherwise compute here.
+  let backCast = opts.backCast;
+  let frontCast = opts.frontCast;
+  if (!Array.isArray(backCast) || !Array.isArray(frontCast)) {
+    const { splitCastByStratum } = require('./compositeCastBuilder');
+    const split = splitCastByStratum(cast);
+    backCast = split.backCast;
+    frontCast = split.frontCast;
+  }
+
+  // Front stratum needs flat colours for the silhouettes; back stratum does
+  // not (rendered natively). Assign colours to FRONT only so we don't
+  // exhaust the palette on back-half entries.
+  const usedColors = new Set(frontCast.map((c) => c.color).filter(Boolean));
+  let nextColorIdx = 0;
+  for (const c of frontCast) {
+    if (c.color) continue;
+    while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) nextColorIdx++;
+    if (nextColorIdx >= DEFAULT_PALETTE.length) {
+      throw new Error(`out of default palette colours (front stratum has ${frontCast.length} characters)`);
+    }
+    c.color = DEFAULT_PALETTE[nextColorIdx++];
+    usedColors.add(c.color);
+  }
+  for (const c of frontCast) {
+    if (!POSE_CELL[c.pose]) throw new Error(`frontCast[${c.name}].pose invalid: ${c.pose}`);
+  }
+  for (const c of backCast) {
+    if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) {
+      throw new Error(`backCast[${c.name}].sheetBuf must be a Buffer`);
+    }
+  }
+
+  const debug = {
+    strategy: 'stratified',
+    backNames: backCast.map(c => c.name),
+    frontNames: frontCast.map(c => c.name),
+  };
+  let totalCost = 0;
+
+  log.info(`[STRATIFIED] cast split — back=[${backCast.map(c=>c.name).join(',')}] front=[${frontCast.map(c=>c.name).join(',')}]`);
+
+  // ── Step 1/5: Anchor plate (back rendered native, front as silhouettes)
+  log.info(`[SCENE COMPOSITE/STRATIFIED] step 1/5 — anchor plate (back=${backCast.length}, front=${frontCast.length})`);
+  const anchorPrompt = buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt);
+  const anchor = await generateWithGrok(anchorPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
+  totalCost += anchor.usage?.cost || 0;
+  const anchorBuf = Buffer.from(anchor.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  debug.anchorPlate = anchor.imageData;
+  debug.anchorPlatePrompt = anchorPrompt;
+  debug.anchorPlateSentToGrok = anchor.sentToGrok || null;
+  // Back-compat aliases — existing dev panels read these names.
+  debug.populatedPlate = anchor.imageData;
+  debug.populatedPlatePrompt = anchorPrompt;
+  debug.blocking = anchor.imageData;
+  debug.blockingPrompt = anchorPrompt;
+
+  // N=1 short-circuit: a single character was rendered natively into the
+  // anchor plate. No silhouettes to lift, no cutouts to inset. Return the
+  // anchor plate as the final image (no blend pass — the blend prompt
+  // assumes pasted cutouts and would degrade an already-coherent scene).
+  if (frontCast.length === 0) {
+    log.info(`[SCENE COMPOSITE/STRATIFIED] short-circuit — front stratum empty; anchor plate is final ($${totalCost.toFixed(4)})`);
+    return {
+      imageData: anchor.imageData,
+      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-stratified' },
+      debug,
+    };
+  }
+
+  // ── Step 2/5: depopulate FRONT silhouettes only (back chars stay intact)
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 2/5 — depopulate front silhouettes');
+  const depopulatePrompt = buildFrontDepopulatePrompt(frontCast);
+  const depopulated = await editWithGrok(depopulatePrompt, [anchor.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_strat_depopulate', depopulated.modelId);
+  totalCost += depopulated.usage?.cost || 0;
+  const backPlateData = depopulated.imageData;
+  const backPlateBuf = Buffer.from(backPlateData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  debug.cleanBackground = backPlateData;
+  debug.cleanBackgroundSource = 'derived-from-anchor-plate-front-only';
+  debug.depopulatePrompt = depopulatePrompt;
+  debug.depopulateSentToGrok = depopulated.sentToGrok || null;
+
+  // ── Step 3/5: front-figure plate (real front chars in place of silhouettes)
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate');
+  const frontInsetPrompt = buildFrontInsetPrompt(frontCast);
+  // Refs: anchor plate as Image 1 (canvas to refine), VB grid as Image 2
+  // (identity ref). Grok edit caps refs at 3 on the standard model and
+  // stitches them on Pro. Per-character sheets would blow that budget for
+  // any front stratum ≥3, so we lean on the VB grid the same way the blend
+  // step does.
+  const frontInsetRefs = visualBibleGridImage
+    ? [anchor.imageData, visualBibleGridImage]
+    : [anchor.imageData];
+  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
+  totalCost += frontPlate.usage?.cost || 0;
+  const frontPlateBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  debug.frontPlate = frontPlate.imageData;
+  debug.frontPlatePrompt = frontInsetPrompt;
+  debug.frontPlateSentToGrok = frontPlate.sentToGrok || null;
+
+  // ── Step 4/5: per-front-char bboxes from anchor↔backPlate diff, then cut
+  // the rendered front figures out of frontPlate inside those bboxes and
+  // paste onto the back plate.
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 4/5 — crop front figures + composite');
+  const detection = await findSilhouettesByDiff(anchorBuf, backPlateBuf, frontCast);
+  const bboxes = {};
+  for (const c of frontCast) {
+    const r = detection.results[c.name];
+    if (!r) {
+      log.warn(`[SCENE COMPOSITE/STRATIFIED] no silhouette for front-stratum ${c.name} (${c.color}) — diff+hue found nothing`);
+      continue;
+    }
+    bboxes[c.name] = r.bbox;
+    log.info(`[SCENE COMPOSITE/STRATIFIED]   ${c.name} (${c.color}): bbox ${r.bbox.width}×${r.bbox.height} @ (${r.bbox.x},${r.bbox.y}) [${r.bbox.pixels} px]`);
+  }
+  if (Object.keys(bboxes).length === 0) {
+    throw new Error('[SCENE COMPOSITE/STRATIFIED] no front silhouettes detected on anchor plate');
+  }
+  debug.bboxes = bboxes;
+
+  // Cut each front character out of frontPlate using its bbox, then paste
+  // onto the back plate. Add 8% padding around each bbox so the cutout
+  // includes a soft edge that survives the later blend.
+  const PAD_RATIO = 0.08;
+  const anchorMeta = await sharp(anchorBuf).metadata();
+  const canvasW = anchorMeta.width, canvasH = anchorMeta.height;
+  const placements = [];
+  for (const c of frontCast) {
+    const bbox = bboxes[c.name];
+    if (!bbox) continue;
+    const padX = Math.round(bbox.width * PAD_RATIO);
+    const padY = Math.round(bbox.height * PAD_RATIO);
+    const cx1 = Math.max(0, bbox.x - padX);
+    const cy1 = Math.max(0, bbox.y - padY);
+    const cx2 = Math.min(canvasW, bbox.x + bbox.width + padX);
+    const cy2 = Math.min(canvasH, bbox.y + bbox.height + padY);
+    const cropW = cx2 - cx1, cropH = cy2 - cy1;
+    const cutBuf = await sharp(frontPlateBuf)
+      .extract({ left: cx1, top: cy1, width: cropW, height: cropH })
+      .png()
+      .toBuffer();
+    placements.push({
+      input: cutBuf,
+      left: cx1,
+      top: cy1,
+      _footY: bbox.y + bbox.height,
+      _name: c.name,
+      _color: c.color,
+      _bbox: bbox,
+    });
+  }
+  if (placements.length === 0) {
+    throw new Error('[SCENE COMPOSITE/STRATIFIED] no placements produced — every bbox failed');
+  }
+
+  // Z-order: read the anchor plate's occlusion for the front stratum. Front
+  // figures are still flat silhouettes there, so the colour-pixel count
+  // method works the same as in the uniform pipeline.
+  const zResult = await detectZOrderByOcclusion(anchorBuf, placements);
+  placements.length = 0;
+  placements.push(...zResult.order);
+  debug.zScores = zResult.scores;
+  debug.zDecisions = zResult.decisions;
+  for (const d of zResult.decisions) {
+    log.info(`[SCENE COMPOSITE/STRATIFIED]   occlusion ${d.a} vs ${d.b}: ${d.a}=${d.aPx}px ${d.b}=${d.bPx}px → ${d.winner} in front`);
+  }
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   z-order (back → front): ${placements.map(p => `${p._name}[score=${zResult.scores[p._name]},foot=${p._footY}]`).join(' → ')}`);
+
+  const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
+  const composited = await sharp(backPlateBuf).composite(compositeInputs).png().toBuffer();
+  const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
+  debug.composited = compositedData;
+
+  // ── Step 5/5: blend pass (same as uniform path)
+  log.info('[SCENE COMPOSITE/STRATIFIED] step 5/5 — blend pass');
+  const blendPrompt = buildBlendEditPrompt(scene);
+  debug.blendPrompt = blendPrompt;
+  const blendRefs = visualBibleGridImage
+    ? [compositedData, visualBibleGridImage]
+    : [compositedData];
+  debug.blendRefCount = blendRefs.length;
+  const pass1 = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', pass1.usage, 'scene_composite_strat_blend', pass1.modelId);
+  totalCost += pass1.usage?.cost || 0;
+  debug.blendSentToGrok = pass1.sentToGrok || null;
+
+  log.info(`[SCENE COMPOSITE/STRATIFIED] complete — total cost $${totalCost.toFixed(4)}, back=${backCast.length} front=${placements.length}/${frontCast.length}`);
+
+  return {
+    imageData: pass1.imageData,
+    usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-stratified' },
+    debug,
+  };
+}
+
 module.exports = {
   generateSceneComposite,
+  generateStratifiedComposite,
   POSE_CELL,
   FACE_CELL,
   DEFAULT_PALETTE,
   cropAvatarCell,
-  sceneCellRefForCharacter,
-  looksLike2x4Sheet,
   // internal helpers exposed for tests
   _internal: {
     findColorBbox,
@@ -1070,6 +1357,10 @@ module.exports = {
     scaleToHeight,
     buildPopulatedPlatePrompt,
     buildDepopulatePrompt,
+    buildAnchorPlatePrompt,
+    buildBackCharLines,
+    buildFrontDepopulatePrompt,
+    buildFrontInsetPrompt,
     buildBlendEditPrompt,
     buildCastLines,
     detectZOrderByOcclusion,

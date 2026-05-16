@@ -51,6 +51,16 @@ const EMAIL = arg('email', 'demo-b-hnecf@magicalstory.ch');
 const PASSWORD = arg('password', 'DemoStory2026!');
 const PAGES = Number(arg('pages', 4));
 const TIMEOUT_S = Number(arg('timeout', 600));
+// Composite + phantom-pose override modes:
+//   'true'  → force composite/phantom on every page (proves new pipeline runs).
+//   'false' → force direct path for every page.
+//   'auto'  → omit the override; let the cast-aware router in imageRouter.js
+//             pick per-page. Best for exercising the dispatcher itself.
+const COMPOSITE_MODE = arg('composite', 'true').toLowerCase();
+const PHANTOM_MODE = arg('phantom', 'true').toLowerCase();
+// Composite pipeline variant. 'auto' omits the override; pipeline default is
+// 'stratified' once the new path lands.
+const STRATEGY_MODE = arg('strategy', 'auto').toLowerCase();
 
 const basicHeader = BASIC_USER && BASIC_PASS
   ? `Basic ${Buffer.from(`${BASIC_USER}:${BASIC_PASS}`).toString('base64')}`
@@ -149,6 +159,14 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     skipQualityEval: true,
     idempotencyKey,
   };
+  if (COMPOSITE_MODE === 'true') payload.composite = true;
+  else if (COMPOSITE_MODE === 'false') payload.composite = false;
+  if (PHANTOM_MODE === 'true') payload.phantomPoseRender = true;
+  else if (PHANTOM_MODE === 'false') payload.phantomPoseRender = false;
+  if (STRATEGY_MODE === 'stratified' || STRATEGY_MODE === 'uniform') {
+    payload.compositeStrategy = STRATEGY_MODE;
+  }
+  console.log(`   composite=${COMPOSITE_MODE} phantomPoseRender=${PHANTOM_MODE} strategy=${STRATEGY_MODE} (auto = pipeline default)`);
   const create = await api('/api/jobs/create-story', {
     method: 'POST',
     body: payload,

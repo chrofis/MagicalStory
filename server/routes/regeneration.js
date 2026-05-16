@@ -875,6 +875,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       phantomPoseRender = false,   // composite step-3 variant (only used when composite=true)
       emptyScene = 'reuse',        // 'reuse' | 'fresh' | 'skip' — composite step-1 source
       useStorySheetCells = false,  // direct-path: replace styled-avatar ref with cropped 2×4 cell
+      compositeStrategy = 'stratified', // 'stratified' (default) | 'uniform' — composite pipeline variant
     } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
@@ -1083,7 +1084,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // path results in the same `results` map under key "composite" (or
     // "composite+phantomPose" when phantomPoseRender is on).
     if (composite && pageNumber >= 0) {
-      const compositeKey = phantomPoseRender ? 'composite+phantomPose' : 'composite';
+      const stratSuffix = compositeStrategy === 'uniform' ? '+uniform' : '';
+      const compositeKey = phantomPoseRender
+        ? `composite+phantomPose${stratSuffix}`
+        : `composite${stratSuffix}`;
       const compositeStart = Date.now();
       try {
         const { buildCompositeCast: buildCompositeCastShared } = require('../lib/compositeCastBuilder');
@@ -1160,6 +1164,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
             aspectRatio: storyData.layout?.imageAspect || DEFAULTS.pageAspect || '3:4',
             visualBibleGridImage: vbGridUri,
             phantomPoseRender,
+            compositeStrategy,
             usageTracker: addUsageNoop,
           });
           results[compositeKey] = {
@@ -1169,7 +1174,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
             usage: compResult.usage || null,
             compositeDebug: compResult.debug || null,
           };
-          log.info(`🧪 [TEST-MODELS] Composite path complete for page ${pageNumber} in ${Date.now() - compositeStart}ms (phantomPose=${phantomPoseRender}, emptyScene=${emptyScene})`);
+          log.info(`🧪 [TEST-MODELS] Composite path complete for page ${pageNumber} in ${Date.now() - compositeStart}ms (strategy=${compositeStrategy}, phantomPose=${phantomPoseRender}, emptyScene=${emptyScene})`);
         }
       } catch (compErr) {
         log.error(`🧪 [TEST-MODELS] Composite path failed for page ${pageNumber}: ${compErr.message}`);
