@@ -4237,6 +4237,35 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     if (!storyData.finalChecksReport) {
       storyData.finalChecksReport = {};
     }
+    // Persist per-run history so we can inspect what entity-consistency saw on each pass.
+    // Capped at MAX_ENTITY_HISTORY entries (oldest dropped) to bound stories.data growth.
+    const MAX_ENTITY_HISTORY = 5;
+    if (!Array.isArray(storyData.finalChecksReport.entityHistory)) {
+      storyData.finalChecksReport.entityHistory = [];
+    }
+    // Backfill: if history is empty but a prior `entity` exists (from a pre-history run),
+    // seed history with it so the round selector shows the baseline too.
+    const prevEntity = storyData.finalChecksReport.entity;
+    if (storyData.finalChecksReport.entityHistory.length === 0 && prevEntity) {
+      storyData.finalChecksReport.entityHistory.push({
+        runIndex: 0,
+        timestamp: prevEntity.timestamp || new Date(Date.now() - 1000).toISOString(),
+        triggeredBy: 'pre-history',
+        report: prevEntity
+      });
+    }
+    const nextRunIndex = (storyData.finalChecksReport.entityHistory.at(-1)?.runIndex ?? -1) + 1;
+    report.runIndex = nextRunIndex;
+    report.timestamp = report.timestamp || new Date().toISOString();
+    storyData.finalChecksReport.entityHistory.push({
+      runIndex: nextRunIndex,
+      timestamp: report.timestamp,
+      triggeredBy: req.body?.triggeredBy || 'manual',
+      report
+    });
+    while (storyData.finalChecksReport.entityHistory.length > MAX_ENTITY_HISTORY) {
+      storyData.finalChecksReport.entityHistory.shift();
+    }
     storyData.finalChecksReport.entity = report;
     // Update top-level fields so frontend display is consistent
     const legacyIssues = storyData.finalChecksReport.legacy?.totalIssues || 0;

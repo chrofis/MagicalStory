@@ -1184,6 +1184,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           grids: (story.finalChecksReport.entity.grids || []).map((grid, idx) => ({
             entityName: grid.entityName,
             entityType: grid.entityType,
+            clothingCategory: grid.clothingCategory,
             cellCount: grid.cellCount,
             manifest: grid.manifest,
             // Indicate that image needs to be loaded separately
@@ -1192,6 +1193,44 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             gridIndex: idx
           }))
         } : undefined,
+        // Per-run history — strip grid images (lazy-loaded via /entity-grid-image?runIndex=N).
+        // Per-character byClothing also has gridImage/gridImages bytes; strip those too.
+        entityHistory: Array.isArray(story.finalChecksReport.entityHistory)
+          ? story.finalChecksReport.entityHistory.map(h => ({
+              runIndex: h.runIndex,
+              timestamp: h.timestamp,
+              triggeredBy: h.triggeredBy,
+              report: h.report ? {
+                ...h.report,
+                grids: (h.report.grids || []).map((grid, idx) => ({
+                  entityName: grid.entityName,
+                  entityType: grid.entityType,
+                  clothingCategory: grid.clothingCategory,
+                  cellCount: grid.cellCount,
+                  manifest: grid.manifest,
+                  hasGridImage: !!grid.gridImage,
+                  gridImageSizeKB: grid.gridImage ? Math.round(grid.gridImage.length * 0.75 / 1024) : 0,
+                  gridIndex: idx
+                })),
+                characters: h.report.characters ? Object.fromEntries(
+                  Object.entries(h.report.characters).map(([name, cr]) => [name, {
+                    ...cr,
+                    gridImage: undefined,
+                    hasGridImage: !!cr.gridImage,
+                    byClothing: cr.byClothing ? Object.fromEntries(
+                      Object.entries(cr.byClothing).map(([cat, cv]) => [cat, {
+                        ...cv,
+                        gridImage: undefined,
+                        gridImages: undefined,
+                        hasGridImage: !!cv.gridImage,
+                        gridImageCount: cv.gridImages?.length || (cv.gridImage ? 1 : 0)
+                      }])
+                    ) : undefined
+                  }])
+                ) : {}
+              } : null
+            }))
+          : [],
         // Strip gridImages from entityRepairs too
         entityRepairs: story.finalChecksReport.entityRepairs ? Object.fromEntries(
           Object.entries(story.finalChecksReport.entityRepairs).map(([name, repair]) => [
@@ -1339,7 +1378,7 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
 router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { entityName, gridIndex, clothingCategory } = req.query;
+    const { entityName, gridIndex, clothingCategory, runIndex } = req.query;
 
     if (!entityName && gridIndex === undefined) {
       return res.status(400).json({ error: 'entityName or gridIndex query parameter required' });
@@ -1362,7 +1401,17 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
     }
 
     const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-    const grids = story.finalChecksReport?.entity?.grids || [];
+    // Source grids from a specific history entry when runIndex is provided; otherwise the
+    // current `entity` (latest run).
+    let sourceReport = story.finalChecksReport?.entity;
+    if (runIndex !== undefined && runIndex !== '') {
+      const runIdx = parseInt(runIndex, 10);
+      const history = story.finalChecksReport?.entityHistory || [];
+      const hist = history.find(h => h.runIndex === runIdx);
+      if (!hist) return res.status(404).json({ error: `runIndex ${runIdx} not in entityHistory` });
+      sourceReport = hist.report;
+    }
+    const grids = sourceReport?.grids || [];
 
     let grid;
     if (gridIndex !== undefined) {
@@ -1385,7 +1434,8 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
       entityName: grid.entityName,
       clothingCategory: grid.clothingCategory,
       gridImage: grid.gridImage,
-      manifest: grid.manifest
+      manifest: grid.manifest,
+      runIndex: sourceReport?.runIndex
     });
   } catch (err) {
     console.error('❌ Error fetching entity grid image:', err);

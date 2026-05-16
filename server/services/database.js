@@ -1062,6 +1062,37 @@ async function extractInlineImagesToR2(storyId, data) {
     if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object') {
       upload(fcr.styleConsistency.gridImage, `stories/${storyId}/debug/final-checks/style-consistency-grid.jpg`, (url) => { fcr.styleConsistency.gridImage = url; });
     }
+    // Per-run entity-consistency history: each round keeps its own grids — must
+    // get unique R2 keys (runIndex in the path) so rounds don't overwrite each other.
+    if (Array.isArray(fcr.entityHistory)) {
+      for (const histEntry of fcr.entityHistory) {
+        const histReport = histEntry?.report;
+        if (!histReport) continue;
+        const runIdx = histEntry.runIndex ?? 'x';
+        if (Array.isArray(histReport.grids)) {
+          for (let k = 0; k < histReport.grids.length; k++) {
+            const g = histReport.grids[k];
+            if (!g) continue;
+            upload(g.gridImage, `stories/${storyId}/debug/final-checks/entity-history/r${runIdx}/grid-${k}.jpg`, (url) => { g.gridImage = url; });
+          }
+        }
+        if (histReport.characters && typeof histReport.characters === 'object') {
+          for (const [charName, charReport] of Object.entries(histReport.characters)) {
+            if (!charReport?.byClothing || typeof charReport.byClothing !== 'object') continue;
+            for (const [clothing, clothingReport] of Object.entries(charReport.byClothing)) {
+              if (!clothingReport) continue;
+              upload(clothingReport.gridImage, `stories/${storyId}/debug/final-checks/entity-history/r${runIdx}/${String(charName).replace(/[^a-zA-Z0-9_-]/g, '_')}-${String(clothing).replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`, (url) => { clothingReport.gridImage = url; });
+              if (Array.isArray(clothingReport.gridImages)) {
+                for (let k = 0; k < clothingReport.gridImages.length; k++) {
+                  const idx = k;
+                  upload(clothingReport.gridImages[idx], `stories/${storyId}/debug/final-checks/entity-history/r${runIdx}/${String(charName).replace(/[^a-zA-Z0-9_-]/g, '_')}-${String(clothing).replace(/[^a-zA-Z0-9_-]/g, '_')}-${idx}.jpg`, (url) => { clothingReport.gridImages[idx] = url; });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
     if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
       for (const [charName, charRepair] of Object.entries(fcr.entityRepairs)) {
         if (!charRepair?.pages || typeof charRepair.pages !== 'object') continue;
@@ -1330,6 +1361,28 @@ function stripInlineImagesFromStoryData(data) {
     }
     if (fcr.styleConsistency && typeof fcr.styleConsistency === 'object') {
       fcr.styleConsistency.gridImage = keepUrl(fcr.styleConsistency.gridImage);
+    }
+    if (Array.isArray(fcr.entityHistory)) {
+      for (const histEntry of fcr.entityHistory) {
+        const histReport = histEntry?.report;
+        if (!histReport) continue;
+        if (Array.isArray(histReport.grids)) {
+          for (const g of histReport.grids) if (g) g.gridImage = keepUrl(g.gridImage);
+        }
+        if (histReport.characters && typeof histReport.characters === 'object') {
+          for (const charReport of Object.values(histReport.characters)) {
+            if (charReport?.byClothing && typeof charReport.byClothing === 'object') {
+              for (const clothing of Object.values(charReport.byClothing)) {
+                if (!clothing) continue;
+                clothing.gridImage = keepUrl(clothing.gridImage);
+                if (Array.isArray(clothing.gridImages)) {
+                  clothing.gridImages = clothing.gridImages.map(keepUrl);
+                }
+              }
+            }
+          }
+        }
+      }
     }
     if (fcr.entityRepairs && typeof fcr.entityRepairs === 'object') {
       for (const charRepair of Object.values(fcr.entityRepairs)) {

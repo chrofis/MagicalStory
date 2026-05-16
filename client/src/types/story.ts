@@ -557,6 +557,14 @@ export interface FinalChecksReport {
   error?: string;
   // New entity consistency report
   entity?: EntityConsistencyReport;
+  // Per-run history of entity consistency checks. Grid images are stripped
+  // from history on the wire — lazy-load via /entity-grid-image?runIndex=N.
+  entityHistory?: Array<{
+    runIndex: number;
+    timestamp: string;
+    triggeredBy?: string;
+    report: EntityConsistencyReport | null;
+  }>;
   // Legacy full-image consistency report
   legacy?: LegacyConsistencyReport;
   // Entity repair results (from "Repair Consistency" button)

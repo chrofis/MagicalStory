@@ -663,14 +663,17 @@ export const storyService = {
     }
   },
 
-  // Lazy load entity grid image by index (dev mode)
+  // Lazy load entity grid image by index (dev mode). Pass runIndex to fetch a
+  // historical run's grid; omit to fetch the latest.
   async getEntityGridImageByIndex(
     storyId: string,
-    gridIndex: number
+    gridIndex: number,
+    runIndex?: number
   ): Promise<{
     entityName: string;
     clothingCategory?: string;
     gridImage: string;
+    runIndex?: number;
     manifest: {
       cellSize: number;
       cols: number;
@@ -686,6 +689,7 @@ export const storyService = {
     try {
       const token = localStorage.getItem('auth_token');
       const params = new URLSearchParams({ gridIndex: gridIndex.toString() });
+      if (runIndex !== undefined) params.set('runIndex', runIndex.toString());
       const response = await fetch(`/api/stories/${storyId}/entity-grid-image?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

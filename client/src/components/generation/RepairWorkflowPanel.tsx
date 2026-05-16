@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Wrench,
   RotateCcw,
@@ -403,6 +403,11 @@ export function RepairWorkflowPanel({
   const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | 'blackout' | null>(null);
   const [whiteoutTarget, setWhiteoutTarget] = useState<'auto' | 'face' | 'body'>('auto');
   const [retryingPages, setRetryingPages] = useState<Set<string>>(new Set()); // "char:pageNum" keys
+  // null = show live latest (workflowState.consistencyResults.report). number = show that runIndex from history.
+  const [selectedRunIndex, setSelectedRunIndex] = useState<number | null>(null);
+  // Lazy-loaded historical grid images, keyed `${runIndex}:${gridIndex}`.
+  const [loadedHistGrids, setLoadedHistGrids] = useState<Record<string, string>>({});
+  const [loadingHistGrids, setLoadingHistGrids] = useState<Set<string>>(new Set());
   const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
@@ -441,6 +446,75 @@ export function RepairWorkflowPanel({
   // Full workflow progress state
   const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
   const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
+
+  // Entity-history aware view: derive the report to render in the consistency-check
+  // section. selectedRunIndex === null → show the live latest (with embedded grids).
+  // Otherwise pick the matching history entry (grids stripped, lazy-loaded).
+  const entityHistory = finalChecksReport?.entityHistory || [];
+  const liveReport = workflowState.consistencyResults.report;
+  const isViewingLive = selectedRunIndex === null;
+  const historicalEntry = !isViewingLive
+    ? entityHistory.find(h => h.runIndex === selectedRunIndex) || null
+    : null;
+  const displayedConsistencyReport = isViewingLive ? liveReport : historicalEntry?.report || null;
+  const displayedConsistencyRunIndex = isViewingLive
+    ? (liveReport as any)?.runIndex
+    : selectedRunIndex;
+
+  // Fetch any missing historical grids when the selected run changes.
+  useEffect(() => {
+    if (isViewingLive || !storyId || !historicalEntry?.report) return;
+    const grids = (historicalEntry.report as any).grids || [];
+    const toFetch: Array<{ runIndex: number; gridIndex: number }> = [];
+    for (const g of grids) {
+      if (g.gridIndex === undefined || !g.hasGridImage) continue;
+      const key = `${historicalEntry.runIndex}:${g.gridIndex}`;
+      if (loadedHistGrids[key] || loadingHistGrids.has(key)) continue;
+      toFetch.push({ runIndex: historicalEntry.runIndex, gridIndex: g.gridIndex });
+    }
+    if (toFetch.length === 0) return;
+    setLoadingHistGrids(prev => {
+      const next = new Set(prev);
+      for (const t of toFetch) next.add(`${t.runIndex}:${t.gridIndex}`);
+      return next;
+    });
+    Promise.all(toFetch.map(async ({ runIndex, gridIndex }) => {
+      const result = await storyService.getEntityGridImageByIndex(storyId, gridIndex, runIndex);
+      return { runIndex, gridIndex, gridImage: result?.gridImage };
+    })).then(results => {
+      setLoadedHistGrids(prev => {
+        const next = { ...prev };
+        for (const r of results) {
+          if (r.gridImage) next[`${r.runIndex}:${r.gridIndex}`] = r.gridImage;
+        }
+        return next;
+      });
+      setLoadingHistGrids(prev => {
+        const next = new Set(prev);
+        for (const r of results) next.delete(`${r.runIndex}:${r.gridIndex}`);
+        return next;
+      });
+    });
+  }, [isViewingLive, historicalEntry, storyId, loadedHistGrids, loadingHistGrids]);
+
+  // Resolve the grid image to show for a (charName, clothing) cell in the displayed report.
+  // For live: embedded in clothingResult.gridImage / gridImages. For history: look up via grids[] + loadedHistGrids.
+  const resolveDisplayedGridImages = (charName: string, clothing: string, clothingResult: any): string[] => {
+    if (isViewingLive) {
+      return clothingResult.gridImages || (clothingResult.gridImage ? [clothingResult.gridImage] : []);
+    }
+    if (!historicalEntry?.report) return [];
+    const histGrids = (historicalEntry.report as any).grids || [];
+    const runIdx = historicalEntry.runIndex;
+    const out: string[] = [];
+    for (const g of histGrids) {
+      if (g.entityName !== charName || g.clothingCategory !== clothing) continue;
+      const key = `${runIdx}:${g.gridIndex}`;
+      const img = loadedHistGrids[key];
+      if (img) out.push(img);
+    }
+    return out;
+  };
 
   // Per-step disable logic: full workflow locks everything, otherwise only block conflicting ops
   // Re-evaluate, consistency check, and redo can all run in parallel (independent API calls)
@@ -1080,23 +1154,69 @@ export function RepairWorkflowPanel({
                   Run Consistency Check
                 </button>
 
-                {workflowState.consistencyResults.report && (
+                {displayedConsistencyReport && (
                   <div className="space-y-3">
+                    {/* Round selector — shown only when history has more than one entry */}
+                    {entityHistory.length > 1 && (
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="text-gray-500">Round:</span>
+                        {entityHistory.map((h) => {
+                          const isSelected = !isViewingLive && selectedRunIndex === h.runIndex;
+                          const isLatestInHistory = h.runIndex === entityHistory[entityHistory.length - 1].runIndex;
+                          // "Live" tab represents the freshest result still in component state.
+                          // If the user has only loaded the story (no live re-run yet), liveReport
+                          // mirrors finalChecksReport.entity which equals entityHistory[last].report —
+                          // so selecting either shows the same data.
+                          return (
+                            <button
+                              key={h.runIndex}
+                              onClick={() => setSelectedRunIndex(h.runIndex)}
+                              className={`px-2 py-1 rounded border ${
+                                isSelected
+                                  ? 'bg-amber-600 text-white border-amber-600'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                              title={`${new Date(h.timestamp).toLocaleString()} • ${h.triggeredBy || 'manual'} • ${h.report?.totalIssues ?? '?'} issues`}
+                            >
+                              R{h.runIndex}{isLatestInHistory ? ' (saved)' : ''}
+                            </button>
+                          );
+                        })}
+                        <button
+                          onClick={() => setSelectedRunIndex(null)}
+                          className={`px-2 py-1 rounded border ${
+                            isViewingLive
+                              ? 'bg-amber-600 text-white border-amber-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                          title="Live latest result in this session"
+                        >
+                          Live
+                        </button>
+                        {displayedConsistencyRunIndex !== undefined && (
+                          <span className="text-gray-400 ml-auto">
+                            runIndex {displayedConsistencyRunIndex}
+                            {historicalEntry?.timestamp && ` • ${new Date(historicalEntry.timestamp).toLocaleString()}`}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className={`p-3 rounded-lg border ${
-                      workflowState.consistencyResults.report.overallConsistent
+                      displayedConsistencyReport.overallConsistent
                         ? 'bg-green-50 border-green-200'
                         : 'bg-amber-50 border-amber-200'
                     }`}>
                       <h5 className="text-sm font-medium mb-1">
-                        {workflowState.consistencyResults.report.overallConsistent
+                        {displayedConsistencyReport.overallConsistent
                           ? 'All characters consistent!'
-                          : `${workflowState.consistencyResults.report.totalIssues} consistency issues found`}
+                          : `${displayedConsistencyReport.totalIssues} consistency issues found`}
                       </h5>
-                      <p className="text-xs text-gray-600">{workflowState.consistencyResults.report.summary}</p>
+                      <p className="text-xs text-gray-600">{displayedConsistencyReport.summary}</p>
                     </div>
 
                     {/* Per-character grids — always visible */}
-                    {Object.entries(workflowState.consistencyResults.report.characters || {}).map(([charName, charResult]) => (
+                    {Object.entries(displayedConsistencyReport.characters || {}).map(([charName, charResult]) => (
                       <div key={charName} className="border rounded-lg overflow-hidden">
                         <div className={`px-3 py-2 text-sm font-medium flex items-center justify-between ${
                           charResult.overallConsistent ? 'bg-green-50' : 'bg-amber-50'
@@ -1114,7 +1234,13 @@ export function RepairWorkflowPanel({
                         </div>
                         <div className="p-3 bg-white space-y-2 text-sm">
                           {/* Per-clothing breakdown (new structure) */}
-                          {charResult.byClothing && Object.entries(charResult.byClothing).map(([clothing, clothingResult]) => (
+                          {charResult.byClothing && Object.entries(charResult.byClothing).map(([clothing, clothingResult]) => {
+                            const gridImagesToShow = resolveDisplayedGridImages(charName, clothing, clothingResult);
+                            const histKey = historicalEntry
+                              ? `${historicalEntry.runIndex}:${((historicalEntry.report as any).grids || []).find((g: any) => g.entityName === charName && g.clothingCategory === clothing)?.gridIndex}`
+                              : null;
+                            const isLoadingHist = !isViewingLive && histKey ? loadingHistGrids.has(histKey) : false;
+                            return (
                             <div key={clothing} className="border-l-2 border-gray-200 pl-3">
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-gray-700">{clothing}</span>
@@ -1122,11 +1248,17 @@ export function RepairWorkflowPanel({
                                   {clothingResult.score}/10
                                 </span>
                               </div>
-                              {(clothingResult.gridImages || (clothingResult.gridImage ? [clothingResult.gridImage] : [])).map((img: string, gridIdx: number) => (
+                              {gridImagesToShow.length === 0 && isLoadingHist && (
+                                <div className="mt-2 mb-2 h-24 flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded border border-gray-200">
+                                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                  Loading round {selectedRunIndex} grid…
+                                </div>
+                              )}
+                              {gridImagesToShow.map((img: string, gridIdx: number) => (
                                 <div key={gridIdx} className="mt-2 mb-2">
                                   <img
                                     src={img}
-                                    alt={`${charName} - ${clothing} consistency grid${(clothingResult.gridImages?.length || 0) > 1 ? ` ${gridIdx + 1}` : ''}`}
+                                    alt={`${charName} - ${clothing} consistency grid${gridImagesToShow.length > 1 ? ` ${gridIdx + 1}` : ''}`}
                                     className="w-full max-h-48 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={() => setGridLightbox(img)}
                                     title="Click to enlarge"
@@ -1152,7 +1284,8 @@ export function RepairWorkflowPanel({
                                 </ul>
                               )}
                             </div>
-                          ))}
+                            );
+                          })}
                           {/* Legacy flat issues (backward compat) */}
                           {!charResult.byClothing && (
                             <>
