@@ -1183,9 +1183,9 @@ function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false, backCa
     .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
     .join('\n');
   const refsBlock = hasIdentityPack
-    ? `\nINPUT IMAGES:\n- Image 1: flat-colour silhouettes on a pure WHITE background. Each silhouette marks where a character must be drawn IN THE OUTPUT. The number, positions, and sizes of silhouettes in Image 1 are binding — the OUTPUT must contain EXACTLY the same number of characters at EXACTLY the same positions/sizes/orientations as the silhouettes in Image 1. Everything outside the silhouettes is WHITE — keep it white in the output.\n- Image 2: labelled identity pack — one body panel per character with the character's name on a BLACK BAR BELOW the panel. Image 2 is for IDENTITY REFERENCE ONLY: it tells you which name maps to which face/clothing. DO NOT COPY the black name bars, the labels, or the side-by-side identity-pack layout into the output. The output must look like Image 1 with each silhouette replaced by a real character — NOT like Image 2.\n`
+    ? `\nINPUT IMAGES:\n- Image 1: flat-colour silhouettes on a pure WHITE background (#FFFFFF, RGB 255,255,255 — fully saturated white, NOT cream, NOT off-white, NOT light grey). Each silhouette marks where a character must be drawn IN THE OUTPUT. The number, positions, and sizes of silhouettes in Image 1 are binding — the OUTPUT must contain EXACTLY the same number of characters at EXACTLY the same positions/sizes/orientations as the silhouettes in Image 1. EVERY pixel outside the silhouettes in the OUTPUT must be pure white #FFFFFF — no gradient, no soft grey edge, no studio backdrop, no shadow on the floor. This output will be alpha-composited onto a separate scene afterward, so any non-white pixel outside the characters becomes a visible artefact.\n- Image 2: labelled identity pack — one body panel per character with the character's name on a BLACK BAR BELOW the panel. Image 2 is for IDENTITY REFERENCE ONLY: it tells you which name maps to which face/clothing. DO NOT COPY the black name bars, the labels, or the side-by-side identity-pack layout into the output. The output must look like Image 1 with each silhouette replaced by a real character — NOT like Image 2.\n`
     : '';
-  const head = `Replace each flat-colour silhouette in Image 1 with the corresponding REAL character. Keep the rest of Image 1 PURE WHITE — the characters will be composited onto a separate scene afterward, so any non-white pixels outside the silhouettes will appear as artefacts.
+  const head = `Replace each flat-colour silhouette in Image 1 with the corresponding REAL character. Keep the rest of Image 1 as PURE WHITE #FFFFFF (RGB 255,255,255) — not cream, not light grey, not a studio backdrop, not a soft shadow. The characters will be composited onto a separate scene afterward; any pixel that isn't pure white outside the character bodies becomes a visible halo in the final image.
 ${refsBlock}
 Silhouette → character mapping:
 ${colorList}
@@ -1193,7 +1193,7 @@ ${colorList}
 DO:
 - For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the identity pack panel and the page brief.
 - All ${frontCast.length} characters appear in ONE image together — share lighting, eye-line continuity, and pose interactions implied by their relative positions.
-- Outside the silhouettes: keep the canvas pure WHITE. No scene, no shadow, no extra elements.
+- Outside the character bodies: every pixel is PURE WHITE #FFFFFF. No grey, no cream, no studio backdrop, no shadow on the floor under the characters, no soft halo around them — pure 255,255,255 right up to the body edge.
 
 DO NOT:
 - Move, resize, rotate, or flip any character relative to where its silhouette sits in Image 1.
