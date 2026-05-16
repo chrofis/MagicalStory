@@ -66,6 +66,14 @@ const DEFAULT_PALETTE = [
   '#8B00B0', // purple
   '#00B0B0', // cyan
 ];
+const DEFAULT_PALETTE_NAMES = {
+  '#E60000': 'red',
+  '#0050D0': 'blue',
+  '#00B050': 'green',
+  '#F0C000': 'yellow',
+  '#8B00B0': 'purple',
+  '#00B0B0': 'cyan',
+};
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -1124,11 +1132,16 @@ function buildAnchorPlatePrompt(scene, frontCast, backCast, cleanBackgroundPromp
     return out;
   };
   const sanitisedFrontCast = frontCast.map(c => ({ ...c, position: subBackNames(c.position), action: subBackNames(c.action) }));
+  // Back-cast positions also need substitution — scene expansion can write
+  // "Sarah stands beside Daniel"; Daniel is another back-cast (silhouette)
+  // so the bare name leaks into the prompt and confuses Grok. Replace with
+  // the matching colour reference.
+  const sanitisedBackCast = backCast.map(c => ({ ...c, position: subBackNames(c.position), action: subBackNames(c.action) }));
   const frontBlock = frontCast.length > 0
     ? `FOREGROUND (real characters, painted INTO the scene, closer to camera) — render these ${frontCast.length} character(s) using the identity pack for face/hair/clothing. These foreground figures sit IN FRONT of any silhouettes they overlap; paint them ON TOP, occluding background silhouettes wherever they cross.\n\n${buildBackCharLines(sanitisedFrontCast)}\n`
     : '';
   const backBlock = backCast.length > 0
-    ? `BACKGROUND (silhouette placeholders, farther from camera, BEHIND the foreground) — paint ${backCast.length} flat-colour silhouette shape(s) on the scene, at the back of the cast layout. The foreground characters above will be drawn IN FRONT of these silhouettes — wherever a foreground character overlaps a silhouette, the foreground character wins (paint over the silhouette). The silhouettes are NOT real characters; they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real background characters will be inset in a later step.\n\n${buildAnonymousCastLines(backCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Flat human-shaped block filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no skin tone, no face, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head per the marker spec above.\n- A correctly drawn silhouette looks like a paper cutout pasted onto the scene.`
+    ? `BACKGROUND (silhouette placeholders, farther from camera, BEHIND the foreground) — paint ${backCast.length} flat-colour silhouette shape(s) on the scene, at the back of the cast layout. The foreground characters above will be drawn IN FRONT of these silhouettes — wherever a foreground character overlaps a silhouette, the foreground character wins (paint over the silhouette). The silhouettes are NOT real characters; they are pure solid-colour cutouts with no face, no clothing, no hair detail, no shading. They mark where real background characters will be inset in a later step.\n\n${buildAnonymousCastLines(sanitisedBackCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Flat human-shaped block filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no shading, no skin tone, no face, no hair texture, no clothing texture.\n- Small BLACK eye dot(s) inside the head per the marker spec above.\n- A correctly drawn silhouette looks like a paper cutout pasted onto the scene.`
     : '';
   const totalCount = frontCast.length + backCast.length;
 
@@ -1290,19 +1303,22 @@ async function generateSceneComposite(opts) {
     log.info('[SCENE COMPOSITE] existingCleanBackground passed — ignored in populated-plate-first pipeline (clean BG is now derived from the populated plate).');
   }
 
-  // Assign colours to any cast entry missing one
+  // Assign colours + colour names to any cast entry missing them.
   const usedColors = new Set(cast.map((c) => c.color).filter(Boolean));
   let nextColorIdx = 0;
   for (const c of cast) {
-    if (c.color) continue;
-    while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) {
-      nextColorIdx++;
+    if (c.color && c.colorName) continue;
+    if (!c.color) {
+      while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) {
+        nextColorIdx++;
+      }
+      if (nextColorIdx >= DEFAULT_PALETTE.length) {
+        throw new Error(`out of default palette colours (cast has ${cast.length} characters)`);
+      }
+      c.color = DEFAULT_PALETTE[nextColorIdx++];
+      usedColors.add(c.color);
     }
-    if (nextColorIdx >= DEFAULT_PALETTE.length) {
-      throw new Error(`out of default palette colours (cast has ${cast.length} characters)`);
-    }
-    c.color = DEFAULT_PALETTE[nextColorIdx++];
-    usedColors.add(c.color);
+    if (!c.colorName) c.colorName = DEFAULT_PALETTE_NAMES[c.color] || 'coloured';
   }
   for (const c of cast) {
     if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) {
@@ -1540,13 +1556,16 @@ async function generateStratifiedComposite(opts) {
   const usedColors = new Set(backCast.map((c) => c.color).filter(Boolean));
   let nextColorIdx = 0;
   for (const c of backCast) {
-    if (c.color) continue;
-    while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) nextColorIdx++;
-    if (nextColorIdx >= DEFAULT_PALETTE.length) {
-      throw new Error(`out of default palette colours (back stratum has ${backCast.length} characters)`);
+    if (c.color && c.colorName) continue;
+    if (!c.color) {
+      while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) nextColorIdx++;
+      if (nextColorIdx >= DEFAULT_PALETTE.length) {
+        throw new Error(`out of default palette colours (back stratum has ${backCast.length} characters)`);
+      }
+      c.color = DEFAULT_PALETTE[nextColorIdx++];
+      usedColors.add(c.color);
     }
-    c.color = DEFAULT_PALETTE[nextColorIdx++];
-    usedColors.add(c.color);
+    if (!c.colorName) c.colorName = DEFAULT_PALETTE_NAMES[c.color] || 'coloured';
   }
   for (const c of backCast) {
     if (!POSE_CELL[c.pose]) throw new Error(`backCast[${c.name}].pose invalid: ${c.pose}`);
