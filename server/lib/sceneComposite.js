@@ -109,18 +109,21 @@ function nearestGrokAspect(w, h) {
 
 // ─── Silhouette colour match — RGB Euclidean distance ────────────────────
 //
-// Verified by sampling real Grok anchor plates. Solid silhouettes land
-// within ~30 RGB distance of the target colour. Grok occasionally renders
-// the silhouette slightly darker than spec (saw blue (9,73,183) vs target
-// (0,80,208) — distance 28). Threshold 60 covers both faithful renders
-// and ~25% darker drift while still rejecting scene colours (wood, stone,
-// fabric all measure >100 distance from the saturated palette colours).
+// Verified by sampling real Grok anchor plates. Grok's faithful renders
+// land within ~30 of the target. But Grok also frequently renders silhouettes
+// SIGNIFICANTLY DESATURATED — saw red rendered as average rgb(225, 68, 69)
+// across 50k pixels (distance 97 from target #E60000), essentially a salmon
+// instead of red. Threshold 110 catches Grok's desaturation drift while
+// scene colours stay rejected (wood at 158+, stone at 180+, skin at 234+
+// from the saturated palette colours).
 //
 // Earlier gradient-from-white attempt failed: it skipped axes where the
 // target was within 30 of white (true for #E60000 with R=230) which let
 // every dark pixel pass for red detection. Pure RGB distance has no such
-// blind spot.
-const SILHOUETTE_MATCH_THRESHOLD_SQ = 60 * 60;
+// blind spot. Connected-component flood fill + 200 px min-blob filter
+// downstream rejects any isolated scene speckles that happen to fall
+// inside the threshold radius.
+const SILHOUETTE_MATCH_THRESHOLD_SQ = 110 * 110;
 function isSilhouetteMatch(r, g, b, tr, tg, tb) {
   const dr = r - tr, dg = g - tg, db = b - tb;
   return dr * dr + dg * dg + db * db <= SILHOUETTE_MATCH_THRESHOLD_SQ;
