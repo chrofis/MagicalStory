@@ -1823,10 +1823,24 @@ async function _stratifiedBody(ctx) {
   // ── Group alignment. We must PRESERVE the relative distances between
   // figures (those distances ARE the layout Grok was asked to honour), so
   // we scale + translate the output AS ONE GROUP — never per-figure. Find
-  // the output content bbox (union of all non-white pixels), find the
+  // the output content bbox (union of all FIGURE pixels), find the
   // input silhouette bbox (union of all silhouette pixels), then map one
   // onto the other.
+  //
+  // A "figure pixel" is one that's neither near-white (background) NOR
+  // near-black (label bars). Grok sometimes leaks the identity-pack name
+  // strips into its output despite the prompt forbidding them — the
+  // black-bar pixels would inflate the output bbox AND get pasted onto
+  // the anchor as visible black-and-white striping. Filtering them out
+  // here is the defence-in-depth.
   const WHITE_TOL_SQ = 35 * 35;
+  const BLACK_TOL_SQ = 50 * 50;
+  const isFigurePx = (r, g, b) => {
+    const dwr = r - 255, dwg = g - 255, dwb = b - 255;
+    if (dwr * dwr + dwg * dwg + dwb * dwb <= WHITE_TOL_SQ) return false;
+    if (r * r + g * g + b * b <= BLACK_TOL_SQ) return false;
+    return true;
+  };
   let inMinX = cropW, inMinY = cropH, inMaxX = -1, inMaxY = -1;
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
@@ -1842,8 +1856,7 @@ async function _stratifiedBody(ctx) {
   for (let y = 0; y < cropH; y++) {
     for (let x = 0; x < cropW; x++) {
       const i = (y * cropW + x) * 3;
-      const dr = grokAtCrop[i] - 255, dg = grokAtCrop[i + 1] - 255, db = grokAtCrop[i + 2] - 255;
-      if (dr * dr + dg * dg + db * db > WHITE_TOL_SQ) {
+      if (isFigurePx(grokAtCrop[i], grokAtCrop[i + 1], grokAtCrop[i + 2])) {
         if (x < outMinX) outMinX = x;
         if (y < outMinY) outMinY = y;
         if (x > outMaxX) outMaxX = x;
@@ -1888,16 +1901,17 @@ async function _stratifiedBody(ctx) {
   }
   debug.alignedFrontPlate = `data:image/png;base64,${await sharp(alignedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer().then(b => b.toString('base64'))}`;
 
-  // ── Alpha mask is derived from the FIGURE PIXELS in the aligned plate,
-  // not from the input silhouette mask. We only want to paste the actual
-  // characters back onto the anchor — never the surrounding white pixels.
-  // Build a binary figure mask (255 = figure pixel, 0 = white-ish), then
-  // feather it for a soft composite edge.
+  // ── Alpha mask is derived from FIGURE PIXELS in the aligned plate — same
+  // isFigurePx test (not near-white, not near-black) used for the bbox
+  // detection. The near-black filter is the defence-in-depth against Grok
+  // copying the identity-pack's "Noah | Emma" black name bar into the
+  // output: even if the prompt's no-labels directive is ignored, the bar
+  // pixels are excluded from both the bbox computation AND the alpha mask,
+  // so they never get composited onto the anchor.
   const figureMaskRaw = Buffer.alloc(cropW * cropH);
   for (let i = 0; i < cropW * cropH; i++) {
     const j = i * 3;
-    const dr = alignedRgb[j] - 255, dg = alignedRgb[j + 1] - 255, db = alignedRgb[j + 2] - 255;
-    figureMaskRaw[i] = (dr * dr + dg * dg + db * db > WHITE_TOL_SQ) ? 255 : 0;
+    figureMaskRaw[i] = isFigurePx(alignedRgb[j], alignedRgb[j + 1], alignedRgb[j + 2]) ? 255 : 0;
   }
 
   // Feather the FIGURE mask (not the silhouette mask) so we paste only
