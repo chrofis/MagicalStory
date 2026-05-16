@@ -1231,17 +1231,31 @@ DO NOT:
   const tail = `\nThe output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
   const backNames = backCast.map(c => c.name).filter(Boolean);
   const frontNames = frontCast.map(c => c.name).filter(Boolean);
-  // For sentences that co-mention a back name, substitute it with a neutral
-  // "a background figure" so Grok doesn't try to redraw the back character.
-  const backSubs = Object.fromEntries(backNames.map(n => [n, 'a background figure']));
-  const briefHeader = `\nPAGE BRIEF (foreground characters only) — canonical descriptions of the foreground characters and their costumes. Use these (with the identity pack) for face, hair, clothing.\n\n`;
+  // In the new pipeline this function fills the BACK silhouettes with real
+  // characters — so frontCast here is actually the back stratum (renders
+  // names KEPT), backCast here is the foreground stratum (drawn elsewhere
+  // in step 1, NOT in this image).
+  //
+  // For sentences that co-mention an off-image character, keep their name
+  // and add a "(drawn separately on the foreground layer, do not redraw)"
+  // parenthetical. Keeping the name preserves spatial context ("Emma
+  // reaches up from one step below Noah" still parses); the parenthetical
+  // tells Grok not to actually paint them. Better than a generic "a
+  // background figure" which (a) was misleading in the new flow, and (b)
+  // collapsed multiple distinct off-image characters into the same
+  // identical phrase, making sentences ambiguous.
+  const backSubs = Object.fromEntries(backNames.map(n => [n, `${n} (drawn separately on the foreground layer — do NOT redraw here)`]));
+  const offCanvasNote = backNames.length > 0
+    ? `\nNOTE: ${backNames.join(', ')} are FOREGROUND characters drawn on a separate layer in step 1. They are NOT in this image. Do NOT paint them here. This image only contains the silhouette-mapped background characters listed above.\n`
+    : '';
+  const briefHeader = `\nPAGE BRIEF (background characters only — the ones being rendered HERE) — canonical descriptions of the silhouette characters and their costumes. Use these (with the identity pack) for face, hair, clothing.\n\n`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
   const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
-  const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
+  const fixedLen = head.length + tail.length + offCanvasNote.length + (filteredBrief ? briefHeader.length + 1 : 0);
   const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
   const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
-  const full = `${head}${briefBlock}${tail}`;
+  const full = `${head}${offCanvasNote}${briefBlock}${tail}`;
   if (full.length > 8000) {
     log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${full.length} chars after trim — still over 8000 (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
   }
