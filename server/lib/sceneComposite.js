@@ -481,6 +481,71 @@ async function cropAvatarCell(sheet, opts = {}) {
 }
 
 /**
+ * Pick the right cell(s) from a 2×4 sheet for use as a per-scene reference
+ * tile (typically as one slot in the VB grid). Composes a single PNG.
+ *
+ *   depth='foreground' / close-up    → face cell stacked above body cell
+ *   depth='midground' / 'background' → body cell only
+ *
+ * Both cropped at the scene-intended pose (front/threeQuarter/profile/back)
+ * and flipped if the cast entry asks for the opposite facing direction.
+ *
+ * Sending a whole 2×4 sheet as a VB-grid tile is wrong — it concats 8 views
+ * into a tile the page generator was never meant to see. This helper is the
+ * source-side fix.
+ *
+ * @param {Buffer|string} sheet  the 2×4 sheet (buffer or data URI)
+ * @param {Object} opts
+ * @param {'front'|'threeQuarter'|'profile'|'back'} [opts.pose]
+ * @param {boolean} [opts.flip]
+ * @param {'foreground'|'midground'|'background'} [opts.depth]
+ * @returns {Promise<Buffer>} a PNG buffer ready to slot into the VB grid.
+ */
+async function sceneCellRefForCharacter(sheet, opts = {}) {
+  const { pose = 'threeQuarter', flip = false, depth = 'foreground' } = opts;
+  const includeFace = depth === 'foreground';
+  const { body, face } = await cropAvatarCell(sheet, { pose, flip, includeFace });
+  if (!includeFace || !face) return body;
+
+  // Stack face on top, body below, on a white background, sized to a
+  // common width so sharp can composite cleanly. Face cell is short
+  // (head only) so the combined tile reads as "this is the character,
+  // shown both head-up-close AND full-body in pose".
+  const TARGET_W = 256;
+  const facePng = await sharp(face).resize({ width: TARGET_W }).png().toBuffer();
+  const bodyPng = await sharp(body).resize({ width: TARGET_W }).png().toBuffer();
+  const fm = await sharp(facePng).metadata();
+  const bm = await sharp(bodyPng).metadata();
+  const totalH = (fm.height || 0) + (bm.height || 0);
+  return sharp({
+    create: { width: TARGET_W, height: totalH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+  })
+    .composite([
+      { input: facePng, top: 0, left: 0 },
+      { input: bodyPng, top: fm.height || 0, left: 0 },
+    ])
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Heuristic: is this image likely a 2×4 character sheet (8 cells, 4 cols × 2
+ * rows)? We use aspect ratio: a sheet generated at 16:9 has W/H ≈ 1.78. A
+ * normal single-portrait reference (~3:4 or 9:16) has W/H ≤ ~0.75. Anything
+ * with aspect > 1.4 is treated as a 2×4 sheet.
+ */
+async function looksLike2x4Sheet(imageData) {
+  const buf = Buffer.isBuffer(imageData)
+    ? imageData
+    : Buffer.from(String(imageData).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  try {
+    const meta = await sharp(buf).metadata();
+    if (!meta.width || !meta.height) return false;
+    return (meta.width / meta.height) > 1.4;
+  } catch { return false; }
+}
+
+/**
  * Detect z-order (paint sequence) by reading actual occlusion from the
  * populated plate. For each pair of placements whose bboxes overlap, count
  * saturated pixels of each character's colour inside the intersection
@@ -992,6 +1057,8 @@ module.exports = {
   FACE_CELL,
   DEFAULT_PALETTE,
   cropAvatarCell,
+  sceneCellRefForCharacter,
+  looksLike2x4Sheet,
   // internal helpers exposed for tests
   _internal: {
     findColorBbox,

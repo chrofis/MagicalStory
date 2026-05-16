@@ -7769,7 +7769,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       elementReferences = elementReferences.filter(e => e.type !== 'location');
     }
     if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+      // Pass per-scene character context so the grid builder crops 2×4
+      // character refs to a single scene-appropriate cell (face+body for
+      // close-ups, body for medium/background — never the whole 8-cell sheet).
+      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks, {
+        sceneCharacters: newSceneMetadata?.fullData?.characters || newSceneMetadata?.characters || [],
+      });
     }
   }
 
@@ -13025,16 +13030,49 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   // Add VB elements (secondary chars, animals, artifacts, vehicles, locations).
   // loadVbReferenceBytes returns base64; wrap as a data URI so the grid
   // composer treats every entry uniformly.
+  //
+  // For CHARACTER entries whose reference image is a 2×4 sheet (Phase 5/6/7
+  // makes every character avatar a 2×4 now), crop a single appropriate cell:
+  //   close-up (foreground) → face + body composite
+  //   midground / background → body cell only
+  // at the scene-intended pose. Sending the whole 2×4 as a VB tile was
+  // wrong — the page generator was being shown 8 views of the same char in
+  // one tile. Per-scene context comes from options.sceneCharacters (passed
+  // from sceneMetadata.fullData.characters), keyed by name.
+  const { sceneCharacters = [] } = options;
+  const sceneCharMap = new Map();
+  for (const sc of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) {
+    const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
+    if (nm) sceneCharMap.set(nm.toLowerCase(), sc);
+  }
+  let sceneCellRefForCharacter, looksLike2x4Sheet;
+  try { ({ sceneCellRefForCharacter, looksLike2x4Sheet } = require('./sceneComposite')); } catch { /* unavailable in tests */ }
+
   await Promise.all(vbElements.map(async (el) => {
     if (!el.referenceImageData && !el.referenceImageUrl) return;
     const bytes = await loadVbReferenceBytes(el);
-    if (bytes) {
-      allElements.push({
-        name: el.name,
-        type: el.type,
-        imageData: `data:image/jpeg;base64,${bytes}`,
-      });
+    if (!bytes) return;
+    let imageData = `data:image/jpeg;base64,${bytes}`;
+
+    // Per-scene cell crop for character entries with 2×4-shaped refs.
+    if (el.type === 'character' && sceneCellRefForCharacter && looksLike2x4Sheet) {
+      try {
+        if (await looksLike2x4Sheet(imageData)) {
+          const ctx = sceneCharMap.get((el.name || '').toLowerCase()) || {};
+          const pose = ['front', 'threeQuarter', 'profile', 'back'].includes(ctx.pose) ? ctx.pose : 'threeQuarter';
+          const flip = ctx.flip === true;
+          const depth = ['foreground', 'midground', 'background'].includes(ctx.depth) ? ctx.depth : 'foreground';
+          const tileBuf = await sceneCellRefForCharacter(imageData, { pose, flip, depth });
+          imageData = `data:image/png;base64,${tileBuf.toString('base64')}`;
+        }
+      } catch (cropErr) {
+        // Fall through to original 2×4 if cropping blew up — better than dropping
+        // the character ref entirely. Surface in logs.
+        require('../utils/logger').log.warn(`[VB GRID] sceneCellRefForCharacter failed for ${el.name}: ${cropErr.message}`);
+      }
     }
+
+    allElements.push({ name: el.name, type: el.type, imageData });
   }));
 
   // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo).

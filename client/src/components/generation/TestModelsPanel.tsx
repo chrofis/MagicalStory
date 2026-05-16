@@ -14,15 +14,34 @@ interface TestModelsPanelProps {
   language: string;
 }
 
+// Verbatim snapshot of what hit the Grok API wire — populated by the API
+// wrapper (server/lib/grok.js editWithGrok/generateWithGrok). Same shape for
+// every call site, so the dev panel renders one source of truth instead of
+// each caller synthesising its own snapshot.
+interface SentToGrok {
+  endpoint: string;            // '/v1/images/edits' | '/v1/images/generations'
+  model: string;
+  aspectRatio: string;
+  resolution?: string;
+  prompt: string;
+  promptLength: number;
+  referenceImages: Array<{ slot: number; role?: string | null; dataUri: string; sizeKb?: number | null }>;
+  capturedAt: string;
+  elapsedMs: number;
+}
+
 interface CompositeDebugBundle {
   populatedPlate?: string;
   populatedPlatePrompt?: string;
+  populatedPlateSentToGrok?: SentToGrok | null;
   cleanBackground?: string;
   cleanBackgroundPrompt?: string | null;
   cleanBackgroundSource?: string;
   depopulatePrompt?: string;
+  depopulateSentToGrok?: SentToGrok | null;
   composited?: string;
   blendPrompt?: string;
+  blendSentToGrok?: SentToGrok | null;
   bboxes?: Record<string, { x: number; y: number; width: number; height: number; pixels: number }>;
   phantomPoseRenders?: Record<string, { output?: string; phantomCrop?: string; prompt?: string; bbox?: unknown; action?: string | null }>;
   zScores?: Record<string, number>;
@@ -64,6 +83,66 @@ const AVAILABLE_MODELS: ModelOption[] = [
 
 // Distinct stable colours for bbox outlines — palette spaced > 30° in hue.
 const BBOX_COLOURS = ['#E60000', '#0050D0', '#00B050', '#F0C000', '#8B00B0', '#00B0B0', '#FF7F00', '#888888'];
+
+/**
+ * Render a single `sentToGrok` snapshot — endpoint + model + aspect + prompt
+ * + each reference image (with role label) and meta. Source is the API
+ * wrapper's verbatim capture, so what's shown is exactly what hit Grok.
+ */
+function SentToGrokBlock({
+  snapshot,
+  label,
+  onLightbox,
+}: {
+  snapshot: SentToGrok | null | undefined;
+  label: string;
+  onLightbox: (src: string) => void;
+}) {
+  if (!snapshot) {
+    return (
+      <details className="mt-1">
+        <summary className="text-[10px] text-gray-400 cursor-pointer">{label} — sent to Grok (not captured)</summary>
+        <div className="text-[10px] text-gray-500 mt-1">No sentToGrok snapshot persisted for this step. (Old story or non-Grok path.)</div>
+      </details>
+    );
+  }
+  return (
+    <details className="mt-1" open>
+      <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">
+        {label} — sent to Grok ({snapshot.endpoint}, {snapshot.model}, {snapshot.aspectRatio}, {snapshot.referenceImages?.length || 0} ref{(snapshot.referenceImages?.length || 0) === 1 ? '' : 's'}, {snapshot.elapsedMs}ms)
+      </summary>
+      <div className="mt-1 space-y-2">
+        <details open>
+          <summary className="text-[10px] text-gray-500 cursor-pointer">Prompt ({snapshot.promptLength} chars)</summary>
+          <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{snapshot.prompt}</pre>
+        </details>
+        {(snapshot.referenceImages || []).length > 0 && (
+          <div>
+            <div className="text-[10px] text-gray-500 mb-1">Reference images ({snapshot.referenceImages.length})</div>
+            <div className="grid grid-cols-3 gap-2">
+              {snapshot.referenceImages.map((ref) => (
+                <div key={ref.slot} className="flex flex-col items-center">
+                  {ref.dataUri && (
+                    <img
+                      src={ref.dataUri}
+                      alt={`slot ${ref.slot}`}
+                      className="max-h-32 w-full object-contain rounded border bg-white cursor-pointer"
+                      onClick={() => onLightbox(ref.dataUri)}
+                    />
+                  )}
+                  <span className="text-[9px] font-mono text-gray-700 mt-0.5">
+                    Slot {ref.slot} {ref.role ? `· ${ref.role}` : ''} {ref.sizeKb != null ? `· ${ref.sizeKb}KB` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="text-[9px] text-gray-400">captured {snapshot.capturedAt}</div>
+      </div>
+    </details>
+  );
+}
 
 /**
  * Crop one bbox out of a source image via SVG. viewBox is the crop region
@@ -734,9 +813,15 @@ export function TestModelsPanel({
                                 ))}
                               </div>
                             )}
-                            {result.compositeDebug.populatedPlatePrompt && (
-                              <details className="mt-1" open>
-                                <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">populated-plate prompt ({result.compositeDebug.populatedPlatePrompt.length} chars)</summary>
+                            <SentToGrokBlock
+                              snapshot={result.compositeDebug.populatedPlateSentToGrok}
+                              label="Populated plate"
+                              onLightbox={setLightboxImage}
+                            />
+                            {/* Fallback for stories generated before sentToGrok existed. */}
+                            {!result.compositeDebug.populatedPlateSentToGrok && result.compositeDebug.populatedPlatePrompt && (
+                              <details className="mt-1">
+                                <summary className="text-[10px] text-gray-400 cursor-pointer">populated-plate prompt (legacy — pre-sentToGrok) ({result.compositeDebug.populatedPlatePrompt.length} chars)</summary>
                                 <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.populatedPlatePrompt}</pre>
                               </details>
                             )}
@@ -754,9 +839,14 @@ export function TestModelsPanel({
                               className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
                               onClick={() => setLightboxImage(result.compositeDebug!.cleanBackground!)}
                             />
-                            {result.compositeDebug.depopulatePrompt && (
-                              <details className="mt-1" open>
-                                <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">depopulate prompt ({result.compositeDebug.depopulatePrompt.length} chars)</summary>
+                            <SentToGrokBlock
+                              snapshot={result.compositeDebug.depopulateSentToGrok}
+                              label="Depopulate"
+                              onLightbox={setLightboxImage}
+                            />
+                            {!result.compositeDebug.depopulateSentToGrok && result.compositeDebug.depopulatePrompt && (
+                              <details className="mt-1">
+                                <summary className="text-[10px] text-gray-400 cursor-pointer">depopulate prompt (legacy — pre-sentToGrok) ({result.compositeDebug.depopulatePrompt.length} chars)</summary>
                                 <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.depopulatePrompt}</pre>
                               </details>
                             )}
@@ -841,15 +931,22 @@ export function TestModelsPanel({
                           </details>
                         )}
                         {/* Step 6 — final blend (the top-of-card image IS this output) */}
-                        {result.compositeDebug.blendPrompt && (
+                        {(result.compositeDebug.blendSentToGrok || result.compositeDebug.blendPrompt) && (
                           <div>
                             <div className="text-[10px] font-semibold text-purple-700 mb-1">
                               6. Blend <span className="text-gray-500 font-normal">— Grok edit harmonises lighting/edges/required objects (final blend is the top-of-card image above)</span>
                             </div>
-                            <details open>
-                              <summary className="text-[10px] font-medium text-purple-600 cursor-pointer">blend prompt ({result.compositeDebug.blendPrompt.length} chars)</summary>
-                              <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.blendPrompt}</pre>
-                            </details>
+                            <SentToGrokBlock
+                              snapshot={result.compositeDebug.blendSentToGrok}
+                              label="Blend"
+                              onLightbox={setLightboxImage}
+                            />
+                            {!result.compositeDebug.blendSentToGrok && result.compositeDebug.blendPrompt && (
+                              <details>
+                                <summary className="text-[10px] text-gray-400 cursor-pointer">blend prompt (legacy — pre-sentToGrok) ({result.compositeDebug.blendPrompt.length} chars)</summary>
+                                <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.blendPrompt}</pre>
+                              </details>
+                            )}
                           </div>
                         )}
                       </div>
