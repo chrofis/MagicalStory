@@ -5965,6 +5965,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Build storyData for iterate (needs scene descriptions, characters, visual bible)
         const pipelineStoryData = {
           characters: inputData.characters,
+          // Phase 7 cell-crop refs: iteratePageCore checks
+          // storyData.characterAvatars to crop a single body cell per character
+          // (matching the scene's pose) instead of attaching the full 2×4
+          // sheet. Without this field present, the cell-crop branch silently
+          // skips and Grok receives the full sheet as a reference — the model
+          // then tries to recompose all 8 cells into the page.
+          characterAvatars: storyCharacterAvatarsForComposite,
           sceneDescriptions: expandedScenes,
           story: fullStoryText,
           storyText: fullStoryText,
