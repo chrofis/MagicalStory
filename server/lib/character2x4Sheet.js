@@ -42,18 +42,37 @@ function loadPhantom() {
   return phantomCache;
 }
 
+// Art-style descriptors injected into the 2×4 generation prompt so the sheet
+// renders in the story's chosen style. MUST stay aligned with
+// sceneComposite.js BLEND_STYLE_LINES — the blend step uses the same
+// descriptors so the page-level art lands on the same surface treatment as
+// the character sheet. Adult-figure stories rely on this: "cartoon" without
+// the descriptor leaves Grok free to invent chibi proportions on an adult
+// face (see staging story job_1778881997472 page 1 — Daniel rendered as
+// chibi-bodied 68-year-old).
+const ART_STYLE_LINES = {
+  watercolor: "soft watercolor children's storybook illustration style — gentle washes, simple outlines, realistic adult proportions for adult characters",
+  pixar:      "Pixar 3D illustration style — smooth shading, clean rim light, age-appropriate body proportions (no chibi heads on adult bodies)",
+  anime:      "anime line-art style — clean lines, flat shading, age-appropriate body proportions",
+  cartoon:    "modern flat cartoon — bold outlines, clean shapes, age-appropriate body proportions (adults have full adult proportions, NOT chibi)",
+  oil:        "oil painting style with visible brushwork, realistic age-appropriate proportions",
+};
+
 function buildPrompt(artStyle, costumeDescription) {
+  const styleLine = ART_STYLE_LINES[artStyle] || ART_STYLE_LINES.watercolor;
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face.
 Image 2 is the character's body. Image 3 is the character's face.
 
 Costume: ${costumeDescription}
+
+Render every cell in ${styleLine}.
 
 Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
 
 Cells 1-4 (top row): head and neck only, no shoulders, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head.
 Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back.
 
-Every cell faces in the same direction as the matching cell in Image 1. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels.`;
+Every cell faces in the same direction as the matching cell in Image 1. The same costume — every accessory — appears in cells 5, 6, 7, and 8. The body in cells 5-8 keeps the proportions of the person in Image 3 (the face photo) — match the apparent age. No text, no numbers, no labels.`;
 }
 
 /**
