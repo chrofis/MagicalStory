@@ -31,15 +31,33 @@ interface SentToGrok {
 }
 
 interface CompositeDebugBundle {
+  // Stratified-only: pre-step-1 artefacts.
+  strategy?: 'stratified' | 'uniform';
+  backNames?: string[];
+  frontNames?: string[];
+  emptyScene?: string;
+  emptySceneSource?: string;
+  emptyScenePrompt?: string;
+  emptySceneSentToGrok?: SentToGrok | null;
+  backIdentityPack?: string;
+  frontIdentityPack?: string;
+  // Step 1 — uniform calls this "populated plate", stratified aliases it.
   populatedPlate?: string;
   populatedPlatePrompt?: string;
   populatedPlateSentToGrok?: SentToGrok | null;
+  // Step 2 — depopulate.
   cleanBackground?: string;
   cleanBackgroundPrompt?: string | null;
   cleanBackgroundSource?: string;
   depopulatePrompt?: string;
   depopulateSentToGrok?: SentToGrok | null;
+  // Step 3 — stratified-only front-figure plate.
+  frontPlate?: string;
+  frontPlatePrompt?: string;
+  frontPlateSentToGrok?: SentToGrok | null;
+  // Step 4 — composited intermediate.
   composited?: string;
+  // Step 5 — blend pass.
   blendPrompt?: string;
   blendSentToGrok?: SentToGrok | null;
   bboxes?: Record<string, { x: number; y: number; width: number; height: number; pixels: number }>;
@@ -826,11 +844,69 @@ export function TestModelsPanel({
                         Composite intermediate steps (actual pipeline order)
                       </summary>
                       <div className="mt-2 space-y-3">
+                        {/* Stratified-only: cast split + step-0 inputs (empty scene + identity packs). */}
+                        {result.compositeDebug.strategy === 'stratified' && (
+                          <div className="rounded border border-emerald-300 bg-emerald-50 p-2 space-y-2">
+                            <div className="text-[10px] font-semibold text-emerald-800">
+                              Stratified Composite — cast split
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-[10px]">
+                              <span><strong>back</strong> (rendered native): {(result.compositeDebug.backNames || []).join(', ') || '—'}</span>
+                              <span><strong>front</strong> (silhouette → cutout): {(result.compositeDebug.frontNames || []).join(', ') || '—'}</span>
+                            </div>
+                            {(result.compositeDebug.emptyScene || result.compositeDebug.backIdentityPack || result.compositeDebug.frontIdentityPack) && (
+                              <div className={fullscreen ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-3 gap-1'}>
+                                {result.compositeDebug.emptyScene && (
+                                  <div className="flex flex-col">
+                                    <div className="text-[9px] font-medium text-emerald-800 mb-0.5">
+                                      0. Empty scene <span className="text-gray-500 font-normal">({result.compositeDebug.emptySceneSource || 'generated'})</span>
+                                    </div>
+                                    <img
+                                      src={result.compositeDebug.emptyScene}
+                                      alt="empty scene"
+                                      className={`${fullscreen ? 'max-h-48' : 'max-h-32'} w-full object-contain rounded border bg-white cursor-pointer`}
+                                      onClick={() => setLightboxImage(result.compositeDebug!.emptyScene!)}
+                                    />
+                                  </div>
+                                )}
+                                {result.compositeDebug.backIdentityPack && (
+                                  <div className="flex flex-col">
+                                    <div className="text-[9px] font-medium text-emerald-800 mb-0.5">Back identity pack</div>
+                                    <img
+                                      src={result.compositeDebug.backIdentityPack}
+                                      alt="back identity pack"
+                                      className={`${fullscreen ? 'max-h-48' : 'max-h-32'} w-full object-contain rounded border bg-white cursor-pointer`}
+                                      onClick={() => setLightboxImage(result.compositeDebug!.backIdentityPack!)}
+                                    />
+                                  </div>
+                                )}
+                                {result.compositeDebug.frontIdentityPack && (
+                                  <div className="flex flex-col">
+                                    <div className="text-[9px] font-medium text-emerald-800 mb-0.5">Front identity pack</div>
+                                    <img
+                                      src={result.compositeDebug.frontIdentityPack}
+                                      alt="front identity pack"
+                                      className={`${fullscreen ? 'max-h-48' : 'max-h-32'} w-full object-contain rounded border bg-white cursor-pointer`}
+                                      onClick={() => setLightboxImage(result.compositeDebug!.frontIdentityPack!)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {result.compositeDebug.emptySceneSentToGrok && (
+                              <SentToGrokBlock
+                                snapshot={result.compositeDebug.emptySceneSentToGrok}
+                                label="Empty scene (step 0)"
+                                onLightbox={setLightboxImage}
+                              />
+                            )}
+                          </div>
+                        )}
                         {/* Step 1 — populated plate with bbox overlay */}
                         {result.compositeDebug.populatedPlate && (
                           <div>
                             <div className="text-[10px] font-semibold text-purple-700 mb-1">
-                              1. Populated plate <span className="text-gray-500 font-normal">— Grok generate, scene + silhouettes in one call</span>
+                              1. {result.compositeDebug.strategy === 'stratified' ? 'Anchor plate' : 'Populated plate'} <span className="text-gray-500 font-normal">— {result.compositeDebug.strategy === 'stratified' ? 'Grok edit on empty scene + identity packs, back chars rendered native + front as silhouettes' : 'Grok generate, scene + silhouettes in one call'}</span>
                             </div>
                             <PlateWithBboxes
                               src={result.compositeDebug.populatedPlate}
@@ -890,7 +966,33 @@ export function TestModelsPanel({
                             )}
                           </div>
                         )}
-                        {/* Step 3 — diff-based bbox detect. Show per-character crops
+                        {/* Stratified-only: Step 3 — front-figure plate (real front
+                            chars rendered together where the silhouettes were). */}
+                        {result.compositeDebug.frontPlate && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-emerald-800 mb-1">
+                              3. Front-figure plate <span className="text-gray-500 font-normal">— Grok edit replaces front silhouettes with real characters (one call, all front chars together)</span>
+                            </div>
+                            <img
+                              src={result.compositeDebug.frontPlate}
+                              alt="front figure plate"
+                              className={`${fullscreen ? 'max-h-[60vh]' : 'max-h-64'} w-full object-contain rounded border bg-white cursor-pointer`}
+                              onClick={() => setLightboxImage(result.compositeDebug!.frontPlate!)}
+                            />
+                            <SentToGrokBlock
+                              snapshot={result.compositeDebug.frontPlateSentToGrok}
+                              label="Front-figure plate"
+                              onLightbox={setLightboxImage}
+                            />
+                            {!result.compositeDebug.frontPlateSentToGrok && result.compositeDebug.frontPlatePrompt && (
+                              <details className="mt-1">
+                                <summary className="text-[10px] text-gray-400 cursor-pointer">front-plate prompt (legacy — pre-sentToGrok) ({result.compositeDebug.frontPlatePrompt.length} chars)</summary>
+                                <pre className="mt-1 text-[10px] bg-gray-50 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap border">{result.compositeDebug.frontPlatePrompt}</pre>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                        {/* Step 3/4 — diff-based bbox detect. Show per-character crops
                             from the populated plate so the result is concrete. */}
                         {result.compositeDebug.bboxes && Object.keys(result.compositeDebug.bboxes).length > 0 && result.compositeDebug.populatedPlate && (
                           <div>

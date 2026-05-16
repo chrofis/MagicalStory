@@ -738,6 +738,73 @@ DO NOT:
   return full;
 }
 
+// ─── Stratified-composite helpers ─────────────────────────────────────────
+
+/**
+ * Stitch the 2×4 sheets of every cast entry into a single horizontal strip
+ * with a name label below each panel. Used as a Grok edit reference to
+ * anchor character identities when the prompt names them.
+ *
+ * @param {Array<Object>} cast - entries with `name` and `sheetBuf` (Buffer).
+ * @param {Object} [options]
+ * @param {number} [options.targetHeight=512] - panel height in px.
+ * @param {number} [options.labelHeight=32]  - black label bar height.
+ * @returns {Promise<string>} data URI of the stitched pack (jpeg).
+ */
+async function buildIdentityPack(cast, options = {}) {
+  const { targetHeight = 512, labelHeight = 32 } = options;
+  if (!Array.isArray(cast) || cast.length === 0) return null;
+
+  // Resize every sheet to the same height; collect dims + raw buffers.
+  const panels = [];
+  for (const c of cast) {
+    if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) continue;
+    const resized = await sharp(c.sheetBuf)
+      .resize({ height: targetHeight, withoutEnlargement: false })
+      .toBuffer({ resolveWithObject: true });
+    panels.push({ buf: resized.data, w: resized.info.width, h: resized.info.height, name: c.name });
+  }
+  if (panels.length === 0) return null;
+
+  // Build a label image (black bar with white text) for each panel using SVG.
+  const labelled = [];
+  for (const p of panels) {
+    const svg = Buffer.from(
+      `<svg width="${p.w}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="${p.w}" height="${labelHeight}" fill="#000"/>
+        <text x="${p.w / 2}" y="${labelHeight / 2 + 6}" font-family="sans-serif" font-size="18" font-weight="bold" fill="#fff" text-anchor="middle">${(p.name || '').replace(/[<>&]/g, '')}</text>
+      </svg>`
+    );
+    const stacked = await sharp({
+      create: { width: p.w, height: p.h + labelHeight, channels: 3, background: '#ffffff' },
+    })
+      .composite([
+        { input: p.buf, top: 0, left: 0 },
+        { input: svg, top: p.h, left: 0 },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer({ resolveWithObject: true });
+    labelled.push({ buf: stacked.data, w: stacked.info.width, h: stacked.info.height });
+  }
+
+  // Horizontal stitch.
+  const totalW = labelled.reduce((acc, p) => acc + p.w, 0);
+  const maxH = labelled.reduce((acc, p) => Math.max(acc, p.h), 0);
+  let x = 0;
+  const composites = labelled.map((p) => {
+    const c = { input: p.buf, top: 0, left: x };
+    x += p.w;
+    return c;
+  });
+  const out = await sharp({
+    create: { width: totalW, height: maxH, channels: 3, background: '#ffffff' },
+  })
+    .composite(composites)
+    .jpeg({ quality: 88 })
+    .toBuffer();
+  return `data:image/jpeg;base64,${out.toString('base64')}`;
+}
+
 // ─── Stratified-composite prompt builders ─────────────────────────────────
 
 /**
@@ -768,22 +835,32 @@ function buildBackCharLines(backCast) {
  * Reference images shipped alongside: one 2×4 sheet per back-stratum char,
  * so Grok knows who they are without consuming a front-stratum cutout pass.
  */
-function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt) {
+function buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasIdentityPack = false) {
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
   const sceneIntentBlock = scene?.intent
     ? `\nScene intent: ${String(scene.intent).trim()}\n`
     : '';
+  // Inputs Grok sees: Image 1 = empty-scene canvas to populate. Image 2 (when
+  // present) = labelled identity pack of back-stratum characters stitched
+  // horizontally with a name bar below each panel. Image 3 (when present) =
+  // labelled front-stratum identity pack. The prompt names the slots explicitly.
+  const refsBlock = hasIdentityPack
+    ? `\nINPUT IMAGES:\n- Image 1: the empty scene canvas. Paint your output ON TOP of this — keep the setting, lighting, and named props from Image 1 intact unless the priority list below says otherwise.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one back-stratum character, with the character's name on a black bar below the panel. Match every back-stratum character's face, hair, and clothing to the matching panel.\n${frontCast.length > 0 ? '- Image 3: labelled identity pack for the front-stratum characters (the ones rendered as flat-colour silhouettes). DO NOT draw their real faces or clothing here — only the flat silhouettes. Image 3 is provided so the silhouette regions sit where the named character will go.\n' : ''}`
+    : '';
   const backBlock = backCast.length > 0
-    ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. Identity references for each follow this prompt as separate images (one 2×4 sheet per back-stratum character). Match each character's face, hair, and clothing from the matching reference sheet.\n\n${buildBackCharLines(backCast)}\n`
+    ? `BACK STRATUM — render these ${backCast.length} character(s) as REAL characters drawn into the scene. ${hasIdentityPack ? 'Match each character\'s face, hair, and clothing to the matching panel of Image 2.' : 'Use the descriptions in the page brief below for each character\'s face, hair, and clothing.'}\n\n${buildBackCharLines(backCast)}\n`
     : '';
   const frontBlock = frontCast.length > 0
-    ? `FRONT STRATUM — place ${frontCast.length} flat-colour silhouette figure(s) on top of the scene. These mark the regions where real characters will be inset in a later step. Use the cast entries below for size, depth and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it.\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.`
+    ? `FRONT STRATUM — place ${frontCast.length} flat-colour silhouette figure(s) on top of the scene. These mark the regions where real characters will be inset in a later step. Use the cast entries below for size, depth and per-character action. Silhouettes MAY partially occlude back-stratum characters when the scene calls for it. ${hasIdentityPack ? 'IGNORE Image 3 for the silhouette appearance — those characters are NOT to be drawn as real characters in this image, only as the flat-colour silhouettes specified below.' : ''}\n\n${buildCastLines(frontCast)}\n\nSILHOUETTE RENDERING DETAILS:\n- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.\n- Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.\n- Size scales with depth: foreground largest, midground medium, background small.`
+    : '';
+  const briefBlock = scene?.pageBrief && String(scene.pageBrief).trim()
+    ? `\nPAGE BRIEF — canonical descriptions of every named character, costume, prop, and required object. Use these descriptions ONLY for the back-stratum characters listed above (and for setting props). The front-stratum characters are silhouettes here — their descriptions are reserved for a later step.\n\n${String(scene.pageBrief).trim()}\n`
     : '';
   const totalCount = backCast.length + frontCast.length;
   return `Paint a single illustrated scene that contains ${totalCount} character(s). Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
-
+${refsBlock}
 PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate.
 
 SETTING DESCRIPTION:
@@ -793,7 +870,7 @@ PRIORITY 2 — Populate the scene with the cast below in two strata. Characters 
 
 ${backBlock}
 ${frontBlock}
-
+${briefBlock}
 NO TEXT in the output.`;
 }
 
@@ -830,17 +907,23 @@ The output is the same scene as the input, with only the coloured silhouettes re
  * Reference images shipped alongside: anchor plate first, then one 2×4
  * sheet per front-stratum character.
  */
-function buildFrontInsetPrompt(frontCast) {
+function buildFrontInsetPrompt(frontCast, scene, hasIdentityPack = false) {
   const colorList = frontCast
     .map(c => `- ${c.color}${c.colorName ? ` (${c.colorName})` : ''} silhouette → ${c.name}`)
     .join('\n');
-  return `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character drawn from the matching reference sheet (Images 2 onward, one 2×4 sheet per front-stratum character in order).
-
+  const refsBlock = hasIdentityPack
+    ? `\nINPUT IMAGES:\n- Image 1: the anchor plate. This is the canvas to refine. Replace each flat-colour silhouette with the matching REAL character; keep everything else pixel-identical.\n- Image 2: labelled identity pack — each panel shows the 2×4 reference sheet for one front-stratum character, with the character's name on a black bar below the panel. Use Image 2 to bind name↔face↔clothing for every silhouette listed below.\n`
+    : '';
+  const briefBlock = scene?.pageBrief && String(scene.pageBrief).trim()
+    ? `\nPAGE BRIEF — canonical descriptions of the named characters and their costumes. Use these descriptions (combined with the identity pack panels) for face, hair, and clothing of the front-stratum characters below.\n\n${String(scene.pageBrief).trim()}\n`
+    : '';
+  return `Refine the input image (Image 1) by replacing each flat-colour silhouette figure with the corresponding REAL character.
+${refsBlock}
 Silhouette → character mapping:
 ${colorList}
 
 DO:
-- For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the reference sheet for that character.
+- For each silhouette, draw the real character occupying the same bounding region: same height, same foot position, same body direction. Face, hair, and clothing must match the identity pack panel and the descriptions in the page brief.
 - All ${frontCast.length} front-stratum characters appear in ONE image together — they share the scene's lighting, eye-line continuity, and any pose interactions implied by their positions.
 - Keep everything else in Image 1 pixel-identical. The background scenery, every named prop, and any back-stratum characters already drawn into the scene must remain exactly as they are.
 
@@ -850,7 +933,7 @@ DO NOT:
 - Change the background scenery, props, or any other figure that is not a flat-colour silhouette.
 - Add text, captions, numbers, or signatures.
 - Leave any flat-colour residue from the silhouettes — they must be fully replaced by rendered characters.
-
+${briefBlock}
 The output is Image 1 with each coloured silhouette replaced by the matching real character, rendered together in one cohesive scene.`;
 }
 
@@ -1129,6 +1212,7 @@ async function generateSceneComposite(opts) {
 async function generateStratifiedComposite(opts) {
   const {
     cleanBackgroundPrompt,
+    existingCleanBackground = null,
     scene = {},
     cast = [],
     aspectRatio = '16:9',
@@ -1183,10 +1267,45 @@ async function generateStratifiedComposite(opts) {
 
   log.info(`[STRATIFIED] cast split — back=[${backCast.map(c=>c.name).join(',')}] front=[${frontCast.map(c=>c.name).join(',')}]`);
 
+  // ── Step 0: empty-scene canvas
+  // Stratified step 1 is a Grok EDIT so we can attach identity packs as
+  // reference images. Edit needs Image 1 = a canvas. Reuse a saved
+  // empty-scene plate when provided; otherwise generate one (extra call).
+  let emptySceneData = null;
+  let emptySceneSource = 'reused';
+  if (existingCleanBackground && typeof existingCleanBackground === 'string' && existingCleanBackground.length > 0) {
+    emptySceneData = existingCleanBackground.startsWith('data:')
+      ? existingCleanBackground
+      : `data:image/jpeg;base64,${existingCleanBackground}`;
+    log.info('[SCENE COMPOSITE/STRATIFIED] step 0/5 — reusing existing clean background as canvas');
+  } else {
+    log.info('[SCENE COMPOSITE/STRATIFIED] step 0/5 — generating empty scene canvas');
+    const emptyPrompt = `Paint a single illustrated scene with no people, no characters, no animals — just the setting, props, and lighting.\n\nSETTING DESCRIPTION:\n${(cleanBackgroundPrompt && cleanBackgroundPrompt.trim()) || scene?.description || 'an outdoor scene'}${scene?.intent ? `\n\nScene intent: ${String(scene.intent).trim()}` : ''}\n\nNO TEXT in the output. No human or animal figures of any kind.`;
+    const emptyGen = await generateWithGrok(emptyPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+    if (usageTracker) usageTracker('grok', emptyGen.usage, 'scene_composite_strat_empty_scene', emptyGen.modelId);
+    totalCost += emptyGen.usage?.cost || 0;
+    emptySceneData = emptyGen.imageData;
+    emptySceneSource = 'generated';
+    debug.emptyScenePrompt = emptyPrompt;
+    debug.emptySceneSentToGrok = emptyGen.sentToGrok || null;
+  }
+  debug.emptyScene = emptySceneData;
+  debug.emptySceneSource = emptySceneSource;
+
+  // ── Identity packs (one stitched reference per stratum that has chars)
+  const backIdentityPack = await buildIdentityPack(backCast);
+  const frontIdentityPack = frontCast.length > 0 ? await buildIdentityPack(frontCast) : null;
+  if (backIdentityPack) debug.backIdentityPack = backIdentityPack;
+  if (frontIdentityPack) debug.frontIdentityPack = frontIdentityPack;
+
   // ── Step 1/5: Anchor plate (back rendered native, front as silhouettes)
   log.info(`[SCENE COMPOSITE/STRATIFIED] step 1/5 — anchor plate (back=${backCast.length}, front=${frontCast.length})`);
-  const anchorPrompt = buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt);
-  const anchor = await generateWithGrok(anchorPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+  const hasAnchorIdentity = !!backIdentityPack;
+  const anchorPrompt = buildAnchorPlatePrompt(scene, backCast, frontCast, cleanBackgroundPrompt, hasAnchorIdentity);
+  const anchorRefs = [emptySceneData];
+  if (backIdentityPack) anchorRefs.push(backIdentityPack);
+  if (frontIdentityPack && anchorRefs.length < 3) anchorRefs.push(frontIdentityPack);
+  const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
   totalCost += anchor.usage?.cost || 0;
   const anchorBuf = Buffer.from(anchor.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
@@ -1196,6 +1315,7 @@ async function generateStratifiedComposite(opts) {
   // Back-compat aliases — existing dev panels read these names.
   debug.populatedPlate = anchor.imageData;
   debug.populatedPlatePrompt = anchorPrompt;
+  debug.populatedPlateSentToGrok = anchor.sentToGrok || null;
   debug.blocking = anchor.imageData;
   debug.blockingPrompt = anchorPrompt;
 
@@ -1227,15 +1347,15 @@ async function generateStratifiedComposite(opts) {
 
   // ── Step 3/5: front-figure plate (real front chars in place of silhouettes)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 3/5 — front figure plate');
-  const frontInsetPrompt = buildFrontInsetPrompt(frontCast);
-  // Refs: anchor plate as Image 1 (canvas to refine), VB grid as Image 2
-  // (identity ref). Grok edit caps refs at 3 on the standard model and
-  // stitches them on Pro. Per-character sheets would blow that budget for
-  // any front stratum ≥3, so we lean on the VB grid the same way the blend
-  // step does.
-  const frontInsetRefs = visualBibleGridImage
-    ? [anchor.imageData, visualBibleGridImage]
-    : [anchor.imageData];
+  const hasFrontIdentity = !!frontIdentityPack;
+  const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity);
+  // Refs: anchor plate as Image 1 (canvas to refine), front identity pack
+  // as Image 2 (face/clothing binding for the silhouette → character map).
+  // VB grid still attached as Image 3 when available — Grok stitches refs
+  // on Pro so we stay within budget either way.
+  const frontInsetRefs = [anchor.imageData];
+  if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
+  if (visualBibleGridImage && frontInsetRefs.length < 3) frontInsetRefs.push(visualBibleGridImage);
   const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
