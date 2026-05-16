@@ -27,7 +27,11 @@ const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 
-const MAX_SHEET_RETRIES = 2;
+// Best-of-N cap: first attempt + N retries. We only retry when the eval
+// returns valid=false — a passing first attempt short-circuits the loop.
+// Keep this tight (one retry) so cost stays bounded; if the first generation
+// is acceptable we don't burn extra Grok calls chasing a marginal improvement.
+const MAX_SHEET_RETRIES = 1;
 
 const PHANTOM_PATH = path.resolve(__dirname, '..', 'assets', 'phantom-watercolor.png');
 let phantomCache = null;
