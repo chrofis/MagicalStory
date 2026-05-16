@@ -807,6 +807,20 @@ export function StoryDisplay({
     const isLoading = loadingAvatarGenImages.has(key);
     const isLoaded = !!loadedAvatarGenImages[key];
 
+    // 2×4 sheets are landscape (16:9). Show them wide enough that all 8
+    // cells are legible — otherwise the square thumb crops away 7 cells.
+    // Applies to the styled output (which is the sheet itself) and to the
+    // phantom/standardAvatar inputs when this entry is a 2×4 entry.
+    const isSheetThumb = type === 'styled' &&
+      ((entry as StyledAvatarGenerationEntry).sheetFormat === '2x4') &&
+      (field === 'output' || field === 'phantom' || field === 'standardAvatar');
+    const thumbClass = isSheetThumb
+      ? 'w-48 h-24 object-contain bg-white rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity'
+      : 'w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity';
+    const placeholderClass = isSheetThumb
+      ? 'w-48 h-24 flex flex-col items-center justify-center bg-blue-50 border border-blue-300 rounded text-blue-500 hover:bg-blue-100 disabled:opacity-50 text-[10px]'
+      : 'w-16 h-16 flex flex-col items-center justify-center bg-blue-50 border border-blue-300 rounded text-blue-500 hover:bg-blue-100 disabled:opacity-50 text-[10px]';
+
     return (
       <div className="flex flex-col items-center">
         <span className="text-gray-600 text-[10px] mb-1">{label}</span>
@@ -814,7 +828,7 @@ export function StoryDisplay({
           <img
             src={imageData}
             alt={label}
-            className="w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity"
+            className={thumbClass}
             onClick={() => setEnlargedImage({ src: imageData, title: label })}
             title={sizeKB ? `${sizeKB} KB - Click to enlarge` : 'Click to enlarge'}
           />
@@ -822,7 +836,7 @@ export function StoryDisplay({
           <button
             onClick={() => fetchAvatarGenImages(type, index)}
             disabled={isLoading || isLoaded}
-            className="w-16 h-16 flex flex-col items-center justify-center bg-blue-50 border border-blue-300 rounded text-blue-500 hover:bg-blue-100 disabled:opacity-50 text-[10px]"
+            className={placeholderClass}
             title="Click to load images"
           >
             {isLoading ? (
