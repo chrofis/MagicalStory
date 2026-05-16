@@ -1533,26 +1533,29 @@ async function generateStratifiedComposite(opts) {
     frontCast = split.frontCast;
   }
 
-  // Front stratum needs flat colours for the silhouettes; back stratum does
-  // not (rendered natively). Assign colours to FRONT only so we don't
-  // exhaust the palette on back-half entries.
-  const usedColors = new Set(frontCast.map((c) => c.color).filter(Boolean));
+  // BACK stratum needs flat colours for the silhouettes (they're the
+  // placeholders in step 1). Front stratum is rendered as real characters
+  // and doesn't need a colour. Assign colours to BACK only so we don't
+  // exhaust the palette on front-half entries.
+  const usedColors = new Set(backCast.map((c) => c.color).filter(Boolean));
   let nextColorIdx = 0;
-  for (const c of frontCast) {
+  for (const c of backCast) {
     if (c.color) continue;
     while (usedColors.has(DEFAULT_PALETTE[nextColorIdx]) && nextColorIdx < DEFAULT_PALETTE.length) nextColorIdx++;
     if (nextColorIdx >= DEFAULT_PALETTE.length) {
-      throw new Error(`out of default palette colours (front stratum has ${frontCast.length} characters)`);
+      throw new Error(`out of default palette colours (back stratum has ${backCast.length} characters)`);
     }
     c.color = DEFAULT_PALETTE[nextColorIdx++];
     usedColors.add(c.color);
   }
-  for (const c of frontCast) {
-    if (!POSE_CELL[c.pose]) throw new Error(`frontCast[${c.name}].pose invalid: ${c.pose}`);
-  }
   for (const c of backCast) {
+    if (!POSE_CELL[c.pose]) throw new Error(`backCast[${c.name}].pose invalid: ${c.pose}`);
+  }
+  // Both strata need sheetBuf — front for step-1 identity pack, back for
+  // step-2 identity pack.
+  for (const c of [...frontCast, ...backCast]) {
     if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) {
-      throw new Error(`backCast[${c.name}].sheetBuf must be a Buffer`);
+      throw new Error(`cast[${c.name}].sheetBuf must be a Buffer`);
     }
   }
 
