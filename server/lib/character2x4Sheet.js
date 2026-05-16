@@ -211,7 +211,7 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
 
   const body = {
     contents: [{ parts }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4000, responseMimeType: 'application/json' },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
@@ -400,10 +400,15 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY, facePhoto);
       log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
-      log.warn(`[CHARACTER 2×4] Gemini eval error on attempt ${attempt}: ${err.message} — treating as best-effort accept`);
-      bestAttempt = { result, score: 10, verdict: null, quick, attempt };
-      attemptHistory.push({ attempt, stage: 'eval-error', score: 10, reason: err.message, imageData: result.imageData });
-      break;
+      // Eval errors no longer get a free score=10. Treat them as score=5
+      // (neutral) so a later successful eval can win the best-of-N selection,
+      // but a JSON-truncation failure can't promote a marginal Grok output to
+      // "best attempt" over a real `valid` verdict on the next retry.
+      log.warn(`[CHARACTER 2×4] Gemini eval error on attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
+      const candidate = { result, score: 5, verdict: null, quick, attempt };
+      attemptHistory.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
+      continue;
     }
     const score = verdict.finalScore ?? 0;
     const candidate = { result, score, verdict, quick, attempt };
@@ -442,9 +447,14 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   };
 
   // ── PASS 2: style transfer (skip when artStyle is realistic or eval skipped) ─
+  // Also skip if Pass 1 itself never produced a valid sheet — running style
+  // transfer on a broken anchor (e.g. all quick-fails, score=0) produces a
+  // stylised version of the same broken layout. Better to surface Pass 1's
+  // failure than mask it with a clean-looking Pass 2.
+  const PASS2_MIN_PASS1_SCORE = 6;
   const wantStyleTransfer = !skipQualityEval && artStyle && artStyle !== 'realistic';
   let pass2 = null;
-  if (wantStyleTransfer) {
+  if (wantStyleTransfer && pass1.finalScore >= PASS2_MIN_PASS1_SCORE) {
     pass2 = await runStyleTransferPass({
       pass1ImageData: pass1.imageData,
       facePhoto,
@@ -452,6 +462,8 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       characterName: character?.name,
       usageTracker,
     });
+  } else if (wantStyleTransfer) {
+    log.warn(`[CHARACTER 2×4] ${character?.name} Pass 2 skipped — Pass 1 finalScore=${pass1.finalScore} < ${PASS2_MIN_PASS1_SCORE} (broken sheet, not worth styling)`);
   }
 
   // The function's primary return value (`imageData`) is the styled sheet

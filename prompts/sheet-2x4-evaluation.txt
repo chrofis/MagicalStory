@@ -20,10 +20,11 @@ TASK 1: LAYOUT
 - Cell containment: every figure stays fully inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
 - `layoutScore` = lowest of the four. A waist-cutting failure or any figure spanning two cells must score 1-3.
 
-TASK 2: IDENTITY CONSISTENCY
-- The 4 head portraits show THE SAME PERSON: identical face shape, eyes, nose, mouth, skin tone, hair colour, hairstyle (and length), glasses (if any). Differences are only the camera angle. Score 1-10.
-- The 4 body figures show the same person AND the same person as the heads — same proportions, same age, same skin tone. Score 1-10.
-- `identityScore` = lower of the two. Different hair colour, age, or face between cells must score 1-3.
+TASK 2: IDENTITY CONSISTENCY (per cell, lowest wins)
+- Pick the person depicted in the front cell (cell 1) as the reference. Score every OTHER cell against it individually.
+- For each of cells 2, 3, 4 (top-row head cells): does it show the same person as cell 1? Same face shape, eyes, nose, mouth, skin tone, hair colour, hairstyle, glasses (if any), AND same apparent gender. Only the camera angle should differ. Score each cell 1-10.
+- For each of cells 5, 6, 7, 8 (bottom-row body cells): does it show the same person as the heads (same face when visible, same gender, same age, same proportions, same skin tone)? Score each cell 1-10.
+- `identityScore` MUST equal the LOWEST of all 7 per-cell scores. ONE cell showing a different person (wrong gender, different face, different age) must score 1-3 for that cell and therefore for identityScore — even if the other 6 cells are perfect. Do not average. Do not round up.
 
 TASK 3: OUTFIT CONSISTENCY (only if REQUESTED_OUTFIT is given below)
 - All 4 full-body figures wear the SAME outfit — every accessory, every garment colour, every cut. Score 1-10.
@@ -31,13 +32,12 @@ TASK 3: OUTFIT CONSISTENCY (only if REQUESTED_OUTFIT is given below)
 - `outfitScore` = lower of the two. Different outfits across cells must score 1-3.
 - If REQUESTED_OUTFIT is not provided, set `outfitScore` based on cross-cell outfit consistency alone (no match check).
 
-TASK 4: SOURCE-PHOTO IDENTITY MATCH
-- Compare Image 1 (source photo) against the heads in Image 2 (generated sheet's cells 1-4).
-- Is this the SAME PERSON? Same face structure (jawline, brow, cheekbones), same eye spacing/colour, same nose shape, same hair colour & general style, same skin tone, same apparent age range. Style/medium can differ (photo vs illustration) — what matters is recognisable identity.
-- Score 1-10. `sourceMatchScore` = the score.
-- Different person (wrong race, wrong age decade, wrong gender, completely different face structure) must score 1-3.
-- Same person rendered in a different style = 8-10.
-- Identity is "kinda there" but a few wrong details = 4-6.
+TASK 4: SOURCE-PHOTO IDENTITY MATCH (per head cell, lowest wins)
+- Compare Image 1 (source photo) against EACH of the 4 head cells in Image 2 (cells 1, 2, 3, 4) individually.
+- For each head cell: is this the SAME PERSON as the source photo? Same face structure (jawline, brow, cheekbones), same eye spacing/colour, same nose shape, same hair colour & general style, same skin tone, same apparent age range, same gender. Style/medium can differ (photo vs illustration) — what matters is recognisable identity.
+- Score each cell 1-10. Different person (wrong gender, wrong age decade, wrong race, completely different face) must score 1-3 for that cell.
+- `sourceMatchScore` MUST equal the LOWEST of the 4 per-cell scores. ONE wrong-person cell out of four must drag sourceMatchScore down to that cell's score. Do not average. Do not round up.
+- Same person rendered in a different style = 8-10 per cell. Identity "kinda there" but several wrong details in a cell = 4-6 for that cell.
 
 `finalScore` MUST equal the LOWEST of layoutScore, identityScore, outfitScore, sourceMatchScore.
 `valid` is `true` only when finalScore ≥ 6.
@@ -53,8 +53,8 @@ Return EXACTLY this JSON shape:
     "layoutScore": 8
   },
   "identity": {
-    "headsSamePerson":   {"score": 9, "reason": "Same face, hair, glasses across all 4 head cells"},
-    "bodiesSamePerson":  {"score": 9, "reason": "Same proportions and identity in all 4 body cells; matches the heads"},
+    "headCells":   {"cell2": 9, "cell3": 9, "cell4": 9, "reason": "All match cell 1 — same girl, same hair, only the angle differs"},
+    "bodyCells":   {"cell5": 9, "cell6": 9, "cell7": 9, "cell8": 9, "reason": "Same girl across all 4 body cells, matches the heads"},
     "identityScore": 9
   },
   "outfit": {
@@ -63,8 +63,9 @@ Return EXACTLY this JSON shape:
     "outfitScore": 8
   },
   "sourceMatch": {
+    "perCell": {"cell1": 8, "cell2": 8, "cell3": 9, "cell4": 8},
     "sourceMatchScore": 8,
-    "reason": "Same person — recognisable jawline, eye colour, hair colour. Sheet stylised as cartoon but identity preserved."
+    "reason": "All 4 head cells show the same person as the source photo. Lowest cell (1, 2, 4) scored 8."
   },
   "finalScore": 8,
   "valid": true,
