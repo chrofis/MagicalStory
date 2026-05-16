@@ -38,7 +38,13 @@ export function ImageHistoryModal({
   entityIssues: pageEntityIssues,
 }: ImageHistoryModalProps) {
   const { language } = useLanguage();
-  const [detailIndex, setDetailIndex] = useState<number | null>(null);
+  // Auto-open the detail panel for the active version when the modal opens
+  // in dev mode — the user almost always wants to see what produced the
+  // current image (method, prompt, refs, issues) without an extra click.
+  const initialDetailIndex = developerMode
+    ? (activeVersionIndex ?? (versions.length > 0 ? versions.length - 1 : null))
+    : null;
+  const [detailIndex, setDetailIndex] = useState<number | null>(initialDetailIndex);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [lightboxRef, setLightboxRef] = useState<string | null>(null);
 
