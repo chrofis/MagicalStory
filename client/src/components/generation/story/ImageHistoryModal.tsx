@@ -264,11 +264,29 @@ export function ImageHistoryModal({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 sm:gap-2">
                         <span className="text-white text-xs sm:text-sm font-semibold">{versionLabel(idx)}</span>
-                        {developerMode && version.qualityScore != null && (
-                          <span className={`text-white text-[10px] sm:text-[11px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${scoreBgColor(version.qualityScore)}`}>
-                            {version.qualityScore}%
-                          </span>
-                        )}
+                        {developerMode && (() => {
+                          // Fall back through every score field so a version with
+                          // any persisted evaluation result shows a badge — older
+                          // entries may carry score under different keys
+                          // (finalScore from the unified pipeline,
+                          // rawQualityScore from a pre-penalty pass).
+                          const score = (version as { qualityScore?: number | null }).qualityScore
+                            ?? (version as { finalScore?: number | null }).finalScore
+                            ?? (version as { rawQualityScore?: number | null }).rawQualityScore
+                            ?? null;
+                          if (score == null) {
+                            return (
+                              <span className="text-gray-300 text-[10px] sm:text-[11px] font-medium px-1 sm:px-1.5 py-0.5 rounded border border-gray-400/40">
+                                no score
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={`text-white text-[10px] sm:text-[11px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
+                              {score}%
+                            </span>
+                          );
+                        })()}
                       </div>
                       {isActiveVersion ? (
                         <span className="bg-green-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex items-center gap-0.5">
