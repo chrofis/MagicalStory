@@ -5403,7 +5403,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // panel, story-data snapshot) can see which method ran.
             pageData.routeDecision = route;
             log.info(`🧭 [ROUTE] P${pageData.pageNumber}: ${route.path}${route.phantomPoseRender ? '+phantomPose' : ''} (cast=${route.cast}, refMode=${route.refMode}) — ${route.reason}`);
-            const compositeEnabled = route.path === 'composite';
+            // KILL-SWITCH (2026-05-16, per user direction): force every page
+            // through the direct path. Composite pipeline was producing
+            // score-0 outputs on staging job_1778925296736_c9ia8qrio pages
+            // 3 + 4, and the depopulate / diff / blend stages are still
+            // unreliable enough that the iterate fallback was salvaging
+            // every composite attempt anyway. The decidePageRoute output
+            // and routeDecision metadata stay populated so the dev panel
+            // still reports which method WOULD have been chosen — only
+            // the gate flips. Remove this override to re-enable composite.
+            const compositeEnabled = false;
             if (compositeEnabled) {
               try {
                 const { generateSceneComposite } = require('./server/lib/sceneComposite');
