@@ -107,46 +107,23 @@ function nearestGrokAspect(w, h) {
   return best;
 }
 
-// ─── Silhouette colour match (handles solid + translucent variants) ──────
+// ─── Silhouette colour match — RGB Euclidean distance ────────────────────
 //
-// A silhouette painted with target colour T at opacity α on a white BG
-// blends to: pixel = α·T + (1-α)·white. Rearranging: (white - pixel) =
-// α·(white - T). So the vector (white - pixel) is parallel to (white - T)
-// with magnitude α relative to it. We check:
-//   - per axis where (255-T) is significant, opacity ratio = (255-pixel)/(255-T)
-//   - all ratios are in [0.3, 1.3]  (at least 30% opacity, not "past" target)
-//   - all ratios agree within 0.4   (pixel lies on the gradient line, not off-axis)
-// Robust to JPEG noise AND translucent silhouettes; rejects scene colours
-// that share hue but sit off the white-to-target gradient (orange near red,
-// sky blue near silhouette blue, etc.).
+// Verified by sampling real Grok anchor plates. Solid silhouettes land
+// within ~30 RGB distance of the target colour. Grok occasionally renders
+// the silhouette slightly darker than spec (saw blue (9,73,183) vs target
+// (0,80,208) — distance 28). Threshold 60 covers both faithful renders
+// and ~25% darker drift while still rejecting scene colours (wood, stone,
+// fabric all measure >100 distance from the saturated palette colours).
+//
+// Earlier gradient-from-white attempt failed: it skipped axes where the
+// target was within 30 of white (true for #E60000 with R=230) which let
+// every dark pixel pass for red detection. Pure RGB distance has no such
+// blind spot.
+const SILHOUETTE_MATCH_THRESHOLD_SQ = 60 * 60;
 function isSilhouetteMatch(r, g, b, tr, tg, tb) {
-  const wdr = 255 - tr, wdg = 255 - tg, wdb = 255 - tb;
-  const wpr = 255 - r,  wpg = 255 - g,  wpb = 255 - b;
-  let minR = Infinity, maxR = -Infinity, count = 0;
-  // Only consider axes where the target differs from white by more than 30
-  // — small differences amplify pixel noise into huge ratio swings.
-  if (wdr >= 30) {
-    const x = wpr / wdr;
-    if (x < minR) minR = x;
-    if (x > maxR) maxR = x;
-    count++;
-  }
-  if (wdg >= 30) {
-    const x = wpg / wdg;
-    if (x < minR) minR = x;
-    if (x > maxR) maxR = x;
-    count++;
-  }
-  if (wdb >= 30) {
-    const x = wpb / wdb;
-    if (x < minR) minR = x;
-    if (x > maxR) maxR = x;
-    count++;
-  }
-  if (count === 0) return false;
-  if (minR < 0.3 || maxR > 1.3) return false;
-  if (maxR - minR > 0.4) return false;
-  return true;
+  const dr = r - tr, dg = g - tg, db = b - tb;
+  return dr * dr + dg * dg + db * db <= SILHOUETTE_MATCH_THRESHOLD_SQ;
 }
 
 // ─── Hue helpers (for the bbox detector) ──────────────────────────────────
