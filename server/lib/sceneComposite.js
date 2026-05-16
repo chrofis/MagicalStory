@@ -1644,13 +1644,13 @@ async function _stratifiedBody(ctx) {
   const anchorCropData = `data:image/png;base64,${anchorCropBuf.toString('base64')}`;
   debug.step3Input = anchorCropData;
   const hasFrontIdentity = !!frontIdentityPack;
-  // Crop aspect drives Grok's edit aspect — pass that explicitly so the
-  // model doesn't try to fit the crop into the page's main aspect.
-  const cropAspect = `${cropW}:${cropH}`;
+  // Grok only accepts preset aspect strings (1:1, 3:4, 9:16, 'auto', etc.) —
+  // pass 'auto' so the model uses the cropped input's own aspect verbatim
+  // and doesn't try to normalise it to a wider/narrower preset.
   const frontInsetPrompt = buildFrontInsetPrompt(frontCast, scene, hasFrontIdentity, backCast);
   const frontInsetRefs = [anchorCropData];
   if (frontIdentityPack) frontInsetRefs.push(frontIdentityPack);
-  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: cropAspect, model: GROK_MODELS.STANDARD });
+  const frontPlate = await editWithGrok(frontInsetPrompt, frontInsetRefs, { aspectRatio: 'auto', model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_front_plate', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
   debug.frontPlate = frontPlate.imageData;
