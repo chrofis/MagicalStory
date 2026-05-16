@@ -1132,6 +1132,11 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         clothingMatchScore: entry.clothingMatchScore ?? null,
         faceMatchDetails: entry.faceMatchDetails ?? null,
         clothingMatchReason: entry.clothingMatchReason ?? null,
+        innerLayoutScore: entry.innerLayoutScore ?? null,
+        innerIdentityScore: entry.innerIdentityScore ?? null,
+        innerOutfitScore: entry.innerOutfitScore ?? null,
+        innerFinalScore: entry.innerFinalScore ?? null,
+        combinedScore: entry.combinedScore ?? null,
         inputs: entry.inputs ? {
           facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
           originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,
@@ -1139,7 +1144,16 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           phantom: entry.inputs.phantom ? { sizeKB: entry.inputs.phantom.sizeKB } : null,
           standardAvatar: entry.inputs.standardAvatar ? { sizeKB: entry.inputs.standardAvatar.sizeKB } : null
         } : null,
-        output: entry.output ? { identifier: entry.output.identifier, sizeKB: entry.output.sizeKB } : null
+        output: entry.output ? { identifier: entry.output.identifier, sizeKB: entry.output.sizeKB } : null,
+        // Two-pass pipeline payload — Pass 1 (realistic identity anchor) +
+        // Pass 2 (style transfer). Each pass keeps best-of-N attempts with
+        // per-task Gemini scores and the attempt's imageData (data URI) so
+        // the dev panel can show every attempt side-by-side. realisticImageData
+        // is Pass 1's selected output. Image data flows through directly here
+        // (no lazy-load endpoint for attempts yet) — gated to developerMode,
+        // worst-case ~6 attempts × ~200 KB per character per style.
+        passes: entry.passes || null,
+        realisticImageData: entry.realisticImageData || null,
       })),
       // Costumed avatar generation log - strip image data, keep metadata
       costumedAvatarGeneration: (story.costumedAvatarGeneration || []).map(entry => ({
