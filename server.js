@@ -6034,7 +6034,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineCharFixDetails = charFixDetails;
         pipelineStyleConsistency = styleConsistency || null;
 
-        // Map pipeline results to allImages format
+        // Map pipeline results to allImages format. Index rawImages by
+        // pageNumber so per-page intermediates that the pipeline drops
+        // (compositeDebug, etc.) can be re-attached from the original
+        // generation result — otherwise the composite intermediates
+        // (clean BG → blocking → composited) are lost before save.
+        const rawByPage = new Map((rawImages || []).map(r => [r.pageNumber, r]));
         allImages = pipelineResult.map(img => ({
           pageNumber: img.pageNumber,
           text: img.text,
@@ -6100,8 +6105,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           outlineCharacters: img.scene?.outlineCharacters || null,
           // Scene-composite intermediates from server/lib/sceneComposite.js.
           // Persisted to story_images by saveStoryData/Update so the dev panel
-          // can show the BG → blocking → composited → final pipeline.
-          compositeDebug: img.compositeDebug || null
+          // can show the BG → blocking → composited → final pipeline. Fall
+          // back to the original rawImages entry — the repair pipeline does
+          // not propagate this field through, so without the fallback every
+          // composite intermediate is silently dropped on save.
+          compositeDebug: img.compositeDebug || rawByPage.get(img.pageNumber)?.compositeDebug || null
         }));
 
         // Extract covers from pipeline results back into coverImages (updated with eval data)
