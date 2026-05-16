@@ -726,10 +726,14 @@ export function TestModelsPanel({
               }),
             ].map(model => {
               const result = results[model.id];
+              // Composite tiles get the full row width — they carry many
+              // intermediate-step images stacked vertically and look cramped
+              // in a half-column slot.
+              const isComposite = model.cost === 'method';
               return (
                 <div
                   key={model.id}
-                  className="border rounded-lg p-3 bg-gray-50 flex flex-col"
+                  className={`border rounded-lg p-3 bg-gray-50 flex flex-col ${isComposite ? 'col-span-2 lg:col-span-2' : ''}`}
                 >
                   {/* Model name + cost badge */}
                   <div className="flex items-center justify-between mb-2">
