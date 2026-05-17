@@ -335,14 +335,24 @@ function extractDraftPagesFromText(response) {
   const map = new Map();
   if (!response) return map;
 
-  const draftStart = response.search(/---\s*STORY\s+DRAFT\s*---/i);
-  if (draftStart === -1) return map;
+  // Sonnet sometimes omits the `---STORY DRAFT---` opener and jumps
+  // straight into `Draft 1` headers (observed on staging story
+  // job_1778967306826_ynmt8lpwa — every page had a `Draft N` header but
+  // the section marker was missing, so this parser returned zero drafts
+  // and pages 1/3/4/10 ended up with empty text because their patch
+  // section was also empty). Fall back to "start of response" when the
+  // marker is missing so the Draft headers still get picked up.
+  const markedStart = response.search(/---\s*STORY\s+DRAFT\s*---/i);
+  const draftStart = markedStart >= 0 ? markedStart : 0;
 
   // Draft section ends at ---ANALYSIS---, ---TITLE---, or ---STORY PAGES---
   // (whichever comes first).
   const tail = response.substring(draftStart);
   const endMatch = tail.match(/---\s*(?:ANALYSIS|TITLE|STORY\s+PAGES)\s*---/i);
   const draftSection = endMatch ? tail.substring(0, endMatch.index) : tail;
+  if (markedStart === -1) {
+    log.warn(`[UNIFIED-PARSER] ---STORY DRAFT--- marker missing; scanning ${draftSection.length} chars for Draft N headers as fallback`);
+  }
 
   // Reset lastIndex on the shared regex (it's `g`-flagged).
   DRAFT_HEADER_RE.lastIndex = 0;
