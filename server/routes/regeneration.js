@@ -1014,10 +1014,17 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // Snapshot of inputs that every model in this run was given. Surfaced in
     // the response so the panel can show "what was sent to the model" next to
     // each result image — makes the test history self-explanatory.
+    // Defensive: prompt can be null/undefined when test-models is fired
+    // against a page whose savedSceneImage.prompt is empty and buildImagePrompt
+    // returned nothing (observed on staging page 4 of job_1778967306826_*,
+    // where Sonnet shipped an empty-text page with no prompt). Without the
+    // guard, prompt.slice() threw "Cannot read properties of undefined" and
+    // tore down the whole composite branch.
+    const safePrompt = typeof prompt === 'string' ? prompt : '';
     const inputSnapshot = {
-      promptLength: prompt.length,
-      promptPreview: prompt.slice(0, 4000),
-      promptFull: prompt,
+      promptLength: safePrompt.length,
+      promptPreview: safePrompt.slice(0, 4000),
+      promptFull: safePrompt,
       referenceMode: effRefMode,
       singlePassScene: effSinglePass,
       iterativePlacement: !!iterativePlacement,
