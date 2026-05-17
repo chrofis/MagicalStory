@@ -1693,12 +1693,38 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
-      // For covers, check if there are text issues
+      // For covers, classify text issues by severity. The eval prompt at
+      // line ~1304 tells the model:
+      //   - title missing/misspelled         → severity CRITICAL
+      //   - stray unrequested text (a letter
+      //     a kid holds, a shop sign, a label) → severity MAJOR
+      // The two need different handling:
+      //   TITLE_ERROR — full regen; no inpaint can paint a missing title.
+      //   STRAY_TEXT  — flows through the normal repair path. Inpaint can
+      //                 paint over the unwanted-text region instead of
+      //                 trashing an otherwise-good cover and retrying.
+      // Before this split, ANY cover text issue forced a full regen, which
+      // wasted a generation every time a character incidentally held
+      // anything written.
       let textIssue = null;
-      if (evaluationType === 'cover' && issuesSummary) {
+      if (evaluationType === 'cover' && Array.isArray(fixableIssues) && fixableIssues.length > 0) {
+        const TEXT_RE = /\b(text|letter|word|sign|caption|label|spell|title|writing|inscription|misspell)/i;
+        const textRelated = fixableIssues.filter(i =>
+          i?.type === 'rendered_text' || TEXT_RE.test(i?.description || '')
+        );
+        if (textRelated.some(i => String(i?.severity || '').toUpperCase() === 'CRITICAL')) {
+          textIssue = 'TITLE_ERROR';
+        } else if (textRelated.length > 0) {
+          textIssue = 'STRAY_TEXT';
+        }
+      }
+      // Fallback for evaluators that didn't emit structured fixable_issues but
+      // mentioned text in issuesSummary — assume worst case (title error) so
+      // we don't ship a missing-title cover when the eval format drifts.
+      if (textIssue === null && evaluationType === 'cover' && issuesSummary) {
         const issuesLower = issuesSummary.toLowerCase();
         if (issuesLower.includes('text') || issuesLower.includes('spell') || issuesLower.includes('letter')) {
-          textIssue = 'TEXT_ERROR';
+          textIssue = 'TITLE_ERROR';
         }
       }
 
@@ -9981,17 +10007,22 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       log.debug(`⭐ [QUALITY RETRY] ${pageLabel}Attempt ${attempts} score: ${score}%`);
     }
 
-    // Check for text errors on covers (but not when "NO TEXT" was expected and is missing)
+    // Check for text errors on covers (but not when "NO TEXT" was expected
+    // and is missing). Only TITLE_ERROR triggers the full-regen path —
+    // STRAY_TEXT (e.g. boy holding a letter, shop sign in background) is
+    // handled by the normal inpaint repair flow below, not by trashing the
+    // image. See the classifier at ~line 1696.
     const noTextExpected = result.expectedText && result.expectedText.toUpperCase() === 'NO TEXT';
     const isExpectedNoText = noTextExpected && result.textIssue === 'MISSING';
     const hasTextError = evaluationType === 'cover' &&
-      result.textIssue &&
-      result.textIssue !== 'NONE' &&
+      result.textIssue === 'TITLE_ERROR' &&
       !isExpectedNoText;
 
     if (hasTextError) {
       log.debug(`📝 [QUALITY RETRY] Text error: ${result.textIssue}`);
       log.debug(`📝 [QUALITY RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
+    } else if (result.textIssue === 'STRAY_TEXT') {
+      log.debug(`📝 [QUALITY RETRY] Stray text detected — routing to inpaint repair (not full regen)`);
     } else if (isExpectedNoText) {
       console.log(`✅ [QUALITY RETRY] No text expected and none found - correct`);
     }
