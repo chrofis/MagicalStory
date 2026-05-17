@@ -79,12 +79,18 @@ export function ImageHistoryModal({
   // can see WHICH repair pass produced this version.
   const formatMethod = (source?: string, type?: string): string => {
     if (!source) {
-      if (!type || type === 'original') return language === 'de' ? 'Original' : 'Original';
+      if (!type || type === 'original') return language === 'de' ? 'Original · direkt' : language === 'fr' ? 'Original · direct' : 'Original · direct';
       return type;
     }
-    if (source === 'original') return language === 'de' ? 'Original' : 'Original';
-    let m = source.match(/^iterate-round-(\d+)/);
-    if (m) return language === 'de' ? `Iteration (Runde ${m[1]})` : language === 'fr' ? `Itération (tour ${m[1]})` : `Iterate (round ${m[1]})`;
+    if (source === 'original') return language === 'de' ? 'Original · direkt' : language === 'fr' ? 'Original · direct' : 'Original · direct';
+    // Composite-iterate (unified-pipeline repair, composite-cover path)
+    let m = source.match(/^composite-iterate-round-(\d+)/);
+    if (m) return language === 'de' ? `Iteration · Composite (Runde ${m[1]})` : language === 'fr' ? `Itération · Composite (tour ${m[1]})` : `Iterate · composite (round ${m[1]})`;
+    // Composite-regenerate (user-triggered cover regen via composite path)
+    if (source === 'composite-regenerate') return language === 'de' ? 'Regenerieren · Composite' : language === 'fr' ? 'Régénérer · composite' : 'Regenerate · composite';
+    if (source === 'regenerate') return language === 'de' ? 'Regenerieren · direkt' : language === 'fr' ? 'Régénérer · direct' : 'Regenerate · direct';
+    m = source.match(/^iterate-round-(\d+)/);
+    if (m) return language === 'de' ? `Iteration · direkt (Runde ${m[1]})` : language === 'fr' ? `Itération · direct (tour ${m[1]})` : `Iterate · direct (round ${m[1]})`;
     m = source.match(/^inpaint-round-(\d+)/);
     if (m) return language === 'de' ? `Inpaint (Runde ${m[1]})` : language === 'fr' ? `Inpaint (tour ${m[1]})` : `Inpaint (round ${m[1]})`;
     m = source.match(/^char-fix-round-(\d+)/);
@@ -310,9 +316,12 @@ export function ImageHistoryModal({
                     </div>
                     <div className="text-[9px] sm:text-[11px] text-gray-300 mt-0.5">
                       {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
-                      {(version.source && version.source !== 'original') || (version.type && version.type !== 'original') ? (
-                        <span className="ml-1 text-gray-400">({formatMethod(version.source, version.type)})</span>
-                      ) : null}
+                      {/* Always show the method (direct / composite / inpaint / etc) so v0
+                          isn't ambiguous — formatMethod now appends `· direkt` to
+                          `original` / `regenerate` and `· composite` to composite-prefixed
+                          sources, so the user can tell which path produced this version
+                          without opening the detail panel. */}
+                      <span className="ml-1 text-gray-400">({formatMethod(version.source, version.type)})</span>
                     </div>
                   </div>
 
