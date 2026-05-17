@@ -88,15 +88,21 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
 
       // Atomic role/credits selection: prevents race condition where two concurrent
       // registrations both see count=0 and both become admin
+      // Welcome credits come from the single source of truth in
+      // CREDIT_CONFIG.LIMITS.INITIAL_USER (200 today). Hardcoding 500 here
+      // caused direct-signup paths to leak more credits than the trial-
+      // claim path. Bind it as a parameter so all signup paths agree.
+      const { CREDIT_CONFIG } = require('../config/credits');
+      const welcomeCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
       const insertResult = await dbQuery(
         `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits)
          VALUES ($1, $2, $3, $4,
            CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
            CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 2 END,
            0,
-           CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END)
+           CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END)
          RETURNING role, story_quota, credits`,
-        [userId, email, email, hashedPassword]
+        [userId, email, email, hashedPassword, welcomeCredits]
       );
       const role = insertResult[0].role;
       const storyQuota = insertResult[0].story_quota;

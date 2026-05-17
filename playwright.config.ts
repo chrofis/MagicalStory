@@ -36,6 +36,16 @@ export default defineConfig({
 
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
+
+    /* HTTP Basic Auth for staging gate (server.js STAGING_AUTH_*). Inert in prod. */
+    ...(process.env.STAGING_AUTH_PASSWORD
+      ? {
+          httpCredentials: {
+            username: process.env.STAGING_AUTH_USER || 'staging',
+            password: process.env.STAGING_AUTH_PASSWORD,
+          },
+        }
+      : {}),
   },
 
   /* Configure projects for major browsers */
