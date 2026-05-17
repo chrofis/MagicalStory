@@ -4699,6 +4699,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     timing.pagesStart = Date.now();
     let allImages;
     let pipelineEntityReport = null;
+    let pipelineEntityHistory = null;
     let pipelineCharFixDetails = null;
     let pipelineStyleConsistency = null;
 
@@ -6050,6 +6051,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Hoist pipeline data for use outside this block (finalChecksReport)
         pipelineEntityReport = pipelineResult[0]?.entityReport || null;
+        pipelineEntityHistory = pipelineResult[0]?.entityHistory || null;
         pipelineCharFixDetails = charFixDetails;
         pipelineStyleConsistency = styleConsistency || null;
 
@@ -6326,6 +6328,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Extract entity report from unified pipeline results (same on every page)
     let finalChecksReport = pipelineEntityReport ? { entity: pipelineEntityReport } : null;
+
+    // Persist the per-round entity history from the pipeline so the UI's round
+    // selector can browse generation-time passes (round 0 = initial, rounds 1+
+    // = repair-loop snapshots). Same shape as manual-run pushes in
+    // regeneration.js so EntityConsistencyView works without branching.
+    if (finalChecksReport && Array.isArray(pipelineEntityHistory) && pipelineEntityHistory.length > 0) {
+      finalChecksReport.entityHistory = pipelineEntityHistory;
+    }
 
     // Build entityRepairs from character fix data for StoryDisplay before/after visualization
     if (finalChecksReport?.entity && pipelineCharFixDetails && Object.keys(pipelineCharFixDetails).length > 0) {

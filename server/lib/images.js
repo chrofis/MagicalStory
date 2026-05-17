@@ -6633,6 +6633,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   let currentEntityReport = entityReport;
 
+  // Per-pipeline-round entity history. Same shape as the manual
+  // /repair-workflow/consistency-check pushes (regeneration.js:4248) so the
+  // round selector in the UI can browse generation-time rounds the same way.
+  // Round 0 = initial check; subsequent rounds appended after each repair.
+  const entityHistory = [];
+  if (entityReport) {
+    entityHistory.push({
+      runIndex: 0,
+      timestamp: entityReport.timestamp || new Date().toISOString(),
+      triggeredBy: 'pipeline-initial',
+      report: entityReport
+    });
+  }
+
   const { decideRepairMethod } = require('./repairLogic');
 
   for (let round = 1; round <= maxRegenAttempts; round++) {
@@ -6888,6 +6902,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
         }
         currentEntityReport = freshEntity;
+        entityHistory.push({
+          runIndex: round,
+          timestamp: freshEntity.timestamp || new Date().toISOString(),
+          triggeredBy: `pipeline-round-${round}`,
+          report: freshEntity
+        });
         log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
       } else {
         log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${freshEntityResult.reason?.message || freshEntityResult.reason}`);
@@ -7264,6 +7284,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageVersions,
       retryHistory,
       entityReport: finalEntityReport || null,
+      entityHistory,
       wasRegenerated: best?.source !== 'original',
       wasCharacterFixed: wasCharFixed,
       wasInpainted: best?.source?.startsWith('inpaint') || false,
