@@ -9,6 +9,7 @@ import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, Scene
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
+import { EntityConsistencyView } from './EntityConsistencyView';
 
 interface StoryTextPrompt {
   batch: number;
@@ -635,45 +636,6 @@ export function StoryDisplay({
     await Promise.all(idsToLoad.map(id => fetchReferenceImage(id)));
   };
 
-  // Entity grid images (lazy-loaded) - keyed by grid index
-  const [loadedEntityGridImages, setLoadedEntityGridImages] = useState<Record<number, string>>({});
-  const [loadingEntityGridImages, setLoadingEntityGridImages] = useState<Set<number>>(new Set());
-
-  // Fetch entity grid image on demand by grid index
-  const fetchEntityGridImage = async (gridIndex: number) => {
-    if (!storyId || loadedEntityGridImages[gridIndex] !== undefined || loadingEntityGridImages.has(gridIndex)) return;
-
-    setLoadingEntityGridImages(prev => new Set(prev).add(gridIndex));
-    try {
-      const data = await storyService.getEntityGridImageByIndex(storyId, gridIndex);
-      if (data?.gridImage) {
-        setLoadedEntityGridImages(prev => ({ ...prev, [gridIndex]: data.gridImage }));
-      }
-    } catch (err) {
-      console.error(`Failed to load entity grid image for index ${gridIndex}:`, err);
-    } finally {
-      setLoadingEntityGridImages(prev => {
-        const next = new Set(prev);
-        next.delete(gridIndex);
-        return next;
-      });
-    }
-  };
-
-  // Load all entity grid images at once
-  const fetchAllEntityGridImages = async () => {
-    if (!storyId) return;
-    const grids = finalChecksReport?.entity?.grids || [];
-    // Load all grids that don't have embedded images and aren't already loaded
-    const indicesToLoad = grids
-      .map((grid, idx) => ({ grid, idx }))
-      .filter(({ grid, idx }) => !grid.gridImage && loadedEntityGridImages[idx] === undefined)
-      .map(({ idx }) => idx);
-
-    // Load in parallel
-    await Promise.all(indicesToLoad.map(idx => fetchEntityGridImage(idx)));
-  };
-
   // Helper: extract per-page entity issues from finalChecksReport (populated by "Run Consistency Check")
   const getEntityIssuesForPage = (pageNum: number) => {
     const entity = finalChecksReport?.entity as any;
@@ -712,58 +674,6 @@ export function StoryDisplay({
       }
     }
     return issues;
-  };
-
-  // Helper to crop a cell from an entity consistency grid image
-  const cropGridCell = async (
-    gridImage: string,
-    cellIndex: number,
-    manifest: { cellSize: number; cols: number; rows: number }
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-
-        const { cellSize, cols } = manifest;
-        const row = Math.floor(cellIndex / cols);
-        const col = cellIndex % cols;
-        const x = col * cellSize;
-        const y = row * cellSize;
-
-        canvas.width = cellSize;
-        canvas.height = cellSize;
-        ctx.drawImage(img, x, y, cellSize, cellSize, 0, 0, cellSize, cellSize);
-
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.onerror = () => reject(new Error('Failed to load grid image'));
-      img.src = gridImage;
-    });
-  };
-
-  // Handle clicking on an individual grid cell to enlarge it
-  const handleCellClick = async (
-    grid: { gridImage: string; entityName: string; manifest: { cellSize: number; cols: number; rows: number; cells: Array<{ letter: string; pageNumber?: number; isReference?: boolean; clothing?: string }> } },
-    cellIndex: number
-  ) => {
-    try {
-      const cell = grid.manifest.cells[cellIndex];
-      const croppedImage = await cropGridCell(grid.gridImage, cellIndex, grid.manifest);
-      const cellLabel = cell.isReference ? 'Reference' : `Page ${cell.pageNumber}`;
-      const clothingLabel = cell.clothing && cell.clothing !== 'standard' ? ` (${cell.clothing})` : '';
-      setEnlargedImage({
-        src: croppedImage,
-        title: `${grid.entityName} - ${cellLabel}${clothingLabel}`
-      });
-    } catch (err) {
-      console.error('Failed to crop cell:', err);
-    }
   };
 
   // Helper to get avatar image - checks both entry and loaded state
@@ -3634,224 +3544,35 @@ export function StoryDisplay({
                     : `Character Consistency (${finalChecksReport.entity.totalIssues || 0} issues)`}
               </summary>
               <div className="mt-4 space-y-4">
-                {/* Entity check summary */}
-                <p className="text-sm text-gray-700">{finalChecksReport.entity.summary}</p>
+                {/* Reusable consistency view (round-browsing + per-character grids + lazy loading) */}
+                {storyId && (
+                  <EntityConsistencyView
+                    storyId={storyId}
+                    entity={finalChecksReport.entity || null}
+                    entityHistory={finalChecksReport.entityHistory || []}
+                    language={language as StoryLanguageCode}
+                    onLightbox={(img) => setEnlargedImage({ src: img, title: 'Entity Consistency Grid' })}
+                  />
+                )}
 
-                {/* Load All button */}
-                {(() => {
-                  const grids = finalChecksReport.entity?.grids || [];
-                  const unloadedCount = grids.filter((g, idx) => !g.gridImage && loadedEntityGridImages[idx] === undefined).length;
-                  if (unloadedCount === 0) return null;
-                  return (
-                    <button
-                      onClick={fetchAllEntityGridImages}
-                      disabled={loadingEntityGridImages.size > 0}
-                      className="text-xs px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
-                    >
-                      {loadingEntityGridImages.size > 0
-                        ? `Loading ${loadingEntityGridImages.size} grids...`
-                        : `Load All Grids (${unloadedCount})`
-                      }
-                    </button>
-                  );
-                })()}
-
-                {/* Entity Grids */}
-                <div className="space-y-2">
-                  {finalChecksReport.entity.grids.map((grid, gridIdx) => {
-                    const charResult = finalChecksReport.entity?.characters?.[grid.entityName];
-                    // Handle both old (flat) and new (byClothing) structure
-                    const isConsistent = charResult?.overallConsistent ?? charResult?.consistent ?? true;
-                    const score = charResult?.overallScore ?? charResult?.score ?? 0;
-                    const issues = charResult?.issues ?? [];
-                    const clothingCat = (grid as { clothingCategory?: string }).clothingCategory;
-
-                    return (
-                      <details key={gridIdx} className={`bg-white border rounded-lg overflow-hidden ${
-                        isConsistent ? 'border-green-200' : 'border-amber-200'
-                      }`}>
-                        <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50">
-                          <span className={`text-sm ${isConsistent ? 'text-green-600' : 'text-amber-600'}`}>
-                            {isConsistent ? '✓' : '⚠️'}
-                          </span>
-                          <span className="font-medium text-sm text-gray-800">
-                            {grid.entityName}
-                            {clothingCat && (
-                              <span className={`ml-1.5 text-xs font-normal px-1.5 py-0.5 rounded ${
-                                clothingCat.startsWith('costumed:')
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : clothingCat === 'winter'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : clothingCat === 'summer'
-                                      ? 'bg-yellow-100 text-yellow-700'
-                                      : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {clothingCat}
-                              </span>
-                            )}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ({grid.cellCount} appearance{grid.cellCount !== 1 ? 's' : ''})
-                          </span>
-                          <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
-                            score >= 8 ? 'bg-green-100 text-green-700' :
-                            score >= 5 ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            Score: {score}/10
-                          </span>
-                        </summary>
-                        <div className="p-3 border-t border-gray-100 space-y-3">
-                          {/* Grid Image - clickable to enlarge, lazy loaded */}
-                          {(() => {
-                            // Use grid index as unique key for loading
-                            // Use embedded gridImage if available, otherwise use lazy-loaded by index
-                            const gridImage = grid.gridImage || loadedEntityGridImages[gridIdx];
-                            const isLoading = loadingEntityGridImages.has(gridIdx);
-                            const sizeKB = (grid as { gridImageSizeKB?: number }).gridImageSizeKB;
-
-                            if (gridImage) {
-                              return (
-                                <div className="flex justify-center bg-gray-50 rounded p-2">
-                                  <img
-                                    src={gridImage}
-                                    alt={`${grid.entityName} consistency grid`}
-                                    className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                                    style={{ maxHeight: '400px' }}
-                                    onClick={() => setEnlargedImage({
-                                      src: gridImage,
-                                      title: `${grid.entityName}${clothingCat ? ` (${clothingCat})` : ''} - Entity Consistency Grid`
-                                    })}
-                                    title="Click to enlarge"
-                                  />
-                                </div>
-                              );
-                            } else if (isLoading) {
-                              return (
-                                <div className="flex justify-center items-center bg-gray-100 rounded p-4 h-32">
-                                  <span className="text-sm text-gray-500">Loading grid image...</span>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="flex flex-col items-center bg-gray-100 rounded p-4">
-                                  <span className="text-xs text-gray-500 mb-2">
-                                    Grid image not loaded {sizeKB ? `(${sizeKB} KB)` : ''}
-                                  </span>
-                                  <button
-                                    onClick={() => fetchEntityGridImage(gridIdx)}
-                                    className="text-xs px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                  >
-                                    Load Grid
-                                  </button>
-                                </div>
-                              );
-                            }
-                          })()}
-
-                          {/* Cell Info with individual repair buttons - clickable to enlarge */}
-                          {grid.manifest?.cells && (
-                            <div className="text-xs text-gray-600">
-                              <span className="font-medium">Cells: </span>
-                              {grid.manifest.cells.map((cell, i) => {
-                                const gridImage = grid.gridImage || loadedEntityGridImages[gridIdx];
-                                return (
-                                <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
-                                  <button
-                                    onClick={() => gridImage && handleCellClick({ ...grid, gridImage }, i)}
-                                    className={`${gridImage ? 'hover:text-blue-600 hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
-                                    title={gridImage ? "Click to enlarge this cell" : "Load grid image first"}
-                                    disabled={!gridImage}
-                                  >
-                                    {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
-                                    {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
-                                  </button>
-                                </span>
-                              )})}
-                            </div>
-                          )}
-
-                          {/* Issues */}
-                          {issues.length > 0 && (
-                            <div className="space-y-2">
-                              <h5 className="text-xs font-medium text-gray-700">Issues:</h5>
-                              {issues.map((issue, issueIdx) => (
-                                <div key={issueIdx} className={`text-xs p-2 rounded ${
-                                  issue.severity === 'critical' ? 'bg-red-50 border-l-4 border-red-400' :
-                                  issue.severity === 'major' ? 'bg-amber-50 border-l-4 border-amber-400' :
-                                  'bg-gray-50 border-l-4 border-gray-300'
-                                }`}>
-                                  <div className="flex items-start gap-2 flex-wrap">
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                      issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
-                                      issue.severity === 'major' ? 'bg-amber-200 text-amber-800' :
-                                      'bg-gray-200 text-gray-700'
-                                    }`}>
-                                      {issue.severity}
-                                    </span>
-                                    {issue.cells && (
-                                      <span className="text-gray-500">
-                                        Cells: {issue.cells.map((cell, cellIdx) => {
-                                          // Check if this cell is in the current grid
-                                          const gridCells = grid.manifest?.cells || [];
-                                          const isInGrid = gridCells.some(c => c.letter === cell && !c.isReference);
-                                          return (
-                                            <span key={cellIdx} className={isInGrid ? 'font-semibold text-gray-800' : 'text-gray-400'}>
-                                              {cellIdx > 0 ? ', ' : ''}{cell}
-                                            </span>
-                                          );
-                                        })}
-                                      </span>
-                                    )}
-                                    {issue.pagesToFix && issue.pagesToFix.length > 0 && (() => {
-                                      // Get page numbers that are visible in this grid
-                                      const gridPageNumbers = new Set(
-                                        (grid.manifest?.cells || [])
-                                          .filter(c => !c.isReference && c.pageNumber != null)
-                                          .map(c => c.pageNumber)
-                                      );
-
-                                      return (
-                                        <span className="text-[10px]">
-                                          Fix: Page{' '}
-                                          {issue.pagesToFix.map((page, pageIdx) => {
-                                            const isVisible = gridPageNumbers.has(page);
-                                            return (
-                                              <span
-                                                key={pageIdx}
-                                                className={`px-1 py-0.5 rounded ${
-                                                  isVisible
-                                                    ? 'bg-orange-200 text-orange-800 font-semibold'
-                                                    : 'bg-gray-200 text-gray-500'
-                                                }`}
-                                                title={isVisible ? 'Visible in grid above' : 'Not in this grid'}
-                                              >
-                                                {pageIdx > 0 ? ' ' : ''}{page}
-                                              </span>
-                                            );
-                                          })}
-                                        </span>
-                                      );
-                                    })()}
-                                    {(issue as { clothingCategory?: string }).clothingCategory && (
-                                      <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px]">
-                                        {(issue as { clothingCategory?: string }).clothingCategory}
-                                      </span>
-                                    )}
-                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
-                                      {issue.subType || issue.type?.replace(/_/g, ' ')}
-                                    </span>
-                                  </div>
-                                  <p className="text-gray-700 mt-1">{issue.description}</p>
-                                  {issue.fixInstruction && (
-                                    <p className="text-green-700 mt-1 text-[10px]">→ {issue.fixInstruction}</p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-
+                {/* Entity Repair Results (grouped by character) */}
+                {finalChecksReport.entityRepairs && Object.keys(finalChecksReport.entityRepairs).length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-gray-200">
+                    <h4 className="text-sm font-bold text-gray-700">
+                      {language === 'de' ? 'Reparaturergebnisse' : language === 'fr' ? 'Résultats de réparation' : 'Repair Results'}
+                    </h4>
+                    {Object.entries(finalChecksReport.entityRepairs).map(([entityName]) => {
+                      const grid = finalChecksReport.entity?.grids?.find(g => g.entityName === entityName);
+                      if (!grid) return null;
+                      const gridIdx = finalChecksReport.entity!.grids.indexOf(grid);
+                      void gridIdx;
+                      return (
+                        <details key={entityName} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                          <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50 text-sm font-medium text-gray-800">
+                            <span className="text-green-600">✓</span>
+                            <span>{entityName}</span>
+                          </summary>
+                          <div className="p-3 border-t border-gray-100 space-y-3">
                           {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
                           {finalChecksReport.entityRepairs?.[grid.entityName] && (
                             <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
@@ -4109,7 +3830,8 @@ export function StoryDisplay({
                       </details>
                     );
                   })}
-                </div>
+                  </div>
+                )}
               </div>
             </details>
           )}

@@ -4563,6 +4563,7 @@ export default function StoryWizard() {
                   characters={characters.filter(c => !excludedCharacters.includes(c.id))}
                   finalChecksReport={finalChecksReport}
                   imageModel={modelSelections.imageModel || undefined}
+                  language={storyLanguage}
                   onImageUpdate={(pageNumber, imageData, versionIndex, metadata) => {
                     if (pageNumber < 0) {
                       // Cover image update
