@@ -446,15 +446,17 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     sentToGrok: bestAttempt.result.sentToGrok || null,
   };
 
-  // ── PASS 2: style transfer (skip when artStyle is realistic or eval skipped) ─
-  // Also skip if Pass 1 itself never produced a valid sheet — running style
-  // transfer on a broken anchor (e.g. all quick-fails, score=0) produces a
-  // stylised version of the same broken layout. Better to surface Pass 1's
-  // failure than mask it with a clean-looking Pass 2.
-  const PASS2_MIN_PASS1_SCORE = 6;
+  // ── PASS 2: style transfer (always runs when artStyle is non-realistic) ─
+  // Previously gated on pass1.finalScore >= 6 to avoid styling a broken
+  // sheet. Removed (2026-05-17 per user direction) — the quickLayoutCheck
+  // is over-eager and was rejecting structurally-fine sheets, then Pass 2
+  // skipped, then the character shipped as a realistic photo embedded in
+  // a watercolour story. The outer Face/Clothing eval still gates the
+  // final selection, so a truly broken sheet won't ship either way. Every
+  // non-realistic art style now gets style transfer applied.
   const wantStyleTransfer = !skipQualityEval && artStyle && artStyle !== 'realistic';
   let pass2 = null;
-  if (wantStyleTransfer && pass1.finalScore >= PASS2_MIN_PASS1_SCORE) {
+  if (wantStyleTransfer) {
     pass2 = await runStyleTransferPass({
       pass1ImageData: pass1.imageData,
       facePhoto,
@@ -462,8 +464,6 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       characterName: character?.name,
       usageTracker,
     });
-  } else if (wantStyleTransfer) {
-    log.warn(`[CHARACTER 2×4] ${character?.name} Pass 2 skipped — Pass 1 finalScore=${pass1.finalScore} < ${PASS2_MIN_PASS1_SCORE} (broken sheet, not worth styling)`);
   }
 
   // The function's primary return value (`imageData`) is the styled sheet
