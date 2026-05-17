@@ -7605,6 +7605,26 @@ initialize().then(() => {
     log.info(`📍 URL: http://localhost:${PORT}`);
   });
 
+  // Trial reminder sweep — emails unclaimed trial accounts at day-5 and day-25.
+  // Hourly cadence: the cohorts move slowly (trials are created sporadically,
+  // reminders fire on day boundaries), so hourly is plenty and bounds slippage
+  // to <1h. setInterval is fine here — node-cron would be overkill for a
+  // single hourly job.
+  if (STORAGE_MODE === 'database' && dbPool) {
+    const { runTrialReminderSweep } = require('./server/lib/trialReminders');
+    // Run once shortly after boot (skip the first hour wait), then every hour.
+    setTimeout(() => {
+      runTrialReminderSweep(dbPool, log).catch(err => {
+        log.error('[trial-reminders] sweep crashed:', err.message);
+      });
+    }, 60 * 1000); // 60s grace so boot work settles first
+    setInterval(() => {
+      runTrialReminderSweep(dbPool, log).catch(err => {
+        log.error('[trial-reminders] sweep crashed:', err.message);
+      });
+    }, 60 * 60 * 1000); // every hour
+  }
+
   // Configure server timeouts to prevent premature connection closures
   // This helps with Railway's edge proxy and HTTP/2 connection management
   server.keepAliveTimeout = 65000; // 65 seconds (longer than typical proxy timeout of 60s)

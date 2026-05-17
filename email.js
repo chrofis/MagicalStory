@@ -68,7 +68,7 @@ const EMAIL_TEMPLATES = {};
 
 function loadEmailTemplates() {
   const emailsDir = path.join(__dirname, 'emails');
-  const templateFiles = ['story-complete.html', 'trial-story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html'];
+  const templateFiles = ['story-complete.html', 'trial-story-complete.html', 'trial-reminder.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html'];
 
   for (const file of templateFiles) {
     const filePath = path.join(emailsDir, file);
@@ -305,6 +305,155 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
     return data;
   } catch (err) {
     console.error('❌ Email send error:', err);
+    return null;
+  }
+}
+
+/**
+ * Variant copy for the trial reminder email. Keyed first by reminderType
+ * ('day5' | 'day25'), then by normalized language. Day-5 leads with the
+ * value still on the table; day-25 leads with urgency.
+ *
+ * Swiss German: ss, never ß.
+ */
+const TRIAL_REMINDER_COPY = {
+  day5: {
+    ENGLISH: {
+      subject: 'You still have {credits} free credits waiting',
+      headline: 'Your {credits} free credits are still waiting.',
+      body: 'You tried MagicalStory a few days ago — your free credits are still on your account, enough to create one more full story, completely free. Set your password to claim them.',
+      ctaLabel: 'Claim my free story',
+      perksIntro: 'With a full account you also unlock:',
+    },
+    GERMAN: {
+      subject: 'Deine {credits} Gratis-Credits warten noch auf dich',
+      headline: 'Deine {credits} Gratis-Credits warten noch.',
+      body: 'Du hast MagicalStory vor ein paar Tagen ausprobiert — deine Gratis-Credits liegen weiterhin auf deinem Konto, genug für eine weitere komplette Geschichte, vollständig gratis. Setze dein Passwort, um sie zu sichern.',
+      ctaLabel: 'Gratis-Geschichte holen',
+      perksIntro: 'Mit einem vollständigen Konto erhältst du ausserdem:',
+    },
+    FRENCH: {
+      subject: 'Vos {credits} crédits gratuits vous attendent toujours',
+      headline: 'Vos {credits} crédits gratuits vous attendent toujours.',
+      body: 'Vous avez essayé MagicalStory il y a quelques jours — vos crédits gratuits sont toujours sur votre compte, de quoi créer une histoire complète de plus, entièrement gratuite. Définissez votre mot de passe pour les réclamer.',
+      ctaLabel: 'Réclamer mon histoire gratuite',
+      perksIntro: 'Avec un compte complet, vous débloquez aussi :',
+    },
+  },
+  day25: {
+    ENGLISH: {
+      subject: 'Your free credits expire in {daysLeft} days',
+      headline: 'Last chance — your free credits expire in {daysLeft} days.',
+      body: 'Your trial claim link is about to expire. Set your password now to keep your {credits} free credits and the story you already created. After {daysLeft} days the link disappears for good.',
+      ctaLabel: 'Claim my account now',
+      perksIntro: 'Once you claim, you also unlock:',
+    },
+    GERMAN: {
+      subject: 'Deine Gratis-Credits laufen in {daysLeft} Tagen ab',
+      headline: 'Letzte Chance — deine Gratis-Credits laufen in {daysLeft} Tagen ab.',
+      body: 'Dein Aktivierungslink läuft bald ab. Setze jetzt dein Passwort, um deine {credits} Gratis-Credits und deine bereits erstellte Geschichte zu behalten. Nach {daysLeft} Tagen verschwindet der Link endgültig.',
+      ctaLabel: 'Konto jetzt aktivieren',
+      perksIntro: 'Sobald du aktivierst, erhältst du ausserdem:',
+    },
+    FRENCH: {
+      subject: 'Vos crédits gratuits expirent dans {daysLeft} jours',
+      headline: 'Dernière chance — vos crédits gratuits expirent dans {daysLeft} jours.',
+      body: 'Votre lien d\'activation est sur le point d\'expirer. Définissez votre mot de passe maintenant pour garder vos {credits} crédits gratuits et l\'histoire que vous avez déjà créée. Après {daysLeft} jours, le lien disparaît pour de bon.',
+      ctaLabel: 'Activer mon compte maintenant',
+      perksIntro: 'Une fois votre compte activé, vous débloquez aussi :',
+    },
+  },
+};
+
+/**
+ * Send a reminder email to an unclaimed trial account.
+ *
+ * @param {string} userEmail
+ * @param {string} firstName
+ * @param {string} claimUrl - Already-built /claim/<token> URL
+ * @param {string} language - English | German | French (case-insensitive, prefix-tolerant)
+ * @param {object} options
+ * @param {('day5'|'day25')} options.reminderType - which reminder this is
+ * @param {number} [options.daysLeft] - required for day25 (days until token expiry)
+ * @param {Buffer} [options.pdfBuffer] - optional PDF attachment (we deliberately
+ *   skip this for reminders; user already has it from the original email)
+ * @param {string} [options.pdfFilename]
+ */
+async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language = 'English', options = {}) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping trial reminder');
+    return null;
+  }
+  if (!validateEmailAddress(userEmail)) {
+    console.error('❌ [EMAIL] Invalid trial-reminder recipient:', userEmail);
+    return null;
+  }
+
+  const reminderType = options.reminderType || 'day5';
+  if (!TRIAL_REMINDER_COPY[reminderType]) {
+    console.error(`❌ [EMAIL] Unknown trial reminderType: ${reminderType}`);
+    return null;
+  }
+
+  const template = getTemplateSection('trial-reminder', language);
+  if (!template) {
+    console.error('❌ Failed to get trial-reminder template');
+    return null;
+  }
+
+  const langKey = normalizeLanguage(language); // ENGLISH | GERMAN | FRENCH
+  const copy = TRIAL_REMINDER_COPY[reminderType][langKey] || TRIAL_REMINDER_COPY[reminderType].ENGLISH;
+
+  const credits = String(CREDIT_CONFIG.LIMITS.INITIAL_USER);
+  const daysLeft = String(options.daysLeft != null ? options.daysLeft : 5);
+
+  // Fill variant-specific strings first (they themselves contain {credits}/{daysLeft}),
+  // then drop them into the outer template as flat fields.
+  const variantValues = { credits, daysLeft };
+  const subject = fillTemplate(copy.subject, variantValues);
+  const headline = fillTemplate(copy.headline, variantValues);
+  const body = fillTemplate(copy.body, variantValues);
+
+  const values = {
+    greeting: firstName || 'there',
+    claimUrl,
+    subject,
+    headline,
+    body,
+    ctaLabel: copy.ctaLabel,
+    perksIntro: copy.perksIntro,
+    credits,
+    daysLeft,
+  };
+
+  try {
+    const emailPayload = {
+      from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
+      to: userEmail,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
+    };
+
+    if (options.pdfBuffer) {
+      emailPayload.attachments = [{
+        filename: options.pdfFilename || 'story.pdf',
+        content: options.pdfBuffer,
+      }];
+    }
+
+    const { data, error } = await resend.emails.send(emailPayload);
+
+    if (error) {
+      console.error('❌ Failed to send trial reminder email:', error);
+      return null;
+    }
+
+    console.log(`📧 Trial ${reminderType} reminder sent to ${userEmail} (${language}), id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error('❌ Email send error (trial reminder):', err);
     return null;
   }
 }
@@ -814,6 +963,7 @@ module.exports = {
   // Customer emails
   sendStoryCompleteEmail,
   sendStoryFailedEmail,
+  sendTrialReminderEmail,
   sendOrderConfirmationEmail,
   sendOrderShippedEmail,
   sendOrderFailedEmail,
