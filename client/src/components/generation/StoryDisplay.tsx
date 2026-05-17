@@ -3562,10 +3562,10 @@ export function StoryDisplay({
                       {language === 'de' ? 'Reparaturergebnisse' : language === 'fr' ? 'Résultats de réparation' : 'Repair Results'}
                     </h4>
                     {Object.entries(finalChecksReport.entityRepairs).map(([entityName]) => {
-                      const grid = finalChecksReport.entity?.grids?.find(g => g.entityName === entityName);
-                      if (!grid) return null;
-                      const gridIdx = finalChecksReport.entity!.grids.indexOf(grid);
-                      void gridIdx;
+                      // Don't gate on finding a matching grid — entity.grids
+                      // is stripped on the wire (server returns only metadata),
+                      // and pre-extraction the gate was hiding repair info for
+                      // any character whose grid lookup missed.
                       return (
                         <details key={entityName} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                           <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50 text-sm font-medium text-gray-800">
@@ -3574,26 +3574,26 @@ export function StoryDisplay({
                           </summary>
                           <div className="p-3 border-t border-gray-100 space-y-3">
                           {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
-                          {finalChecksReport.entityRepairs?.[grid.entityName] && (
+                          {finalChecksReport.entityRepairs?.[entityName] && (
                             <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-green-700">✓ Repaired</span>
                                 <span className="text-xs text-gray-500">
-                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired
-                                    ? `${finalChecksReport.entityRepairs[grid.entityName]?.cellsRepaired} pages updated`
-                                    : finalChecksReport.entityRepairs?.[grid.entityName]?.pages
-                                      ? `${Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length} page(s) repaired individually`
+                                  {finalChecksReport.entityRepairs?.[entityName]?.cellsRepaired
+                                    ? `${finalChecksReport.entityRepairs[entityName]?.cellsRepaired} pages updated`
+                                    : finalChecksReport.entityRepairs?.[entityName]?.pages
+                                      ? `${Object.keys(finalChecksReport.entityRepairs[entityName]?.pages || {}).length} page(s) repaired individually`
                                       : ''}
-                                  {(finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount ?? 0) > 1 &&
-                                    ` (${finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount} clothing groups)`}
+                                  {(finalChecksReport.entityRepairs?.[entityName]?.clothingGroupCount ?? 0) > 1 &&
+                                    ` (${finalChecksReport.entityRepairs?.[entityName]?.clothingGroupCount} clothing groups)`}
                                 </span>
                               </div>
 
                               {/* Display repair results based on available format */}
-                              {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.length ? (
+                              {finalChecksReport.entityRepairs?.[entityName]?.gridsByClothing?.length ? (
                                 /* NEW: Per-clothing-group repair results */
                                 <div className="space-y-3">
-                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.map((clothingGroup) => (
+                                  {finalChecksReport.entityRepairs?.[entityName]?.gridsByClothing?.map((clothingGroup) => (
                                     <div key={clothingGroup.clothingCategory} className="border border-gray-200 rounded p-2">
                                       <div className="flex items-center gap-2 mb-2">
                                         <span className="text-xs font-medium text-gray-700">{clothingGroup.clothingCategory}</span>
@@ -3621,20 +3621,20 @@ export function StoryDisplay({
                                                 src={cell.before}
                                                 alt={`${cell.letter} before`}
                                                 className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before (${clothingGroup.clothingCategory})` })}
+                                                onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before (${clothingGroup.clothingCategory})` })}
                                               />
                                               <img
                                                 src={cell.after}
                                                 alt={`${cell.letter} after`}
                                                 className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After (${clothingGroup.clothingCategory})` })}
+                                                onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After (${clothingGroup.clothingCategory})` })}
                                               />
                                               <div className="bg-gray-900 rounded">
                                                 <img
                                                   src={cell.diff}
                                                   alt={`${cell.letter} diff`}
                                                   className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                  onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff (${clothingGroup.clothingCategory})` })}
+                                                  onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff (${clothingGroup.clothingCategory})` })}
                                                 />
                                               </div>
                                             </div>
@@ -3650,7 +3650,7 @@ export function StoryDisplay({
                                                 src={clothingGroup.gridBefore}
                                                 alt="Before repair"
                                                 className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                onClick={() => clothingGroup.gridBefore && setEnlargedImage({ src: clothingGroup.gridBefore, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Before` })}
+                                                onClick={() => clothingGroup.gridBefore && setEnlargedImage({ src: clothingGroup.gridBefore, title: `${entityName} - ${clothingGroup.clothingCategory} Grid Before` })}
                                               />
                                             </div>
                                           </div>
@@ -3661,7 +3661,7 @@ export function StoryDisplay({
                                                 src={clothingGroup.gridAfter}
                                                 alt="After repair"
                                                 className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                onClick={() => clothingGroup.gridAfter && setEnlargedImage({ src: clothingGroup.gridAfter, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid After` })}
+                                                onClick={() => clothingGroup.gridAfter && setEnlargedImage({ src: clothingGroup.gridAfter, title: `${entityName} - ${clothingGroup.clothingCategory} Grid After` })}
                                               />
                                             </div>
                                           </div>
@@ -3673,7 +3673,7 @@ export function StoryDisplay({
                                                   src={clothingGroup.gridDiff}
                                                   alt="Difference"
                                                   className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                  onClick={() => setEnlargedImage({ src: clothingGroup.gridDiff!, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Diff` })}
+                                                  onClick={() => setEnlargedImage({ src: clothingGroup.gridDiff!, title: `${entityName} - ${clothingGroup.clothingCategory} Grid Diff` })}
                                                 />
                                               </div>
                                             </div>
@@ -3683,7 +3683,7 @@ export function StoryDisplay({
                                     </div>
                                   ))}
                                 </div>
-                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.length ? (
+                              ) : finalChecksReport.entityRepairs?.[entityName]?.cellComparisons?.length ? (
                                 /* Backward compatible: flat cell comparisons (old format) */
                                 <div className="space-y-2">
                                   <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
@@ -3692,7 +3692,7 @@ export function StoryDisplay({
                                     <span>After</span>
                                     <span>Diff</span>
                                   </div>
-                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.map((cell) => (
+                                  {finalChecksReport.entityRepairs?.[entityName]?.cellComparisons?.map((cell) => (
                                     <div key={cell.letter} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
                                       <div className="text-center">
                                         <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
@@ -3702,26 +3702,26 @@ export function StoryDisplay({
                                         src={cell.before}
                                         alt={`${cell.letter} before`}
                                         className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                        onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before` })}
+                                        onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before` })}
                                       />
                                       <img
                                         src={cell.after}
                                         alt={`${cell.letter} after`}
                                         className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                        onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After` })}
+                                        onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After` })}
                                       />
                                       <div className="bg-gray-900 rounded">
                                         <img
                                           src={cell.diff}
                                           alt={`${cell.letter} diff`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff` })}
+                                          onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff` })}
                                         />
                                       </div>
                                     </div>
                                   ))}
                                 </div>
-                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.pages && Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length > 0 ? (
+                              ) : finalChecksReport.entityRepairs?.[entityName]?.pages && Object.keys(finalChecksReport.entityRepairs[entityName]?.pages || {}).length > 0 ? (
                                 /* Single-page repairs: show individual page comparisons */
                                 <div className="space-y-2">
                                   <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
@@ -3730,7 +3730,7 @@ export function StoryDisplay({
                                     <span>After</span>
                                     <span>Diff</span>
                                   </div>
-                                  {Object.entries(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).map(([pageNum, pageData]) => (
+                                  {Object.entries(finalChecksReport.entityRepairs[entityName]?.pages || {}).map(([pageNum, pageData]) => (
                                     <div key={pageNum} className="space-y-1">
                                       <div className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
                                         <div className="text-center">
@@ -3743,13 +3743,13 @@ export function StoryDisplay({
                                           src={pageData.comparison?.before}
                                           alt={`P${pageNum} before`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
                                         />
                                         <img
                                           src={pageData.comparison?.after}
                                           alt={`P${pageNum} after`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
                                         />
                                         {pageData.comparison?.diff ? (
                                           <div className="bg-gray-900 rounded">
@@ -3757,7 +3757,7 @@ export function StoryDisplay({
                                               src={pageData.comparison.diff}
                                               alt={`P${pageNum} diff`}
                                               className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                              onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                              onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
                                             />
                                           </div>
                                         ) : (
@@ -3775,19 +3775,19 @@ export function StoryDisplay({
                                     </div>
                                   ))}
                                 </div>
-                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair ? (
+                              ) : finalChecksReport.entityRepairs?.[entityName]?.gridBeforeRepair ? (
                                 /* Fallback to full grid comparison for oldest repairs */
-                                <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                   <div className="space-y-1">
                                     <span className="text-[10px] font-medium text-gray-500">Before Repair</span>
                                     <div className="bg-gray-50 rounded p-1">
                                       <img
-                                        src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair}
+                                        src={finalChecksReport.entityRepairs?.[entityName]?.gridBeforeRepair}
                                         alt="Before repair"
                                         className="w-full h-auto rounded cursor-pointer hover:opacity-80"
                                         onClick={() => {
-                                          const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair;
-                                          if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Before Repair` });
+                                          const src = finalChecksReport.entityRepairs?.[entityName]?.gridBeforeRepair;
+                                          if (src) setEnlargedImage({ src, title: `${entityName} - Grid Before Repair` });
                                         }}
                                       />
                                     </div>
@@ -3796,27 +3796,27 @@ export function StoryDisplay({
                                     <span className="text-[10px] font-medium text-gray-500">After Repair</span>
                                     <div className="bg-gray-50 rounded p-1">
                                       <img
-                                        src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair}
+                                        src={finalChecksReport.entityRepairs?.[entityName]?.gridAfterRepair}
                                         alt="After repair"
                                         className="w-full h-auto rounded cursor-pointer hover:opacity-80"
                                         onClick={() => {
-                                          const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair;
-                                          if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid After Repair` });
+                                          const src = finalChecksReport.entityRepairs?.[entityName]?.gridAfterRepair;
+                                          if (src) setEnlargedImage({ src, title: `${entityName} - Grid After Repair` });
                                         }}
                                       />
                                     </div>
                                   </div>
-                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff && (
+                                  {finalChecksReport.entityRepairs?.[entityName]?.gridDiff && (
                                     <div className="space-y-1">
                                       <span className="text-[10px] font-medium text-gray-500">Difference</span>
                                       <div className="bg-gray-900 rounded p-1">
                                         <img
-                                          src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ?? undefined}
+                                          src={finalChecksReport.entityRepairs?.[entityName]?.gridDiff ?? undefined}
                                           alt="Difference"
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
                                           onClick={() => {
-                                            const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff;
-                                            if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Diff` });
+                                            const src = finalChecksReport.entityRepairs?.[entityName]?.gridDiff;
+                                            if (src) setEnlargedImage({ src, title: `${entityName} - Grid Diff` });
                                           }}
                                         />
                                       </div>
