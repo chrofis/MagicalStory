@@ -1299,6 +1299,9 @@ export const storyService = {
     visualBibleGrid?: string;
     grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
     bboxDetection?: BboxSceneDetection | null;  // Bbox detection for the new image
+    // Canonical DB version_index of the just-saved version. Clients use this
+    // for `activeVersion` instead of array-position-based length-1.
+    versionIndex?: number;
     // Preview mode
     previewOnly?: boolean;
     message: string;
@@ -1335,6 +1338,7 @@ export const storyService = {
       landmarkPhotos?: LandmarkPhoto[];
       visualBibleGrid?: string;
       bboxDetection?: BboxSceneDetection | null;
+      versionIndex?: number;
       previewOnly?: boolean;
       message: string;
     }>(

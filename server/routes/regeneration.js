@@ -20,7 +20,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
+const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -751,10 +751,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       [id, [String(pageNumber)], JSON.stringify(imagePrompt)]
     );
 
-    // Update image_version_meta with new active version (new version is always the last one)
-    const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-    const newActiveIndex = scene?.imageVersions?.length ? getActiveIndexAfterPush(scene.imageVersions, 'scene') : 0;
-    await setActiveVersion(id, pageNumber, newActiveIndex);
+    // Active version is picked by recomputeAllActiveVersions inside
+    // saveScenePageData/saveStoryData (best score wins) — no explicit
+    // setActiveVersion needed here.
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -1340,13 +1339,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
     scene.prompt = result.prompt;
     scene.wasScaleRepaired = true;
     // Persist
-    const dbVersionIndex = (await dbQuery(
-      `SELECT COALESCE(MAX(version_index), -1) AS m
-       FROM story_images
-       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2`,
-      [id, pageNumber]
-    ))[0]?.m;
-    const newVersionIndex = (dbVersionIndex ?? -1) + 1;
+    const newVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
     await saveStoryImage(id, 'scene', pageNumber, result.imageData, {
       generatedAt: newVersion.createdAt,
       versionIndex: newVersionIndex,
@@ -1455,12 +1448,15 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
             prompt: effectiveStyle,
           };
           cover.imageVersions.push(newVersion);
-          newVersionIndex = cover.imageVersions.length - 1;
-          // saveStoryImage(storyId, imageType, pageNumber, imageData, options).
-          // Pass versionIndex via options — without it, the default 0
-          // OVERWRITES the original. Bytes go to R2 + image_url; image_data
-          // stays null when R2 succeeds.
+          // Query DB for next version_index — `imageVersions.length - 1` can
+          // diverge from DB max when the array has gaps or in-flight writes
+          // moved DB ahead. saveStoryImage(storyId, imageType, pageNumber,
+          // imageData, options): pass versionIndex via options — without it,
+          // the default 0 OVERWRITES the original.
+          newVersionIndex = await getNextVersionIndex(id, coverType, null);
           await saveStoryImage(id, coverType, null, result.imageData, { versionIndex: newVersionIndex });
+          // Style-transfer has no quality score on the new version, so
+          // recomputeAllActiveVersions wouldn't pick it — set explicitly.
           await setActiveVersion(id, coverType, newVersionIndex);
         }
       } else {
@@ -1485,11 +1481,10 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
             prompt: effectiveStyle,
           };
           sceneImage.imageVersions.push(newVersion);
-          newVersionIndex = sceneImage.imageVersions.length - 1;
-          // Same arg-order discipline as the cover branch above. Without
-          // versionIndex in options, the new bytes silently overwrote v0 in
-          // story_images and the modal couldn't find the new version row.
+          // Query DB for next version_index — see cover branch comment above.
+          newVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
           await saveStoryImage(id, 'scene', pageNumber, result.imageData, { versionIndex: newVersionIndex });
+          // No quality score on style-transfer output — set active explicitly.
           await setActiveVersion(id, `${pageNumber}`, newVersionIndex);
         }
       }
@@ -1972,7 +1967,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         generatedAt: timestamp,
         type: 'iteration',
         method: compositeAttempts ? 'composite' : undefined,
-        source: compositeAttempts ? 'composite-iterate' : 'iterate',
+        // Dev-mode user-triggered iterate is always a single pass — mirror the
+        // unified-pipeline `round-N` suffix so ImageHistoryModal.formatMethod's
+        // regex matches and renders "Composite Iterate · Round 1" instead of
+        // the bare slug.
+        source: compositeAttempts ? 'composite-iterate-round-1' : 'iterate-round-1',
         fixTargets: imageResult.fixTargets || [],
         fixableIssues: imageResult.fixableIssues || [],
         totalAttempts: imageResult.totalAttempts || null,
@@ -1988,15 +1987,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Also update cover-level bboxDetection to match new active image
       existingCover.bboxDetection = imageResult.bboxDetection || null;
 
-      // Query database for actual max version_index to avoid overwriting existing versions
-      const maxVersionResult = await dbQuery(
-        `SELECT COALESCE(MAX(version_index), -1) as max_version
-         FROM story_images
-         WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
-        [id, coverKey]
-      );
-      const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
-      const newVersionIndex = currentMaxVersion + 1;
+      const newVersionIndex = await getNextVersionIndex(id, coverKey, null);
 
       // Save the new cover image directly at the correct version_index
       await saveStoryImage(id, coverKey, null, imageResult.imageData, {
@@ -2007,15 +1998,17 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Mark as already saved so saveStoryData doesn't re-save it
       newVersion._alreadySaved = true;
 
-      // Update the cover data in storyData
+      // Update the cover data in storyData.
+      // Eval fields (qualityScore, qualityReasoning, fixTargets, fixableIssues)
+      // are intentionally NOT written at the root level — they live on the
+      // version row that was just pushed, same shape as scenes. Writing them
+      // at root meant the cover ROOT held the LATEST version's eval, so v0
+      // in the modal rendered v1's reasoning. Removed 2026-05-17.
       const coverData = {
         ...existingCover,
         imageData: imageResult.imageData,
         description: sceneDescription,
         prompt: coverPrompt,
-        qualityScore: imageResult.score,
-        qualityReasoning: imageResult.reasoning || null,
-        fixTargets: imageResult.fixTargets || [],
         modelId: imageResult.modelId || coverImageModelId,
         wasIterated: true,
         wasRegenerated: true,
@@ -2031,10 +2024,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       };
       storyData.coverImages[coverKey] = coverData;
 
-      // Update active version in metadata
-      await setActiveVersion(id, coverKey, newVersionIndex);
-
-      // Save updated story (covers use saveStoryData, not saveScenePageData)
+      // Active version is picked by recomputeAllActiveVersions inside
+      // saveStoryData (best score wins) — no explicit setActiveVersion needed.
       await saveStoryData(id, storyData);
 
       // Deduct credits if not unlimited
@@ -2337,10 +2328,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       await saveStoryData(id, storyData);
     }
 
-    // Update active version in metadata
-    const scene = updatedSceneData;
-    const newActiveIndex = scene?.imageVersions?.length ? getActiveIndexAfterPush(scene.imageVersions, 'scene') : 0;
-    await setActiveVersion(id, pageNumber, newActiveIndex);
+    // Active version is picked by recomputeAllActiveVersions inside
+    // saveScenePageData/saveStoryData (best score wins).
 
     // Deduct credits if not unlimited
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -2561,12 +2550,14 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       log.debug(`📸 [COVER REGEN] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
     }
 
-    // For backwards compatibility, also capture previous version info
+    // For backwards compatibility, also capture previous version info.
+    // Prefer per-version data (post-2026-05-17 fix); fall back to root for legacy covers.
     const previousCover = existingCover;
     const previousImageData = previousCover?.imageData || (typeof previousCover === 'string' ? previousCover : null);
-    const previousScore = previousCover?.qualityScore || null;
-    const previousReasoning = previousCover?.qualityReasoning || null;
-    const previousPrompt = previousCover?.prompt || null;
+    const previousVersionEntry = previousCover?.imageVersions?.[previousCover.imageVersions.length - 1];
+    const previousScore = previousVersionEntry?.qualityScore ?? previousCover?.qualityScore ?? null;
+    const previousReasoning = previousVersionEntry?.qualityReasoning ?? previousCover?.qualityReasoning ?? null;
+    const previousPrompt = previousVersionEntry?.prompt ?? previousCover?.prompt ?? null;
     // Keep the true original if this was already regenerated before
     const trueOriginalImage = previousCover?.originalImage || previousImageData;
     const trueOriginalScore = previousCover?.originalScore || previousScore;
@@ -2637,25 +2628,17 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // Add new version
     const updatedVersions = [...(existingCover.imageVersions || []), newVersion];
 
-    // Query database for actual max version_index (blob data may have stripped imageData)
-    // This ensures we don't overwrite existing versions when the blob's imageVersions is incomplete
-    const maxVersionResult = await dbQuery(
-      `SELECT COALESCE(MAX(version_index), -1) as max_version
-       FROM story_images
-       WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
-      [id, coverKey]
-    );
-    const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
-    const newVersionIndex = currentMaxVersion + 1;
+    const newVersionIndex = await getNextVersionIndex(id, coverKey, null);
 
-    // Update the cover in story data with new structure including quality, description, prompt, and previous version
+    // Update the cover in story data. Eval fields (qualityScore, qualityReasoning,
+    // fixTargets, fixableIssues, bboxDetection) intentionally NOT written at the
+    // root — they live on imageVersions[N]. Same shape as scenes (which only
+    // ever held eval data per-version). Removed 2026-05-17 to fix v0 rendering
+    // with v1's reasoning.
     const coverData = {
       imageData: coverResult.imageData,
       description: sceneDescription,
       prompt: coverPrompt,
-      qualityScore: coverResult.score,
-      qualityReasoning: coverResult.reasoning || null,
-      fixTargets: coverResult.fixTargets || [],  // Bounding boxes for auto-repair
       modelId: coverResult.modelId || null,
       wasRegenerated: true,
       totalAttempts: coverResult.totalAttempts || 1,
@@ -2672,7 +2655,6 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       referencePhotos: coverCharacterPhotos,
       regeneratedAt: new Date().toISOString(),
       regenerationCount: (previousCover?.regenerationCount || 0) + 1,
-      bboxDetection: coverResult.bboxDetection || null,
       bboxOverlayImage: coverResult.bboxOverlayImage || null,
       // NEW: imageVersions array for unified versioning
       imageVersions: updatedVersions
@@ -2701,10 +2683,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       storyData.coverImages.backCover = coverData;
     }
 
-    // Update active version in image_version_meta (same mechanism as scenes)
-    await setActiveVersion(id, coverKey, newVersionIndex);
-
-    // Save updated story metadata (imageData will be stripped by saveStoryData)
+    // Active version is picked by recomputeAllActiveVersions inside
+    // saveStoryData (best score wins) — same as scenes.
     await saveStoryData(id, storyData);
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
@@ -2910,16 +2890,13 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
       delete scene.imageData;
 
-      // Save updated scene atomically
+      // Save updated scene atomically. Active version picked by
+      // recomputeActiveVersion inside saveScenePageData/saveStoryData.
       storyData.sceneImages = sceneImages;
       const savedAtomically = await saveScenePageData(id, pageNumber, scene);
       if (!savedAtomically) {
         await saveStoryData(id, storyData);
       }
-
-      // Update active version in metadata
-      const newActiveIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
-      await setActiveVersion(id, pageNumber, newActiveIndex);
     }
 
     log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
@@ -3225,17 +3202,12 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
       sceneImages[sceneIndex] = currentScene;
 
-      // Save updated scene atomically
+      // Save updated scene atomically. Active version picked by
+      // recomputeActiveVersion inside saveScenePageData/saveStoryData.
       storyData.sceneImages = sceneImages;
       const savedAtomically = await saveScenePageData(id, pageNumber, currentScene);
       if (!savedAtomically) {
         await saveStoryData(id, storyData);
-      }
-
-      // Update active version in metadata if we created a new version
-      if (anyRepaired) {
-        const newActiveIndex = getActiveIndexAfterPush(currentScene.imageVersions, 'scene');
-        await setActiveVersion(id, pageNumber, newActiveIndex);
       }
 
       log.info(`✅ [REPAIR] Saved ${newRetryEntries.length} repair entries for story ${id}, page ${pageNumber}`);
@@ -5088,10 +5060,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             storyData.sceneImages = sceneImages;
           }
           await saveStoryData(id, storyData);
-          // Note: saveStoryData already saves images from imageVersions to story_images table
-          // For covers, use coverType string as the version identifier
-          const versionId = isCover ? coverType : update.pageNumber;
-          await setActiveVersion(id, versionId, newDbVersionIndex);
+          // Active version is picked by recomputeAllActiveVersions inside
+          // saveStoryData. Char-repair's new version has a qualityScore from
+          // the just-completed Gemini eval, so it competes fairly.
 
           // Debug images are already inside repairResult.comparison (set during Grok repair)
           const comparison = repairResult.comparison || null;
@@ -5245,16 +5216,9 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
       }
     }
 
-    // Save updated story (this saves all images from imageVersions to story_images)
+    // Save updated story. Active versions for repaired pages are picked by
+    // recomputeAllActiveVersions inside saveStoryData (best score wins).
     await saveStoryData(id, storyData);
-
-    // Set active version for each repaired page
-    for (const pageNumber of pagesProcessed) {
-      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
-      if (scene?.imageVersions?.length) {
-        await setActiveVersion(id, pageNumber, getActiveIndexAfterPush(scene.imageVersions, 'scene'));
-      }
-    }
 
     log.info(`✅ [REPAIR-WORKFLOW] Artifact repair complete: ${pagesProcessed.length} pages, ${issuesFixed} issues fixed`);
     res.json({ pagesProcessed, issuesFixed });
@@ -5318,11 +5282,15 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       return res.status(404).json({ error: 'No cover image data found' });
     }
 
-    // Capture previous image info before editing
+    // Capture previous image info before editing.
+    // Prefer per-version data; fall back to root for legacy covers (pre-2026-05-17).
     const previousImageData = currentImageData;
-    const previousScore = typeof existingCover === 'object' ? existingCover.qualityScore || null : null;
-    const previousReasoning = typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null;
-    log.debug(`📸 [COVER EDIT] Capturing previous image (score: ${previousScore})`);
+    const prevVersionEntry = typeof existingCover === 'object'
+      ? existingCover.imageVersions?.[existingCover.imageVersions.length - 1]
+      : null;
+    const previousScore = prevVersionEntry?.qualityScore ?? (typeof existingCover === 'object' ? existingCover.qualityScore || null : null);
+    const previousReasoning = prevVersionEntry?.qualityReasoning ?? (typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null);
+    log.debug(`✏️ [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImageData, editPrompt);
@@ -5393,14 +5361,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     existingCover.editedAt = new Date().toISOString();
     delete existingCover.imageData;
 
-    // Query database for actual max version_index to avoid overwriting existing versions
-    const maxVersionResult = await dbQuery(
-      `SELECT COALESCE(MAX(version_index), -1) as max_version
-       FROM story_images
-       WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
-      [id, coverKey]
-    );
-    const newVersionIndex = (maxVersionResult[0]?.max_version ?? -1) + 1;
+    const newVersionIndex = await getNextVersionIndex(id, coverKey, null);
 
     // Save the new cover image at the correct version_index
     await saveStoryImage(id, coverKey, null, editResult.imageData, {
@@ -5408,8 +5369,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       generatedAt: timestamp,
       versionIndex: newVersionIndex
     });
+    // Active version picked by recomputeAllActiveVersions inside saveStoryData.
     await saveStoryData(id, storyData);
-    await setActiveVersion(id, coverKey, newVersionIndex);
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 
@@ -5421,7 +5382,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       qualityReasoning,
       originalImage: previousImageData,
       originalScore: previousScore,
-      originalReasoning: previousReasoning
+      originalReasoning: previousReasoning,
+      versionIndex: newVersionIndex
     });
 
   } catch (err) {

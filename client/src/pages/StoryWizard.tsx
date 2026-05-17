@@ -4591,7 +4591,10 @@ export default function StoryWizard() {
                               modelId: metadata?.modelId,
                             }
                           ];
-                          return { ...prev, [coverKey]: { ...existing, imageData, imageVersions: updatedVersions, activeVersion: updatedVersions.length - 1 } };
+                          // versionIndex is the canonical DB index from the server. Local
+                          // array-position-based fallbacks (length-1) get out of sync with
+                          // DB when the array migrates or in-flight writes reorder.
+                          return { ...prev, [coverKey]: { ...existing, imageData, imageVersions: updatedVersions, activeVersion: versionIndex } };
                         });
                       }
                     } else {
@@ -4627,7 +4630,8 @@ export default function StoryWizard() {
                             ...img,
                             imageData,
                             imageVersions: updatedVersions,
-                            activeVersion: versionIndex ?? updatedVersions.length - 1,
+                            // versionIndex is canonical DB index from server — required.
+                            activeVersion: versionIndex,
                           };
                         }
                         return img;
@@ -4751,7 +4755,10 @@ export default function StoryWizard() {
                           type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                           qualityScore: v.qualityScore
                         }));
-                        const newActiveVersion = updatedVersions ? updatedVersions.length - 1 : img.activeVersion;
+                        // Server returns versionIndex on iterate — use it as the active
+                        // DB index. Falling back to length-1 misaligns the picker with
+                        // the actual saved row when the array shape has drifted.
+                        const newActiveVersion = result.versionIndex ?? img.activeVersion;
                         return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions, activeVersion: newActiveVersion };
                       }));
                     }
@@ -5113,6 +5120,9 @@ export default function StoryWizard() {
                           repairHistory: result.repairHistory,
                           repairedAt: new Date().toISOString(),
                           imageVersions: updatedVersions,
+                          // Artifact-repair endpoint returns {pagesProcessed,issuesFixed}
+                          // — no per-page versionIndex. length-1 is best effort; the
+                          // next image refresh from /images will reconcile.
                           activeVersion: updatedVersions.length - 1,
                         };
                       }
@@ -5157,7 +5167,7 @@ export default function StoryWizard() {
                           ...existingVersions,
                           { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
                         ];
-                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex ?? updatedVersions.length - 1 } };
+                        return { ...prev, [coverKey]: { ...existing, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex } };
                       });
                     } else {
                       // Scene repair — update sceneImages
@@ -5170,7 +5180,7 @@ export default function StoryWizard() {
                           ...existingVersions,
                           { imageData: repaired.imageData, versionIndex: repaired.versionIndex, createdAt: new Date().toISOString(), type: 'entity-repair' as const }
                         ];
-                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex ?? updatedVersions.length - 1 };
+                        return { ...img, imageData: repaired.imageData, imageVersions: updatedVersions, activeVersion: repaired.versionIndex };
                       }));
                     }
                     // Trigger full image refresh so version picker gets DB-sourced versions
@@ -5269,7 +5279,9 @@ export default function StoryWizard() {
                             type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                             qualityScore: v.qualityScore
                           }));
-                          const newActiveVersion = updatedVersions ? updatedVersions.length - 1 : img.activeVersion;
+                          // iterate endpoint returns canonical versionIndex; prefer it
+                          // over array-position-based length-1.
+                          const newActiveVersion = result.versionIndex ?? img.activeVersion;
                           return {
                             ...img,
                             imageData: result.imageData,
@@ -6061,7 +6073,9 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
-                            activeVersion: updatedVersions.length - 1,
+                            // scene-edit endpoint doesn't return versionIndex; length-1
+                            // is best-effort until the next /images refresh.
+                            activeVersion: (result as any).versionIndex ?? updatedVersions.length - 1,
                           };
                         }));
                         log.info('Image edited successfully, updated state with quality info');
@@ -6096,7 +6110,8 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
-                            activeVersion: updatedVersions.length - 1,
+                            // cover-edit endpoint returns canonical versionIndex (added 2026-05-17).
+                            activeVersion: (result as any).versionIndex ?? updatedVersions.length - 1,
                           };
                           return { ...prev, [key]: updatedCover };
                         });

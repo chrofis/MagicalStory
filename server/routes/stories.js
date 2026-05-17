@@ -2131,115 +2131,103 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           : {};
       }
 
-      // Group images by page/cover type
+      // Group images by page/cover type.
+      // Scenes and covers share the same per-row collection logic — one helper
+      // handles both. Covers go into a plain object by type; scenes into a
+      // Map by pageNumber (pageNumber also injected as a field for the array
+      // form below).
       const sceneImagesMap = new Map();
       const covers = {};
       const pagesWithEmptyScene = new Set();
 
+      // Track which (bucket, key) we've already initialized to avoid stomping
+      // the active values on later rows.
+      const collectImageRow = (row, target, key, activeIdx, extraInit) => {
+        if (activeOnly) {
+          target[key] = {
+            ...extraInit,
+            imageData: pickImageSrcFast(row.image_data, row.image_url),
+            imageUrl: row.image_url || null,
+            qualityScore: row.quality_score,
+            generatedAt: row.generated_at,
+            versionCount: row.version_count || 1,
+            activeVersion: row.version_index
+          };
+          return;
+        }
+        if (!target[key]) {
+          target[key] = {
+            ...extraInit,
+            imageData: null,
+            qualityScore: null,
+            generatedAt: null,
+            imageVersions: [],
+            activeVersion: activeIdx
+          };
+        }
+        const entry = target[key];
+        entry.imageVersions.push({
+          versionIndex: row.version_index,
+          imageData: pickImageSrc(row.image_data, row.image_url),
+          imageUrl: row.image_url || null,
+          qualityScore: row.quality_score,
+          generatedAt: row.generated_at,
+          createdAt: row.generated_at,
+        });
+        if (row.version_index === entry.activeVersion) {
+          entry.imageData = pickImageSrc(row.image_data, row.image_url);
+          entry.imageUrl = row.image_url || null;
+          entry.qualityScore = row.quality_score;
+          entry.generatedAt = row.generated_at;
+        }
+      };
+
+      // Map adapter so collectImageRow can use `target[key] = ...` semantics
+      // on the sceneImages map.
+      const sceneAdapter = new Proxy({}, {
+        get: (_, k) => sceneImagesMap.get(Number(k)),
+        set: (_, k, v) => { sceneImagesMap.set(Number(k), v); return true; },
+      });
+
       for (const row of separateImages) {
         if (row.image_type === 'empty_scene') {
-          // Track which pages have empty scene backgrounds (frontend lazy-loads them)
           pagesWithEmptyScene.add(row.page_number);
           continue;
         }
         if (row.image_type === 'scene') {
           const pageNum = row.page_number;
-
-          if (activeOnly) {
-            // Fast path: one image per page, no versions array. Prefer URL so
-            // the response stays small — browser fetches images from R2/CDN.
-            sceneImagesMap.set(pageNum, {
-              pageNumber: pageNum,
-              imageData: pickImageSrcFast(row.image_data, row.image_url),
-              imageUrl: row.image_url || null,
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at,
-              versionCount: row.version_count || 1,
-              activeVersion: row.version_index
-            });
-          } else {
-            // Full path: build imageVersions array with ALL versions
-            if (!sceneImagesMap.has(pageNum)) {
-              const activeIdx = activeVersions[pageNum.toString()] ?? 0;
-              sceneImagesMap.set(pageNum, {
-                pageNumber: pageNum,
-                imageData: null,
-                qualityScore: null,
-                generatedAt: null,
-                imageVersions: [],
-                activeVersion: activeIdx
-              });
-            }
-            const scene = sceneImagesMap.get(pageNum);
-            const activeIdx = scene.activeVersion;
-
-            // Add ALL versions to imageVersions array (including version 0)
-            scene.imageVersions.push({
-              versionIndex: row.version_index,
-              imageData: pickImageSrc(row.image_data, row.image_url),
-              imageUrl: row.image_url || null,
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at,
-              createdAt: row.generated_at, // Alias for frontend compatibility
-            });
-
-            // Set main imageData to the ACTIVE version (not always version 0)
-            // This ensures full load returns the same image as fast load
-            if (row.version_index === activeIdx) {
-              scene.imageData = pickImageSrc(row.image_data, row.image_url);
-              scene.imageUrl = row.image_url || null;
-              scene.qualityScore = row.quality_score;
-              scene.generatedAt = row.generated_at;
-            }
-          }
+          const activeIdx = activeVersions[pageNum.toString()] ?? 0;
+          collectImageRow(row, sceneAdapter, pageNum, activeIdx, { pageNumber: pageNum });
         } else {
           // Cover image (frontCover, initialPage, backCover)
           const coverType = row.image_type;
+          const activeIdx = activeVersions[coverType] ?? 0;
+          collectImageRow(row, covers, coverType, activeIdx, {});
+        }
+      }
 
-          if (activeOnly) {
-            // Fast path: one image per cover, no versions array. Prefer URL.
-            covers[coverType] = {
-              imageData: pickImageSrcFast(row.image_data, row.image_url),
-              imageUrl: row.image_url || null,
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at,
-              versionCount: row.version_count || 1,
-              activeVersion: row.version_index
-            };
-          } else {
-            // Full path: build imageVersions array
-            const activeCoverVersion = activeVersions[coverType] ?? 0;
-            if (!covers[coverType]) {
-              covers[coverType] = {
-                imageData: null,
-                qualityScore: null,
-                generatedAt: null,
-                imageVersions: [],
-                activeVersion: activeCoverVersion
-              };
-            }
-
-            const coverData = covers[coverType];
-
-            // Add to imageVersions array (include versionIndex for consistent version selection)
-            coverData.imageVersions.push({
-              versionIndex: row.version_index,
-              imageData: pickImageSrc(row.image_data, row.image_url),
-              imageUrl: row.image_url || null,
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at,
-              createdAt: row.generated_at, // Alias for frontend compatibility
-            });
-
-            // If this is the active version, set as main imageData
-            if (row.version_index === activeCoverVersion) {
-              coverData.imageData = pickImageSrc(row.image_data, row.image_url);
-              coverData.imageUrl = row.image_url || null;
-              coverData.qualityScore = row.quality_score;
-              coverData.generatedAt = row.generated_at;
+      // Bounds-check: clamp activeVersion to a version that actually exists
+      // in the DB. Without this, a stale active pointer (e.g. story_images
+      // row deleted but image_version_meta not updated) would result in the
+      // response showing null imageData on the active page.
+      if (!activeOnly) {
+        const clampActive = (entry, label, key) => {
+          if (!entry?.imageVersions?.length) return;
+          const maxIdx = Math.max(...entry.imageVersions.map(v => v.versionIndex));
+          if (entry.activeVersion > maxIdx) {
+            console.warn(`⚠️ [/images] ${label}=${key} activeVersion=${entry.activeVersion} exceeds max=${maxIdx}; clamping`);
+            entry.activeVersion = maxIdx;
+            const active = entry.imageVersions.find(v => v.versionIndex === maxIdx);
+            if (active) {
+              entry.imageData = active.imageData;
+              entry.imageUrl = active.imageUrl;
+              entry.qualityScore = active.qualityScore;
+              entry.generatedAt = active.generatedAt;
             }
           }
-        }
+        };
+        for (const [pageNum, scene] of sceneImagesMap) clampActive(scene, 'scene', pageNum);
+        for (const coverType of Object.keys(covers)) clampActive(covers[coverType], 'cover', coverType);
       }
 
       // For full mode only: merge cover metadata and process imageVersions
@@ -2322,27 +2310,20 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               }
             }
             covers[coverType].referencePhotos = sanitizeReferencePhotos(blobCover.referencePhotos);
-            // Merge per-version metadata — same fields as scenes. Always
-            // prefer blobCover.imageVersions[N] when present (uniform per-
-            // version source of truth). Falling back to blobCover root for
-            // v0 was a legacy shape from before v0 was added to imageVersions
-            // and is now actively wrong: the cover ROOT gets OVERWRITTEN by
-            // the latest version's qualityReasoning + fixableIssues every
-            // time a new version is saved (the regenerate routes assign
-            // coverData with the new scores at the root level). Result: v0
-            // in the dev panel rendered with v1's eval feedback while
-            // displaying v0's score — impossible to debug. Observed on
-            // staging job_1779036350422_ohdfkmnlr frontCover.
+            // Per-version metadata: same shape as scenes. Always read from
+            // blobCover.imageVersions[N]. Pre-2026-05-17 code wrote eval
+            // fields to the cover ROOT and v0's per-version slot was empty
+            // (and code fell back to root for v0) — but root was clobbered
+            // by the latest version's data on every save, so v0 rendered
+            // with v1's reasoning. Root no longer carries eval fields and
+            // cover lazy-migration now seeds imageVersions[0] from the
+            // original imageData, so the v0→root fallback is gone.
             if (blobCover.imageVersions && covers[coverType].imageVersions) {
               for (let i = 0; i < covers[coverType].imageVersions.length; i++) {
                 const dbVersionIdx = covers[coverType].imageVersions[i].versionIndex;
                 const blobVersion = blobCover.imageVersions?.[dbVersionIdx];
                 if (blobVersion) {
                   mergeFields(covers[coverType].imageVersions[i], blobVersion);
-                } else if (dbVersionIdx === 0) {
-                  // Legacy stories: v0's data lives on the root only (no
-                  // imageVersions[0]). Fall back so older stories still render.
-                  mergeFields(covers[coverType].imageVersions[i], blobCover);
                 }
               }
             }

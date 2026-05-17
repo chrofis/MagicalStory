@@ -2274,6 +2274,33 @@ async function persistCompositeDebug(storyId, img) {
   return saved;
 }
 
+/**
+ * Single source of truth for "what's the next version_index I should write?"
+ * Hits the DB once with `MAX(version_index) + 1`, scoped to the same
+ * (story, type, page) tuple that `saveStoryImage` writes to. Routes that
+ * pushed a new entry to `imageVersions[]` and then used `length - 1` could
+ * silently overwrite an existing row (one in-flight regen + a slightly stale
+ * imageVersions array would both target the same index). Use this helper
+ * instead.
+ *
+ * @param {string} storyId
+ * @param {string} imageType  'scene' | 'frontCover' | 'initialPage' | 'backCover'
+ * @param {number|null} pageNumber  null for covers
+ * @returns {Promise<number>}  next version_index to write
+ */
+async function getNextVersionIndex(storyId, imageType, pageNumber = null) {
+  if (!isDatabaseMode()) throw new Error('Database mode required');
+  const rows = await dbQuery(
+    `SELECT COALESCE(MAX(version_index), -1) AS m
+     FROM story_images
+     WHERE story_id = $1
+       AND image_type = $2
+       AND ${pageNumber === null ? 'page_number IS NULL' : 'page_number = $3'}`,
+    pageNumber === null ? [storyId, imageType] : [storyId, imageType, pageNumber]
+  );
+  return (rows[0]?.m ?? -1) + 1;
+}
+
 async function saveStoryImage(storyId, imageType, pageNumber, imageData, options = {}) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
@@ -3032,6 +3059,7 @@ module.exports = {
   upsertStory,
   // Image functions
   saveStoryImage,
+  getNextVersionIndex,
   getStoryImage,
   imagesExistByType,
   imgBytesAsync,

@@ -41,8 +41,23 @@ export function ImageHistoryModal({
   // Auto-open the detail panel for the active version when the modal opens
   // in dev mode — the user almost always wants to see what produced the
   // current image (method, prompt, refs, issues) without an extra click.
+  // Fallback when caller forgot to pass activeVersionIndex: pick the best
+  // scored version (matches the server's pickBestVersionIndex picker). Falling
+  // back to length-1 here was hiding the actual active when a later version
+  // scored worse than an earlier one.
+  const pickBestIndex = () => {
+    if (!versions.length) return null;
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    for (let i = 0; i < versions.length; i++) {
+      const s = (versions[i] as any)?.qualityScore;
+      if (typeof s !== 'number') continue;
+      if (s >= bestScore) { bestScore = s; bestIdx = i; }
+    }
+    return bestIdx >= 0 ? bestIdx : versions.length - 1;
+  };
   const initialDetailIndex = developerMode
-    ? (activeVersionIndex ?? (versions.length > 0 ? versions.length - 1 : null))
+    ? (activeVersionIndex ?? pickBestIndex())
     : null;
   const [detailIndex, setDetailIndex] = useState<number | null>(initialDetailIndex);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);

@@ -237,6 +237,21 @@ function activeBboxOverlay(image: any): string | null {
   return (v?.bboxOverlayImage as string | undefined) ?? (image?.bboxOverlayImage ?? null);
 }
 
+// Cover quality panels read score/reasoning from the active version's row,
+// not from the cover ROOT. Pre-2026-05-17 the regen routes were writing
+// each new version's eval data to the cover root too, so the root held the
+// LATEST version's score+reasoning regardless of which version was active.
+// That made v0 in the dev panel render v1's reasoning. Root no longer
+// carries eval fields; everything reads per-version, same as scenes.
+function activeQuality(image: any): { score: number | undefined; reasoning: string | null; modelId: string | null } {
+  const v: any = pickActiveVersion(image);
+  return {
+    score: (v?.qualityScore ?? image?.qualityScore) as number | undefined,
+    reasoning: (v?.qualityReasoning ?? image?.qualityReasoning) ?? null,
+    modelId: (v?.qualityModelId ?? image?.qualityModelId) ?? null,
+  };
+}
+
 export function StoryDisplay({
   title,
   dedication,
@@ -4695,29 +4710,33 @@ export function StoryDisplay({
                 })()}
 
                 {/* Quality Score */}
-                {frontCoverObj.qualityScore !== undefined && (
-                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                        {frontCoverObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({frontCoverObj.qualityModelId})</span>}
-                      </span>
-                      <span className={`text-lg font-bold ${
-                        frontCoverObj.qualityScore >= 70 ? 'text-green-600' :
-                        frontCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {Math.round(frontCoverObj.qualityScore)}%
-                      </span>
-                    </summary>
-                    {frontCoverObj.qualityReasoning && (
-                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                        <p className="whitespace-pre-wrap">{frontCoverObj.qualityReasoning}</p>
-                      </div>
-                    )}
-                  </details>
-                )}
+                {(() => {
+                  const q = activeQuality(frontCoverObj);
+                  if (q.score === undefined) return null;
+                  return (
+                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
+                        </span>
+                        <span className={`text-lg font-bold ${
+                          q.score >= 70 ? 'text-green-600' :
+                          q.score >= 50 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {Math.round(q.score)}%
+                        </span>
+                      </summary>
+                      {q.reasoning && (
+                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                        </div>
+                      )}
+                    </details>
+                  );
+                })()}
 
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
@@ -4939,29 +4958,33 @@ export function StoryDisplay({
                 })()}
 
                 {/* Quality Score */}
-                {initialPageObj.qualityScore !== undefined && (
-                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                        {initialPageObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({initialPageObj.qualityModelId})</span>}
-                      </span>
-                      <span className={`text-lg font-bold ${
-                        initialPageObj.qualityScore >= 70 ? 'text-green-600' :
-                        initialPageObj.qualityScore >= 50 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {Math.round(initialPageObj.qualityScore)}%
-                      </span>
-                    </summary>
-                    {initialPageObj.qualityReasoning && (
-                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                        <p className="whitespace-pre-wrap">{initialPageObj.qualityReasoning}</p>
-                      </div>
-                    )}
-                  </details>
-                )}
+                {(() => {
+                  const q = activeQuality(initialPageObj);
+                  if (q.score === undefined) return null;
+                  return (
+                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
+                        </span>
+                        <span className={`text-lg font-bold ${
+                          q.score >= 70 ? 'text-green-600' :
+                          q.score >= 50 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {Math.round(q.score)}%
+                        </span>
+                      </summary>
+                      {q.reasoning && (
+                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                        </div>
+                      )}
+                    </details>
+                  );
+                })()}
 
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
@@ -6612,29 +6635,33 @@ export function StoryDisplay({
                 })()}
 
                 {/* Quality Score */}
-                {backCoverObj.qualityScore !== undefined && (
-                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                        {backCoverObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({backCoverObj.qualityModelId})</span>}
-                      </span>
-                      <span className={`text-lg font-bold ${
-                        backCoverObj.qualityScore >= 70 ? 'text-green-600' :
-                        backCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {Math.round(backCoverObj.qualityScore)}%
-                      </span>
-                    </summary>
-                    {backCoverObj.qualityReasoning && (
-                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                        <p className="whitespace-pre-wrap">{backCoverObj.qualityReasoning}</p>
-                      </div>
-                    )}
-                  </details>
-                )}
+                {(() => {
+                  const q = activeQuality(backCoverObj);
+                  if (q.score === undefined) return null;
+                  return (
+                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
+                        </span>
+                        <span className={`text-lg font-bold ${
+                          q.score >= 70 ? 'text-green-600' :
+                          q.score >= 50 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {Math.round(q.score)}%
+                        </span>
+                      </summary>
+                      {q.reasoning && (
+                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                        </div>
+                      )}
+                    </details>
+                  );
+                })()}
 
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
