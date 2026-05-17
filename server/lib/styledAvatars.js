@@ -17,7 +17,6 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
-const { generateStyledCostumedAvatar } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');

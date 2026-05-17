@@ -7,7 +7,7 @@
  *
  * Inputs:
  *   - phantom (the pose template — bundled at server/assets/phantom-watercolor.png)
- *   - styled 2×2 avatar (existing production output from generateStyledCostumedAvatar)
+ *   - standard avatar (single-image body reference from clothing-avatars pipeline)
  *   - character face photo (identity anchor)
  *
  * One Grok edit call. ~$0.02 per character per costume. Used by the scene
