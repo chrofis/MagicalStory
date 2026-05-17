@@ -558,7 +558,7 @@ Si vous pensez que nous avons violé vos droits à la vie privée, vous avez le 
 export default function PrivacyPolicy() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const content = privacyContent[language] || privacyContent.en;
+  const content = privacyContent[language as keyof typeof privacyContent] || privacyContent.en;
 
   const handleBack = () => {
     // Check if there's history to go back to

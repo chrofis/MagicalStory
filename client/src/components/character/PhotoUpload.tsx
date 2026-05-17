@@ -46,7 +46,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
   const [consent2Checked, setConsent2Checked] = useState(false);
   const [isRecordingConsent, setIsRecordingConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const texts = consentTexts[language] || consentTexts.en;
+  const texts = consentTexts[language as keyof typeof consentTexts] || consentTexts.en;
 
   // User has already consented if photoConsentAt is set
   const hasExistingConsent = !!user?.photoConsentAt;

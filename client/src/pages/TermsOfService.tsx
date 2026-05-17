@@ -429,7 +429,7 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
 export default function TermsOfService() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const content = termsContent[language] || termsContent.en;
+  const content = termsContent[language as keyof typeof termsContent] || termsContent.en;
 
   const handleBack = () => {
     // Check if there's history to go back to

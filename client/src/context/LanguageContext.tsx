@@ -11,7 +11,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
 const STORAGE_KEY = 'magicalstory_language';
-const SUPPORTED: Language[] = ['en', 'de', 'fr'];
+const SUPPORTED: Language[] = ['en', 'de', 'fr', 'it'];
 const isLanguage = (v: unknown): v is Language => typeof v === 'string' && SUPPORTED.includes(v as Language);
 
 const isBrowser = typeof window !== 'undefined';

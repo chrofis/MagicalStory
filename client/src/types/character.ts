@@ -260,6 +260,7 @@ export interface LocalizedString {
   en: string;
   de: string;
   fr: string;
+  it?: string;
 }
 
 // Visual Bible types

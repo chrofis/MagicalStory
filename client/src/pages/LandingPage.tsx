@@ -172,6 +172,61 @@ const sectionTranslations = {
     discoverScience: 'Pourquoi ça marche',
     discoverScienceDesc: 'La recherche derrière les histoires personnalisées et le développement de l\'enfant.',
   },
+  it: {
+    // Section 1: Characters
+    step1: 'Passo 1',
+    createCharacters: 'Crea i tuoi personaggi',
+    createCharactersDesc: 'Carica le foto della tua famiglia e ritrovali come personaggi illustrati per tutta la storia. Ogni personaggio mantiene il suo aspetto unico in ogni pagina.',
+    addFamily: 'Aggiungi tutta la famiglia - bambini, genitori, nonni o amici',
+    defineNames: 'Definisci nomi, età e relazioni tra i personaggi',
+    consistentCharacters: 'I personaggi appaiono in modo coerente in tutta la storia',
+    // Section 2: Story
+    step2: 'Passo 2',
+    tellStory: 'Racconta la tua storia',
+    tellStoryDescBefore: 'Scegli tra ',
+    tellStoryDescLink: '170+ temi',
+    tellStoryDescAfter: ' o descrivi la tua avventura — dai pirati al primo giorno di scuola. Lei ha il pieno controllo: modifichi ogni testo e dia forma a ogni illustrazione esattamente come la vuole.',
+    selectThemes: 'Avventura, fantasy, compleanno, storie della buonanotte, sfide di vita e altro',
+    customElements: 'Modifica i testi liberamente — ogni pagina, ogni parola',
+    readingLevel: 'Modella le immagini — cambia la scena, regola lo stile, rifinisci i dettagli',
+    // Section 3: Style
+    step3: 'Passo 3',
+    chooseStyle: 'Scegli il tuo stile',
+    chooseStyleDesc: 'Scegli lo stile di illustrazione che si adatta alla tua storia. Acquerello, animazione 3D, fumetto, anime — ogni stile è applicato in modo coerente in tutte le pagine.',
+    artStyles: '8+ stili artistici unici: 3D in stile Pixar, acquerello, fumetto, anime e altri',
+    consistentStyle: 'Stile coerente in tutte le pagine e per tutti i personaggi',
+    bookLength: 'Scegli la lunghezza preferita del libro - da storie brevi ad avventure più lunghe',
+    // Section 4: Print
+    step4: 'Passo 4',
+    printShare: 'Stampa e condividi',
+    printShareDesc: 'La tua storia è pronta! Scaricala subito in PDF o ordina un bellissimo libro stampato consegnato a casa tua.',
+    pdfDownload: 'Download PDF immediato - perfetto da leggere su tablet o stampare a casa',
+    printOptions: 'Stampa con copertina rigida o morbida - 20x20cm, qualità professionale',
+    shipping: 'Spedizione in Svizzera - il regalo perfetto per ogni occasione',
+    giftGuideLink: 'Scopri idee regalo per età e occasione',
+    // Why It Works
+    whyTitle: 'Perché fare la predica quando si può raccontare una storia?',
+    whyDesc: 'I bambini non imparano dalle prediche — imparano dalle storie che amano. Una storia sul lavarsi i denti ispira più di qualsiasi discussione. E quando sono loro l\'eroe? Non vedono l\'ora di farlo da soli.',
+    whyLink: 'Scopri perché funziona',
+    // CTA
+    readyToCreate: 'Pronto a creare il tuo libro?',
+    ctaDesc: 'Carica una foto, scegli un\'avventura e la tua storia personalizzata sarà pronta in meno di 3 minuti.',
+    // Discover more (pre-footer grid)
+    discoverTitle: 'Scopri di più',
+    discoverDesc: 'Trova ispirazione, idee regalo e storie della tua regione.',
+    discoverThemes: '170+ temi',
+    discoverThemesDesc: 'Dai pirati al primo giorno di scuola — ogni avventura immaginabile.',
+    discoverOccasions: 'Idee regalo',
+    discoverOccasionsDesc: 'Compleanno, battesimo, inizio della scuola — il libro perfetto per ogni occasione.',
+    discoverGiftHub: 'Guida ai regali',
+    discoverGiftHubDesc: 'Aiuto per trovare il regalo giusto in base a età e interessi.',
+    discoverSwiss: 'Storie svizzere',
+    discoverSwissDesc: 'Leggende locali e storie del tuo paese.',
+    discoverCompare: 'Confronta',
+    discoverCompareDesc: 'Come si confronta MagicalStory con altri fornitori di libri personalizzati.',
+    discoverScience: 'Perché funziona',
+    discoverScienceDesc: 'La ricerca dietro le storie personalizzate e lo sviluppo del bambino.',
+  },
 };
 
 export default function LandingPage() {

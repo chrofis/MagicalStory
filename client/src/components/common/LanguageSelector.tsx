@@ -5,6 +5,7 @@ const languages: { code: Language; flag: string; label: string }[] = [
   { code: 'en', flag: '🇬🇧', label: 'English' },
   { code: 'de', flag: '🇩🇪', label: 'Deutsch' },
   { code: 'fr', flag: '🇫🇷', label: 'Français' },
+  { code: 'it', flag: '🇮🇹', label: 'Italiano' },
 ];
 
 interface LanguageSelectorProps {

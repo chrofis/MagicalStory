@@ -4,12 +4,14 @@ export const defaultStrengths: Record<Language, string[]> = {
   en: ['Cheerful', 'Kind', 'Caring', 'Funny', 'Forgiving', 'Protective', 'Loyal', 'Generous', 'Fair-minded', 'Honest', 'Confident', 'Brave', 'Trustworthy', 'Determined', 'Hardworking', 'Leader', 'Patient', 'Curious', 'Imaginative', 'Smart', 'Creative', 'Observant', 'Resourceful', 'Energetic', 'Fast', 'Strong', 'Adventurous'],
   de: ['Fröhlich', 'Freundlich', 'Hilfsbereit', 'Lustig', 'Nachsichtig', 'Beschützend', 'Treu', 'Grosszügig', 'Gerecht', 'Ehrlich', 'Selbstbewusst', 'Mutig', 'Vertrauenswürdig', 'Entschlossen', 'Fleissig', 'Leader', 'Geduldig', 'Neugierig', 'Fantasievoll', 'Klug', 'Kreativ', 'Aufmerksam', 'Einfallsreich', 'Energiegeladen', 'Schnell', 'Stark', 'Abenteuerlustig'],
   fr: ['Joyeux', 'Gentil', 'Attentionné', 'Drôle', 'Indulgent', 'Protecteur', 'Loyal', 'Généreux', 'Équitable', 'Honnête', 'Confiant', 'Courageux', 'Digne de confiance', 'Déterminé', 'Travailleur', 'Leader', 'Patient', 'Curieux', 'Imaginatif', 'Intelligent', 'Créatif', 'Observateur', 'Débrouillard', 'Énergique', 'Rapide', 'Fort', 'Aventureux'],
+  it: ['Allegro', 'Gentile', 'Premuroso', 'Divertente', 'Indulgente', 'Protettivo', 'Leale', 'Generoso', 'Giusto', 'Onesto', 'Sicuro di sé', 'Coraggioso', 'Affidabile', 'Determinato', 'Diligente', 'Leader', 'Paziente', 'Curioso', 'Fantasioso', 'Intelligente', 'Creativo', 'Attento', 'Pieno di risorse', 'Energico', 'Veloce', 'Forte', 'Avventuroso'],
 };
 
 export const defaultFlaws: Record<Language, string[]> = {
   en: ['Impatient', 'Distracted', 'Talkative', 'Whiny', 'Messy', 'Forgetful', 'Tattletale', 'Sore Loser', 'Stubborn', 'Lying', 'Bossy', 'Gullible', 'Jealous', 'Easily scared', 'Clingy', 'Quick-tempered', 'Selfish', 'Sneaky', 'Reckless', 'Shy', 'Clumsy', 'Lazy', 'Boastful', 'Indecisive', 'Perfectionist'],
   de: ['Ungeduldig', 'Zerstreut', 'Gesprächig', 'Weinerlich', 'Unordentlich', 'Vergesslich', 'Petze', 'Schlechter Verlierer', 'Stur', 'Lügnerisch', 'Rechthaberisch', 'Leichtgläubig', 'Eifersüchtig', 'Ängstlich', 'Anhänglich', 'Jähzornig', 'Egoistisch', 'Hinterlistig', 'Leichtsinnig', 'Schüchtern', 'Tollpatschig', 'Faul', 'Prahlerisch', 'Unentschlossen', 'Perfektionist'],
   fr: ['Impatient', 'Distrait', 'Bavard', 'Pleurnicheur', 'Désordonné', 'Oublieux', 'Rapporteur', 'Mauvais perdant', 'Têtu', 'Menteur', 'Autoritaire', 'Crédule', 'Jaloux', 'Facilement effrayé', 'Collant', 'Colérique', 'Égoïste', 'Sournois', 'Imprudent', 'Timide', 'Maladroit', 'Paresseux', 'Vantard', 'Indécis', 'Perfectionniste'],
+  it: ['Impaziente', 'Distratto', 'Chiacchierone', 'Piagnucolone', 'Disordinato', 'Smemorato', 'Spione', 'Cattivo perdente', 'Testardo', 'Bugiardo', 'Prepotente', 'Credulone', 'Geloso', 'Pauroso', 'Appiccicoso', 'Irascibile', 'Egoista', 'Sornione', 'Imprudente', 'Timido', 'Goffo', 'Pigro', 'Vanaglorioso', 'Indeciso', 'Perfezionista'],
 };
 
 export const defaultChallenges: Record<Language, string[]> = {
@@ -81,6 +83,29 @@ export const defaultChallenges: Record<Language, string[]> = {
     'Peur du vide',
     'Peur des araignées',
     'Peur des bruits forts'
+  ],
+  it: [
+    // Sfide all'inizio
+    'Seguire le regole',
+    'Controllare le emozioni',
+    'Condividere con gli altri',
+    'Esami e voti',
+    'Fare nuove amicizie',
+    'Parlare in pubblico',
+    'Provare cose nuove',
+    'Accettare e chiedere aiuto',
+    'Affrontare i cambiamenti',
+    'Difendere se stessi',
+    // Paure alla fine
+    'Paura del buio',
+    'Incubi e brutti sogni',
+    'Mostri, fantasmi e cose sotto il letto',
+    'Paura di restare soli',
+    'Paura di perdersi',
+    'Medici, dentisti e iniezioni',
+    'Paura delle altezze',
+    'Paura dei ragni',
+    'Paura dei rumori forti'
   ],
 };
 

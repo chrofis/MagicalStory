@@ -30,7 +30,7 @@ const footerTexts = {
 
 export function Footer() {
   const { language } = useLanguage();
-  const texts = footerTexts[language] || footerTexts.en;
+  const texts = footerTexts[language as keyof typeof footerTexts] || footerTexts.en;
   const currentYear = new Date().getFullYear();
 
   return (

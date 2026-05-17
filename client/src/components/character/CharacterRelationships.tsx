@@ -45,8 +45,8 @@ export function CharacterRelationships({
   const allRelationshipTypes = [
     ...relationshipTypes,
     ...customRelationships.map((rel) => ({
-      value: { en: rel.forward, de: rel.forward, fr: rel.forward },
-      inverse: { en: rel.inverse, de: rel.inverse, fr: rel.inverse },
+      value: { en: rel.forward, de: rel.forward, fr: rel.forward, it: rel.forward },
+      inverse: { en: rel.inverse, de: rel.inverse, fr: rel.inverse, it: rel.inverse },
     })),
   ];
 
@@ -160,8 +160,8 @@ export function CharacterRelationships({
                       + {lang === 'de' ? 'Eigene' : lang === 'fr' ? 'Personnalisé' : 'Custom'}
                     </option>
                     {allRelationshipTypes.map((type, idx) => (
-                      <option key={idx} value={type.value[lang]}>
-                        {type.value[lang]}
+                      <option key={idx} value={type.value[lang] || type.value.en}>
+                        {type.value[lang] || type.value.en}
                       </option>
                     ))}
                   </select>

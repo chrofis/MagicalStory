@@ -43,7 +43,7 @@ export function FaceSelectionModal({
   developerMode = false,
 }: FaceSelectionModalProps) {
   const { language } = useLanguage();
-  const t = translations[language] || translations.en;
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   return (
     <Modal

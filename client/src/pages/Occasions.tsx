@@ -48,7 +48,7 @@ const texts: Record<string, {
 
 export default function Occasions() {
   const { language } = useLanguage();
-  const t = texts[language] || texts.en;
+  const t = texts[language as keyof typeof texts] || texts.en;
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
@@ -69,8 +69,9 @@ export default function Occasions() {
         {/* Occasion Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-16">
           {occasions.map((occasion) => {
-            const name = occasion.name[language] || occasion.name.en;
-            const description = occasion.description[language] || occasion.description.en;
+            const dataLang = (language === 'it' ? 'en' : language) as 'en' | 'de' | 'fr';
+            const name = occasion.name[dataLang] || occasion.name.en;
+            const description = occasion.description[dataLang] || occasion.description.en;
             // Truncate description to ~100 chars for the card
             const shortDesc = description.length > 110 ? description.slice(0, 110).replace(/\s+\S*$/, '') + '...' : description;
 

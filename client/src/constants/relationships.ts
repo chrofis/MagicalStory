@@ -2,36 +2,36 @@ import type { RelationshipType, LocalizedString } from '@/types/character';
 import type { Language } from '@/types/story';
 
 export const relationshipTypes: RelationshipType[] = [
-  { value: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec' }, inverse: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec' } },
-  { value: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec' }, inverse: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec' } },
-  { value: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à' }, inverse: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à' } },
-  { value: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec' }, inverse: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec' } },
-  { value: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de' }, inverse: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de' } },
-  { value: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de' }, inverse: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de' } },
-  { value: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de' }, inverse: { en: 'Child of', de: 'Kind von', fr: 'Enfant de' } },
-  { value: { en: 'Child of', de: 'Kind von', fr: 'Enfant de' }, inverse: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de' } },
-  { value: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de' }, inverse: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de' } },
-  { value: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de' }, inverse: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de' } },
-  { value: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de' }, inverse: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Bel-enfant de' } },
-  { value: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Bel-enfant de' }, inverse: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de' } },
-  { value: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec' }, inverse: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec' } },
-  { value: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec' }, inverse: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec' } },
-  { value: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' }, inverse: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' } },
+  { value: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec', it: 'Migliori amici con' }, inverse: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec', it: 'Migliori amici con' } },
+  { value: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec', it: 'Amici con' }, inverse: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec', it: 'Amici con' } },
+  { value: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à', it: 'Sposato/a con' }, inverse: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à', it: 'Sposato/a con' } },
+  { value: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec', it: 'In relazione con' }, inverse: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec', it: 'In relazione con' } },
+  { value: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de', it: 'Fratello/Sorella maggiore di' }, inverse: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de', it: 'Fratello/Sorella minore di' } },
+  { value: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de', it: 'Fratello/Sorella minore di' }, inverse: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de', it: 'Fratello/Sorella maggiore di' } },
+  { value: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de', it: 'Genitore di' }, inverse: { en: 'Child of', de: 'Kind von', fr: 'Enfant de', it: 'Figlio/a di' } },
+  { value: { en: 'Child of', de: 'Kind von', fr: 'Enfant de', it: 'Figlio/a di' }, inverse: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de', it: 'Genitore di' } },
+  { value: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de', it: 'Nonno/a di' }, inverse: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de', it: 'Nipote di' } },
+  { value: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de', it: 'Nipote di' }, inverse: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de', it: 'Nonno/a di' } },
+  { value: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de', it: 'Suocero/a di' }, inverse: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Bel-enfant de', it: 'Genero/Nuora di' } },
+  { value: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Bel-enfant de', it: 'Genero/Nuora di' }, inverse: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de', it: 'Suocero/a di' } },
+  { value: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec', it: 'Rivali con' }, inverse: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec', it: 'Rivali con' } },
+  { value: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec', it: 'Vicini di' }, inverse: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec', it: 'Vicini di' } },
+  { value: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de', it: 'Non conosce' }, inverse: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de', it: 'Non conosce' } },
 ];
 
 export function getNotKnownRelationship(lang: Language): string {
   const notKnown = relationshipTypes.find(r => r.value.en === 'Not Known to');
-  return notKnown ? notKnown.value[lang] : 'Not Known to';
+  return notKnown ? (notKnown.value[lang] || notKnown.value.en) : 'Not Known to';
 }
 
 export function isNotKnownRelationship(value: string): boolean {
   const notKnown = relationshipTypes.find(r => r.value.en === 'Not Known to');
   if (!notKnown) return false;
-  return value === notKnown.value.en || value === notKnown.value.de || value === notKnown.value.fr;
+  return value === notKnown.value.en || value === notKnown.value.de || value === notKnown.value.fr || value === notKnown.value.it;
 }
 
 export function getLocalizedRelationship(rel: LocalizedString, lang: Language): string {
-  return rel[lang];
+  return rel[lang] || rel.en;
 }
 
 export interface CustomRelationshipPair {
@@ -47,7 +47,7 @@ export function findInverseRelationship(
   // First check built-in relationships
   for (const rel of relationshipTypes) {
     if (rel.value[lang] === value) {
-      return rel.inverse[lang];
+      return rel.inverse[lang] || rel.inverse.en;
     }
   }
   // Then check custom relationships (both directions)

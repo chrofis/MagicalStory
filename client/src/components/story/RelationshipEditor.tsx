@@ -30,8 +30,8 @@ export function RelationshipEditor({
   const allRelationships = [
     ...relationshipTypes,
     ...customRelationships.map((rel) => ({
-      value: { en: rel, de: rel, fr: rel },
-      inverse: { en: rel, de: rel, fr: rel },
+      value: { en: rel, de: rel, fr: rel, it: rel },
+      inverse: { en: rel, de: rel, fr: rel, it: rel },
     })),
   ];
 
@@ -108,8 +108,8 @@ export function RelationshipEditor({
                         + {lang === 'de' ? 'Eigene' : lang === 'fr' ? 'Personnalisé' : 'Custom'}
                       </option>
                       {allRelationships.map((type, idx) => (
-                        <option key={idx} value={type.value[lang]}>
-                          {type.value[lang]}
+                        <option key={idx} value={type.value[lang] || type.value.en}>
+                          {type.value[lang] || type.value.en}
                         </option>
                       ))}
                     </select>

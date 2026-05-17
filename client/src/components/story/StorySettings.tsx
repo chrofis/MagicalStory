@@ -19,6 +19,7 @@ export type StoryLanguage = StoryLanguageCode;
 export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
   { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
+  { code: 'it-ch', name: 'Italiano (Svizzera)', flag: '🇨🇭' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
@@ -39,8 +40,17 @@ export const FRENCH_VARIANTS: { code: StoryLanguageCode; name: string; flag: str
   { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
 ];
 
+// Italian regional variants (shown after separator)
+export const ITALIAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'it-it', name: 'Italiano (Italia)', flag: '🇮🇹' },
+  { code: 'it-it-north', name: 'Italiano (Nord)', flag: '🇮🇹' },
+  { code: 'it-it-central', name: 'Italiano (Toscana)', flag: '🇮🇹' },
+  { code: 'it-it-south', name: 'Italiano (Sud)', flag: '🇮🇹' },
+  { code: 'it-sm', name: 'Italiano (San Marino)', flag: '🇸🇲' },
+];
+
 // Combined list for lookups
-const ALL_LANGUAGES = [...STORY_LANGUAGES, ...GERMAN_VARIANTS, ...FRENCH_VARIANTS];
+const ALL_LANGUAGES = [...STORY_LANGUAGES, ...GERMAN_VARIANTS, ...FRENCH_VARIANTS, ...ITALIAN_VARIANTS];
 
 interface StorySettingsProps {
   characters: Character[];
@@ -330,7 +340,7 @@ export function StorySettings({
                   ))}
                   {/* German Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : 'German Variants'}
+                    {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : language === 'it' ? 'Varianti tedesche' : 'German Variants'}
                   </div>
                   {/* German regional variants */}
                   {GERMAN_VARIANTS.map((langOption) => (
@@ -347,10 +357,27 @@ export function StorySettings({
                   ))}
                   {/* French Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : 'French Variants'}
+                    {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : language === 'it' ? 'Varianti francesi' : 'French Variants'}
                   </div>
                   {/* French regional variants */}
-                  {FRENCH_VARIANTS.map((langOption, idx) => (
+                  {FRENCH_VARIANTS.map((langOption) => (
+                    <button
+                      key={langOption.code}
+                      onClick={() => {
+                        onStoryLanguageChange(langOption.code);
+                        setIsLanguageDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 ${storyLanguage === langOption.code ? 'bg-blue-50' : ''}`}
+                    >
+                      <span className="font-medium text-gray-700">{langOption.name}</span>
+                    </button>
+                  ))}
+                  {/* Italian Separator */}
+                  <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
+                    {language === 'de' ? 'Italienisch Varianten' : language === 'fr' ? 'Variantes italiennes' : language === 'it' ? 'Varianti italiane' : 'Italian Variants'}
+                  </div>
+                  {/* Italian regional variants */}
+                  {ITALIAN_VARIANTS.map((langOption, idx) => (
                     <button
                       key={langOption.code}
                       onClick={() => {
@@ -358,7 +385,7 @@ export function StorySettings({
                         setIsLanguageDropdownOpen(false);
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 ${
-                        idx === FRENCH_VARIANTS.length - 1 ? 'last:rounded-b-lg' : ''
+                        idx === ITALIAN_VARIANTS.length - 1 ? 'last:rounded-b-lg' : ''
                       } ${storyLanguage === langOption.code ? 'bg-blue-50' : ''}`}
                     >
                       <span className="font-medium text-gray-700">{langOption.name}</span>

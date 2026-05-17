@@ -3758,10 +3758,10 @@ export default function StoryWizard() {
   };
 
   // Get story type name for display
-  const getStoryTypeName = () => {
+  const getStoryTypeName = (): string => {
     // Check built-in types
     const builtInType = storyTypes.find(t => t.id === storyType);
-    if (builtInType) return builtInType.name[language as keyof typeof builtInType.name];
+    if (builtInType) return builtInType.name[language as keyof typeof builtInType.name] || builtInType.name.en;
     return storyType;
   };
 

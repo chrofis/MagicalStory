@@ -115,7 +115,7 @@ const colorMap: Record<string, { bg: string; border: string; icon: string; bulle
 
 export default function HowItWorks() {
   const { language } = useLanguage();
-  const t = translations[language] || translations.de;
+  const t = translations[language as keyof typeof translations] || translations.de;
 
   return (
     <div className="min-h-screen bg-white">

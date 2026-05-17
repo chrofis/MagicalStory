@@ -98,7 +98,7 @@ function getThemeInfo(themeId: string, category: CategorySlug): { name: Localize
 export default function OccasionPage() {
   const { occasionSlug } = useParams<{ occasionSlug: string }>();
   const { language } = useLanguage();
-  const t = pageTexts[language] || pageTexts.en;
+  const t = pageTexts[language as keyof typeof pageTexts] || pageTexts.en;
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const occasion = useMemo(() => {
@@ -109,12 +109,13 @@ export default function OccasionPage() {
     return <Navigate to="/anlaesse" replace />;
   }
 
-  const name = occasion.name[language] || occasion.name.en;
-  const title = occasion.title[language] || occasion.title.en;
-  const description = occasion.description[language] || occasion.description.en;
-  const intro = occasion.intro[language] || occasion.intro.en;
-  const tips = occasion.tips[language] || occasion.tips.en;
-  const deliveryNote = occasion.deliveryNote[language] || occasion.deliveryNote.en;
+  const dataLang = (language === 'it' ? 'en' : language) as 'en' | 'de' | 'fr';
+  const name = occasion.name[dataLang] || occasion.name.en;
+  const title = occasion.title[dataLang] || occasion.title.en;
+  const description = occasion.description[dataLang] || occasion.description.en;
+  const intro = occasion.intro[dataLang] || occasion.intro.en;
+  const tips = occasion.tips[dataLang] || occasion.tips.en;
+  const deliveryNote = occasion.deliveryNote[dataLang] || occasion.deliveryNote.en;
   const faq = occasion.faq;
 
   const themeCards = occasion.recommendedThemes
@@ -233,8 +234,8 @@ export default function OccasionPage() {
             </div>
             <div className="space-y-3">
               {faq.map((item, i) => {
-                const question = item.q[language] || item.q.en;
-                const answer = item.a[language] || item.a.en;
+                const question = item.q[dataLang] || item.q.en;
+                const answer = item.a[dataLang] || item.a.en;
                 const isOpen = openFaq === i;
                 return (
                   <div

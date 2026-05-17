@@ -86,7 +86,7 @@ export default function WelcomePage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { isAuthenticated, user } = useAuth();
-  const t = translations[language] || translations.en;
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   // Redirect if user has already consented (not a new user)
   // Admins can view this page without redirect (for testing/preview)

@@ -32,23 +32,23 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
   };
 
   const texts = {
-    language: language === 'de' ? 'Sprache' : language === 'fr' ? 'Langue' : 'Language',
-    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits',
-    createNewStory: language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'Create New Story',
-    myStories: language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories',
-    myOrders: language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : 'My Orders',
-    buyCredits: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : 'Buy Credits',
-    adminPanel: language === 'de' ? 'Admin Panel' : language === 'fr' ? 'Panneau Admin' : 'Admin Panel',
-    manageUsers: language === 'de' ? 'Benutzer verwalten' : language === 'fr' ? 'Gérer les utilisateurs' : 'Manage Users',
-    changePassword: language === 'de' ? 'Passwort ändern' : language === 'fr' ? 'Changer le mot de passe' : 'Change Password',
-    themes: language === 'de' ? 'Themen' : language === 'fr' ? 'Thèmes' : 'Themes',
+    language: language === 'de' ? 'Sprache' : language === 'fr' ? 'Langue' : language === 'it' ? 'Lingua' : 'Language',
+    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits',
+    createNewStory: language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : language === 'it' ? 'Nuova storia' : 'Create New Story',
+    myStories: language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : language === 'it' ? 'Le mie storie' : 'My Stories',
+    myOrders: language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : language === 'it' ? 'I miei ordini' : 'My Orders',
+    buyCredits: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : language === 'it' ? 'Acquista crediti' : 'Buy Credits',
+    adminPanel: language === 'de' ? 'Admin Panel' : language === 'fr' ? 'Panneau Admin' : language === 'it' ? 'Pannello Admin' : 'Admin Panel',
+    manageUsers: language === 'de' ? 'Benutzer verwalten' : language === 'fr' ? 'Gérer les utilisateurs' : language === 'it' ? 'Gestisci utenti' : 'Manage Users',
+    changePassword: language === 'de' ? 'Passwort ändern' : language === 'fr' ? 'Changer le mot de passe' : language === 'it' ? 'Cambia password' : 'Change Password',
+    themes: language === 'de' ? 'Themen' : language === 'fr' ? 'Thèmes' : language === 'it' ? 'Temi' : 'Themes',
     faq: 'FAQ',
-    about: language === 'de' ? 'Über uns' : language === 'fr' ? 'À propos' : 'About',
-    contact: language === 'de' ? 'Kontakt' : language === 'fr' ? 'Contact' : 'Contact',
-    legal: language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : 'Legal',
-    terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : 'Terms',
-    privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : 'Privacy',
-    myAccount: language === 'de' ? 'Mein Konto' : language === 'fr' ? 'Mon compte' : 'My Account'
+    about: language === 'de' ? 'Über uns' : language === 'fr' ? 'À propos' : language === 'it' ? 'Chi siamo' : 'About',
+    contact: language === 'de' ? 'Kontakt' : language === 'fr' ? 'Contact' : language === 'it' ? 'Contatti' : 'Contact',
+    legal: language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : language === 'it' ? 'Note legali' : 'Legal',
+    terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : language === 'it' ? 'Termini' : 'Terms',
+    privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : language === 'it' ? 'Privacy' : 'Privacy',
+    myAccount: language === 'de' ? 'Mein Konto' : language === 'fr' ? 'Mon compte' : language === 'it' ? 'Il mio account' : 'My Account'
   };
 
   return (
@@ -74,7 +74,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
       <div className="border-b border-gray-700 px-4 py-2">
         <div className="text-xs text-gray-400 mb-2">{texts.language}</div>
         <div className="flex gap-2">
-          {(['en', 'de', 'fr'] as Language[]).map((lang) => (
+          {(['en', 'de', 'fr', 'it'] as Language[]).map((lang) => (
             <button
               key={lang}
               onClick={() => {
@@ -158,7 +158,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
                   }`}
                 >
                   <Code size={16} />
-                  <span>{language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : 'Developer Mode'}</span>
+                  <span>{language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : language === 'it' ? 'Modalità sviluppatore' : 'Developer Mode'}</span>
                   <span className={`ml-auto text-xs font-bold px-1.5 py-0.5 rounded ${
                     developerMode ? 'bg-black/20 text-black' : 'bg-gray-600 text-gray-300'
                   }`}>{developerMode ? 'ON' : 'OFF'}</span>

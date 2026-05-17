@@ -1,7 +1,7 @@
 import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, VisualBible } from './character';
 
 // UI Language - matches LocalizedString keys (used for UI translations)
-export type UILanguage = 'en' | 'de' | 'fr';
+export type UILanguage = 'en' | 'de' | 'fr' | 'it';
 // Legacy alias for backwards compatibility
 export type Language = UILanguage;
 
@@ -40,7 +40,7 @@ export interface StoryCategory {
 
 // Swiss Stories types
 // Multilingual string for story ideas (title, description, context)
-export type SwissLocalizedString = { en: string; de: string; fr: string };
+export type SwissLocalizedString = { en: string; de: string; fr: string; it?: string };
 
 export interface SwissStoryIdea {
   id: string;      // 'bern-1'
@@ -52,7 +52,7 @@ export interface SwissStoryIdea {
 
 export interface SwissCity {
   id: string;
-  name: { en: string; de: string; fr: string };
+  name: { en: string; de: string; fr: string; it?: string };
   canton: string;
   lat: number;
   lon: number;
@@ -71,7 +71,7 @@ export interface SwissSage {
 }
 
 export interface SwissStoriesData {
-  cantons: Record<string, { en: string; de: string; fr: string }>;
+  cantons: Record<string, { en: string; de: string; fr: string; it?: string }>;
   cities: SwissCity[];
   sagen?: SwissSage[];
 }

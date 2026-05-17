@@ -221,7 +221,7 @@ export function StoryCategorySelector({
       loading: 'Chargement...',
     },
   };
-  const t = translations[lang] || translations.en;
+  const t = translations[lang as keyof typeof translations] || translations.en;
 
   // Toggle group expansion
   const toggleAdventureGroup = (groupId: string) => {

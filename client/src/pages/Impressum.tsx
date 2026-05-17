@@ -78,7 +78,7 @@ Les obligations de supprimer ou de bloquer l'utilisation d'informations conformÃ
 export default function Impressum() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const content = impressumContent[language] || impressumContent.en;
+  const content = impressumContent[language as keyof typeof impressumContent] || impressumContent.en;
 
   const handleBack = () => {
     if (window.history.length > 1) {
