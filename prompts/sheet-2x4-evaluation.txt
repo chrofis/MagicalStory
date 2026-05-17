@@ -26,11 +26,13 @@ TASK 2: IDENTITY CONSISTENCY (per cell, lowest wins)
 - For each of cells 5, 6, 7, 8 (bottom-row body cells): does it show the same person as the heads (same face when visible, same gender, same age, same proportions, same skin tone)? Score each cell 1-10.
 - `identityScore` MUST equal the LOWEST of all 7 per-cell scores. ONE cell showing a different person (wrong gender, different face, different age) must score 1-3 for that cell and therefore for identityScore — even if the other 6 cells are perfect. Do not average. Do not round up.
 
-TASK 3: OUTFIT CONSISTENCY (only if REQUESTED_OUTFIT is given below)
-- All 4 full-body figures wear the SAME outfit — every accessory, every garment colour, every cut. Score 1-10.
-- The outfit matches REQUESTED_OUTFIT (when provided): right type, right colours, right pieces. Score 1-10.
-- `outfitScore` = lower of the two. Different outfits across cells must score 1-3.
-- If REQUESTED_OUTFIT is not provided, set `outfitScore` based on cross-cell outfit consistency alone (no match check).
+TASK 3: OUTFIT MATCHES REQUESTED COSTUME (item-by-item)
+- Read REQUESTED_OUTFIT below and split it into individual items (e.g. "red plaid shirt", "brown corduroy jacket", "blue suspenders", "tan corduroy pants", "leather lace-up shoes" → 5 items).
+- For each item, check whether the figures in cells 5-8 visibly wear it. Be strict: a jacket that's listed but not drawn counts as missing, even if the other 4 items are present. Hats, glasses, suspenders, jackets, scarves, sashes, capes — every named item must be visible.
+- Score 1-10 by item-count match: all items present = 10. ONE listed item missing = score ≤4. TWO or more missing = score ≤2. Wrong colour on any item = score ≤5.
+- Cross-cell consistency: all 4 body cells in 5-8 wear the same outfit. If outfit varies between cells, score 1-3.
+- `outfitScore` = the LOWER of the item-match score and the cross-cell consistency score.
+- If REQUESTED_OUTFIT is not provided, score on cross-cell consistency alone (no match check).
 
 TASK 4: SOURCE-PHOTO IDENTITY MATCH (per head cell, lowest wins)
 - Compare Image 1 (source photo) against EACH of the 4 head cells in Image 2 (cells 1, 2, 3, 4) individually.

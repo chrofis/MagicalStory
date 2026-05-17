@@ -17,7 +17,7 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
-const { generateStyledCostumedAvatar, evaluateAvatarFaceMatch } = require('../routes/avatars');
+const { generateStyledCostumedAvatar } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
@@ -59,7 +59,10 @@ async function resolveAvatarBytes(avatars, category) {
 }
 
 // Quality gate constants for styled avatar evaluation
-const MAX_STYLED_AVATAR_RETRIES = 2;
+// MAX_STYLED_AVATAR_RETRIES removed (2026-05-17): the outer retry loop
+// was unwound when the redundant outer evaluateAvatarFaceMatch call was
+// deleted. The inner generator (generateCharacter2x4Sheet) handles
+// best-of-N retries for both passes internally.
 const MIN_FACE_MATCH_SCORE = 5;
 const MIN_CLOTHING_MATCH_SCORE = 5;
 
@@ -296,122 +299,81 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
             : clothingCategory === 'costumed'
               ? 'costume'
               : 'standard outfit');
-    const maxRetries = skipQualityEval ? 1 : MAX_STYLED_AVATAR_RETRIES;
-    // Best-of-N retry: keep every attempt, return the highest-scoring one.
-    // Each attempt scores on face match (identity) + clothing match. The
-    // generator inside (generateCharacter2x4Sheet) also has its own best-of-N
-    // layout/identity/outfit eval — by the time we get a result here, that
-    // inner eval has already picked the best Grok output for this attempt.
-    // We score it AGAIN here against the user's photo to verify identity
-    // survived the style conversion.
-    const allAttempts = [];  // { downsized, faceScore, clothingScore, combinedScore, ... }
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok (attempt ${attempt}/${maxRetries})`);
-      const result = await generateCharacter2x4Sheet(adHocChar, {
-        clothingCategory,
-        costumeDescription,
-        artStyle,
-        usageTracker: addUsage,
-      });
-      if (!result?.imageData) {
-        log.warn(`[STYLED AVATAR] 2×4 attempt ${attempt} returned no image for ${characterName}`);
-        continue;
-      }
-      const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
-
-      // ─── Quality gate: face + costume eval via Gemini ───────────────────
-      let faceMatchScore = null;
-      let clothingMatchScore = null;
-      let evalDetails = null;
-      if (!skipQualityEval && facePhoto && process.env.GEMINI_API_KEY) {
-        try {
-          const evalResult = await evaluateAvatarFaceMatch(
-            facePhoto, downsizedSheet, process.env.GEMINI_API_KEY, costumeDescription
-          );
-          if (evalResult) {
-            faceMatchScore = evalResult.score ?? null;
-            clothingMatchScore = evalResult.clothingMatch?.score ?? null;
-            evalDetails = {
-              faceReason: evalResult.reasoning || null,
-              clothingReason: evalResult.clothingMatch?.reason || null,
-            };
-          }
-        } catch (evalErr) {
-          log.warn(`[STYLED AVATAR] 2×4 eval failed for ${characterName} (attempt ${attempt}): ${evalErr.message}`);
-        }
-      }
-      const usedPhantom = result.refs?.phantom || null;
-      const usedStandard = result.refs?.standardAvatar || originalAvatar;
-      const usedFace = result.refs?.facePhoto || facePhoto;
-      const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
-      const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
-      const passed = !faceFail && !clothingFail;
-
-      // Combined score for best-of-N selection. Use the inner generator's
-      // verdict (layout/identity/outfit) too when available — that score
-      // catches structural defects (Sarah's 2-column "sheet") that the
-      // face-match eval can't see.
-      const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 10;
-      const face = faceMatchScore ?? 10;       // missing eval = neutral
-      const clothing = clothingMatchScore ?? 10;
-      const combined = Math.min(innerFinal, face, clothing);
-
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        characterName, artStyle, clothingCategory,
-        durationMs: Date.now() - startTime,
-        success: passed,
-        attempt,
-        sheetFormat: '2x4',
-        prompt: result.prompt || null,
-        faceMatchScore,
-        clothingMatchScore,
-        innerLayoutScore: result.finalVerdict?.layout?.layoutScore ?? null,
-        innerIdentityScore: result.finalVerdict?.identity?.identityScore ?? null,
-        innerOutfitScore: result.finalVerdict?.outfit?.outfitScore ?? null,
-        innerFinalScore: innerFinal,
-        combinedScore: combined,
-        innerAttemptHistory: result.attemptHistory || null,
-        // Two-pass payload — Pass 1 (realistic) + Pass 2 (style-transferred).
-        // Frontend dev panel renders each pass's attempts side-by-side, with
-        // per-task scores (layout/identity/outfit/sourceMatch for Pass 1;
-        // layout/identity/style/outfit for Pass 2) and the selected attempt
-        // highlighted. realisticImageData is Pass 1's selected output so the
-        // panel can show the identity anchor alongside the styled output.
-        passes: result.passes || null,
-        realisticImageData: result.realisticImageData || null,
-        faceMatchDetails: evalDetails?.faceReason || null,
-        clothingMatchReason: evalDetails?.clothingReason || null,
-        inputs: {
-          phantom: usedPhantom ? { sizeKB: getImageSizeKB(usedPhantom), imageData: usedPhantom } : null,
-          standardAvatar: usedStandard ? { sizeKB: getImageSizeKB(usedStandard), imageData: usedStandard } : null,
-          facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
-        },
-        output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
-        ...(passed ? {} : { warning: `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
-      };
-      styledAvatarGenerationLog.push(logEntry);
-      if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
-        styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
-      }
-      allAttempts.push({ attempt, downsized: downsizedSheet, faceMatchScore, clothingMatchScore, combinedScore: combined, passed, logEntry });
-
-      if (passed) {
-        log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10) — using this`);
-        return downsizedSheet;
-      }
-      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} attempt ${attempt} score=${combined} (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — keeping as candidate`);
+    // ONE call per pass, no outer retry. The inner generator already does
+    // best-of-N for both Pass 1 (realistic identity anchor — one Gemini call
+    // checks layout + identity-vs-source + costume-match) and Pass 2 (style
+    // transfer — one Gemini call checks layout + identity preserved + style
+    // applied + costume preserved). The previous outer evaluateAvatarFaceMatch
+    // call was a third Gemini eval per attempt that scored the same sheet on
+    // partially-overlapping criteria, and an outer retry loop on top of all
+    // that. Removed — Pass 1 eval is now the authoritative quality gate.
+    log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok`);
+    const result = await generateCharacter2x4Sheet(adHocChar, {
+      clothingCategory,
+      costumeDescription,
+      artStyle,
+      usageTracker: addUsage,
+    });
+    if (!result?.imageData) {
+      throw new Error(`[STYLED AVATAR] 2×4 produced no image for ${characterName}/${clothingCategory}/${artStyle}`);
     }
-    // No attempt passed cleanly — pick the best of the candidates so the
-    // story ships SOMETHING and the dev panel surfaces all attempts. The
-    // legacy 2×2 Gemini fallback used to fire here; we kill it because it
-    // silently saved sheets that bypassed the structural eval.
-    if (allAttempts.length === 0) {
-      throw new Error(`[STYLED AVATAR] 2×4 produced no usable image for ${characterName}/${clothingCategory}/${artStyle} after ${maxRetries} attempts`);
+    const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
+
+    const usedPhantom = result.refs?.phantom || null;
+    const usedStandard = result.refs?.standardAvatar || originalAvatar;
+    const usedFace = result.refs?.facePhoto || facePhoto;
+
+    // Map the inner verdict to the dev-panel face/clothing slots so the UI
+    // keeps rendering. faceMatchScore = sourceMatch from Pass 1's eval (head
+    // cells vs source photo). clothingMatchScore = outfit from Pass 1's eval
+    // (costume item-by-item match against REQUESTED_OUTFIT — newly strict per
+    // the prompt change in this commit).
+    const pass1Verdict = result.passes?.pass1?.finalVerdict;
+    const faceMatchScore = pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null;
+    const clothingMatchScore = pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null;
+    const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 0;
+    const passed = (faceMatchScore == null || faceMatchScore >= MIN_FACE_MATCH_SCORE)
+                && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE);
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      characterName, artStyle, clothingCategory,
+      durationMs: Date.now() - startTime,
+      success: passed,
+      attempt: 1,
+      sheetFormat: '2x4',
+      prompt: result.prompt || null,
+      faceMatchScore,
+      clothingMatchScore,
+      innerLayoutScore: pass1Verdict?.layout?.layoutScore ?? null,
+      innerIdentityScore: pass1Verdict?.identity?.identityScore ?? null,
+      innerOutfitScore: pass1Verdict?.outfit?.outfitScore ?? null,
+      innerFinalScore: innerFinal,
+      combinedScore: innerFinal,
+      innerAttemptHistory: result.attemptHistory || null,
+      passes: result.passes || null,
+      realisticImageData: result.realisticImageData || null,
+      faceMatchDetails: pass1Verdict?.sourceMatch?.reason || null,
+      clothingMatchReason: pass1Verdict?.outfit?.reason || null,
+      inputs: {
+        phantom: usedPhantom ? { sizeKB: getImageSizeKB(usedPhantom), imageData: usedPhantom } : null,
+        standardAvatar: usedStandard ? { sizeKB: getImageSizeKB(usedStandard), imageData: usedStandard } : null,
+        facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
+      },
+      output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
+      ...(passed ? {} : { warning: `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
+    };
+    styledAvatarGenerationLog.push(logEntry);
+    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
+      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
     }
-    const best = allAttempts.reduce((a, b) => (b.combinedScore > a.combinedScore ? b : a));
-    log.warn(`[STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} best-of-${allAttempts.length}: attempt ${best.attempt} (combined=${best.combinedScore}/10, face=${best.faceMatchScore}, clothing=${best.clothingMatchScore})`);
-    return best.downsized;
+
+    if (passed) {
+      log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
+    } else {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} below threshold (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — shipping anyway`);
+    }
+    return downsizedSheet;
   } catch (err) {
     log.error(`[STYLED AVATAR] 2×4 generation threw for ${characterName}/${clothingCategory}/${artStyle}: ${err.message}`);
     throw err;
