@@ -115,8 +115,11 @@ export default function TrialWizard() {
     photos: {},
   });
 
-  // Map UI language to story language (de → de-ch for Swiss German)
-  const storyLanguage = language === 'de' ? 'de-ch' : language === 'fr' ? 'fr' : 'en';
+  // Map UI language to story language. Both de and fr upgrade to the Swiss
+  // variant — that's the primary market and the Swiss typography rules in
+  // server/lib/languages.js (tight «» guillemets, no space before !?:;) are
+  // attached to the -ch language codes.
+  const storyLanguage = language === 'de' ? 'de-ch' : language === 'fr' ? 'fr-ch' : 'en';
 
   // Story input state — pre-fill from URL params (from theme pages)
   const [storyInput, setStoryInput] = useState<StoryInput>(() => {

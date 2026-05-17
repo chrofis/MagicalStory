@@ -33,6 +33,25 @@ function detectStoredLanguage(): Language | null {
   }
 }
 
+/**
+ * Detect the visitor's browser language. Walks navigator.languages in order
+ * and returns the first one we support — only the primary subtag matters
+ * ('fr-CH', 'fr-FR' and 'fr' all map to 'fr'). Unsupported languages
+ * (Italian, Spanish, etc.) return null so the caller falls through to the
+ * hardcoded default.
+ */
+function detectBrowserLanguage(): Language | null {
+  if (!isBrowser) return null;
+  const tags = (navigator.languages && navigator.languages.length > 0)
+    ? navigator.languages
+    : navigator.language ? [navigator.language] : [];
+  for (const tag of tags) {
+    const primary = (tag || '').toLowerCase().split('-')[0];
+    if (isLanguage(primary)) return primary;
+  }
+  return null;
+}
+
 interface LanguageProviderProps {
   children: ReactNode;
   /**
@@ -47,8 +66,10 @@ export function LanguageProvider({ children, initialLanguage }: LanguageProvider
   const [language, setLanguageState] = useState<Language>(() => {
     // SSR / pre-rendered: trust the value the prerender script picked.
     if (initialLanguage && isLanguage(initialLanguage)) return initialLanguage;
-    // CSR: URL ?lang= takes priority, then stored preference, then German default.
-    return detectUrlLanguage() || detectStoredLanguage() || 'de';
+    // CSR: URL ?lang= takes priority, then stored preference, then browser
+    // language (navigator.languages), then hardcoded German fallback. A
+    // French-speaker visiting fresh now lands on French instead of German.
+    return detectUrlLanguage() || detectStoredLanguage() || detectBrowserLanguage() || 'de';
   });
 
   useEffect(() => {
