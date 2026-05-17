@@ -479,8 +479,17 @@ async function generateCoverViaComposite({
     const cleanRaw = await removeBackground(body);
     const trimmed = await sharp(cleanRaw).trim({ threshold: 1 }).toBuffer().catch(() => cleanRaw);
     const targetH = Math.max(40, Math.round(heightCm(c.age) * pxPerCm * 1.2));
-    const resized = await sharp(trimmed).resize({ height: targetH }).png().toBuffer();
-    const m = await sharp(resized).metadata();
+    let resized = await sharp(trimmed).resize({ height: targetH }).png().toBuffer();
+    let m = await sharp(resized).metadata();
+    // Cap to the white-bg canvas. Resizing by height can produce a width > W
+    // for very tall narrow figures, or a height > H if targetH itself exceeds
+    // the canvas. Sharp's composite() throws "Image to composite must have
+    // same dimensions or smaller" in either case, taking down the whole
+    // composite-cover path. Scale down once more so the layer fits.
+    if (m.width > W || m.height > H) {
+      resized = await sharp(resized).resize({ width: W, height: H, fit: 'inside' }).png().toBuffer();
+      m = await sharp(resized).metadata();
+    }
     figures.push({ name: c.name, age: parseInt(c.age, 10), gender: c.gender, buffer: resized, width: m.width, height: m.height });
   }
   if (figures.length === 0) throw new Error('No figures could be assembled for composite cover');
@@ -527,8 +536,12 @@ async function generateCoverViaComposite({
   }
   if (propBuf) {
     const propTargetH = Math.round(H * 0.25);
-    const propResized = await sharp(propBuf).resize({ height: propTargetH }).png().toBuffer();
-    const pm = await sharp(propResized).metadata();
+    let propResized = await sharp(propBuf).resize({ height: propTargetH }).png().toBuffer();
+    let pm = await sharp(propResized).metadata();
+    if (pm.width > W || pm.height > H) {
+      propResized = await sharp(propResized).resize({ width: W, height: H, fit: 'inside' }).png().toBuffer();
+      pm = await sharp(propResized).metadata();
+    }
     const left = Math.max(0, Math.round((W - pm.width) / 2));
     const top = Math.max(0, H - 8 - pm.height);
     layers.push({ input: propResized, left, top });
