@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type {
   RepairWorkflowStep,
   RepairWorkflowState,
@@ -210,7 +210,7 @@ export function useRepairWorkflow({
   sceneImages,
   coverImages,
   characters: _characters,
-  finalChecksReport: _finalChecksReport,
+  finalChecksReport,
   imageModel,
   qualityModel,
   onImageUpdate,
@@ -218,6 +218,22 @@ export function useRepairWorkflow({
 }: UseRepairWorkflowProps): UseRepairWorkflowReturn {
   const [workflowState, setWorkflowState] = useState<RepairWorkflowState>(createInitialState);
   const [redoProgress, setRedoProgress] = useState({ current: 0, total: 0, currentPage: undefined as number | undefined });
+
+  // Auto-seed consistency results on mount when the story already has an
+  // entity-check report in finalChecksReport. Otherwise step 5 reads as
+  // "pending" and the round-selector tabs never render (they only show
+  // when consistencyResults.report is populated) — so the user can't
+  // browse entityHistory without first clicking Collect Feedback.
+  useEffect(() => {
+    const entity = finalChecksReport?.entity;
+    if (!entity) return;
+    if (workflowState.consistencyResults.report) return; // already seeded
+    setWorkflowState(prev => ({
+      ...prev,
+      consistencyResults: { report: entity as any },
+      stepStatus: { ...prev.stepStatus, 'consistency-check': prev.stepStatus['consistency-check'] === 'pending' ? 'completed' : prev.stepStatus['consistency-check'] },
+    }));
+  }, [finalChecksReport?.entity, workflowState.consistencyResults.report]);
 
   // Abort mechanism for stopping runaway workflows
   const abortControllerRef = useRef<AbortController | null>(null);
