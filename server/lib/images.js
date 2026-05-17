@@ -7170,6 +7170,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       inpaintReferenceImages: v.inpaintReferenceImages || null,
       textSpaceCoveragePct: v.textSpaceCoveragePct ?? null,
       textSpacePosition: v.textSpacePosition || null,
+      // Composite-cover 2-pass debug — pass1Input (figures-on-white),
+      // pass1Output (Grok repose), pass2Input (figures composited onto
+      // landmark), pass2Output (final), prompts + modelIds. Without this
+      // the dev-panel version detail can't show ANY composite intermediate
+      // even though source='composite-iterate-round-N' says composite ran.
+      // method='composite' lets the UI badge the version as such instead
+      // of just inferring from source string.
+      method: v.method || null,
+      compositeAttempts: v.compositeAttempts || null,
     });
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));
