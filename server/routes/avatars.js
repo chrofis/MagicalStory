@@ -749,6 +749,93 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
 }
 
 /**
+ * Single shared Gemini avatar-generation call. Used by EVERY avatar code path
+ * — generateDynamicAvatar (option-picker route), generateSingleAvatar inline
+ * in /generate-clothing-avatars, and any future avatar caller. Eliminates the
+ * ~80 lines of duplicated request-body / fetch / parse / token-extract logic
+ * that existed in two places.
+ *
+ * Returns a result shape that lets the caller decide how to surface errors:
+ *   { ok: true,  imageData, inputTokens, outputTokens }
+ *   { ok: false, error,                 inputTokens, outputTokens }
+ *   { ok: false, blocked: true, blockReason, inputTokens, outputTokens }   // safety filter
+ *
+ * @param {Object} opts
+ * @param {string}  opts.geminiApiKey
+ * @param {string}  opts.referenceImageBase64  base64 (no `data:` prefix)
+ * @param {string}  opts.referenceMimeType     'image/jpeg' | 'image/png'
+ * @param {string}  opts.prompt                full text prompt
+ * @param {string}  [opts.modelId='gemini-2.5-flash-image']
+ * @param {string}  [opts.aspectRatio='9:16']
+ * @param {number}  [opts.temperature=0.3]
+ * @param {string}  [opts.safetyThreshold='BLOCK_ONLY_HIGH']
+ * @param {string}  [opts.systemInstruction]   defaults to PROMPT_TEMPLATES.avatarSystemInstruction
+ * @param {string}  [opts.logTag='[AVATAR API]']
+ */
+async function callGeminiAvatarApi(opts) {
+  const {
+    geminiApiKey,
+    referenceImageBase64,
+    referenceMimeType = 'image/jpeg',
+    prompt,
+    modelId = 'gemini-2.5-flash-image',
+    aspectRatio = '9:16',
+    temperature = 0.3,
+    safetyThreshold = 'BLOCK_ONLY_HIGH',
+    systemInstruction = PROMPT_TEMPLATES.avatarSystemInstruction,
+    logTag = '[AVATAR API]',
+  } = opts;
+
+  const requestBody = {
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: referenceMimeType, data: referenceImageBase64 } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: {
+      temperature,
+      responseModalities: ['TEXT', 'IMAGE'],
+      imageConfig: { aspectRatio },
+    },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: safetyThreshold },
+      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: safetyThreshold },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: safetyThreshold },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: safetyThreshold },
+    ],
+  };
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiApiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    log.error(`❌ ${logTag} HTTP ${response.status}:`, errorText);
+    return { ok: false, error: `API error: ${response.status}`, inputTokens: 0, outputTokens: 0 };
+  }
+  const data = await response.json();
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  if (data.promptFeedback?.blockReason) {
+    return { ok: false, blocked: true, blockReason: data.promptFeedback.blockReason, inputTokens, outputTokens };
+  }
+  let imageData = null;
+  if (data.candidates?.[0]?.content?.parts) {
+    for (const part of data.candidates[0].content.parts) {
+      if (part.inlineData?.mimeType?.startsWith('image/')) {
+        imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+  }
+  if (!imageData) return { ok: false, error: 'No image in response', inputTokens, outputTokens };
+  return { ok: true, imageData, inputTokens, outputTokens };
+}
+
+/**
  * Evaluate if costume was properly applied to BOTH bottom row images in a 2x2 grid.
  * Returns { pass: boolean, reason: string, confidence: 'high'|'medium'|'low' }
  *
@@ -1051,87 +1138,24 @@ async function generateDynamicAvatar(character, category, config) {
     const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
     log.debug(`🎭 [DYNAMIC AVATAR] Prepared: ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
 
-    const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = 'image/jpeg'; // Always JPEG after resize
-
-    const requestBody = {
-      systemInstruction: {
-        parts: [{
-          text: PROMPT_TEMPLATES.avatarSystemInstruction
-        }]
-      },
-      contents: [{
-        parts: [
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data
-            }
-          },
-          { text: avatarPrompt }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.3,
-        responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: {
-          aspectRatio: "9:16"
-        }
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
-      ]
-    };
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [DYNAMIC AVATAR] ${logCategory} generation failed:`, errorText);
-      return { success: false, error: `API error: ${response.status}` };
+    const result = await callGeminiAvatarApi({
+      geminiApiKey,
+      referenceImageBase64: resizedPhoto.replace(/^data:image\/\w+;base64,/, ''),
+      referenceMimeType: 'image/jpeg',
+      prompt: avatarPrompt,
+      logTag: `[DYNAMIC AVATAR] ${logCategory}`,
+    });
+    if (result.inputTokens > 0 || result.outputTokens > 0) {
+      console.log(`📊 [DYNAMIC AVATAR] ${logCategory} - input: ${result.inputTokens.toLocaleString()}, output: ${result.outputTokens.toLocaleString()}`);
     }
-
-    let data = await response.json();
-
-    // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    if (inputTokens > 0 || outputTokens > 0) {
-      console.log(`📊 [DYNAMIC AVATAR] ${logCategory} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    if (result.blocked) {
+      log.warn(`[DYNAMIC AVATAR] ${logCategory} blocked by safety filters: ${result.blockReason}`);
+      return { success: false, error: `Blocked by safety filters: ${result.blockReason}` };
     }
-
-    // Check if blocked by safety filters
-    if (data.promptFeedback?.blockReason) {
-      log.warn(`[DYNAMIC AVATAR] ${logCategory} blocked by safety filters:`, data.promptFeedback.blockReason);
-      return { success: false, error: `Blocked by safety filters: ${data.promptFeedback.blockReason}` };
+    if (!result.ok) {
+      return { success: false, error: result.error || 'Gemini avatar call failed' };
     }
-
-    // Extract image from response
-    let imageData = null;
-    if (data.candidates && data.candidates[0]?.content?.parts) {
-      for (const part of data.candidates[0].content.parts) {
-        if (part.inlineData?.mimeType?.startsWith('image/')) {
-          const imgMime = part.inlineData.mimeType;
-          imageData = `data:${imgMime};base64,${part.inlineData.data}`;
-          break;
-        }
-      }
-    }
-
-    if (!imageData) {
-      log.error(`❌ [DYNAMIC AVATAR] No image in response for ${logCategory}`);
-      return { success: false, error: 'No image generated' };
-    }
+    const imageData = result.imageData;
 
     // Compress the avatar
     const compressed = await compressImageToJPEG(imageData, 85, 768);
@@ -3031,134 +3055,54 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
 
-        // Use Gemini for Gemini models
-        const requestBody = {
-          systemInstruction: {
-            parts: [{
-              text: PROMPT_TEMPLATES.avatarSystemInstruction
-            }]
-          },
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Data
-                }
-              },
-              { text: avatarPrompt }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            responseModalities: ["TEXT", "IMAGE"],
-            imageConfig: {
-              aspectRatio: "9:16"
-            }
-          },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
-          ]
+        // Gemini avatar gen — funnel through the shared callGeminiAvatarApi
+        // helper so request setup / safety threshold / parse / token extract
+        // logic isn't duplicated. Token tracking + safety-filter retry
+        // (with the simplified avatarRetryPrompt) stay route-local because
+        // they fold into `results.tokenUsage` and the per-category retry
+        // policy is route-specific.
+        const callOpts = {
+          geminiApiKey,
+          referenceImageBase64: base64Data,
+          referenceMimeType: mimeType,
+          prompt: avatarPrompt,
+          modelId: geminiModelId,
+          logTag: `[CLOTHING AVATARS] ${category}`,
+        };
+        const trackTokens = (modelId, input, output) => {
+          if (input <= 0 && output <= 0) return;
+          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${modelId}, input: ${input.toLocaleString()}, output: ${output.toLocaleString()}`);
+          if (!results.tokenUsage.byModel[modelId]) {
+            results.tokenUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+          }
+          results.tokenUsage.byModel[modelId].input_tokens += input;
+          results.tokenUsage.byModel[modelId].output_tokens += output;
+          results.tokenUsage.byModel[modelId].calls += 1;
         };
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-          }
-        );
+        let geminiResult = await callGeminiAvatarApi(callOpts);
+        trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          log.error(`❌ [CLOTHING AVATARS] ${category} generation failed:`, errorText);
-          return { category, prompt: avatarPrompt, imageData: null };
-        }
-
-        let data = await response.json();
-
-        // Track token usage for cost tracking (per model)
-        const avatarModelId = selectedModel;
-        const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
-        const avatarOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-        if (avatarInputTokens > 0 || avatarOutputTokens > 0) {
-          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${avatarModelId}, input: ${avatarInputTokens.toLocaleString()}, output: ${avatarOutputTokens.toLocaleString()}`);
-          // Accumulate tokens per model for accurate cost tracking
-          if (!results.tokenUsage.byModel[avatarModelId]) {
-            results.tokenUsage.byModel[avatarModelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
-          }
-          results.tokenUsage.byModel[avatarModelId].input_tokens += avatarInputTokens;
-          results.tokenUsage.byModel[avatarModelId].output_tokens += avatarOutputTokens;
-          results.tokenUsage.byModel[avatarModelId].calls += 1;
-        }
-
-        // Check if blocked by safety filters - retry with simplified prompt
-        if (data.promptFeedback?.blockReason) {
-          log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
-          log.debug(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
-
-          const outfitDescription = category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : 'casual clothes';
+        if (geminiResult.blocked) {
+          log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters: ${geminiResult.blockReason} — retrying with simplified prompt`);
+          const outfitDescription = category === 'winter' ? 'a winter coat'
+            : category === 'summer' ? 'a casual T-shirt and shorts'
+              : 'casual clothes';
           const retryPrompt = fillTemplate(PROMPT_TEMPLATES.avatarRetryPrompt, {
             '{OUTFIT_DESCRIPTION}': outfitDescription
           });
-
-          const retryRequestBody = {
-            ...requestBody,
-            contents: [{
-              parts: [
-                requestBody.contents[0].parts[0],
-                { text: retryPrompt }
-              ]
-            }]
-          };
-
-          const retryResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(retryRequestBody)
-            }
-          );
-
-          if (retryResponse.ok) {
-            data = await retryResponse.json();
-            const retryInputTokens = data.usageMetadata?.promptTokenCount || 0;
-            const retryOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-            if (retryInputTokens > 0 || retryOutputTokens > 0) {
-              console.log(`📊 [AVATAR GENERATION] ${category} retry - model: ${avatarModelId}, input: ${retryInputTokens.toLocaleString()}, output: ${retryOutputTokens.toLocaleString()}`);
-              // Accumulate retry tokens per model
-              if (!results.tokenUsage.byModel[avatarModelId]) {
-                results.tokenUsage.byModel[avatarModelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
-              }
-              results.tokenUsage.byModel[avatarModelId].input_tokens += retryInputTokens;
-              results.tokenUsage.byModel[avatarModelId].output_tokens += retryOutputTokens;
-              results.tokenUsage.byModel[avatarModelId].calls += 1;
-            }
-            if (data.promptFeedback?.blockReason) {
-              log.warn(`[CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
-              return { category, prompt: avatarPrompt, imageData: null };
-            }
-          } else {
-            log.error(`❌ [CLOTHING AVATARS] ${category} retry failed`);
+          geminiResult = await callGeminiAvatarApi({ ...callOpts, prompt: retryPrompt, logTag: `[CLOTHING AVATARS] ${category} retry` });
+          trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
+          if (geminiResult.blocked) {
+            log.warn(`[CLOTHING AVATARS] ${category} retry also blocked: ${geminiResult.blockReason}`);
             return { category, prompt: avatarPrompt, imageData: null };
           }
         }
 
-        // Extract image from response
-        let imageData = null;
-        if (data.candidates && data.candidates[0]?.content?.parts) {
-          for (const part of data.candidates[0].content.parts) {
-            if (part.inlineData) {
-              imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              break;
-            }
-          }
+        if (!geminiResult.ok) {
+          return { category, prompt: avatarPrompt, imageData: null };
         }
+        const imageData = geminiResult.imageData;
 
         if (imageData) {
           // Compress avatar to JPEG
