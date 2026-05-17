@@ -36,9 +36,9 @@ function detectStoredLanguage(): Language | null {
 /**
  * Detect the visitor's browser language. Walks navigator.languages in order
  * and returns the first one we support — only the primary subtag matters
- * ('fr-CH', 'fr-FR' and 'fr' all map to 'fr'). Unsupported languages
- * (Italian, Spanish, etc.) return null so the caller falls through to the
- * hardcoded default.
+ * ('fr-CH', 'fr-FR' and 'fr' all map to 'fr'; 'it-CH', 'it-IT' to 'it').
+ * Unsupported primary subtags (Spanish, Portuguese, etc.) return null so
+ * the caller falls through to the hardcoded German default.
  */
 function detectBrowserLanguage(): Language | null {
   if (!isBrowser) return null;

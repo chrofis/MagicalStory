@@ -50,6 +50,7 @@ const stepLabels: Record<string, Record<TrialStep, string>> = {
   en: { character: 'Character', topic: 'Topic', ideas: 'Ideas' },
   de: { character: 'Figur', topic: 'Thema', ideas: 'Ideen' },
   fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idées' },
+  it: { character: 'Personaggio', topic: 'Argomento', ideas: 'Idee' },
 };
 
 const trialUsedStrings: Record<string, { title: string; desc: string; signUp: string; checkInbox: string; viewStory: string }> = {
@@ -74,6 +75,13 @@ const trialUsedStrings: Record<string, { title: string; desc: string; signUp: st
     checkInbox: 'Déjà inscrit ? Vérifiez votre boîte de réception pour le lien de vérification.',
     viewStory: 'Voir votre histoire',
   },
+  it: {
+    title: 'Hai già creato la tua storia gratuita!',
+    desc: 'Registrati per un account completo e crea altre storie con più personaggi, trame più lunghe e libri stampati.',
+    signUp: 'Registrati ora',
+    checkInbox: 'Già registrato? Controlla la tua casella di posta per il link di verifica.',
+    viewStory: 'Vedi la tua storia',
+  },
 };
 
 const loggedInStrings: Record<string, { title: string; desc: string; goToCreate: string }> = {
@@ -91,6 +99,11 @@ const loggedInStrings: Record<string, { title: string; desc: string; goToCreate:
     title: 'Vous avez déjà un compte !',
     desc: 'Vous êtes connecté. Créez des histoires directement depuis votre compte — avec plus de personnages, des histoires plus longues et des livres imprimés.',
     goToCreate: 'Créer une histoire',
+  },
+  it: {
+    title: 'Hai già un account!',
+    desc: 'Sei connesso. Crea storie direttamente dal tuo account — con più personaggi, storie più lunghe e libri stampati.',
+    goToCreate: 'Crea una storia',
   },
 };
 
