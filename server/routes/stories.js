@@ -2322,19 +2322,27 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               }
             }
             covers[coverType].referencePhotos = sanitizeReferencePhotos(blobCover.referencePhotos);
-            // Merge per-version metadata — same fields as scenes
+            // Merge per-version metadata — same fields as scenes. Always
+            // prefer blobCover.imageVersions[N] when present (uniform per-
+            // version source of truth). Falling back to blobCover root for
+            // v0 was a legacy shape from before v0 was added to imageVersions
+            // and is now actively wrong: the cover ROOT gets OVERWRITTEN by
+            // the latest version's qualityReasoning + fixableIssues every
+            // time a new version is saved (the regenerate routes assign
+            // coverData with the new scores at the root level). Result: v0
+            // in the dev panel rendered with v1's eval feedback while
+            // displaying v0's score — impossible to debug. Observed on
+            // staging job_1779036350422_ohdfkmnlr frontCover.
             if (blobCover.imageVersions && covers[coverType].imageVersions) {
               for (let i = 0; i < covers[coverType].imageVersions.length; i++) {
                 const dbVersionIdx = covers[coverType].imageVersions[i].versionIndex;
-                if (dbVersionIdx === 0) {
-                  // v0: metadata lives on the cover object itself (not in imageVersions array)
+                const blobVersion = blobCover.imageVersions?.[dbVersionIdx];
+                if (blobVersion) {
+                  mergeFields(covers[coverType].imageVersions[i], blobVersion);
+                } else if (dbVersionIdx === 0) {
+                  // Legacy stories: v0's data lives on the root only (no
+                  // imageVersions[0]). Fall back so older stories still render.
                   mergeFields(covers[coverType].imageVersions[i], blobCover);
-                } else {
-                  // v1+: metadata in blob imageVersions array
-                  const blobVersion = blobCover.imageVersions?.[dbVersionIdx];
-                  if (blobVersion) {
-                    mergeFields(covers[coverType].imageVersions[i], blobVersion);
-                  }
                 }
               }
             }
