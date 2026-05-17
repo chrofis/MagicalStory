@@ -48,6 +48,20 @@ function needsScaleRepair(sceneMetadata) {
   const nonBg = chars.filter(c => (c.depth || '').toLowerCase() !== 'background');
   if (bg.length === 0 || nonBg.length === 0) return false;
 
+  // Skip indoor scenes. Rooms have limited depth — there's no "deep
+  // background" to push a character into, so the relocate-and-shrink pass
+  // either produces a tiny figure crammed against a wall or Grok refuses
+  // and keeps the original size. Outline-declared `depth: background`
+  // inside an interior typically means "back wall of the room", not
+  // "distant in landscape", which works fine at original size.
+  // Setting field is a string "indoor"|"outdoor" in unified mode; the
+  // legacy trial path wrapped it in { indoorOutdoor }. Handle both.
+  const settingRaw = sceneMetadata?.fullData?.setting ?? sceneMetadata?.setting;
+  const settingStr = typeof settingRaw === 'string'
+    ? settingRaw
+    : (settingRaw?.indoorOutdoor || settingRaw?.location || '');
+  if (/\bindoor\b/i.test(settingStr)) return false;
+
   // Don't run when the bg characters are inside a SHARED VESSEL that ties
   // them spatially to the foreground action — boat / cart / wagon / carriage.
   // Page 7 of the Tell story is the canonical bad case: Roger leaps FROM
