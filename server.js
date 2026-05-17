@@ -6808,7 +6808,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 : pdfStoryResult.rows[0].data;
               pdfStoryData = await rehydrateStoryImages(storyId, pdfStoryData);
 
-              const pdfBuffer = await generateViewPdf(pdfStoryData, 'square');
+              const pdfBuffer = await generateViewPdf(pdfStoryData, 'A4', { trialLayout: true });
               const pdfSizeMB = pdfBuffer.length / 1024 / 1024;
               log.info(`[UNIFIED] Generated trial PDF for email (${pdfSizeMB.toFixed(2)} MB)`);
               if (pdfSizeMB > 35) {

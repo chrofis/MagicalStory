@@ -964,10 +964,17 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
  *
  * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
+ * @param {Object} [options]
+ * @param {boolean} [options.textOverlay=false] - Bake text into images (Print Preview style)
+ * @param {boolean} [options.trialLayout=false] - Trial email PDF layout: force A4, full-page
+ *   cover as title, story pages with a SQUARE image (210×210mm) at top and text in the
+ *   ~70mm strip below. No initial-page, no back cover. Total pages = N_story + 1.
  * @returns {Promise<Buffer>} PDF buffer
  */
 async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options = {}) {
-  const { textOverlay = false } = options;
+  const { textOverlay = false, trialLayout = false } = options;
+  // Trial layout forces A4 — the square image + text strip math depends on a portrait page
+  if (trialLayout) bookFormat = 'A4';
   // Get dimensions for the selected format
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
   const { pageWidth, pageHeight } = format;
@@ -1001,9 +1008,9 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     }
   }
 
-  // 2. INITIAL PAGE (dedication/intro)
+  // 2. INITIAL PAGE (dedication/intro) — skipped in trial layout
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
-  if (initialPageImageData) {
+  if (initialPageImageData && !trialLayout) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
@@ -1026,16 +1033,22 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   log.debug(`📄 [VIEW PDF] Generating with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard 2-page'}`);
 
   if (isPictureBook) {
-    const textRatio = textOverlay
-      ? getPictureBookTextRatio(storyData.languageLevel)
-      : computeTextBelowRatio(storyPages, storyData.languageLevel);
+    // Trial layout pins the image area to a perfect 210×210 square, so the
+    // text strip is whatever's left at the bottom (70mm on A4 → ratio = 0.25).
+    const textRatio = trialLayout
+      ? (pageHeight - pageWidth) / pageHeight
+      : (textOverlay
+          ? getPictureBookTextRatio(storyData.languageLevel)
+          : computeTextBelowRatio(storyPages, storyData.languageLevel));
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
     const textMargin = mmToPoints(3);
     const textWidth = pageWidth - (textMargin * 2);
     const textAreaHeight = pageHeight * textRatio;
     const availableTextHeight = textAreaHeight - textMargin;
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, textOverlay ? 'center' : 'left');
-    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, textOverlay);
+    // Trial layout never bakes text into the image — it lives in the strip below.
+    const useTextOverlay = trialLayout ? false : textOverlay;
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, startFont, 10, useTextOverlay ? 'center' : 'left');
+    await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, useTextOverlay);
   } else {
     const marginOuter = 20;
     const marginGutter = 30;
@@ -1046,9 +1059,9 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     await addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize);
   }
 
-  // 4. BACK COVER (last page)
+  // 4. BACK COVER (last page) — skipped in trial layout
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
-  if (backCoverImageData) {
+  if (backCoverImageData && !trialLayout) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
