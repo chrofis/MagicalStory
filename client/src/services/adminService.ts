@@ -23,6 +23,24 @@ export interface TrialStatsHistoryEntry {
   avatars_generated: number;
 }
 
+export interface TrialFunnelUnclaimedEntry {
+  id: string;
+  email: string;
+  username: string | null;
+  createdAt: string;
+  claimTokenExpires: string | null;
+  daysUntilExpiry: number | null;
+}
+
+export interface TrialFunnel {
+  totalTrials: number;
+  trialStoryGenerated: number;
+  trialClaimed: number;
+  trialLoggedInAtLeastOnce: number;
+  trialMultiStory: number;
+  unclaimed: TrialFunnelUnclaimedEntry[];
+}
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -430,6 +448,10 @@ export const adminService = {
 
   async getTrialStatsHistory(days = 30): Promise<TrialStatsHistoryEntry[]> {
     return api.get<TrialStatsHistoryEntry[]>(`/api/admin/trial-stats/history?days=${days}`);
+  },
+
+  async getTrialFunnel(days = 30): Promise<TrialFunnel> {
+    return api.get<TrialFunnel>(`/api/admin/trial-funnel?days=${days}`);
   },
 
   // Token Usage Analytics

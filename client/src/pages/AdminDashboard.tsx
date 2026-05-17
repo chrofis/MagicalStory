@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
+import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
 import {
   Users,
   BookOpen,
@@ -58,6 +58,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
   const [trialHistory, setTrialHistory] = useState<TrialStatsHistoryEntry[]>([]);
+  const [trialFunnel, setTrialFunnel] = useState<TrialFunnel | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [userSearch, setUserSearch] = useState('');
@@ -114,14 +115,16 @@ export default function AdminDashboard() {
     if (stats) return; // Already loaded
     setIsLoadingStats(true);
     try {
-      const [statsData, trialData, historyData] = await Promise.all([
+      const [statsData, trialData, historyData, funnelData] = await Promise.all([
         adminService.getStats(),
         adminService.getTrialStats().catch(() => null),
         adminService.getTrialStatsHistory(14).catch(() => []),
+        adminService.getTrialFunnel(30).catch(() => null),
       ]);
       setStats(statsData);
       if (trialData) setTrialStats(trialData);
       setTrialHistory(historyData);
+      if (funnelData) setTrialFunnel(funnelData);
     } catch (err) {
       console.error('Failed to load stats:', err);
     } finally {
@@ -745,6 +748,81 @@ export default function AdminDashboard() {
                       isString
                     />
                   </>
+                )}
+              </div>
+            )}
+
+            {/* Trial Funnel */}
+            {trialFunnel && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-orange-600" />
+                      {texts.trialFunnel}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">{texts.trialFunnelSubtitle}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">{texts.trialFunnelTotal}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{trialFunnel.totalTrials.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">{texts.trialFunnelStoryGenerated}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{trialFunnel.trialStoryGenerated.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">{texts.trialFunnelClaimed}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{trialFunnel.trialClaimed.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">{texts.trialFunnelLoggedIn}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{trialFunnel.trialLoggedInAtLeastOnce.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">{texts.trialFunnelMultiStory}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{trialFunnel.trialMultiStory.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">{texts.trialFunnelUnclaimedTitle}</h3>
+                {trialFunnel.unclaimed.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">{texts.trialFunnelEmpty}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-gray-500">
+                          <th className="pb-2 pr-4">{texts.trialFunnelColEmail}</th>
+                          <th className="pb-2 pr-4">{texts.trialFunnelColSignedUp}</th>
+                          <th className="pb-2 text-right">{texts.trialFunnelColExpires}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trialFunnel.unclaimed.map((row) => (
+                          <tr key={row.id} className="border-b border-gray-100">
+                            <td className="py-1.5 pr-4">
+                              <a
+                                href={`mailto:${row.email}`}
+                                className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                              >
+                                {row.email}
+                              </a>
+                            </td>
+                            <td className="py-1.5 pr-4 text-gray-600">
+                              {new Date(row.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="py-1.5 text-right font-mono">
+                              {row.daysUntilExpiry !== null ? row.daysUntilExpiry : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}

@@ -12,7 +12,7 @@ const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
-const { getTrialStats, getTrialStatsHistory } = require('../trial');
+const { getTrialStats, getTrialStatsHistory, getTrialFunnel } = require('../trial');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -770,6 +770,21 @@ router.get('/trial-stats/history', authenticateToken, requireAdmin, async (req, 
     res.json(history);
   } catch (err) {
     res.status(500).json({ error: 'Failed to load trial stats history' });
+  }
+});
+
+// GET /api/admin/trial-funnel - Trial conversion funnel (open trials only)
+router.get('/trial-funnel', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Trial funnel requires database mode' });
+    }
+    const days = parseInt(req.query.days) || 30;
+    const funnel = await getTrialFunnel(days);
+    res.json(funnel);
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching trial funnel:', err);
+    res.status(500).json({ error: 'Failed to load trial funnel' });
   }
 });
 

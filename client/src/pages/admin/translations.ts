@@ -123,6 +123,19 @@ export const adminTranslations = {
     // Trial Stats
     trialStoriesToday: 'Trial Stories Today',
     trialAvatarsToday: 'Trial Avatars Today',
+    // Trial Funnel
+    trialFunnel: 'Trial Funnel',
+    trialFunnelSubtitle: 'Open trial accounts (not yet claimed)',
+    trialFunnelTotal: 'Total trial accounts',
+    trialFunnelStoryGenerated: 'Story generated',
+    trialFunnelClaimed: 'Claimed',
+    trialFunnelLoggedIn: 'Logged in',
+    trialFunnelMultiStory: 'Multiple stories',
+    trialFunnelUnclaimedTitle: 'Unclaimed accounts (claim token still valid)',
+    trialFunnelColEmail: 'Email',
+    trialFunnelColSignedUp: 'Signed up',
+    trialFunnelColExpires: 'Days until expiry',
+    trialFunnelEmpty: 'No unclaimed trial accounts in this window.',
     // Failed Jobs Tab
     failedJobs: 'Failed Jobs',
   },
@@ -246,6 +259,19 @@ export const adminTranslations = {
     // Trial Stats
     trialStoriesToday: 'Trial-Geschichten heute',
     trialAvatarsToday: 'Trial-Avatare heute',
+    // Trial Funnel
+    trialFunnel: 'Trial-Funnel',
+    trialFunnelSubtitle: 'Offene Trial-Konten (noch nicht beansprucht)',
+    trialFunnelTotal: 'Trial-Konten gesamt',
+    trialFunnelStoryGenerated: 'Geschichte generiert',
+    trialFunnelClaimed: 'Angemeldet (Passwort gesetzt)',
+    trialFunnelLoggedIn: 'Eingeloggt',
+    trialFunnelMultiStory: 'Mehrere Geschichten',
+    trialFunnelUnclaimedTitle: 'Unbeanspruchte Konten (Claim-Token noch gültig)',
+    trialFunnelColEmail: 'E-Mail',
+    trialFunnelColSignedUp: 'Registriert',
+    trialFunnelColExpires: 'Tage bis Ablauf',
+    trialFunnelEmpty: 'Keine unbeanspruchten Trial-Konten in diesem Zeitraum.',
     // Failed Jobs Tab
     failedJobs: 'Fehlgeschlagene Jobs',
   },
@@ -369,6 +395,19 @@ export const adminTranslations = {
     // Trial Stats
     trialStoriesToday: 'Histoires trial aujourd\'hui',
     trialAvatarsToday: 'Avatars trial aujourd\'hui',
+    // Trial Funnel
+    trialFunnel: 'Funnel d\'essai',
+    trialFunnelSubtitle: 'Comptes d\'essai ouverts (non encore réclamés)',
+    trialFunnelTotal: 'Comptes d\'essai au total',
+    trialFunnelStoryGenerated: 'Histoire générée',
+    trialFunnelClaimed: 'Réclamé',
+    trialFunnelLoggedIn: 'Connecté',
+    trialFunnelMultiStory: 'Plusieurs histoires',
+    trialFunnelUnclaimedTitle: 'Comptes non réclamés (jeton de réclamation encore valide)',
+    trialFunnelColEmail: 'E-mail',
+    trialFunnelColSignedUp: 'Inscrit',
+    trialFunnelColExpires: 'Jours avant expiration',
+    trialFunnelEmpty: 'Aucun compte d\'essai non réclamé dans cette fenêtre.',
     // Failed Jobs Tab
     failedJobs: 'Jobs échoués',
   },

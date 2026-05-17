@@ -216,6 +216,102 @@ async function getTrialStatsHistory(days = 30) {
 }
 
 /**
+ * Get trial funnel stats for admin dashboard.
+ *
+ * Returns conversion-funnel metrics for OPEN trial accounts only — i.e. users
+ * with `is_trial = true`. On successful claim the trial route flips `is_trial`
+ * to FALSE, so this snapshot captures un-claimed trials. The `claimed` count is
+ * therefore expected to be 0 in steady state; it's kept in the response to make
+ * the funnel shape explicit and to catch any future flow changes.
+ *
+ * @param {number} days - lookback window in days for unclaimed list (default 30)
+ * @returns {Promise<object>}
+ */
+async function getTrialFunnel(days = 30) {
+  try {
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    if (!pool) {
+      return {
+        totalTrials: 0,
+        trialStoryGenerated: 0,
+        trialClaimed: 0,
+        trialLoggedInAtLeastOnce: 0,
+        trialMultiStory: 0,
+        unclaimed: [],
+      };
+    }
+
+    const since = `${days} days`;
+
+    const countsResult = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE u.is_trial = true)                                                                    AS total_trials,
+         COUNT(*) FILTER (WHERE u.is_trial = true AND EXISTS (SELECT 1 FROM stories s WHERE s.user_id = u.id))        AS trial_story_generated,
+         COUNT(*) FILTER (WHERE u.is_trial = true AND u.has_set_password = true)                                       AS trial_claimed,
+         COUNT(*) FILTER (WHERE u.is_trial = true AND u.last_login IS NOT NULL)                                        AS trial_logged_in_at_least_once,
+         COUNT(*) FILTER (WHERE u.is_trial = true AND u.stories_generated >= 2)                                        AS trial_multi_story
+       FROM users u
+       WHERE u.is_trial = true
+          OR (u.created_at >= NOW() - $1::INTERVAL AND u.is_trial = true)`,
+      [since]
+    );
+
+    const row = countsResult.rows[0] || {};
+
+    const unclaimedResult = await pool.query(
+      `SELECT
+         u.id,
+         u.email,
+         u.username,
+         u.created_at,
+         u.claim_token_expires
+       FROM users u
+       WHERE u.is_trial = true
+         AND u.claim_token IS NOT NULL
+         AND u.claim_token_expires > NOW()
+         AND u.created_at >= NOW() - $1::INTERVAL
+       ORDER BY u.created_at DESC
+       LIMIT 100`,
+      [since]
+    );
+
+    const now = Date.now();
+    const unclaimed = unclaimedResult.rows.map((r) => {
+      const expires = r.claim_token_expires ? new Date(r.claim_token_expires) : null;
+      const daysUntilExpiry = expires ? Math.max(0, Math.ceil((expires.getTime() - now) / (1000 * 60 * 60 * 24))) : null;
+      return {
+        id: r.id,
+        email: r.email,
+        username: r.username,
+        createdAt: r.created_at,
+        claimTokenExpires: r.claim_token_expires,
+        daysUntilExpiry,
+      };
+    });
+
+    return {
+      totalTrials: parseInt(row.total_trials, 10) || 0,
+      trialStoryGenerated: parseInt(row.trial_story_generated, 10) || 0,
+      trialClaimed: parseInt(row.trial_claimed, 10) || 0,
+      trialLoggedInAtLeastOnce: parseInt(row.trial_logged_in_at_least_once, 10) || 0,
+      trialMultiStory: parseInt(row.trial_multi_story, 10) || 0,
+      unclaimed,
+    };
+  } catch (err) {
+    log.warn(`[TRIAL FUNNEL] Failed to compute funnel: ${err.message}`);
+    return {
+      totalTrials: 0,
+      trialStoryGenerated: 0,
+      trialClaimed: 0,
+      trialLoggedInAtLeastOnce: 0,
+      trialMultiStory: 0,
+      unclaimed: [],
+    };
+  }
+}
+
+/**
  * Verify Cloudflare Turnstile token server-side.
  * Returns true if valid, false if invalid or Turnstile unavailable (graceful fallback).
  */
@@ -2374,6 +2470,7 @@ module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;
 module.exports.getTrialStatsHistory = getTrialStatsHistory;
+module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
