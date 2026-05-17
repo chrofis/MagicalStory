@@ -3,6 +3,7 @@
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
+const { CREDIT_CONFIG } = require('./server/config/credits');
 
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY
@@ -223,7 +224,8 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
     greeting: firstName || 'there',
     title: storyTitle,
     storyUrl: storyUrl,
-    claimUrl: options.claimUrl || ''
+    claimUrl: options.claimUrl || '',
+    credits: String(CREDIT_CONFIG.LIMITS.INITIAL_USER)
   };
 
   try {
