@@ -3876,7 +3876,6 @@ router.get('/avatar-jobs/:jobId', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-module.exports.generateDynamicAvatar = generateDynamicAvatar;
 module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
 module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;
 module.exports.evaluateAvatarFaceMatch = evaluateAvatarFaceMatch;

@@ -31,7 +31,6 @@ const { setStyledAvatar, invalidateStyledAvatarForCategory } = require('./styled
  * @returns {Object} - { generated: [], failed: [], tokenUsage: {} }
  */
 async function generateStoryAvatars(characters, clothingRequirements, artStyle, addUsage, options = {}) {
-  const { generateDynamicAvatar } = require('../routes/avatars');
   const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
   const { persistStyledAvatar } = require('../services/database');
   const userId = options.userId || null;
@@ -176,20 +175,44 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
               result = { success: false };
             }
           } else {
-            // Standard/winter/summer: generate base avatar (should rarely happen)
-            log.warn(`[AVATAR-GEN] ⚠️ FALLBACK: ${char.name} missing ${category} avatar - this shouldn't normally happen`);
-            result = await generateDynamicAvatar(char, category, config);
-
-            if (result.success && result.imageData) {
-              char.avatars[category] = result.imageData;
-              invalidateStyledAvatarForCategory(char.name, category, char);
-              if (result.clothing) {
-                char.avatars.clothing[category] = result.clothing;
+            // Standard/winter/summer with no signature: still produce a 2×4 sheet
+            // so every story avatar shares one storage shape and the cell-crop
+            // readers (sceneComposite, iteratePageCore) work uniformly. The base
+            // single-image generator (generateDynamicAvatar) is now reserved for
+            // character-creation routes only — story-prep ALWAYS goes 2×4.
+            log.warn(`[AVATAR-GEN] ⚠️ FALLBACK: ${char.name} missing ${category} styled sheet, generating one now`);
+            const baseClothing = char.avatars?.clothing?.[category]
+              || (typeof config.description === 'string' ? config.description : '')
+              || `${category} outfit`;
+            try {
+              const sheet = await generateCharacter2x4Sheet(char, {
+                clothingCategory: category,
+                costumeDescription: baseClothing,
+                artStyle,
+                usageTracker: addUsage,
+              });
+              if (sheet?.imageData) {
+                char.avatars.styledAvatars[artStyle][category] = sheet.imageData;
+                setStyledAvatar(char.name, category, artStyle, sheet.imageData);
+                char.avatars.clothing[category] = baseClothing;
+                if (userId && char.id) {
+                  try {
+                    await persistStyledAvatar(userId, char.id, artStyle, category, sheet.imageData);
+                  } catch (persistErr) {
+                    log.warn(`[AVATAR-GEN] persistStyledAvatar failed for ${char.name}/${category}: ${persistErr.message}`);
+                  }
+                }
+                result = { success: true, imageData: sheet.imageData };
+                generated.push(`${char.name}:${logCategory}@${artStyle}`);
+                log.warn(`[AVATAR-GEN] ⚠️ FALLBACK: Generated 2×4 ${category}@${artStyle} for ${char.name}`);
+              } else {
+                failed.push(`${char.name}:${logCategory}`);
+                result = { success: false };
               }
-              generated.push(`${char.name}:${logCategory}`);
-              log.warn(`[AVATAR-GEN] ⚠️ FALLBACK: Generated ${category} for ${char.name}`);
-            } else {
+            } catch (err) {
+              log.warn(`[AVATAR-GEN] FALLBACK 2×4 ${category}@${artStyle} for ${char.name} failed: ${err.message}`);
               failed.push(`${char.name}:${logCategory}`);
+              result = { success: false };
             }
           }
 
