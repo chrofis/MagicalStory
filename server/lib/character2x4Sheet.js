@@ -231,21 +231,27 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   return JSON.parse(text);
 }
 
-// Art-style descriptors injected into the Pass 2 style-transfer prompt.
-// Stay aligned with sceneComposite.js BLEND_STYLE_LINES so the downstream
-// page blend lands on the same surface treatment as the styled sheet.
-const STYLE_LINES = {
-  watercolor: "soft watercolour children's storybook illustration — gentle washes, simple ink outlines, subtle colour layering",
-  pixar:      "Pixar 3D illustration style — smooth volumetric shading, clean rim light, subtle subsurface scattering",
-  anime:      "anime line-art style — clean black outlines, flat cel-shaded colour fills, simplified facial features",
-  cartoon:    "modern flat cartoon — bold outlines, clean shapes, flat fills with simple shading",
-  oil:        "oil painting style — visible brushwork, layered colour mixing, painterly texture",
-  ghibli:     "Studio Ghibli illustration style — soft watercolour backgrounds with hand-drawn line work, warm palette",
-  comic:      "western comic-book style — bold ink outlines, halftone shading, saturated colours",
-};
+// Art-style descriptor for the Pass 2 style-transfer prompt.
+// Reads from the canonical ART_STYLES dictionary in storyHelpers.js so every
+// style the wizard exposes (14 today: watercolor, realistic, concept, oil,
+// pixar, cartoon, comic, anime, manga, steampunk, cyber, chibi, pixel,
+// lowpoly) is supported. Previously a hard-coded 7-entry STYLE_LINES map
+// silently downgraded the other 7 to watercolour, so e.g. a "manga" story
+// got a watercolour Pass 2 sheet. resolveArtStyle returns rich
+// per-backend prose; we use Grok since Pass 2 runs through editWithGrok.
+function resolveStyleLineForSheet(artStyle) {
+  // Defer require until call time — storyHelpers.js is heavy and not
+  // needed until Pass 2 runs.
+  const { resolveArtStyle } = require('./storyHelpers');
+  const style = resolveArtStyle(artStyle, 'grok');
+  if (style) return style;
+  // Unknown style id (shouldn't happen — frontend constrains to ART_STYLES).
+  // Fail loudly instead of silently swapping to watercolour.
+  throw new Error(`[CHARACTER 2×4] Unknown artStyle "${artStyle}" — add it to ART_STYLES in server/lib/storyHelpers.js`);
+}
 
 function buildStyleTransferPrompt(artStyle) {
-  const styleLine = STYLE_LINES[artStyle] || STYLE_LINES.watercolor;
+  const styleLine = resolveStyleLineForSheet(artStyle);
   return `Re-render this 2×4 character reference sheet in ${styleLine}.
 
 Preserve EVERYTHING except the visual style:
@@ -267,7 +273,7 @@ Only the surface treatment changes from photographic to ${styleLine}.`;
  * prompts/sheet-2x4-style-eval.txt.
  */
 async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey) {
-  const styleLabel = STYLE_LINES[artStyle] || STYLE_LINES.watercolor;
+  const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
