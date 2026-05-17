@@ -358,7 +358,16 @@ async function recomputeAllActiveVersions(storyId, storyData) {
       if (!s?.pageNumber || !Array.isArray(s.imageVersions) || s.imageVersions.length === 0) continue;
       const r = await recomputeActiveVersion(storyId, s.pageNumber, s.imageVersions, 'scene');
       scenes++;
-      if (r) switches++;
+      if (r) {
+        switches++;
+        // Mirror the canonical active version onto the JSONB blob too. Without
+        // this, stories.data.sceneImages[N].activeVersion stays undefined and
+        // any client/code path that reads from the blob (instead of from the
+        // image_version_meta column) falls back to "last index" — see staging
+        // story job_1778925296736 where every page's blob activeVersion was
+        // undefined while the meta correctly tracked the best version.
+        s.activeVersion = r.activeIndex;
+      }
     }
   }
   if (storyData.coverImages && typeof storyData.coverImages === 'object') {
@@ -367,7 +376,10 @@ async function recomputeAllActiveVersions(storyId, storyData) {
       if (!cv?.imageVersions || cv.imageVersions.length === 0) continue;
       const r = await recomputeActiveVersion(storyId, kind, cv.imageVersions, kind);
       covers++;
-      if (r) switches++;
+      if (r) {
+        switches++;
+        cv.activeVersion = r.activeIndex;
+      }
     }
   }
   return { scenes, covers, switches };

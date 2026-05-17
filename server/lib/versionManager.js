@@ -36,15 +36,31 @@ function dbToArrayIndex(dbIndex, _imageType) {
  * After pushing a new version onto imageVersions, return the DB version_index
  * that should be set as the active version.
  *
+ * Picks by canonical scoring (pickBestVersionIndex from scoring.js) so the
+ * BEST-scoring version wins, not the LAST-pushed one. Previously this
+ * returned `imageVersions.length - 1` unconditionally, which made every
+ * regen overwrite the picked-best active version with the newly-pushed
+ * (potentially worse) attempt. Observed on staging job_1778925296736_*
+ * pages 10-14: meta pointed to the last attempt even when an earlier
+ * version had a higher score.
+ *
  * Call this AFTER the push (i.e. imageVersions already contains the new entry).
  *
  * @param {Array} imageVersions - The imageVersions array (after push)
- * @param {string} _imageType   - Unused (kept for API stability)
- * @returns {number} The version_index to pass to setActiveVersion
+ * @param {string} imageType    - 'scene' | 'frontCover' | 'initialPage' | 'backCover'
+ * @returns {number} The DB version_index to pass to setActiveVersion
  */
-function getActiveIndexAfterPush(imageVersions, _imageType) {
+function getActiveIndexAfterPush(imageVersions, imageType) {
   if (!imageVersions || imageVersions.length === 0) return 0;
-  return imageVersions.length - 1;
+  // Lazy require to avoid a circular dep: scoring.js → versionManager.js
+  // (arrayToDbIndex) → would loop back here on early load.
+  const { pickBestVersionIndex } = require('./scoring');
+  const arrayIdx = pickBestVersionIndex(imageVersions);
+  if (arrayIdx < 0) {
+    // No version has a score yet (all-null) — fall back to newest.
+    return arrayToDbIndex(imageVersions.length - 1, imageType);
+  }
+  return arrayToDbIndex(arrayIdx, imageType);
 }
 
 module.exports = {
