@@ -31,10 +31,7 @@ const { setStyledAvatar, invalidateStyledAvatarForCategory } = require('./styled
  * @returns {Object} - { generated: [], failed: [], tokenUsage: {} }
  */
 async function generateStoryAvatars(characters, clothingRequirements, artStyle, addUsage, options = {}) {
-  const {
-    generateDynamicAvatar,
-    generateStyledAvatarWithSignature
-  } = require('../routes/avatars');
+  const { generateDynamicAvatar } = require('../routes/avatars');
   const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
   const { persistStyledAvatar } = require('../services/database');
   const userId = options.userId || null;
@@ -129,22 +126,54 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
               result = { success: false };
             }
           } else if (config.signature) {
-            // Signature: generate styled avatar directly (1 API call)
-            result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
-
-            if (result.success && result.imageData) {
-              char.avatars.styledAvatars[artStyle][category] = result.imageData;
-              setStyledAvatar(char.name, category, artStyle, result.imageData);
-              if (result.clothing) {
-                char.avatars.clothing[category] = result.clothing;
+            // Signature: 2×4 sheet via the unified path. Base clothing + signature
+            // items fold into one costume description; generateCharacter2x4Sheet
+            // produces the same 2×4 (Pass 1 realistic + Pass 2 styled) as the
+            // costumed path, just keyed under standard/winter/summer instead of
+            // styledAvatars[artStyle].costumed.<key>. Downstream cell-crop logic
+            // (sceneComposite.sceneCellRefForCharacter, iteratePageCore's
+            // cropAvatarCell) handles per-page depth-aware cell selection so the
+            // page generator receives 1 cell (background/midground) or 2 cells
+            // (foreground close-up) — never the full 8-cell sheet.
+            const baseClothing = char.avatars?.clothing?.[category]
+              || (typeof config.description === 'string' ? config.description : '')
+              || `${category} outfit`;
+            const signatureSuffix = config.signature && String(config.signature).toLowerCase() !== 'none'
+              ? `, plus this signature element: ${config.signature}`
+              : '';
+            const combinedCostume = `${baseClothing}${signatureSuffix}`;
+            try {
+              const sheet = await generateCharacter2x4Sheet(char, {
+                clothingCategory: category,
+                costumeDescription: combinedCostume,
+                artStyle,
+                usageTracker: addUsage,
+              });
+              if (sheet?.imageData) {
+                char.avatars.styledAvatars[artStyle][category] = sheet.imageData;
+                setStyledAvatar(char.name, category, artStyle, sheet.imageData);
+                char.avatars.clothing[category] = combinedCostume;
+                if (config.signature) {
+                  char.avatars.signatures[category] = config.signature;
+                }
+                if (userId && char.id) {
+                  try {
+                    await persistStyledAvatar(userId, char.id, artStyle, category, sheet.imageData);
+                  } catch (persistErr) {
+                    log.warn(`[AVATAR-GEN] persistStyledAvatar failed for ${char.name}/${category}: ${persistErr.message}`);
+                  }
+                }
+                result = { success: true, imageData: sheet.imageData };
+                generated.push(`${char.name}:${logCategory}+sig@${artStyle}`);
+                log.debug(`[AVATAR-GEN] ✅ Generated 2×4 ${category}+sig@${artStyle} for ${char.name}`);
+              } else {
+                failed.push(`${char.name}:${logCategory}`);
+                result = { success: false };
               }
-              if (result.signature) {
-                char.avatars.signatures[category] = result.signature;
-              }
-              generated.push(`${char.name}:${logCategory}+sig@${artStyle}`);
-              log.debug(`[AVATAR-GEN] ✅ Generated styled ${category}+sig@${artStyle} for ${char.name}`);
-            } else {
+            } catch (err) {
+              log.warn(`[AVATAR-GEN] 2×4 ${category}+sig@${artStyle} for ${char.name} failed: ${err.message}`);
               failed.push(`${char.name}:${logCategory}`);
+              result = { success: false };
             }
           } else {
             // Standard/winter/summer: generate base avatar (should rarely happen)
