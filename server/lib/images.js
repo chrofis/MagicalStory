@@ -8472,6 +8472,13 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   }
   const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : useFullScene ? 'grok_inpaint' : 'grok_blackout';
 
+  // Hoisted so every branch (blended / cutout / fullScene / blackout) can read
+  // these. Previously only the blended branch declared them, and the fullScene
+  // occluder-subtract logic referenced protectedBodiesForGrok → ReferenceError
+  // on every body-repair call from the pipeline.
+  const protectedFacesForGrok = options.protectedFaces || [];
+  const protectedBodiesForGrok = options.protectedBodies || [];
+
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
   // Crop character reference to front column only for styled avatars (2-column grid: front | side)
@@ -8604,8 +8611,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     };
 
     const whiteoutTarget = options.whiteoutTarget || 'face';
-    const protectedFacesForGrok = options.protectedFaces || [];
-    const protectedBodiesForGrok = options.protectedBodies || [];
 
     if (whiteoutTarget === 'body') {
       // Body repair: blur the full body region (face + body + clothing).
@@ -8822,16 +8827,27 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const pad = 0.1;
       let pxmin = Math.max(0, fxmin - fw * pad), pymin = Math.max(0, fymin - fh * pad);
       let pxmax = Math.min(1, fxmax + fw * pad), pymax = Math.min(1, fymax + fh * pad);
-      // Clamp the side facing the target so the padded rect + feather never
-      // crosses the midpoint between the two boxes' centers.
+      // Midpoint clamp: keep the padded rect from pushing past the line halfway
+      // between target and neighbour center, so adjacent (non-overlapping)
+      // characters don't eat into the target. BUT when the neighbour's bbox
+      // actually overlaps the target's bbox on an axis, the neighbour stands
+      // in front of / behind the target — clamping at the midpoint carves a
+      // hole out of the neighbour's overlap zone and lets Grok repaint right
+      // through them. Skip the clamp on whichever axis has bbox overlap.
       const fcx = (fxmin + fxmax) / 2;
       const fcy = (fymin + fymax) / 2;
       const midX = (fcx + targetCx) / 2;
       const midY = (fcy + targetCy) / 2;
-      if (fcx < targetCx) pxmax = Math.min(pxmax, midX - featherX);
-      else if (fcx > targetCx) pxmin = Math.max(pxmin, midX + featherX);
-      if (fcy < targetCy) pymax = Math.min(pymax, midY - featherY);
-      else if (fcy > targetCy) pymin = Math.max(pymin, midY + featherY);
+      const overlapsTargetX = fxmin < xmax && fxmax > xmin;
+      const overlapsTargetY = fymin < ymax && fymax > ymin;
+      if (!overlapsTargetX) {
+        if (fcx < targetCx) pxmax = Math.min(pxmax, midX - featherX);
+        else if (fcx > targetCx) pxmin = Math.max(pxmin, midX + featherX);
+      }
+      if (!overlapsTargetY) {
+        if (fcy < targetCy) pymax = Math.min(pymax, midY - featherY);
+        else if (fcy > targetCy) pymin = Math.max(pymin, midY + featherY);
+      }
       // Clamp coordinates to blend-region pixel space. Without clamping the
       // coordinates can go negative (char straddles blend region boundary) or
       // exceed blendWidth/blendHeight, which breaks the distance calculation
@@ -9293,9 +9309,94 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const hatchCrop = await sharp(paddedScene)
       .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
       .jpeg({ quality: 90 }).toBuffer();
-    const silhouetteMaskBuf = await fetchSilhouettePng(hatchCrop);
+    let silhouetteMaskBuf = await fetchSilhouettePng(hatchCrop);
     if (!silhouetteMaskBuf) {
       log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge unavailable — falling back to rectangular hatch`);
+    }
+
+    // Subtract OCCLUDER silhouettes. rembg in the target's crop returns ALL
+    // foreground figures inside that crop, not just the target — when a
+    // neighbour stands in front of the target, the returned silhouette
+    // covers both, and the magenta crosshatch then masks the neighbour too
+    // (observed: Sarah repair with boy kneeling in front — boy's head
+    // landed inside the magenta and got redrawn). For each other character
+    // whose bbox overlaps the target's hatch region, fetch its silhouette
+    // separately and dest-out it from the target silhouette so the
+    // crosshatch only covers the target.
+    if (silhouetteMaskBuf && Array.isArray(protectedBodiesForGrok) && protectedBodiesForGrok.length > 0) {
+      for (const pb of protectedBodiesForGrok) {
+        if (!Array.isArray(pb) || pb.length !== 4) continue;
+        const [pyMin, pxMin, pyMax, pxMax] = pb;
+        if ([pyMin, pxMin, pyMax, pxMax].some(v => v == null || isNaN(v))) continue;
+        // Pad the occluder bbox by 20% on each side before cropping for
+        // rembg. A tight bbox truncates the silhouette at the bbox edges —
+        // the occluder's head, hair, or extended limbs fall outside the
+        // crop and rembg can't include them in the silhouette, so the
+        // subtraction misses those parts and they stay inside the target
+        // mask. Observed: Sarah repair with boy in front — boy's head
+        // landed outside his tight bbox crop, his silhouette captured only
+        // his torso, and his head was left inside the magenta. 20% padding
+        // gives rembg enough surrounding context to capture the full
+        // occluder. The intersection clip below limits the subtraction
+        // back to the target's hatch region so we never carve outside it.
+        const OCC_PAD = 0.20;
+        const pbW = pxMax - pxMin;
+        const pbH = pyMax - pyMin;
+        const pxMinPad = Math.max(0, pxMin - pbW * OCC_PAD);
+        const pyMinPad = Math.max(0, pyMin - pbH * OCC_PAD);
+        const pxMaxPad = Math.min(1, pxMax + pbW * OCC_PAD);
+        const pyMaxPad = Math.min(1, pyMax + pbH * OCC_PAD);
+        const occLeft   = Math.max(0, Math.floor(pxMinPad * sceneMeta.width));
+        const occTop    = Math.max(0, Math.floor(pyMinPad * sceneMeta.height));
+        const occRight  = Math.min(paddedW, Math.ceil(pxMaxPad * sceneMeta.width));
+        const occBottom = Math.min(paddedH, Math.ceil(pyMaxPad * sceneMeta.height));
+        const occWidth  = occRight - occLeft;
+        const occHeight = occBottom - occTop;
+        if (occWidth <= 1 || occHeight <= 1) continue;
+        // No intersection with hatch region → nothing to subtract.
+        if (occRight <= hatchLeft || occLeft >= hatchLeft + hatchWidth) continue;
+        if (occBottom <= hatchTop || occTop >= hatchTop + hatchHeight) continue;
+        // Skip the self-bbox if it accidentally got into protectedBodies.
+        if (occLeft === figLeft && occTop === figTop && occWidth === figWidth && occHeight === figHeight) continue;
+
+        try {
+          const occCrop = await sharp(paddedScene)
+            .extract({ left: occLeft, top: occTop, width: occWidth, height: occHeight })
+            .jpeg({ quality: 90 }).toBuffer();
+          const occSilhouette = await fetchSilhouettePng(occCrop);
+          if (!occSilhouette) continue;
+          // Clip the occluder silhouette to the intersection with the target's
+          // hatch region. Sharp's composite rejects negative offsets and inputs
+          // that extend past the base canvas — both happen whenever the
+          // occluder bbox sticks out beyond the target's hatch crop (Emma
+          // starts at x=491 px, target hatch starts at x=766 px → raw shift is
+          // -275, throws "Image to composite must have same dimensions or
+          // smaller"). Compute the rectangle the two share, extract only that
+          // sub-region of the occluder silhouette, then dest-out it at a
+          // guaranteed-non-negative offset inside the target mask.
+          const ixmin = Math.max(occLeft, hatchLeft);
+          const iymin = Math.max(occTop,  hatchTop);
+          const ixmax = Math.min(occLeft + occWidth,  hatchLeft + hatchWidth);
+          const iymax = Math.min(occTop  + occHeight, hatchTop  + hatchHeight);
+          const iWidth  = ixmax - ixmin;
+          const iHeight = iymax - iymin;
+          if (iWidth <= 0 || iHeight <= 0) continue;
+          const occClipped = await sharp(occSilhouette)
+            .extract({
+              left:   ixmin - occLeft,
+              top:    iymin - occTop,
+              width:  iWidth,
+              height: iHeight,
+            })
+            .png().toBuffer();
+          silhouetteMaskBuf = await sharp(silhouetteMaskBuf)
+            .composite([{ input: occClipped, left: ixmin - hatchLeft, top: iymin - hatchTop, blend: 'dest-out' }])
+            .png().toBuffer();
+          log.info(`👤 [CHAR REPAIR GROK] Subtracted occluder silhouette: occ @(${occLeft},${occTop}) ${occWidth}x${occHeight}, intersection ${iWidth}x${iHeight} @ target-mask offset (${ixmin - hatchLeft},${iymin - hatchTop})`);
+        } catch (occErr) {
+          log.warn(`⚠️ [CHAR REPAIR GROK] Occluder silhouette subtract failed: ${occErr.message}`);
+        }
+      }
     }
 
     // Clip the crosshatch to the silhouette via dest-in: keeps hatch line
