@@ -739,8 +739,14 @@ export default function StoryWizard() {
     // active job if the GenerationContext hasn't started tracking it yet.
     // Without this, opening /create?jobId=… in a fresh tab leaves the wizard
     // at step 6 with isGenerating=true but no progress or covers ever flow in.
+    // Skip adoption when GenerationContext has already finished this jobId —
+    // the completion handler clears activeJob to null, and without this guard
+    // the effect would re-adopt the same id, startTracking() resets the
+    // completion fields, polling immediately re-completes, and the cycle
+    // repeats forever (UI shows a 3% spinner because progress was reset).
     const urlJobId = searchParams.get('jobId');
-    if (urlJobId && !activeJob && startTracking) {
+    const alreadyCompleted = urlJobId && completedStoryId === urlJobId;
+    if (urlJobId && !activeJob && startTracking && !alreadyCompleted) {
       log.info('[StoryWizard] Adopting jobId from URL into GenerationContext:', urlJobId);
       startTracking(urlJobId, '');
       // The next render will see activeJob populated and fall through to the
