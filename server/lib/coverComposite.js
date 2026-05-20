@@ -211,35 +211,64 @@ function parseExplicitSequence(coverHint, characters) {
   return result.length >= 2 ? result : null;
 }
 
-// ─── Avatar quadrant extraction (body-front / body-profile) ────────────
+// ─── Avatar sheet-cell extraction ──────────────────────────────────────
+//
+// The styled avatar layout depends on the generator:
+//   • Modern (2026-05-14+): 2×4 sheet — 4 columns × 2 rows at 16:9.
+//       Top row    cells 1-4: face — front / three-quarter / profile / back
+//       Bottom row cells 5-8: body — front / three-quarter / profile / back
+//       body-front = cell 5 (col 0, row 1). body-profile = cell 7 (col 2, row 1).
+//   • Legacy 2×2 Gemini fallback: 2 columns × 2 rows, portrait aspect.
+//       TL=face-front, TR=face-profile, BL=body-front, BR=body-profile.
+//   • Single image: portrait, no grid — return as-is.
+//
+// Branch on aspect h/w: ≲0.8 → 2×4 sheet; 1.3–2.2 → legacy 2×2 (variance
+// scan locates the separators); otherwise → single cell.
 async function extractQuadrant(buffer, which = 'body-front') {
   const meta = await sharp(buffer).metadata();
   if (!meta.width || !meta.height) return null;
   const aspect = meta.height / meta.width;
-  if (aspect < 1.3 || aspect > 2.2) return buffer; // not a 2x2 grid
 
-  const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
-  const { width, height } = info;
-  let minHVar = Infinity, sepY = Math.floor(height / 2);
-  for (let y = Math.floor(height * 0.25); y < Math.floor(height * 0.75); y++) {
-    let s = 0, sq = 0;
-    for (let x = 0; x < width; x++) { const v = data[y * width + x]; s += v; sq += v * v; }
-    const mean = s / width;
-    const variance = sq / width - mean * mean;
-    if (variance < minHVar) { minHVar = variance; sepY = y; }
+  // 2×4 sheet (4 cols × 2 rows, 16:9 → aspect ≈ 0.56).
+  if (aspect < 0.8) {
+    const cellW = Math.floor(meta.width / 4);
+    const cellH = Math.floor(meta.height / 2);
+    const col = which === 'body-profile' ? 2 : 0;
+    const row = 1;
+    return sharp(buffer)
+      .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
+      .png()
+      .toBuffer();
   }
-  let minVVar = Infinity, sepX = Math.floor(width / 2);
-  for (let x = Math.floor(width * 0.3); x < Math.floor(width * 0.7); x++) {
-    let s = 0, sq = 0;
-    for (let y = 0; y < height; y++) { const v = data[y * width + x]; s += v; sq += v * v; }
-    const mean = s / height;
-    const variance = sq / height - mean * mean;
-    if (variance < minVVar) { minVVar = variance; sepX = x; }
+
+  // Legacy 2×2 portrait grid: locate separators by min variance.
+  if (aspect >= 1.3 && aspect <= 2.2) {
+    const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+    let minHVar = Infinity, sepY = Math.floor(height / 2);
+    for (let y = Math.floor(height * 0.25); y < Math.floor(height * 0.75); y++) {
+      let s = 0, sq = 0;
+      for (let x = 0; x < width; x++) { const v = data[y * width + x]; s += v; sq += v * v; }
+      const mean = s / width;
+      const variance = sq / width - mean * mean;
+      if (variance < minHVar) { minHVar = variance; sepY = y; }
+    }
+    let minVVar = Infinity, sepX = Math.floor(width / 2);
+    for (let x = Math.floor(width * 0.3); x < Math.floor(width * 0.7); x++) {
+      let s = 0, sq = 0;
+      for (let y = 0; y < height; y++) { const v = data[y * width + x]; s += v; sq += v * v; }
+      const mean = s / height;
+      const variance = sq / height - mean * mean;
+      if (variance < minVVar) { minVVar = variance; sepX = x; }
+    }
+    if (which === 'body-profile') {
+      return sharp(buffer).extract({ left: sepX, top: sepY, width: width - sepX, height: height - sepY }).toBuffer();
+    }
+    return sharp(buffer).extract({ left: 0, top: sepY, width: sepX, height: height - sepY }).toBuffer();
   }
-  if (which === 'body-profile') {
-    return sharp(buffer).extract({ left: sepX, top: sepY, width: width - sepX, height: height - sepY }).toBuffer();
-  }
-  return sharp(buffer).extract({ left: 0, top: sepY, width: sepX, height: height - sepY }).toBuffer();
+
+  // Single image (no grid).
+  return buffer;
 }
 
 // ─── Background removal (rembg via Python service, chroma-key fallback) ──
