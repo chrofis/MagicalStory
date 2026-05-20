@@ -453,6 +453,63 @@ export function ImageHistoryModal({
                     </div>
                   )}
 
+                  {/* 3b. COMPOSITE-COVER 2-PASS DEBUG — pass 1 (figures-on-white repose)
+                       + pass 2 (landmark composite), per version. Each cover version
+                       carries its own compositeAttempts, so flipping between versions
+                       in the modal shows that version's actual intermediate plates. */}
+                  {(() => {
+                    const attempts = (detailVersion as any).compositeAttempts as Array<{
+                      pass: number; input?: string; vbGrid?: string; output?: string;
+                      prompt?: string; modelId?: string; elapsedMs?: number;
+                    }> | null | undefined;
+                    if (!Array.isArray(attempts) || attempts.length === 0) return null;
+                    return (
+                      <div className="mt-2 pt-3 border-t border-purple-200">
+                        <div className="text-xs font-semibold text-purple-700 mb-2 flex items-center gap-1">
+                          🎨 {language === 'de' ? 'Composite-Cover (2 Durchgänge)' : 'Composite cover (2 passes)'}
+                          <span className="text-[10px] font-normal text-purple-500">
+                            ({attempts.length} {language === 'de' ? 'Durchgang' + (attempts.length === 1 ? '' : 'e') : 'pass' + (attempts.length === 1 ? '' : 'es')})
+                          </span>
+                        </div>
+                        {attempts.map((att) => (
+                          <div key={att.pass} className="mb-3 bg-purple-50 rounded-lg p-2 border border-purple-200">
+                            <div className="text-[11px] font-medium text-purple-700 mb-2">
+                              {language === 'de' ? `Durchgang ${att.pass}` : `Pass ${att.pass}`}
+                              {att.modelId && <span className="ml-2 text-[10px] font-normal text-purple-500">{att.modelId}</span>}
+                              {att.elapsedMs != null && <span className="ml-2 text-[10px] font-normal text-purple-500">{(att.elapsedMs / 1000).toFixed(1)}s</span>}
+                            </div>
+                            <div className={`grid gap-2 mb-2 ${att.vbGrid ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                              {att.input && (
+                                <div>
+                                  <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Eingabe' : 'Input'}</div>
+                                  <img src={att.input} alt={`Composite pass ${att.pass} input`} className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setLightboxRef(att.input!)} title="Click to enlarge" />
+                                </div>
+                              )}
+                              {att.vbGrid && (
+                                <div>
+                                  <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'VB-Raster (Ref.)' : 'VB grid (ref)'}</div>
+                                  <img src={att.vbGrid} alt={`Composite pass ${att.pass} VB grid`} className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setLightboxRef(att.vbGrid!)} title="Click to enlarge" />
+                                </div>
+                              )}
+                              {att.output && (
+                                <div>
+                                  <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Ausgabe' : 'Output'}</div>
+                                  <img src={att.output} alt={`Composite pass ${att.pass} output`} className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setLightboxRef(att.output!)} title="Click to enlarge" />
+                                </div>
+                              )}
+                            </div>
+                            {att.prompt && (
+                              <details className="text-[11px] text-purple-700">
+                                <summary className="cursor-pointer font-medium">{language === 'de' ? 'Prompt anzeigen' : 'Show prompt'} ({att.prompt.length} {language === 'de' ? 'Zeichen' : 'chars'})</summary>
+                                <pre className="mt-1 p-2 bg-white rounded border border-purple-200 whitespace-pre-wrap break-words text-[10px] text-gray-700 max-h-64 overflow-y-auto">{att.prompt}</pre>
+                              </details>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   {/* 4. FINAL SCORE — single number from the backend, no client-side recompute. */}
                   {(() => {
                     const score = detailVersion.finalScore != null
