@@ -737,9 +737,18 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   const pass2Input = await sharp(landmarkResized).composite([{ input: cutoutResized, left: offX, top: offY }]).jpeg({ quality: 92 }).toBuffer();
 
   // 9. Build pass 2 prompt
-  const titleLine = title
-    ? `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`
-    : '';
+  // Text instruction depends on cover type:
+  //   • frontCover / initialPage → render the story title in the upper third
+  //   • backCover                → render only the "magicalstory.ch" footer
+  //     (back covers must NOT carry the story title per prompts/back-cover.txt;
+  //     the template is bypassed entirely on the composite path so the
+  //     equivalent rule has to live here instead).
+  let textLine = '';
+  if (coverKey === 'backCover') {
+    textLine = `\nFOOTER TEXT: render exactly the text "magicalstory.ch" inset from the bottom-left corner (roughly 5% in from both the left edge and the bottom edge, sitting clearly inside the frame, not flush against the border). Hand-painted watercolor letterforms — NOT a system font. Do NOT render the story title. Do NOT add any other text, names, or labels — only "magicalstory.ch".`;
+  } else if (title) {
+    textLine = `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`;
+  }
   // Pass 2: scene prose (legacy stories) is fine because the landmark is
   // already painted into the input — atmosphere matching, no risk of
   // Grok adding a wrong landscape. New stories carry only the structured
@@ -785,7 +794,7 @@ The background of this image is a real photograph of a specific landmark. DO NOT
 YOUR EDIT (in this order):
 1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
 2. The figures (already painted in watercolor with interactive poses) are foreground — blend them into the scene by matching lighting and softening cutout edges. DO NOT change their poses.
-3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.${titleLine}
+3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.${textLine}
 
 PRESERVE EXACTLY:
 - Every building, window, roofline, doorway — they are correct in the input.
@@ -793,7 +802,7 @@ PRESERVE EXACTLY:
 - Every prop's silhouette and material.
 - Every figure's GAZE DIRECTION — if a character is looking down at a held prop in the input, they are still looking down at that prop in the output. Do NOT redirect any gaze toward the camera.
 
-DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${titleLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
+DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${textLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
 
   // 10. Call Grok pass 2
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 2 (watercolor + landmark) — Grok edit`);
