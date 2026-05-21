@@ -110,7 +110,8 @@ Then a single-line JSON object:
 **`objects[]`**
 - String array of Visual Bible IDs only (`LOC001`, `ART002.2`).
 - Include every recurring visual element visible in the scene.
-- For landmarks with photo variants, use `LOC003.2` format. Default to `.1` if unsure. Pick the variant matching the scene's perspective.
+- Real-landmark LOCs use the dotted vantage form (`LOC003.2`). Pick the variant matching the scene's perspective; default to `.1` if unsure.
+- Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001` — no dotted form, they have no vantages.
 
 **`interactions[]`** — visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`.
 

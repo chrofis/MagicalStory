@@ -196,7 +196,9 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 - `pose` (optional, default `front`): one of `front`, `threeQuarter`, `profile`, `back`. Picks which cell of the character's pre-rendered 2×4 reference sheet the composite path uses for this scene. `front` = facing the camera. `threeQuarter` = body rotated 45° away from the camera, both eyes still visible. `profile` = full side view, one eye visible. `back` = back of the figure, no face. Use the pose that matches the action: a watching character → `threeQuarter`; a character walking away → `back`; a character addressing the reader → `front`; a character in a side-by-side confrontation → `profile`. Consumed only when `enableSceneComposite` is on; harmless otherwise.
 - `flip` (optional, default `false`): `true` if this character should face the camera's RIGHT, `false` if facing the camera's LEFT. The 2×4 cells face left by default; `flip: true` mirrors them. Two characters facing each other should have opposite `flip` values. Consumed only when `enableSceneComposite` is on; harmless otherwise.
 
-**objects[]** — Visual Bible IDs. **For every page, the FIRST `LOC###` ID is the page's primary location and MUST be a vantage (e.g. `LOC001.2`, not bare `LOC001`).** The vantage you pick must be the one whose `pages: []` array includes this page number — i.e. the assignment you made in the Visual Bible. The pipeline reads this to attach the right pre-rendered canvas. If a real landmark also has numbered photo variants, use the same dotted form: the vantage and the photo variant are the same numbering.
+**objects[]** — Visual Bible IDs. The FIRST `LOC###` ID is the page's primary location. Form depends on the location type:
+- Real landmark (`isRealLandmark: true`): use the dotted vantage form `LOC###.N` (e.g. `LOC002.1`). The vantage you pick must be the one whose `pages: []` array includes this page number.
+- Invented location (`isRealLandmark: false`): use the bare form `LOC###` (e.g. `LOC001`). Invented locations have no vantages — the pipeline renders one backdrop per LOC and reuses it.
 
 **interactions[]** — visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`.
 
@@ -763,14 +765,25 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "features": "[distinctive visual elements]",
       "signatureElement": "[ONE unique detail]",
       "isRealLandmark": false,
-      "landmarkQuery": null,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "[real-landmark example]",
+      "pages": [A, B, C],
+      "setting": "[indoor/outdoor, type]",
+      "colors": "[specific colors]",
+      "features": "[distinctive visual elements]",
+      "signatureElement": "[ONE unique detail]",
+      "isRealLandmark": true,
+      "landmarkQuery": "[EXACT name from AVAILABLE LANDMARKS]",
       "vantages": [
         {
-          "id": "LOC001.1",
-          "name": "[short label, e.g. 'exterior view from upstream', 'on the bridge deck', 'under the bridge from the riverbank']",
+          "id": "LOC002.1",
+          "name": "[short label, e.g. 'exterior view from upstream']",
           "shot": "wide|medium|close-up|wide-low|aerial",
-          "description": "[2-3 sentences naming what the camera sees from this vantage — the building/landscape elements visible, the angle, the foreground band where characters will be composited later. No characters here, only setting.]",
-          "pages": [X, Y]
+          "description": "[2-3 sentences naming what the camera sees — landmark elements, angle, the foreground band where characters will be composited later. Background only, no figures.]",
+          "pages": [A, B]
         }
       ]
     }
@@ -787,22 +800,24 @@ For famous buildings, monuments, or locations that exist in reality:
 - This helps us show accurate landmark photos in illustrations
 
 **LOCATION VANTAGES:**
-Every location MUST have a `vantages[]` array — at least one entry. A vantage is one camera position into the location: a single canvas image is rendered for it once and reused across every page that uses that vantage. Pages reference a vantage with the dotted form `LOC001.2` in their `objects[]` (vantage 2 of LOC001).
+Vantages apply ONLY to real landmarks (`isRealLandmark: true`). Each vantage is one camera angle into the landmark; a single canvas is rendered per vantage and reused across the pages that use it. Pages reference a vantage with the dotted form `LOC001.2` (vantage 2 of LOC001).
 
-**When to split into multiple vantages.** Use a separate vantage entry whenever the same location is shown from a fundamentally different camera position or framing — different enough that one canvas image cannot serve both shots. Common splits:
-- Exterior of a building / interior of the same building (`LOC###.1` outside the church, `LOC###.2` inside the nave)
-- On a structure / under or beside it (`LOC###.1` on the bridge deck, `LOC###.2` under the bridge from the riverbank)
-- Wide vista / close-up of one element (`LOC###.1` whole castle from below, `LOC###.2` close on the broken battlement)
-- Approach view / arrival view (`LOC###.1` path leading to it, `LOC###.2` standing in front of the entrance)
+Invented locations (`isRealLandmark: false`) do NOT have a `vantages[]` field. The `features` + `signatureElement` + `setting` already describe the place; the pipeline renders one backdrop per LOC and reuses it across pages. Pages reference an invented LOC with the bare id `LOC001` in their `objects[]` — never dotted.
 
-Do NOT make a separate vantage for: lighting changes, weather changes, time of day, or different characters present. One vantage handles all of those — the canvas is generic location backdrop, the per-page render adjusts the lighting and characters.
+For real landmarks, split into multiple vantages when the same place is shown from a fundamentally different camera position or framing — different enough that one canvas image cannot serve both shots. Common splits:
+- Exterior / interior of the same building (`LOC###.1` outside, `LOC###.2` inside)
+- On a structure / under or beside it (`LOC###.1` on the bridge deck, `LOC###.2` under the bridge)
+- Wide vista / close-up of one element (`LOC###.1` whole castle, `LOC###.2` close on a battlement)
+- Approach view / arrival view (`LOC###.1` path leading to it, `LOC###.2` standing in front)
 
-Each vantage entry has:
-- `id` (required): `LOC###.N` where N starts at 1.
-- `name` (required): short human-readable label (3–8 words).
-- `shot` (required): `wide` / `medium` / `close-up` / `wide-low` / `aerial`. Drives the camera angle for the canvas.
-- `description` (required): 2–3 sentences naming what the camera sees — building/landscape elements, angle, the empty foreground band where characters will be composited later. Background only, no figures.
-- `pages` (required): list of page numbers that use this vantage. Every page in `LOC###.pages` must appear in exactly one vantage's `pages`.
+Do NOT split for: lighting changes, weather, time of day, or different characters present.
+
+Each vantage entry (real landmarks only):
+- `id`: `LOC###.N` where N starts at 1.
+- `name`: short label (3–8 words).
+- `shot`: `wide` / `medium` / `close-up` / `wide-low` / `aerial`.
+- `description`: 2–3 sentences naming what the camera sees — landmark elements, angle, the empty foreground band for characters. Background only, no figures.
+- `pages`: list of page numbers that use this vantage. Every page in `LOC###.pages` must appear in exactly one vantage's `pages`.
 
 {AVAILABLE_LANDMARKS_SECTION}
 
@@ -811,7 +826,7 @@ Each vantage entry has:
 Each cover is a STRUCTURED render spec, not a prose paragraph. The fields below ARE the spec — rendering reads them directly. No prose `Hint:` line; if you include one, it is ignored.
 
 **COVER RULES (CRITICAL):**
-- **REAL LANDMARK ONLY:** the first entry in `Objects:` is the backdrop and must be a LOC### whose Visual Bible entry has BOTH (1) `isRealLandmark: true` AND (2) `landmarkQuery` EXACTLY matching a name from the AVAILABLE LANDMARKS list above. You may NOT invent new backdrop locations. Story-local non-landmark settings (riverbanks, town squares, family homes) are forbidden as cover backdrops — pick a real landmark from the input list even when a story-local setting fits the closing beat better.
+- **BACKDROP:** the first entry in `Objects:` is the cover backdrop and must be a LOC### that exists in the Visual Bible. Prefer a real landmark (`isRealLandmark: true` with `landmarkQuery` matching the AVAILABLE LANDMARKS list) when the story has one — the cover will composite onto its real photo. If no real landmark exists, use the most story-defining invented LOC (the place where the central beat happens). Do NOT invent a new LOC just for the cover.
 - **LIST EVERY CHARACTER BY NAME.** Never write "the family", "everyone", "the group", "his family behind him". List each one: `- Sophie ...`, `- Manuel ...`.
 - **CLOTHING:** must be one of `standard | winter | summer | costumed` AND must be a category this character has marked `used: true` in their `clothingRequirements`. If the story has any costumed clothing, all cover characters MUST use the costumed variant.
 - **HOLDS:** exactly one item per character (each character has 2 hands but a cover needs one focal prop per figure). Value is an ART### from `Objects:` or the word `nothing`. Never list 2+ items for the same character.
