@@ -9328,6 +9328,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     if (!silhouetteMaskBuf) {
       log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge unavailable — falling back to rectangular hatch`);
     }
+    // Snapshot the pre-subtract silhouette + its opaque area so we can
+    // detect and revert pathological subtracts (see post-loop check).
+    const silhouetteBeforeSubtract = silhouetteMaskBuf;
+    const opaqueFraction = async (buf) => {
+      try {
+        const s = await sharp(buf).stats();
+        // Alpha channel mean / 255 = fraction of opaque pixels for a binary mask.
+        const ch = s?.channels?.[3];
+        return ch ? ch.mean / 255 : null;
+      } catch { return null; }
+    };
+    const fracBefore = silhouetteMaskBuf ? await opaqueFraction(silhouetteMaskBuf) : null;
 
     // Subtract OCCLUDER silhouettes. rembg in the target's crop returns ALL
     // foreground figures inside that crop, not just the target — when a
@@ -9411,6 +9423,25 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         } catch (occErr) {
           log.warn(`⚠️ [CHAR REPAIR GROK] Occluder silhouette subtract failed: ${occErr.message}`);
         }
+      }
+    }
+
+    // Pathological-subtract guard. rembg has no instance segmentation: when
+    // an occluder bbox (padded 20%) sits next to or overlapping other figures,
+    // rembg's silhouette of that crop covers ALL foreground in it — including
+    // the target itself when bbox-detection labels are misaligned. dest-outting
+    // that silhouette then carves the target out of its own crosshatch mask,
+    // and the magenta ends up on the wrong figure (observed in
+    // tests/char-repair-overlap/job_1778525478433_fkl0f12x4_p2_Noah_fullscene:
+    // target "Noah" bbox was on Emma's strip, protected Emma got subtracted,
+    // crosshatch landed on Mom). If the subtract removed >70% of the target
+    // silhouette, treat it as a likely label mismatch and revert to the
+    // pre-subtract silhouette so the target gets crosshatched at all.
+    if (silhouetteMaskBuf && fracBefore != null && silhouetteBeforeSubtract) {
+      const fracAfter = await opaqueFraction(silhouetteMaskBuf);
+      if (fracAfter != null && fracAfter < fracBefore * 0.30) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Occluder subtract removed ${Math.round((1 - fracAfter / fracBefore) * 100)}% of target silhouette (before=${fracBefore.toFixed(2)}, after=${fracAfter.toFixed(2)}) — reverting to pre-subtract mask (likely bbox-label mismatch).`);
+        silhouetteMaskBuf = silhouetteBeforeSubtract;
       }
     }
 
