@@ -2623,6 +2623,27 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
     costumed: ['standard']  // Costumed falls back to standard
   };
 
+  // Per-story clothingRequirements (signature/description) is the
+  // source of truth for the CURRENT story. avatars.clothing[category] is
+  // character-level metadata that persists across stories and can be stale
+  // (e.g. last story dressed Emma in pink, this story wants yellow). Lookup
+  // priority: clothingRequirements.signature → clothingRequirements.description
+  // → avatars.clothing[category].
+  const resolveClothingDescription = (charName, category, avatars) => {
+    if (!category) return null;
+    const charReqs = clothingRequirements?.[charName];
+    if (charReqs && charReqs[category]) {
+      const catReq = charReqs[category];
+      if (catReq.signature && catReq.signature !== 'none') return catReq.signature;
+      if (catReq.description) return catReq.description;
+    }
+    if (avatars?.clothing?.[category]) {
+      const clothingData = avatars.clothing[category];
+      return typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
+    }
+    return null;
+  };
+
   return characters
     .map(char => {
       let photoType = 'none';
@@ -2746,13 +2767,9 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         actualClothingUsed = resolvedClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${resolvedClothing} for ${artStyle}`);
 
-        // Fallback to avatars.clothing if not already set from avatarData
-        if (!clothingDescription && avatars?.clothing?.[resolvedClothing]) {
-          const clothingData = avatars.clothing[resolvedClothing];
-          clothingDescription = typeof clothingData === 'string'
-            ? clothingData
-            : formatClothingObject(clothingData);
-          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${resolvedClothing} for styled avatar`);
+        if (!clothingDescription) {
+          clothingDescription = resolveClothingDescription(char.name, resolvedClothing, avatars);
+          if (clothingDescription) log.debug(`[CLOTHING DESC] ${char.name}: resolved for styled ${resolvedClothing}: "${clothingDescription}"`);
         }
       }
       // Fall back to unstyled clothing avatar (standard, winter, summer).
@@ -2774,11 +2791,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
           if (cached) photoUrl = `data:image/jpeg;base64,${cached}`;
         }
         actualClothingUsed = resolvedClothing;
-        // Get extracted clothing description for this avatar
-        if (avatars.clothing && avatars.clothing[resolvedClothing]) {
-          const clothingData = avatars.clothing[resolvedClothing];
-          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-        }
+        clothingDescription = resolveClothingDescription(char.name, resolvedClothing, avatars);
         log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${resolvedClothing} (no styled avatar found)`);
       }
 
@@ -2815,10 +2828,8 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
             // anywhere, leave it empty rather than leak standard clothing description
             // into a costumed scene (better to have no clothing guidance than wrong).
             const descriptionPreservedFromCostumed = !!clothingDescription;
-            if (!clothingDescription && resolvedClothing !== 'costumed'
-                && avatars.clothing && avatars.clothing[fallbackCategory]) {
-              const clothingData = avatars.clothing[fallbackCategory];
-              clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
+            if (!clothingDescription && resolvedClothing !== 'costumed') {
+              clothingDescription = resolveClothingDescription(char.name, fallbackCategory, avatars);
             }
             // Distinguish benign pre-resolution from real problems:
             // - Costumed with description already preserved: styled avatar isn't ready
@@ -2869,34 +2880,13 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         log.warn(`[PHOTO LOOKUP] No photo found for "${char.name}" (wanted: ${searchedFor}, hasAvatars: ${hasAvatars}, hasPhotos: ${hasPhotos})`);
       }
 
-      // Fallback 1: Try avatars.clothing[category] directly
-      // This is needed because metadata strips avatar IMAGES but keeps clothing DESCRIPTIONS
-      // The actual image comes from styled avatar cache, but description is in character data
-      if (!clothingDescription && avatars?.clothing) {
+      // Final fallback: catch any code path above that left clothingDescription
+      // null (e.g. when only photos fell through). Same priority as the helper:
+      // clothingRequirements.signature → .description → avatars.clothing[category].
+      if (!clothingDescription) {
         const categoryToCheck = actualClothingUsed || resolvedClothing;
-        if (categoryToCheck && avatars.clothing[categoryToCheck]) {
-          const clothingData = avatars.clothing[categoryToCheck];
-          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${categoryToCheck}: "${clothingDescription}"`);
-        }
-      }
-
-      // Fallback 2: use signature or description from clothingRequirements if still no clothingDescription
-      // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" }, "costumed": { "description": "..." } } }
-      if (!clothingDescription && clothingRequirements && clothingRequirements[char.name]) {
-        const charReqs = clothingRequirements[char.name];
-        const categoryToCheck = actualClothingUsed || resolvedClothing;
-        if (categoryToCheck && charReqs[categoryToCheck]) {
-          const catReq = charReqs[categoryToCheck];
-          // Prefer signature (detailed clothing text), skip "none"; fall back to description
-          if (catReq.signature && catReq.signature !== 'none') {
-            clothingDescription = catReq.signature;
-            log.debug(`[CLOTHING DESC] ${char.name}: using signature from clothingRequirements: "${clothingDescription}"`);
-          } else if (catReq.description) {
-            clothingDescription = catReq.description;
-            log.debug(`[CLOTHING DESC] ${char.name}: using description from clothingRequirements: "${clothingDescription}"`);
-          }
-        }
+        clothingDescription = resolveClothingDescription(char.name, categoryToCheck, avatars);
+        if (clothingDescription) log.debug(`[CLOTHING DESC] ${char.name}: late-resolved for ${categoryToCheck}: "${clothingDescription}"`);
       }
 
       // Per-clothing face/body crop URLs for shot-aware reference selection.
