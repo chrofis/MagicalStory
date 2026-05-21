@@ -99,7 +99,7 @@ function needsScaleRepair(sceneMetadata) {
  * goal is to tell Grok exactly which figure to leave alone and which to
  * shrink-and-replace. Long prose dilutes the signal.
  */
-function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription }) {
+function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription, interactions = [] }) {
   const lines = [];
   // Grok ALWAYS renders the named characters in the input image — usually
   // too large and too close to the camera. Scale-repair's job is to
@@ -108,28 +108,49 @@ function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription })
   // second tiny version. Phrase as "move".
   lines.push(`Edit this ${shot || 'wide'} scene by RELOCATING the named characters. Every named character is already drawn somewhere in the input image — do not add new figures. The total figure count must not increase. Each named character must appear EXACTLY ONCE in the output.`);
   lines.push('');
-  lines.push('Foreground / midground figures — keep these at their current position and size:');
+
+  // Action lookup: per-character interactions from the scene metadata.
+  // Without these the prompt only described WHERE each character is, never
+  // WHAT they're doing — Grok lost gestures (Emma reaching into the chest,
+  // Hans holding the glass) during the relocation. Re-asserting the action
+  // tells the model "keep this gesture intact" alongside "keep this
+  // position".
+  const actionFor = (name) => {
+    if (!Array.isArray(interactions)) return '';
+    const list = interactions.filter(i => i?.character === name && i?.where);
+    if (list.length === 0) return '';
+    // 1-2 sentences max. Comma-joined where-clauses; if more than 2, keep first 2.
+    return list.slice(0, 2).map(i => i.where).join('; ');
+  };
+
+  lines.push('Foreground / midground figures — keep these at their current position, size, AND action. The position phrase says where in the frame they sit; the action phrase says what they are physically doing — preserve both exactly from the input image.');
   for (const c of fgChars) {
     const pos = c.position ? ` — ${c.position}` : '';
-    lines.push(`- ${c.name}${pos}`);
+    const action = actionFor(c.name);
+    const actionLine = action ? ` Action: ${action}.` : '';
+    lines.push(`- ${c.name}${pos}.${actionLine}`);
   }
   lines.push('');
-  lines.push('Background figures — find the existing figure of this character in the input image and MOVE+SHRINK it to the target position below. The relocated figure should be clearly smaller than the foreground figures (roughly one-third their height or less):');
+  lines.push('Background figures — find the existing figure of this character in the input image and MOVE+SHRINK it to the target position below. The relocated figure should be clearly smaller than the foreground figures (roughly one-third their height or less). Preserve the action the figure is performing even at the smaller size — if they were facing the camera, keep them facing the camera; if they were watching the foreground action, keep them watching it:');
   for (const c of bgChars) {
     // Each bg figure needs three things in one line:
     //   1. a clear name handle for the model,
     //   2. a physical description so Grok knows WHO to draw — name alone
     //      ("Gessler") means nothing to the model,
-    //   3. a position phrase telling Grok where in the frame.
+    //   3. a position phrase telling Grok where in the frame,
+    //   4. an action phrase so the shrunken figure keeps its gesture
+    //      (facing the table, looking at the path, etc.).
     // No fractional sizes ("1/6 of frame height") — Grok ignores them.
     // No "body language only / no facial detail" — that phrasing produced
     // black silhouettes. Just say "tiny in the background".
     const desc = (c.physicalDescription || '').trim();
     const pos = c.position ? ` Target position: ${c.position}.` : '';
+    const action = actionFor(c.name);
+    const actionLine = action ? ` Action: ${action}.` : '';
     if (desc) {
-      lines.push(`- ${c.name} (${desc}): move this character to the deep background.${pos}`);
+      lines.push(`- ${c.name} (${desc}): move this character to the deep background.${pos}${actionLine}`);
     } else {
-      lines.push(`- ${c.name}: move this character to the deep background.${pos}`);
+      lines.push(`- ${c.name}: move this character to the deep background.${pos}${actionLine}`);
     }
   }
   lines.push('');
@@ -202,7 +223,11 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
     physicalDescription: descByName[(c.name || '').toLowerCase()] || c.physicalDescription || null,
   }));
 
-  const prompt = buildScaleRepairPrompt({ bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription });
+  // Pull declared interactions so the prompt re-asserts each character's
+  // action alongside their position. Without this the relocation lost
+  // gestures (Emma reaching into the chest, Hans holding the glass).
+  const interactions = sceneMetadata?.fullData?.interactions || sceneMetadata?.interactions || [];
+  const prompt = buildScaleRepairPrompt({ bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription, interactions });
   // Combine refs: foreground avatars (identity anchors for the kept figures)
   // first, then any explicit background refs (usually empty — see callsite
   // comment in server.js). Foreground avatars stop Grok from drifting the
