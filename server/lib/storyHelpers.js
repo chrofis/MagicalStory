@@ -1174,9 +1174,29 @@ function applyReferenceMode({
     // Grok can use each crop verbatim without splitting a quadrant). On wide
     // shots we drop the face crop because it would anchor portrait scale.
     // Older avatars (no thumbnail URLs) keep their single full-grid entry.
+    //
+    // CRITICAL: when the photo is already a fresh story-scoped cell crop
+    // from applyStoryCellRefs (photoType starts with `cell-`), DO NOT
+    // overwrite photoUrl with variantUrls. variantUrls.face/body point to
+    // pre-baked thumbnails of the character's BASE photo (default outfit) —
+    // overwriting with them silently reverts the freshly-rendered styled
+    // avatar with the outline's per-story clothing back to the character's
+    // default outfit. Real-world miss: smoke #5 page 4 had Hans in red
+    // plaid + suspenders (base photo) instead of the outline-specified
+    // beige collared shirt, because his cell-cropped watercolor ref got
+    // overwritten by variantUrls.body pointing at the realistic plaid
+    // thumbnail.
     const out = [];
     for (const p of characterPhotos) {
       if (!p) continue;
+      const photoType = String(p.photoType || '');
+      const isStoryCellCrop = photoType.startsWith('cell-');
+      if (isStoryCellCrop) {
+        // Already a per-story styled crop — keep verbatim. Do not split
+        // into face/body variantUrls.
+        out.push(p);
+        continue;
+      }
       const v = p.variantUrls || {};
       if (!v.face && !v.body) {
         // Pre-thumbnail avatar — keep the original entry untouched.
