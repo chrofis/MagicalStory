@@ -646,6 +646,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
       return report;
     }
 
+    // Art style is read by collectEntityAppearances (for styled-avatar
+    // lookup) AND by the per-character clothing-group loop below — hoist
+    // the declaration above the first use to avoid the TDZ error
+    // ("Cannot access 'artStyle' before initialization") my earlier fix
+    // accidentally introduced when I added artStyle to the
+    // collectEntityAppearances call without moving the existing `const
+    // artStyle = ...` line above it.
+    const artStyle = storyData.artStyle || 'pixar';
+
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
     const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
@@ -680,9 +689,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     log.info(`🔍 [ENTITY-CHECK] Found ${entityAppearances.size} entities with appearances`);
 
-    // Process each character entity - group by clothing for accurate evaluation
-    const artStyle = storyData.artStyle || 'pixar';
-
+    // Process each character entity - group by clothing for accurate evaluation.
+    // (artStyle is hoisted above the collectEntityAppearances call.)
     if (checkCharacters) {
       // Flatten all character×clothing tasks for maximum parallelism
       // Instead of: 5 characters parallel, clothing groups serial within each
