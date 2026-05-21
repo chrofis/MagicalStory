@@ -4190,58 +4190,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
     }
 
-    // Cover-backdrop validation. Sonnet's cover-rule says every cover backdrop
-    // LOC must (a) be marked isRealLandmark:true in the visual bible, AND
-    // (b) trace back to a name in the AVAILABLE_LANDMARKS list. When Sonnet
-    // breaks the rule (it does — see job_1778400519362_xwufe7ptv where it
-    // invented LOC005 Limmatufer for the back cover), the composite-cover
-    // pipeline ends up with no landmark photo and falls back to figures-on-
-    // white. Catch the rule violation here and substitute a valid landmark
-    // so the downstream cover gen actually has a backdrop.
+    // Cover-backdrop validation. Trust Sonnet's pick — it knows the story
+    // and chose a location that fits. Don't substitute an unrelated VB
+    // location just to get a photo (e.g. swapping the story's garden for a
+    // Zürich landmark). The downstream cover-iterate path already routes:
+    //   • picked LOC has a real-landmark photo → composite (pass-1 white +
+    //     pass-2 landmark protection)
+    //   • picked LOC is invented or photo-less → normal generation, using
+    //     the LOC's prose description as the backdrop
+    // We only step in when Sonnet picked a LOC id that doesn't resolve in
+    // the VB at all — fall back to ANY VB location so the cover still has
+    // a backdrop instead of empty `hint.objects`.
     if (coverHints && Array.isArray(visualBible?.locations)) {
-      const availableLandmarkNames = new Set(
-        (inputData.availableLandmarks || []).map(l => String(l.name || '').toLowerCase())
-      );
-      // Pool of valid backdrops: VB locations that are real landmarks AND
-      // whose landmarkQuery matches the input list. Prefer photo-bearing
-      // (referencePhotoUrl from Swiss pre-indexed, or referenceImageUrl from
-      // historical curation) so the substitute actually has bytes available.
-      const validBackdrops = visualBible.locations.filter(loc => {
-        if (!loc?.id || !loc.isRealLandmark) return false;
-        if (!loc.landmarkQuery) return false;
-        if (availableLandmarkNames.size > 0
-            && !availableLandmarkNames.has(String(loc.landmarkQuery).toLowerCase())) return false;
-        return true;
-      });
-      const photoBearing = validBackdrops.filter(loc =>
-        loc.referencePhotoUrl || loc.referencePhotoData
-        || loc.referenceImageUrl || loc.referenceImageData
-        || (Array.isArray(loc.photoVariants) && loc.photoVariants.length > 0)
-      );
-      const fallback = photoBearing[0] || validBackdrops[0] || null;
-
+      const anyVbLoc = visualBible.locations.find(l => l?.id) || null;
       for (const [coverType, hint] of Object.entries(coverHints)) {
         if (!hint || !Array.isArray(hint.objects)) continue;
         const locIds = hint.objects.filter(o => typeof o === 'string' && /^LOC\d+/i.test(o));
-        if (locIds.length === 0) continue;
-        // Test the FIRST LOC (the primary backdrop). Subsequent LOCs are
-        // secondary references and don't drive the composite landmark slot.
-        const primary = locIds[0];
-        const loc = visualBible.locations.find(l => l.id && l.id.toUpperCase() === primary.toUpperCase());
-        if (!loc) continue;
-        const isValidBackdrop = loc.isRealLandmark
-          && loc.landmarkQuery
-          && (availableLandmarkNames.size === 0
-              || availableLandmarkNames.has(String(loc.landmarkQuery).toLowerCase()));
-        if (isValidBackdrop) continue; // ✅ Sonnet picked correctly
-        // ❌ Rule violation
-        if (!fallback) {
-          log.warn(`⚠️ [COVER-VALIDATE] ${coverType}: Sonnet picked ${primary} (${loc.name}) — not a real landmark from input — and NO valid fallback exists in this story's VB. Composite will run without a landmark backdrop.`);
-          continue;
-        }
-        log.warn(`⚠️ [COVER-VALIDATE] ${coverType}: Sonnet picked ${primary} (${loc.name}) — not a real landmark from input. Substituting with ${fallback.id} (${fallback.name}).`);
-        // Replace primary LOC, keep ART/other entries
-        hint.objects = [fallback.id, ...hint.objects.filter(o => o !== primary)];
+        const primary = locIds[0] || null;
+        const picked = primary
+          ? visualBible.locations.find(l => l.id && l.id.toUpperCase() === primary.toUpperCase())
+          : null;
+        if (picked) continue; // ✅ Sonnet's pick exists in VB — keep it
+        if (!anyVbLoc) continue; // VB has no locations at all — nothing to substitute
+        log.info(`[COVER-VALIDATE] ${coverType}: ${primary ? `${primary} not in VB` : 'no LOC picked'} — substituting with ${anyVbLoc.id} (${anyVbLoc.name})`);
+        hint.objects = [anyVbLoc.id, ...(hint.objects || []).filter(o => o !== primary)];
       }
     }
 

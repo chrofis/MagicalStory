@@ -333,6 +333,18 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const landmarkBuf = coverLandmarkPhotos?.[0]
         ? await loadLandmarkBytes(coverLandmarkPhotos[0])
         : null;
+      // Composite path requires a real landmark photo for pass 2 (the
+      // photo-protection edit). Without one, pass 2 is skipped and pass 1
+      // returns figures-on-white — which then gets padded with gray bars
+      // to fit the page aspect. For invented locations (no photo) we want
+      // a full backdrop, not a white plate, so route those through the
+      // normal generation path below where the LOC's prose description
+      // drives the backdrop directly.
+      if (!landmarkBuf) {
+        log.info(`🎨 [COVER-ITERATE] ${coverKey}: no landmark photo for composite path — using normal generation with location prose`);
+        // Fall through to the normal path. No throw, just skip the
+        // composite branch entirely so generateImageWithQualityRetry runs.
+      } else {
       const compositeResult = await generateCoverViaComposite({
         coverKey,
         // Use mergedCharacters (with fresh avatars merged) so the composite
@@ -378,6 +390,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
         previousScore: existingCover.qualityScore || null,
         compositeDebug: compositeResult.debug,
       };
+      } // close else (landmarkBuf present)
     } catch (err) {
       log.warn(`⚠️ [COVER-ITERATE] composite path failed: ${err.message} — falling back to normal path`);
     }
