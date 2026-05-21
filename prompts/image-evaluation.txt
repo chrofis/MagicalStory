@@ -110,7 +110,7 @@ Match each figure to a reference photo. For each figure, check:
 - **Reference identity** — wrong reference matched, or character unrecognisable from face/build → **CRITICAL**.
 - **Duplicate** — two figures matching the same reference (the same person rendered twice while another character is missing) → **CRITICAL**.
 - **Clothing** — fully wrong colour or wrong garment type vs the reference (blue shirt rendered red, dress rendered as trousers) → **MAJOR**. Small accent or trim difference (missing stripe, slightly off shade) → **MODERATE**.
-- **Hair** — wrong colour vs reference → **MAJOR**. Slightly different style (waves vs straight, parted on the wrong side) but same colour → **MODERATE**.
+- **Hair** — wrong colour vs reference → **MAJOR**. Slightly different style (waves vs straight, parted on the wrong side) but same colour → **MODERATE**. Small length variation within the same general band (ear-length vs chin-length, chin-length vs shoulder-length, shoulder-length vs upper-back) with same colour → **MINOR**. Dramatic length change (waist-length rendered as a buzz cut, or vice versa) → **MAJOR**.
 - **Glasses** — reference wears glasses but the figure doesn't, or vice versa → **MAJOR**.
 
 ---

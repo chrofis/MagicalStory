@@ -4979,11 +4979,27 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
+      // Build a CHARACTER CLOTHING REFERENCE block from the canonical
+      // per-page clothing description (resolved by the pipeline against the
+      // outline's clothingRequirements[char][category].description). Without
+      // this the eval doesn't know what each character's "standard" outfit
+      // actually IS — it sees a butterfly graphic on Emma's shirt, doesn't
+      // know the butterfly is canonical, and flags it MAJOR as an off-spec
+      // addition. With this block prepended, Gemini knows the intended
+      // outfit and only flags actual mismatches.
+      const clothingContextLines = (img.allCharacterPhotos || img.characterPhotos || [])
+        .filter(p => p?.name && p?.clothingDescription)
+        .map(p => `- ${p.name}: ${p.clothingDescription}`);
+      const clothingHeader = clothingContextLines.length > 0
+        ? `CHARACTER CLOTHING REFERENCE (the canonical outfit each character is wearing — treat anything matching this as correct, NOT as an off-spec addition):\n${clothingContextLines.join('\n')}\n\n`
+        : '';
+      const sceneDescWithClothing = `${clothingHeader}${img.sceneDescription || img.prompt || ''}`;
+
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
       const qualityResult = await evaluateImageQuality(
         img.imageData,
-        img.sceneDescription || img.prompt || '',
+        sceneDescWithClothing,
         img.allCharacterPhotos || img.characterPhotos || [],
         img.evaluationType || 'scene',
         qualityModelOverride,
