@@ -124,59 +124,57 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
               failed.push(`${char.name}:${logCategory}`);
               result = { success: false };
             }
-          } else if (config.signature) {
-            // Signature: 2×4 sheet via the unified path. Base clothing + signature
-            // items fold into one costume description; generateCharacter2x4Sheet
-            // produces the same 2×4 (Pass 1 realistic + Pass 2 styled) as the
-            // costumed path, just keyed under standard/winter/summer instead of
-            // styledAvatars[artStyle].costumed.<key>. Downstream cell-crop logic
-            // (sceneComposite.sceneCellRefForCharacter, iteratePageCore's
-            // cropAvatarCell) handles per-page depth-aware cell selection so the
-            // page generator receives 1 cell (background/midground) or 2 cells
-            // (foreground close-up) — never the full 8-cell sheet.
-            const baseClothing = char.avatars?.clothing?.[category]
-              || (typeof config.description === 'string' ? config.description : '')
-              || `${category} outfit`;
-            // Signature is meant to be an ACCESSORY (scarf, pin, watch) layered
-            // on top of the base outfit. Sonnet occasionally generates a main
-            // garment name as the signature (e.g. Noah: base = "green T-Rex
-            // hoodie", signature = "dark blue zip-up hoodie") which then
-            // contradicts the base clothing in the prompt the model receives.
-            // Defensive check: drop the signature when it names a garment slot
-            // that's already covered by the base clothing description. The
-            // prompt-side fix (clothingRequirements example in story-unified.txt)
-            // tells Sonnet "ACCESSORY ONLY"; this is the belt-and-braces guard.
-            const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
-              't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
-              'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
-            const sigLower = String(config.signature || '').toLowerCase();
-            const baseLower = String(baseClothing || '').toLowerCase();
-            const conflictingSlot = GARMENT_SLOTS.find(slot =>
-              sigLower.includes(slot) && baseLower.includes(slot)
-            );
-            let signatureSuffix = '';
-            if (config.signature && String(config.signature).toLowerCase() !== 'none') {
-              if (conflictingSlot) {
-                log.warn(`[AVATAR-GEN] ${char.name}:${category} — dropping signature "${config.signature}" (conflicts with base "${conflictingSlot}" already in clothing). Signature should be an accessory, not a main garment.`);
-              } else {
-                signatureSuffix = `, plus this signature element: ${config.signature}`;
+          } else if (config.description || config.signature) {
+            // Standard / winter / summer with story-specific clothing override.
+            // The schema's `description` field (new — story-unified.txt clothingRequirements)
+            // IS the full final outfit Sonnet wants for this story: start point
+            // is the character's stored clothing (shown to Sonnet via
+            // characterPhysicalBlock includeClothing:true in storyHelpers.js),
+            // and Sonnet outputs the complete final outfit including any
+            // accessory or garment change. The avatar generator uses it verbatim
+            // — no concatenation, no "plus this signature element" suffix that
+            // historically caused conflicts (Noah base = green T-Rex hoodie,
+            // signature = blue zip-up hoodie → two contradicting tops in one
+            // prompt). Older outlines that still emit `signature` get
+            // backward-compatible handling: concat with the guard that drops
+            // the signature when it names a garment slot already in the base.
+            let costumeForSheet;
+            if (typeof config.description === 'string' && config.description.trim()) {
+              costumeForSheet = config.description.trim();
+            } else {
+              // Legacy: signature-only outline. Concat base + signature with
+              // the conflict guard (dropped signature if it names a main
+              // garment slot already in the base).
+              const baseClothing = char.avatars?.clothing?.[category] || `${category} outfit`;
+              const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
+                't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
+                'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
+              const sigLower = String(config.signature || '').toLowerCase();
+              const baseLower = String(baseClothing).toLowerCase();
+              const conflictingSlot = GARMENT_SLOTS.find(slot =>
+                sigLower.includes(slot) && baseLower.includes(slot)
+              );
+              let signatureSuffix = '';
+              if (config.signature && String(config.signature).toLowerCase() !== 'none') {
+                if (conflictingSlot) {
+                  log.warn(`[AVATAR-GEN] ${char.name}:${category} — dropping legacy signature "${config.signature}" (conflicts with base "${conflictingSlot}").`);
+                } else {
+                  signatureSuffix = `, plus this signature element: ${config.signature}`;
+                }
               }
+              costumeForSheet = `${baseClothing}${signatureSuffix}`;
             }
-            const combinedCostume = `${baseClothing}${signatureSuffix}`;
             try {
               const sheet = await generateCharacter2x4Sheet(char, {
                 clothingCategory: category,
-                costumeDescription: combinedCostume,
+                costumeDescription: costumeForSheet,
                 artStyle,
                 usageTracker: addUsage,
               });
               if (sheet?.imageData) {
                 char.avatars.styledAvatars[artStyle][category] = sheet.imageData;
                 setStyledAvatar(char.name, category, artStyle, sheet.imageData);
-                char.avatars.clothing[category] = combinedCostume;
-                if (config.signature) {
-                  char.avatars.signatures[category] = config.signature;
-                }
+                char.avatars.clothing[category] = costumeForSheet;
                 if (userId && char.id) {
                   try {
                     await persistStyledAvatar(userId, char.id, artStyle, category, sheet.imageData);
@@ -185,14 +183,14 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
                   }
                 }
                 result = { success: true, imageData: sheet.imageData };
-                generated.push(`${char.name}:${logCategory}+sig@${artStyle}`);
-                log.debug(`[AVATAR-GEN] ✅ Generated 2×4 ${category}+sig@${artStyle} for ${char.name}`);
+                generated.push(`${char.name}:${logCategory}@${artStyle}`);
+                log.debug(`[AVATAR-GEN] ✅ Generated 2×4 ${category}@${artStyle} for ${char.name}`);
               } else {
                 failed.push(`${char.name}:${logCategory}`);
                 result = { success: false };
               }
             } catch (err) {
-              log.warn(`[AVATAR-GEN] 2×4 ${category}+sig@${artStyle} for ${char.name} failed: ${err.message}`);
+              log.warn(`[AVATAR-GEN] 2×4 ${category}@${artStyle} for ${char.name} failed: ${err.message}`);
               failed.push(`${char.name}:${logCategory}`);
               result = { success: false };
             }

@@ -548,20 +548,22 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // Log what data is available for debugging
       log.debug(`🎨 [STYLED AVATAR] ${charName}: facePhoto=${facePhoto ? 'yes' : 'no'}, photos.face=${char.photos?.face ? 'yes' : 'no'}, physical=${Object.keys(char.physical || {}).length} keys`);
 
-      // Get clothing description text (for explicit clothing in styled avatar)
+      // Get clothing description text (for explicit clothing in styled avatar).
+      // Priority chain:
+      //   1. clothingRequirements[char][category].description — Sonnet's
+      //      story-specific FULL final outfit (the new schema, story-unified.txt).
+      //      Used verbatim. No concatenation.
+      //   2. char.avatars.clothing[category] — the character's stored base
+      //      clothing (e.g. Noah's green T-Rex hoodie). Used when no outline
+      //      override is present.
+      //   3. Legacy signature-only outline → concat with the conflict guard
+      //      (drops signature if it names a main garment slot already in the
+      //      base, the old Noah "blue zip-up hoodie + green T-Rex hoodie" case).
       let clothingDescription = null;
       if (!clothingCategory.startsWith('costumed:') && clothingCategory !== 'costumed') {
-        // Get stored clothing description for this category
-        clothingDescription = char.avatars?.clothing?.[clothingCategory];
-        // Also check for signature items to include
-        // First try char.avatars.signatures, then fallback to clothingRequirements
-        let signature = char.avatars?.signatures?.[clothingCategory];
-
-        // Debug: log what's in clothingRequirements for this character
-        // Use case-insensitive lookup for character name (Claude might use different casing)
+        // Look up the outline's clothingRequirements for this character
         let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
         if (!charReqs && clothingRequirements) {
-          // Fallback: case-insensitive + trimmed lookup
           const charNameLower = charName.trim().toLowerCase();
           const matchingKey = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === charNameLower);
           if (matchingKey) {
@@ -570,37 +572,38 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           }
         }
         const catReqs = charReqs?.[clothingCategory];
-        log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - charReqs keys: ${charReqs ? Object.keys(charReqs).join(',') : 'none'}, catReqs: ${JSON.stringify(catReqs || 'none')}`);
 
-        if (!signature && catReqs?.signature && catReqs.signature !== 'none') {
-          signature = catReqs.signature;
-          log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using signature from clothingRequirements: "${signature}"`);
-        }
-        log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - clothing: ${clothingDescription ? 'yes' : 'no'}, signature: ${signature ? signature.substring(0, 50) + '...' : 'no'}`);
-        // Defensive: signature is supposed to be an accessory (scarf, pin),
-        // not a main garment. When Sonnet generates one anyway (e.g. Noah:
-        // base = "green T-Rex hoodie", signature = "dark blue zip-up
-        // hoodie"), concatenating both into the prompt makes the model
-        // pick one or the other — usually the wrong one. If the signature
-        // names a garment slot that's already in the base clothing, drop
-        // the signature. Mirror of the guard in storyAvatarGeneration.js.
-        if (signature && clothingDescription) {
-          const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
-            't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
-            'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
-          const sigLower = String(signature).toLowerCase();
-          const baseLower = String(clothingDescription).toLowerCase();
-          const conflictingSlot = GARMENT_SLOTS.find(slot =>
-            sigLower.includes(slot) && baseLower.includes(slot)
-          );
-          if (conflictingSlot) {
-            log.warn(`[STYLED AVATARS] ${charName}:${clothingCategory} — dropping signature "${signature}" (conflicts with "${conflictingSlot}" already in clothing description). Signature should be an accessory, not a main garment.`);
-          } else {
-            clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+        // Priority 1: story-specific full description from Sonnet
+        if (catReqs?.description && typeof catReqs.description === 'string' && catReqs.description.trim()) {
+          clothingDescription = catReqs.description.trim();
+          log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using story-specific description from clothingRequirements`);
+        } else {
+          // Priority 2: stored base clothing
+          clothingDescription = char.avatars?.clothing?.[clothingCategory] || null;
+          // Priority 3: legacy signature concat (backward compat for older outlines)
+          let signature = char.avatars?.signatures?.[clothingCategory];
+          if (!signature && catReqs?.signature && catReqs.signature !== 'none') {
+            signature = catReqs.signature;
           }
-        } else if (signature && !clothingDescription) {
-          clothingDescription = `SIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+          if (signature) {
+            const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
+              't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
+              'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
+            const sigLower = String(signature).toLowerCase();
+            const baseLower = String(clothingDescription || '').toLowerCase();
+            const conflictingSlot = GARMENT_SLOTS.find(slot =>
+              sigLower.includes(slot) && baseLower.includes(slot)
+            );
+            if (clothingDescription && !conflictingSlot) {
+              clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+            } else if (!clothingDescription) {
+              clothingDescription = `SIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+            } else if (conflictingSlot) {
+              log.warn(`[STYLED AVATARS] ${charName}:${clothingCategory} — dropping legacy signature "${signature}" (conflicts with "${conflictingSlot}" already in clothing).`);
+            }
+          }
         }
+        log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - final clothingDescription: ${clothingDescription ? `${clothingDescription.substring(0, 80)}…` : 'none'}`);
       }
 
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {

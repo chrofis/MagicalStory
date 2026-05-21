@@ -5174,8 +5174,14 @@ ${adventureGuide}` : ''}`;
   // physical description into each scene's prose, so it needs the actual traits.
   // Without this block it hallucinates — e.g. giving a character a beard when
   // facialHair is 'clean-shaven', or dropping glasses entirely.
+  // Include the character's stored clothing description. Sonnet uses this as
+  // the STARTING POINT for clothingRequirements[char][category].description —
+  // it can keep it as-is, add an accessory, or change a garment for the story,
+  // but the avatar generator no longer concatenates a separate "signature"
+  // line that could conflict (Noah: green hoodie + signature "blue hoodie" =
+  // two contradictory tops in the same prompt). One field, one full outfit.
   const characterPhysicalBlock = (inputData.characters || [])
-    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: false }))
+    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
     .join('\n\n');
 
   // Build available landmarks section if landmarks were pre-discovered

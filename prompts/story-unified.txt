@@ -578,7 +578,7 @@ Based on the story draft, determine which clothing variants each character needs
   - ONLY leave `costumed.used: false` when the story is set in the present day with normal everyday clothing.
 - **Costumed is PREFERRED** — when in doubt, mark `costumed.used: true`. Characters in costume look better and are more immersive.
 - **COVER IMAGES MUST use costumed when the story has costumes** — if `costumed.used: true` for any character, every cover (title page, initial page, back cover) MUST use that costumed variant for them, not `standard`. If the story is present-day with no costumes, covers use `standard` like the rest of the pages — do not invent a costume just for the cover.
-- **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
+- **Description** (standard/winter/summer): the FULL final clothing description for this story. The Main Characters block above lists each character's stored clothing as a starting point. You may keep it verbatim, ADD a story-relevant accessory (red scarf, scout badge, watch), or CHANGE a garment if the story calls for it (e.g., a snowy adventure replaces standard sneakers with hiking boots). Output the complete outfit — top, bottom, footwear, any accessories — as one self-contained description. The avatar generator uses this verbatim with no concatenation; whatever you write IS the outfit. Omit only when `used: false`.
 - **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
 - **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
@@ -603,9 +603,9 @@ Based on the story draft, determine which clothing variants each character needs
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[ACCESSORY ONLY — a small distinguishing item layered on top of the base outfit: scarf, pin, watch, hat, glasses chain, badge, single bracelet. NEVER a main garment (top, jacket, hoodie, shirt, sweater, trousers, dress, shoes) — the character record already defines those, and a signature that names another top creates a conflict. OMIT this field if no such accessory applies.]" },
-      "winter": { "used": true/false, "signature": "[ACCESSORY ONLY — scarf, mittens, beanie, ear-muffs. NEVER a main winter garment like a coat or boots. OMIT if no accessory.]" },
-      "summer": { "used": true/false, "signature": "[ACCESSORY ONLY — sunglasses, sun hat, beach bracelet. NEVER a main summer garment like a t-shirt or shorts. OMIT if no accessory.]" },
+      "standard": { "used": true/false, "description": "[FULL final outfit for this story — top, bottom, footwear, accessories. Start from the character's stored standard clothing (shown in the Main Characters block above), keep it as-is OR add an accessory OR change a garment if the story needs it. Output the complete outfit as one self-contained description; the avatar generator uses it verbatim with no concatenation.]" },
+      "winter": { "used": true/false, "description": "[FULL winter outfit — coat/jacket, bottoms, footwear, gloves/scarf/hat. Same rule as standard: start from the stored winter clothing, output the complete final outfit.]" },
+      "summer": { "used": true/false, "description": "[FULL summer outfit — top, bottoms, footwear, sun accessories. Same rule as standard: start from the stored summer clothing, output the complete final outfit.]" },
       "costumed": { "used": true/false, "costume": "[real costume name like 'wizard' or 'knight'; OMIT this field and set used:false if no costume]", "description": "[full outfit; OMIT if no costume]" }
     }
   }
@@ -613,9 +613,9 @@ Based on the story draft, determine which clothing variants each character needs
 ```
 
 **No placeholder strings.** Never write `"none"`, `"n/a"`, `"tbd"`, or empty `""` as a value. If the field doesn't apply, omit it. Examples:
-- Character has no signature in standard clothing → `"standard": { "used": true }` (omit `signature` entirely)
-- Story has no costumes → `"costumed": { "used": false }` (omit `costume` and `description` entirely)
-- Character doesn't appear in winter → `"winter": { "used": false }` (omit `signature`)
+- Story has no costumes → `"costumed": { "used": false }` (omit `costume` and `description`)
+- Character doesn't appear in winter → `"winter": { "used": false }` (omit `description`)
+- Character uses standard but the story doesn't modify it → `"standard": { "used": true, "description": "[copy the character's stored standard outfit verbatim]" }`. Always include the description when `used: true`; the avatar generator needs it.
 
 **Brief example:**
 ```
@@ -667,7 +667,7 @@ FIXES REQUIRED:
 TITLE: Sophie's Snowy Surprise
 
 ---CLOTHING REQUIREMENTS---
-{ "clothingRequirements": { "Sophie": { "standard": { "used": true }, "winter": { "used": true, "signature": "red scarf" }, "costumed": { "used": false } } } }
+{ "clothingRequirements": { "Sophie": { "standard": { "used": true, "description": "navy blue striped jumper, dark blue jeans, white sneakers" }, "winter": { "used": true, "description": "navy blue striped jumper under a red wool coat, dark blue jeans tucked into brown leather boots, red scarf, white mittens" }, "costumed": { "used": false } } } }
 ```
 
 
