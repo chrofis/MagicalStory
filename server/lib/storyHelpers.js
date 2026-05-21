@@ -5743,17 +5743,31 @@ function getPageText(storyText, pageNumber) {
   const safeNum = parseInt(pageNumber, 10);
   if (isNaN(safeNum)) return null;
 
+  // Strip Sonnet's meta-annotations from page text before returning. Without
+  // this, the trailing `*(Word count: N)*` and similar `*( ... )*` blocks
+  // that Sonnet writes between sections leak into the rendered story page
+  // (user observed `*(Word count: 111)*` at the end of page 4 in smoke #5).
+  // Applied to both the array-format text and the regex-extracted text.
+  const stripMetaAnnotations = (s) => {
+    if (typeof s !== 'string') return s;
+    return s
+      .replace(/^\s*\*\([^)]*\)\*\s*\n?/g, '')            // leading meta blocks
+      .replace(/\n\s*\*\([^)]*\)\*\s*(?=\n|$)/g, '')      // any mid/trailing meta block on its own line
+      .replace(/\s*\*\([^)]*\)\*\s*$/g, '')               // trailing meta block at end of string
+      .trim();
+  };
+
   // Handle array format (unified mode)
   if (Array.isArray(storyText)) {
     const page = storyText.find(p => p.pageNumber === safeNum);
-    return page?.text || null;
+    return page?.text ? stripMetaAnnotations(page.text) : null;
   }
 
   // Match page markers like "--- Page/Seite/Página X ---" or "## Page/Seite X"
   const pageRegex = new RegExp(`(?:---|##)\\s*(?:Page|Seite|Página|Pagina)\\s+${safeNum}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*(?:Page|Seite|Página|Pagina)\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
-  return match ? match[1].trim() : null;
+  return match ? stripMetaAnnotations(match[1]) : null;
 }
 
 /**
