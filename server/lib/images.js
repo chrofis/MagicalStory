@@ -7734,7 +7734,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
         ? sc.pose : 'threeQuarter';
       const flip = sc?.flip === true;
-      poseByName.set(nm.toLowerCase(), { pose, flip });
+      // Depth drives whether we include the head cell alongside the body
+      // cell. Foreground (close-up canvas-large faces) gets head+body
+      // stacked; midground / background get body only — the face inside
+      // the body cell is enough at that scale, and a separate head ref
+      // would just add noise for a small-on-canvas figure.
+      const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
+        ? sc.depth : 'foreground';
+      poseByName.set(nm.toLowerCase(), { pose, flip, depth });
     }
     for (const ref of referencePhotos) {
       const charName = ref.name;
@@ -7748,14 +7755,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       else slotKey = 'costumed';
       const sheetUri = story[slotKey] || story.costumed;
       if (!sheetUri) continue;
-      const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false };
+      const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
+      const includeFace = pf.depth === 'foreground';
       try {
-        const { body } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace: false });
-        ref.photoUrl = `data:image/png;base64,${body.toString('base64')}`;
-        ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}`;
+        const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace, stack: includeFace });
+        const buf = stacked || body;
+        ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
+        ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}${includeFace ? '-headbody' : ''}`;
         ref.cellPose = pf.pose;
         ref.cellFlip = pf.flip;
-        log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''} cell from ${slotKey}`);
+        ref.cellDepth = pf.depth;
+        ref.cellIncludesFace = includeFace;
+        log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''}${includeFace ? ' + head' : ''} (depth=${pf.depth}) from ${slotKey}`);
       } catch (err) {
         log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message} — falling back to existing ref`);
       }

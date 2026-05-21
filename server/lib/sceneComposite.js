@@ -530,7 +530,7 @@ const FACE_CELL = {
  * @returns {Promise<{ body: Buffer, face: Buffer|null }>} PNG buffers.
  */
 async function cropAvatarCell(sheet, opts = {}) {
-  const { pose = 'threeQuarter', flip = false, includeFace = false } = opts;
+  const { pose = 'threeQuarter', flip = false, includeFace = false, stack = false } = opts;
   const sheetBuf = Buffer.isBuffer(sheet)
     ? sheet
     : Buffer.from(String(sheet).replace(/^data:image\/\w+;base64,/, ''), 'base64');
@@ -545,7 +545,39 @@ async function cropAvatarCell(sheet, opts = {}) {
     face = await cropSheetCell(sheetBuf, faceIdx);
     if (flip) face = await flipHorizontal(face);
   }
-  return { body, face };
+
+  // When stack=true and face is included, vertically combine face (top) +
+  // body (bottom) into a single PNG matching the 2×4 sheet's column layout.
+  // Single reference slot per character — same as the body-only path — but
+  // foreground characters get a tight head close-up alongside the full body
+  // pose so the model has a high-detail face anchor for canvas-large faces.
+  let stacked = null;
+  if (stack && face) {
+    const [faceMeta, bodyMeta] = await Promise.all([
+      sharp(face).metadata(),
+      sharp(body).metadata(),
+    ]);
+    const W = Math.max(faceMeta.width || 0, bodyMeta.width || 0);
+    const fH = faceMeta.height || 0;
+    const bH = bodyMeta.height || 0;
+    const faceResized = (faceMeta.width !== W)
+      ? await sharp(face).resize(W, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).png().toBuffer()
+      : face;
+    const bodyResized = (bodyMeta.width !== W)
+      ? await sharp(body).resize(W, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).png().toBuffer()
+      : body;
+    const faceResizedMeta = (faceMeta.width !== W) ? await sharp(faceResized).metadata() : { height: fH };
+    const bodyResizedMeta = (bodyMeta.width !== W) ? await sharp(bodyResized).metadata() : { height: bH };
+    const totalH = (faceResizedMeta.height || fH) + (bodyResizedMeta.height || bH);
+    stacked = await sharp({
+      create: { width: W, height: totalH, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    }).composite([
+      { input: faceResized, left: 0, top: 0 },
+      { input: bodyResized, left: 0, top: faceResizedMeta.height || fH },
+    ]).png().toBuffer();
+  }
+
+  return { body, face, stacked };
 }
 
 /**

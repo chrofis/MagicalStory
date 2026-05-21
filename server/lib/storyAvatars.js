@@ -152,7 +152,9 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
       ? sc.pose : 'threeQuarter';
     const flip = sc?.flip === true;
-    poseByName.set(nm.toLowerCase(), { pose, flip });
+    const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
+      ? sc.depth : 'foreground';
+    poseByName.set(nm.toLowerCase(), { pose, flip, depth });
   }
 
   for (const ref of referencePhotos) {
@@ -167,13 +169,19 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     else slotKey = 'costumed';
     const sheetUri = story[slotKey] || story.costumed;
     if (!sheetUri) continue;
-    const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false };
+    const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
+    // Foreground → stack head + body into one ref (canvas-large faces need
+    // a tight head anchor). Midground / background → body cell only.
+    const includeFace = pf.depth === 'foreground';
     try {
-      const { body } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace: false });
-      ref.photoUrl = `data:image/png;base64,${body.toString('base64')}`;
-      ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}`;
+      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace, stack: includeFace });
+      const buf = stacked || body;
+      ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
+      ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}${includeFace ? '-headbody' : ''}`;
       ref.cellPose = pf.pose;
       ref.cellFlip = pf.flip;
+      ref.cellDepth = pf.depth;
+      ref.cellIncludesFace = includeFace;
     } catch (err) {
       // Fall through to the existing full-image ref. Logged at debug level
       // by the caller if it tracks errors.
