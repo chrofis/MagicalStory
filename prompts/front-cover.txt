@@ -17,10 +17,14 @@ Create a front cover illustration for a children's book.
 - Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **TEXT REQUIREMENT - CRITICAL:**
-The image MUST include this exact title text: "{STORY_TITLE}"
-- Position the title in the upper third of the image
-- The letters have significant three-dimensional volume — they are physical objects in the scene, not flat text. They catch the scene's lighting and cast shadows like any other object would. Their color is not uniform but shaped by the light sources in the scene
-- Use an artistic hand-crafted lettering style that fits the story's world — never standard computer fonts
-- The title is the ONLY text that should appear in the image
+The image MUST include this exact title text painted directly INTO the scene's upper third: "{STORY_TITLE}"
+- Position the title in the upper third of the canvas.
+- The letters have significant three-dimensional volume — they are physical objects in the scene, not flat text. They catch the scene's lighting and cast shadows like any other object would. Their color is not uniform but shaped by the light sources in the scene.
+- Use an artistic hand-crafted lettering style that fits the story's world — never standard computer fonts.
+- The title is the ONLY text that should appear in the image.
+- The title must NOT sit in a separate band, label strip, or framed caption area outside the illustration. The illustration fills the full canvas; the title sits ON it.
+
+**FRAMING - CRITICAL:**
+Render a borderless full-bleed illustration. The scene must extend to ALL four edges of the canvas — no torn-paper border, no polaroid frame, no scrapbook page, no rough deckle edges, no off-white matte or paper-on-paper effect around the artwork. Treat the canvas as the painting surface itself.
 
 {VISUAL_BIBLE}

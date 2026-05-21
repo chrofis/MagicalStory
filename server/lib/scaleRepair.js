@@ -161,6 +161,7 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
     pageNumber,
     sceneBackground = null,
     backgroundCharacterRefs = [],
+    foregroundCharacterRefs = [],
     artStyleDescription = null,
     imageModelOverride = 'grok-imagine',
     // No aspect → Grok edit crops the input to square. Always default to the
@@ -186,7 +187,12 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   }));
 
   const prompt = buildScaleRepairPrompt({ bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription });
-  log.info(`📐 [SCALE-REPAIR] Page ${pageNumber}: ${fgChars.length} fg / ${bgChars.length} bg | shot=${shot} | bg refs attached: ${backgroundCharacterRefs.length}`);
+  // Combine refs: foreground avatars (identity anchors for the kept figures)
+  // first, then any explicit background refs (usually empty — see callsite
+  // comment in server.js). Foreground avatars stop Grok from drifting the
+  // identity of kept figures while it relocates the bg figure.
+  const characterRefs = [...foregroundCharacterRefs, ...backgroundCharacterRefs];
+  log.info(`📐 [SCALE-REPAIR] Page ${pageNumber}: ${fgChars.length} fg / ${bgChars.length} bg | shot=${shot} | refs attached: ${characterRefs.length} (${foregroundCharacterRefs.length} fg + ${backgroundCharacterRefs.length} bg)`);
 
   // generateImageOnly handles the Grok-edit path when previousImage is set.
   // Loaded lazily because images.js imports storyHelpers which imports back.
@@ -194,7 +200,7 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   const { IMAGE_MODELS } = require('../config/models');
   const backend = IMAGE_MODELS[imageModelOverride]?.backend || 'grok';
 
-  const result = await generateImageOnly(prompt, backgroundCharacterRefs, {
+  const result = await generateImageOnly(prompt, characterRefs, {
     pageNumber,
     sceneBackground,
     previousImage: currentImage,

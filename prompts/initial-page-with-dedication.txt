@@ -20,10 +20,14 @@ Create an introduction page illustration for a children's book.
 - Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **TEXT REQUIREMENT - CRITICAL:**
-The image MUST include this exact dedication text: "<user_input>{DEDICATION}</user_input>"
-- Position the text in the lower third of the image
-- Use elegant, hand-crafted lettering that fits the story's art style — not standard computer fonts. The text should feel like part of the illustration, painted or drawn by the same artist
-- Keep the lettering flat and graceful (not three-dimensional) — this is a dedication, not a title
-- Do NOT add any other text - ONLY the dedication text above
+The image MUST include this exact dedication text painted directly INTO the scene's lower third: "<user_input>{DEDICATION}</user_input>"
+- Render the text as hand-painted letterforms on top of the painted scene (sky, grass, wall, or low background element) — like part of the illustration, painted by the same artist.
+- Position the text in the lower third of the canvas.
+- It must NOT sit in a separate white band, label strip, footer bar, paper margin, or framed caption area below the illustration. The illustration fills the full canvas; the text is painted ON the illustration.
+- Keep the lettering flat and graceful (not three-dimensional) — this is a dedication, not a title.
+- Do NOT add any other text - ONLY the dedication text above.
+
+**FRAMING - CRITICAL:**
+Render a borderless full-bleed illustration. The scene must extend to ALL four edges of the canvas — no torn-paper border, no polaroid frame, no scrapbook page, no rough deckle edges, no off-white matte or paper-on-paper effect around the artwork. Treat the canvas as the painting surface itself.
 
 {VISUAL_BIBLE}

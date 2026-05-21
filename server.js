@@ -5565,21 +5565,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     .map(c => (c.name || '').toLowerCase()));
                   const bgCharObjs = (inputData.characters || []).filter(c =>
                     bgNames.has((c.name || '').toLowerCase()));
-                  // Background character avatars INTENTIONALLY NOT ATTACHED.
-                  // A face avatar tells Grok "render this person identifiably"
-                  // and the model upsizes the figure to fit a recognisable
-                  // face — directly contradicting "tiny in the background".
-                  // Description-only is enough; the foreground composition
-                  // is preserved from the source image so no foreground
-                  // avatar is needed either.
-                  // Physical descriptions — Grok has no idea who "Gessler" is
-                  // by name. Build a hair/face/clothing line for each bg char
-                  // so the prompt can describe them.
-                  // Per-page clothing override: the unified outline may have
-                  // declared `costumed:medieval` (or winter/summer) for this
-                  // page. Without an override the helper falls back to the
-                  // standard avatar slot — modern clothes leak into a
-                  // medieval scene.
+                  // Refs strategy:
+                  //   - BACKGROUND characters (the ones being shrunk): NO avatar
+                  //     attached. A face avatar tells Grok "render this person
+                  //     identifiably" and the model upsizes the figure to fit a
+                  //     recognisable face — directly contradicting "tiny in the
+                  //     background". Description-only is enough.
+                  //   - FOREGROUND / midground characters (kept at their current
+                  //     position): avatars ATTACHED. Without them Grok was
+                  //     drifting foreground identity while relocating the bg
+                  //     figure ("repaint the whole scene, only differently"
+                  //     failure mode). Attaching the fg avatars anchors the
+                  //     identity Grok must preserve.
                   const clothingByName = new Map(allChars.map(c => [
                     (c.name || '').toLowerCase(),
                     c.clothing || null,
@@ -5595,10 +5592,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       description: helpers.buildCharacterPhysicalDescription(c, override) || '',
                     };
                   }).filter(x => x.description);
+                  // Foreground/midground avatar refs. Resolve per-character
+                  // clothing the same way the main scene render does, then
+                  // pull the corresponding styled avatar (2×4 sheet body cell
+                  // is what the rest of the pipeline uses; for scale-repair
+                  // the simpler full styled-avatar URL is fine — Grok only
+                  // needs identity, not depth-specific framing).
+                  const fgNames = new Set(allChars
+                    .filter(c => (c.depth || '').toLowerCase() !== 'background')
+                    .map(c => (c.name || '').toLowerCase()));
+                  const fgCharObjs = (inputData.characters || []).filter(c =>
+                    fgNames.has((c.name || '').toLowerCase()));
+                  const fgRefs = [];
+                  for (const c of fgCharObjs) {
+                    const label = clothingByName.get((c.name || '').toLowerCase()) || null;
+                    const override = helpers.resolveClothingForPage(c, label, clothingReqs);
+                    const slotKey = override && override.startsWith('costumed') ? 'costumed' : (override || 'standard');
+                    const avatarUrl = c.avatars?.styledAvatars?.[inputData.artStyle]?.[slotKey]
+                      || c.avatars?.styledAvatars?.[inputData.artStyle]?.standard
+                      || c.avatars?.[slotKey]
+                      || c.avatars?.standard
+                      || null;
+                    if (avatarUrl) {
+                      fgRefs.push({ name: c.name, photoUrl: avatarUrl });
+                    }
+                  }
                   scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
                     pageNumber: pageData.pageNumber,
                     sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
                     backgroundCharacterRefs: [],  // intentionally empty — see comment above
+                    foregroundCharacterRefs: fgRefs,
                     backgroundCharacterDescriptions: bgDescriptions,
                     artStyleDescription: helpers.resolveArtStyle(inputData.artStyle, 'grok') || null,
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
