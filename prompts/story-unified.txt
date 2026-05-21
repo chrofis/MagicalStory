@@ -283,7 +283,7 @@ A reader comparing SCENE and `emptyScenePrompt` side by side must see the same g
 
 **Scene Variety (IMPORTANT for great illustrations):**
 - **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
-- **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters per scene. If a group moment is needed, keep 1-2 characters in foreground and use `"depth": "background"` or `"perspective": "back view"` for others.
+- **SIMPLE SCENES PREFERRED** — prefer 1–2 central characters per scene. For group moments: keep 1–2 in foreground (the action), put the rest in **midground** (still readable faces, just further from the camera). Use `"depth": "background"` ONLY when a character is genuinely tiny/distant per the §depth definition (~1/6 frame height or less — a sentry on a far ridge, a figure at the end of a long path). A character standing a few metres behind the focal action — at a fence, at the back of a room, watching from the doorway — is **midground**, not background. Misuse triggers an unwanted scale-repair pass that shrinks the character far smaller than the scene intends.
 - **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story.
 - **VARY EXPRESSIONS** - Not every scene is happy. Match expression to the moment: wonder, concentration, worry, surprise, determination. "Smiling" on at most 2-3 pages in the entire story.
 - **NO TWO CONSECUTIVE SCENES ALIKE** - Each scene must differ from the previous one in at least 2 of: shot type, character count, perspective. If page 3 is a medium shot of 2 characters facing each other, page 4 CANNOT be another medium shot of 2 characters facing each other.

@@ -32,8 +32,23 @@ const { log } = require('../utils/logger');
 
 /**
  * Returns true if the scene metadata declares at least one background
- * character AND at least one non-background character — the only
+ * character AND at least one FOREGROUND character — the only
  * composition pattern this pass targets.
+ *
+ * Trigger rule history:
+ *   - Was: any background + any non-background (foreground OR midground).
+ *     But midground + background scenes don't need scale-repair —
+ *     everyone is roughly the same depth band; Grok renders them at
+ *     comparable sizes by default. Running the pass on those scenes
+ *     either uselessly shrinks midground figures further or fails the
+ *     edit and burns Grok credits. Real-world miss: smoke #4 page 4 had
+ *     Emma/Noah/Hans/Sarah all midground at a garden table and Daniel
+ *     "background" at the fence behind — outline labelled him background
+ *     but he's only a few metres back, well within mid-distance. Scale-
+ *     repair ran, tried to shrink Daniel further than he should be,
+ *     produced a worse result.
+ *   - Now: requires actual foreground + background. If the scene has
+ *     only midground + background (no foreground), skip.
  *
  * @param {Object} sceneMetadata - extractSceneMetadata() output
  * @returns {boolean}
@@ -44,9 +59,10 @@ function needsScaleRepair(sceneMetadata) {
         ? sceneMetadata.characters
         : null);
   if (!Array.isArray(chars) || chars.length < 2) return false;
-  const bg = chars.filter(c => (c.depth || '').toLowerCase() === 'background');
-  const nonBg = chars.filter(c => (c.depth || '').toLowerCase() !== 'background');
-  if (bg.length === 0 || nonBg.length === 0) return false;
+  const depthOf = (c) => (c.depth || '').toLowerCase();
+  const bg = chars.filter(c => depthOf(c) === 'background');
+  const fg = chars.filter(c => depthOf(c) === 'foreground');
+  if (bg.length === 0 || fg.length === 0) return false;
 
   // Skip indoor scenes. Rooms have limited depth — there's no "deep
   // background" to push a character into, so the relocate-and-shrink pass
