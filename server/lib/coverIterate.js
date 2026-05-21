@@ -370,6 +370,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
         landmarkBuf,
         artStyle: storyData.artStyle || 'watercolor',
         title: storyData.title || '',
+        dedication: storyData.dedication || '',
         styleHint: styleDescription,
         usageTracker,
       });

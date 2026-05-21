@@ -470,6 +470,7 @@ async function generateCoverViaComposite({
   landmarkBuf,
   artStyle = 'watercolor',
   title = '',
+  dedication = '',
   styleHint = "watercolor children's storybook illustration, soft brushwork, gentle storybook colors",
   sceneDescription = '',
   vbGrid = null,
@@ -746,7 +747,19 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   let textLine = '';
   if (coverKey === 'backCover') {
     textLine = `\nFOOTER TEXT: render exactly the text "magicalstory.ch" inset from the bottom-left corner (roughly 5% in from both the left edge and the bottom edge, sitting clearly inside the frame, not flush against the border). Hand-painted watercolor letterforms — NOT a system font. Do NOT render the story title. Do NOT add any other text, names, or labels — only "magicalstory.ch".`;
+  } else if (coverKey === 'initialPage') {
+    // Initial page mirrors the dedication-page semantics from
+    // initial-page-with-dedication.txt / initial-page-no-dedication.txt:
+    // render the dedication when provided (lower third, smaller and softer
+    // than a title), otherwise NO text at all. Never the story title — the
+    // title belongs on the front cover only.
+    if (dedication) {
+      textLine = `\nDEDICATION TEXT: render this exact dedication in the lower third of the canvas: "${dedication}". Hand-painted watercolor letterforms — NOT a system font, kept flat and graceful (this is a dedication, not a title — quieter, smaller, no 3D depth). Do NOT render the story title. This is the only text in the image.`;
+    } else {
+      textLine = `\nThis page has NO TEXT — purely a visual / atmospheric illustration. Do not render the story title, do not render a dedication, do not add any letterforms, signs, banners, or captions anywhere.`;
+    }
   } else if (title) {
+    // frontCover (and any other coverKey that isn't backCover/initialPage)
     textLine = `\nTITLE TEXT: render this exact title across the upper third of the canvas: "${title}". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.`;
   }
   // Pass 2: scene prose (legacy stories) is fine because the landmark is
