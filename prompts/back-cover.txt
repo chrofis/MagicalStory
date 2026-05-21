@@ -17,9 +17,14 @@ Create a back cover illustration for a children's book.
 - Each character has 2 hands. Show at most 2 items held per character.
 
 **TEXT REQUIREMENT - CRITICAL:**
-The image MUST include this exact text: "magicalstory.ch"
-- Position it inset from the bottom-left corner — roughly 5% in from both the left edge and the bottom edge, so the text sits clearly inside the frame, not flush against the border
-- Use elegant, readable letters
-- Do NOT add any other text besides "magicalstory.ch" — no title, no names, no labels
+The image MUST include this exact text painted directly INTO the scene's lower-left area: "magicalstory.ch"
+- Render the text as small hand-painted letterforms on top of the painted scene (grass, path, ground, or low background element) — like a discreet signature painted by the illustrator on the scene itself.
+- Position it inset from the bottom-left corner — roughly 5% in from both the left edge and the bottom edge.
+- It must NOT sit in a separate white band, label strip, footer bar, paper margin, or framed caption area below the illustration. The illustration fills the full canvas; the text is painted ON the illustration, not below it.
+- Use elegant, readable letters at a quiet, modest size.
+- Do NOT add any other text besides "magicalstory.ch" — no title, no names, no labels.
+
+**FRAMING - CRITICAL:**
+Render a borderless full-bleed illustration. The watercolor scene must extend to ALL four edges of the canvas — no torn-paper border, no polaroid frame, no scrapbook page, no rough deckle edges, no off-white matte or paper-on-paper effect around the artwork. Treat the canvas as the painting surface itself.
 
 {VISUAL_BIBLE}

@@ -651,7 +651,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
       storyCharacters: characters,
       clothingRequirements: storyData.clothingRequirements || null,
-      visualBible: storyData.visualBible || null
+      visualBible: storyData.visualBible || null,
+      artStyle,
     });
 
     // Extract and forward pages where fallback bbox detection was run
@@ -1064,7 +1065,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
 async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
-  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null } = options;
+  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null, artStyle = 'watercolor' } = options;
   const pagesWithNewBbox = [];
   const appearances = new Map();
 
