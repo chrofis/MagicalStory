@@ -5,7 +5,8 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { ImageLightbox } from '../common/ImageLightbox';
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
@@ -3168,7 +3169,7 @@ export function StoryDisplay({
                                           src={a.imageData}
                                           alt={`Pass 1 attempt ${a.attempt}`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => { const w = window.open(); if (w) { w.document.write(`<img src="${a.imageData}" style="max-width:100%;height:auto" />`); }}}
+                                          onClick={() => setEnlargedImage({ src: a.imageData!, title: `Pass 1 attempt ${a.attempt}` })}
                                         />
                                       )}
                                       <div className="mt-1 flex flex-wrap gap-1">
@@ -3215,7 +3216,7 @@ export function StoryDisplay({
                                           src={a.imageData}
                                           alt={`Pass 2 attempt ${a.attempt}`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => { const w = window.open(); if (w) { w.document.write(`<img src="${a.imageData}" style="max-width:100%;height:auto" />`); }}}
+                                          onClick={() => setEnlargedImage({ src: a.imageData!, title: `Pass 2 attempt ${a.attempt}` })}
                                         />
                                       )}
                                       <div className="mt-1 flex flex-wrap gap-1">
@@ -6834,9 +6835,9 @@ export function StoryDisplay({
 
       {/* Enlarged Image Modal for single image viewing */}
       {enlargedImage && (
-        <EnlargedImageModal
+        <ImageLightbox
           src={enlargedImage.src}
-          title={enlargedImage.title}
+          alt={enlargedImage.title}
           onClose={() => setEnlargedImage(null)}
         />
       )}
