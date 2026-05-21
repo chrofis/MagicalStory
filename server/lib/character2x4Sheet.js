@@ -113,28 +113,30 @@ function resolveStandardAvatar(character) {
 }
 
 /**
- * Cheap pixel-level layout check — runs before the Gemini call. Verifies the
- * horizontal mid-row gutter and the three vertical column gutters are mostly
- * white. Most layout failures (figures crossing the row gutter — the
- * "Sarah-cut-in-half" failure mode on staging story job_1778871083037_xq22dos68)
- * show up here for free; only sheets that pass this gate cost a Gemini call.
+ * Cheap pixel-level layout check — runs before the Gemini call. The intent
+ * is: every gutter band should be a UNIFORM solid colour (no figure
+ * crossing it). The actual colour doesn't matter — white, gray, beige,
+ * pale blue all fine — what matters is that the band reads as one flat
+ * tone, not a streak of mixed skin / clothing / hair pixels.
  *
- * Threshold history:
- *   - 80%: original strict gate. Real-world observation: Grok consistently
- *     comes back at 0–60% even after 3 retries (every char on staging
- *     job_1779382004213). The gate was rejecting EVERY attempt, the
- *     best-of-N then picked a score=0 candidate, and the budget burned
- *     for nothing. The fundamental issue is the phantom + prompt give
- *     Grok cells that are slightly too small for the figure scale Aurora
- *     wants to draw; tuning that needs a focused debug session.
- *   - 60%: pragmatic floor. Still catches catastrophic overlaps (figure
- *     squarely straddling the row gutter ⇒ band <30%) but accepts the
- *     usual 60–70% case where only the figure's edges nick the gutter.
- *     The downstream Gemini eval still gates final identity / layout
- *     correctness, so accepting these doesn't ship broken sheets.
+ * Previous versions of this check required ≥80%, then ≥60% of pixels to
+ * be specifically WHITE (lum > 240). That rejected sheets with a cream
+ * or light-gray background as if a figure were crossing, even when the
+ * gutter was perfectly clean. Real-world failures on staging story
+ * job_1779388105801: Emma + Sarah pass-1 attempts each scored 0 three
+ * times despite producing perfectly fine sheets — because the figures'
+ * clothing tone bled into the band's average and pulled the "% white
+ * pixels" below threshold.
+ *
+ * New rule: in each band, measure how many pixels are close to the
+ * band's median colour. If ≥60% of pixels in the band are within a
+ * small RGB distance of the band's median, the band is uniform (whatever
+ * its tone) and we pass it. A figure crossing the band mixes 2+ distinct
+ * tones (skin + clothing + hair vs background) and dramatically lowers
+ * the "close-to-median" fraction.
  *
  * Returns { valid, reason } — valid=true when every gutter band is ≥60%
- * white pixels (lum > 240).
+ * uniform.
  */
 async function quickLayoutCheck(imageData) {
   const b64 = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -142,40 +144,60 @@ async function quickLayoutCheck(imageData) {
   const { data, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;
   const band = Math.max(2, Math.round(Math.min(W, H) * 0.015));
+
+  // Per-channel distance from median that still counts as "same tone".
+  // 25 is roughly the tolerance for paper noise / wash gradients without
+  // accommodating skin (~+50 from a pale bg) or clothing (~+80+).
+  const TOL = 25;
+
+  // Returns the fraction of pixels in `samples` (an array of [r,g,b])
+  // that lie within TOL of the per-channel median.
+  function uniformFraction(samples) {
+    if (samples.length === 0) return 0;
+    const rs = samples.map(p => p[0]).sort((a, b) => a - b);
+    const gs = samples.map(p => p[1]).sort((a, b) => a - b);
+    const bs = samples.map(p => p[2]).sort((a, b) => a - b);
+    const mid = Math.floor(rs.length / 2);
+    const mR = rs[mid], mG = gs[mid], mB = bs[mid];
+    let close = 0;
+    for (const [r, g, b] of samples) {
+      if (Math.abs(r - mR) <= TOL && Math.abs(g - mG) <= TOL && Math.abs(b - mB) <= TOL) close++;
+    }
+    return close / samples.length;
+  }
+
   function rowBand(yCenter) {
-    let bright = 0, total = 0;
+    const samples = [];
     for (let y = yCenter - band; y <= yCenter + band; y++) {
       if (y < 0 || y >= H) continue;
       for (let x = 0; x < W; x++) {
         const i = (y * W + x) * 3;
-        if ((data[i] + data[i+1] + data[i+2]) / 3 > 240) bright++;
-        total++;
+        samples.push([data[i], data[i+1], data[i+2]]);
       }
     }
-    return total > 0 ? bright / total : 0;
+    return uniformFraction(samples);
   }
   function colBand(xCenter) {
-    let bright = 0, total = 0;
+    const samples = [];
     for (let x = xCenter - band; x <= xCenter + band; x++) {
       if (x < 0 || x >= W) continue;
       for (let y = 0; y < H; y++) {
         const i = (y * W + x) * 3;
-        if ((data[i] + data[i+1] + data[i+2]) / 3 > 240) bright++;
-        total++;
+        samples.push([data[i], data[i+1], data[i+2]]);
       }
     }
-    return total > 0 ? bright / total : 0;
+    return uniformFraction(samples);
   }
   const checks = [
-    { name: 'mid-row gutter',  whiteFrac: rowBand(Math.floor(H / 2)) },
-    { name: 'col gutter 1/4',  whiteFrac: colBand(Math.floor(W / 4)) },
-    { name: 'col gutter 2/4',  whiteFrac: colBand(Math.floor(W / 2)) },
-    { name: 'col gutter 3/4',  whiteFrac: colBand(Math.floor(3 * W / 4)) },
+    { name: 'mid-row gutter',  uniformFrac: rowBand(Math.floor(H / 2)) },
+    { name: 'col gutter 1/4',  uniformFrac: colBand(Math.floor(W / 4)) },
+    { name: 'col gutter 2/4',  uniformFrac: colBand(Math.floor(W / 2)) },
+    { name: 'col gutter 3/4',  uniformFrac: colBand(Math.floor(3 * W / 4)) },
   ];
   const THRESHOLD = 0.60;
   for (const c of checks) {
-    if (c.whiteFrac < THRESHOLD) {
-      return { valid: false, reason: `${c.name} only ${(100*c.whiteFrac).toFixed(1)}% white (need ≥${Math.round(THRESHOLD*100)}%) — figure likely crosses the gutter` };
+    if (c.uniformFrac < THRESHOLD) {
+      return { valid: false, reason: `${c.name} only ${(100*c.uniformFrac).toFixed(1)}% uniform (need ≥${Math.round(THRESHOLD*100)}%) — figure likely crosses the gutter` };
     }
   }
   return { valid: true };
