@@ -6536,7 +6536,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (fig.bodyBox) protectedBodies.push(toRect(fig.bodyBox));
     }
 
-    const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
+    // Per-story clothingRequirements is the source of truth (correct for THIS
+    // story); avatars.clothing is character-level metadata that persists
+    // across stories and can carry stale colours from a previous run. Without
+    // this preference, the repair Grok prompt sends stale clothing text while
+    // the eval (driven by the new story's requirements) keeps flagging the
+    // colour mismatch — repair runs N times for nothing. Same priority as
+    // storyHelpers.resolveClothingDescription.
+    const clothingDesc = (() => {
+      const reqs = storyData?.clothingRequirements?.[charName];
+      if (reqs && reqs[clothingCategory]) {
+        const cat = reqs[clothingCategory];
+        if (cat.signature && cat.signature !== 'none') return cat.signature;
+        if (cat.description) return cat.description;
+      }
+      return character.avatars?.clothing?.[clothingCategory] || '';
+    })();
     const sceneDesc = img.sceneDescription || img.text || '';
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
 
