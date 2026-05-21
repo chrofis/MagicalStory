@@ -2345,20 +2345,32 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               const dbVersionIdx = scene.imageVersions[i].versionIndex;
 
               if (dbVersionIdx === 0) {
-                // v0: find original metadata from one of three sources (in priority order):
-                // 1. Iterate preservation entry at imageVersions[0] (no 'source' field)
-                // 2. originalMetadata saved before Object.assign (repair-before-iterate case)
-                // 3. Main blob scene object (no iterate happened, main blob = v0)
+                // v0 priority order:
+                // 1. imageVersions[0] when it carries FULL original metadata
+                //    (source='original' + modelId + the rest). This is what
+                //    the unified pipeline writes via buildVersionEntry. The
+                //    previous guard `!firstBlob.source` REJECTED this case —
+                //    treating a fully-populated original entry as if it were
+                //    a stub — and dropped to path 3, which only forwards a
+                //    handful of fields (no source, no grokRefImages, no
+                //    type). End result: every "original" version in the dev
+                //    panel showed source=null, modelId=null, refs=[].
+                // 2. imageVersions[0] when it lacks `source` (legacy iterate
+                //    preservation entry — the iterate path used to write a
+                //    stub without source). Still merge it.
+                // 3. blobScene.originalMetadata (older repair-before-iterate
+                //    save shape).
+                // 4. Main blob scene-level fields (oldest legacy shape,
+                //    no per-version array at all). Falls back here only when
+                //    none of 1–3 produced data — also forwards scene-level
+                //    grokRefImages so the original render's refs aren't lost.
                 const firstBlob = blobScene.imageVersions?.[0];
-                if (firstBlob && !firstBlob.source) {
-                  // Source 1: iterate preservation entry
+                if (firstBlob) {
                   mergeFields(scene.imageVersions[i], firstBlob);
                 } else if (blobScene.originalMetadata) {
-                  // Source 2: saved before iterate's Object.assign (repair ran first)
                   mergeFields(scene.imageVersions[i], blobScene.originalMetadata);
                   scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
                 } else {
-                  // Source 3: main blob = v0 (no iterate happened)
                   mergeFields(scene.imageVersions[i], {
                     description: blobScene.sceneDescription,
                     prompt: blobScene.prompt,
@@ -2366,6 +2378,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                     qualityReasoning: blobScene.qualityReasoning,
                     fixTargets: blobScene.fixTargets,
                     referencePhotoNames: blobScene.referencePhotoNames,
+                    grokRefImages: blobScene.grokRefImages,
+                    source: 'original',
+                    type: 'original',
                   });
                   scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
                 }
