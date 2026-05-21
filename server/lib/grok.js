@@ -1084,18 +1084,24 @@ async function packReferences(refs = {}, options = {}) {
     const w = meta?.width || 0;
     const h = meta?.height || 0;
 
-    // Metadata invalid → force the slot into the target aspect with a safe crop
+    // Metadata invalid → force the slot into the target aspect with pad
+    // (not crop). Same reasoning as the main pad path below: cropping risks
+    // losing heads/feet on character cells; padding with the image's edge
+    // colour is invisible on uniform backgrounds and at worst adds a small
+    // bar on landmarks. Can't sample edge colour without metadata, so this
+    // fallback uses plain white — acceptable since we only land here when
+    // sharp couldn't even read the image dims (rare).
     if (!w || !h) {
       try {
         const fallbackRatio = targetRatio;
         const fw = Math.round(FALLBACK_SIZE * (fallbackRatio >= 1 ? 1 : fallbackRatio));
         const fh = Math.round(FALLBACK_SIZE / (fallbackRatio >= 1 ? fallbackRatio : 1));
-        const cropped = await sharp(buf)
-          .resize(fw, fh, { fit: 'cover', position: 'centre' })
+        const padded = await sharp(buf)
+          .resize(fw, fh, { fit: 'contain', position: 'centre', background: { r: 255, g: 255, b: 255 } })
           .jpeg({ quality: 90 })
           .toBuffer();
-        paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
-        log.debug(`🎨 ${tag} Slot ${i + 1}: fallback sized to ${fw}x${fh}`);
+        paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
+        log.debug(`🎨 ${tag} Slot ${i + 1}: fallback padded to ${fw}x${fh}`);
       } catch (fallbackErr) {
         log.error(`❌ [GROK] Slot ${i + 1}: fallback resize failed (${fallbackErr.message}) — dropping slot`);
       }
@@ -1111,29 +1117,62 @@ async function packReferences(refs = {}, options = {}) {
       continue;
     }
 
-    // Crop to target aspect — never pad with white, those bars survive through
-    // Grok editing and end up baked into the output. Keep the shorter relative
-    // dimension intact and trim the longer one to match aspect.
+    // Pad to target aspect — do NOT crop. Cropping was the previous behaviour
+    // (fit: 'cover') and chopped heads / feet off character cell refs when
+    // the cell aspect didn't match the target. Real-world failure: Daniel
+    // page 1 V3 lost his head because the head sat near the top of the cell
+    // and the centre-crop trimmed it. The original concern about "white bars
+    // surviving into the output" only applies to bars that look distinct
+    // against the image — when we sample the image's own edge colour and pad
+    // with that, the bars blend with the existing background (character
+    // cells have a uniform light background already, so the pad becomes
+    // invisible). For landmark photos with varied edges, a small bar is
+    // strictly better than losing landmark detail.
+    //
+    // Compute target dims: expand the SHORTER dimension instead of trimming
+    // the longer one. Source aspect-ratio is preserved by sharp's `contain`
+    // fit.
     let targetW, targetH;
     if (currentRatio > targetRatio) {
-      // Source wider than target → keep height, crop width
-      targetH = h;
-      targetW = Math.round(h * targetRatio);
-    } else {
-      // Source taller than target → keep width, crop height
+      // Source wider than target → keep width, grow height with padding
       targetW = w;
       targetH = Math.round(w / targetRatio);
+    } else {
+      // Source taller than target → keep height, grow width with padding
+      targetH = h;
+      targetW = Math.round(h * targetRatio);
+    }
+
+    // Sample the edge colour (4-pixel border) so the padding bars blend with
+    // whatever's at the image edge. For character cell crops this is the
+    // cell's white-ish background → invisible. For landmark photos this is
+    // typically sky/wall/foliage → less visually jarring than pure white.
+    let padR = 255, padG = 255, padB = 255;
+    try {
+      const edgeBand = Math.max(2, Math.round(Math.min(w, h) * 0.01));
+      const { data: edgePixels } = await sharp(buf)
+        .extract({ left: 0, top: 0, width: w, height: edgeBand })
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let sumR = 0, sumG = 0, sumB = 0, n = 0;
+      for (let p = 0; p < edgePixels.length; p += 3) {
+        sumR += edgePixels[p]; sumG += edgePixels[p + 1]; sumB += edgePixels[p + 2]; n++;
+      }
+      if (n > 0) { padR = Math.round(sumR / n); padG = Math.round(sumG / n); padB = Math.round(sumB / n); }
+    } catch (sampleErr) {
+      log.debug(`🎨 ${tag} Slot ${i + 1}: edge sample failed (${sampleErr.message}) — padding with white`);
     }
 
     try {
-      const cropped = await sharp(buf)
-        .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
+      const padded = await sharp(buf)
+        .resize(targetW, targetH, { fit: 'contain', position: 'centre', background: { r: padR, g: padG, b: padB } })
         .jpeg({ quality: 90 })
         .toBuffer();
-      paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
-      log.debug(`🎨 ${tag} Slot ${i + 1}: cropped ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio})`);
+      paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
+      log.debug(`🎨 ${tag} Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio}, pad rgb(${padR},${padG},${padB}))`);
     } catch (padErr) {
-      log.warn(`⚠️ [GROK] Slot ${i + 1}: crop failed (${padErr.message}) — dropping slot`);
+      log.warn(`⚠️ [GROK] Slot ${i + 1}: pad failed (${padErr.message}) — dropping slot`);
     }
   }
 
