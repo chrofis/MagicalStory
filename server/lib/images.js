@@ -5431,6 +5431,39 @@ function lastRepairRegressed(versions) {
 }
 
 /**
+ * True when the page is stuck at score 0 across multiple attempts — original
+ * scored 0, every repair so far also scored 0. Repair can't recover from a
+ * catastrophic original; another round will almost certainly produce another
+ * 0% version too, wasting Grok credits.
+ *
+ * Real-world trigger: smoke job_1779382004213 page 3 — scored 0 on every
+ * round (vis=0 across pass 0/1/2/3), all 3 repair passes consumed the
+ * Grok budget without changing the score, story shipped with a broken page
+ * AND an inflated repair bill.
+ *
+ * Returns true after the page has at least one zero-scored repair attempt
+ * AND the best score across all versions is still ≤ 0. Pages with even a
+ * single non-zero version skip this gate (a partial recovery is real
+ * signal — keep trying).
+ */
+function pageStuckAtZero(versions) {
+  if (!Array.isArray(versions) || versions.length < 2) return false;
+  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  let bestScore = -Infinity;
+  let hasZeroRepair = false;
+  for (const v of versions) {
+    const s = scoreOf(v);
+    if (s != null && s > bestScore) bestScore = s;
+    const src = v?.source || '';
+    if (s === 0 && (src.startsWith('inpaint-') || src.startsWith('iterate-') || src.startsWith('composite-iterate-') || src.startsWith('char-fix-'))) {
+      hasZeroRepair = true;
+    }
+  }
+  if (!hasZeroRepair) return false;
+  return bestScore <= 0;
+}
+
+/**
  * True when the page has already been through at least one inpaint AND at least
  * one iterate, and neither produced a better score than the pre-repair best.
  * Once both strategies have failed to improve, a third round is almost certain
@@ -6728,6 +6761,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const bestSoFar = selectBestVersion(versions);
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
 
+      if (pageStuckAtZero(versions)) {
+        log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — page stuck at 0% (original + repair both scored 0, no recovery signal). Bailing to save Grok credits.`);
+        return { img, method: null, latestEval, skipped: true };
+      }
+
       if (bothStrategiesTriedAndRegressed(versions)) {
         log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
         return { img, method: null, latestEval, skipped: true };
@@ -6963,6 +7001,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             entityPenalty: evEntityPenalty,
             entityIssues: evEntityResult.issues,
             evaluatedAt: new Date().toISOString(),
+            // Composite-cover 2-pass debug bundle from executeIterateAction
+            // (cover iterates only). buildVersionEntry reads v.compositeAttempts
+            // and v.method to populate the version row so the modal can render
+            // the pass-1/pass-2 plates. Without these two lines the source
+            // label still says 'composite-iterate-round-N' but the version
+            // has compositeAttempts:null → modal shows score+prompt but no
+            // intermediate thumbnails. Verified missing on staging job
+            // job_1779382004213_idu0axofe initialPage v1.
+            compositeAttempts: repairResult.compositeAttempts || null,
+            method: repairResult.method || null,
           });
         }
       }

@@ -690,16 +690,16 @@ async function generateCoverViaComposite({
 
   const pass1Prompt = `PASS 1: REPOSE FIGURES ONLY.
 
-The first input image shows ${n} character cutouts on a plain white background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Just change the poses.
+The first input image shows ${n} character cutouts on a plain background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
 ${actionSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
-PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, white background, relative left-to-right positions.
+PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain background, relative left-to-right positions.
 
-DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, or any background. The background MUST stay pure white. NO TEXT, no signage, no letters anywhere.
+DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, foliage, or any scenic background — no forest, no street, no room. The background stays plain (white, gray, or a flat neutral tone — any of these are acceptable since pass 2 composites onto the real landmark photo and rembg cleanly separates figures from any plain background). NO TEXT, no signage, no letters anywhere.
 
-If any figure still has arms at their sides, the task has failed. If the background is anything other than white, the task has failed.`;
+If any figure still has arms at their sides, the task has failed. If the background contains a scene (forest, street, building, sky with clouds, etc.) instead of staying plain, the task has failed.`;
 
   // 6. Call Grok pass 1 — figures-on-white as primary edit target, VB grid as
   // a second reference image when available so the model knows exactly what

@@ -510,7 +510,10 @@ export function ImageHistoryModal({
                     );
                   })()}
 
-                  {/* 4. FINAL SCORE — single number from the backend, no client-side recompute. */}
+                  {/* 4. FINAL SCORE — single number from the backend, no client-side recompute.
+                       Show a breakdown when the raw visual score differs from the final
+                       (semantic + entity penalties applied on top), so the user can see
+                       why "the image shows 40%" became "Endwert 20%". */}
                   {(() => {
                     const score = detailVersion.finalScore != null
                       ? detailVersion.finalScore
@@ -519,13 +522,38 @@ export function ImageHistoryModal({
                         : null);
                     if (score == null) return null;
                     const entityPenalty = detailVersion.entityPenalty || 0;
+                    // `qualityScore` is the value emitted by the main image-evaluation
+                    // eval AFTER semantic and three-stage merges (pipeline buildVersionEntry
+                    // at server/lib/images.js:7199 sets `qualityScore: v.score`, and v.score
+                    // is post-semantic). `rawQualityScore` is the pre-semantic visual.
+                    // We show the chain: rawQuality → quality (after semantic) → final
+                    // (after entity). Only show segments that actually differ from final.
+                    const visual = (detailVersion as { rawQualityScore?: number | null }).rawQualityScore
+                      ?? detailVersion.qualityScore ?? null;
+                    const afterSemantic = detailVersion.qualityScore ?? visual;
+                    const semanticPenalty = (typeof visual === 'number' && typeof afterSemantic === 'number')
+                      ? Math.max(0, visual - afterSemantic)
+                      : 0;
+                    const showVisual = typeof visual === 'number' && visual !== score;
                     return (
                       <div className="flex flex-wrap items-center gap-3 text-sm">
                         <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
                         <span className={`font-bold text-lg ${scoreColor(score)}`}>
                           {score}%
                         </span>
-                        {entityPenalty > 0 && (
+                        {showVisual && (
+                          <span className="text-xs text-gray-500">
+                            ({language === 'de' ? 'Bild' : 'image'} {visual}%
+                            {semanticPenalty > 0 && (
+                              <> · {language === 'de' ? 'Semantik' : 'semantic'} −{semanticPenalty}</>
+                            )}
+                            {entityPenalty > 0 && (
+                              <> · {language === 'de' ? 'Konsistenz' : 'consistency'} −{entityPenalty}</>
+                            )}
+                            )
+                          </span>
+                        )}
+                        {!showVisual && entityPenalty > 0 && (
                           <span className="text-xs text-gray-500">
                             ({language === 'de' ? 'Konsistenz-Abzug' : 'consistency penalty'} −{entityPenalty})
                           </span>

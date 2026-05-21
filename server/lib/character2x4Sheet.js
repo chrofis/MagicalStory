@@ -119,7 +119,21 @@ function resolveStandardAvatar(character) {
  * "Sarah-cut-in-half" failure mode on staging story job_1778871083037_xq22dos68)
  * show up here for free; only sheets that pass this gate cost a Gemini call.
  *
- * Returns { valid, reason } — valid=true when every gutter band is ≥80%
+ * Threshold history:
+ *   - 80%: original strict gate. Real-world observation: Grok consistently
+ *     comes back at 0–60% even after 3 retries (every char on staging
+ *     job_1779382004213). The gate was rejecting EVERY attempt, the
+ *     best-of-N then picked a score=0 candidate, and the budget burned
+ *     for nothing. The fundamental issue is the phantom + prompt give
+ *     Grok cells that are slightly too small for the figure scale Aurora
+ *     wants to draw; tuning that needs a focused debug session.
+ *   - 60%: pragmatic floor. Still catches catastrophic overlaps (figure
+ *     squarely straddling the row gutter ⇒ band <30%) but accepts the
+ *     usual 60–70% case where only the figure's edges nick the gutter.
+ *     The downstream Gemini eval still gates final identity / layout
+ *     correctness, so accepting these doesn't ship broken sheets.
+ *
+ * Returns { valid, reason } — valid=true when every gutter band is ≥60%
  * white pixels (lum > 240).
  */
 async function quickLayoutCheck(imageData) {
@@ -158,9 +172,10 @@ async function quickLayoutCheck(imageData) {
     { name: 'col gutter 2/4',  whiteFrac: colBand(Math.floor(W / 2)) },
     { name: 'col gutter 3/4',  whiteFrac: colBand(Math.floor(3 * W / 4)) },
   ];
+  const THRESHOLD = 0.60;
   for (const c of checks) {
-    if (c.whiteFrac < 0.80) {
-      return { valid: false, reason: `${c.name} only ${(100*c.whiteFrac).toFixed(1)}% white (need ≥80%) — figure likely crosses the gutter` };
+    if (c.whiteFrac < THRESHOLD) {
+      return { valid: false, reason: `${c.name} only ${(100*c.whiteFrac).toFixed(1)}% white (need ≥${Math.round(THRESHOLD*100)}%) — figure likely crosses the gutter` };
     }
   }
   return { valid: true };
