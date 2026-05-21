@@ -603,9 +603,9 @@ Based on the story draft, determine which clothing variants each character needs
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[a worn item like 'red scarf' or 'scout vest with badges'; OMIT this field if no signature]" },
-      "winter": { "used": true/false, "signature": "[cold-weather additions; OMIT if not used]" },
-      "summer": { "used": true/false, "signature": "[warm-weather items; OMIT if not used]" },
+      "standard": { "used": true/false, "signature": "[ACCESSORY ONLY — a small distinguishing item layered on top of the base outfit: scarf, pin, watch, hat, glasses chain, badge, single bracelet. NEVER a main garment (top, jacket, hoodie, shirt, sweater, trousers, dress, shoes) — the character record already defines those, and a signature that names another top creates a conflict. OMIT this field if no such accessory applies.]" },
+      "winter": { "used": true/false, "signature": "[ACCESSORY ONLY — scarf, mittens, beanie, ear-muffs. NEVER a main winter garment like a coat or boots. OMIT if no accessory.]" },
+      "summer": { "used": true/false, "signature": "[ACCESSORY ONLY — sunglasses, sun hat, beach bracelet. NEVER a main summer garment like a t-shirt or shorts. OMIT if no accessory.]" },
       "costumed": { "used": true/false, "costume": "[real costume name like 'wizard' or 'knight'; OMIT this field and set used:false if no costume]", "description": "[full outfit; OMIT if no costume]" }
     }
   }

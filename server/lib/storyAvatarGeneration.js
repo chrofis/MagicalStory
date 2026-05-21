@@ -137,9 +137,31 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
             const baseClothing = char.avatars?.clothing?.[category]
               || (typeof config.description === 'string' ? config.description : '')
               || `${category} outfit`;
-            const signatureSuffix = config.signature && String(config.signature).toLowerCase() !== 'none'
-              ? `, plus this signature element: ${config.signature}`
-              : '';
+            // Signature is meant to be an ACCESSORY (scarf, pin, watch) layered
+            // on top of the base outfit. Sonnet occasionally generates a main
+            // garment name as the signature (e.g. Noah: base = "green T-Rex
+            // hoodie", signature = "dark blue zip-up hoodie") which then
+            // contradicts the base clothing in the prompt the model receives.
+            // Defensive check: drop the signature when it names a garment slot
+            // that's already covered by the base clothing description. The
+            // prompt-side fix (clothingRequirements example in story-unified.txt)
+            // tells Sonnet "ACCESSORY ONLY"; this is the belt-and-braces guard.
+            const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
+              't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
+              'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
+            const sigLower = String(config.signature || '').toLowerCase();
+            const baseLower = String(baseClothing || '').toLowerCase();
+            const conflictingSlot = GARMENT_SLOTS.find(slot =>
+              sigLower.includes(slot) && baseLower.includes(slot)
+            );
+            let signatureSuffix = '';
+            if (config.signature && String(config.signature).toLowerCase() !== 'none') {
+              if (conflictingSlot) {
+                log.warn(`[AVATAR-GEN] ${char.name}:${category} — dropping signature "${config.signature}" (conflicts with base "${conflictingSlot}" already in clothing). Signature should be an accessory, not a main garment.`);
+              } else {
+                signatureSuffix = `, plus this signature element: ${config.signature}`;
+              }
+            }
             const combinedCostume = `${baseClothing}${signatureSuffix}`;
             try {
               const sheet = await generateCharacter2x4Sheet(char, {

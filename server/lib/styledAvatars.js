@@ -577,8 +577,27 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using signature from clothingRequirements: "${signature}"`);
         }
         log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - clothing: ${clothingDescription ? 'yes' : 'no'}, signature: ${signature ? signature.substring(0, 50) + '...' : 'no'}`);
+        // Defensive: signature is supposed to be an accessory (scarf, pin),
+        // not a main garment. When Sonnet generates one anyway (e.g. Noah:
+        // base = "green T-Rex hoodie", signature = "dark blue zip-up
+        // hoodie"), concatenating both into the prompt makes the model
+        // pick one or the other — usually the wrong one. If the signature
+        // names a garment slot that's already in the base clothing, drop
+        // the signature. Mirror of the guard in storyAvatarGeneration.js.
         if (signature && clothingDescription) {
-          clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+          const GARMENT_SLOTS = ['hoodie', 'jacket', 'coat', 'sweater', 'shirt',
+            't-shirt', 'tshirt', 'top', 'blouse', 'dress', 'skirt', 'trousers',
+            'pants', 'shorts', 'jeans', 'shoes', 'sneakers', 'boots', 'sandals'];
+          const sigLower = String(signature).toLowerCase();
+          const baseLower = String(clothingDescription).toLowerCase();
+          const conflictingSlot = GARMENT_SLOTS.find(slot =>
+            sigLower.includes(slot) && baseLower.includes(slot)
+          );
+          if (conflictingSlot) {
+            log.warn(`[STYLED AVATARS] ${charName}:${clothingCategory} — dropping signature "${signature}" (conflicts with "${conflictingSlot}" already in clothing description). Signature should be an accessory, not a main garment.`);
+          } else {
+            clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+          }
         } else if (signature && !clothingDescription) {
           clothingDescription = `SIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
         }
