@@ -161,7 +161,8 @@ Flag as a defect when you see (severity in brackets):
 - Missing torso inside the frame, ghostly or transparent body parts you can see through, body fused/melted into the background → **CRITICAL**.
 - Missing one arm or one leg inside the frame (not just cropped at the edge) → **MAJOR**.
 - Two overlapping copies of the same figure stacked (double-exposure artifact) → **MAJOR**.
-- Smudged or smeared region where a body part should be (clear blur defect, not stylistic softness) → **MAJOR**.
+- A whole limb or large body region rendered as a blurred / smeared / unrecognisable shape (cannot read as an arm, hand, leg) → **MAJOR**.
+- Slight smudging on a small body region (one finger fused to another, soft fingertips, gentle blur on a hand) where the limb is still clearly identifiable → **MINOR**. This is normal stylised brushwork, not a structural defect.
 
 Do NOT flag when:
 - The figure is legitimately cropped by the frame edge (head visible, body extends below frame).
@@ -221,9 +222,10 @@ Skip this sub-check if DECLARED INTERACTIONS is empty. Entries without a `storyR
 
 **RENDERED TEXT** (model hallucination, common on atmospheric scenes):
 - If a `⚠️ TEXT RULES FOR THIS IMAGE` block at the top of this prompt names an allowed text string, that exact text is permitted in the image (typically the cover title or a dedication). Do NOT flag it. Apply the rest of this rule to anything else.
-- Any OTHER readable text painted into the artwork that wasn't requested → **MAJOR**, set `rendered_text_ok: false`. Includes captions, banners, signs, shop labels, book covers/spines with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions on walls or stones, and garbled pseudo-text.
 - Story-text OVERLAY (the white-on-image story sentence shown via the calm zone) is composited AFTER generation by the renderer — it is NOT in the image you are evaluating. So when no TEXT RULES block is present, any text inside the image content itself is a defect.
-- Add a `fixable_issues` entry with `type: "rendered_text"`, severity MAJOR, `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
+- Readable text painted into the artwork that wasn't requested → **MAJOR**, `type: "rendered_text"`, `rendered_text_ok: false`. Includes legible captions, banners, signs, shop labels, book covers with visible titles, embroidered words, painted slogans, sky-writing, decorative inscriptions.
+- Illegible / garbled pseudo-text on a small prop (a label, a coin face, a book spine, a sign in the deep background) that doesn't form readable words → **MINOR**, `type: "rendered_text"`. It's a localised cosmetic flaw, not a content failure — `fix` says "Inpaint the small text region as continuous prop material."
+- Add the `fixable_issues` entry with `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
 
 **FACES:**
 - Cross-eyes (eyes pointing different directions) → **MAJOR**.
