@@ -264,9 +264,9 @@ async function extractQuadrant(buffer, which = 'body-front') {
       if (variance < minVVar) { minVVar = variance; sepX = x; }
     }
     if (which === 'body-profile') {
-      return sharp(buffer).extract({ left: sepX, top: sepY, width: width - sepX, height: height - sepY }).toBuffer();
+      return sharp(buffer).extract({ left: sepX, top: sepY, width: width - sepX, height: height - sepY }).png().toBuffer();
     }
-    return sharp(buffer).extract({ left: 0, top: sepY, width: sepX, height: height - sepY }).toBuffer();
+    return sharp(buffer).extract({ left: 0, top: sepY, width: sepX, height: height - sepY }).png().toBuffer();
   }
 
   // Single image (no grid).

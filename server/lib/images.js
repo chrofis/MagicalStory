@@ -8970,14 +8970,19 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     }
 
     const blendedRegion = await sharp(blended, { raw: { width: blendWidth, height: blendHeight, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
-    // Composite mask region onto black full-scene canvas to show position
-    const maskRegionGray = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } })
-      .toColourspace('srgb').jpeg({ quality: 80 }).toBuffer();
-    const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-      .jpeg({ quality: 80 }).toBuffer();
-    const blendMaskFinal = await sharp(blendMaskBuffer)
-      .composite([{ input: maskRegionGray, left: blendLeft, top: blendTop }])
-      .jpeg({ quality: 80 }).toBuffer();
+    // Debug blend-mask preview: only built when dev panel asks for it. The
+    // previous unconditional build cost ~3 MB of JPEG work per repair call
+    // for a buffer that was immediately discarded on the production path.
+    let blendMaskFinal = null;
+    if (options.includeDebug) {
+      const maskRegionGray = await sharp(maskPixels, { raw: { width: blendWidth, height: blendHeight, channels: 1 } })
+        .toColourspace('srgb').jpeg({ quality: 80 }).toBuffer();
+      const blendMaskBuffer = await sharp({ create: { width: sceneMeta.width, height: sceneMeta.height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .jpeg({ quality: 80 }).toBuffer();
+      blendMaskFinal = await sharp(blendMaskBuffer)
+        .composite([{ input: maskRegionGray, left: blendLeft, top: blendTop }])
+        .jpeg({ quality: 80 }).toBuffer();
+    }
 
     // G. Composite blended region onto original scene
     const composited = await sharp(sceneBuffer)
@@ -8993,7 +8998,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       comparison: { before: originalSceneDataUri, after: finalImageData },
       blackoutImage: `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`,
       grokRawResult: grokResult.imageData,
-      blendMask: `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}`,
+      blendMask: blendMaskFinal ? `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}` : null,
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
       usage: grokResult.usage,
