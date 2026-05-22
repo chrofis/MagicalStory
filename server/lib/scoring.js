@@ -277,19 +277,29 @@ function composeFinalScore(breakdown) {
  * @param {object} version
  * @param {object} breakdown
  */
+/**
+ * Single source of truth for writing scoring fields onto a version
+ * object. Used by every code path that produces a new version (the
+ * round-loop push in images.js, applyScoreBreakdown below, the
+ * regeneration routes). Keeps finalScore SIGNED — clamping to 0
+ * collapses "marginal" and "broken" into the same value and the
+ * picker's later-wins-ties rule then promotes the broken one.
+ */
+function setVersionScores(version, evalScore, entityPenalty) {
+  if (!version || typeof version !== 'object') return;
+  version.evalScore = evalScore;
+  version.entityPenalty = (Number(entityPenalty) || 0);
+  version.finalScore = (typeof evalScore === 'number')
+    ? evalScore - version.entityPenalty
+    : null;
+}
+
 function applyScoreBreakdown(version, breakdown) {
   if (!version || typeof version !== 'object') return;
   version.scoreBreakdown = breakdown;
-  version.evalScore = composeEvalScore(breakdown);
-  version.entityPenalty = (breakdown && breakdown.entity && Number(breakdown.entity.penalty)) || 0;
-  // DO NOT clamp finalScore to 0. Real-world miss: smoke #6 page 2 had
-  // V1 (original) eval=30 entityPenalty=30 → finalScore=0, and V3
-  // (inpaint-round-2, broken) eval=0 entityPenalty=60 → finalScore=-60.
-  // Clamping both to 0 erased the difference; pickBestVersionIndex's
-  // `>=` tie-break then chose V3 (later index) over V1, leaving the
-  // story with a visibly broken page active. Keep the raw signed value
-  // so the picker sees the truth. UI can clamp to 0 at display time.
-  version.finalScore = version.evalScore - version.entityPenalty;
+  const evalScore = composeEvalScore(breakdown);
+  const entityPenalty = (breakdown && breakdown.entity && Number(breakdown.entity.penalty)) || 0;
+  setVersionScores(version, evalScore, entityPenalty);
 }
 
 /**
@@ -428,6 +438,7 @@ module.exports = {
   composeEvalScore,
   composeFinalScore,
   applyScoreBreakdown,
+  setVersionScores,
   pickBestVersionIndex,
   recomputeActiveVersion,
   recomputeAllActiveVersions,

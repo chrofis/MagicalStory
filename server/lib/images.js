@@ -6961,13 +6961,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const evScore = ev.score ?? ev.qualityScore ?? null;
           const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
           const evEntityPenalty = evEntityResult.penalty;
-          versions.push({
+          const { setVersionScores } = require('./scoring');
+          const newVersion = {
             imageData: repairResult.imageData,
             score: evScore,
-            // No Math.max(0, ...) clamp — keep negative values so the
-            // picker can distinguish "broken (-60)" from "marginal (0)".
-            // See scoring.js applyScoreBreakdown for the same reasoning.
-            finalScore: evScore != null ? (evScore - evEntityPenalty) : null,
             source: repairResult.source,
             evaluation: ev,
             modelId: repairResult.modelId,
@@ -6979,7 +6976,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
             description: repairResult.description || null,
-            entityPenalty: evEntityPenalty,
             entityIssues: evEntityResult.issues,
             evaluatedAt: new Date().toISOString(),
             // Composite-cover 2-pass debug bundle from executeIterateAction
@@ -6992,7 +6988,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // job_1779382004213_idu0axofe initialPage v1.
             compositeAttempts: repairResult.compositeAttempts || null,
             method: repairResult.method || null,
-          });
+          };
+          // Single source of truth for evalScore/entityPenalty/finalScore.
+          setVersionScores(newVersion, evScore, evEntityPenalty);
+          versions.push(newVersion);
         }
       }
     }
