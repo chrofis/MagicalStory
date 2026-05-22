@@ -3220,6 +3220,14 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       log.info(`✅ [REPAIR] Saved ${newRetryEntries.length} repair entries for story ${id}, page ${pageNumber}`);
     }
 
+    // Surface the new version index so the client can mark the new image as
+    // active in the version history instead of overwriting v0. When no
+    // repair happened, fall back to the active version already on the
+    // scene (or 0 for legacy stories without imageVersions).
+    const repairVersionIndex = anyRepaired && Array.isArray(currentScene.imageVersions)
+      ? currentScene.imageVersions.length - 1
+      : (typeof currentScene.activeVersion === 'number' ? currentScene.activeVersion : 0);
+
     res.json({
       success: true,
       pageNumber,
@@ -3227,6 +3235,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       noErrorsFound: !anyRepaired && newRetryEntries.some(e => e.noRepairNeeded),
       passesRun: newRetryEntries.length,
       imageData: currentImageData,
+      versionIndex: repairVersionIndex,
       retryEntries: newRetryEntries,
       repairHistory: allRepairHistory
     });

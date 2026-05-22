@@ -959,7 +959,7 @@ export function useRepairWorkflow({
       console.error('Character repair failed:', error);
       failStep('character-repair', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, startStep, failStep, onImageUpdate]);
+  }, [storyId, startStep, failStep, onImageUpdate, reEvaluatePages]);
 
   // Reject a character repair — revert to the version before repair
   const rejectRepair = useCallback(async (characterName: string, pageNumber: number, previousVersionIndex: number) => {
@@ -1006,7 +1006,12 @@ export function useRepairWorkflow({
 
       if (result.repaired && result.imageData && onImageUpdate) {
         try {
-          onImageUpdate(pageNumber, result.imageData, 0, {
+          // Use the versionIndex returned by the server (the new version
+          // pushed onto imageVersions[]) instead of hardcoding 0 — the old
+          // value overwrote v0 in the UI's version selector and hid the
+          // repair from the version-history modal.
+          const newVersionIndex = typeof result.versionIndex === 'number' ? result.versionIndex : 0;
+          onImageUpdate(pageNumber, result.imageData, newVersionIndex, {
             type: 'inpaint-repair',
           });
         } catch (err) {
@@ -1049,7 +1054,7 @@ export function useRepairWorkflow({
       console.error('Inpaint repair failed:', error);
       failStep('inpaint-repair', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, startStep, failStep, onImageUpdate]);
+  }, [storyId, startStep, failStep, onImageUpdate, reEvaluatePages]);
 
   // Get step number (1-7, 0 for idle)
   const getStepNumber = useCallback((step: RepairWorkflowStep): number => {

@@ -1206,6 +1206,7 @@ export const storyService = {
     repaired: boolean;
     noErrorsFound: boolean;
     imageData: string;
+    versionIndex?: number;
     repairHistory: Array<{
       attempt: number;
       errorType: string;
@@ -1231,6 +1232,7 @@ export const storyService = {
       repaired: boolean;
       noErrorsFound: boolean;
       imageData: string;
+      versionIndex?: number;
       repairHistory: Array<{
         attempt: number;
         errorType: string;
