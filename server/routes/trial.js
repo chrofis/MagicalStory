@@ -72,7 +72,7 @@ function isAdminRequest(req) {
   const token = req.body?.adminToken;
   if (!token) return false;
   try {
-    const hmac = require('crypto');
+    const crypto = require('crypto');
     const secret = process.env.JWT_SECRET;
     if (!secret) return false;
     // Token format: "timestamp:hmac"
@@ -80,8 +80,16 @@ function isAdminRequest(req) {
     if (!ts || !sig) return false;
     const timestamp = parseInt(ts, 10);
     if (isNaN(timestamp) || Date.now() - timestamp > BYPASS_TTL_MS) return false;
-    const expected = hmac.createHmac('sha256', secret).update(`trial-bypass:${ts}`).digest('hex');
-    return sig === expected;
+    const expected = crypto.createHmac('sha256', secret).update(`trial-bypass:${ts}`).digest('hex');
+    // Constant-time comparison. The old `sig === expected` short-circuits
+    // on the first mismatched byte, leaking timing information that lets a
+    // network-positioned attacker brute-force the HMAC one byte at a time.
+    // Both buffers must be the same length for timingSafeEqual; if not,
+    // bail out fast (the length itself is not secret).
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
   } catch { return false; }
 }
 

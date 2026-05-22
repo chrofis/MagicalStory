@@ -1146,8 +1146,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
 
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }
 
 
@@ -1366,8 +1365,7 @@ def analyze_photo():
     except Exception as e:
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -1584,8 +1582,7 @@ def compare_lpips():
     except Exception as e:
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -1731,8 +1728,7 @@ def split_grid():
         print(f"[SPLIT-GRID] Error: {e}")
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -1918,8 +1914,7 @@ def split_reference_sheet():
         print(f"[SPLIT-REFSHEET] Error: {e}")
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -2210,8 +2205,7 @@ def extract_face():
         print(f"[EXTRACT-FACE] Error: {e}")
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -2474,8 +2468,7 @@ def get_face_embedding():
         print(f"[FACE-EMBED] Error: {e}")
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -2669,8 +2662,7 @@ def compare_identity():
         print(f"[COMPARE-ID] Error: {e}")
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -2823,8 +2815,7 @@ def detect_all_faces():
         import traceback
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -2904,8 +2895,7 @@ def detect_anime_faces():
         import traceback
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -3045,7 +3035,7 @@ def detect_illustration_faces():
     except Exception as e:
         print(f"[DETECT-ILLUSTRATION] Error: {e}")
         import traceback
-        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == '__main__':

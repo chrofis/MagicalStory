@@ -1,9 +1,23 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { GenerationProvider } from './context/GenerationContext';
+import { useAuth } from './context/AuthContext';
+
+// Route guard for admin-only pages. Without this wrapper, the AdminDashboard
+// component briefly mounts and renders before its own role check fires —
+// during the 200–500 ms auth-loading window an anonymous visitor sees a
+// flash of admin UI before being redirected. Gating the route at the
+// router level shows a spinner during auth-loading and redirects before
+// the admin component is mounted at all.
+function AdminRoute({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (!isAuthenticated || user?.role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 
 // Fix iOS Safari blank page when restoring old tabs from bfcache
 // Safari freezes the page state and restores it later — but JS state is stale
@@ -66,7 +80,7 @@ function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/book-builder" element={<BookBuilder />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
           <Route path="/terms" element={<TermsOfService />} />
