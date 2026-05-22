@@ -391,6 +391,11 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON credit_transactions(transaction_type)`);
+    // The Stripe webhook idempotency check filters by reference_id (=session_id)
+    // and runs inside the 10s webhook response window. Without this index, the
+    // lookup degrades to a sequential scan as credit_transactions grows. Partial
+    // index skips rows where reference_id is null (story-credit deductions etc.).
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_reference_id ON credit_transactions(reference_id) WHERE reference_id IS NOT NULL`);
 
     // Story jobs table
     await dbPool.query(`
