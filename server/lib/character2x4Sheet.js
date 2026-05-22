@@ -223,7 +223,7 @@ async function quickLayoutCheck(imageData) {
  * @param {string} [sourcePhoto]  source face photo (data URI). When provided,
  *   sent as Image 1 and the source-match task fires; the sheet becomes Image 2.
  */
-async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null) {
+async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null) {
   const sheetB64 = imageData.replace(/^data:image\/\w+;base64,/, '');
   const sheetMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
@@ -265,6 +265,12 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   const j = await resp.json();
   const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini eval returned no text');
+  if (usageTracker && j?.usageMetadata) {
+    usageTracker('gemini_quality', {
+      input_tokens: j.usageMetadata.promptTokenCount || 0,
+      output_tokens: j.usageMetadata.candidatesTokenCount || 0,
+    }, 'character_2x4_eval', 'gemini-2.5-flash');
+  }
   return JSON.parse(text);
 }
 
@@ -309,7 +315,7 @@ Only the surface treatment changes from photographic to ${styleLine}.`;
  * Pass 2 styled sheet. Returns parsed JSON verdict from
  * prompts/sheet-2x4-style-eval.txt.
  */
-async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey) {
+async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null) {
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = PROMPT_TEMPLATES.sheet2x4StyleEval;
@@ -347,6 +353,12 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   const j = await resp.json();
   const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini style-eval returned no text');
+  if (usageTracker && j?.usageMetadata) {
+    usageTracker('gemini_quality', {
+      input_tokens: j.usageMetadata.promptTokenCount || 0,
+      output_tokens: j.usageMetadata.candidatesTokenCount || 0,
+    }, 'character_2x4_style_eval', 'gemini-2.5-flash');
+  }
   return JSON.parse(text);
 }
 
@@ -440,7 +452,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       // Pass the source face photo so Task 4 (sourceMatchScore) fires —
       // catches sheets that are structurally fine but show a different
       // person than the user uploaded (e.g. Grok hallucinating identity).
-      verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY, facePhoto);
+      verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY, facePhoto, usageTracker);
       log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Eval errors no longer get a free score=10. Treat them as score=5
@@ -562,7 +574,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 
     let verdict = null;
     try {
-      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY);
+      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker);
       log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — accepting as best-effort`);

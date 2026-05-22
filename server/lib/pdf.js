@@ -507,8 +507,11 @@ function getPictureBookTextRatio(languageLevel) {
  * @returns {number} ratio in [0.18, 0.40]
  */
 function computeTextBelowRatio(pages, languageLevel) {
+  // parseStoryPages returns string[] (each entry is the page text), not
+  // objects — read p directly. The earlier `p?.text` always evaluated to
+  // undefined → every story got the minimum 0.18 ratio regardless of length.
   const wordCounts = (pages || [])
-    .map(p => (p?.text || '').trim().split(/\s+/).filter(Boolean).length);
+    .map(p => String(p || '').trim().split(/\s+/).filter(Boolean).length);
   const maxWords = wordCounts.length ? Math.max(...wordCounts) : 0;
   // Bucket by longest-page word count.
   let ratio;

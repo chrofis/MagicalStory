@@ -1387,11 +1387,14 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
     return false;
   };
 
-  // Merge each category
+  // Merge each category. addVisualBibleChangeLog signature is
+  // (vb, pageNumber, element, type, change, before, after). These merges
+  // happen at story-init time (not per-page), so pageNumber is null and
+  // change="added".
   for (const char of newEntries.secondaryCharacters || []) {
     if (!alreadyExists(char)) {
       visualBible.secondaryCharacters.push(char);
-      addVisualBibleChangeLog(visualBible, `Added secondary character: ${char.name} [${char.id || 'no-id'}]`);
+      addVisualBibleChangeLog(visualBible, null, char.name || char.id || 'unknown', 'secondaryCharacters', 'added', null, char);
       addedCount++;
     }
   }
@@ -1399,7 +1402,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   for (const animal of newEntries.animals || []) {
     if (!alreadyExists(animal)) {
       visualBible.animals.push(animal);
-      addVisualBibleChangeLog(visualBible, `Added animal: ${animal.name} [${animal.id || 'no-id'}]`);
+      addVisualBibleChangeLog(visualBible, null, animal.name || animal.id || 'unknown', 'animals', 'added', null, animal);
       addedCount++;
     }
   }
@@ -1407,7 +1410,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   for (const artifact of newEntries.artifacts || []) {
     if (!alreadyExists(artifact)) {
       visualBible.artifacts.push(artifact);
-      addVisualBibleChangeLog(visualBible, `Added artifact: ${artifact.name} [${artifact.id || 'no-id'}]`);
+      addVisualBibleChangeLog(visualBible, null, artifact.name || artifact.id || 'unknown', 'artifacts', 'added', null, artifact);
       addedCount++;
     }
   }
@@ -1415,7 +1418,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   for (const loc of newEntries.locations || []) {
     if (!alreadyExists(loc)) {
       visualBible.locations.push(loc);
-      addVisualBibleChangeLog(visualBible, `Added location: ${loc.name} [${loc.id || 'no-id'}]`);
+      addVisualBibleChangeLog(visualBible, null, loc.name || loc.id || 'unknown', 'locations', 'added', null, loc);
       addedCount++;
     }
   }
@@ -1423,7 +1426,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   for (const veh of newEntries.vehicles || []) {
     if (!alreadyExists(veh)) {
       visualBible.vehicles.push(veh);
-      addVisualBibleChangeLog(visualBible, `Added vehicle: ${veh.name} [${veh.id || 'no-id'}]`);
+      addVisualBibleChangeLog(visualBible, null, veh.name || veh.id || 'unknown', 'vehicles', 'added', null, veh);
       addedCount++;
     }
   }
@@ -1431,7 +1434,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   for (const item of newEntries.clothing || []) {
     if (!alreadyExists(item)) {
       visualBible.clothing.push(item);
-      addVisualBibleChangeLog(visualBible, `Added clothing: ${item.name} [${item.id || 'no-id'}] (worn by ${item.wornBy || 'unknown'})`);
+      addVisualBibleChangeLog(visualBible, null, item.name || item.id || 'unknown', 'clothing', 'added', null, item);
       addedCount++;
     }
   }

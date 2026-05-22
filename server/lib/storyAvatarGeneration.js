@@ -237,16 +237,12 @@ async function generateStoryAvatars(characters, clothingRequirements, artStyle, 
             }
           }
 
-          // Track token usage
-          if (result?.tokenUsage?.byModel && addUsage) {
-            for (const [modelId, usage] of Object.entries(result.tokenUsage.byModel)) {
-              const functionName = isCostumed ? 'avatar_costumed' : 'avatar_styled';
-              addUsage('gemini_image', {
-                input_tokens: usage.input_tokens || 0,
-                output_tokens: usage.output_tokens || 0
-              }, functionName, modelId);
-            }
-          }
+          // Token usage is already reported by generateCharacter2x4Sheet
+          // via the inner usageTracker (passed as addUsage), and by the
+          // Gemini eval calls inside character2x4Sheet (fix #34). The old
+          // branch read result.tokenUsage.byModel which is never populated
+          // here (result is `{success, imageData}`), so this was dead code
+          // mislabelled as 'gemini_image' on every Grok 2×4 call.
 
           return { tokenUsage: result?.tokenUsage, isCostumed };
         } catch (err) {

@@ -6596,9 +6596,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     if (repairResult.usage && usageTracker) {
-      usageTracker('gemini_image', {
+      // Provider is Grok for char-repair (repairCharacterMismatchWithGrok);
+      // the prior 'gemini_image' label was a copy-paste miscategorisation
+      // that inflated the Gemini column and hid Grok char-repair spend.
+      usageTracker('grok', {
         input_tokens: repairResult.usage.inputTokens || 0,
-        output_tokens: repairResult.usage.outputTokens || 0
+        output_tokens: repairResult.usage.outputTokens || 0,
+        cost: repairResult.usage.cost,
+        direct_cost: repairResult.usage.direct_cost ?? repairResult.usage.cost,
       }, 'unified_pipeline_char_fix', repairResult.usage.model);
     }
 
