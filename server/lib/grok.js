@@ -15,6 +15,7 @@ const sharp = require('sharp');
 const { createCanvas } = require('canvas');
 const { log } = require('../utils/logger');
 const r2 = require('./r2');
+const { withGrok } = require('./aiConcurrency');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -71,7 +72,7 @@ async function generateWithGrok(prompt, options = {}) {
 
   const startTime = Date.now();
 
-  const doFetch = async () => {
+  const doFetch = async () => withGrok(async () => {
     const response = await fetch(`${XAI_API_URL}/images/generations`, {
       method: 'POST',
       headers: {
@@ -90,7 +91,7 @@ async function generateWithGrok(prompt, options = {}) {
       throw err;
     }
     return response;
-  };
+  });
 
   try {
     let response;
@@ -300,7 +301,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
   const startTime = Date.now();
 
-  const doFetch = async () => {
+  const doFetch = async () => withGrok(async () => {
     const response = await fetch(`${XAI_API_URL}/images/edits`, {
       method: 'POST',
       headers: {
@@ -319,7 +320,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       throw err;
     }
     return response;
-  };
+  });
 
   try {
     let response;

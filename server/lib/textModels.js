@@ -6,6 +6,7 @@
 
 const { log } = require('../utils/logger');
 const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
+const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -148,7 +149,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     messages[0] = { role: 'user', content: options.images ? [...userContent.slice(0, -1), { type: 'text', text: effectivePrompt }] : effectivePrompt };
   }
 
-  const data = await withRetry(async () => {
+  const data = await withAnthropic(() => withRetry(async () => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -172,7 +173,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     }
 
     return res.json();
-  }, { maxRetries: 2, baseDelay: 2000 });
+  }, { maxRetries: 2, baseDelay: 2000 }));
 
   // Extract token usage
   const inputTokens = data.usage?.input_tokens || 0;
@@ -513,7 +514,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
   }
 
   const callAPI = async (model) => {
-    return withRetry(async () => {
+    return withGemini(() => withRetry(async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       return fetch(url, {
         method: 'POST',
@@ -529,7 +530,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
           }
         })
       });
-    }, { maxRetries: 2, baseDelay: 2000 });
+    }, { maxRetries: 2, baseDelay: 2000 }));
   };
 
   let response = await callAPI(modelId);
@@ -614,7 +615,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     messages.push({ role: 'assistant', content: options.prefill });
   }
 
-  const data = await withRetry(async () => {
+  const data = await withGrok(() => withRetry(async () => {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -637,7 +638,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     }
 
     return res.json();
-  }, { maxRetries: 2, baseDelay: 2000 });
+  }, { maxRetries: 2, baseDelay: 2000 }));
 
   const inputTokens = data.usage?.prompt_tokens || 0;
   const outputTokens = data.usage?.completion_tokens || 0;

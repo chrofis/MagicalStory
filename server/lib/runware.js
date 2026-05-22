@@ -12,6 +12,7 @@
 
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
+const { withRunware } = require('./aiConcurrency');
 
 const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
@@ -35,7 +36,15 @@ if (RUNWARE_API_KEY) {
  * Non-retryable HTTP errors (4xx other than 429) and validation failures
  * propagate immediately. Matches the discipline of textModels.withRetry.
  */
-async function runwareFetchWithRetry(payload, { maxRetries = 2, baseDelay = 1000, maxDelay = 6000, timeoutMs = 60000 } = {}) {
+async function runwareFetchWithRetry(payload, opts = {}) {
+  // Queue every Runware call against the global Runware semaphore so the
+  // upstream pipeline can fan out widely without hammering Runware's GPU
+  // pool. The retry+timeout logic runs inside the limit slot — one slot
+  // per outbound HTTP call, including retry attempts.
+  return withRunware(() => _runwareFetchWithRetryInner(payload, opts));
+}
+
+async function _runwareFetchWithRetryInner(payload, { maxRetries = 2, baseDelay = 1000, maxDelay = 6000, timeoutMs = 60000 } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
