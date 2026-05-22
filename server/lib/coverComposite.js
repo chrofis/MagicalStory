@@ -45,6 +45,8 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
+const { coverLabel } = require('./coverKeys');
+const { stripDataUriPrefix } = require('./r2');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -285,7 +287,7 @@ async function removeBackground(buf) {
     if (r.ok) {
       const j = await r.json();
       if (j.success && j.image) {
-        return Buffer.from(j.image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        return Buffer.from(stripDataUriPrefix(j.image), 'base64');
       }
     }
   } catch (e) {
@@ -438,7 +440,7 @@ async function loadImageAny(src) {
   if (!src) return null;
   if (typeof src === 'object') return loadImageAny(src.imageUrl || src.imageData);
   if (typeof src !== 'string') return null;
-  if (src.startsWith('data:')) return Buffer.from(src.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  if (src.startsWith('data:')) return Buffer.from(stripDataUriPrefix(src), 'base64');
   if (/^https?:\/\//i.test(src)) {
     const r = await fetch(src);
     if (!r.ok) return null;
@@ -478,7 +480,7 @@ async function generateCoverViaComposite({
 }) {
   const W = 1024;
   const H = 1365;
-  const label = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+  const label = coverLabel(coverKey);
   log.info(`🎨 [COVER-COMPOSITE] ${label}: starting composite-cover generation`);
 
   // 1. Determine character sequence (explicit > alternation)
@@ -680,7 +682,7 @@ async function generateCoverViaComposite({
     if (Buffer.isBuffer(vbGrid)) {
       vbGridBuf = vbGrid;
     } else if (typeof vbGrid === 'string') {
-      const stripped = vbGrid.replace(/^data:image\/\w+;base64,/, '');
+      const stripped = stripDataUriPrefix(vbGrid);
       try { vbGridBuf = Buffer.from(stripped, 'base64'); } catch { vbGridBuf = null; }
     }
   }

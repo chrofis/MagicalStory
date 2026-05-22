@@ -16,6 +16,7 @@
 
 const { log } = require('../utils/logger');
 const { setStyledAvatar, invalidateStyledAvatarForCategory } = require('./styledAvatars');
+const { AVATAR_SLOTS } = require('./clothingCategories');
 
 /**
  * Generate avatars for story characters based on clothing requirements.
@@ -298,7 +299,7 @@ function validateCharacterAvatars(characters, clothingRequirements) {
       if (!config || !config.used) continue;
 
       // Check if base avatar exists for standard categories
-      if (['standard', 'winter', 'summer'].includes(category)) {
+      if (AVATAR_SLOTS.includes(category)) {
         if (!char.avatars?.[category] && !char.avatars?.standard) {
           missing.push({ name: char.name, category, reason: 'No base avatar' });
         }

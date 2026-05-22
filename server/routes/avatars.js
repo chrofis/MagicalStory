@@ -43,6 +43,18 @@ const ART_STYLE_SAMPLES = {
 
 const styleSampleCache = new Map();
 
+// URL-only writers (Phase 5). Inline base64 only persists when R2 upload
+// returned no URL — readers expect URL field. Hoisted from two identical
+// definitions inside avatar persistence handlers.
+const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
+const onlyMissingThumbs = (inline, urls) => {
+  if (!inline) return undefined;
+  if (!urls) return inline;
+  const out = {};
+  for (const k of Object.keys(inline)) if (!urls[k]) out[k] = inline[k];
+  return Object.keys(out).length ? out : undefined;
+};
+
 /**
  * Load art style sample image as base64 (local copy — mirrors styledAvatars.js)
  * @param {string} artStyle - Art style ID
@@ -2437,14 +2449,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // is persisted ONLY when R2 upload failed (so the readers, which
             // require URL, still have something). Sliced inlines elsewhere
             // are intermediate results that don't need to land in Postgres.
-            const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
-            const onlyMissingThumbs = (inline, urls) => {
-              if (!inline) return undefined;
-              if (!urls) return inline;
-              const out = {};
-              for (const k of Object.keys(inline)) if (!urls[k]) out[k] = inline[k];
-              return Object.keys(out).length ? out : undefined;
-            };
+            // onlyIfNoUrl / onlyMissingThumbs are hoisted to module scope.
             const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
             const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
             const newAvatarData = {
@@ -3590,14 +3595,7 @@ These corrections OVERRIDE what is visible in the reference photo.
 
             // URL-only writer (Phase 5). Inline base64 only persists when
             // R2 upload returned no URL — readers expect URL field.
-            const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
-            const onlyMissingThumbs = (inline, urls) => {
-              if (!inline) return undefined;
-              if (!urls) return inline;
-              const out = {};
-              for (const k of Object.keys(inline)) if (!urls[k]) out[k] = inline[k];
-              return Object.keys(out).length ? out : undefined;
-            };
+            // onlyIfNoUrl / onlyMissingThumbs are hoisted to module scope.
             const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
             const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
             const newAvatarData = {

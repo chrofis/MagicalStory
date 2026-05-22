@@ -25,6 +25,18 @@
 const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
 const { log } = require('../utils/logger');
 
+/**
+ * Strip a `data:image/...;base64,` prefix from a string and return the bare
+ * base64 payload. Pass-through for non-strings. Mirrors the inline regex used
+ * in ~100 sites across the image / cover / avatar pipeline.
+ *
+ * @param {string|*} s
+ * @returns {string|*}
+ */
+function stripDataUriPrefix(s) {
+  return typeof s === 'string' ? s.replace(/^data:image\/\w+;base64,/, '') : s;
+}
+
 let _client = null;
 let _configured = null;
 
@@ -380,6 +392,7 @@ async function fetchImageBytes(url) {
 
 module.exports = {
   isConfigured,
+  stripDataUriPrefix,
   uploadImage,
   fetchImageBytes,
   bytesFromAnyImage,

@@ -15,15 +15,42 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
-const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription } = require('./storyHelpers');
+const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription, extractJsonFromText } = require('./storyHelpers');
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
+const { COVER_HINT_KEY } = require('./coverKeys');
 const r2 = require('./r2');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+/**
+ * Resolve the active version for a scene image. Each version stores its own
+ * imageData and bboxDetection — without this the grid was being composed from
+ * page-level imageData (almost always v0), so a page where v0 had a wrong
+ * character but v3 (active, score 95) had the correct one still produced a
+ * mismatch finding. The active version is the source of truth.
+ *
+ * Priority for bboxDetection: sharedBboxDetection (unified pipeline pre-step)
+ *   > active version's bboxDetection > page-level fallback.
+ *
+ * @param {Object} img - scene image record with imageVersions, activeVersion, imageData, bboxDetection
+ * @returns {{ activeIdx: number, activeVersion: Object|null, imageData: string|null, bboxDetection: Object|null, versionIndex: number|null }}
+ */
+function resolveActiveVersionData(img) {
+  const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
+  const lastIdx = versions.length - 1;
+  const activeIdx = (typeof img.activeVersion === 'number')
+    ? Math.max(0, Math.min(img.activeVersion, lastIdx))
+    : lastIdx;
+  const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
+  const imageData = activeVersion?.imageData || img.imageData;
+  const versionIndex = lastIdx >= 0 ? activeIdx : null;
+  const bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
+  return { activeIdx, activeVersion, imageData, bboxDetection, versionIndex };
+}
 
 /**
  * Detect faces in an illustration using anime + Haar cascades via Python service.
@@ -67,7 +94,7 @@ async function detectIllustrationFaces(imageData, padPercent = 60) {
 async function validateFaceCropWithGemini(cropData) {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-    const base64 = cropData.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = r2.stripDataUriPrefix(cropData);
     const result = await model.generateContent([
       { inlineData: { mimeType: 'image/jpeg', data: base64 } },
       'Does this image show a human or illustrated character face? Answer only "yes" or "no".'
@@ -599,12 +626,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // Include covers in entity checks (covers often show multiple characters)
     const coverEntries = [];
     const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
-    // coverImages keys → coverHints keys (frontCover↔titlePage, others identical)
-    const COVER_HINT_KEY = { frontCover: 'titlePage', initialPage: 'initialPage', backCover: 'backCover' };
     if (storyData.coverImages) {
       for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
         if (cover && (cover.imageData || cover.hasImage)) {
-          // Get active version image if available
+          // NOTE: covers identify their active version by a boolean `isActive` flag
+          // on each version entry, NOT by the numeric `activeVersion` index that
+          // scene images use. Do not route this through resolveActiveVersionData().
           let imageData = cover.imageData;
           if (cover.imageVersions?.length > 0) {
             const activeVersion = cover.imageVersions.find(v => v.isActive);
@@ -1085,25 +1112,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
   for (const img of sceneImages) {
     const pageNumber = img.pageNumber;
 
-    // Resolve the active version. Each version stores its own imageData and
-    // bboxDetection — without this the grid was being composed from page-level
-    // imageData (almost always v0), so a page where v0 had Noah-as-elderly-man
-    // but v3 (active, score 95) had a correct young-boy still produced an
-    // "elderly man" finding. The active version is the source of truth.
-    const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
-    const lastIdx = versions.length - 1;
-    const activeIdx = (typeof img.activeVersion === 'number')
-      ? Math.max(0, Math.min(img.activeVersion, lastIdx))
-      : lastIdx;
-    const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
-    const imageData = activeVersion?.imageData || img.imageData;
-    const versionIndex = lastIdx >= 0 ? activeIdx : null;
+    // See resolveActiveVersionData() at the top of this file for the rationale.
+    const { activeVersion, imageData, versionIndex, bboxDetection: bboxDetectionInit } = resolveActiveVersionData(img);
 
     if (!imageData) continue;
 
-    // Priority: sharedBboxDetection (unified pipeline pre-step) > active version's
-    // bboxDetection > page-level fallback. Fresh detection runs below if all missing.
-    let bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
+    let bboxDetection = bboxDetectionInit;
 
     // Get clothing info for this page - try multiple sources
     // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
@@ -1500,18 +1514,12 @@ function collectObjectAppearances(sceneImages, visualBible = null) {
 
     // Active-version-aware: object crops come from the version the user is
     // looking at, not whatever v0 happened to have stored at page level.
-    const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
-    const lastIdx = versions.length - 1;
-    const activeIdx = (typeof img.activeVersion === 'number')
-      ? Math.max(0, Math.min(img.activeVersion, lastIdx))
-      : lastIdx;
-    const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
-    const imageData = activeVersion?.imageData || img.imageData;
+    // See resolveActiveVersionData() at the top of this file for the rationale.
+    const { imageData, bboxDetection: bboxDetectionInit } = resolveActiveVersionData(img);
 
     if (!imageData) continue;
 
-    // Priority: sharedBboxDetection > active version bbox > page-level bbox.
-    let bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
+    let bboxDetection = bboxDetectionInit;
 
     if (!bboxDetection?.objects) continue;
 
@@ -1905,39 +1913,12 @@ Compare each cell to the reference avatar (Cell R) for:
     const response = result.response;
     const text = response.text();
 
-    // Parse JSON response
-    let parsed;
-    try {
-      // Extract JSON from response (handle markdown code blocks)
-      let jsonText = text;
-
-      // Try to extract from ```json ... ``` blocks (with closing backticks)
-      const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonBlockMatch) {
-        jsonText = jsonBlockMatch[1];
-      } else {
-        // Try to extract from ``` ... ``` blocks (with closing backticks)
-        const codeBlockMatch = text.match(/```\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-          jsonText = codeBlockMatch[1];
-        } else if (text.trim().startsWith('```json')) {
-          // Handle case where response starts with ```json but has no closing backticks
-          jsonText = text.trim().replace(/^```json\s*/, '').replace(/```\s*$/, '');
-        } else if (text.trim().startsWith('```')) {
-          // Handle case where response starts with ``` but has no closing backticks
-          jsonText = text.trim().replace(/^```\s*/, '').replace(/```\s*$/, '');
-        } else {
-          // Try to find JSON object directly (starts with {)
-          const jsonObjMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonObjMatch) {
-            jsonText = jsonObjMatch[0];
-          }
-        }
-      }
-
-      parsed = JSON.parse(jsonText.trim());
-    } catch (parseErr) {
-      log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName}: ${parseErr.message}`);
+    // Parse JSON response — extractJsonFromText handles fenced blocks, raw JSON,
+    // and balanced-brace extraction (covers the unclosed-fence cases that the
+    // older inline parser tried to handle separately).
+    const parsed = extractJsonFromText(text);
+    if (!parsed) {
+      log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName}`);
       log.debug(`[ENTITY-CHECK] Raw response: ${text.substring(0, 200)}...`);
       return {
         consistent: true,

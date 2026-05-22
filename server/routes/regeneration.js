@@ -85,6 +85,7 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
+const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -1892,7 +1893,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
 
       const sceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
-      const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
+      const normalizedCoverType = coverKeyToType(coverKey);
 
       // Merge avatars: story avatars first, then fresh from characters table as fallback
       const freshCharResult = await getDbPool().query(
@@ -2488,7 +2489,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       ? JSON.parse(story.data)
       : story.data;
 
-    const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
+    const coverKey = coverTypeToKey(normalizedCoverType);
 
     // Apply user edits to storyData BEFORE calling iterateCover. The
     // iterateCover function reads from storyData (title / dedication /
@@ -2577,7 +2578,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // a uniform result. Same function the unified-pipeline auto-repair and
     // the dev-mode iterate endpoint use.
     const { iterateCover } = require('../lib/coverIterate');
-    const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+    const coverLabelStr = coverLabel(normalizedCoverType);
     const coverImageModelId = MODEL_DEFAULTS.coverImage;
     const iterResult = await iterateCover(coverKey, storyData, {
       imageModel: coverImageModelId,

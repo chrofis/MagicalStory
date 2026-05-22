@@ -26,6 +26,10 @@
 // Canonical buckets — the ONLY valid cache key values
 const CANONICAL = Object.freeze(['standard', 'winter', 'summer', 'costumed']);
 
+// The three avatar slots that every character is expected to have (excludes
+// story-specific 'costumed', which is generated on demand).
+const AVATAR_SLOTS = Object.freeze(['standard', 'winter', 'summer']);
+
 /**
  * Normalize any clothing category string to one of 4 canonical buckets.
  *
@@ -172,6 +176,7 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
 
 module.exports = {
   CANONICAL,
+  AVATAR_SLOTS,
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,

@@ -11,6 +11,7 @@ const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
+const { coverKeyToType, coverKeyToHintKey, coverLabel } = require('./coverKeys');
 
 function getStoryHelpers() {
   return require('./storyHelpers');
@@ -116,10 +117,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   // Character selection: use cover hints (authoritative) > scene description > fallback
   const MAX_COVER_CHARACTERS = 5;
-  const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
+  const normalizedCoverType = coverKeyToType(coverKey);
 
   // Cover hints from outline — authoritative character list with per-character clothing
-  const hintKey = coverKey === 'frontCover' ? 'titlePage' : coverKey === 'initialPage' ? 'initialPage' : 'backCover';
+  const hintKey = coverKeyToHintKey(coverKey);
   const coverHint = storyData.coverHints?.[hintKey];
   const hintCharClothing = coverHint?.characterClothing;
 
@@ -291,14 +292,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   // --- Build cover references (landmark photos, empty-scene plate, VB grid) ---
   // Shared with the streaming initial-gen path so v0 and iterate use the same anchors.
-  const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+  const coverLabelStr = coverLabel(coverKey);
   const refs = await buildCoverReferences({
     coverKey,
     visualBible,
     artStyle: storyData.artStyle,
     sceneDescription,
     coverHint,
-    logLabel: `${coverLabel} ITERATE`,
+    logLabel: `${coverLabelStr} ITERATE`,
   });
   const {
     landmarkPhotos: coverLandmarkPhotos,
@@ -401,7 +402,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const imageResult = await generateImageWithQualityRetry(
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
-    `${coverLabel} ITERATE`,
+    `${coverLabelStr} ITERATE`,
     { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
   );
 
@@ -476,7 +477,7 @@ async function buildCoverReferences({
   const { generateImageOnly, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./images');
   const { getElementReferenceImagesForPage, getElementReferenceImagesByIds } = require('./visualBible');
 
-  const label = logLabel || (coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER');
+  const label = logLabel || coverLabel(coverKey);
 
   // Resolve scene metadata: caller-provided wins; otherwise try parsing the
   // description (rarely succeeds for covers — they're plain prose) and fall

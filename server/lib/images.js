@@ -381,7 +381,7 @@ const MAX_MASK_COVERAGE_PERCENT = 25;
  */
 function hashImageData(imageData) {
   if (!imageData || typeof imageData !== 'string') return null;
-  const data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const data = r2Lib.stripDataUriPrefix(imageData);
   return crypto.createHash('sha256').update(data).digest('hex').substring(0, 8);
 }
 
@@ -400,7 +400,7 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
     .map(p => typeof p === 'string' ? p : p?.photoUrl)
     .filter(url => url && typeof url === 'string' && url.startsWith('data:image'))
     .map(photoUrl => {
-      const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = r2Lib.stripDataUriPrefix(photoUrl);
       return crypto.createHash('sha256').update(base64Data).digest('hex').substring(0, 16);
     })
     .sort()
@@ -423,7 +423,7 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 async function cropImageForSequential(imageBase64) {
   try {
     // Remove data URI prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageBase64);
 
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(base64Data, 'base64');
@@ -481,7 +481,7 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
     // Remove data URI prefix if present and detect original mime type
     const mimeMatch = pngBase64.match(/^data:(image\/\w+);base64,/);
     const originalMimeType = mimeMatch ? mimeMatch[1] : 'image/png';
-    const base64Data = pngBase64.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(pngBase64);
 
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(base64Data, 'base64');
@@ -722,7 +722,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
   const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null } = options;
   try {
-    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
     const { data: pixels, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
     const { width, height } = info;
@@ -827,7 +827,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
       try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey) {
-          const base64ForVision = imageData.replace(/^data:image\/\w+;base64,/, '');
+          const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
           const sceneCtx = sceneDescription
@@ -987,7 +987,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       return null;
     }
 
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
     const parts = [
@@ -1269,7 +1269,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Extract base64 and mime type for generated image
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -1381,7 +1381,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           } else {
             // Compress and cache
             const compressed = await compressImageToJPEG(photoUrl, 85, 768); // 85% quality, max 768px
-            compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+            compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
             compressedRefCache.set(imageHash, compressedBase64);
           }
 
@@ -2161,7 +2161,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     }
 
     // Extract base64 and mime type
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -2496,7 +2496,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
         const overlayDataUri = await createBboxOverlayImage(imageData, pass1Result);
 
         if (overlayDataUri) {
-          const overlayBase64 = overlayDataUri.replace(/^data:image\/\w+;base64,/, '');
+          const overlayBase64 = r2Lib.stripDataUriPrefix(overlayDataUri);
           const overlayMime = overlayDataUri.match(/^data:(image\/\w+);base64,/)
             ? overlayDataUri.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -2621,7 +2621,7 @@ Respond with ONLY the JSON.`;
       if (cascadeFaces.length > 0) {
         let imgW = 1024, imgH = 1024;
         try {
-          const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+          const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageData), 'base64')).metadata();
           imgW = meta.width || 1024;
           imgH = meta.height || 1024;
         } catch { /* use defaults */ }
@@ -3679,7 +3679,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     // Crop 15% from top and bottom to change aspect ratio
     const croppedImage = await cropImageForSequential(previousImage);
 
-    const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(croppedImage);
     const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
       croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
@@ -3730,7 +3730,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         } else {
           // Compress and cache (768px for image gen - slightly larger than quality eval)
           const compressed = await compressImageToJPEG(photoUrl, 85, 768);
-          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
           compressedRefCache.set(imageHash, compressedBase64);
         }
 
@@ -4381,7 +4381,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   // For sequential mode: Add PREVIOUS scene image FIRST
   if (hasSequentialImage) {
     const croppedImage = await cropImageForSequential(previousImage);
-    const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(croppedImage);
     const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
       croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
@@ -4398,7 +4398,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Scene background reference (empty scene for style anchoring)
   if (sceneBackground && sceneBackground.startsWith('data:image')) {
-    const bgBase64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
+    const bgBase64 = r2Lib.stripDataUriPrefix(sceneBackground);
     const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     parts.push({ text: `[Background]:` });
     parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
@@ -4433,7 +4433,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
           cacheHits++;
         } else {
           const compressed = await compressImageToJPEG(photoUrl, 85, 768);
-          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
           compressedRefCache.set(imageHash, compressedBase64);
         }
 
@@ -8051,8 +8051,8 @@ async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName
   log.info(`👤 [CHAR REPAIR] Starting character replacement for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
   // Extract base64 from both images
-  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
+  const currentBase64 = r2Lib.stripDataUriPrefix(imageData);
+  const avatarBase64 = r2Lib.stripDataUriPrefix(characterPhoto);
 
   // Build issue context if provided
   const issueDescription = options.issueDescription || '';
@@ -8537,7 +8537,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
   // Crop character reference to front column only for styled avatars (2-column grid: front | side)
   // Raw photos are single images — cropping cuts the person in half
-  const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
+  const avatarBase64 = r2Lib.stripDataUriPrefix(characterPhoto);
   const avatarBuffer = Buffer.from(avatarBase64, 'base64');
   const isAvatarGrid = options.photoType && (options.photoType.startsWith('styled-') || options.photoType.startsWith('costumed-') || options.photoType.startsWith('clothing-'));
   const croppedAvatar = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
@@ -8555,7 +8555,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       throw new Error(`Failed to fetch scene image from R2: ${imageData}`);
     }
   } else {
-    const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const currentBase64 = r2Lib.stripDataUriPrefix(imageData);
     sceneBuffer = Buffer.from(currentBase64, 'base64');
   }
 
@@ -8780,7 +8780,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // C. Decode Grok result. Resize to scene dimensions aspect-preserving
     // (fit:'inside') and letterbox-crop if Grok returned a slightly
     // different aspect. Never fit:'fill' — that stretches the image.
-    let grokBuffer = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    let grokBuffer = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
     grokBuffer = await resizeGrokToSceneDims(grokBuffer, sceneMeta.width, sceneMeta.height);
 
     // D. Calculate blend region: bbox + 10% padding (just enough for the edge feather).
@@ -9173,7 +9173,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     }
 
     // Decode Grok's output
-    const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+    const repairedRegionBase64 = r2Lib.stripDataUriPrefix(grokResult.imageData);
     let repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
 
     // Step 1: detect and trim any uniform pale border Grok ADDED (letterbox
@@ -9586,7 +9586,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     //
     // The user can also force feather OFF via options.featherComposite=false
     // for A/B debugging (rare; the auto-detect handles the normal case).
-    const grokRawBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const grokRawBuf = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
     const featherEnabled = options.featherComposite !== false;
     let finalBuf;
     let featherDecision = 'OFF (no silhouette)';
@@ -9927,7 +9927,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     }
 
     // Extract base64 and mime type from the image
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -10825,7 +10825,7 @@ async function inspectImageForErrors(imageData) {
     log.debug('🔍 [INSPECT] Analyzing image for physics errors...');
 
     // Extract base64 and mime type
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -10936,7 +10936,7 @@ async function getImageDimensions(imageData) {
     return dimensionCache.get(cacheKey);
   }
 
-  const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const base64Data = r2Lib.stripDataUriPrefix(imageData);
   const buffer = Buffer.from(base64Data, 'base64');
   const metadata = await sharp(buffer).metadata();
   const dimensions = { width: metadata.width, height: metadata.height };
@@ -11186,11 +11186,11 @@ async function verifyInpaintWithLLM(beforeImage, afterImage, issueDescription, f
       return null;
     }
 
-    const beforeBase64 = beforeImage.replace(/^data:image\/\w+;base64,/, '');
+    const beforeBase64 = r2Lib.stripDataUriPrefix(beforeImage);
     const beforeMime = beforeImage.match(/^data:(image\/\w+);base64,/) ?
       beforeImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    const afterBase64 = afterImage.replace(/^data:image\/\w+;base64,/, '');
+    const afterBase64 = r2Lib.stripDataUriPrefix(afterImage);
     const afterMime = afterImage.match(/^data:(image\/\w+);base64,/) ?
       afterImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -11681,7 +11681,7 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
  */
 async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, options = {}) {
   // 1. Create whiteout overlay on all bounding box regions
-  const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
+  const origBase64 = r2Lib.stripDataUriPrefix(originalImage);
   const origBuffer = Buffer.from(origBase64, 'base64');
   const metadata = await sharp(origBuffer).metadata();
   const { width, height } = metadata;
@@ -11741,7 +11741,7 @@ IMPORTANT:
 
   // 4. Feathered blend each region back onto original (same technique as character repair)
   const FEATHER_PX = 30;
-  const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+  const grokBase64 = r2Lib.stripDataUriPrefix(grokResult.imageData);
   let grokBuffer = Buffer.from(grokBase64, 'base64');
 
   // Resize Grok result to match original dimensions if needed
@@ -11870,7 +11870,7 @@ async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImag
     log.debug(`🔧 [INPAINT] Fix prompt: "${fixPrompt}"`);
 
     // Extract base64 and mime type for original image
-    const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
+    const origBase64 = r2Lib.stripDataUriPrefix(originalImage);
     const origMimeType = originalImage.match(/^data:(image\/\w+);base64,/) ?
       originalImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -12104,7 +12104,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
 
         if (!compressedBase64) {
           const compressed = await compressImageToJPEG(refPhoto, 85, 768);
-          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
           compressedRefCache.set(imageHash, compressedBase64);
         }
 
@@ -12132,7 +12132,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
 
     // Compress image for efficiency
     const compressed = await compressImageToJPEG(imageData, 80, 768);
-    const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(compressed);
 
     parts.push({
       text: `Image ${i + 1} (Page ${img.pageNumber || 'unknown'}):`
@@ -12606,7 +12606,7 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
   const parts = [];
 
   // Add current image first (Image 1)
-  const currentBase64 = currentImage.replace(/^data:image\/\w+;base64,/, '');
+  const currentBase64 = r2Lib.stripDataUriPrefix(currentImage);
   parts.push({ text: `Image 1 (Page ${currentPageNumber} - CURRENT, to evaluate):` });
   parts.push({
     inline_data: {
@@ -12624,7 +12624,7 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
 
     // Compress for efficiency
     const compressed = await compressImageToJPEG(imageData, 80, 768);
-    const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = r2Lib.stripDataUriPrefix(compressed);
 
     parts.push({ text: `Image ${i + 2} (Page ${img.pageNumber} - reference):` });
     parts.push({
@@ -12899,7 +12899,7 @@ async function splitGridIntoReferences(gridImage, count) {
   let buffer;
   let base64;
   if (typeof gridImage === 'string') {
-    base64 = gridImage.replace(/^data:image\/\w+;base64,/, '');
+    base64 = r2Lib.stripDataUriPrefix(gridImage);
     buffer = Buffer.from(base64, 'base64');
   } else {
     buffer = gridImage;
@@ -13148,7 +13148,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       }
 
       // Extract base64 from data URI
-      const gridImageData = result.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const gridImageData = r2Lib.stripDataUriPrefix(result.imageData);
 
       log.info(`[REF-SHEET] ✓ Generated ${batch.length}-element grid (${Math.round(gridImageData.length / 1024)}KB)`);
 
@@ -13363,7 +13363,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   if (gridElements.length === 1) {
     try {
       const el = gridElements[0];
-      const base64Data = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = r2Lib.stripDataUriPrefix(el.imageData);
       const imageBuffer = Buffer.from(base64Data, 'base64');
       const resized = await sharp(imageBuffer)
         .resize({ width: 512, withoutEnlargement: true })
@@ -13410,7 +13410,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
     // First pass: resize all images and calculate total height
     const resizedElements = [];
     for (const el of gridElements) {
-      const base64Data = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = r2Lib.stripDataUriPrefix(el.imageData);
       const imageBuffer = Buffer.from(base64Data, 'base64');
       const resized = await sharp(imageBuffer)
         .resize({ width: cellWidth, withoutEnlargement: true })
@@ -13654,7 +13654,7 @@ async function analyzeImageStyle(imageData) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured');
 
-  const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const base64Data = r2Lib.stripDataUriPrefix(imageData);
   const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
@@ -13703,7 +13703,7 @@ async function compareImageStyles(imageDataA, imageDataB) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured');
 
-  const toBase64 = (img) => img.replace(/^data:image\/\w+;base64,/, '');
+  const toBase64 = (img) => r2Lib.stripDataUriPrefix(img);
   const getMime = (img) => img.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;

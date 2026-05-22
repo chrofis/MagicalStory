@@ -44,6 +44,7 @@ const {
 } = require('./repairVerification');
 
 const { detectSubRegion } = require('./images');
+const { stripDataUriPrefix } = require('./r2');
 
 // Severity colors for annotated image
 const SEVERITY_COLORS = {
@@ -177,7 +178,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   // Convert to buffer if needed
   const imageBuffer = Buffer.isBuffer(imageData)
     ? imageData
-    : Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(imageData), 'base64');
 
   const metadata = await sharp(imageBuffer).metadata();
   const imgDimensions = { width: metadata.width, height: metadata.height };

@@ -191,7 +191,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   if (model === GROK_MODELS.PRO && images.length > 1) {
     log.info(`🎨 [GROK] Pro model supports 1 image — stitching ${images.length} refs into composite`);
     const buffers = images.map(url => {
-      const base64 = url.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = r2.stripDataUriPrefix(url);
       return Buffer.from(base64, 'base64');
     });
     const stitched = await stitchImagesHorizontally(buffers, 768);
@@ -219,7 +219,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
   for (let i = 0; i < images.length; i++) {
     try {
-      const base64 = images[i].replace(/^data:image\/\w+;base64,/, '');
+      const base64 = r2.stripDataUriPrefix(images[i]);
       const buf = Buffer.from(base64, 'base64');
       const meta = await sharp(buf).metadata();
       if (!meta.width || !meta.height) continue;
@@ -919,7 +919,7 @@ async function packReferences(refs = {}, options = {}) {
   // The mask confused Grok (it copied abstract black/white shapes into the output).
   // VB elements now ride in the same slot(s) as the character avatars instead.
   if (hasSceneBackground) {
-    const base64 = sceneBackground.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = r2.stripDataUriPrefix(sceneBackground);
     const buf = Buffer.from(base64, 'base64');
     const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
@@ -929,7 +929,7 @@ async function packReferences(refs = {}, options = {}) {
   // Previous image goes FIRST — it's the scene being re-rendered (style transfer)
   // or the previous page for visual continuity (sequential mode)
   if (previousImage && previousImage.startsWith('data:image')) {
-    const base64 = previousImage.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = r2.stripDataUriPrefix(previousImage);
     const buf = Buffer.from(base64, 'base64');
     const resized = await sharp(buf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
@@ -1045,7 +1045,7 @@ async function packReferences(refs = {}, options = {}) {
   // strip onto the mask, Grok bakes that strip's text verbatim into the output.
   if (textAreaMask && !hasSceneBackground && slots.length < 3) {
     try {
-      const base64 = textAreaMask.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = r2.stripDataUriPrefix(textAreaMask);
       const maskBuf = Buffer.from(base64, 'base64');
       const resized = await sharp(maskBuf)
         .resize({ height: 768, withoutEnlargement: true })
@@ -1070,7 +1070,7 @@ async function packReferences(refs = {}, options = {}) {
   const paddedSlots = [];
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i];
-    const base64 = slot.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = r2.stripDataUriPrefix(slot);
     const buf = Buffer.from(base64, 'base64');
 
     let meta;
@@ -1230,7 +1230,7 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
     const el = elements[i];
     if (!el.imageData) continue;
     try {
-      const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = r2.stripDataUriPrefix(el.imageData);
       const elBuf = Buffer.from(base64, 'base64');
       const cell = await sharp(elBuf)
         .resize(cellW, cellH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
@@ -1318,7 +1318,7 @@ async function composeSceneWithVbBorder(sceneBuffer, vbElements = [], options = 
     if (!el.imageData) continue;
 
     try {
-      const base64 = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = r2.stripDataUriPrefix(el.imageData);
       const elBuf = Buffer.from(base64, 'base64');
 
       // Fill the cell with the element image (cover crops to fit, maximizes visibility)
