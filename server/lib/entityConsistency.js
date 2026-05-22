@@ -2832,12 +2832,21 @@ function buildPhysicalTraitsDescription(character) {
  * @param {string} artStyle - Art style being used
  * @returns {string} Clothing description
  */
-function buildClothingDescription(character, clothingCategory, artStyle) {
+function buildClothingDescription(character, clothingCategory, artStyle, clothingRequirements = null) {
   const avatars = character.avatars;
+
+  // Per-story clothingRequirements is the source of truth for THIS story;
+  // avatars.clothing[category] is character-level metadata that can be
+  // stale across stories. Priority: signature → description → avatars.
+  // Per the 2026-05-22 codebase-audit decision, avatars.clothing is kept as
+  // a fallback rather than removed.
+  const charReqs = clothingRequirements?.[character?.name];
 
   // Handle costumed clothing — bare 'costumed' (Phase 5) or legacy 'costumed:<sub>'.
   if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
     const colonSub = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : null;
+    if (charReqs?.costumed?.signature && charReqs.costumed.signature !== 'none') return charReqs.costumed.signature;
+    if (charReqs?.costumed?.description) return charReqs.costumed.description;
     // Nested-by-subtype legacy shape: prefer the matching key, else first entry.
     if (avatars?.costumed && typeof avatars.costumed === 'object') {
       if (colonSub && avatars.costumed[colonSub]?.clothing) return avatars.costumed[colonSub].clothing;
@@ -2847,7 +2856,13 @@ function buildClothingDescription(character, clothingCategory, artStyle) {
     return `${colonSub || 'costume'} as shown in reference`;
   }
 
-  // For standard categories, try to get extracted clothing from styled avatar
+  // Standard categories: per-story signature/description wins over stale avatars.clothing.
+  if (charReqs?.[clothingCategory]?.signature && charReqs[clothingCategory].signature !== 'none') {
+    return charReqs[clothingCategory].signature;
+  }
+  if (charReqs?.[clothingCategory]?.description) {
+    return charReqs[clothingCategory].description;
+  }
   if (avatars?.clothing?.[clothingCategory]) {
     return avatars.clothing[clothingCategory];
   }
@@ -2955,8 +2970,9 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     const builtHair = buildHairDescription(character.physical || {}, character.physicalTraitsSource);
     const hairStyle = builtHair || 'as shown in reference';
 
-    // Build clothing description for this scene
-    const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle);
+    // Build clothing description for this scene — pass clothingRequirements
+    // so the current-story signature wins over stale avatars.clothing.
+    const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements);
 
     // Format issues found for this page (if provided in options)
     let issuesFoundText = '';

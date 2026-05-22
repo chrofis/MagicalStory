@@ -3071,19 +3071,29 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
   const label = (clothingLabel || '').trim();
   const isCostumed = label.startsWith('costumed');
 
+  // Priority: clothingRequirements (per-story, source of truth for CURRENT
+  // story) → avatars.clothing (character-level metadata, can be stale across
+  // stories). Per the 2026-05-22 codebase-audit decision, avatars.clothing
+  // is kept as a fallback rather than removed.
   if (isCostumed) {
+    const reqs = clothingRequirements?.[char.name]?.costumed;
+    if (reqs?.signature && reqs.signature !== 'none') return reqs.signature;
+    if (reqs?.description) return reqs.description;
     if (avatars?.clothing?.costumed) {
       const desc = Object.values(avatars.clothing.costumed)[0];
       if (desc) return typeof desc === 'string' ? desc : formatClothingObject(desc);
     }
-    const reqDesc = clothingRequirements?.[char.name]?.costumed?.description;
-    if (reqDesc) return reqDesc;
     return null;
   }
 
-  if (label && avatars?.clothing?.[label]) {
-    const desc = avatars.clothing[label];
-    return typeof desc === 'string' ? desc : formatClothingObject(desc);
+  if (label) {
+    const reqs = clothingRequirements?.[char.name]?.[label];
+    if (reqs?.signature && reqs.signature !== 'none') return reqs.signature;
+    if (reqs?.description) return reqs.description;
+    if (avatars?.clothing?.[label]) {
+      const desc = avatars.clothing[label];
+      return typeof desc === 'string' ? desc : formatClothingObject(desc);
+    }
   }
   return null;
 }
