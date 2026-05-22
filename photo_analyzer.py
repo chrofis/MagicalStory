@@ -35,6 +35,15 @@ logging.getLogger('mediapipe').setLevel(logging.CRITICAL)
 
 app = Flask(__name__)
 CORS(app)
+# Cap request body at 16 MB. Image endpoints decode base64 then expand into
+# numpy arrays; without this guard a 20 MB base64 payload (~14 MP image)
+# balloons to 50+ MB of process memory per request, and rembg on top of
+# that can hit 200–400 MB. The cap rejects oversized inputs at the Flask
+# layer before any decoding happens, removing the DoS vector.
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+# Per-image pixel cap applied AFTER cv2.imdecode but BEFORE rembg / heavy
+# pipelines. Anything larger is downscaled proportionally.
+MAX_IMAGE_DIM = 2048
 
 # Try to initialize MediaPipe (may fail on newer Python versions)
 mp_face_detection = None
@@ -107,6 +116,20 @@ except Exception as e:
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Load the OpenCV frontal-face Haar cascade ONCE at module load. Per-request
+# CascadeClassifier(...) parses + loads the XML every call (~10–30 ms wasted).
+# detect_face_opencv() / detect_all_faces_opencv() now read this global.
+try:
+    _FRONTAL_FACE_CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    if _FRONTAL_FACE_CASCADE.empty():
+        print("[WARN] Frontal face cascade failed to load")
+        _FRONTAL_FACE_CASCADE = None
+    else:
+        print("[OK] Frontal face cascade loaded (Haar)")
+except Exception as _e:
+    print(f"[WARN] Frontal face cascade init error: {_e}")
+    _FRONTAL_FACE_CASCADE = None
 
 # Load anime face cascade (for illustrated/cartoon faces)
 ANIME_CASCADE_AVAILABLE = False
@@ -238,9 +261,10 @@ def detect_face_opencv(image):
     Used when MediaPipe is not available (e.g., Python 3.14+).
     Returns bounding box as percentage of image dimensions (0-100)
     """
-    # Load the Haar cascade for face detection
-    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    face_cascade = cv2.CascadeClassifier(cascade_path)
+    # Module-level cascade (loaded once at startup) — see _FRONTAL_FACE_CASCADE.
+    face_cascade = _FRONTAL_FACE_CASCADE
+    if face_cascade is None:
+        return None
 
     # Convert to grayscale for detection
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -311,8 +335,10 @@ def detect_all_faces_opencv(image):
     Returns list of faces sorted by size (largest first).
     More strict settings to reduce false positives.
     """
-    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    face_cascade = cv2.CascadeClassifier(cascade_path)
+    # Module-level cascade (loaded once at startup) — see _FRONTAL_FACE_CASCADE.
+    face_cascade = _FRONTAL_FACE_CASCADE
+    if face_cascade is None:
+        return []
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     img_h, img_w = image.shape[:2]
@@ -878,10 +904,8 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
         else:
             print(f"[FACE] Using original size {img_w}x{img_h} (aspect: {aspect_ratio:.2f})")
 
-        # DEBUG: Save detection image to see what MediaPipe analyzes
-        debug_path = os.path.join(TEMP_DIR, 'debug_detection_input.jpg')
-        cv2.imwrite(debug_path, detection_img)
-        print(f"[DEBUG] Saved detection input to: {debug_path}")
+        # (Removed dev-only debug image write to TEMP_DIR; in production this
+        # was overwriting a decoded copy of every uploaded photo on disk.)
 
         # Use cached faces if provided (from first call), otherwise detect
         # This prevents face ID instability between calls
@@ -1546,15 +1570,9 @@ def compare_lpips():
             import torch.nn.functional as F
             img2_tensor = F.interpolate(img2_tensor, size=img1_tensor.shape[2:], mode='bilinear', align_corners=False)
 
-        # DEBUG: Save images being compared
-        try:
-            from torchvision.utils import save_image
-            save_image(img1_tensor * 0.5 + 0.5, 'test-results/lpips_debug_img1.png')
-            save_image(img2_tensor * 0.5 + 0.5, 'test-results/lpips_debug_img2.png')
-            print(f"[LPIPS DEBUG] Saved comparison images to test-results/lpips_debug_img1.png and img2.png")
-            print(f"[LPIPS DEBUG] img1 shape: {img1_tensor.shape}, img2 shape: {img2_tensor.shape}")
-        except Exception as e:
-            print(f"[LPIPS DEBUG] Failed to save debug images: {e}")
+        # (Removed dev-only debug image writes to test-results/; in production
+        # the directory doesn't exist and the writes silently failed, but if
+        # ever created they'd persist decoded comparison images on disk.)
 
         # Compute LPIPS
         with torch.no_grad():
@@ -2943,12 +2961,15 @@ def detect_illustration_faces():
             )
             anime_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in detections]
 
-        # Run Haar cascade (catches some faces anime misses)
-        haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        haar_faces_raw = haar_cascade.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
-        )
-        haar_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in haar_faces_raw]
+        # Run Haar cascade (catches some faces anime misses). Uses the
+        # module-level cascade loaded once at startup; no per-request reload.
+        haar_cascade = _FRONTAL_FACE_CASCADE
+        haar_faces = []
+        if haar_cascade is not None:
+            haar_faces_raw = haar_cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
+            )
+            haar_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in haar_faces_raw]
 
         # Compute IoU for matching
         def iou(a, b):
