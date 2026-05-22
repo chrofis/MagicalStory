@@ -9428,7 +9428,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         if (occRight <= hatchLeft || occLeft >= hatchLeft + hatchWidth) continue;
         if (occBottom <= hatchTop || occTop >= hatchTop + hatchHeight) continue;
         // Skip the self-bbox if it accidentally got into protectedBodies.
-        if (occLeft === figLeft && occTop === figTop && occWidth === figWidth && occHeight === figHeight) continue;
+        // The original pixel-equality check (occLeft===figLeft && occWidth===figWidth
+        // && ...) never fired because occ-coords are derived from the 20%-padded
+        // bbox while figLeft/figTop/figWidth/figHeight come from the unpadded
+        // target bbox. Compare normalized pre-pad coords instead with a small
+        // tolerance to absorb rounding.
+        const ε = 0.005;
+        const selfMatch =
+          Math.abs(pxMin - xmin) < ε &&
+          Math.abs(pyMin - ymin) < ε &&
+          Math.abs(pxMax - xmax) < ε &&
+          Math.abs(pyMax - ymax) < ε;
+        if (selfMatch) continue;
 
         try {
           const occCrop = await sharp(paddedScene)
@@ -9481,11 +9492,23 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // crosshatch landed on Mom). If the subtract removed >70% of the target
     // silhouette, treat it as a likely label mismatch and revert to the
     // pre-subtract silhouette so the target gets crosshatched at all.
-    if (silhouetteMaskBuf && fracBefore != null && silhouetteBeforeSubtract) {
+    if (silhouetteMaskBuf && fracBefore != null && fracBefore > 0 && silhouetteBeforeSubtract) {
       const fracAfter = await opaqueFraction(silhouetteMaskBuf);
       if (fracAfter != null && fracAfter < fracBefore * 0.30) {
         log.warn(`⚠️ [CHAR REPAIR GROK] Occluder subtract removed ${Math.round((1 - fracAfter / fracBefore) * 100)}% of target silhouette (before=${fracBefore.toFixed(2)}, after=${fracAfter.toFixed(2)}) — reverting to pre-subtract mask (likely bbox-label mismatch).`);
         silhouetteMaskBuf = silhouetteBeforeSubtract;
+      }
+    }
+    // Belt-and-braces: if the silhouette ended up effectively empty (rembg
+    // glitch or pathological subtract that the revert guard couldn't catch
+    // because fracBefore was 0), fall back to the rectangular hatch so we
+    // don't ship Grok an unmarked scene — that would produce a silent
+    // "repair appears to succeed but didn't repaint anything" failure.
+    if (silhouetteMaskBuf) {
+      const finalFrac = await opaqueFraction(silhouetteMaskBuf);
+      if (finalFrac != null && finalFrac < 0.01) {
+        log.warn(`⚠️ [CHAR REPAIR GROK] Silhouette mask near-empty (frac=${finalFrac.toFixed(3)}) — falling back to rectangular hatch.`);
+        silhouetteMaskBuf = null;
       }
     }
 
