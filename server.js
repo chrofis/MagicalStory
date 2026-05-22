@@ -6946,7 +6946,13 @@ async function _processStoryJobImpl(jobId) {
   }
   async function checkCancellation() {
     const result = await dbPool.query('SELECT status FROM story_jobs WHERE id = $1', [jobId]);
-    if (result.rows.length === 0 || result.rows[0].status === 'failed') {
+    // Only fire on the explicit 'cancelled' status set by the user-driven
+    // cancel endpoint. Previously this matched 'failed' too, which meant
+    // any transient pipeline error in one branch would trip every other
+    // in-flight pLimit slot via JobCancelledError and shadow the real
+    // error in logs / refunds. Also treat the job-row-missing case as
+    // cancelled (the row was deleted out from under us).
+    if (result.rows.length === 0 || result.rows[0].status === 'cancelled') {
       log.info(`🛑 [PIPELINE] Job ${jobId} cancelled — aborting pipeline`);
       throw new JobCancelledError(jobId);
     }

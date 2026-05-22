@@ -1875,7 +1875,7 @@ export const storyService = {
   },
 
   async getJobStatus(jobId: string): Promise<{
-    status: 'pending' | 'processing' | 'completed' | 'failed';
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
     progress?: { current: number; total: number; message: string };
     result?: {
       storyId: string;
@@ -2105,7 +2105,7 @@ export const storyService = {
     // Backend sends 'result' (not 'resultData') - support both for backwards compatibility
     const resultData = response.result || response.resultData;
     return {
-      status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
+      status: response.status as 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled',
       progress: {
         current: response.progress || 0,
         total: 100,
@@ -2145,7 +2145,7 @@ export const storyService = {
   // Get user's active/pending jobs (for restoring generation state after impersonation)
   async getActiveJobs(): Promise<Array<{
     id: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
     progress: number;
     progress_message: string;
     created_at: string;
@@ -2163,7 +2163,7 @@ export const storyService = {
       .filter(job => job.status === 'pending' || job.status === 'processing')
       .map(job => ({
         ...job,
-        status: job.status as 'pending' | 'processing' | 'completed' | 'failed',
+        status: job.status as 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled',
       }));
   },
 

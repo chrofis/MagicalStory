@@ -46,14 +46,14 @@ async function cleanupOldCompletedJobs() {
       DELETE FROM story_job_checkpoints
       WHERE job_id IN (
         SELECT id FROM story_jobs
-        WHERE status IN ('completed', 'failed')
+        WHERE status IN ('completed', 'failed', 'cancelled')
         AND updated_at < NOW() - INTERVAL '1 hour'
       )
     `);
 
     const jobResult = await pool.query(`
       DELETE FROM story_jobs
-      WHERE status IN ('completed', 'failed')
+      WHERE status IN ('completed', 'failed', 'cancelled')
       AND updated_at < NOW() - INTERVAL '1 hour'
     `);
 
@@ -609,10 +609,16 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
       log.error(`❌ Failed to refund credits for cancelled job ${jobId}:`, refundErr.message);
     }
 
-    // Mark job as failed (cancelled)
+    // Mark job as cancelled (NOT failed). Using a distinct status lets the
+    // pipeline's checkCancellation() detect user-driven cancel without
+    // false-positive firing on every transient 'failed' transition (e.g.
+    // a pipeline error sets status='failed' in another path → all in-flight
+    // pLimit slots would throw JobCancelledError and shadow the real
+    // error). The status column is VARCHAR(50) with no CHECK constraint,
+    // so adding the new value is a runtime-only change — no migration.
     await getDbPool().query(
       `UPDATE story_jobs
-       SET status = 'failed',
+       SET status = 'cancelled',
            error_message = 'Cancelled by user',
            updated_at = NOW()
        WHERE id = $1`,

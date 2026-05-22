@@ -201,14 +201,17 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
         setHasUnviewedCompletion(true);
         setProgress({ current: 100, total: 100, message: 'Complete!' });
         cleanupAfterTerminalState();
-      } else if (status.status === 'failed') {
-        const errorMsg = status.error || 'Generation failed';
+      } else if (status.status === 'failed' || status.status === 'cancelled') {
+        const errorMsg = status.error || (status.status === 'cancelled' ? 'Cancelled' : 'Generation failed');
 
         // Server-side cleanup of abandoned jobs is silent (no error toast).
+        // User-driven cancellation is also silent — they pressed cancel,
+        // they know it stopped.
         const isAbandoned = errorMsg.toLowerCase().includes('abandoned')
           || errorMsg.toLowerCase().includes('stopped responding');
-        if (isAbandoned) {
-          logger.info('[GenerationContext] Job cleaned up by server (abandoned/stale):', errorMsg);
+        const isUserCancel = status.status === 'cancelled';
+        if (isAbandoned || isUserCancel) {
+          logger.info('[GenerationContext] Job ended (abandoned/cancelled):', errorMsg);
         } else {
           logger.error('[GenerationContext] Job failed:', errorMsg);
           setError(errorMsg);
