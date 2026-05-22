@@ -4,10 +4,10 @@ The main characters WITNESS the historical event unfold - they are observers, no
 They experience history from the sidelines as a child, neighbor, friend, helper, or curious onlooker.
 
 Examples of observer roles:
-- Moon landing: "Emma and Max watch the Moon landing on TV with their family, dreaming of becoming astronauts."
-- Wright Brothers: "Sophie is a local child who watches two strange men testing flying machines on the beach."
-- Light bulb: "Max is Edison's young assistant who fetches materials and witnesses the breakthrough."
-- Pyramids: "Emma is a worker's daughter who sneaks onto the construction site and befriends the architect's son."
+- Moon landing: "CharacterA and CharacterB watch the Moon landing on TV with their family, dreaming of becoming astronauts."
+- Wright Brothers: "CharacterA is a local child who watches two strange men testing flying machines on the beach."
+- Light bulb: "CharacterA is Edison's young assistant who fetches materials and witnesses the breakthrough."
+- Pyramids: "CharacterA is a worker's daughter who sneaks onto the construction site and befriends the architect's son."
 
 IMPORTANT:
 - Characters observe, help, or are inspired by the historical figures

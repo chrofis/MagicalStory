@@ -86,7 +86,7 @@ Output one continuous paragraph of prose, then `---METADATA---`, then a single J
 
 **Example prose:**
 
-Sophie — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the foreground of a snowy town plaza, her gaze lifted toward the ancient clock tower that rises in the background with its blue face glowing faintly against grey clouds. Beside her walks Manuel, a slim ten-year-old in a navy parka and snow boots, body angled toward Sophie and face tilted upward in curiosity. Light snow falls onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
+CharacterA — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the foreground of a snowy town plaza, her gaze lifted toward the ancient clock tower that rises in the background with its blue face glowing faintly against grey clouds. Beside her walks CharacterB, a slim ten-year-old in a navy parka and snow boots, body angled toward CharacterA and face tilted upward in curiosity. Light snow falls onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
 
 **Metadata block:**
 
@@ -107,12 +107,12 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "Sophie", "clothing": "winter", "position": "foreground"},
-    {"name": "Manuel", "clothing": "winter", "position": "beside Sophie"}
+    {"name": "CharacterA", "clothing": "winter", "position": "foreground"},
+    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA"}
   ],
   "objects": ["LOC001"],
   "interactions": [
-    {"character": "Sophie", "object": "tower", "where": "gazes up at the clock tower", "storyRelevant": true, "priority": "essential"}
+    {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "storyRelevant": true, "priority": "essential"}
   ],
   "reuseEmptyScene": true,
   "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background, its blue face visible against grey clouds. Light snow falls on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
@@ -128,7 +128,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 <!-- TEXT_OVERLAY_BEGIN -->
 - `draftValidation`: must include `calmZoneCheck` confirming no named character / weapon / crowd in the textPosition corner.
 <!-- TEXT_OVERLAY_END -->
-- `characters[]`: one entry per character. Always `name`, `clothing`, `position`. `position` is a short relational phrase matching the prose (`on the boat`, `behind Roger`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures.
+- `characters[]`: one entry per character. Always `name`, `clothing`, `position`. `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures.
 - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
 - `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. For landmarks with photo variants use `LOC003.2` format — pick the variant matching the scene's perspective.
 - `interactions[]`: visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`. Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`. Omit entirely: pure ground/floor/path contact, leaning on walls, sitting on generic chairs. Field shape `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action — no body-part positioning, no pose details. Cap: 1–4 entries, 0–2 with `storyRelevant: true`. Distance verbs (`shoots`, `aims at`, `calls to`) require an explicit separation phrase in `where` (`across the room`, `down the valley`); for these scenes the shot must be `ultra-wide` and the prose must place each figure at the correct end of the frame.

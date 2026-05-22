@@ -12,7 +12,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 2. **Cross-check appearance traits against the character profile.** When an evaluator flags an appearance trait (glasses, hair, facial hair, etc.) but the character profile says the trait should be present, drop the issue — the evaluator was comparing against an incomplete scene description. Record the drop in `dropped_issues` with reason `"profile_says_trait_is_correct"`. The profile never adds new fixes; it only suppresses false ones.
 
-3. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center", "the elderly woman with silver hair"). If the input feedback uses a name, replace it with the visual identifier from the detected figures (use bbox / position / clothing). Never write "Roger's body", "Werner's head", "Lukas's gaze".
+3. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center", "the elderly woman with silver hair"). If the input feedback uses a name, replace it with the visual identifier from the detected figures (use bbox / position / clothing). Never write "CharacterA's body", "CharacterB's head", "CharacterC's gaze".
 
 4. Split every issue into one of two buckets:
    - **per_character** — fixable only by swapping a character's appearance: hair, face, skin, eye color, glasses, clothing, facial hair. These require the character's reference avatar.
@@ -100,7 +100,7 @@ Final: `"Open the eyes wide."`
 {
   "per_character_fixes": [
     {
-      "characterName": "Lukas",
+      "characterName": "CharacterA",
       "visual_identifier": "the slim boy with brown hair in the center foreground",
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
@@ -110,7 +110,7 @@ Final: `"Open the eyes wide."`
       "fix_instruction": "Rotate the head down toward the hands."
     },
     {
-      "characterName": "Roger",
+      "characterName": "CharacterB",
       "visual_identifier": "the tall brown-haired man on the right",
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
@@ -134,7 +134,7 @@ Final: `"Open the eyes wide."`
   "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable.",
   "deduped_issues": [
     {"description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"]},
-    {"description": "Roger's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
+    {"description": "CharacterB's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
     {"description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"]},
     {"description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"]}
   ]

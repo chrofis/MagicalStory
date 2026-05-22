@@ -88,11 +88,11 @@ When writing `recommendation` and `pagesToFix`:
 6. **`canonicalVersion`** - describe what the correct version looks like (used as reference)
 
 Example:
-- Images 1, 2, 3 all show Lukas
+- Images 1, 2, 3 all show CharacterA
 - Images 1 & 2: no scarf
 - Image 3: blue scarf
 - WRONG: "Either add scarf to 1 & 2, or remove from 3"
-- CORRECT: `"pagesToFix": [3]`, `"canonicalVersion": "no scarf, as shown in images 1 and 2"`, `"recommendation": "Regenerate page 3: remove the scarf from Lukas to match images 1 and 2"`
+- CORRECT: `"pagesToFix": [3]`, `"canonicalVersion": "no scarf, as shown in images 1 and 2"`, `"recommendation": "Regenerate page 3: remove the scarf from CharacterA to match images 1 and 2"`
 
 ## Severity Guide
 - **high**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)

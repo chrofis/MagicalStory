@@ -74,7 +74,7 @@ Write ONE sentence (≈25–40 words) describing what is happening in the image.
 
 Use OBSERVABLE verbs only — describe body and object positions, not intent. Allowed: `aims`, `points at`, `shoulders`, `extends arms toward`, `holds out with palms up`, `grips`, `kneels`, `raises`, `faces`, `looks at`, `stands over`, `backs away from`. FORBIDDEN (intent words — leave those to Stage 2): `offers`, `hands over`, `gives`, `presents`, `surrenders`, `threatens`, `attacks`, `greets`, `comforts`, `protects`.
 
-Anchor the weapon-and-handled-object description: if a figure holds a weapon or tool, say HOW — aim direction of the barrel, grip points, whether it is shouldered or extended. Example: *"Manuel (foreground left) shoulders a crossbow with the barrel pointed at Roger (foreground center), who kneels with bound wrists raised, in a wooden rowing boat on storm waves."*
+Anchor the weapon-and-handled-object description: if a figure holds a weapon or tool, say HOW — aim direction of the barrel, grip points, whether it is shouldered or extended. Example: *"CharacterA (foreground left) extends a lantern with arm raised toward CharacterB (foreground center), who stands with hands cupped to receive it, on a cobblestone street at dusk."*
 
 Also extract the main action as a short observable phrase in `main_action`.
 
@@ -99,7 +99,7 @@ Return JSON only (no other text):
   "matches": [
     {
       "figure": 1,
-      "reference": "Werner",
+      "reference": "CharacterA",
       "confidence": 0.6,
       "clothing_match": true,
       "hair_match": false,
@@ -121,8 +121,8 @@ Return JSON only (no other text):
     "physics_ok": true,
     "issues": []
   },
-  "scene_summary": "Manuel (foreground left) shoulders a crossbow with the barrel pointed at Roger (foreground center), who kneels with bound wrists raised, in a wooden rowing boat on storm waves.",
-  "main_action": "aiming a crossbow at a kneeling bound man"
+  "scene_summary": "CharacterA (foreground left) extends a lantern with arm raised toward CharacterB (foreground center), who stands with hands cupped to receive it, on a cobblestone street at dusk.",
+  "main_action": "extending a lantern toward another character"
 }
 ```
 

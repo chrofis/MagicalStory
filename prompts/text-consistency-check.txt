@@ -24,14 +24,14 @@ This is frequently wrong in generated stories. Verify EVERY page:
 
 **Example of WRONG formatting (one solid block):**
 ```
-Sophie ran across the meadow. She could see the tree in the distance. "Wait!" called Max. He struggled to keep up. They finally reached the tree together.
+CharacterA ran across the meadow. She could see the tree in the distance. "Wait!" called CharacterB. He struggled to keep up. They finally reached the tree together.
 ```
 
 **Example of CORRECT formatting (paragraphs with blank lines):**
 ```
-Sophie ran across the meadow. She could see the tree in the distance.
+CharacterA ran across the meadow. She could see the tree in the distance.
 
-"Wait!" called Max. He struggled to keep up.
+"Wait!" called CharacterB. He struggled to keep up.
 
 They finally reached the tree together.
 ```

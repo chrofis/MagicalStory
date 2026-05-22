@@ -36,9 +36,9 @@ Write pages {START_PAGE} through {END_PAGE} of a children's story based on the o
 Your characters must feel like real people, not cardboard cutouts.
 
 **SHOW, don't TELL:**
-- Instead of "Max was curious" → Show Max asking unexpected questions, peeking behind doors, wondering aloud
-- Instead of "Emma was shy" → Show Emma hiding behind her mom, speaking quietly, avoiding eye contact
-- Instead of "Leo was brave" → Show Leo stepping forward when others hesitate, volunteering for the scary task
+- Instead of "the main character was curious" → Show them asking unexpected questions, peeking behind doors, wondering aloud
+- Instead of "the main character was shy" → Show them hiding behind a parent, speaking quietly, avoiding eye contact
+- Instead of "the main character was brave" → Show them stepping forward when others hesitate, volunteering for the scary task
 
 **Each character should:**
 - Have a unique voice in dialogue (different speech patterns, word choices)
@@ -79,9 +79,9 @@ Stay within the word count. Count your words. Aim for the middle of the range, n
 
 **Example of correct paragraph formatting:**
 ```
-Sophie ran across the meadow, her hair flying in the wind. She could see the old oak tree in the distance.
+CharacterA ran across the meadow, her hair flying in the wind. She could see the old oak tree in the distance.
 
-"Wait for me!" called Max, struggling to keep up. His shorter legs made it hard to match her pace.
+"Wait for me!" called CharacterB, struggling to keep up. His shorter legs made it hard to match her pace.
 
 When they reached the tree, both children stopped to catch their breath. The view from here was amazing.
 ```
@@ -174,7 +174,7 @@ Add at least 5 entries. Even if an element appears only once, add it for visual 
   "locations": [
     {
       "id": "LOC001",
-      "name": "Emma's bedroom",
+      "name": "the protagonist's bedroom",
       "pages": [1, 10],
       "setting": "indoor, child's bedroom",
       "colors": "pale pink walls, white furniture",
@@ -194,9 +194,9 @@ Add at least 5 entries. Even if an element appears only once, add it for visual 
   "clothing": [
     {
       "id": "CLO001",
-      "name": "Max's superhero cape",
+      "name": "the main character's superhero cape",
       "pages": [3, 4, 5],
-      "wornBy": "Max",
+      "wornBy": "CharacterA",
       "description": "red blanket with yellow star sewn on",
       "howWorn": "tied around shoulders over regular clothes"
     }

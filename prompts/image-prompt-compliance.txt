@@ -89,24 +89,24 @@ Return JSON only:
     "setting_match": true
   },
   "character_compliance": [
-    {"name": "Manuel", "clothing_match": false, "clothing_issue": "wearing modern sweatshirt instead of medieval tunic", "facing_match": false, "facing_issue": "facing away from camera but should face toward Lukas", "severity": "CRITICAL"}
+    {"name": "CharacterA", "clothing_match": false, "clothing_issue": "wearing modern sweatshirt instead of medieval tunic", "facing_match": false, "facing_issue": "facing away from camera but should face toward CharacterB", "severity": "CRITICAL"}
   ],
   "interaction_compliance": [
-    {"character": "Lukas", "object": "crossbow", "expected": "both hands gripping, arms raised", "actual": "holding crossbow at side", "match": false, "severity": "MAJOR"}
+    {"character": "CharacterB", "object": "crossbow", "expected": "both hands gripping, arms raised", "actual": "holding crossbow at side", "match": false, "severity": "MAJOR"}
   ],
   "main_action_check": {
-    "prompt_action": "Manuel offers the crossbow to Roger",
-    "story_text_action": "Manuel reaches under the bench and holds the crossbow out to Roger",
-    "inventory_action": "Manuel shoulders the crossbow with barrel pointed at Roger",
+    "prompt_action": "CharacterA offers the crossbow to CharacterC",
+    "story_text_action": "CharacterA reaches under the bench and holds the crossbow out to CharacterC",
+    "inventory_action": "CharacterA shoulders the crossbow with barrel pointed at CharacterC",
     "match": false,
     "severity": "CRITICAL",
     "issue": "wrong_action: prompt and story text narrate offering/hand-over; inventory shows aiming"
   },
   "score": 4,
   "verdict": "FAIL",
-  "issues_summary": "Manuel in modern clothes facing wrong way; crossbow not aimed correctly",
+  "issues_summary": "CharacterA in modern clothes facing wrong way; crossbow not aimed correctly",
   "fixable_issues": [
-    {"character": "Manuel", "description": "Manuel wears modern sweatshirt instead of medieval tunic", "severity": "CRITICAL", "type": "clothing", "fix": "Replace dark sweatshirt with ochre wool tunic on the figure facing away"}
+    {"character": "CharacterA", "description": "CharacterA wears modern sweatshirt instead of medieval tunic", "severity": "CRITICAL", "type": "clothing", "fix": "Replace dark sweatshirt with ochre wool tunic on the figure facing away"}
   ]
 }
 ```

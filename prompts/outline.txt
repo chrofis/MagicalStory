@@ -44,18 +44,18 @@ Your task is to create a compelling, well-structured story outline that will gui
 - Write in third person (he/she/they)
 
 **CRITICAL: Write in PRESENT TENSE**
-- The story should be written in PRESENT TENSE (e.g., "Sophie walks into the forest", "Max finds a treasure")
+- The story should be written in PRESENT TENSE (e.g., "the protagonist walks into the forest", "the main character finds a treasure")
 - This creates immediacy and engagement for young readers
 - Exception: Use past tense only when a character recalls or talks about something that happened before the story (flashbacks, memories)
-- Example CORRECT: "Sophie opens the door and sees a magical garden."
-- Example WRONG: "Sophie opened the door and saw a magical garden."
+- Example CORRECT: "the protagonist opens the door and sees a magical garden."
+- Example WRONG: "the protagonist opened the door and saw a magical garden."
 
 When writing about characters' strengths and weaknesses:
 - NEVER mention the trait words directly (e.g., don't write "She is brave" or "He is shy")
 - SHOW the traits through actions, dialogue, and behavior instead
 - Let the reader discover the character's personality through what they DO, not what they ARE told
-- Example: Instead of "Max is curious", show Max asking lots of questions and exploring new places
-- Example: Instead of "Emma is afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
+- Example: Instead of "the protagonist is curious", show them asking lots of questions and exploring new places
+- Example: Instead of "the protagonist is afraid of the dark", show them hesitating at a dark doorway or asking for a nightlight
 
 ---
 
@@ -123,13 +123,13 @@ Beyond color differences, each character must have a **structurally different ou
 ```json
 {
   "clothingRequirements": {
-    "Sophie": {
+    "CharacterA": {
       "standard": { "used": true, "signature": "cherry red wool scarf" },
       "winter": { "used": false },
       "summer": { "used": true, "signature": "bright yellow sunflower hair clip" },
       "costumed": { "used": true, "costume": "Pirate", "description": "Striped RED-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
     },
-    "Max": {
+    "CharacterB": {
       "standard": { "used": true, "signature": "royal blue denim jacket" },
       "winter": { "used": true, "signature": "forest green puffy winter coat" },
       "summer": { "used": false },
@@ -183,7 +183,7 @@ List ONLY recurring visual elements that appear in 2 or more scenes. Skip one-ti
 - description: Size, color, material, distinctive markings
 
 **Locations** - Every distinct place in the story:
-- name: What it's called (e.g., "Emma's house")
+- name: What it's called (e.g., "the protagonist's house")
 - setting: Indoor/outdoor, type of place
 - colors: Specific building/place colors
 - features: Architectural details, distinctive elements
@@ -206,7 +206,7 @@ For famous buildings, monuments, or natural wonders that exist in reality:
 - signatureElement: ONE memorable detail
 
 **Clothing & Costumes** - Special outfits/costumes (NOT everyday clothes):
-- name: Item name WITH character name (e.g., "Max's superhero cape")
+- name: Item name WITH character name (e.g., "the main character's superhero cape")
 - wornBy: Which character wears this (REQUIRED)
 - description: Colors, materials, distinctive features
 - howWorn: How the character wears it
@@ -328,7 +328,7 @@ For EACH of the {PAGES} story pages, provide:
 - Do NOT write text that mentions 5-6 characters all doing things on the same page
 - If a group exists, the TEXT should describe what 2-3 key characters are doing, not catalog everyone's actions
 - Other characters can be PRESENT but not actively described (e.g., "while the others watched" is fine)
-- For group scenes: focus on the emotional center (e.g., "Sophie hugs Grandma" → don't describe what each of 5 other people is doing)
+- For group scenes: focus on the emotional center (e.g., "the protagonist hugs Grandma" → don't describe what each of 5 other people is doing)
 
 **Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
 - Write **[same]** if clothing matches the previous page
@@ -416,7 +416,7 @@ For EACH of the {PAGES} story pages, provide:
   "locations": [
     {
       "id": "LOC001",
-      "name": "Emma's house",
+      "name": "the protagonist's house",
       "pages": [1, 10],
       "setting": "suburban home, outdoor/indoor",
       "colors": "pale blue walls with white trim",
@@ -447,9 +447,9 @@ For EACH of the {PAGES} story pages, provide:
   "clothing": [
     {
       "id": "CLO001",
-      "name": "Max's superhero cape",
+      "name": "the main character's superhero cape",
       "pages": [3, 4, 5, 6],
-      "wornBy": "Max",
+      "wornBy": "CharacterA",
       "description": "red blanket with yellow star sewn on back",
       "howWorn": "tied around shoulders over regular clothes"
     }
