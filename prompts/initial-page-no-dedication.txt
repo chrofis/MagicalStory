@@ -21,7 +21,7 @@ Create an introduction page illustration for a children's book.
 - This image should contain NO TEXT at all
 - Create a purely visual, atmospheric illustration that sets the mood for the story
 
-**FRAMING - CRITICAL:**
-Render a borderless full-bleed illustration. The scene must extend to ALL four edges of the canvas — no torn-paper border, no polaroid frame, no scrapbook page, no rough deckle edges, no off-white matte or paper-on-paper effect around the artwork. Treat the canvas as the painting surface itself.
+**FRAMING:**
+Borderless full-bleed illustration. No torn-paper border, polaroid frame, scrapbook page, deckle edges, or matte around the artwork.
 
 {VISUAL_BIBLE}

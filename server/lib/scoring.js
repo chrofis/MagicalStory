@@ -282,7 +282,14 @@ function applyScoreBreakdown(version, breakdown) {
   version.scoreBreakdown = breakdown;
   version.evalScore = composeEvalScore(breakdown);
   version.entityPenalty = (breakdown && breakdown.entity && Number(breakdown.entity.penalty)) || 0;
-  version.finalScore = Math.max(0, version.evalScore - version.entityPenalty);
+  // DO NOT clamp finalScore to 0. Real-world miss: smoke #6 page 2 had
+  // V1 (original) eval=30 entityPenalty=30 → finalScore=0, and V3
+  // (inpaint-round-2, broken) eval=0 entityPenalty=60 → finalScore=-60.
+  // Clamping both to 0 erased the difference; pickBestVersionIndex's
+  // `>=` tie-break then chose V3 (later index) over V1, leaving the
+  // story with a visibly broken page active. Keep the raw signed value
+  // so the picker sees the truth. UI can clamp to 0 at display time.
+  version.finalScore = version.evalScore - version.entityPenalty;
 }
 
 /**

@@ -353,7 +353,8 @@ Return JSON only (no other text):
   - `severity`: CATASTROPHIC, CRITICAL, MAJOR, MODERATE, MINOR (per §2).
   - `type`: image_coherence, face, limb, clothing, object, environment, physics, proportion, incomplete_figure, scale, rendered_text.
   - `fix`: How to fix THIS EXACT issue described above (visual description only, NO character names — use position and appearance).
-  - CRITICAL: `description` and `fix` MUST refer to the SAME issue. If pants are wrong, fix the pants. If hair clips are missing, add hair clips. Never mix issues between entries.
+  - `description` and `fix` refer to the SAME issue and the SAME figure. The visual identifier in `description` and the figure the `fix` acts on are the same physical figure; lateral position (left/center/right) in `fix` matches `description`.
+  - When a figure is rendered as the wrong character, `fix` repaints that figure using the correct character's reference traits (hair, age, clothing, accessories from the character reference list). Never replace with a generic type.
 - Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting.
 - Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration.
 - `confidence`: 0.0-1.0 reference match confidence.

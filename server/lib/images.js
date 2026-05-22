@@ -6964,7 +6964,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           versions.push({
             imageData: repairResult.imageData,
             score: evScore,
-            finalScore: evScore != null ? Math.max(0, evScore - evEntityPenalty) : null,
+            // No Math.max(0, ...) clamp — keep negative values so the
+            // picker can distinguish "broken (-60)" from "marginal (0)".
+            // See scoring.js applyScoreBreakdown for the same reasoning.
+            finalScore: evScore != null ? (evScore - evEntityPenalty) : null,
             source: repairResult.source,
             evaluation: ev,
             modelId: repairResult.modelId,
