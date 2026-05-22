@@ -577,10 +577,15 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker);
       log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
-      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — accepting as best-effort`);
-      best = { result, attempt, score: 10, verdict: null };
-      attempts.push({ attempt, stage: 'eval-error', score: 10, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
-      break;
+      // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
+      // lock in this attempt at the maximum score and break the retry loop.
+      // Score it neutrally and continue so a later attempt that DOES eval
+      // successfully can win the best-of-N comparison.
+      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
+      const candidate = { result, attempt, score: 5, verdict: null };
+      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      if (!best || candidate.score > best.score) best = candidate;
+      continue;
     }
     const score = verdict.finalScore ?? 0;
     attempts.push({

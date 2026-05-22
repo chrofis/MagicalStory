@@ -27,7 +27,10 @@ async function withRetry(fn, options = {}) {
     } catch (error) {
       lastError = error;
 
-      // Check if error is retryable (network errors, timeouts, 5xx)
+      // Check if error is retryable (network errors, timeouts, 5xx, 429).
+      // Anthropic/xAI attach error.status on HTTP failures; retrying 4xx
+      // other than 429 (rate limit) wastes quota on errors that won't fix
+      // themselves (400 bad request, 401/403 auth, 422 validation).
       const isRetryable =
         error.code === 'UND_ERR_SOCKET' ||
         error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
@@ -42,6 +45,7 @@ async function withRetry(fn, options = {}) {
         error.message?.includes('reset') ||
         error.message?.includes('ECONNRESET') ||
         error.message?.includes('fetch failed') ||
+        error.status === 429 ||
         (error.status >= 500 && error.status < 600);
 
       if (!isRetryable || attempt === maxRetries) {

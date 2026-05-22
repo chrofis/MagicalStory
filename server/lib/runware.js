@@ -29,6 +29,53 @@ if (RUNWARE_API_KEY) {
   log.warn(`🎨 Runware API: ❌ Not configured (RUNWARE_API_KEY not set)`);
 }
 
+/**
+ * Retry wrapper for Runware fetch calls. Retries on transient errors
+ * (network, timeout, 5xx, 429) with exponential backoff + jitter.
+ * Non-retryable HTTP errors (4xx other than 429) and validation failures
+ * propagate immediately. Matches the discipline of textModels.withRetry.
+ */
+async function runwareFetchWithRetry(payload, { maxRetries = 2, baseDelay = 1000, maxDelay = 6000, timeoutMs = 60000 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(RUNWARE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err = new Error(`Runware API error (${response.status}): ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      const isRetryable =
+        error.code === 'UND_ERR_SOCKET' ||
+        error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.name === 'AbortError' ||
+        error.name === 'TimeoutError' ||
+        error.message?.includes('fetch failed') ||
+        error.status === 429 ||
+        (error.status >= 500 && error.status < 600);
+      if (!isRetryable || attempt === maxRetries) throw lastError;
+      const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 500, maxDelay);
+      log.warn(`⚠️ [RUNWARE] Transient failure (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message} — retrying in ${Math.round(delay)}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 // Available models
 // Text-to-image: https://runware.ai/models
 // Inpainting/Tools: https://runware.ai/docs/en/image-inference/flux-tools
@@ -106,22 +153,7 @@ async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
   const startTime = Date.now();
 
   try {
-    const response = await fetch(RUNWARE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [RUNWARE] API error ${response.status}: ${errorText}`);
-      throw new Error(`Runware API error (${response.status}): ${errorText}`);
-    }
-
+    const response = await runwareFetchWithRetry(payload, { timeoutMs: 60000 });
     const data = await response.json();
     const elapsed = Date.now() - startTime;
 
@@ -224,22 +256,7 @@ async function generateWithRunware(prompt, options = {}) {
   const startTime = Date.now();
 
   try {
-    const response = await fetch(RUNWARE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [RUNWARE] API error ${response.status}: ${errorText}`);
-      throw new Error(`Runware API error (${response.status}): ${errorText}`);
-    }
-
+    const response = await runwareFetchWithRetry(payload, { timeoutMs: 60000 });
     const data = await response.json();
     const elapsed = Date.now() - startTime;
 
@@ -349,22 +366,7 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
   const startTime = Date.now();
 
   try {
-    const response = await fetch(RUNWARE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [RUNWARE ACE++] API error ${response.status}: ${errorText}`);
-      throw new Error(`Runware ACE++ API error (${response.status}): ${errorText}`);
-    }
-
+    const response = await runwareFetchWithRetry(payload, { timeoutMs: 60000 });
     const data = await response.json();
     const elapsed = Date.now() - startTime;
 
@@ -505,22 +507,7 @@ async function generateWithPuLID(referenceImage, prompt, options = {}) {
   const startTime = Date.now();
 
   try {
-    const response = await fetch(RUNWARE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [RUNWARE PuLID] API error ${response.status}: ${errorText}`);
-      throw new Error(`Runware PuLID API error (${response.status}): ${errorText}`);
-    }
-
+    const response = await runwareFetchWithRetry(payload, { timeoutMs: 60000 });
     const data = await response.json();
     const elapsed = Date.now() - startTime;
 
