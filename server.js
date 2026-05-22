@@ -754,49 +754,75 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           }
 
           if (STORAGE_MODE === 'database') {
-            // IDEMPOTENCY CHECK: Check if this credit purchase was already processed
-            const existingTransaction = await dbPool.query(
-              'SELECT id FROM credit_transactions WHERE reference_id = $1 AND transaction_type = $2',
-              [fullSession.id, 'purchase']
-            );
+            // Atomic credit grant. Previously the SELECT-then-UPDATE sequence
+            // ran outside a transaction, so two concurrent Stripe webhook
+            // deliveries (Stripe retries on HTTP 5xx) could both pass the
+            // idempotency check, both read the same balance, and both write
+            // the same new balance — one grant silently lost. The
+            // uq_credit_transactions_purchase_ref unique index now prevents
+            // the duplicate INSERT, and the SELECT ... FOR UPDATE on the
+            // user row serializes concurrent credit mutations for the same
+            // user. Re-run the idempotency check inside the lock so the
+            // happy path returns early without UPDATEing.
+            const dbClient = await dbPool.connect();
+            try {
+              await dbClient.query('BEGIN');
+              // Lock the user row first to serialize all credit mutations for
+              // this user during this transaction.
+              const userResult = await dbClient.query(
+                'SELECT credits FROM users WHERE id = $1 FOR UPDATE',
+                [userId]
+              );
+              if (userResult.rows.length === 0) {
+                throw new Error('User not found for credits purchase');
+              }
+              // Re-check idempotency under the lock — a sibling webhook may
+              // have already inserted the transaction row.
+              const existingTransaction = await dbClient.query(
+                'SELECT id FROM credit_transactions WHERE reference_id = $1 AND transaction_type = $2',
+                [fullSession.id, 'purchase']
+              );
+              if (existingTransaction.rows.length > 0) {
+                await dbClient.query('COMMIT');
+                log.warn('⚠️ [STRIPE WEBHOOK] Credits already added for this session, skipping duplicate:', fullSession.id);
+                res.json({ received: true, type: 'credits', duplicate: true });
+                return;
+              }
 
-            if (existingTransaction.rows.length > 0) {
-              log.warn('⚠️ [STRIPE WEBHOOK] Credits already added for this session, skipping duplicate:', fullSession.id);
-              res.json({ received: true, type: 'credits', duplicate: true });
-              return;
+              const currentCredits = userResult.rows[0].credits || 0;
+              // Don't add to unlimited credits (-1)
+              const newCredits = currentCredits === -1 ? -1 : currentCredits + creditsToAdd;
+
+              await dbClient.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, userId]);
+
+              // Defense-in-depth: the unique partial index on
+              // (reference_id WHERE transaction_type='purchase') guarantees
+              // this INSERT throws on a true duplicate, so the transaction
+              // rolls back without granting credits.
+              await dbClient.query(`
+                INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                VALUES ($1, $2, $3, 'purchase', $4, $5)
+              `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`]);
+
+              await dbClient.query('COMMIT');
+
+              log.info(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
+              log.debug(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
+              log.debug('💾 [STRIPE WEBHOOK] Credits transaction recorded');
+              await logActivity(userId, null, 'CREDITS_PURCHASED', {
+                sessionId: fullSession.id,
+                creditsAdded: creditsToAdd,
+                amountCents: amountPaid,
+                currency: fullSession.currency,
+                balanceAfter: newCredits,
+                isTestPayment,
+              });
+            } catch (txErr) {
+              await dbClient.query('ROLLBACK').catch(() => {});
+              throw txErr;
+            } finally {
+              dbClient.release();
             }
-
-            // Get current credits
-            const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
-            if (userResult.rows.length === 0) {
-              throw new Error('User not found for credits purchase');
-            }
-
-            const currentCredits = userResult.rows[0].credits || 0;
-            // Don't add to unlimited credits (-1)
-            const newCredits = currentCredits === -1 ? -1 : currentCredits + creditsToAdd;
-
-            // Update credits
-            await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, userId]);
-
-            log.info(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
-            log.debug(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
-
-            // Create transaction record
-            await dbPool.query(`
-              INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-              VALUES ($1, $2, $3, 'purchase', $4, $5)
-            `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`]);
-
-            log.debug('💾 [STRIPE WEBHOOK] Credits transaction recorded');
-            await logActivity(userId, null, 'CREDITS_PURCHASED', {
-              sessionId: fullSession.id,
-              creditsAdded: creditsToAdd,
-              amountCents: amountPaid,
-              currency: fullSession.currency,
-              balanceAfter: newCredits,
-              isTestPayment,
-            });
           }
 
           res.json({ received: true, type: 'credits' });
@@ -870,91 +896,109 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // Use first story ID as the primary for orders table (for backwards compatibility)
           const primaryStoryId = validatedStoryIds[0];
 
-          // IDEMPOTENCY CHECK: Check if this order was already processed
-          const existingOrder = await dbPool.query(
-            'SELECT id FROM orders WHERE stripe_session_id = $1',
-            [fullSession.id]
-          );
-
-          if (existingOrder.rows.length > 0) {
-            log.warn('⚠️ [STRIPE WEBHOOK] Order already processed, skipping duplicate:', fullSession.id);
-            res.json({ received: true, duplicate: true });
-            return;
-          }
-
-          // stripe_mode: which Stripe account processed this PI. Required for
-          // refunds — refunds must hit the same account that took the payment.
-          // Set in checkout session metadata at creation time. Default 'live'
-          // for legacy/missing metadata.
+          // IDEMPOTENCY CHECK + ORDER + TOKEN GRANT — single transaction.
+          // The order INSERT, the credits UPDATE, and the credit_transactions
+          // INSERT must commit together. If they don't, a crash between
+          // them leaves an order without tokens credited; a retry then sees
+          // the order row, exits via the idempotency check, and the user
+          // never gets the tokens they paid for.
           const stripeMode = fullSession.metadata?.stripeMode === 'test' ? 'test' : 'live';
-
-          await dbPool.query(`
-            INSERT INTO orders (
-              user_id, story_id, stripe_session_id, stripe_payment_intent_id,
-              customer_name, customer_email,
-              shipping_name, shipping_address_line1, shipping_address_line2,
-              shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              amount_total, currency, payment_status, quantity, stripe_mode
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-          `, [
-            userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
-            customerInfo.name, customerInfo.email,
-            fullSession.shipping?.name || customerInfo.name,
-            address.line1, address.line2,
-            address.city, address.state, address.postal_code, address.country,
-            fullSession.amount_total, fullSession.currency, fullSession.payment_status,
-            orderQuantity, stripeMode
-          ]);
-          await logActivity(userId, customerInfo.email, 'ORDER_PLACED', {
-            sessionId: fullSession.id,
-            paymentIntentId: fullSession.payment_intent,
-            primaryStoryId,
-            amountCents: fullSession.amount_total,
-            currency: fullSession.currency,
-            quantity: orderQuantity,
-            coverType: orderCoverType,
-            bookFormat: orderBookFormat,
-            stripeMode,
-          });
-
-          // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
           const totalPages = parseInt(fullSession.metadata?.totalPages) || 0;
           let tokensToCredit = 0;
-          if (totalPages > 0 && userId) {
-            // Check for 2x promo multiplier
-            const promoResult = await dbPool.query(
-              "SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'"
-            );
-            const multiplier = promoResult.rows[0]?.config_value ? parseInt(promoResult.rows[0].config_value) : 1;
-            const tokensPerPage = 10 * multiplier;
-            tokensToCredit = totalPages * tokensPerPage;
+          let postTokenBalance = null;
 
-            // Credit tokens to user
-            await dbPool.query(
-              'UPDATE users SET credits = credits + $1 WHERE id = $2',
-              [tokensToCredit, userId]
-            );
+          const orderClient = await dbPool.connect();
+          try {
+            await orderClient.query('BEGIN');
 
-            // Record transaction
-            const balanceResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
-            await dbPool.query(`
-              INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-              VALUES ($1, $2, $3, 'book_purchase_reward', $4, $5)
+            // Re-check idempotency inside the tx so a sibling webhook can't
+            // race past us between the check and the INSERT.
+            const existingOrder = await orderClient.query(
+              'SELECT id FROM orders WHERE stripe_session_id = $1',
+              [fullSession.id]
+            );
+            if (existingOrder.rows.length > 0) {
+              await orderClient.query('COMMIT');
+              log.warn('⚠️ [STRIPE WEBHOOK] Order already processed, skipping duplicate:', fullSession.id);
+              res.json({ received: true, duplicate: true });
+              return;
+            }
+
+            await orderClient.query(`
+              INSERT INTO orders (
+                user_id, story_id, stripe_session_id, stripe_payment_intent_id,
+                customer_name, customer_email,
+                shipping_name, shipping_address_line1, shipping_address_line2,
+                shipping_city, shipping_state, shipping_postal_code, shipping_country,
+                amount_total, currency, payment_status, quantity, stripe_mode
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             `, [
-              userId,
-              tokensToCredit,
-              balanceResult.rows[0]?.credits || tokensToCredit,
-              fullSession.id,
-              `Book purchase reward: ${totalPages} pages × ${tokensPerPage} tokens${multiplier > 1 ? ' (2x promo)' : ''}`
+              userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
+              customerInfo.name, customerInfo.email,
+              fullSession.shipping?.name || customerInfo.name,
+              address.line1, address.line2,
+              address.city, address.state, address.postal_code, address.country,
+              fullSession.amount_total, fullSession.currency, fullSession.payment_status,
+              orderQuantity, stripeMode
             ]);
 
-            // Update order with tokens credited
-            await dbPool.query(
-              'UPDATE orders SET tokens_credited = $1 WHERE stripe_session_id = $2',
-              [tokensToCredit, fullSession.id]
-            );
+            // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
+            if (totalPages > 0 && userId) {
+              const promoResult = await orderClient.query(
+                "SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'"
+              );
+              const multiplier = promoResult.rows[0]?.config_value ? parseInt(promoResult.rows[0].config_value) : 1;
+              const tokensPerPage = 10 * multiplier;
+              tokensToCredit = totalPages * tokensPerPage;
 
-            log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
+              // Atomic increment with RETURNING — no SELECT-then-UPDATE race;
+              // balance_after below is the true post-write value for THIS
+              // tx, not whatever another concurrent tx left after.
+              const upd = await orderClient.query(
+                'UPDATE users SET credits = credits + $1 WHERE id = $2 RETURNING credits',
+                [tokensToCredit, userId]
+              );
+              postTokenBalance = upd.rows[0]?.credits ?? tokensToCredit;
+
+              await orderClient.query(`
+                INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                VALUES ($1, $2, $3, 'book_purchase_reward', $4, $5)
+              `, [
+                userId,
+                tokensToCredit,
+                postTokenBalance,
+                fullSession.id,
+                `Book purchase reward: ${totalPages} pages × ${tokensPerPage} tokens${multiplier > 1 ? ' (2x promo)' : ''}`
+              ]);
+
+              await orderClient.query(
+                'UPDATE orders SET tokens_credited = $1 WHERE stripe_session_id = $2',
+                [tokensToCredit, fullSession.id]
+              );
+            }
+
+            await orderClient.query('COMMIT');
+
+            await logActivity(userId, customerInfo.email, 'ORDER_PLACED', {
+              sessionId: fullSession.id,
+              paymentIntentId: fullSession.payment_intent,
+              primaryStoryId,
+              amountCents: fullSession.amount_total,
+              currency: fullSession.currency,
+              quantity: orderQuantity,
+              coverType: orderCoverType,
+              bookFormat: orderBookFormat,
+              stripeMode,
+            });
+            if (tokensToCredit > 0) {
+              const tokensPerPage = tokensToCredit / totalPages;
+              log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
+            }
+          } catch (txErr) {
+            await orderClient.query('ROLLBACK').catch(() => {});
+            throw txErr;
+          } finally {
+            orderClient.release();
           }
 
           // ── Referral cashback: if a valid referral code was used, credit
@@ -6848,23 +6892,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);
     genLog.error('pipeline_error', error.message, null, { stage: genLog.currentStage, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
 
-    // Try to refund credits on failure
+    // Try to refund credits on failure. Atomic-claim pattern: zero out
+    // credits_reserved in one UPDATE-RETURNING so a later refund attempt
+    // (e.g. the outer _processStoryJobImpl catch) reads 0 and short-circuits.
+    // The previous SELECT-then-UPDATE chain could double-refund if the
+    // status update raced or the SET credits_reserved=0 failed after the
+    // user-credits write succeeded.
     try {
-      const jobRow = await dbPool.query('SELECT credits_reserved, user_id FROM story_jobs WHERE id = $1', [jobId]);
-      if (jobRow.rows.length > 0) {
-        const creditsToRefund = jobRow.rows[0].credits_reserved || 0;
-        const refundUserId = jobRow.rows[0].user_id;
-
-        if (creditsToRefund > 0 && refundUserId) {
+      const claim = await dbPool.query(
+        `UPDATE story_jobs
+         SET credits_reserved = 0
+         WHERE id = $1 AND credits_reserved > 0
+         RETURNING credits_reserved AS refunded, user_id`,
+        [jobId]
+      );
+      if (claim.rows.length > 0) {
+        const { refunded, user_id: refundUserId } = claim.rows[0];
+        if (refundUserId && refunded > 0) {
           await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2 RETURNING credits',
-            [creditsToRefund, refundUserId]
+            'UPDATE users SET credits = credits + $1 WHERE id = $2',
+            [refunded, refundUserId]
           );
-          await dbPool.query(
-            'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
-            [jobId]
-          );
-          log.info(`💳 [UNIFIED] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
+          log.info(`💳 [UNIFIED] Refunded ${refunded} credits for failed job ${jobId}`);
         }
       }
     } catch (refundErr) {
@@ -7336,54 +7385,33 @@ async function _processStoryJobImpl(jobId) {
       log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
 
-    // Full refund if story is not 100% complete - incomplete stories have no value to user
+    // Full refund if story is not 100% complete. Atomic-claim pattern so a
+    // sibling refund path (the inner processUnifiedStoryJob catch above)
+    // can't double-refund — whoever zeros credits_reserved first wins.
     try {
-      const jobResult = await dbPool.query(
-        'SELECT user_id, credits_reserved, progress FROM story_jobs WHERE id = $1',
+      const claim = await dbPool.query(
+        `UPDATE story_jobs
+         SET credits_reserved = 0
+         WHERE id = $1 AND credits_reserved > 0 AND COALESCE(progress, 0) < 100
+         RETURNING credits_reserved AS refunded, user_id, COALESCE(progress, 0) AS progress_percent`,
         [jobId]
       );
-      if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
-        const refundUserId = jobResult.rows[0].user_id;
-        const totalCredits = jobResult.rows[0].credits_reserved;
-        const progressPercent = jobResult.rows[0].progress || 0;
-
-        // Full refund if story is not 100% complete - incomplete stories have no value to user
-        const isComplete = progressPercent >= 100;
-        const creditsToRefund = isComplete ? 0 : totalCredits;
-
-        if (creditsToRefund > 0) {
-          // Get current balance
-          const userResult = await dbPool.query(
-            'SELECT credits FROM users WHERE id = $1',
-            [refundUserId]
+      if (claim.rows.length > 0) {
+        const { refunded, user_id: refundUserId, progress_percent: progressPercent } = claim.rows[0];
+        if (refundUserId && refunded > 0) {
+          const upd = await dbPool.query(
+            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
+            [refunded, refundUserId]
           );
-
-          if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
-            const currentBalance = userResult.rows[0].credits;
-            const newBalance = currentBalance + creditsToRefund;
-
-            // Refund credits
-            await dbPool.query(
-              'UPDATE users SET credits = $1 WHERE id = $2',
-              [newBalance, refundUserId]
-            );
-
-            // Create refund transaction record
-            const description = `Full refund: ${creditsToRefund} credits - story generation failed at ${progressPercent}%`;
-
+          if (upd.rows.length > 0) {
+            const newBalance = upd.rows[0].credits;
+            const description = `Full refund: ${refunded} credits - story generation failed at ${progressPercent}%`;
             await dbPool.query(
               `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
                VALUES ($1, $2, $3, $4, $5, $6)`,
-              [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, description]
+              [refundUserId, refunded, newBalance, 'story_refund', jobId, description]
             );
-
-            // Reset credits_reserved to prevent double refunds
-            await dbPool.query(
-              'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
-              [jobId]
-            );
-
-            log.info(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
+            log.info(`💳 Refunded ${refunded} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
           }
         }
       }

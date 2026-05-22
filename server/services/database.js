@@ -396,6 +396,12 @@ async function initializeDatabase() {
     // lookup degrades to a sequential scan as credit_transactions grows. Partial
     // index skips rows where reference_id is null (story-credit deductions etc.).
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_reference_id ON credit_transactions(reference_id) WHERE reference_id IS NOT NULL`);
+    // Defense-in-depth against Stripe webhook duplicate delivery: enforce
+    // that no two 'purchase' rows can share a reference_id (stripe session id).
+    // The webhook handler also takes a SELECT ... FOR UPDATE row lock, but
+    // if either guard fails for any reason, this index makes the duplicate
+    // INSERT fail at the DB level instead of silently double-crediting.
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_transactions_purchase_ref ON credit_transactions(reference_id) WHERE reference_id IS NOT NULL AND transaction_type = 'purchase'`);
 
     // Story jobs table
     await dbPool.query(`
