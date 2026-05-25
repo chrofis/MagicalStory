@@ -1681,26 +1681,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // Import the actual generation logic (reuse from sync path)
     // For now, we'll make a simplified version that calls the same helpers
 
-    // Force Grok for clothing-avatar generation. Gemini's image model
-    // returns IMAGE_OTHER (safety refusal) consistently on adult-face
-    // photos — Sarah's avatar stuck for 10 min during a prod showcase
-    // until the orchestrator's poll timed out. The client may still send
-    // avatarModel (dev-mode override persisted in localStorage), but for
-    // this specific path it is ignored: the safety failure is on the
-    // upstream model. Other Grok variants (e.g. grok-imagine-pro) are
-    // honoured.
-    const clientWantsGrokVariant = avatarModel && IMAGE_MODELS[avatarModel]?.backend === 'grok';
-    const selectedModel = clientWantsGrokVariant ? avatarModel : 'grok-imagine';
+    const selectedModel = avatarModel || MODEL_DEFAULTS.avatar || 'grok-imagine';
     const modelConfig = IMAGE_MODELS[selectedModel];
-    const useRunware = false;
-    const useGrok = true;
-    const geminiModelId = null;
+    const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const useGrok = modelConfig?.backend === 'grok';
+    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
     const isFemale = gender === 'female';
-    if (avatarModel && !clientWantsGrokVariant) {
-      log.warn(`👔 [AVATAR JOB ${jobId}] Client requested avatarModel=${avatarModel} but this path is Grok-only (Gemini IMAGE_OTHER on adult faces) — using ${selectedModel} instead`);
-    }
 
-    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: grok`);
+    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const clothingCategories = {
       winter: { emoji: '❄️' },
@@ -2773,19 +2761,14 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 
     // SYNC MODE: Original blocking behavior (for backwards compatibility)
 
-    // Force Grok — see comment at the async-job handler above for context.
-    // Sync regen path uses the same Grok-only policy.
-    const clientWantsGrokVariant = avatarModel && IMAGE_MODELS[avatarModel]?.backend === 'grok';
-    const selectedModel = clientWantsGrokVariant ? avatarModel : 'grok-imagine';
+    // Determine which model to use
+    const selectedModel = avatarModel || MODEL_DEFAULTS.avatar || 'grok-imagine';
     const modelConfig = IMAGE_MODELS[selectedModel];
-    const useRunware = false;
-    const useGrok = true;
-    const geminiModelId = null;
-    if (avatarModel && !clientWantsGrokVariant) {
-      log.warn(`👔 [CLOTHING AVATARS] Client requested avatarModel=${avatarModel} but this path is Grok-only — using ${selectedModel} instead`);
-    }
+    const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const useGrok = modelConfig?.backend === 'grok';
+    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: grok`);
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const isFemale = gender === 'female';
 
