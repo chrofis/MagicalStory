@@ -8,13 +8,9 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 
 {SCENE_DESCRIPTION}
 
-**COMPOSITION:**
-- Characters must INTERACT with the scene — facing and engaging with objects, landmarks, or each other. NOT standing in front of a backdrop looking at the viewer.
-- Characters face TOWARD what they interact with. Eyes look at objects or other characters, NOT at the camera.
-- If a character is INTERACTING with something in the BACKGROUND (running toward the castle, looking up at the tower, walking toward the bridge), they face that direction — back or side to the camera. If the character's interaction target is in foreground or midground, they face that target instead, with face visible to the reader.
-- Each character must be DOING something specific (reaching, looking at, holding, walking toward). No static posing.
-- **DEPTH — read each character's position label and honour it:** "foreground" characters fill roughly the lower half of the frame, large, with feet on the ground. "midground" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. "background" characters are small, distant, far behind. Foreground larger than midground larger than background.
-- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled "foreground". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that action target — not the camera. When the target is in the background, the character faces away from camera with back or side visible.
+- Depth: `foreground` characters are large and dominate the lower half. `midground` characters occupy the middle band, smaller and further back. `background` characters are small and distant. Foreground > midground > background in size.
 
 {REQUIRED_OBJECTS}
 
