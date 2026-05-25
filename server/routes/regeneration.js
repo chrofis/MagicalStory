@@ -1362,7 +1362,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       modelId: result.modelId,
       prompt: result.prompt,
       grokRefImages: result.grokRefImages || null,
-      versionIndex: newVersionIndex,
+      activeVersion: newVersionIndex,
     });
   } catch (err) {
     log.error('Error in scale-repair:', err);
@@ -1507,7 +1507,7 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
       success: true,
       imageData: result.imageData,
       modelId: result.modelId || targetModel,
-      versionIndex: newVersionIndex,
+      activeVersion: newVersionIndex,
       elapsed,
     });
   } catch (err) {
@@ -2107,8 +2107,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         visualBibleGrid: coverVbGrid ? `data:image/jpeg;base64,${coverVbGrid.toString('base64')}` : null,
         grokRefImages: imageResult.grokRefImages || null,
         message: 'Cover regenerated with fresh generation',
-        // Version info
-        versionIndex: newVersionIndex
+        // User-triggered cover regen — pushed version IS the active one
+        // (server already called setActiveVersion above). Single field.
+        activeVersion: newVersionIndex
       });
     }
 
@@ -2338,8 +2339,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       await saveStoryData(id, storyData);
     }
 
-    // Active version is picked by recomputeAllActiveVersions inside
-    // saveScenePageData/saveStoryData (best score wins).
+    // Iterate is an explicit "give me another shot" — make the new push
+    // canonical regardless of what recomputeAllActiveVersions just picked.
+    // This is the only signal the client needs back; we return it as
+    // `activeVersion` so the API has one consistent field name.
+    await setActiveVersion(id, `${pageNumber}`, iterateNewVersionIndex);
 
     // Deduct credits if not unlimited
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -2414,12 +2418,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       grokRefImages: iterResult.grokRefImages || null,
       // Bbox detection for the new image (so frontend can display immediately)
       bboxDetection: iterResult.bboxDetection || null,
-      // Canonical version index of the just-pushed version. Client callers
-      // (StoryWizard, useRepairWorkflow) read this to set activeVersion;
-      // without it they kept the OLD active version on the UI after an
-      // iterate, requiring a page refresh to see the regen. The cover
-      // branch above already returns this — scene branch was missing.
-      versionIndex: iterateNewVersionIndex,
+      // Single source of truth for "which version is now active" — we just
+      // wrote this via setActiveVersion(), so the client and DB agree.
+      // (Previously this was returned as `versionIndex`, alongside the
+      // separately-derived `scene.activeVersion`. Two field names for the
+      // same answer caused confusion; unified on `activeVersion`.)
+      activeVersion: iterateNewVersionIndex,
       message: previewMismatches.length > 0
         ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
         : 'No mismatches found, regenerated with fresh analysis'
@@ -2749,8 +2753,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       // API cost tracking
       apiCost: coverImageCost,
       apiCostModel: coverImageModelId,
-      // Version info (for version history UI)
-      versionIndex: newVersionIndex,
+      // Server's canonical pointer to the now-displayed version.
+      activeVersion: newVersionIndex,
       imageVersions: updatedVersions.map(v => ({
         imageData: v.imageData,
         qualityScore: v.qualityScore,
@@ -3229,13 +3233,15 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       log.info(`✅ [REPAIR] Saved ${newRetryEntries.length} repair entries for story ${id}, page ${pageNumber}`);
     }
 
-    // Surface the new version index so the client can mark the new image as
-    // active in the version history instead of overwriting v0. When no
-    // repair happened, fall back to the active version already on the
-    // scene (or 0 for legacy stories without imageVersions).
-    const repairVersionIndex = anyRepaired && Array.isArray(currentScene.imageVersions)
+    // Single source of truth: when a repair happened, make the just-pushed
+    // version active. Otherwise fall back to whatever was already active.
+    const repairActiveVersion = anyRepaired && Array.isArray(currentScene.imageVersions)
       ? currentScene.imageVersions.length - 1
       : (typeof currentScene.activeVersion === 'number' ? currentScene.activeVersion : 0);
+    if (anyRepaired) {
+      // Persist the override so a refresh + the wire response agree.
+      await setActiveVersion(id, `${pageNumber}`, repairActiveVersion);
+    }
 
     res.json({
       success: true,
@@ -3244,7 +3250,10 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       noErrorsFound: !anyRepaired && newRetryEntries.some(e => e.noRepairNeeded),
       passesRun: newRetryEntries.length,
       imageData: currentImageData,
-      versionIndex: repairVersionIndex,
+      // API contract: `activeVersion` is the single field the client uses
+      // to display the right version after any regen/repair operation.
+      // (Previously returned as `versionIndex` — same value, clearer name.)
+      activeVersion: repairActiveVersion,
       retryEntries: newRetryEntries,
       repairHistory: allRepairHistory
     });
@@ -5394,8 +5403,9 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       generatedAt: timestamp,
       versionIndex: newVersionIndex
     });
-    // Active version picked by recomputeAllActiveVersions inside saveStoryData.
     await saveStoryData(id, storyData);
+    // User-triggered cover edit — make the new push canonical (no pickBest).
+    await setActiveVersion(id, coverKey, newVersionIndex);
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 
@@ -5408,7 +5418,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       originalImage: previousImageData,
       originalScore: previousScore,
       originalReasoning: previousReasoning,
-      versionIndex: newVersionIndex
+      activeVersion: newVersionIndex
     });
 
   } catch (err) {

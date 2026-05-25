@@ -4762,10 +4762,9 @@ export default function StoryWizard() {
                           type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                           qualityScore: v.qualityScore
                         }));
-                        // Server returns versionIndex on iterate — use it as the active
-                        // DB index. Falling back to length-1 misaligns the picker with
-                        // the actual saved row when the array shape has drifted.
-                        const newActiveVersion = result.versionIndex ?? img.activeVersion;
+                        // Server returns activeVersion on iterate — it's now the canonical
+                        // pointer (the new push, made active server-side via setActiveVersion).
+                        const newActiveVersion = result.activeVersion ?? img.activeVersion;
                         return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions, activeVersion: newActiveVersion };
                       }));
                     }
@@ -5286,9 +5285,8 @@ export default function StoryWizard() {
                             type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
                             qualityScore: v.qualityScore
                           }));
-                          // iterate endpoint returns canonical versionIndex; prefer it
-                          // over array-position-based length-1.
-                          const newActiveVersion = result.versionIndex ?? img.activeVersion;
+                          // iterate endpoint returns canonical activeVersion.
+                          const newActiveVersion = result.activeVersion ?? img.activeVersion;
                           return {
                             ...img,
                             imageData: result.imageData,
@@ -6080,9 +6078,9 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
-                            // scene-edit endpoint doesn't return versionIndex; length-1
-                            // is best-effort until the next /images refresh.
-                            activeVersion: (result as any).versionIndex ?? updatedVersions.length - 1,
+                            // editScene/editCover return activeVersion (renamed from
+                            // versionIndex). Fall back to length-1 for legacy responses.
+                            activeVersion: ((result as any).activeVersion ?? (result as any).versionIndex) ?? updatedVersions.length - 1,
                           };
                         }));
                         log.info('Image edited successfully, updated state with quality info');

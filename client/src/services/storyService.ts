@@ -1206,7 +1206,8 @@ export const storyService = {
     repaired: boolean;
     noErrorsFound: boolean;
     imageData: string;
-    versionIndex?: number;
+    /** Server's canonical pointer to which version is now active. */
+    activeVersion?: number;
     repairHistory: Array<{
       attempt: number;
       errorType: string;
@@ -1232,7 +1233,7 @@ export const storyService = {
       repaired: boolean;
       noErrorsFound: boolean;
       imageData: string;
-      versionIndex?: number;
+      activeVersion?: number;
       repairHistory: Array<{
         attempt: number;
         errorType: string;
@@ -1301,9 +1302,12 @@ export const storyService = {
     visualBibleGrid?: string;
     grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
     bboxDetection?: BboxSceneDetection | null;  // Bbox detection for the new image
-    // Canonical DB version_index of the just-saved version. Clients use this
-    // for `activeVersion` instead of array-position-based length-1.
-    versionIndex?: number;
+    // Single source of truth for "which version should the UI display now."
+    // The server made the new push canonical via setActiveVersion(); this is
+    // the same integer the persisted scene.activeVersion now holds. Replaced
+    // the older `versionIndex` field which meant the same thing under a more
+    // confusing name.
+    activeVersion?: number;
     // Preview mode
     previewOnly?: boolean;
     message: string;
@@ -1340,7 +1344,7 @@ export const storyService = {
       landmarkPhotos?: LandmarkPhoto[];
       visualBibleGrid?: string;
       bboxDetection?: BboxSceneDetection | null;
-      versionIndex?: number;
+      activeVersion?: number;
       previewOnly?: boolean;
       message: string;
     }>(

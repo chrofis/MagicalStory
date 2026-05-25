@@ -742,8 +742,8 @@ export function useRepairWorkflow({
           if (result?.success) {
             pagesCompleted.push(pageNumber);
 
-            // Use server-returned versionIndex (authoritative), fall back to local count
-            const versionIndex = result.versionIndex ?? (sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length ?? 0);
+            // Use server-returned activeVersion (authoritative), fall back to local count
+            const versionIndex = result.activeVersion ?? (sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length ?? 0);
             newVersions[pageNumber] = versionIndex;
 
             // Capture before/after details for comparison display
@@ -1006,11 +1006,10 @@ export function useRepairWorkflow({
 
       if (result.repaired && result.imageData && onImageUpdate) {
         try {
-          // Use the versionIndex returned by the server (the new version
-          // pushed onto imageVersions[]) instead of hardcoding 0 — the old
-          // value overwrote v0 in the UI's version selector and hid the
-          // repair from the version-history modal.
-          const newVersionIndex = typeof result.versionIndex === 'number' ? result.versionIndex : 0;
+          // Use the activeVersion returned by the server (the new push made
+          // active) instead of hardcoding 0 — hardcoding overwrote v0 in
+          // the UI's version selector and hid the repair from history.
+          const newVersionIndex = typeof result.activeVersion === 'number' ? result.activeVersion : 0;
           onImageUpdate(pageNumber, result.imageData, newVersionIndex, {
             type: 'inpaint-repair',
           });
@@ -1293,7 +1292,7 @@ export function useRepairWorkflow({
                 allChangedPages.add(pageNumber);
                 if (!signal.aborted) {
                   const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-                  const newVersionIndex = result.versionIndex ?? (scene?.imageVersions?.length ?? 0);
+                  const newVersionIndex = result.activeVersion ?? (scene?.imageVersions?.length ?? 0);
                   onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
                     description: result.sceneDescription,
                     prompt: result.imagePrompt,
