@@ -94,9 +94,10 @@ loadEmailTemplates();
 function normalizeLanguage(language) {
   if (!language) return 'ENGLISH';
   const lang = language.toUpperCase();
-  // Match exact values and prefix-based language codes (de-ch, de-at, fr-ch, etc.)
+  // Match exact values and prefix-based language codes (de-ch, de-at, fr-ch, it-ch, etc.)
   if (lang === 'GERMAN' || lang === 'DEUTSCH' || lang.startsWith('DE') || lang.startsWith('GSW')) return 'GERMAN';
   if (lang === 'FRENCH' || lang === 'FRANCAIS' || lang === 'FRANÇAIS' || lang.startsWith('FR')) return 'FRENCH';
+  if (lang === 'ITALIAN' || lang === 'ITALIANO' || lang.startsWith('IT')) return 'ITALIAN';
   return 'ENGLISH';
 }
 
@@ -109,7 +110,7 @@ function getTemplateSection(templateName, language) {
   }
 
   const langMarker = `[${normalizeLanguage(language)}]`;
-  const languages = ['[ENGLISH]', '[GERMAN]', '[FRENCH]'];
+  const languages = ['[ENGLISH]', '[GERMAN]', '[FRENCH]', '[ITALIAN]'];
 
   // Find the start of the requested language section
   const startIdx = template.indexOf(langMarker);

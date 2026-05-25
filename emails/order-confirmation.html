@@ -180,3 +180,57 @@ Html:
     </tr>
   </table>
 </div>
+
+[ITALIAN]
+Subject: Ordine confermato - Il tuo libro MagicalStory è in stampa!
+Text:
+Ciao {greeting},
+
+Grazie per il tuo ordine! Il tuo libro di storie personalizzato è in stampa.
+
+Dettagli dell'ordine:
+- Numero d'ordine: {orderId}
+- Importo: {amount} {currency}
+- Indirizzo di consegna: {addressLine1}, {city}, {postalCode}, {country}
+
+Riceverai un'altra e-mail con le informazioni di tracciamento quando il libro sarà spedito.
+Tempo di consegna stimato: {deliveryEstimate}
+
+Grazie per aver scelto MagicalStory!
+
+--
+MagicalStory - Momenti magici, una storia alla volta
+magicalstory.ch
+Rispondi a questa e-mail o scrivici a support@magicalstory.ch
+MagicalStory, Svizzera
+---
+Html:
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <p>Ciao {greeting},</p>
+  <p>Grazie per il tuo ordine! Il tuo libro di storie personalizzato è in stampa.</p>
+  <h3>Dettagli dell'ordine:</h3>
+  <ul>
+    <li><strong>Numero d'ordine:</strong> {orderId}</li>
+    <li><strong>Importo:</strong> {amount} {currency}</li>
+    <li><strong>Indirizzo di consegna:</strong> {addressLine1}, {city}, {postalCode}, {country}</li>
+  </ul>
+  <p>Riceverai un'altra e-mail con le informazioni di tracciamento quando il libro sarà spedito.</p>
+  <p><strong>Tempo di consegna stimato:</strong> {deliveryEstimate}</p>
+  <p>Grazie per aver scelto MagicalStory!</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 20px;">
+  <table style="width: 100%;" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="vertical-align: middle; width: 120px;">
+        <a href="https://magicalstory.ch">
+          <img src="https://magicalstory.ch/images/email-logo.png" alt="MagicalStory" style="height: 100px; width: auto;">
+        </a>
+      </td>
+      <td style="vertical-align: middle; padding-left: 15px; color: #999; font-size: 12px; line-height: 1.6;">
+        MagicalStory - Momenti magici, una storia alla volta<br>
+        <a href="https://magicalstory.ch" style="color: #999; text-decoration: none;">magicalstory.ch</a><br>
+        Rispondi a questa e-mail o scrivici a <a href="mailto:support@magicalstory.ch" style="color: #999;">support@magicalstory.ch</a><br>
+        MagicalStory, Svizzera
+      </td>
+    </tr>
+  </table>
+</div>
