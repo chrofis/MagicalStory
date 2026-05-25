@@ -4868,14 +4868,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
           await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars);
         }
-        // over-the-shoulder: the target character is tiny, soft-focused, in the
-        // distance — attaching its reference photo would force Grok to render it
-        // at portrait scale. Keep only the first character (the acting one) as a
-        // reference; the rest ride in prose only.
+        // over-the-shoulder: drop refs ONLY for background-depth characters.
+        // Original rule dropped ALL non-actor refs on the assumption "the target
+        // is tiny, soft-focused, in the distance" — but OTS is also used with
+        // midground subjects (e.g. character across a fence, holding an object).
+        // Smoke #7 page 2 caught the regression: Noah was midground, ref got
+        // dropped, Grok had only text → rendered Noah in wrong outfit (blue
+        // button-up instead of olive sweatshirt + red backpack). Background
+        // figures still need the drop — attaching their portrait forces Grok
+        // to upsize them past "tiny in the distance".
         if (sceneMetadata?.framingPattern === 'over-the-shoulder' && pagePhotos.length > 1) {
-          const dropped = pagePhotos.slice(1).map(p => p.name).join(', ');
-          pagePhotos = pagePhotos.slice(0, 1);
-          log.info(`🎯 [FRAMING] Page ${pageNum} over-the-shoulder: kept ${pagePhotos[0]?.name}, dropped refs for ${dropped}`);
+          const metaChars = sceneMetadata?.fullData?.characters || [];
+          const isBackground = (name) => {
+            const c = metaChars.find(mc => (mc.name || '').toLowerCase() === (name || '').toLowerCase());
+            return (c?.depth || '').toLowerCase() === 'background';
+          };
+          const before = pagePhotos.length;
+          // Always keep the actor (index 0); among the rest, drop only bg refs.
+          pagePhotos = pagePhotos.filter((p, i) => i === 0 || !isBackground(p.name));
+          if (pagePhotos.length < before) {
+            log.info(`🎯 [FRAMING] Page ${pageNum} over-the-shoulder: kept actor + ${pagePhotos.length - 1} non-bg refs, dropped ${before - pagePhotos.length} background refs`);
+          }
         }
         // Trial mode fallback: scene hints are plain text, so extract LOC IDs manually
         if (!sceneMetadata && scene.sceneDescription) {
