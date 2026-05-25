@@ -299,20 +299,21 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     // Return only safe public data (no user info, no prompts)
     const data = story.data;
 
-    // Extract pages from story text (format: "## Seite N\ntext..." or "--- Page N ---\ntext...")
+    // Canonical page list = data.sceneImages array. Always emit one entry per
+    // page in that list, even if getPageText fails (Sonnet's marker malformed,
+    // missing, or numbering gap) — dropping a page here was hiding 6/14 pages
+    // on stories where text parsing missed some markers. Front-end renders an
+    // empty text block gracefully; better than the page vanishing.
     const pages = [];
     const storyText = data.story || data.storyText || data.generatedStory || '';
     const sceneCount = data.sceneImages?.length || data.totalScenes || data.pages || 10;
     for (let i = 1; i <= sceneCount; i++) {
-      const text = getPageText(storyText, i);
-      if (text) {
-        const sceneImg = data.sceneImages?.find(s => Number(s.pageNumber) === i);
-        pages.push({
-          pageNumber: i,
-          text,
-          textPosition: sceneImg?.textPosition || null,
-        });
-      }
+      const sceneImg = data.sceneImages?.find(s => Number(s.pageNumber) === i);
+      pages.push({
+        pageNumber: i,
+        text: getPageText(storyText, i) || '',
+        textPosition: sceneImg?.textPosition || null,
+      });
     }
 
     // Cover existence — single round-trip, no blob fetch. The previous loop

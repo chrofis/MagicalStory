@@ -504,8 +504,36 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         }
       }
 
-      // Build sceneImages array from image info
+      // Build sceneImages array. Seed the map from the canonical page list in
+      // data.sceneImages FIRST so every declared page appears in the response,
+      // even if it has no story_images row yet (failed generation, content-
+      // blocked, mid-flight job). Previously we built the map only from
+      // story_images rows, which silently dropped any page that never
+      // persisted an image — 6/14 pages vanished on the Berger smoke story.
+      // Front-end already renders hasImage:false placeholders gracefully.
       const sceneImagesMap = new Map();
+      const sceneSeedRows = await dbQuery(
+        `SELECT (scene->>'pageNumber')::int AS page_number,
+                scene->'compositeBboxes' AS bboxes,
+                (scene->>'hasCompositeStages')::boolean AS has_stages
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE id = $1`,
+        [id]
+      );
+      for (const row of sceneSeedRows) {
+        if (row.page_number == null) continue;
+        sceneImagesMap.set(row.page_number, {
+          pageNumber: row.page_number,
+          hasImage: false,
+          qualityScore: null,
+          generatedAt: null,
+          imageVersions: [],
+          activeVersion: 0,
+          hasCompositeStages: row.has_stages === true,
+          compositeBboxes: row.bboxes || null,
+        });
+      }
+
       const coverImages = { frontCover: null, initialPage: null, backCover: null };
 
       // Pre-compute version counts per cover so we can pick the active version (not just the last row)
@@ -519,6 +547,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       for (const row of imageInfoRows) {
         if (row.image_type === 'scene') {
           const activeVersion = activeVersions[row.page_number] ?? 0;
+          // Pages outside the canonical sceneImages list — defensive fallback
+          // (shouldn't normally happen). Seed-from-blob is the primary path.
           if (!sceneImagesMap.has(row.page_number)) {
             const compositeMeta = compositeMetaByPage.get(row.page_number) || {};
             sceneImagesMap.set(row.page_number, {
@@ -527,15 +557,15 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
               imageVersions: [],
-              activeVersion: activeVersion,  // Track which version is active
-              // Composite pipeline flags — gate the 4-stage dev panel viewer.
+              activeVersion: activeVersion,
               hasCompositeStages: compositeMeta.hasCompositeStages || false,
               compositeBboxes: compositeMeta.compositeBboxes || null,
             });
           }
-          // Add all versions (including version 0) to imageVersions array
-          // Merge with metadata from data blob (description, prompt, modelId, type)
+          // Flip the seeded placeholder to a live entry on first row seen.
           const scene = sceneImagesMap.get(row.page_number);
+          scene.hasImage = true;
+          scene.activeVersion = activeVersion;
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
           const versionMeta = row.version_index > 0
             ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {})
