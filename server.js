@@ -6870,7 +6870,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Send story completion email to customer
     try {
       const userResult = await dbPool.query(
-        'SELECT email, username, shipping_first_name, preferred_language, is_trial, claim_token FROM users WHERE id = $1',
+        'SELECT email, username, shipping_first_name, preferred_language, is_trial, claim_token, (trial_data IS NOT NULL) AS has_trial_data FROM users WHERE id = $1',
         [userId]
       );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
@@ -6882,8 +6882,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const emailOptions = {};
         if (shareToken) emailOptions.shareToken = shareToken;
 
-        // For trial users: generate PDF and claim URL to include in email
-        if (user.is_trial) {
+        // Generate + attach the PDF when the story came from the trial flow,
+        // even if the user has since converted to a full account (e.g. linked
+        // Google or set a password mid-generation). is_trial flips to false on
+        // conversion; trial_data stays populated, so it's the durable signal.
+        // Without this OR, anyone who linked Google between job creation and
+        // completion gets the regular story-complete email with no PDF
+        // (observed for amandatavaresfo2@gmail.com on 2026-05-23).
+        if (user.is_trial || user.has_trial_data) {
           try {
             // Generate a claim token if user doesn't have one
             let claimToken = user.claim_token;
