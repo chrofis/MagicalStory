@@ -5879,6 +5879,91 @@ async function inpaintPage(imageData, evaluation, options = {}) {
  * @param {number} [options.inpaintMaxPasses=1] - Inpaint attempts per page per round
  * @returns {Promise<{results: Array<Object>, charFixDetails: Object}>}
  */
+
+/**
+ * Resolve a character's face/body bbox for char-fix targeting AND for building
+ * the protection list of OTHER characters on the same page.
+ *
+ * Single source-of-truth lookup so target and protection always agree:
+ *   1. entityReport.characters[name].byClothing[*].appearances[pageNumber]
+ *      — same upstream as bbox detection, but face boxes are cascade-improved
+ *      (anime + Haar) when cascade ran. Prefer this over raw figures.
+ *   2. bestEval.bboxDetection.figures[name] — canonical bbox detection result
+ *      cached at img.sharedBboxDetection.
+ *   3. bestEval.matches[name].face_bbox — quality eval's independent face
+ *      detection (no bodyBox available here).
+ *
+ * Skips UNKNOWN figures. Case-insensitive name match. Normalises to
+ * [y0, x0, y1, x1].
+ *
+ * @param {string} charName
+ * @param {Object} sources
+ * @param {Object} [sources.bestEval]
+ * @param {Object} [sources.entityReport]
+ * @param {number} sources.pageNumber
+ * @returns {{ faceBbox: Array|null, bodyBbox: Array|null, source: string|null }}
+ */
+function resolveCharBbox(charName, { bestEval, entityReport, pageNumber } = {}) {
+  if (!charName || charName === 'UNKNOWN') {
+    return { faceBbox: null, bodyBbox: null, source: null };
+  }
+  const lowerName = charName.toLowerCase();
+  const toRect = (b) => {
+    if (!b) return null;
+    if (Array.isArray(b)) return b;
+    if (typeof b.y === 'number' && typeof b.height === 'number') {
+      return [b.y, b.x, b.y + b.height, b.x + b.width];
+    }
+    return null;
+  };
+
+  // Tier 1: entity report (cascade-improved faces when available)
+  const charEntity = entityReport?.characters?.[charName];
+  if (charEntity?.byClothing) {
+    for (const clothingData of Object.values(charEntity.byClothing)) {
+      const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
+      if (app && (app.faceBox || app.bodyBox)) {
+        const faceBbox = toRect(app.faceBox);
+        const bodyBbox = toRect(app.bodyBox);
+        if (faceBbox || bodyBbox) {
+          return { faceBbox, bodyBbox, source: 'entity' };
+        }
+      }
+    }
+  }
+
+  // Tier 2: canonical bbox detection figures
+  const figures = bestEval?.bboxDetection?.figures || [];
+  const figure = figures.find(f => {
+    if (!f.name || f.name === 'UNKNOWN') return false;
+    return f.name.toLowerCase() === lowerName ||
+      (f.label && f.label.toLowerCase().includes(lowerName));
+  });
+  if (figure && (figure.faceBox || figure.bodyBox)) {
+    return {
+      faceBbox: toRect(figure.faceBox),
+      bodyBbox: toRect(figure.bodyBox),
+      source: 'bbox',
+    };
+  }
+
+  // Tier 3: quality eval matches (face only)
+  const matches = bestEval?.matches || [];
+  const match = matches.find(m =>
+    m.name?.toLowerCase() === lowerName ||
+    m.character?.toLowerCase() === lowerName
+  );
+  if (match && (match.face_bbox || match.bbox)) {
+    return {
+      faceBbox: toRect(match.face_bbox),
+      bodyBbox: toRect(match.bbox),
+      source: 'eval',
+    };
+  }
+
+  return { faceBbox: null, bodyBbox: null, source: null };
+}
+
 async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const {
     characters = [],
@@ -6467,55 +6552,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const currentImageData = best?.imageData || img.imageData;
     const bestEval = best?.evaluation;
 
-    // Bbox tier-search (4 tiers, matches former Step 5 logic).
-    let faceBbox = null;
-    let bodyBbox = null;
-    if (bestEval?.bboxDetection?.figures) {
-      const figure = bestEval.bboxDetection.figures.find(f =>
-        f.name?.toLowerCase() === charName.toLowerCase() ||
-        f.label?.toLowerCase().includes(charName.toLowerCase())
-      );
-      if (figure) {
-        if (figure.faceBox) faceBbox = figure.faceBox;
-        if (figure.bodyBox) bodyBbox = figure.bodyBox;
-      }
-    }
-    if (!faceBbox && !bodyBbox && currentEntityReport?.characters?.[charName]?.byClothing) {
-      for (const clothingData of Object.values(currentEntityReport.characters[charName].byClothing)) {
-        const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-        if (app?.faceBox) {
-          faceBbox = Array.isArray(app.faceBox) ? app.faceBox : [app.faceBox.y, app.faceBox.x, app.faceBox.y + app.faceBox.height, app.faceBox.x + app.faceBox.width];
-        }
-        if (app?.bodyBox) {
-          bodyBbox = Array.isArray(app.bodyBox) ? app.bodyBox : [app.bodyBox.y, app.bodyBox.x, app.bodyBox.y + app.bodyBox.height, app.bodyBox.x + app.bodyBox.width];
-        }
-        if (faceBbox || bodyBbox) break;
-      }
-    }
-    if (!faceBbox && !bodyBbox && bestEval?.matches) {
-      const charMatch = bestEval.matches.find(m =>
-        m.name?.toLowerCase() === charName.toLowerCase() ||
-        m.character?.toLowerCase() === charName.toLowerCase()
-      );
-      if (charMatch?.face_bbox) faceBbox = charMatch.face_bbox;
-      if (charMatch?.bbox) bodyBbox = charMatch.bbox;
-    }
-    if (!faceBbox && !bodyBbox) {
-      try {
-        const detection = await detectAllBoundingBoxes(currentImageData, {
-          expectedCharacters: [{ name: charName }]
-        });
-        const charFigure = detection?.figures?.find(f =>
-          f.name?.toLowerCase() === charName.toLowerCase()
-        );
-        if (charFigure) {
-          faceBbox = charFigure.faceBox || null;
-          bodyBbox = charFigure.bodyBox || null;
-        }
-      } catch (detectErr) {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${roundNum} char-fix: bbox detection failed for ${charName}: ${detectErr.message}`);
-      }
-    }
+    // Single bbox source-of-truth — same helper feeds target + protection
+    // so they can't disagree. detectAllBoundingBoxes is NOT re-called on miss;
+    // its internal safety+model retries already exhausted before storing the
+    // result, so a re-call just burns another API hit.
+    const targetResolved = resolveCharBbox(charName, {
+      bestEval, entityReport: currentEntityReport, pageNumber,
+    });
+    const faceBbox = targetResolved.faceBbox;
+    const bodyBbox = targetResolved.bodyBbox;
     if (!faceBbox && !bodyBbox) {
       return { pageNumber, imageData: null, error: `no bbox for ${charName}` };
     }
@@ -6541,16 +6586,25 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
     const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
+    // Protection list: same helper, iterated over sceneCharacters so
+    // protection draws from the same source as the target lookup. If a
+    // character has no bbox in any tier we skip them (can't protect what we
+    // can't locate) rather than abort the repair.
     const protectedFaces = [];
     const protectedBodies = [];
-    const bboxFigures = bestEval?.bboxDetection?.figures || [];
-    const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
-    for (const fig of bboxFigures) {
-      if (!fig.name || fig.name === 'UNKNOWN') continue;
-      if (fig.name.toLowerCase() === charName.toLowerCase()) continue;
-      if (fig.faceBox) protectedFaces.push(toRect(fig.faceBox));
-      if (fig.bodyBox) protectedBodies.push(toRect(fig.bodyBox));
+    const protectedNames = [];
+    const otherChars = (img.sceneCharacters || []).filter(c =>
+      c?.name && c.name.toLowerCase() !== charName.toLowerCase()
+    );
+    for (const otherChar of otherChars) {
+      const r = resolveCharBbox(otherChar.name, {
+        bestEval, entityReport: currentEntityReport, pageNumber,
+      });
+      if (r.faceBbox) protectedFaces.push(r.faceBbox);
+      if (r.bodyBbox) protectedBodies.push(r.bodyBbox);
+      if (r.faceBbox || r.bodyBbox) protectedNames.push(otherChar.name);
     }
+    log.info(`🛡️ [CHAR-FIX] Round ${roundNum} char-fix ${charName} on p${pageNumber}: target bbox source=${targetResolved.source}, protection bboxes for: ${protectedNames.length ? protectedNames.join(', ') : '(none)'}`);
 
     // Per-story clothingRequirements is the source of truth (correct for THIS
     // story); avatars.clothing is character-level metadata that persists
