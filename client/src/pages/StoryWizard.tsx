@@ -5359,7 +5359,6 @@ export default function StoryWizard() {
               } : undefined}
               // Image regeneration with credits
               userCredits={isImpersonating ? -1 : (user?.credits || 0)}
-              imageRegenerationCost={5}
               isImpersonating={isImpersonating}
               onSelectImageVersion={storyId ? async (pageNumber: number, versionIndex: number) => {
                 try {

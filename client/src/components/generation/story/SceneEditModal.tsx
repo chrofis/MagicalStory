@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshCw, Edit3, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { IMAGE_REGENERATION_COST } from '@/constants/credits';
 import type { RetryAttempt } from '@/types/story';
 
 interface CharacterOption {
@@ -50,7 +51,6 @@ interface SceneEditModalProps {
   onClose: () => void;
   onRegenerate: () => void;
   isRegenerating: boolean;
-  imageRegenerationCost: number;
   // Character selection
   characters?: CharacterOption[];
   selectedCharacterIds?: number[];
@@ -66,7 +66,6 @@ export function SceneEditModal({
   onClose,
   onRegenerate,
   isRegenerating,
-  imageRegenerationCost,
   characters = [],
   selectedCharacterIds = [],
   onCharacterSelectionChange,
@@ -337,7 +336,7 @@ export function SceneEditModal({
                 <>
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="text-xs opacity-80">({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})</span>
+                  <span className="text-xs opacity-80">({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})</span>
                 </>
               )}
             </button>

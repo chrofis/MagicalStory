@@ -15,6 +15,9 @@ export const INITIAL_USER_CREDITS = 200;
 /** Credits charged per story page (1 page = 1 scene = 1 illustration). */
 export const CREDITS_PER_PAGE = 10;
 
+/** Credits charged to regenerate a single page image. Mirrors CREDIT_COSTS.IMAGE_REGENERATION on the server. */
+export const IMAGE_REGENERATION_COST = 2;
+
 /**
  * Example story length used in marketing copy like
  * "a 20-page story uses 200 credits". Keep in sync with EXAMPLE_STORY_CREDITS.
