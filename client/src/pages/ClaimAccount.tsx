@@ -5,6 +5,7 @@ import storage from '@/services/storage';
 import { KeyRound, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGooglePopup } from '@/services/googleAuth';
+import { INITIAL_USER_CREDITS } from '@/constants/credits';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -25,7 +26,9 @@ const translations = {
     invalidDesc: 'This claim link is invalid or has expired. You can still log in to your account if you have a password set.',
     goToLogin: 'Go to Login',
     successTitle: 'Account claimed!',
-    successDesc: 'You\'re now logged in. Redirecting to your stories...',
+    successCredits: `+${INITIAL_USER_CREDITS} credits added`,
+    successCreditsDesc: 'Enough to create another full story.',
+    successRedirect: 'Redirecting to your stories…',
     error: 'Something went wrong. Please try again.',
   },
   de: {
@@ -44,7 +47,9 @@ const translations = {
     invalidDesc: 'Dieser Link ist ungültig oder abgelaufen. Du kannst dich trotzdem anmelden, wenn du ein Passwort hast.',
     goToLogin: 'Zur Anmeldung',
     successTitle: 'Konto beansprucht!',
-    successDesc: 'Du bist jetzt eingeloggt. Weiterleitung zu deinen Geschichten...',
+    successCredits: `+${INITIAL_USER_CREDITS} Credits gutgeschrieben`,
+    successCreditsDesc: 'Genug, um eine weitere vollständige Geschichte zu erstellen.',
+    successRedirect: 'Weiterleitung zu deinen Geschichten…',
     error: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
   },
   fr: {
@@ -63,8 +68,31 @@ const translations = {
     invalidDesc: 'Ce lien est invalide ou a expiré. Vous pouvez toujours vous connecter si vous avez un mot de passe.',
     goToLogin: 'Aller à la connexion',
     successTitle: 'Compte revendiqué !',
-    successDesc: 'Vous êtes maintenant connecté. Redirection vers vos histoires...',
+    successCredits: `+${INITIAL_USER_CREDITS} crédits ajoutés`,
+    successCreditsDesc: 'De quoi créer une histoire complète de plus.',
+    successRedirect: 'Redirection vers vos histoires…',
     error: 'Quelque chose s\'est mal passé. Veuillez réessayer.',
+  },
+  it: {
+    brand: 'Magical Story',
+    loading: 'Verifica del link in corso...',
+    welcomeBack: 'Bentornato',
+    setPassword: 'Imposta una password per conservare il tuo account.',
+    password: 'Nuova password',
+    confirmPassword: 'Conferma password',
+    submit: 'Imposta password e accedi',
+    passwordTooShort: 'La password deve contenere almeno 8 caratteri',
+    passwordsMismatch: 'Le password non corrispondono',
+    orGoogle: 'Oppure accedi con Google',
+    googleButton: 'Continua con Google',
+    invalidTitle: 'Link non valido o scaduto',
+    invalidDesc: 'Questo link non è valido o è scaduto. Puoi comunque accedere al tuo account se hai impostato una password.',
+    goToLogin: 'Vai al login',
+    successTitle: 'Account attivato!',
+    successCredits: `+${INITIAL_USER_CREDITS} crediti aggiunti`,
+    successCreditsDesc: 'Abbastanza per creare un\'altra storia completa.',
+    successRedirect: 'Reindirizzamento alle tue storie…',
+    error: 'Qualcosa è andato storto. Riprova.',
   },
 };
 
@@ -265,14 +293,18 @@ export default function ClaimAccount() {
             </div>
           )}
 
-          {/* Success */}
+          {/* Success — celebrate the credit grant so the user knows what they got */}
           {pageState === 'success' && (
             <div className="text-center py-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.successTitle}</h2>
-              <p className="text-gray-500">{t.successDesc}</p>
+              <h2 className="text-2xl font-bold text-gray-800 mb-3">{t.successTitle}</h2>
+              <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-full px-4 py-2 mb-3">
+                <span className="text-amber-700 font-bold text-base">🎁 {t.successCredits}</span>
+              </div>
+              <p className="text-gray-700 text-sm mb-1">{t.successCreditsDesc}</p>
+              <p className="text-gray-400 text-xs">{t.successRedirect}</p>
             </div>
           )}
 

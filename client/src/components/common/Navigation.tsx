@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Sparkles, Loader2 } from 'lucide-react';
+import { Menu, Sparkles, Loader2, Coins } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
@@ -35,6 +36,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
+  const { isAuthenticated, user, isImpersonating } = useAuth();
   const generation = useGenerationOptional();
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -203,6 +205,28 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
               </span>
             </button>
           )}
+
+          {/* Credit balance pill — always visible for signed-in users so they
+              never lose sight of their balance. Click → buy-credits modal. */}
+          {isAuthenticated && user && (() => {
+            const credits = user.credits ?? 0;
+            const unlimited = user.credits === -1 || isImpersonating;
+            const pillClass =
+              unlimited      ? 'bg-indigo-500 hover:bg-indigo-600 text-white' :
+              credits === 0  ? 'bg-red-600 hover:bg-red-700 text-white' :
+              credits < 50   ? 'bg-yellow-600 hover:bg-yellow-700 text-white' :
+                               'bg-green-600 hover:bg-green-700 text-white';
+            return (
+              <button
+                onClick={() => setShowCreditsModal(true)}
+                className={`${pillClass} px-2.5 py-1.5 md:px-3 rounded text-xs font-semibold flex items-center gap-1.5 flex-shrink-0`}
+                title={language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : language === 'it' ? 'Acquista crediti' : 'Buy credits'}
+              >
+                <Coins size={14} className="flex-shrink-0" />
+                <span>{unlimited ? '∞' : credits}</span>
+              </button>
+            );
+          })()}
 
           {/* Menu Button */}
           <div className="relative" ref={menuRef}>

@@ -303,17 +303,24 @@ router.post('/google', authLimiter, async (req, res) => {
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
     const userId = crypto.randomUUID();
 
+    // Use the single source of truth for the welcome-credit amount. Google
+    // paths previously hardcoded 500 while email signup uses
+    // CREDIT_CONFIG.LIMITS.INITIAL_USER (200). Same Google click giving more
+    // credits than email was a give-away inconsistency; unifying on 200.
+    const { CREDIT_CONFIG: _ccfg } = require('../config/credits');
+    const _googleWelcomeCredits = _ccfg.LIMITS.INITIAL_USER;
+
     const result = await dbQuery(
       `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
        VALUES ($1, $2, $3, $4,
          CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
          CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
          0,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END,
          TRUE)
        ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
        RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, googleEmail, hashedPassword]
+      [userId, username, googleEmail, hashedPassword, _googleWelcomeCredits]
     );
     const user = result[0];
     const isNewUser = user.is_new_user;
@@ -520,17 +527,24 @@ router.get('/google/callback', authLimiter, async (req, res) => {
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
     const userId = crypto.randomUUID();
 
+    // Use the single source of truth for the welcome-credit amount. Google
+    // paths previously hardcoded 500 while email signup uses
+    // CREDIT_CONFIG.LIMITS.INITIAL_USER (200). Same Google click giving more
+    // credits than email was a give-away inconsistency; unifying on 200.
+    const { CREDIT_CONFIG: _ccfg } = require('../config/credits');
+    const _googleWelcomeCredits = _ccfg.LIMITS.INITIAL_USER;
+
     const result = await dbQuery(
       `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
        VALUES ($1, $2, $3, $4,
          CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
          CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
          0,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 500 END,
+         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END,
          TRUE)
        ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
        RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, googleEmail, hashedPassword]
+      [userId, username, googleEmail, hashedPassword, _googleWelcomeCredits]
     );
     const user = result[0];
     const isNewUser = user.is_new_user;
