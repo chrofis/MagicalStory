@@ -5674,15 +5674,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     (c.name || '').toLowerCase(),
                     c.clothing || null,
                   ]));
-                  // Story-level clothingRequirements (Sonnet's outline outfits).
-                  // The fallback on pageData.sceneMetadata was always null —
-                  // clothingRequirements lives on storyData, not on per-page
-                  // metadata. Empty clothingReqs caused resolveClothingForPage
-                  // to fall back to the character record's base outfit, which
-                  // leaked default clothing (Hans's plaid + suspenders) into
-                  // the scale-repair prompt's "Wearing:" line.
-                  const clothingReqs = clothingRequirements
-                    || pageData.sceneMetadata?.fullData?.clothingRequirements
+                  const clothingReqs = pageData.sceneMetadata?.fullData?.clothingRequirements
                     || pageData.sceneMetadata?.clothingRequirements
                     || null;
                   const bgDescriptions = bgCharObjs.map(c => {
