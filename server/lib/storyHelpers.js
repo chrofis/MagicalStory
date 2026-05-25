@@ -4567,30 +4567,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       });
     }
 
-    // Clothing + heights are the load-bearing per-character signals.
-    // We used to also emit "**CHARACTER REFERENCE PHOTOS:** [Noah], [Hans],
-    // [Emma] — EXACTLY 3 characters, no more" but both halves were wrong:
-    //   - the [Name] listing duplicates the labels already burned into each
-    //     attached portrait,
-    //   - the strict "EXACTLY N, no more" guard suppressed legitimate
-    //     background figures (crowds, soldiers, secondary VB characters,
-    //     passersby) that the scene description explicitly called for.
-    // The named cast is governed by the scene prose; the attached portraits
-    // tell Grok who's who. We just need to anchor what the named characters
-    // wear and how tall they are relative to each other.
-    const clothingLines = sceneCharacters
-      .map(c => {
-        const desc = clothingMap[c.name?.toLowerCase()];
-        return desc ? `- ${c.name}: ${desc}` : null;
-      })
-      .filter(Boolean);
-
+    // Heights are the only per-character signal we still emit as a dedicated
+    // block. The dedicated "Clothing for each named character" list used to
+    // sit here too — ~150 chars per character × 5 chars = 750 chars of
+    // duplicate. The labeled portrait references (post-cell-crop) already
+    // show each character wearing the outline outfit, AND the scene prose
+    // names the clothing category per character. Removed to free room for
+    // the prose (smoke #7 page 4 came in at 8236 chars vs Grok's 7500
+    // limit; truncation chopped EXACT POSES). Kept the per-character
+    // clothing text in img.allCharacterPhotos so the eval prompt (which
+    // does NOT have the labeled portraits attached) still receives it via
+    // the CHARACTER CLOTHING REFERENCE block built in images.js.
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
-
-    if (clothingLines.length > 0) {
-      characterReferenceList += `\n**Clothing for each named character (must match the attached labeled portrait):**\n${clothingLines.join('\n')}\n`;
-    }
-
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;
       log.debug(`[IMAGE PROMPT] Added relative heights: ${heightDescription}`);
