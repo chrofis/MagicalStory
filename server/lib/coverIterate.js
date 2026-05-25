@@ -532,7 +532,7 @@ async function buildCoverReferences({
         });
         log.info(`🔗 [COVER-REFS] ${label}: using curated photo from ${loc.id} (${loc.name}) — not a real landmark but has a usable photo`);
       } else {
-        log.warn(`⚠️ [COVER-REFS] ${label}: outline picked ${loc.id} (${loc.name}) but no photo available`);
+        log.info(`🔗 [COVER-REFS] ${label}: invented location ${loc.id} (${loc.name}) — composite path skipped, using normal generation`);
       }
     }
     if (matchedLocs.length > 0) {

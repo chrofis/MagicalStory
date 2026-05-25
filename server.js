@@ -3387,9 +3387,58 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Build per-character clothing requirements from hint.characterClothing
         // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
+        // Prose Hint: line is no longer emitted by Sonnet (covers are now a
+        // STRUCTURED render spec per prompts/story-unified.txt §COVER SCENE
+        // HINTS). Compose a scene description from the structured fields
+        // (mood + characters with position/holds/gazes + first LOC backdrop).
+        // Falls back to the legacy generic boilerplate only when the
+        // structured fields are also missing (legacy stories or parser miss).
         let sceneDescription = hint.hint || hint.scene || '';
+        if (!sceneDescription || sceneDescription.length < 20) {
+          const vb = streamingVisualBible || {};
+          const vbList = (kind) => Array.isArray(vb[kind]) ? vb[kind] : [];
+          const resolveId = (id) => {
+            const upper = String(id || '').toUpperCase();
+            const all = [...vbList('locations'), ...vbList('artifacts'), ...vbList('characters'), ...vbList('animals'), ...vbList('vehicles')];
+            return all.find(e => (e?.id || '').toUpperCase() === upper) || null;
+          };
+          const objects = Array.isArray(hint.objects) ? hint.objects : [];
+          const backdropId = objects.find(id => /^LOC\d+/i.test(id || ''));
+          const backdrop = backdropId ? resolveId(backdropId) : null;
+          const details = hint.characterDetails || {};
+          const charLines = (hint.characters || []).map(rawName => {
+            const baseName = String(rawName).replace(/\s*\([^)]*\)\s*$/, '').trim();
+            const d = details[baseName] || {};
+            const pos = d.position ? ` (${d.position})` : '';
+            const holdsRaw = (d.holds || '').toString().trim();
+            let holdsPhrase = '';
+            if (holdsRaw && !['nothing', 'none', '-'].includes(holdsRaw.toLowerCase())) {
+              const holdsArt = holdsRaw.match(/(LOC|ART|ANI|VEH|CHR|CLO)\d+/i);
+              const holdsName = holdsArt ? (resolveId(holdsArt[0])?.name || holdsRaw) : holdsRaw;
+              holdsPhrase = ` holding ${holdsName}`;
+            }
+            const gazes = (d.gazesAt || '').toString().trim();
+            let gazePhrase = '';
+            if (gazes) {
+              const gazeArt = gazes.match(/(LOC|ART|ANI|VEH|CHR|CLO)\d+/i);
+              const gazeTarget = gazeArt ? (resolveId(gazeArt[0])?.name || gazes) : gazes;
+              gazePhrase = `, gazing at ${gazeTarget}`;
+            }
+            return `${baseName}${pos}${holdsPhrase}${gazePhrase}`;
+          }).filter(Boolean);
+          if (charLines.length > 0) {
+            const moodPhrase = hint.mood ? `, ${hint.mood} mood` : '';
+            const backdropPhrase = backdrop
+              ? ` at ${backdrop.name}${backdrop.description ? ` (${backdrop.description})` : ''}`
+              : '';
+            sceneDescription = `Cover scene${backdropPhrase}${moodPhrase}. ${charLines.join('. ')}.`;
+            log.debug(`📕 [COVER] ${coverType}: Composed scene from structured hint (${sceneDescription.length} chars, ${charLines.length} chars, backdrop=${backdrop?.id || 'none'})`);
+          }
+        }
 
-        // Fallback: If scene description is empty or too short, generate a meaningful one
+        // Last-resort fallback: structured fields were also empty (legacy
+        // stories pre-structured-hints, or parser miss). Emit the generic
+        // boilerplate so the cover render doesn't fail outright.
         if (!sceneDescription || sceneDescription.length < 20) {
           const mainCharNames = inputData.characters
             .filter(c => c.isMainCharacter)
@@ -3404,7 +3453,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           } else {
             sceneDescription = `A satisfying conclusion scene showing ${mainCharNames} after their ${theme} adventure. They look happy and content, with visual elements reflecting how the story ended.`;
           }
-          log.debug(`📕 [COVER] ${coverType}: Using fallback scene description (hint was empty)`);
+          log.warn(`📕 [COVER] ${coverType}: structured hint composer produced nothing — using generic boilerplate fallback`);
         }
 
         // Inject explicit per-character holdings from the outline `holds` annotations.
