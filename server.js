@@ -254,7 +254,8 @@ const {
   getPageText,
   updatePageText,
   resolveArtStyle,
-  enforceSpreadTextPosition
+  enforceSpreadTextPosition,
+  buildSceneClothingRequirements,
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
@@ -4850,32 +4851,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         const defaultClothing = 'standard';
-        // Shallow spread shares nested character objects with clothingRequirements.
-        // We MUST clone the inner entry before assigning _currentClothing —
-        // otherwise the per-scene value leaks into storyData.clothingRequirements
-        // and sticks around for every subsequent page and iterate call.
-        const sceneClothingRequirements = { ...clothingRequirements };
-        for (const char of sceneCharacters) {
-          const charNameTrimmed = char.name.trim().toLowerCase();
-          // Per-scene clothing from Claude's hint or Art Director expansion
-          let charClothing = Object.entries(perCharClothing).find(
-            ([name]) => name.trim().toLowerCase() === charNameTrimmed
-          )?.[1];
-          // Fallback: if not in per-scene data, check global clothingRequirements for a costumed variant
-          if (!charClothing) {
-            const globalReqs = clothingRequirements?.[char.name] || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
-            if (globalReqs?.costumed?.used) {
-              charClothing = 'costumed';
-              log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed (${globalReqs.costumed.costume || 'unnamed'})`);
-            } else {
-              charClothing = defaultClothing;
-            }
-          }
-          sceneClothingRequirements[char.name] = {
-            ...(sceneClothingRequirements[char.name] || {}),
-            _currentClothing: charClothing
-          };
-        }
+        const sceneClothingRequirements = buildSceneClothingRequirements(
+          sceneCharacters,
+          perCharClothing,
+          clothingRequirements
+        );
         let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, inputData.artStyle, sceneClothingRequirements);
         // applyStyledAvatars now skips costumed-* entries internally (see
         // styledAvatars.js), so it's safe to call on a mixed-clothing scene.
@@ -5674,9 +5654,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     (c.name || '').toLowerCase(),
                     c.clothing || null,
                   ]));
-                  const clothingReqs = pageData.sceneMetadata?.fullData?.clothingRequirements
-                    || pageData.sceneMetadata?.clothingRequirements
-                    || null;
+                  // Same per-page resolved view the page-gen path builds —
+                  // story-level clothingRequirements (full outfit descriptions
+                  // per category) merged with this page's per-character
+                  // category labels (`perCharClothing`). Story-level alone
+                  // doesn't know which category each character wears on this
+                  // page (standard / costumed / etc.), so resolveClothingForPage
+                  // can't pick the right description without `_currentClothing`.
+                  const clothingReqs = buildSceneClothingRequirements(
+                    pageData.sceneCharacters || [],
+                    pageData.perCharClothing || {},
+                    clothingRequirements
+                  );
                   const bgDescriptions = bgCharObjs.map(c => {
                     const label = clothingByName.get((c.name || '').toLowerCase()) || null;
                     const override = helpers.resolveClothingForPage(c, label, clothingReqs);

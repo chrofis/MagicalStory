@@ -3065,6 +3065,60 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  *                                             from the unified outline pass
  * @returns {string|null} resolved clothing text, or null when nothing applies
  */
+/**
+ * Build the per-page resolved view of clothingRequirements. Single source of
+ * truth for "what is each character wearing on THIS page" — used by page
+ * generation, scale-repair, and any other path that needs the per-page outfit.
+ *
+ * Story-level `clothingRequirements` holds the FULL outfit description per
+ * (character, category). Per-page `perCharClothing` holds the CATEGORY label
+ * for each character on this page. This function combines them: shallow-clones
+ * the story-level requirements, then stamps `_currentClothing: <category>` on
+ * each scene character's entry so downstream `resolveClothingForPage(char,
+ * label, sceneClothingRequirements)` can pick the right description (handling
+ * per-page outfit swaps like a character starting in standard and switching
+ * to costumed mid-story).
+ *
+ * Fallback when a scene character has no per-page entry: use the character's
+ * `costumed.used: true` variant if present (story is fully costumed), else
+ * default to 'standard'.
+ *
+ * Shallow-clones the inner entry before stamping `_currentClothing` so the
+ * story-level `clothingRequirements` is not mutated.
+ *
+ * @param {Array<{name: string}>} sceneCharacters - chars present in this page
+ * @param {Object} perCharClothing - per-page category map (e.g. { Hans: 'standard' })
+ * @param {Object} clothingRequirements - story-level requirements blob
+ * @returns {Object} sceneClothingRequirements with _currentClothing per char
+ */
+function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothingRequirements) {
+  const out = { ...(clothingRequirements || {}) };
+  const defaultClothing = 'standard';
+  const perChar = perCharClothing || {};
+  for (const char of (sceneCharacters || [])) {
+    if (!char?.name) continue;
+    const charNameTrimmed = char.name.trim().toLowerCase();
+    let charClothing = Object.entries(perChar).find(
+      ([name]) => name.trim().toLowerCase() === charNameTrimmed
+    )?.[1];
+    if (!charClothing) {
+      const globalReqs = clothingRequirements?.[char.name]
+        || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
+      if (globalReqs?.costumed?.used) {
+        charClothing = 'costumed';
+        log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed (${globalReqs.costumed.costume || 'unnamed'})`);
+      } else {
+        charClothing = defaultClothing;
+      }
+    }
+    out[char.name] = {
+      ...(out[char.name] || {}),
+      _currentClothing: charClothing,
+    };
+  }
+  return out;
+}
+
 function resolveClothingForPage(char, clothingLabel, clothingRequirements = null) {
   if (!char) return null;
   const avatars = char.avatars || char.clothingAvatars || {};
@@ -5858,6 +5912,7 @@ module.exports = {
   prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
   resolveClothingForPage,
+  buildSceneClothingRequirements,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
