@@ -6,6 +6,7 @@ import { signInWithGooglePopup } from '@/services/googleAuth';
 import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
+import { trackEmailLead } from '@/utils/gtagConversion';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -442,6 +443,7 @@ export default function TrialGenerationPage() {
       }
 
       setEmailLinked(true);
+      trackEmailLead();
     } catch {
       setAuthError(t.error);
     } finally {
