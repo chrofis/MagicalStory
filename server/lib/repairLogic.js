@@ -179,6 +179,21 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
   }
 
+  // 1b. Structurally broken base — iterate, never char-fix.
+  // Char-fix repaints a region of the input image; if the input is
+  // structurally broken (extra figure invented, wrong character, scene
+  // composition collapsed), repainting a region won't recover it and
+  // can erase other characters in the process. The finalScore captures
+  // overall image health (visual − semantic-penalty − entity-penalty),
+  // unclamped. Below 20 means the base is broken enough that any
+  // patch-repair attempt is wasted budget.
+  const finalScore = (typeof evaluator.finalScore === 'number')
+    ? evaluator.finalScore
+    : (typeof evaluator.qualityScore === 'number' ? evaluator.qualityScore - (Number(evaluator.entityPenalty) || 0) : null);
+  if (typeof finalScore === 'number' && finalScore < 20) {
+    return { method: 'iterate', reason: `base too broken for patch-repair (final=${finalScore})` };
+  }
+
   // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
